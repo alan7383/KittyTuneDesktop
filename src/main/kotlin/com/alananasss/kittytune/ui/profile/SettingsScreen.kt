@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -70,6 +71,13 @@ fun SettingsScreen(
                     onClick = { selectedCategory = "local" },
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
+                NavigationDrawerItem(
+                    label = { Text(str("pref_updates_title")) },
+                    icon = { Icon(Icons.Rounded.SystemUpdate, null) },
+                    selected = selectedCategory == "update",
+                    onClick = { selectedCategory = "update" },
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
             }
         }
 
@@ -83,6 +91,76 @@ fun SettingsScreen(
                 "lyrics" -> LyricsSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
                 "discord" -> DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel)
                 "local" -> LocalMediaSettingsScreen(onBackClick = null)
+                "update" -> AboutUpdateSettingsScreen()
+            }
+        }
+    }
+}
+
+@Composable
+fun AboutUpdateSettingsScreen() {
+    val status by com.alananasss.kittytune.data.UpdateManager.status.collectAsState()
+    val progress by com.alananasss.kittytune.data.UpdateManager.downloadProgress.collectAsState()
+    val releaseInfo = com.alananasss.kittytune.data.UpdateManager.releaseInfo
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(str("update_about_title"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Text(str("update_current_version", com.alananasss.kittytune.BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyLarge)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                when (status) {
+                    com.alananasss.kittytune.data.UpdateStatus.IDLE -> {
+                        Text(str("update_idle_desc"))
+                        Button(onClick = { scope.launch { com.alananasss.kittytune.data.UpdateManager.checkForUpdate(isManual = true) } }) {
+                            Text(str("update_btn_check"))
+                        }
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.CHECKING -> {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            Text(str("update_checking"))
+                        }
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.AVAILABLE -> {
+                        Text(str("update_available", releaseInfo?.tagName ?: ""), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        if (!releaseInfo?.body.isNullOrEmpty()) {
+                            Text("${str("update_release_notes")}\n${releaseInfo?.body}", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Button(onClick = { scope.launch { com.alananasss.kittytune.data.UpdateManager.downloadUpdate() } }) {
+                            Text(str("update_btn_download"))
+                        }
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING -> {
+                        Text(str("update_downloading", (progress * 100).toInt()))
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL -> {
+                        Text(str("update_ready"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Button(onClick = { com.alananasss.kittytune.data.UpdateManager.installUpdate() }) {
+                            Text(str("update_btn_install"))
+                        }
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.NO_UPDATE -> {
+                        Text(str("update_no_update"), color = MaterialTheme.colorScheme.primary)
+                        OutlinedButton(onClick = { scope.launch { com.alananasss.kittytune.data.UpdateManager.checkForUpdate(isManual = true) } }) {
+                            Text(str("update_btn_recheck"))
+                        }
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.ERROR -> {
+                        Text(str("update_error"), color = MaterialTheme.colorScheme.error)
+                        Button(onClick = { scope.launch { com.alananasss.kittytune.data.UpdateManager.checkForUpdate(isManual = true) } }) {
+                            Text(str("update_btn_retry"))
+                        }
+                    }
+                }
             }
         }
     }

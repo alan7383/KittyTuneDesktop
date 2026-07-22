@@ -2,6 +2,7 @@ package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.NamedPrefs
+import com.alananasss.kittytune.data.network.GithubAsset
 import com.alananasss.kittytune.data.network.GithubClient
 import com.alananasss.kittytune.data.network.GithubRelease
 import com.alananasss.kittytune.utils.AppUtils
@@ -74,11 +75,38 @@ object UpdateManager {
         }
     }
 
+    fun findMatchingAsset(): GithubAsset? {
+        val assets = releaseInfo?.assets ?: return null
+        val osName = System.getProperty("os.name", "").lowercase()
+        val osArch = System.getProperty("os.arch", "").lowercase()
+        val isArm = osArch.contains("arm") || osArch.contains("aarch64")
+
+        return when {
+            osName.contains("win") -> {
+                assets.find { it.name.contains("Setup", ignoreCase = true) && it.name.endsWith(".exe", ignoreCase = true) }
+                    ?: assets.find { it.name.endsWith(".exe", ignoreCase = true) }
+                    ?: assets.find { it.name.endsWith(".msi", ignoreCase = true) }
+            }
+            osName.contains("mac") -> {
+                assets.find { it.name.endsWith(".dmg", ignoreCase = true) }
+            }
+            osName.contains("nux") || osName.contains("nix") -> {
+                val debArch = if (isArm) "arm64" else "amd64"
+                val rpmArch = if (isArm) "aarch64" else "x86_64"
+
+                assets.find { it.name.endsWith(".deb", ignoreCase = true) && it.name.contains(debArch, ignoreCase = true) }
+                    ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) && it.name.contains(rpmArch, ignoreCase = true) }
+                    ?: assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && it.name.contains(rpmArch, ignoreCase = true) }
+                    ?: assets.find { it.name.endsWith(".AppImage", ignoreCase = true) }
+                    ?: assets.find { it.name.endsWith(".deb", ignoreCase = true) }
+                    ?: assets.firstOrNull()
+            }
+            else -> assets.firstOrNull()
+        }
+    }
+
     suspend fun downloadUpdate() {
-        // Prefer the Windows installer asset over the Android APK.
-        val asset = releaseInfo?.assets?.find {
-            it.name.endsWith(".msi", ignoreCase = true) || it.name.endsWith(".exe", ignoreCase = true)
-        } ?: releaseInfo?.assets?.find { it.name.endsWith(".apk", ignoreCase = true) }
+        val asset = findMatchingAsset()
 
         if (asset == null) {
             _status.value = UpdateStatus.ERROR
@@ -113,8 +141,8 @@ object UpdateManager {
 
                 val body = response.body ?: throw Exception("Empty response body")
                 val totalSize = body.contentLength()
-                val ext = asset.name.substringAfterLast('.', "msi")
-                val file = File(AppDirs.cacheDir, "update.$ext")
+                val ext = asset.name.substringAfterLast('.', "installer")
+                val file = File(AppDirs.cacheDir, "update_$ext.${asset.name.substringAfterLast('.', "bin")}")
                 if (file.exists()) file.delete()
 
                 body.byteStream().use { input ->
@@ -144,14 +172,35 @@ object UpdateManager {
         }
     }
 
-    /** Launch the downloaded installer (Windows will elevate as needed) and exit. */
+    /** Launch the downloaded installer according to the OS. */
     fun installUpdate() {
         val file = downloadedInstallerFile ?: return
         try {
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().open(file)
-            } else {
-                ProcessBuilder("cmd", "/c", "start", "", file.absolutePath).start()
+            val osName = System.getProperty("os.name", "").lowercase()
+            when {
+                osName.contains("win") -> {
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().open(file)
+                    } else {
+                        ProcessBuilder("cmd", "/c", "start", "", file.absolutePath).start()
+                    }
+                }
+                osName.contains("nux") || osName.contains("nix") -> {
+                    if (file.name.endsWith(".AppImage", ignoreCase = true)) {
+                        file.setExecutable(true)
+                        ProcessBuilder(file.absolutePath).start()
+                    } else {
+                        ProcessBuilder("xdg-open", file.absolutePath).start()
+                    }
+                }
+                osName.contains("mac") -> {
+                    ProcessBuilder("open", file.absolutePath).start()
+                }
+                else -> {
+                    if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().open(file)
+                    }
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()

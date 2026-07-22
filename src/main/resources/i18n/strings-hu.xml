@@ -2077,6 +2077,24 @@
     <string name="audio_source_header">Hangrögzítés forrása</string>
     <string name="audio_source_desktop">Asztali hang (Számítógép hangja)</string>
     <string name="audio_source_desktop_tag">Asztali hang</string>
+
+    <!-- Updates & About -->
+    <string name="pref_updates_title">Frissítések</string>
+    <string name="update_about_title">Névjegy és Frissítések</string>
+    <string name="update_current_version">Jelenlegi verzió: v%1$s</string>
+    <string name="update_idle_desc">Ellenőrizze, hogy elérhető-e új verzió.</string>
+    <string name="update_btn_check">Frissítések keresése</string>
+    <string name="update_checking">Frissítések keresése folyamatban…</string>
+    <string name="update_available">Új verzió (%1$s) érhető el!</string>
+    <string name="update_release_notes">Kiadási megjegyzések:</string>
+    <string name="update_btn_download">Frissítés letöltése</string>
+    <string name="update_downloading">Frissítés letöltése (%1$d%%)…</string>
+    <string name="update_ready">A frissítés készen áll a telepítésre!</string>
+    <string name="update_btn_install">Telepítő indítása és Bezárás</string>
+    <string name="update_no_update">A KittyTune legújabb verzióját használja!</string>
+    <string name="update_btn_recheck">Újraellenőrzés</string>
+    <string name="update_error">Nem sikerült a frissítést ellenőrizni vagy letölteni.</string>
+    <string name="update_btn_retry">Újra</string>
 </resources>
 
 
