@@ -73,6 +73,10 @@ compose.desktop {
     application {
         mainClass = "com.alananasss.kittytune.MainKt"
 
+        buildTypes.release.proguard {
+            isEnabled.set(false)
+        }
+
         nativeDistributions {
             targetFormats(
                 TargetFormat.Dmg,
@@ -84,10 +88,21 @@ compose.desktop {
             )
             packageName = "KittyTune"
             packageVersion = "1.0.0"
+            description = "KittyTuneDesktop"
+            copyright = "© 2026 KittyTune. All rights reserved."
+            vendor = "KittyTune"
+
+            windows {
+                shortcut = true
+                menu = true
+                upgradeUuid = "6f8d30e5-7971-4a7b-a19c-49fb1e5b1234"
+            }
 
             linux {
                 shortcut = true
+                menuGroup = "AudioVideo"
                 appCategory = "AudioVideo"
+                packageName = "kitty-tune"
             }
         }
     }
