@@ -107,7 +107,7 @@
     <string name="welcome_title">Welcome to\nKittyTune</string>
 
     <string name="welcome_subtitle">Discover, stream, and download without limits</string>
-    <string name="welcome_sync_hint">Want mobile ↔ PC sync? Log in with SoundCloud and your likes, playlists and library stay perfectly in sync across all your devices!</string>
+    <string name="welcome_sync_hint">Log in with SoundCloud to sync your likes, playlists and library across all your devices!</string>
 
 
 

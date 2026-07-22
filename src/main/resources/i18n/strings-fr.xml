@@ -89,7 +89,7 @@
     <string name="welcome_title">Bienvenue sur\nKittyTune</string>
 
     <string name="welcome_subtitle">Découvrez, streamez et téléchargez sans limite</string>
-    <string name="welcome_sync_hint">Envie d\'une synchro mobile ↔ PC ? Connecte-toi à SoundCloud et tes likes, playlists et ta bibliothèque restent parfaitement synchronisés entre chaque appareil !</string>
+    <string name="welcome_sync_hint">Connecte-toi à SoundCloud pour synchroniser tes likes, playlists et ta bibliothèque entre tous tes appareils !</string>
 
     <string name="login_title">Connexion SoundCloud</string>
 

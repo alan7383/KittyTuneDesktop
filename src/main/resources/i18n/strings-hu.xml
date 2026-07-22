@@ -89,7 +89,7 @@
     <string name="welcome_title">Üdvözöl a\nKittyTune</string>
 
     <string name="welcome_subtitle">Fedezd fel, streameld és töltsd le kedvenceidet korlátlanul</string>
-    <string name="welcome_sync_hint">Mobil ↔ PC szinkronizálást szeretnél? Jelentkezz be a SoundCloud-fiókoddal, és a kedvenceid, lejátszási listáid és a könyvtárad tökéletesen szinkronban maradnak minden eszközödön!</string>
+    <string name="welcome_sync_hint">Jelentkezz be a SoundCloud-fiókoddal, és a kedvenceid, lejátszási listáid és a könyvtárad szinkronban maradnak minden eszközödön!</string>
 
     <string name="login_title">SoundCloud Belépés</string>
 

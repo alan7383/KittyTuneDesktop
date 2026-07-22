@@ -51,7 +51,6 @@ import org.json.JSONObject
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.net.URLEncoder
-import java.awt.Desktop
 import java.net.URI
 import com.sun.net.httpserver.HttpServer
 import java.net.InetSocketAddress
@@ -97,8 +96,9 @@ fun LoginScreen(
 
     var hasLaunchedBrowser by rememberSaveable { mutableStateOf(false) }
 
+    val os = remember { System.getProperty("os.name").lowercase() }
+
     DisposableEffect(Unit) {
-        // Start localhost server to receive the POST from PowerShell on a random free port
         val server = try {
             HttpServer.create(InetSocketAddress(0), 0)
         } catch (e: Exception) {
@@ -108,46 +108,83 @@ fun LoginScreen(
 
         if (server != null) {
             val port = server.address.port
-            try {
-                if (System.getProperty("os.name").contains("Windows", ignoreCase = true)) {
+
+            if (os.contains("windows")) {
+                try {
                     val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
                     if (!appDir.exists()) appDir.mkdirs()
-                    
+
                     val batFile = java.io.File(appDir, "sc_handler.bat")
                     batFile.writeText("@echo off\r\npowershell.exe -WindowStyle Hidden -Command \"Invoke-RestMethod -Uri 'http://localhost:$port/callback' -Method Post -Body '%1'\"")
-                    
+
                     val cmd1 = arrayOf("REG", "ADD", "HKCU\\Software\\Classes\\sc", "/ve", "/d", "URL:sc Protocol", "/f")
                     val cmd2 = arrayOf("REG", "ADD", "HKCU\\Software\\Classes\\sc", "/v", "URL Protocol", "/d", "", "/f")
-                    
+
                     val handlerCmd = "\"${batFile.absolutePath}\" \"%1\""
                     val cmd3 = arrayOf("REG", "ADD", "HKCU\\Software\\Classes\\sc\\shell\\open\\command", "/ve", "/d", handlerCmd, "/f")
-                    
+
                     Runtime.getRuntime().exec(cmd1).waitFor()
                     Runtime.getRuntime().exec(cmd2).waitFor()
                     Runtime.getRuntime().exec(cmd3).waitFor()
+                } catch (e: Exception) {
+                    println("Failed to register Windows protocol: ${e.message}")
                 }
-            } catch (e: Exception) {
-                println("Failed to register protocol: ${e.message}")
+            } else if (os.contains("linux")) {
+                try {
+                    val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
+                    if (!appDir.exists()) appDir.mkdirs()
+
+                    val shellFile = java.io.File(appDir, "sc_handler.sh")
+                    shellFile.writeText(buildString {
+                        append("#!/bin/bash\n")
+                        append("# Only forward the OAuth redirect (contains code= param).\n")
+                        append("# SoundCloud's deep-link check sends sc://auth without code=\n")
+                        append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
+                        append("if [[ \"\$1\" == *\"code=\"* ]]; then\n")
+                        append("  curl -s -X POST 'http://localhost:$port/callback' -d \"\$1\"\n")
+                        append("fi\n")
+                    })
+                    shellFile.setExecutable(true)
+
+                    val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")
+                    mimeDir.mkdirs()
+                    val targetDesktop = java.io.File(mimeDir, "kittytune-sc.desktop")
+                    targetDesktop.writeText(buildString {
+                        append("[Desktop Entry]\n")
+                        append("Name=KittyTune SC Auth\n")
+                        append("Exec=${shellFile.absolutePath} %u\n")
+                        append("Type=Application\n")
+                        append("NoDisplay=true\n")
+                        append("MimeType=x-scheme-handler/sc;\n")
+                        append("Terminal=false\n")
+                    })
+
+                    Runtime.getRuntime().exec(arrayOf("xdg-mime", "default", "kittytune-sc.desktop", "x-scheme-handler/sc")).waitFor()
+                    Runtime.getRuntime().exec(arrayOf("update-desktop-database", mimeDir.absolutePath)).waitFor()
+                } catch (e: Exception) {
+                    println("Failed to register Linux protocol: ${e.message}")
+                }
             }
 
             server.apply {
                 createContext("/callback") { exchange ->
-                    if (exchange.requestMethod.equals("POST", ignoreCase = true)) {
-                        val body = String(exchange.requestBody.readBytes())
-                        val code = extractCodeFromUrl(body)
-                        val returnedState = extractStateFromUrl(body)
-                        if (code != null && returnedState == authState) {
-                            AuthFlowManager.setAuthCode(code)
-                        } else if (code != null) {
-                            println("State mismatch! Expected $authState but got $returnedState")
-                        }
-                        val response = "Authentification reussie ! Vous pouvez fermer cette page."
-                        exchange.sendResponseHeaders(200, response.toByteArray(Charsets.UTF_8).size.toLong())
-                        exchange.responseBody.write(response.toByteArray(Charsets.UTF_8))
-                        exchange.responseBody.close()
-                    } else {
-                        exchange.sendResponseHeaders(405, -1)
+                    val url = when (exchange.requestMethod.uppercase()) {
+                        "GET" -> exchange.requestURI.toString()
+                        "POST" -> String(exchange.requestBody.readBytes())
+                        else -> { exchange.sendResponseHeaders(405, -1); return@createContext }
                     }
+
+                    val code = extractCodeFromUrl(url)
+                    val returnedState = extractStateFromUrl(url)
+                    if (code != null && returnedState == authState) {
+                        AuthFlowManager.setAuthCode(code)
+                    } else if (code != null) {
+                        println("State mismatch! Expected $authState but got $returnedState")
+                    }
+                    val response = "Authentification reussie ! Vous pouvez fermer cette page."
+                    exchange.sendResponseHeaders(200, response.toByteArray(Charsets.UTF_8).size.toLong())
+                    exchange.responseBody.write(response.toByteArray(Charsets.UTF_8))
+                    exchange.responseBody.close()
                 }
                 executor = null
                 start()
@@ -230,17 +267,13 @@ fun LoginScreen(
                 if (isLoading) {
                     Text(
                         text = str("login_auth_in_progress"),
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Text(
                         text = str("login_waiting_browser"),
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = str("login_no_browser_hint"),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -312,11 +345,7 @@ private fun buildAuthUrl(
 }
 
 private fun launchSoundCloudAuth(authUrl: String) {
-    try {
-        Desktop.getDesktop().browse(URI(authUrl))
-    } catch (e: Exception) {
-        println("Could not launch browser: ${e.message}")
-    }
+    com.alananasss.kittytune.core.openUrl(authUrl)
 }
 
 private fun exchangeCodeForTokens(
@@ -396,4 +425,3 @@ private fun String?.cleanOAuthValue(): String? = this
     ?.trim()
     ?.trim('"')
     ?.takeIf { it.isNotBlank() && it != "null" }
-

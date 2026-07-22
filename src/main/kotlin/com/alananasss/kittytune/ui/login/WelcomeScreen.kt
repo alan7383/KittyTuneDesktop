@@ -1,100 +1,68 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.login
 
-import androidx.compose.material3.ButtonDefaults
-
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alananasss.kittytune.core.str
+
 @Composable
 fun WelcomeScreen(
     onLoginClick: () -> Unit,
     onGuestClick: () -> Unit,
     isGuestLoading: Boolean
 ) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentAlignment = Alignment.Center
-        ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 8.dp,
-                shadowElevation = 12.dp,
-                modifier = Modifier
-                    .width(420.dp)
-                    .padding(24.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(40.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(32.dp)
-                ) {
-                    WelcomeHeader()
-
-                    WelcomeButtons(
-                        onLoginClick = onLoginClick,
-                        onGuestClick = onGuestClick,
-                        isGuestLoading = isGuestLoading
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surface,
+                        MaterialTheme.colorScheme.surfaceContainerLow,
                     )
-
-                    WelcomeSyncHint()
-                }
+                )
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 4.dp,
+            modifier = Modifier.width(440.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 44.dp, vertical = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(36.dp)
+            ) {
+                WelcomeHeader()
+                WelcomeButtons(
+                    onLoginClick = onLoginClick,
+                    onGuestClick = onGuestClick,
+                    isGuestLoading = isGuestLoading
+                )
+                WelcomeSyncHint()
             }
         }
-    }
-}
-
-@Composable
-private fun WelcomeSyncHint() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
-            .padding(horizontal = 14.dp, vertical = 12.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.Sync,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp)
-        )
-        Text(
-            text = str("welcome_sync_hint"),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            lineHeight = 17.sp
-        )
     }
 }
 
@@ -104,38 +72,31 @@ private fun WelcomeHeader() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.MusicNote,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-        }
+        Icon(
+            imageVector = Icons.Rounded.MusicNote,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
 
         Text(
             text = str("app_name"),
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
 
         Text(
             text = str("welcome_subtitle"),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             lineHeight = 24.sp
         )
     }
 }
+
 @Composable
 private fun WelcomeButtons(
     onLoginClick: () -> Unit,
@@ -166,40 +127,39 @@ private fun WelcomeButtons(
         } else {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Button(
-shape = RoundedCornerShape(12.dp),
                     onClick = onLoginClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(52.dp),
+                    shapes = ButtonDefaults.shapes(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                 ) {
-                    Text(
-                        text = str("login_soundcloud"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.width(8.dp))
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        imageVector = Icons.AutoMirrored.Filled.Login,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = str("login_soundcloud"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
 
-                FilledTonalButton(
-shape = RoundedCornerShape(12.dp),
+                OutlinedButton(
                     onClick = onGuestClick,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        .height(52.dp),
+                    shapes = ButtonDefaults.shapes(),
+                    colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.onSurface
                     ),
                 ) {
@@ -208,14 +168,30 @@ shape = RoundedCornerShape(12.dp),
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         text = str("login_guest"),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WelcomeSyncHint() {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+    ) {
+        Text(
+            text = str("welcome_sync_hint"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            lineHeight = 18.sp
+        )
     }
 }
