@@ -172,18 +172,29 @@ object UpdateManager {
         }
     }
 
-    /** Launch the downloaded installer according to the OS. */
-    fun installUpdate() {
+    /** Launch the downloaded installer silently or natively according to the OS. */
+    fun installUpdate(silent: Boolean = true) {
         val file = downloadedInstallerFile ?: return
         try {
             val osName = System.getProperty("os.name", "").lowercase()
             when {
                 osName.contains("win") -> {
-                    if (Desktop.isDesktopSupported()) {
-                        Desktop.getDesktop().open(file)
+                    if (file.name.endsWith(".msi", ignoreCase = true)) {
+                        val args = if (silent) arrayOf("msiexec", "/i", file.absolutePath, "/passive", "/norestart") else arrayOf("msiexec", "/i", file.absolutePath)
+                        ProcessBuilder(*args).start()
                     } else {
-                        ProcessBuilder("cmd", "/c", "start", "", file.absolutePath).start()
+                        val args = if (silent) arrayOf(file.absolutePath, "/passive", "/quiet", "/norestart") else arrayOf(file.absolutePath)
+                        try {
+                            ProcessBuilder(*args).start()
+                        } catch (e: Exception) {
+                            if (Desktop.isDesktopSupported()) {
+                                Desktop.getDesktop().open(file)
+                            } else {
+                                ProcessBuilder("cmd", "/c", "start", "", file.absolutePath).start()
+                            }
+                        }
                     }
+                    kotlin.system.exitProcess(0)
                 }
                 osName.contains("nux") || osName.contains("nix") -> {
                     if (file.name.endsWith(".AppImage", ignoreCase = true)) {
@@ -192,9 +203,11 @@ object UpdateManager {
                     } else {
                         ProcessBuilder("xdg-open", file.absolutePath).start()
                     }
+                    kotlin.system.exitProcess(0)
                 }
                 osName.contains("mac") -> {
                     ProcessBuilder("open", file.absolutePath).start()
+                    kotlin.system.exitProcess(0)
                 }
                 else -> {
                     if (Desktop.isDesktopSupported()) {
