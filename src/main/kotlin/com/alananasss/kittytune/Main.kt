@@ -1,4 +1,4 @@
-﻿package com.alananasss.kittytune
+package com.alananasss.kittytune
 
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable

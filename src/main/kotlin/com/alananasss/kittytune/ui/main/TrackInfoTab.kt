@@ -291,9 +291,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                             ExpandableDescription(
                                 text = displayTrack.description!!,
                                 onUrlClick = { url ->
-                                    try {
-                                        Desktop.getDesktop().browse(URI(url))
-                                    } catch (e: Exception) { e.printStackTrace() }
+                                    com.alananasss.kittytune.core.openUrl(url)
                                 },
                                 onMentionClick = { username ->
                                     vm.resolveAndNavigateToArtist(username.removePrefix("@"))
