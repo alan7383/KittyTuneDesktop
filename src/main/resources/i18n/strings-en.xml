@@ -2272,6 +2272,24 @@
     <string name="audio_source_header">Audio recording source</string>
     <string name="audio_source_desktop">Desktop audio (Computer sound)</string>
     <string name="audio_source_desktop_tag">Desktop audio</string>
+
+    <!-- Updates & About -->
+    <string name="pref_updates_title">Updates</string>
+    <string name="update_about_title">About &amp; Updates</string>
+    <string name="update_current_version">Current version: v%1$s</string>
+    <string name="update_idle_desc">Check if a new version is available.</string>
+    <string name="update_btn_check">Check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_available">A new version (%1$s) is available!</string>
+    <string name="update_release_notes">Release Notes:</string>
+    <string name="update_btn_download">Download Update</string>
+    <string name="update_downloading">Downloading update (%1$d%%)…</string>
+    <string name="update_ready">The update is ready to be installed!</string>
+    <string name="update_btn_install">Launch Installer &amp; Exit</string>
+    <string name="update_no_update">You are using the latest version of KittyTune!</string>
+    <string name="update_btn_recheck">Re-check</string>
+    <string name="update_error">Failed to check or download update.</string>
+    <string name="update_btn_retry">Retry</string>
 </resources>
 
 

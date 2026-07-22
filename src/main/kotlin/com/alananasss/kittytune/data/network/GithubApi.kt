@@ -23,7 +23,7 @@ data class GithubAsset(
 )
 
 interface GithubApiService {
-    @GET("repos/alan7383/kittytune/releases/latest")
+    @GET("repos/alan7383/KittyTuneDesktop/releases/latest")
     suspend fun getLatestRelease(): GithubRelease
 }
 

@@ -2080,6 +2080,24 @@
     <string name="audio_source_header">Source d\'enregistrement audio</string>
     <string name="audio_source_desktop">Audio du bureau (Son de l\'ordinateur)</string>
     <string name="audio_source_desktop_tag">Audio bureau</string>
+
+    <!-- Updates & About -->
+    <string name="pref_updates_title">Mises à jour</string>
+    <string name="update_about_title">À propos &amp; Mises à jour</string>
+    <string name="update_current_version">Version actuelle : v%1$s</string>
+    <string name="update_idle_desc">Vérifiez si une nouvelle version est disponible.</string>
+    <string name="update_btn_check">Vérifier les mises à jour</string>
+    <string name="update_checking">Vérification des mises à jour en cours…</string>
+    <string name="update_available">Une nouvelle version (%1$s) est disponible !</string>
+    <string name="update_release_notes">Notes de version :</string>
+    <string name="update_btn_download">Télécharger la mise à jour</string>
+    <string name="update_downloading">Téléchargement de la mise à jour (%1$d%%)…</string>
+    <string name="update_ready">La mise à jour est prête à être installée !</string>
+    <string name="update_btn_install">Lancer l\'installateur &amp; Fermer</string>
+    <string name="update_no_update">Vous utilisez la dernière version de KittyTune !</string>
+    <string name="update_btn_recheck">Re-vérifier</string>
+    <string name="update_error">Impossible de vérifier ou télécharger la mise à jour.</string>
+    <string name="update_btn_retry">Réessayer</string>
 </resources>
 
 
