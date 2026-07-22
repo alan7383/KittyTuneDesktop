@@ -197,11 +197,35 @@ object UpdateManager {
                     kotlin.system.exitProcess(0)
                 }
                 osName.contains("nux") || osName.contains("nix") -> {
-                    if (file.name.endsWith(".AppImage", ignoreCase = true)) {
-                        file.setExecutable(true)
-                        ProcessBuilder(file.absolutePath).start()
-                    } else {
-                        ProcessBuilder("xdg-open", file.absolutePath).start()
+                    when {
+                        file.name.endsWith(".AppImage", ignoreCase = true) -> {
+                            file.setExecutable(true)
+                            ProcessBuilder(file.absolutePath).start()
+                        }
+                        file.name.endsWith(".deb", ignoreCase = true) -> {
+                            try {
+                                ProcessBuilder("pkexec", "dpkg", "-i", file.absolutePath).start()
+                            } catch (e: Exception) {
+                                ProcessBuilder("xdg-open", file.absolutePath).start()
+                            }
+                        }
+                        file.name.endsWith(".rpm", ignoreCase = true) -> {
+                            try {
+                                ProcessBuilder("pkexec", "rpm", "-Uvh", file.absolutePath).start()
+                            } catch (e: Exception) {
+                                ProcessBuilder("xdg-open", file.absolutePath).start()
+                            }
+                        }
+                        file.name.endsWith(".pkg.tar.zst", ignoreCase = true) -> {
+                            try {
+                                ProcessBuilder("pkexec", "pacman", "-U", "--noconfirm", file.absolutePath).start()
+                            } catch (e: Exception) {
+                                ProcessBuilder("xdg-open", file.absolutePath).start()
+                            }
+                        }
+                        else -> {
+                            ProcessBuilder("xdg-open", file.absolutePath).start()
+                        }
                     }
                     kotlin.system.exitProcess(0)
                 }
