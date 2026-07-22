@@ -1,4 +1,4 @@
-name: Build & Release Multi-Arch Installers
+name: Build & Release All Universal Installers (Windows, macOS, Linux)
 
 on:
   push:
@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-windows-x64:
-    name: Build Windows Setup x64 (.exe, .msi)
+  build-windows:
+    name: Build Windows Installers (.exe, .msi, Portable .zip)
     runs-on: windows-latest
 
     steps:
@@ -26,24 +26,57 @@ jobs:
         run: git update-index --chmod=+x gradlew
         shell: bash
 
-      - name: Build Windows Installer (.exe, .msi)
-        run: .\gradlew.bat packageReleaseExe packageReleaseMsi
+      - name: Build Windows Installers & Portable App
+        run: .\gradlew.bat packageReleaseExe packageReleaseMsi createReleaseDistributable
 
-      - name: Rename binaries with x64 architecture
+      - name: Prepare Windows Distribution Binaries
         run: |
           mkdir dist-win
-          Get-ChildItem -Path build\compose\binaries\main-release\exe\*.exe | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.0-x64.exe" }
+          Get-ChildItem -Path build\compose\binaries\main-release\exe\*.exe | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.0-Setup-x64.exe" }
           Get-ChildItem -Path build\compose\binaries\main-release\msi\*.msi | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.0-x64.msi" }
+          Compress-Archive -Path build\compose\binaries\main-release\app\* -DestinationPath dist-win\KittyTune-1.0.0-Windows-Portable-x64.zip
         shell: powershell
 
-      - name: Upload Windows Installers
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: KittyTune-Windows-x64
+          name: KittyTune-Windows
           path: dist-win/*
 
+  build-macos:
+    name: Build macOS Installer (.dmg)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build macOS DMG Package
+        run: ./gradlew packageReleaseDmg
+
+      - name: Prepare macOS Binaries
+        run: |
+          mkdir dist-mac
+          cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-1.0.0.dmg
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: KittyTune-macOS
+          path: dist-mac/*
+
   build-linux-x64:
-    name: Build Linux x64 Packages (.deb, .rpm, .pkg.tar.zst)
+    name: Build Linux x64 Packages (.deb, .rpm, .pkg.tar.zst, .AppImage)
     runs-on: ubuntu-latest
 
     steps:
@@ -65,8 +98,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debian & RPM Packages
-        run: ./gradlew packageReleaseDeb packageReleaseRpm
+      - name: Build Debian, RPM & AppImage Packages
+        run: ./gradlew packageReleaseDeb packageReleaseRpm packageReleaseAppImage || ./gradlew packageReleaseDeb packageReleaseRpm
 
       - name: Create Arch Linux x64 Package (.pkg.tar.zst)
         run: |
@@ -102,6 +135,7 @@ jobs:
           path: |
             build/compose/binaries/main-release/deb/*.deb
             build/compose/binaries/main-release/rpm/*.rpm
+            build/compose/binaries/main-release/appimage/*.AppImage
             kitty-tune-1.0.0-1-x86_64.pkg.tar.zst
 
   build-linux-arm64:
@@ -167,17 +201,23 @@ jobs:
             kitty-tune-1.0.0-1-aarch64.pkg.tar.zst
 
   release:
-    name: Publish GitHub Release (Multi-Arch)
-    needs: [build-windows-x64, build-linux-x64, build-linux-arm64]
+    name: Publish Universal GitHub Release
+    needs: [build-windows, build-macos, build-linux-x64, build-linux-arm64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Download Windows x64 Artifacts
+      - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: KittyTune-Windows-x64
+          name: KittyTune-Windows
+          path: ./release-files
+
+      - name: Download macOS Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: KittyTune-macOS
           path: ./release-files
 
       - name: Download Linux x64 Artifacts

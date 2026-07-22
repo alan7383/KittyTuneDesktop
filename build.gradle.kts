@@ -104,6 +104,11 @@ compose.desktop {
                 appCategory = "AudioVideo"
                 packageName = "kitty-tune"
             }
+
+            macOS {
+                bundleID = "com.alananasss.kittytune"
+                appCategory = "public.app-category.music"
+            }
         }
     }
 }
