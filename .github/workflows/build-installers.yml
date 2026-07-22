@@ -1,0 +1,205 @@
+name: Build & Release Multi-Arch Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows-x64:
+    name: Build Windows Setup x64 (.exe, .msi)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: git update-index --chmod=+x gradlew
+        shell: bash
+
+      - name: Build Windows Installer (.exe, .msi)
+        run: .\gradlew.bat packageReleaseExe packageReleaseMsi
+
+      - name: Rename binaries with x64 architecture
+        run: |
+          mkdir dist-win
+          Get-ChildItem -Path build\compose\binaries\main-release\exe\*.exe | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.0-x64.exe" }
+          Get-ChildItem -Path build\compose\binaries\main-release\msi\*.msi | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.0-x64.msi" }
+        shell: powershell
+
+      - name: Upload Windows Installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: KittyTune-Windows-x64
+          path: dist-win/*
+
+  build-linux-x64:
+    name: Build Linux x64 Packages (.deb, .rpm, .pkg.tar.zst)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install packaging tools (rpm, fakeroot, zstd)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot zstd binutils
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debian & RPM Packages
+        run: ./gradlew packageReleaseDeb packageReleaseRpm
+
+      - name: Create Arch Linux x64 Package (.pkg.tar.zst)
+        run: |
+          mkdir -p arch_build/pkg
+          DEB_FILE=$(ls build/compose/binaries/main-release/deb/*.deb 2>/dev/null || ls build/compose/binaries/main/deb/*.deb 2>/dev/null | head -n 1)
+          ar x "$DEB_FILE"
+          tar -xf data.tar.* -C arch_build/pkg
+          
+          cat << EOF > arch_build/pkg/.PKGINFO
+          pkgname = kitty-tune
+          pkgver = 1.0.0-1
+          pkgdesc = KittyTune Desktop Music Player
+          url = https://github.com/alan7383/KittyTuneDesktop
+          builddate = $(date +%s)
+          packager = GitHub Actions <actions@github.com>
+          size = $(du -sk arch_build/pkg | cut -f1)
+          arch = x86_64
+          license = custom
+          depend = java-runtime>=17
+          depend = hicolor-icon-theme
+          depend = alsa-lib
+          depend = gtk3
+          EOF
+          
+          cd arch_build/pkg
+          tar --gno -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.0-1-x86_64.pkg.tar.zst
+          cd ../..
+
+      - name: Upload Linux x64 Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: KittyTune-Linux-x64
+          path: |
+            build/compose/binaries/main-release/deb/*.deb
+            build/compose/binaries/main-release/rpm/*.rpm
+            kitty-tune-1.0.0-1-x86_64.pkg.tar.zst
+
+  build-linux-arm64:
+    name: Build Linux ARM64 Packages (.deb, .rpm, .pkg.tar.zst)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install packaging tools (rpm, fakeroot, zstd)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot zstd binutils
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debian & RPM Packages
+        run: ./gradlew packageReleaseDeb packageReleaseRpm
+
+      - name: Create Arch Linux ARM64 Package (.pkg.tar.zst)
+        run: |
+          mkdir -p arch_build_arm/pkg
+          DEB_FILE=$(ls build/compose/binaries/main-release/deb/*.deb 2>/dev/null || ls build/compose/binaries/main/deb/*.deb 2>/dev/null | head -n 1)
+          ar x "$DEB_FILE"
+          tar -xf data.tar.* -C arch_build_arm/pkg
+          
+          cat << EOF > arch_build_arm/pkg/.PKGINFO
+          pkgname = kitty-tune
+          pkgver = 1.0.0-1
+          pkgdesc = KittyTune Desktop Music Player
+          url = https://github.com/alan7383/KittyTuneDesktop
+          builddate = $(date +%s)
+          packager = GitHub Actions <actions@github.com>
+          size = $(du -sk arch_build_arm/pkg | cut -f1)
+          arch = aarch64
+          license = custom
+          depend = java-runtime>=17
+          depend = hicolor-icon-theme
+          depend = alsa-lib
+          depend = gtk3
+          EOF
+          
+          cd arch_build_arm/pkg
+          tar --gno -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.0-1-aarch64.pkg.tar.zst
+          cd ../..
+
+      - name: Upload Linux ARM64 Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: KittyTune-Linux-arm64
+          path: |
+            build/compose/binaries/main-release/deb/*.deb
+            build/compose/binaries/main-release/rpm/*.rpm
+            kitty-tune-1.0.0-1-aarch64.pkg.tar.zst
+
+  release:
+    name: Publish GitHub Release (Multi-Arch)
+    needs: [build-windows-x64, build-linux-x64, build-linux-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows x64 Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: KittyTune-Windows-x64
+          path: ./release-files
+
+      - name: Download Linux x64 Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: KittyTune-Linux-x64
+          path: ./release-files
+
+      - name: Download Linux ARM64 Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: KittyTune-Linux-arm64
+          path: ./release-files
+
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.0' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'KittyTune Desktop v1.0.0' }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: ./release-files/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
