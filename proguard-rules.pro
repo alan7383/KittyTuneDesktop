@@ -1,1 +1,11 @@
--ignorewarnings
+-dontwarn org.bytedeco.opencv.**
+-dontwarn org.bytedeco.openblas.**
+-dontwarn org.bytedeco.leptonica.**
+-dontwarn org.bytedeco.tesseract.**
+-dontwarn org.bytedeco.cuda.**
+-dontwarn org.bytedeco.mxnet.**
+-dontwarn org.bytedeco.tensorflow.**
+-dontwarn org.bytedeco.caffe.**
+-dontwarn org.bytedeco.ale.**
+-dontwarn org.bytedeco.hdf5.**
+-dontwarn org.bytedeco.flandmark.**
