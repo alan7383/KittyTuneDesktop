@@ -50,7 +50,25 @@ dependencies {
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.mpatric:mp3agic:0.9.1")
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.2")
-    implementation("org.bytedeco:javacv-platform:1.5.10")
+
+    val javacvVersion = "1.5.10"
+    implementation("org.bytedeco:javacv:$javacvVersion")
+    implementation("org.bytedeco:ffmpeg:6.1.1-$javacvVersion")
+
+    val osName = System.getProperty("os.name").lowercase()
+    val osArch = System.getProperty("os.arch").lowercase()
+    val platformClassifier = when {
+        osName.contains("win") -> "windows-x86_64"
+        osName.contains("mac") && osArch.contains("aarch64") -> "macosx-arm64"
+        osName.contains("mac") -> "macosx-x86_64"
+        osName.contains("linux") && osArch.contains("aarch64") -> "linux-arm64"
+        osName.contains("linux") -> "linux-x86_64"
+        else -> null
+    }
+    if (platformClassifier != null) {
+        implementation("org.bytedeco:ffmpeg:6.1.1-$javacvVersion:$platformClassifier")
+        implementation("org.bytedeco:javacpp:$javacvVersion:$platformClassifier")
+    }
 
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("com.materialkolor:material-kolor:5.0.0-alpha07")
@@ -60,13 +78,6 @@ dependencies {
     implementation("org.json:json:20260522")
     implementation("net.java.dev.jna:jna:5.14.0")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
-
-    val javafxVersion = "21.0.2"
-    listOf("win", "mac", "linux").forEach { platform ->
-        listOf("javafx-base", "javafx-graphics", "javafx-controls", "javafx-swing", "javafx-media", "javafx-web").forEach { module ->
-            implementation("org.openjfx:$module:$javafxVersion:$platform")
-        }
-    }
 }
 
 compose.desktop {
@@ -74,7 +85,7 @@ compose.desktop {
         mainClass = "com.alananasss.kittytune.MainKt"
 
         buildTypes.release.proguard {
-            isEnabled.set(false)
+            isEnabled.set(true)
         }
 
         nativeDistributions {
