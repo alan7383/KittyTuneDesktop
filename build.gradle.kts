@@ -78,6 +78,19 @@ dependencies {
     implementation("org.json:json:20260522")
     implementation("net.java.dev.jna:jna:5.14.0")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
+
+    val javafxVersion = "21.0.2"
+    val javafxClassifier = when {
+        osName.contains("win") -> "win"
+        osName.contains("mac") -> "mac"
+        osName.contains("linux") -> "linux"
+        else -> null
+    }
+    if (javafxClassifier != null) {
+        listOf("javafx-base", "javafx-graphics", "javafx-controls", "javafx-swing", "javafx-media", "javafx-web").forEach { module ->
+            implementation("org.openjfx:$module:$javafxVersion:$javafxClassifier")
+        }
+    }
 }
 
 compose.desktop {
