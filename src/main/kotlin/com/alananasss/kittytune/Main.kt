@@ -64,10 +64,18 @@ fun main() {
     AppBootstrap.init()
 
     application {
+        val appIcon = androidx.compose.runtime.remember {
+            runCatching {
+                Thread.currentThread().contextClassLoader?.getResourceAsStream("icons/kittytune.png")?.use { stream ->
+                    androidx.compose.ui.graphics.painter.BitmapPainter(androidx.compose.ui.res.loadImageBitmap(stream))
+                }
+            }.getOrNull()
+        }
+
         Window(
             onCloseRequest = ::exitApplication,
             title = "KittyTune",
-            icon = painterResource("icons/kittytune.png"),
+            icon = appIcon,
             state = rememberWindowState(size = DpSize(1440.dp, 900.dp), position = androidx.compose.ui.window.WindowPosition(androidx.compose.ui.Alignment.Center)),
             onKeyEvent = { event ->
                 // Esc = Android back (dismiss expanded player, sheets, nav back...)

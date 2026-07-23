@@ -115,7 +115,6 @@ compose.desktop {
             packageName = "KittyTune"
             packageVersion = "1.0.0"
             description = "KittyTuneDesktop"
-            copyright = "© 2026 KittyTune. All rights reserved."
             vendor = "KittyTune"
 
             modules(
@@ -140,6 +139,7 @@ compose.desktop {
                 shortcut = true
                 menu = true
                 upgradeUuid = "6f8d30e5-7971-4a7b-a19c-49fb1e5b1234"
+                iconFile.set(project.file("src/main/resources/icons/kittytune.png"))
             }
 
             linux {
