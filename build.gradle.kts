@@ -98,7 +98,8 @@ compose.desktop {
         mainClass = "com.alananasss.kittytune.MainKt"
 
         buildTypes.release.proguard {
-            isEnabled.set(false)
+            isEnabled.set(true)
+            configurationFiles.from(file("proguard-rules.pro"))
         }
 
         nativeDistributions {
