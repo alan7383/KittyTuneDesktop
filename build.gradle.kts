@@ -52,7 +52,9 @@ dependencies {
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.2")
 
     val javacvVersion = "1.5.10"
-    implementation("org.bytedeco:javacv:$javacvVersion")
+    implementation("org.bytedeco:javacv:$javacvVersion") {
+        exclude(group = "org.bytedeco", module = "opencv")
+    }
     implementation("org.bytedeco:ffmpeg:6.1.1-$javacvVersion")
 
     val osName = System.getProperty("os.name").lowercase()
