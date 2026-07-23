@@ -118,6 +118,24 @@ compose.desktop {
             copyright = "© 2026 KittyTune. All rights reserved."
             vendor = "KittyTune"
 
+            modules(
+                "java.compiler",
+                "java.instrument",
+                "java.management",
+                "java.net.http",
+                "java.sql",
+                "java.naming",
+                "java.scripting",
+                "java.prefs",
+                "jdk.dynalink",
+                "jdk.httpserver",
+                "jdk.jfr",
+                "jdk.jsobject",
+                "jdk.unsupported",
+                "jdk.unsupported.desktop",
+                "jdk.xml.dom"
+            )
+
             windows {
                 shortcut = true
                 menu = true
