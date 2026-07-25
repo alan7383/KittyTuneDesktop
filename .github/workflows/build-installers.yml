@@ -111,24 +111,29 @@ jobs:
           ar x "$DEB_FILE"
           tar -xf data.tar.* -C arch_build/pkg
           
-          cat << EOF > arch_build/pkg/.PKGINFO
+          cat << 'PKGEOF' > arch_build/pkg/.PKGINFO
           pkgname = kitty-tune
           pkgver = 1.0.10-1
           pkgdesc = KittyTune Desktop Music Player
           url = https://github.com/alan7383/KittyTuneDesktop
-          builddate = $(date +%s)
+          builddate = REPLACE_BUILDDATE
           packager = GitHub Actions <actions@github.com>
-          size = $(du -sk arch_build/pkg | cut -f1)
+          size = REPLACE_SIZE
           arch = x86_64
           license = custom
           depend = java-runtime>=17
           depend = hicolor-icon-theme
           depend = alsa-lib
           depend = gtk3
-          EOF
+          PKGEOF
+          
+          PKG_SIZE=$(du -sk arch_build/pkg | cut -f1)
+          PKG_DATE=$(date +%s)
+          sed -i "s/REPLACE_SIZE/$PKG_SIZE/" arch_build/pkg/.PKGINFO
+          sed -i "s/REPLACE_BUILDDATE/$PKG_DATE/" arch_build/pkg/.PKGINFO
           
           cd arch_build/pkg
-          tar --gno -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.10-1-x86_64.pkg.tar.zst
+          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.10-1-x86_64.pkg.tar.zst
           cd ../..
 
       - name: Upload Linux x64 Packages
@@ -177,24 +182,29 @@ jobs:
           ar x "$DEB_FILE"
           tar -xf data.tar.* -C arch_build_arm/pkg
           
-          cat << EOF > arch_build_arm/pkg/.PKGINFO
+          cat << 'PKGEOF' > arch_build_arm/pkg/.PKGINFO
           pkgname = kitty-tune
           pkgver = 1.0.10-1
           pkgdesc = KittyTune Desktop Music Player
           url = https://github.com/alan7383/KittyTuneDesktop
-          builddate = $(date +%s)
+          builddate = REPLACE_BUILDDATE
           packager = GitHub Actions <actions@github.com>
-          size = $(du -sk arch_build_arm/pkg | cut -f1)
+          size = REPLACE_SIZE
           arch = aarch64
           license = custom
           depend = java-runtime>=17
           depend = hicolor-icon-theme
           depend = alsa-lib
           depend = gtk3
-          EOF
+          PKGEOF
+          
+          PKG_SIZE=$(du -sk arch_build_arm/pkg | cut -f1)
+          PKG_DATE=$(date +%s)
+          sed -i "s/REPLACE_SIZE/$PKG_SIZE/" arch_build_arm/pkg/.PKGINFO
+          sed -i "s/REPLACE_BUILDDATE/$PKG_DATE/" arch_build_arm/pkg/.PKGINFO
           
           cd arch_build_arm/pkg
-          tar --gno -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.10-1-aarch64.pkg.tar.zst
+          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.10-1-aarch64.pkg.tar.zst
           cd ../..
 
       - name: Upload Linux ARM64 Packages
