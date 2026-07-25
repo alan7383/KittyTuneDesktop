@@ -389,3 +389,99 @@ private fun String?.toArtworkUrl(): String? {
     if (this.isNullOrBlank()) return null
     return replace("{size}", "large")
 }
+
+// ─────────────────────────────────────────────────────────────
+// Related Likers GraphQL (Social Proof)
+// Exact replica of SoundCloud's C31965d.RELATED_LIKERS_QUERY
+// ─────────────────────────────────────────────────────────────
+
+object RelatedLikersGraphQl {
+
+    private val USER_FIELDS = """
+        urn
+        permalink
+        username
+        avatarUrl
+        firstName
+        lastName
+        city
+        country
+        countryCode
+        tracksCount
+        playlistCount
+        followersCount
+        followingsCount
+        verified
+        isPro
+        description
+        userAvatarUrlTemplate
+        visualUrlTemplate
+        stationUrns
+        createdAt
+        badges
+    """.trimIndent()
+
+    private val QUERY = """
+        query RelatedLikersForTracks(${'$'}input: AllTracksInput!) {
+            allTracks(allTracksInput: ${'$'}input) {
+               urn
+               relatedLikers {
+                 users {
+                   $USER_FIELDS
+                 }
+               }
+            }
+        }
+    """.trimIndent()
+
+    fun request(trackUris: List<String>): RelatedLikersRequest = RelatedLikersRequest(
+        query = QUERY,
+        variables = RelatedLikersVariables(
+            input = RelatedLikersInput(
+                trackKeys = trackUris.map { RelatedLikersTrackKey(urn = it) }
+            )
+        )
+    )
+}
+
+data class RelatedLikersRequest(
+    val query: String,
+    val variables: RelatedLikersVariables,
+)
+
+data class RelatedLikersVariables(
+    val input: RelatedLikersInput,
+)
+
+data class RelatedLikersInput(
+    val trackKeys: List<RelatedLikersTrackKey>,
+)
+
+data class RelatedLikersTrackKey(
+    val urn: String,
+)
+
+data class RelatedLikersResponse(
+    val data: RelatedLikersData?,
+    val errors: List<GraphQlError>? = null,
+)
+
+data class RelatedLikersData(
+    val allTracks: List<RelatedLikersTrack>?,
+)
+
+data class RelatedLikersTrack(
+    val urn: String?,
+    val relatedLikers: RelatedLikersResult?,
+)
+
+data class RelatedLikersResult(
+    val users: List<RelatedLikersApiUser>?,
+)
+
+data class RelatedLikersApiUser(
+    val urn: String?,
+    val username: String?,
+    val avatarUrl: String?,
+    val verified: Boolean?,
+)

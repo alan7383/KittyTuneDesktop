@@ -35,7 +35,7 @@ import androidx.compose.material.icons.rounded.SurroundSound
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.WaterDrop
-import androidx.compose.material3.AlertDialog
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -230,7 +230,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
         }
         if (showBassBoostDialog) {
             var showEarrapeWarning by remember { mutableStateOf(false) }
-            AlertDialog(
+            EscapableAlertDialog(
                 onDismissRequest = { showBassBoostDialog = false },
                 icon = { Icon(Icons.Rounded.Bolt, null) },
                 title = { Text(str("effect_bass_boost")) },
@@ -295,7 +295,7 @@ onClick = { showBassBoostDialog = false }) { Text(str("btn_ok")) } }
                         countdown--
                     }
                 }
-                AlertDialog(
+                EscapableAlertDialog(
                     onDismissRequest = { showEarrapeWarning = false },
                     title = { Text(str("warning_title")) },
                     text = { Text(str("earrape_warning")) },
@@ -331,7 +331,7 @@ private fun IntensityDialog(
     onValueChange: (Float) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    EscapableAlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(icon, null) },
         title = { Text(title) },

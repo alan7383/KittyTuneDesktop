@@ -415,12 +415,11 @@
     ) {
         val numericId: Long
             get() {
-                // urn = "soundcloud:system-playlists:track-stations:1948149687"
-                val parts = (urn ?: id ?: "").split(":")
+                val parts = (urn ?: permalinkUrl ?: id ?: "").split(":", "/")
                 return parts.lastOrNull()?.toLongOrNull() ?: 0L
             }
-        val isArtistStation: Boolean get() = (urn ?: id ?: "").contains("artist-stations")
-        val isTrackStation: Boolean get() = (urn ?: id ?: "").contains("track-stations")
+        val isArtistStation: Boolean get() = (urn ?: permalinkUrl ?: id ?: "").contains("artist-stations")
+        val isTrackStation: Boolean get() = (urn ?: permalinkUrl ?: id ?: "").contains("track-stations")
         val fullResArtwork: String
             get() {
                 if (!artworkUrl.isNullOrEmpty()) return artworkUrl.replace("large", "t500x500")
@@ -519,6 +518,13 @@
         @SerializedName("likes_count") val likesCount: Int? = 0,
         @SerializedName("kind") val kind: String? = null
     ) {
+        val numericId: Long
+            get() {
+                val parts = (urn ?: permalinkUrl ?: id.toString()).split(":", "/")
+                return parts.lastOrNull()?.toLongOrNull() ?: id
+            }
+        val isArtistStation: Boolean get() = (urn ?: permalinkUrl ?: id.toString()).contains("artist-stations")
+        val isTrackStation: Boolean get() = (urn ?: permalinkUrl ?: id.toString()).contains("track-stations")
         val fullResArtwork: String
             get() {
                 if (!artworkUrl.isNullOrEmpty()) return artworkUrl.replace("large", "t500x500")

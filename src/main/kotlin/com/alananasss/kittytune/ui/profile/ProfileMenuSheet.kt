@@ -13,7 +13,6 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.material.icons.automirrored.rounded.Logout
     import androidx.compose.material.icons.rounded.BarChart
     import androidx.compose.material.icons.rounded.Close
-    import androidx.compose.material.icons.rounded.EmojiEvents
     import androidx.compose.material.icons.rounded.Notifications
     import androidx.compose.material.icons.rounded.Mail
     import androidx.compose.material.icons.rounded.Settings
@@ -39,7 +38,6 @@ import androidx.compose.material3.ContainedLoadingIndicator
         onViewProfile: () -> Unit,
         onNotificationsClick: () -> Unit,
         onMessagesClick: () -> Unit,
-        onAchievementsClick: () -> Unit,
         onListeningStatsClick: () -> Unit,
         onSettingsClick: () -> Unit,
         onLogoutClick: () -> Unit
@@ -157,14 +155,6 @@ import androidx.compose.material3.ContainedLoadingIndicator
                             onMessagesClick()
                         }
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surface, thickness = 1.dp)
-
-                    MenuRowItem(
-                        icon = Icons.Rounded.EmojiEvents,
-                        label = str("profile_menu_achievements"),
-                        onClick = { onDismiss(); onAchievementsClick() }
-                    )
-
                     HorizontalDivider(color = MaterialTheme.colorScheme.surface, thickness = 1.dp)
 
                     MenuRowItem(

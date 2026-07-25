@@ -54,6 +54,8 @@
 
     <string name="btn_close">Close</string>
 
+    <string name="btn_fullscreen">Full Screen</string>
+
     <string name="btn_back">Back</string>
 
     <string name="btn_reset">Reset</string>
@@ -441,6 +443,7 @@
     <string name="search_library_hint">Filter library</string>
 
     <string name="search_playlist_hint">Filter playlist</string>
+    <string name="search_tracks_hint">Filter tracks</string>
 
     <string name="lib_offline_mode">Offline Mode • Local access only</string>
 
@@ -873,8 +876,6 @@
 
     <string name="profile_menu_login">Log In</string>
 
-    <string name="profile_menu_achievements">Achievements</string>
-
     <string name="profile_menu_settings">Settings</string>
 
     <string name="pref_bottom_menu_fab_stats">Listening Stats</string>
@@ -909,7 +910,17 @@
 
     <string name="comment_send_action">Post</string>
 
+    <string name="comment_reply">Reply</string>
+
+    <string name="comment_replying_to">Replying to %1$s</string>
+
+    <string name="comment_write_reply">Write a reply&#8230;</string>
+
     <string name="comment_default_avatar">Default Avatar</string>
+
+    <string name="social_proof_liked_single">%1$s liked this track</string>
+
+    <string name="social_proof_liked_multiple">%1$s and %2$s others liked this track</string>
 
     <string name="login_to_interact">Log in to interact</string>
 
@@ -1139,12 +1150,6 @@
 
     <string name="pref_theme_pure_black_sub">Saves battery on OLED screens</string>
 
-    <string name="settings_cat_player">Player</string>
-
-    <string name="pref_new_player_design">New player design</string>
-
-    <string name="pref_player_style">Player Style</string>
-
     <string name="pref_language">Language</string>
 
     <string name="pref_language_sub">App language</string>
@@ -1156,12 +1161,6 @@
     <string name="theme_light">Light</string>
 
     <string name="theme_dark">Dark</string>
-
-    <string name="style_theme">Solid Color</string>
-
-    <string name="style_gradient">Gradient</string>
-
-    <string name="style_blur">Blur</string>
 
     <string name="lang_french">Français</string>
 
@@ -1495,9 +1494,6 @@
     <string name="update_available_title">Update Available</string>
 
     <string name="update_btn_download">Download &amp; Install</string>
-
-    <string name="update_downloading">Downloading update&#8230;</string>
-
     <string name="update_error">Update failed</string>
 
     <string name="update_no_update">No update available</string>
@@ -1509,192 +1505,6 @@
     <string name="pref_auto_update_sub">Check for new versions on startup</string>
 
 
-
-    <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
-
-    <!-- ACHIEVEMENTS                                                                     -->
-
-    <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
-
-
-
-    <string name="achievements_title">Achievements</string>
-
-    <string name="achievements_subtitle">%1$d / %2$d unlocked</string>
-
-    <string name="achievements_current_level">Level</string>
-
-    <string name="xp_format">%1$d / %2$d XP</string>
-
-    <string name="xp_reward">%d XP</string>
-
-    <string name="achievements_reset_progress">Reset</string>
-
-    <string name="achievements_replay_legend">Replay Legend</string>
-
-    <string name="achievements_status_done">Unlocked</string>
-
-    <string name="achievements_secret_title">Secret</string>
-
-    <string name="achievements_reset_success">Progress reset</string>
-
-    <string name="ach_secret_desc">\?</string>
-
-    <string name="pref_achievement_popups">Achievement Toasts</string>
-
-    <string name="pref_achievement_popups_sub">Notify when unlocked</string>
-
-
-
-    <string name="ach_cat_time">Endurance ( ˘_˘) &#8230;</string>
-
-    <string name="ach_cat_volume">Volume ♪└( ＾ω＾ )」</string>
-
-    <string name="ach_cat_loyalty">Streak ( 🔥_🔥 )</string>
-
-    <string name="ach_cat_collection">Collection ( 📦_📦 )</string>
-
-    <string name="ach_cat_player">Tech [ ◉_◉ ]</string>
-
-    <string name="ach_cat_hardcore">Hardcore ( ✖_✖ )</string>
-
-    <string name="ach_cat_secret">Mysteries ( ¬‿¬ )</string>
-
-
-
-    <!-- TIME -->
-
-    <string name="ach_time_1h_title">Warm-up</string>
-
-    <string name="ach_time_1h_desc">1 hour listening</string>
-
-    <string name="ach_time_24h_title">24/7</string>
-
-    <string name="ach_time_24h_desc">24 hours total listening</string>
-
-    <string name="ach_time_100h_title">Addict</string>
-
-    <string name="ach_time_100h_desc">100 hours listening</string>
-
-    <string name="ach_time_500h_title">Half-Mille</string>
-
-    <string name="ach_time_500h_desc">500 hours listening</string>
-
-    <string name="ach_time_1000h_title">Veteran</string>
-
-    <string name="ach_time_1000h_desc">1000 hours listening</string>
-
-    <string name="ach_time_2500h_title">Grand Master</string>
-
-    <string name="ach_time_2500h_desc">2500 hours listening</string>
-
-    <string name="ach_time_5000h_title">Eternal</string>
-
-    <string name="ach_time_5000h_desc">5000 hours listening</string>
-
-    <string name="ach_time_10000h_title">Transcendence</string>
-
-    <string name="ach_time_10000h_desc">10,000 hours. Mastery level</string>
-
-
-
-    <!-- PLAYS -->
-
-    <string name="ach_plays_1_title">First Step</string>
-
-    <string name="ach_plays_1_desc">Listen to 1 track</string>
-
-    <string name="ach_plays_100_title">Curious</string>
-
-    <string name="ach_plays_100_desc">100 plays</string>
-
-    <string name="ach_plays_1000_title">Explorer</string>
-
-    <string name="ach_plays_1000_desc">1,000 plays</string>
-
-    <string name="ach_plays_5000_title">Music Fan</string>
-
-    <string name="ach_plays_5000_desc">5,000 plays</string>
-
-    <string name="ach_plays_10000_title">Machine</string>
-
-    <string name="ach_plays_10000_desc">10,000 plays</string>
-
-    <string name="ach_plays_20000_title">Visionary</string>
-
-    <string name="ach_plays_20000_desc">20,000 plays</string>
-
-    <string name="ach_plays_50000_title">Oracle</string>
-
-    <string name="ach_plays_50000_desc">50,000 plays</string>
-
-    <string name="ach_plays_100000_title">God of Sound</string>
-
-    <string name="ach_plays_100000_desc">100,000 plays</string>
-
-
-
-    <!-- STREAK -->
-
-    <string name="ach_streak_7_title">Full Week</string>
-
-    <string name="ach_streak_7_desc">7 days in a row</string>
-
-    <string name="ach_streak_30_title">Regular</string>
-
-    <string name="ach_streak_30_desc">30 days in a row</string>
-
-    <string name="ach_streak_100_title">Centurion</string>
-
-    <string name="ach_streak_100_desc">100 days in a row</string>
-
-    <string name="ach_streak_200_title">Double Century</string>
-
-    <string name="ach_streak_200_desc">200 days in a row</string>
-
-    <string name="ach_streak_365_title">Perfect Year</string>
-
-    <string name="ach_streak_365_desc">365 days in a row</string>
-
-    <string name="ach_streak_500_title">Invincible</string>
-
-    <string name="ach_streak_500_desc">500 days in a row</string>
-
-    <string name="ach_early_bird_title">Early Bird</string>
-
-    <string name="ach_early_bird_desc">10 plays between 5am and 8am</string>
-
-    <string name="ach_night_owl_title">Night Owl</string>
-
-    <string name="ach_night_owl_desc">10 plays between 3am and 5am</string>
-
-    <string name="ach_lunch_break_title">Lunch Break</string>
-
-    <string name="ach_lunch_break_desc">10 plays between 12pm and 1pm</string>
-
-
-
-    <!-- ACTIONS -->
-
-    <string name="ach_liker_50_title">Enthusiast</string>
-
-    <string name="ach_liker_50_desc">Like 50 tracks</string>
-
-    <string name="ach_liker_1000_title">Heart of Gold</string>
-
-    <string name="ach_liker_1000_desc">Like 1000 tracks</string>
-
-    <string name="ach_liker_5000_title">Infinite Love</string>
-
-    <string name="ach_liker_5000_desc">Like 5000 tracks</string>
-
-    <string name="ach_playlist_creator_title">Selector</string>
-
-    <string name="ach_playlist_creator_desc">Create 5 playlists</string>
-
-    <string name="ach_playlist_god_title">Architect</string>
-
-    <string name="ach_playlist_god_desc">Create 50 playlists</string>
 
     <string name="ach_download_100_title">Collector</string>
 
@@ -1760,27 +1570,7 @@
 
 
 
-    <string name="dialog_reset_achievements_title">Reset?</string>
 
-    <string name="dialog_reset_achievements_msg">You will lose all achievements and progress. This cannot be undone</string>
-
-    <string name="dialog_reset_achievements_confirm">Continue</string>
-
-    <string name="dialog_reset_achievements_final_title">ARE YOU SURE?</string>
-
-    <string name="dialog_reset_achievements_final_msg">Last chance. Everything will be wiped</string>
-
-    <string name="dialog_reset_achievements_final_confirm">WIPE EVERYTHING</string>
-
-    <string name="completion_legend">LEGEND</string>
-
-    <string name="completion_message">You have completed KittyTune</string>
-
-    <string name="completion_thanks">Thanks</string>
-
-    <string name="completion_thanks_message">"Getting all achievements is no small feat. Your passion for music is why this app exists.\n\nThanks for the ride.\n\n~ Alan :3"</string>
-
-    <string name="completion_continue">Tap to continue</string>
 
 
 
@@ -1791,10 +1581,6 @@
     <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
 
 
-
-    <string name="achievement_unlocked">Achievement Unlocked!</string>
-
-    <string name="achievement_xp">+%1$d XP</string>
 
     <string name="streak_popup_title">Streak</string>
 
@@ -2221,6 +2007,7 @@
     <string name="table_header_album">Album</string>
     <string name="table_header_date_added">Date added</string>
     <string name="table_header_release_date">Release date</string>
+    <string name="table_header_plays">Plays</string>
 
     <!-- Track list view mode (Compact / List) -->
     <string name="view_mode_compact">Compact</string>
@@ -2290,6 +2077,23 @@
     <string name="update_btn_recheck">Re-check</string>
     <string name="update_error">Failed to check or download update.</string>
     <string name="update_btn_retry">Retry</string>
+    <string name="update_installing_title">Installing update in KittyTune...</string>
+    <string name="update_installing_step">Step 2/2: Preparing files...</string>
+    <string name="update_success_title">Update installed successfully</string>
+    <string name="update_btn_restart">Restart application</string>
+    <string name="update_btn_minimize">Minimize to background</string>
+    <string name="update_installing_btn">Installing...</string>
+    <string name="update_simulation_title">Test Simulation</string>
+    <string name="update_simulation_btn">Test updater (Simulation)</string>
+    <string name="update_restarting_toast">Restarting application...</string>
+    <string name="update_restarted_toast">Application restarted successfully!</string>
+    <string name="update_btn_pause">Pause</string>
+    <string name="update_btn_resume">Resume</string>
+    <string name="update_paused_title">Download paused</string>
+    <string name="update_multi_instance_title">Another instance detected</string>
+    <string name="update_multi_instance_desc">Another instance of KittyTune is currently open. Do you want to close it to continue the installation?</string>
+    <string name="update_btn_close_instances">Close instances</string>
+    <string name="update_btn_dont_remind">Don\'t remind me again</string>
 </resources>
 
 

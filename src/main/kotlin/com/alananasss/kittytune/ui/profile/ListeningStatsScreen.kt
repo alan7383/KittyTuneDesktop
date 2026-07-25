@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,7 +61,7 @@ fun ListeningStatsScreen(
     }
 
     if (showSettingsDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showSettingsDialog = false },
             title = {
                 Text(

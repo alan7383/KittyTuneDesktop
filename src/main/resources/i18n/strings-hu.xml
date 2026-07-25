@@ -46,6 +46,8 @@
 
     <string name="btn_close">Bezárás</string>
 
+    <string name="btn_fullscreen">Teljes képernyő</string>
+
     <string name="btn_back">Vissza</string>
 
     <string name="btn_reset">Alaphelyzet</string>
@@ -779,8 +781,6 @@
 
     <string name="profile_menu_login">Belépés</string>
 
-    <string name="profile_menu_achievements">Achievementek</string>
-
     <string name="profile_menu_settings">Beállítások</string>
 
     <string name="profile_menu_logout">Kijelentkezés</string>
@@ -807,7 +807,17 @@
 
     <string name="comment_send_action">Küldés</string>
 
+    <string name="comment_reply">Válasz</string>
+
+    <string name="comment_replying_to">Válasz neki: %1$s</string>
+
+    <string name="comment_write_reply">Válasz írása&#8230;</string>
+
     <string name="comment_default_avatar">Alapértelmezett profilkép</string>
+
+    <string name="social_proof_liked_single">%1$s kedvelte ezt a számot</string>
+
+    <string name="social_proof_liked_multiple">%1$s és %2$s más kedvelte ezt a számot</string>
 
     <string name="login_to_interact">Jelentkezz be az interakcióhoz</string>
 
@@ -1023,12 +1033,6 @@
 
     <string name="pref_theme_pure_black_sub">Akkukímélő OLED kijelzőkhöz</string>
 
-    <string name="settings_cat_player">Lejátszó</string>
-
-    <string name="pref_new_player_design">Új lejátszó dizájn</string>
-
-    <string name="pref_player_style">Lejátszó stílusa</string>
-
     <string name="pref_language">Nyelv</string>
 
     <string name="pref_language_sub">App nyelve</string>
@@ -1038,12 +1042,6 @@
     <string name="theme_light">Világos</string>
 
     <string name="theme_dark">Sötét</string>
-
-    <string name="style_theme">Egyszínű</string>
-
-    <string name="style_gradient">Gradiens</string>
-
-    <string name="style_blur">Homályos (Blur)</string>
 
     <string name="lang_french">Français</string>
 
@@ -1301,7 +1299,7 @@
 
     <string name="discord_rpc_title">Discord RPC</string>
 
-    <string name="discord_status_header">�?llapot</string>
+    <string name="discord_status_header">?llapot</string>
 
     <string name="discord_connected">Csatlakozva</string>
 
@@ -1319,7 +1317,7 @@
 
     <string name="discord_enable_rpc_desc">Jelenlegi zene megjelenítése Discordon</string>
 
-    <string name="pref_discord_status_display">�?llapot megjelenítés kiválasztása</string>
+    <string name="pref_discord_status_display">?llapot megjelenítés kiválasztása</string>
 
     <string name="discord_status_activity">Tevékenység neve (KittyTune)</string>
     <string name="discord_status_soundcloud">Tevékenység neve (SoundCloud)</string>
@@ -1362,11 +1360,8 @@
 
     <string name="update_available_title">Frissítés elérhető</string>
 
-    <string name="update_btn_download">Letöltés és Telepítés</string>
-
-    <string name="update_downloading">Letöltés&#8230;</string>
-
-    <string name="update_error">Sikertelen frissítés</string>
+    <string name="update_btn_download">Letöltés &amp; Telepítés</string>
+    <string name="update_error">Frissítés sikertelen</string>
 
     <string name="update_no_update">Nincs elérhető frissítés</string>
 
@@ -1376,271 +1371,13 @@
 
     <string name="pref_auto_update_sub">Verzióellenőrzés indításkor</string>
 
-    <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
+    <!-- ───────────────────────────────────────────────────────────────────────────────── -->
 
-    <!-- ACHIEVEMENTS                                                                     -->
-
-    <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
-
-    <string name="achievements_title">Achievementek</string>
-
-    <string name="achievements_subtitle">%1$d / %2$d megszerezve</string>
-
-    <string name="achievements_current_level">Szint</string>
-
-    <string name="xp_format">%1$d / %2$d XP</string>
-
-    <string name="xp_reward">%d XP</string>
-
-    <string name="achievements_reset_progress">Reset</string>
-
-    <string name="achievements_replay_legend">Legenda újrajátszása</string>
-
-    <string name="achievements_status_done">Megszerezve</string>
-
-    <string name="achievements_secret_title">Titkos</string>
-
-    <string name="achievements_reset_success">Progression törölve</string>
-
-    <string name="ach_secret_desc">\?</string>
-
-    <string name="pref_achievement_popups">Achievement értesítések</string>
-
-    <string name="pref_achievement_popups_sub">Jelezzen, ha feloldasz valamit</string>
-
-    <string name="ach_cat_time">Kitartás ( ˘_˘) &#8230;</string>
-
-    <string name="ach_cat_volume">Mennyiség ♪└( ＾ω＾ )」</string>
-
-    <string name="ach_cat_loyalty">Streak ( 🔥_🔥 )</string>
-
-    <string name="ach_cat_collection">Gyűjtő ( 📦_📦 )</string>
-
-    <string name="ach_cat_player">Tech [ ◉_◉ ]</string>
-
-    <string name="ach_cat_hardcore">Hardcore ( ✖_✖ )</string>
-
-    <string name="ach_cat_secret">Rejtélyek ( ¬‿¬ )</string>
-
-    <!-- TIME -->
-
-    <string name="ach_time_1h_title">Bemelegítés</string>
-
-    <string name="ach_time_1h_desc">1 óra zene</string>
-
-    <string name="ach_time_24h_title">24 órás</string>
-
-    <string name="ach_time_24h_desc">24 óra összesített zene</string>
-
-    <string name="ach_time_100h_title">Addict</string>
-
-    <string name="ach_time_100h_desc">100 óra zene</string>
-
-    <string name="ach_time_500h_title">Félezer</string>
-
-    <string name="ach_time_500h_desc">500 óra zene</string>
-
-    <string name="ach_time_1000h_title">Veterán</string>
-
-    <string name="ach_time_1000h_desc">1000 óra zene</string>
-
-    <string name="ach_time_2500h_title">Nagymester</string>
-
-    <string name="ach_time_2500h_desc">2500 óra zene</string>
-
-    <string name="ach_time_5000h_title">Örökkévaló</string>
-
-    <string name="ach_time_5000h_desc">5000 óra zene</string>
-
-    <string name="ach_time_10000h_title">Transzcendencia</string>
-
-    <string name="ach_time_10000h_desc">10 000 óra. A mester szint</string>
-
-    <!-- PLAYS -->
-
-    <string name="ach_plays_1_title">Első Lépés</string>
-
-    <string name="ach_plays_1_desc">Hallgass meg 1 számot</string>
-
-    <string name="ach_plays_100_title">Kíváncsi</string>
-
-    <string name="ach_plays_100_desc">100 lejátszás</string>
-
-    <string name="ach_plays_1000_title">Felfedező</string>
-
-    <string name="ach_plays_1000_desc">1 000 lejátszás</string>
-
-    <string name="ach_plays_5000_title">Zeneőrült</string>
-
-    <string name="ach_plays_5000_desc">5 000 lejátszás</string>
-
-    <string name="ach_plays_10000_title">Gép</string>
-
-    <string name="ach_plays_10000_desc">10 000 lejátszás</string>
-
-    <string name="ach_plays_20000_title">Látnok</string>
-
-    <string name="ach_plays_20000_desc">20 000 lejátszás</string>
-
-    <string name="ach_plays_50000_title">Orákulum</string>
-
-    <string name="ach_plays_50000_desc">50 000 lejátszás</string>
-
-    <string name="ach_plays_100000_title">Hangisten</string>
-
-    <string name="ach_plays_100000_desc">100 000 lejátszás</string>
-
-    <!-- STREAK -->
-
-    <string name="ach_streak_7_title">Teljes Hét</string>
-
-    <string name="ach_streak_7_desc">7 nap egyhuzamban</string>
-
-    <string name="ach_streak_30_title">Törzsvendég</string>
-
-    <string name="ach_streak_30_desc">30 nap egyhuzamban</string>
-
-    <string name="ach_streak_100_title">Százados</string>
-
-    <string name="ach_streak_100_desc">100 nap egyhuzamban</string>
-
-    <string name="ach_streak_200_title">Dupla Százados</string>
-
-    <string name="ach_streak_200_desc">200 nap egyhuzamban</string>
-
-    <string name="ach_streak_365_title">Tökéletes Év</string>
-
-    <string name="ach_streak_365_desc">365 nap egyhuzamban</string>
-
-    <string name="ach_streak_500_title">Legyőzhetetlen</string>
-
-    <string name="ach_streak_500_desc">500 nap egyhuzamban</string>
-
-    <string name="ach_early_bird_title">Koránkelő</string>
-
-    <string name="ach_early_bird_desc">10 hallgatás 05:00 és 08:00 között</string>
-
-    <string name="ach_night_owl_title">Éjjeli Bagoly</string>
-
-    <string name="ach_night_owl_desc">10 hallgatás 03:00 és 05:00 között</string>
-
-    <string name="ach_lunch_break_title">Ebédszünet</string>
-
-    <string name="ach_lunch_break_desc">10 hallgatás 12:00 és 13:00 között</string>
-
-    <!-- ACTIONS -->
-
-    <string name="ach_liker_50_title">Lelkes</string>
-
-    <string name="ach_liker_50_desc">Likeolj 50 számot</string>
-
-    <string name="ach_liker_1000_title">Aranyszív</string>
-
-    <string name="ach_liker_1000_desc">Likeolj 1000 számot</string>
-
-    <string name="ach_liker_5000_title">Végtelen Szeretet</string>
-
-    <string name="ach_liker_5000_desc">Likeolj 5000 számot</string>
-
-    <string name="ach_playlist_creator_title">Szelektor</string>
-
-    <string name="ach_playlist_creator_desc">Készíts 5 playlistet</string>
-
-    <string name="ach_playlist_god_title">Építész</string>
-
-    <string name="ach_playlist_god_desc">Készíts 50 playlistet</string>
-
-    <string name="ach_download_100_title">Gyűjtő</string>
-
-    <string name="ach_download_100_desc">Tölts le 100 számot</string>
-
-    <string name="ach_download_1000_title">Archiváló</string>
-
-    <string name="ach_download_1000_desc">Tölts le 1000 számot</string>
-
-    <string name="ach_skipper_100_title">Zappoló</string>
-
-    <string name="ach_skipper_100_desc">Skippelj 100 számot</string>
-
-    <string name="ach_skipper_1000_title">Sosem Jó</string>
-
-    <string name="ach_skipper_1000_desc">Skippelj 1000 számot</string>
-
-    <string name="ach_bass_addict_title">Bass Addict</string>
-
-    <string name="ach_bass_addict_desc">10 óra Bass Boosttal</string>
-
-    <string name="ach_speed_demon_title">Nightcore Fan</string>
-
-    <string name="ach_speed_demon_desc">1 óra hallgatás Speed &gt; 1.2x</string>
-
-    <string name="ach_social_star_title">Viral</string>
-
-    <string name="ach_social_star_desc">Ossz meg 50 számot</string>
-
-    <!-- SPECIAL -->
-
-    <string name="ach_obsessed_50_title">Megszállott</string>
-
-    <string name="ach_obsessed_50_desc">UGYANAZ a szám 50-szer</string>
-
-    <string name="ach_obsessed_200_title">�?rület</string>
-
-    <string name="ach_obsessed_200_desc">UGYANAZ a szám 200-szor</string>
-
-    <string name="ach_night_shift_pro_title">Vámpír</string>
-
-    <string name="ach_night_shift_pro_desc">8 óra egyhuzamban 22:00 és 06:00 között</string>
-
-    <string name="ach_marathon_title">Maraton</string>
-
-    <string name="ach_marathon_desc">8 óra folyamatos zene</string>
-
-    <string name="ach_no_skip_50_title">Fókusz</string>
-
-    <string name="ach_no_skip_50_desc">50 szám skip nélkül</string>
-
-    <string name="ach_developer_title">Hacker</string>
-
-    <string name="ach_weekend_warrior_title">Weekend Warrior</string>
-
-    <string name="ach_ghost_title">Szellem</string>
-
-    <string name="ach_lucky7_title">Jackpot</string>
-
-    <string name="ach_glitch_title">Glitch in the Matrix</string>
-
-    <string name="dialog_reset_achievements_title">Reset?</string>
-
-    <string name="dialog_reset_achievements_msg">Elveszítesz minden achievementet és szintet. Nem vonható vissza</string>
-
-    <string name="dialog_reset_achievements_confirm">Mehet</string>
-
-    <string name="dialog_reset_achievements_final_title">BIZTOS?</string>
-
-    <string name="dialog_reset_achievements_final_msg">Utolsó esély. Minden törlődik</string>
-
-    <string name="dialog_reset_achievements_final_confirm">MINDENT TÖRÖL</string>
-
-    <string name="completion_legend">LEGENDA</string>
-
-    <string name="completion_message">Kijátszottad a KittyTune-t</string>
-
-    <string name="completion_thanks">Kösz</string>
-
-    <string name="completion_thanks_message">"Minden achievementet megszerezni nem kis teljesítmény. A zene iránti szenvedélyed miatt létezik ez az app.\n\nKöszi az utazást.\n\n~ Alan :3"</string>
-
-    <string name="completion_continue">Koppints a folytatáshoz</string>
-
-    <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
+    <!-- ??????????????????????????????????????????????????????????????????????????????? -->
 
     <!-- SYSTEM & NOTIFICATIONS                                                           -->
 
     <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
-
-    <string name="achievement_unlocked">Achievement feloldva!</string>
-
-    <string name="achievement_xp">+%1$d XP</string>
 
     <string name="streak_popup_title">Streak</string>
 
@@ -2095,6 +1832,24 @@
     <string name="update_btn_recheck">Újraellenőrzés</string>
     <string name="update_error">Nem sikerült a frissítést ellenőrizni vagy letölteni.</string>
     <string name="update_btn_retry">Újra</string>
+    <string name="update_installing_title">Frissítés telepítése a KittyTune-ban...</string>
+    <string name="update_installing_step">2/2. lépés: Fájlok előkészítése...</string>
+    <string name="update_success_title">A frissítés sikeresen telepítve</string>
+    <string name="update_btn_restart">Alkalmazás újraindítása</string>
+    <string name="update_btn_minimize">Háttérbe kicsinyítés</string>
+    <string name="update_installing_btn">Telepítés folyamatban...</string>
+    <string name="update_simulation_title">Teszt szimuláció</string>
+    <string name="update_simulation_btn">Frissítő tesztelése (Szimuláció)</string>
+    <string name="update_restarting_toast">Alkalmazás újraindítása...</string>
+    <string name="update_restarted_toast">Az alkalmazás sikeresen újraindítva!</string>
+    <string name="update_btn_pause">Szüneteltetés</string>
+    <string name="update_btn_resume">Folytatás</string>
+    <string name="update_paused_title">Letöltés szüneteltetve</string>
+    <string name="update_multi_instance_title">Másik példány észlelve</string>
+    <string name="update_multi_instance_desc">A KittyTune egy másik példánya jelenleg nyitva van. Bezárja, hogy folytassa a telepítést?</string>
+    <string name="update_btn_close_instances">Példányok bezárása</string>
+    <string name="update_btn_dont_remind">Ne emlékeztessen újra</string>
+    <string name="search_filter_all">Összes</string>
 </resources>
 
 

@@ -72,6 +72,8 @@ import androidx.compose.material.icons.rounded.FormatAlignLeft
 import androidx.compose.material.icons.rounded.FormatAlignCenter
 import androidx.compose.material.icons.rounded.FormatAlignRight
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.core.BackHandler
+import androidx.compose.material.icons.rounded.Verified
 import kotlin.math.roundToInt
     import com.alananasss.kittytune.ui.player.LyricsMode
     import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -134,13 +136,19 @@ import kotlin.math.roundToInt
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                            Text(
-                                                text = currentTrack.user?.username ?: "",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = Color.White.copy(alpha = 0.7f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = currentTrack.user?.username ?: "",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color.White.copy(alpha = 0.7f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                if (currentTrack.user?.verified == true) {
+                                                    Spacer(Modifier.width(3.dp))
+                                                    Icon(Icons.Rounded.Verified, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+                                                }
+                                            }
                                         }
                                     }
                                 } else {
@@ -764,6 +772,7 @@ fun QuickLyricsSettingsDialog(
     val currentOffsetMs = viewModel.lyricsOffset
     val currentOffsetSec = currentOffsetMs / 1000f
 
+    BackHandler(onBack = onDismiss)
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),

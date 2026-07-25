@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.library.LibraryItem
 import com.alananasss.kittytune.ui.library.LibraryViewMode
@@ -124,9 +125,11 @@ fun Sidebar(
                     iconUnselected = Icons.Outlined.Home,
                     compact = collapsed,
                 ) {
-                    navController.navigate("home") {
-                        popUpTo("home")
-                        launchSingleTop = true
+                    if (currentRoute != "home") {
+                        navController.navigate("home") {
+                            popUpTo("home")
+                            launchSingleTop = true
+                        }
                     }
                 }
                 SidebarNavItem(
@@ -136,7 +139,9 @@ fun Sidebar(
                     iconUnselected = Icons.Rounded.DynamicFeed,
                     compact = collapsed,
                 ) {
-                    navController.navigate("feed") { launchSingleTop = true }
+                    if (currentRoute != "feed") {
+                        navController.navigate("feed") { launchSingleTop = true }
+                    }
                 }
                 SidebarNavItem(
                     label = str("explorer_title"),
@@ -145,7 +150,9 @@ fun Sidebar(
                     iconUnselected = Icons.Outlined.Explore,
                     compact = collapsed,
                 ) {
-                    navController.navigate("genres") { launchSingleTop = true }
+                    if (currentRoute != "genres") {
+                        navController.navigate("genres") { launchSingleTop = true }
+                    }
                 }
                 SidebarNavItem(
                     label = str("pref_bottom_menu_fab_recognition"),
@@ -154,7 +161,9 @@ fun Sidebar(
                     iconUnselected = Icons.Rounded.GraphicEq,
                     compact = collapsed,
                 ) {
-                    navController.navigate("recognition") { launchSingleTop = true }
+                    if (currentRoute != "recognition") {
+                        navController.navigate("recognition") { launchSingleTop = true }
+                    }
                 }
             }
         }
@@ -302,15 +311,33 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
         when (item) {
             is LibraryItem.PlaylistItem -> {
                 val pl = item.playlist
+                val permalink = pl.permalinkUrl
+                val isYoutubeShortcut = permalink != null && permalink.startsWith("yt_radio:")
+                val isTrackStation = pl.isTrackStation || permalink?.contains("track-stations") == true || pl.urn?.contains("track-stations") == true
+                val isArtistStation = pl.isArtistStation || permalink?.contains("artist-stations") == true || pl.urn?.contains("artist-stations") == true
+
+                val dest = when {
+                    isYoutubeShortcut -> java.net.URLEncoder.encode(permalink, "UTF-8")
+                    isTrackStation -> "station:${pl.numericId}"
+                    isArtistStation -> "station_artist:${pl.numericId}"
+                    pl.urn?.startsWith("soundcloud:system-playlists:") == true -> "system_playlist:${pl.urn}"
+                    pl.id < 0 -> "local_playlist:${pl.id}"
+                    else -> pl.id.toString()
+                }
+
                 LibEntry(
-                    key = "pl_${pl.id}",
+                    key = "pl_${pl.id}_${pl.permalinkUrl ?: ""}",
                     title = pl.title ?: "",
                     subtitle = listOfNotNull(
-                        if (pl.isAlbum) str("lib_albums") else str("lib_playlists"),
+                        when {
+                            isTrackStation || isArtistStation -> str("lib_stations")
+                            pl.isAlbum -> str("lib_albums")
+                            else -> str("lib_playlists")
+                        },
                         pl.user?.username,
                     ).joinToString(" • "),
                     artworkUrl = pl.fullResArtwork,
-                    destination = pl.id.toString(),
+                    destination = dest,
                     playlist = pl,
                 )
             }
@@ -1072,7 +1099,7 @@ private fun CreatePlaylistDialog(
     var isPublic by remember { mutableStateOf(true) }
     val focusRequester = remember { FocusRequester() }
 
-    AlertDialog(
+    EscapableAlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null) },
         title = { Text(str("lib_create_playlist_title")) },

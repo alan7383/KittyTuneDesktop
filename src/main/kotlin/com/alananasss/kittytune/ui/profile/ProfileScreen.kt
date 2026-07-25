@@ -14,8 +14,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.selection.SelectionContainer
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -25,14 +25,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -47,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -65,7 +76,10 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.domain.Comment
 import com.alananasss.kittytune.domain.Playlist
@@ -94,6 +108,7 @@ fun ProfileScreen(
     val listState = rememberLazyListState()
     var expandedSection by remember { mutableStateOf<String?>(null) }
     var showEditSheet by remember { mutableStateOf(false) }
+    var userListDialogType by remember { mutableStateOf<String?>(null) }
     val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(userId) {
@@ -120,40 +135,6 @@ fun ProfileScreen(
         if (profileViewModel.isLoading && user == null) {
             ProfileScreenShimmer(onBackClick)
         } else if (user != null) {
-            // overlay for expanded sections
-            AnimatedVisibility(
-                visible = expandedSection != null,
-                enter = slideInHorizontally { it },
-                exit = slideOutHorizontally { it },
-                modifier = Modifier.zIndex(2f)
-            ) {
-                if (expandedSection == "comments") {
-                    FullCommentListScreen(
-                        comments = profileViewModel.userComments,
-                        onBack = { expandedSection = null },
-                        playerViewModel = playerViewModel,
-                        profileViewModel = profileViewModel
-                    )
-                } else {
-                    val (title, list) = when (expandedSection) {
-                        "popular" -> str("profile_tab_popular") to profileViewModel.popularTracks.toList()
-                        "tracks" -> str("profile_tab_tracks") to profileViewModel.allTracks.toList()
-                        "reposts" -> str("profile_tab_reposts") to profileViewModel.repostedTracks.toList()
-                        "likes" -> str("profile_tab_likes", user.username ?: "") to profileViewModel.likedTracks.toList()
-                        else -> "" to emptyList<Track>()
-                    }
-                    val contextForList = if (expandedSection == "likes") null else artistPlaybackContext
-                    FullListScreen(
-                        title = title,
-                        tracks = list,
-                        onBack = { expandedSection = null },
-                        playerViewModel = playerViewModel,
-                        downloadProgress = downloadProgress,
-                        context = contextForList
-                    )
-                }
-            }
-
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(bottom = 32.dp),
@@ -167,7 +148,9 @@ fun ProfileScreen(
                         playerViewModel = playerViewModel,
                         onNavigate = onNavigate,
                         profileViewModel = profileViewModel,
-                        artistContext = artistPlaybackContext
+                        artistContext = artistPlaybackContext,
+                        onFollowersClick = { userListDialogType = "followers" },
+                        onFollowingClick = { userListDialogType = "followings" }
                     )
                 }
 
@@ -188,30 +171,31 @@ fun ProfileScreen(
                                     playerViewModel.resolveAndNavigateToArtist(username.removePrefix("@"))
                                 }
                             )
-                            Spacer(Modifier.height(16.dp))
                         }
                     }
                 }
 
                 if (profileViewModel.popularTracks.isNotEmpty()) {
-                    item { ProfileSectionTitle(title = str("profile_tab_popular"), showMore = profileViewModel.popularTracks.size > 5, onMoreClick = { expandedSection = "popular" }) }
+                    item { ProfileSectionTitle(title = str("profile_tab_popular"), showMore = profileViewModel.popularTracks.size > 5, onMoreClick = { onNavigate("profile_collection:${user.id}:popular") }) }
                     itemsIndexed(profileViewModel.popularTracks.take(5)) { index, track ->
-                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.popularTracks, artistPlaybackContext)
+                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.popularTracks, artistPlaybackContext, showPlays = true, showDate = false)
                     }
                 }
 
                 if (profileViewModel.allTracks.isNotEmpty()) {
-                    item { ProfileSectionTitle(title = str("profile_latest_tracks"), showMore = true, onMoreClick = { expandedSection = "tracks" }) }
+                    item { ProfileSectionTitle(title = str("profile_latest_tracks"), showMore = true, onMoreClick = { onNavigate("profile_collection:${user.id}:tracks") }) }
                     itemsIndexed(profileViewModel.allTracks.take(5)) { index, track ->
-                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.allTracks, artistPlaybackContext)
+                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.allTracks, artistPlaybackContext, showPlays = true, showDate = false)
                     }
                 }
 
                 if (profileViewModel.albums.isNotEmpty()) {
-                    item { ProfileSectionTitle(str("profile_tab_albums")) }
                     item {
-                        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            items(profileViewModel.albums) { playlist -> ProfileSquareCard(playlist) { onNavigate(playlist.id.toString()) } }
+                        ProfileHorizontalCarouselRow(
+                            title = str("profile_tab_albums"),
+                            items = profileViewModel.albums
+                        ) { playlist ->
+                            ProfileSquareCard(playlist) { onNavigate(playlist.id.toString()) }
                         }
                     }
                 }
@@ -219,11 +203,11 @@ fun ProfileScreen(
                 if (profileViewModel.playlists.isNotEmpty()) {
                     item {
                         val name = user.username ?: str("generic_artist")
-                        ProfileSectionTitle(str("profile_playlists_by_user", name))
-                    }
-                    item {
-                        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            items(profileViewModel.playlists) { playlist -> ProfileSquareCard(playlist) { onNavigate(playlist.id.toString()) } }
+                        ProfileHorizontalCarouselRow(
+                            title = str("profile_playlists_by_user", name),
+                            items = profileViewModel.playlists
+                        ) { playlist ->
+                            ProfileSquareCard(playlist) { onNavigate(playlist.id.toString()) }
                         }
                     }
                 }
@@ -231,19 +215,19 @@ fun ProfileScreen(
                 if (profileViewModel.likedTracks.isNotEmpty()) {
                     item {
                         val name = user.username ?: str("generic_artist")
-                        ProfileSectionTitle(title = str("profile_likes_by_user", name), showMore = true, onMoreClick = { expandedSection = "likes" })
+                        ProfileSectionTitle(title = str("profile_likes_by_user", name), showMore = true, onMoreClick = { onNavigate("profile_collection:${user.id}:likes") })
                     }
                     itemsIndexed(profileViewModel.likedTracks.take(3)) { index, track ->
-                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.likedTracks, null)
+                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.likedTracks, null, showPlays = false, showDate = true)
                     }
                 }
 
                 if (profileViewModel.repostedTracks.isNotEmpty()) {
                     item {
-                        ProfileSectionTitle(title = str("profile_tab_reposts"), showMore = true, onMoreClick = { expandedSection = "reposts" })
+                        ProfileSectionTitle(title = str("profile_tab_reposts"), showMore = true, onMoreClick = { onNavigate("profile_collection:${user.id}:reposts") })
                     }
                     itemsIndexed(profileViewModel.repostedTracks.take(5)) { index, track ->
-                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.repostedTracks, artistPlaybackContext)
+                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.repostedTracks, null, showPlays = false, showDate = true)
                     }
                 }
 
@@ -252,7 +236,7 @@ fun ProfileScreen(
                         ProfileSectionTitle(
                             title = str("profile_tab_comments"),
                             showMore = profileViewModel.userComments.size > 3,
-                            onMoreClick = { expandedSection = "comments" }
+                            onMoreClick = { onNavigate("profile_collection:${user.id}:comments") }
                         )
                     }
                     itemsIndexed(profileViewModel.userComments.take(3)) { _, comment ->
@@ -273,10 +257,12 @@ fun ProfileScreen(
 
                 if (profileViewModel.similarArtists.isNotEmpty()) {
                     item { Spacer(Modifier.height(24.dp)) }
-                    item { ProfileSectionTitle(str("profile_similar_artists")) }
                     item {
-                        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            items(profileViewModel.similarArtists) { artist -> ArtistCircle(artist) { onNavigate("profile:${artist.id}") } }
+                        ProfileHorizontalCarouselRow(
+                            title = str("profile_similar_artists"),
+                            items = profileViewModel.similarArtists
+                        ) { artist ->
+                            ArtistCircle(artist) { onNavigate("profile:${artist.id}") }
                         }
                     }
                 }
@@ -301,7 +287,6 @@ fun ProfileScreen(
                         }
                     }
                 },
-                // Removed redundant navigationIcon
                 actions = {
                     if (profileViewModel.isCurrentUser) {
                         AnimatedVisibility(visible = showBarBackground, enter = fadeIn(), exit = fadeOut()) {
@@ -320,7 +305,6 @@ fun ProfileScreen(
                     IconButton(onClick = {
                             val cleanUsername = user.username?.replace(" ", "")?.lowercase() ?: "user"
                             val shareUrl = user.permalinkUrl ?: "https://soundcloud.com/$cleanUsername"
-                            // desktop share: copy to clipboard
                             val selection = java.awt.datatransfer.StringSelection(shareUrl)
                             java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
                         },
@@ -341,6 +325,18 @@ fun ProfileScreen(
                     onSave = { name, bio, city ->
                         profileViewModel.updateProfile(name, bio, city, "")
                         showEditSheet = false
+                    }
+                )
+            }
+
+            userListDialogType?.let { type ->
+                UserListDialog(
+                    userId = user.id,
+                    type = type,
+                    onDismiss = { userListDialogType = null },
+                    onUserClick = { targetUserId ->
+                        userListDialogType = null
+                        playerViewModel.navigateToArtist(targetUserId)
                     }
                 )
             }
@@ -374,7 +370,6 @@ fun ProfileScreenShimmer(onBackClick: () -> Unit) {
         }
         CenterAlignedTopAppBar(
             title = {},
-            // Removed redundant navigationIcon
             colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
             modifier = Modifier.align(Alignment.TopCenter).zIndex(1f)
         )
@@ -413,7 +408,9 @@ fun ModernProfileHeader(
     playerViewModel: PlayerViewModel,
     onNavigate: (String) -> Unit,
     profileViewModel: ProfileViewModel,
-    artistContext: PlaybackContext?
+    artistContext: PlaybackContext?,
+    onFollowersClick: () -> Unit = {},
+    onFollowingClick: () -> Unit = {}
 ) {
     Box(modifier = Modifier.fillMaxWidth().height(420.dp)) {
         val bgModel = user.bannerUrl ?: user.avatarUrl
@@ -465,14 +462,14 @@ fun ModernProfileHeader(
                     text = "${NumberFormat.getNumberInstance(Locale.US).format(user.followersCount)} ${str("profile_followers")}",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)
+                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onFollowersClick() }.padding(horizontal = 4.dp, vertical = 2.dp)
                 )
                 Text(text = " • ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                 Text(
                     text = "${NumberFormat.getNumberInstance(Locale.US).format(user.followingsCount)} ${str("profile_followings")}",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).padding(horizontal = 4.dp, vertical = 2.dp)
+                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onFollowingClick() }.padding(horizontal = 4.dp, vertical = 2.dp)
                 )
                 Text(text = " • ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                 Text(text = "${NumberFormat.getNumberInstance(Locale.US).format(user.trackCount)} ${str("profile_tracks")}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -532,7 +529,7 @@ fun EditProfileDialog(
     var showDeleteBannerConfirm by remember { mutableStateOf(false) }
 
     if (showDeleteConfirm) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text(str("dialog_delete_avatar_title")) },
             text = { Text(str("dialog_delete_avatar_msg")) },
@@ -546,7 +543,7 @@ fun EditProfileDialog(
     }
 
     if (showDeleteBannerConfirm) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showDeleteBannerConfirm = false },
             title = { Text(str("dialog_delete_header_title")) },
             text = { Text(str("dialog_delete_header_msg")) },
@@ -559,6 +556,7 @@ fun EditProfileDialog(
         )
     }
 
+    BackHandler(onBack = onDismiss)
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(28.dp),
@@ -576,7 +574,6 @@ fun EditProfileDialog(
                 }
 
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
-                    // banner area — click to pick a new banner image
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -614,7 +611,6 @@ fun EditProfileDialog(
                         }
                     }
 
-                    // avatar container — click to pick a new avatar
                     Box(modifier = Modifier.align(Alignment.BottomCenter).size(130.dp)) {
                         Box(
                             modifier = Modifier
@@ -661,7 +657,7 @@ fun EditProfileDialog(
                         value = name,
                         onValueChange = { name = it },
                         label = { Text(str("profile_name")) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -670,7 +666,7 @@ fun EditProfileDialog(
                         value = city,
                         onValueChange = { city = it },
                         label = { Text(str("profile_city")) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -679,7 +675,7 @@ fun EditProfileDialog(
                         value = bio,
                         onValueChange = { bio = it },
                         label = { Text(str("profile_bio")) },
-                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                        modifier = Modifier.fillMaxWidth().height(120.dp).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                     Spacer(Modifier.height(24.dp))
@@ -704,8 +700,19 @@ fun FullListScreen(
     onBack: () -> Unit,
     playerViewModel: PlayerViewModel,
     downloadProgress: Map<Long, Int>,
-    context: PlaybackContext?
+    context: PlaybackContext?,
+    isLoading: Boolean = false,
+    showPlays: Boolean = true
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredTracks = remember(tracks, searchQuery) {
+        if (searchQuery.isBlank()) tracks else tracks.filter {
+            (it.title ?: "").contains(searchQuery, ignoreCase = true) ||
+            (it.user?.username ?: "").contains(searchQuery, ignoreCase = true)
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -719,26 +726,109 @@ fun FullListScreen(
             contentPadding = PaddingValues(bottom = 32.dp),
             modifier = Modifier.padding(innerPadding).fillMaxSize()
         ) {
-            item {
+            item(key = "actions") {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Button(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(tracks, context = context) },
-                        modifier = Modifier.weight(1f),
+                    Button(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(filteredTracks, context = context) },
+                        modifier = Modifier.weight(1f).height(44.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(str("btn_play"))
+                        Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(str("btn_play"), fontWeight = FontWeight.Bold)
                     }
-                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(tracks.shuffled(), context = context) },
-                        modifier = Modifier.weight(1f)
+                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(filteredTracks.shuffled(), context = context) },
+                        modifier = Modifier.weight(1f).height(44.dp)
                     ) {
-                        Icon(Icons.Default.Shuffle, null); Spacer(Modifier.width(8.dp)); Text(str("btn_shuffle"))
+                        Icon(Icons.Default.Shuffle, null); Spacer(Modifier.width(8.dp)); Text(str("btn_shuffle"), fontWeight = FontWeight.Bold)
                     }
                 }
             }
-            itemsIndexed(tracks) { index, track ->
-                ProfileTrackItem(track, index, playerViewModel, downloadProgress, tracks, context)
+
+            if (isLoading) {
+                items(10) { TrackListItemShimmer() }
+            } else if (tracks.isNotEmpty()) {
+                item(key = "search_and_sort") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text(str("search_tracks_hint")) },
+                            leadingIcon = { Icon(Icons.Default.Search, null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, null) }
+                                }
+                            },
+                            singleLine = true,
+                            shape = CircleShape,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.fillMaxWidth().trackTextInput()
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                if (filteredTracks.isEmpty() && searchQuery.isNotEmpty()) {
+                    item(key = "empty_search") {
+                        com.alananasss.kittytune.ui.library.EmptyPlaylistView(
+                            playlistId = "",
+                            isUserCreated = false,
+                            isEmptySearch = true
+                        )
+                    }
+                } else {
+                    item(key = "table_header") {
+                        com.alananasss.kittytune.ui.library.TrackTableHeaderRow(
+                            showAlbum = false,
+                            showDate = true,
+                            releaseDateMode = false,
+                            showPlays = showPlays
+                        )
+                    }
+                }
+
+                itemsIndexed(filteredTracks) { index, track ->
+                    val progress = downloadProgress[track.id]
+                    val isDownloading = progress != null
+                    val isDownloaded by produceState(false, track.id, downloadProgress) {
+                        value = DownloadManager.getLocalTrack(track.id)?.localAudioPath?.isNotEmpty() == true
+                    }
+
+                    com.alananasss.kittytune.ui.library.TrackTableItem(
+                        track = track,
+                        currentlyPlayingTrack = playerViewModel.currentTrack,
+                        index = index,
+                        isDownloading = isDownloading,
+                        isDownloaded = isDownloaded,
+                        downloadProgress = progress ?: 0,
+                        showVerifiedBadge = true,
+                        showAlbum = false,
+                        showDate = true,
+                        showPlays = showPlays,
+                        onPlayCountClick = {
+                            playerViewModel.navigateToTrackDetails(track.id)
+                        },
+                        onClick = {
+                            playerViewModel.playPlaylist(filteredTracks, startIndex = index, context = context)
+                        },
+                        onOptionClick = { playerViewModel.showTrackOptions(track) },
+                        onAlbumClick = { albumId -> playerViewModel.navigateToPlaylistId = albumId }
+                    )
+                }
+            } else {
+                item(key = "empty_tracks") {
+                    com.alananasss.kittytune.ui.library.EmptyPlaylistView(
+                        playlistId = "",
+                        isUserCreated = false,
+                        isEmptySearch = false
+                    )
+                }
             }
         }
     }
@@ -751,7 +841,9 @@ fun ProfileTrackItem(
     playerViewModel: PlayerViewModel,
     downloadProgress: Map<Long, Int>,
     contextList: List<Track>,
-    context: PlaybackContext?
+    context: PlaybackContext?,
+    showPlays: Boolean = true,
+    showDate: Boolean = false
 ) {
     val progress = downloadProgress[track.id]
     val isDownloading = progress != null
@@ -759,18 +851,25 @@ fun ProfileTrackItem(
         value = DownloadManager.getLocalTrack(track.id)?.localAudioPath?.isNotEmpty() == true
     }
 
-    TrackListItem(
+    com.alananasss.kittytune.ui.library.TrackTableItem(
         track = track,
         currentlyPlayingTrack = playerViewModel.currentTrack,
         index = index,
         isDownloading = isDownloading,
         isDownloaded = isDownloaded,
         downloadProgress = progress ?: 0,
-        showVerifiedBadge = false,
+        showVerifiedBadge = true,
+        showAlbum = false,
+        showDate = showDate,
+        showPlays = showPlays,
+        onPlayCountClick = {
+            playerViewModel.navigateToTrackDetails(track.id)
+        },
         onClick = {
             playerViewModel.playPlaylist(contextList, startIndex = index, context = context)
         },
-        onOptionClick = { playerViewModel.showTrackOptions(track) }
+        onOptionClick = { playerViewModel.showTrackOptions(track) },
+        onAlbumClick = {}
     )
 }
 
@@ -786,6 +885,159 @@ fun ProfileSectionTitle(title: String, showMore: Boolean = false, onMoreClick: (
             TextButton(shape = RoundedCornerShape(12.dp), onClick = onMoreClick) {
                 Text(str("btn_see_all"), fontWeight = FontWeight.Bold)
                 Icon(Icons.AutoMirrored.Filled.ArrowForward, null, modifier = Modifier.size(16.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun <T> ProfileHorizontalCarouselRow(
+    title: String,
+    items: List<T>,
+    showMore: Boolean = false,
+    onMoreClick: () -> Unit = {},
+    itemContent: @Composable (T) -> Unit
+) {
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val surfaceColor = MaterialTheme.colorScheme.background
+
+    val canScrollLeft by remember {
+        derivedStateOf { listState.canScrollBackward }
+    }
+    val canScrollRight by remember {
+        derivedStateOf { listState.canScrollForward }
+    }
+
+    val alphaLeft by animateFloatAsState(if (canScrollLeft) 1f else 0f, label = "alphaLeft")
+    val alphaRight by animateFloatAsState(if (canScrollRight) 1f else 0f, label = "alphaRight")
+
+    val isScrollable by remember {
+        derivedStateOf { listState.canScrollBackward || listState.canScrollForward }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ProfileSectionTitle(
+            title = title,
+            showMore = showMore,
+            onMoreClick = onMoreClick
+        )
+        Box(modifier = Modifier.fillMaxWidth()) {
+            LazyRow(
+                state = listState,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(isScrollable) {
+                        if (!isScrollable) return@pointerInput
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                if (event.type == PointerEventType.Scroll) {
+                                    val change = event.changes.firstOrNull()
+                                    if (change != null) {
+                                        val delta = if (change.scrollDelta.x != 0f) change.scrollDelta.x else change.scrollDelta.y
+                                        if (delta != 0f) {
+                                            change.consume()
+                                            coroutineScope.launch {
+                                                listState.scrollBy(delta * 50f)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .pointerInput(isScrollable) {
+                        if (!isScrollable) return@pointerInput
+                        detectHorizontalDragGestures { change, dragAmount ->
+                            change.consume()
+                            coroutineScope.launch {
+                                listState.scrollBy(-dragAmount)
+                            }
+                        }
+                    }
+            ) {
+                items(items) { item ->
+                    itemContent(item)
+                }
+            }
+
+            Box(Modifier.matchParentSize()) {
+                if (alphaLeft > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(72.dp)
+                            .align(Alignment.CenterStart)
+                            .graphicsLayer { alpha = alphaLeft }
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)
+                                )
+                            ),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    val first = listState.firstVisibleItemIndex
+                                    listState.animateScrollToItem(maxOf(0, first - 3))
+                                }
+                            },
+                            modifier = Modifier
+                                .padding(start = 12.dp)
+                                .shadow(4.dp, CircleShape)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                if (alphaRight > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(72.dp)
+                            .align(Alignment.CenterEnd)
+                            .graphicsLayer { alpha = alphaRight }
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f))
+                                )
+                            ),
+                        contentAlignment = Alignment.CenterEnd
+                    ) {
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    val first = listState.firstVisibleItemIndex
+                                    listState.animateScrollToItem(minOf(items.size - 1, first + 3))
+                                }
+                            },
+                            modifier = Modifier
+                                .padding(end = 16.dp)
+                                .shadow(4.dp, CircleShape)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -978,7 +1230,6 @@ fun FullCommentListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(str("profile_tab_comments"), fontWeight = FontWeight.Bold) },
-                // Removed redundant navigationIcon
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
@@ -1055,5 +1306,71 @@ fun getRelativeTime(dateStr: String?): String {
         }
     } catch (_: Exception) {
         return ""
+    }
+}
+
+@Composable
+fun ProfileCollectionScreen(
+    userId: String,
+    section: String,
+    onBackClick: () -> Unit,
+    playerViewModel: PlayerViewModel
+) {
+    val profileViewModel: ProfileViewModel = viewModel(key = "profile_coll_$userId") { ProfileViewModel(AppInstance.application) }
+
+    LaunchedEffect(userId) {
+        userId.toLongOrNull()?.let { id ->
+            profileViewModel.loadProfile(id)
+        }
+    }
+
+    val user = profileViewModel.user
+    val downloadProgress by DownloadManager.downloadProgress.collectAsState()
+
+    val artistText = str("generic_artist")
+    val artistPlaybackContext = remember(user, artistText) {
+        user?.let {
+            PlaybackContext(
+                displayText = "$artistText • ${it.username}",
+                navigationId = "profile:${it.id}",
+                imageUrl = it.avatarUrl,
+                artistName = it.username,
+                isVerified = it.verified
+            )
+        }
+    }
+
+    if (profileViewModel.isLoading) {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularWavyProgressIndicator(modifier = Modifier.size(36.dp))
+        }
+    } else {
+        when {
+            section == "comments" -> FullCommentListScreen(
+                comments = profileViewModel.userComments,
+                onBack = onBackClick,
+                playerViewModel = playerViewModel,
+                profileViewModel = profileViewModel
+            )
+            else -> {
+                val (title, list) = when (section) {
+                    "popular" -> str("profile_tab_popular") to profileViewModel.popularTracks.toList()
+                    "tracks" -> str("profile_tab_tracks") to profileViewModel.allTracks.toList()
+                    "reposts" -> str("profile_tab_reposts") to profileViewModel.repostedTracks.toList()
+                    "likes" -> str("profile_tab_likes", user?.username ?: "") to profileViewModel.likedTracks.toList()
+                    else -> "" to emptyList<Track>()
+                }
+                FullListScreen(
+                    title = title,
+                    tracks = list,
+                    onBack = onBackClick,
+                    playerViewModel = playerViewModel,
+                    downloadProgress = downloadProgress,
+                    context = if (section == "likes" || section == "reposts") null else artistPlaybackContext,
+                    isLoading = profileViewModel.isLoading,
+                    showPlays = section != "likes" && section != "reposts"
+                )
+            }
+        }
     }
 }

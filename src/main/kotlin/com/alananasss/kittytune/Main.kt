@@ -25,6 +25,11 @@ import com.alananasss.kittytune.ui.login.WelcomeScreen
 import com.alananasss.kittytune.ui.main.MainScreen
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+
 enum class AppState { WELCOME, LOGIN, MAIN }
 
 @Composable
@@ -77,13 +82,46 @@ fun main() {
             title = "KittyTune",
             icon = appIcon,
             state = rememberWindowState(size = DpSize(1440.dp, 900.dp), position = androidx.compose.ui.window.WindowPosition(androidx.compose.ui.Alignment.Center)),
-            onKeyEvent = { event ->
-                // Esc = Android back (dismiss expanded player, sheets, nav back...)
+            onPreviewKeyEvent = { event ->
                 if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
                     DesktopBackDispatcher.onBack()
+                    true
+                } else if (event.type == KeyEventType.KeyDown && !com.alananasss.kittytune.core.TextInputTracker.isFocused()) {
+                    val isShift = event.isShiftPressed
+                    val isCtrl = event.isCtrlPressed
+                    val isAlt = event.isAltPressed
+                    val isMeta = event.isMetaPressed
+                    val noModifiers = !isShift && !isCtrl && !isAlt && !isMeta
+
+                    val isShortcutKey = when {
+                        noModifiers -> when (event.key) {
+                            Key.Spacebar, Key.M, Key.L, Key.R, Key.S, Key.P, Key.H, Key.Q,
+                            Key.DirectionLeft, Key.DirectionRight, Key.G,
+                            Key.Zero, Key.One, Key.Two, Key.Three, Key.Four,
+                            Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine -> true
+                            else -> false
+                        }
+                        isShift && !isCtrl && !isAlt && !isMeta -> when (event.key) {
+                            Key.DirectionRight, Key.DirectionLeft, Key.DirectionUp, Key.DirectionDown, Key.L, Key.S -> true
+                            else -> false
+                        }
+                        else -> false
+                    }
+
+                    if (isShortcutKey) {
+                        com.alananasss.kittytune.core.GlobalShortcutDispatcher.dispatch(event)
+                        true
+                    } else {
+                        false
+                    }
                 } else {
-                    com.alananasss.kittytune.core.GlobalShortcutDispatcher.dispatch(event)
+                    false
                 }
+            },
+            onKeyEvent = { event ->
+                if (!com.alananasss.kittytune.core.TextInputTracker.isFocused()) {
+                    com.alananasss.kittytune.core.GlobalShortcutDispatcher.dispatch(event)
+                } else false
             },
         ) {
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }

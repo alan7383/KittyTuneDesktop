@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,7 +84,7 @@ fun RecognitionHistoryScreen(
     }
 
     if (showClearHistoryDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showClearHistoryDialog = false },
             title = { Text(str("dialog_clear_history_title")) },
             text = { Text(str("dialog_clear_history_msg")) },
@@ -171,7 +172,7 @@ fun RecognitionHistoryScreen(
                             )
                         }
 
-                        items(items) { item ->
+                        items(items, key = { it.id }) { item ->
                             HistoryItemRow(
                                 item = item,
                                 currentlyPlayingTrack = playerViewModel.currentTrack,

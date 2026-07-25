@@ -13,8 +13,6 @@ import com.alananasss.kittytune.media.Player as ExoPlayer
 import com.alananasss.kittytune.R
 import com.alananasss.kittytune.data.*
 import com.alananasss.kittytune.data.local.LocalPlaylist
-import com.alananasss.kittytune.ui.common.AchievementNotificationManager
-import com.alananasss.kittytune.ui.common.AchievementNotification
 import com.alananasss.kittytune.data.local.LyricsAlignment
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.LrcLibClient
@@ -85,6 +83,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var effectsState by mutableStateOf(playerPrefs.getLastEffects())
     var isPreciseSpeedEnabled by mutableStateOf(playerPrefs.getPreciseSpeedEnabled())
 
+    var volume by mutableFloatStateOf(MusicManager.getVolume())
+        private set
+
+    private var volumeBeforeMute: Float = 1.0f
+
+    fun updateVolume(v: Float) {
+        val newVol = v.coerceIn(0f, 1f)
+        volume = newVol
+        MusicManager.setVolume(newVol)
+    }
+
+    fun toggleMute() {
+        if (volume > 0f) {
+            volumeBeforeMute = volume
+            updateVolume(0f)
+        } else {
+            updateVolume(if (volumeBeforeMute > 0f) volumeBeforeMute else 1.0f)
+        }
+    }
+
+    fun volumeUp(delta: Float = 0.1f) {
+        updateVolume(volume + delta)
+    }
+
+    fun volumeDown(delta: Float = 0.1f) {
+        updateVolume(volume - delta)
+    }
+
     var repeatMode by mutableStateOf(playerPrefs.getLastRepeatMode())
     var shuffleEnabled by mutableStateOf(playerPrefs.getLastShuffleEnabled())
     private var isAutoplayRadioLoading by mutableStateOf(false)
@@ -114,6 +140,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var commentNextHref: String? = null
     var isPostingComment by mutableStateOf(false)
     var captchaUrl by mutableStateOf<String?>(null)
+
+    var socialLikerUser by mutableStateOf<User?>(null)
+    var isSocialLikerLoading by mutableStateOf(false)
+    private var socialProofTrackId: Long? = null
 
     var replyingToComment by mutableStateOf<Comment?>(null)
     private var pendingCommentBody: String? = null
@@ -218,6 +248,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var playJob: Job? = null
     private var discordJob: Job? = null
     private var discordRpc: com.alananasss.kittytune.data.DiscordRPC? = null
+    private var mprisService: com.alananasss.kittytune.data.MprisService? = null
+    private var windowsSmtcService: com.alananasss.kittytune.data.WindowsSmtcService? = null
 
     // Android used a BroadcastReceiver to sync player state across the app<->service
     // process boundary. Desktop is single-process, so this is a no-op.
@@ -257,9 +289,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (state == Player.STATE_BUFFERING) isLoading = true
 
             if (state == Player.STATE_ENDED) {
-                AchievementManager.increment("no_skip_50")
-                incrementPlayCount()
-
                 // Record listening stats
                 currentTrack?.let { track ->
                     if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
@@ -284,8 +313,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
                 if (repeatMode == RepeatMode.ONE) {
-                    AchievementManager.increment("obsessed_50")
-                    AchievementManager.increment("obsessed_200")
                     currentPosition = 0L
                     MusicManager.player.seekTo(0)
                     MusicManager.player.play()
@@ -473,7 +500,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             viewModelScope.launch {
                 isLiked = LikeRepository.isTrackLiked(finalTrack.id)
                 loadLyrics(finalTrack)
-                AchievementManager.checkTrackNameSecret(finalTrack.title ?: "")
 
                 if (finalTrack.source == "soundcloud" && finalTrack.id > 0 && (finalTrack.permalinkUrl.isNullOrEmpty() || finalTrack.user?.avatarUrl.isNullOrEmpty() || finalTrack.playbackCount == 0)) {
                     try {
@@ -559,7 +585,49 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         discordRpc = null
     }
 
+    private fun initMprisService() {
+        if (mprisService == null) {
+            try {
+                mprisService = com.alananasss.kittytune.data.MprisService(
+                    onPlay = { player.play() },
+                    onPause = { player.pause() },
+                    onPlayPause = { togglePlayPause() },
+                    onNext = { playNext() },
+                    onPrevious = { smartPrevious() },
+                    onSeek = { seekTo(it) }
+                )
+            } catch (e: Exception) {
+                println("MPRIS service init exception: ${e.message}")
+            }
+        }
+    }
+
+    private fun initWindowsSmtcService() {
+        if (windowsSmtcService == null) {
+            try {
+                windowsSmtcService = com.alananasss.kittytune.data.WindowsSmtcService(
+                    onPlay = { togglePlayPause() },
+                    onPause = { togglePlayPause() },
+                    onPlayPause = { togglePlayPause() },
+                    onNext = { playNext() },
+                    onPrevious = { smartPrevious() }
+                )
+            } catch (e: Exception) {
+                println("Windows SMTC service init exception: ${e.message}")
+            }
+        }
+    }
+
+    fun updateMprisMedia() {
+        initMprisService()
+        mprisService?.updateMedia(currentTrack, isPlaying, currentPosition)
+
+        initWindowsSmtcService()
+        windowsSmtcService?.updateMedia(currentTrack, isPlaying)
+    }
+
     fun updateDiscordPresence() {
+        updateMprisMedia()
         val track = currentTrack
         val token = playerPrefs.getDiscordToken()
         val enabled = playerPrefs.getDiscordRpcEnabled()
@@ -586,6 +654,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     override fun onCleared() {
         super.onCleared()
         closeDiscordRpc()
+        try {
+            mprisService?.close()
+        } catch (_: Exception) {}
+        mprisService = null
+
+        try {
+            windowsSmtcService?.close()
+        } catch (_: Exception) {}
+        windowsSmtcService = null
+
         try {
             MusicManager.player.removeListener(playerListener)
         } catch (_: IllegalStateException) {
@@ -817,7 +895,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             e.printStackTrace()
         }
         showMenuSheet = false
-        AchievementManager.increment("social_star")
     }
 
     fun openTrackDetails(targetTrack: Track? = null) {
@@ -962,6 +1039,55 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun onNavigationHandled() { navigateToPlaylistId = null }
+
+    fun loadSocialProof(specificTrack: Track? = null) {
+        val t = specificTrack ?: selectedTrackForSheet ?: trackForMenu ?: currentTrack ?: return
+        val trackId = t.id
+        if (trackId <= 0) {
+            socialLikerUser = null
+            return
+        }
+        if (socialProofTrackId == trackId) return
+        socialProofTrackId = trackId
+        viewModelScope.launch {
+            try {
+                isSocialLikerLoading = true
+                socialLikerUser = null
+                val trackUrn = "soundcloud:tracks:$trackId"
+                val request = com.alananasss.kittytune.data.network.RelatedLikersGraphQl.request(
+                    trackUris = listOf(trackUrn)
+                )
+                val response = com.alananasss.kittytune.data.network.RetrofitClient.create()
+                    .getRelatedLikersGraphQL(request)
+                val me = com.alananasss.kittytune.data.network.RetrofitClient.create().getMe()
+                val myUrn = "soundcloud:users:${me.id}"
+                val users = response.data?.allTracks
+                    ?.flatMap { it.relatedLikers?.users.orEmpty() }
+                    ?.filter { it.urn != myUrn }
+                    .orEmpty()
+                if (users.isNotEmpty()) {
+                    val u = users.first()
+                    val userId = u.urn?.substringAfterLast(':')?.toLongOrNull() ?: 0L
+                    if (userId > 0) {
+                        socialLikerUser = User(
+                            id = userId,
+                            username = u.username,
+                            avatarUrl = u.avatarUrl,
+                            verified = u.verified ?: false,
+                            urn = u.urn
+                        )
+                    }
+                } else {
+                    socialLikerUser = null
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                socialLikerUser = null
+            } finally {
+                isSocialLikerLoading = false
+            }
+        }
+    }
 
     fun loadComments(refresh: Boolean = false, specificTrack: Track? = null) {
         val t = specificTrack ?: selectedTrackForSheet ?: trackForMenu ?: currentTrack ?: return
@@ -1218,7 +1344,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playTrackAtPosition(track: Track, position: Long) { pendingSeekPosition = position; playPlaylist(listOf(track), 0); showCommentsSheet = false; isPlayerExpanded = true }
-    fun skipToQueueItem(index: Int) { playTrackAtIndex(index, addToHistory = false); AchievementManager.trackSkipped(); AchievementManager.increment("skipper_100"); AchievementManager.increment("skipper_1000") }
+    fun skipToQueueItem(index: Int) { playTrackAtIndex(index, addToHistory = false) }
 
     private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true) {
         if (index < 0 || index >= _queue.size) { currentContext = null; return }
@@ -1254,7 +1380,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             MusicManager.currentTrack = finalTrack
             isLiked = LikeRepository.isTrackLiked(finalTrack.id)
             loadLyrics(finalTrack)
-            AchievementManager.checkTrackNameSecret(finalTrack.title ?: "")
+            loadSocialProof(finalTrack)
             saveStateAsync(saveQueue = false)
 
             if (addToHistory && currentContext?.navigationId?.startsWith("station:") != true && currentContext?.navigationId?.startsWith("yt_radio:") != true) {
@@ -1266,10 +1392,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun playNext(manual: Boolean = true) {
         if (isAutoplayRadioLoading) return
 
-        if (manual && player.currentPosition > 2000) {
-            incrementPlayCount()
-        }
-
         // Record skip stats
         if (manual) {
             currentTrack?.let { track ->
@@ -1280,12 +1402,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         val nextIndex = currentQueueIndex + 1
-
-        if (manual) {
-            AchievementManager.trackSkipped()
-            AchievementManager.increment("skipper_100")
-            AchievementManager.increment("skipper_1000")
-        }
 
         if (nextIndex < _queue.size) {
             playTrackAtIndex(nextIndex, addToHistory = false)
@@ -1404,10 +1520,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun smartPrevious() {
-        if (player.currentPosition > 2000) {
-            incrementPlayCount()
-        }
-
         if (player.currentPosition > 3000) {
             // User is restarting the same track â€” this is a manual replay
             currentTrack?.let { track ->
@@ -1599,9 +1711,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         if (isLiked) {
             LikeRepository.addLike(t)
-            AchievementManager.increment("liker_50")
-            AchievementManager.increment("liker_1000")
-            AchievementManager.increment("liker_5000")
         } else {
             LikeRepository.removeLike(t.id)
         }
@@ -1616,11 +1725,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setEightDSpeed(v: Float) { effectsState = effectsState.copy(eightDSpeed = v); applyEffectsAndSave() }
     fun toggleMuffled() { val n = !effectsState.isMuffledEnabled; effectsState = effectsState.copy(isMuffledEnabled = n); applyEffectsAndSave() }
     fun setMuffledIntensity(v: Float) { effectsState = effectsState.copy(muffledIntensity = v); applyEffectsAndSave() }
-    fun toggleBassBoost() { val n = !effectsState.isBassBoostEnabled; effectsState = effectsState.copy(isBassBoostEnabled = n); applyEffectsAndSave(); if (n) AchievementManager.increment("bass_addict", 1) }
+    fun toggleBassBoost() { val n = !effectsState.isBassBoostEnabled; effectsState = effectsState.copy(isBassBoostEnabled = n); applyEffectsAndSave() }
     fun setBassBoostIntensity(v: Float) { effectsState = effectsState.copy(bassBoostIntensity = v); applyEffectsAndSave() }
     fun toggleReverb() { effectsState = effectsState.copy(isReverbEnabled = !effectsState.isReverbEnabled); applyEffectsAndSave() }
     fun setReverbIntensity(v: Float) { effectsState = effectsState.copy(reverbIntensity = v); applyEffectsAndSave() }
-    fun toggleEarrape() { val n = !effectsState.isEarrapeEnabled; effectsState = effectsState.copy(isEarrapeEnabled = n); applyEffectsAndSave(); if (n) AchievementManager.increment("bass_addict", 1) }
+    fun toggleEarrape() { val n = !effectsState.isEarrapeEnabled; effectsState = effectsState.copy(isEarrapeEnabled = n); applyEffectsAndSave() }
 
 
     fun hasSeenEarrapeWarning(): Boolean = playerPrefs.hasSeenEarrapeWarning()
@@ -1644,7 +1753,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             e.printStackTrace()
         }
         showPlaylistMenuSheet = false
-        AchievementManager.increment("social_star")
     }
     fun prepareBulkAdd(tracks: List<Track>) { tracksToAddInBulk = tracks; trackForMenu = null; showAddToPlaylistSheet = true }
     fun addToPlaylist(playlistId: Long, track: Track) { DownloadManager.addTrackToPlaylist(playlistId, track); showAddToPlaylistSheet = false; emitUiEvent(str("success_generic")) }
@@ -1653,8 +1761,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             showAddToPlaylistSheet = false
             emitUiEvent(str("success_generic"))
-            AchievementManager.increment("playlist_creator")
-            AchievementManager.increment("playlist_god")
         }
     }
     fun createAndAddToPlaylist(name: String, track: Track) { 
@@ -1664,7 +1770,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             withContext(Dispatchers.Main) { 
                 showAddToPlaylistSheet = false
                 emitUiEvent(str("success_generic"))
-                AchievementManager.increment("playlist_creator") 
             }
         } 
     }
@@ -1675,7 +1780,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             withContext(Dispatchers.Main) { 
                 showAddToPlaylistSheet = false
                 emitUiEvent(str("success_generic"))
-                AchievementManager.increment("playlist_creator") 
             } 
         } 
     }
@@ -1696,7 +1800,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         saveStateAsync(saveQueue = true)
         emitUiEvent(str("menu_add_queue"))
     }
-    fun downloadTrack(track: Track) { if (DownloadManager.isTrackDownloading(track.id)) return; DownloadManager.downloadTrack(track); AchievementManager.increment("download_1000") }
+    fun downloadTrack(track: Track) { if (DownloadManager.isTrackDownloading(track.id)) return; DownloadManager.downloadTrack(track) }
 
     private fun emitUiEvent(msg: String) { viewModelScope.launch { _uiEvent.emit(msg) } }
     private fun saveStateAsync(saveQueue: Boolean = false) {
@@ -1746,9 +1850,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             pushRecentlyPlayedToSoundCloud(currentTrack)
                         }
                     }
-                    AchievementManager.addPlayTime(1, isGuest, effectsState.speed)
-                    if (effectsState.isBassBoostEnabled || effectsState.isEarrapeEnabled) AchievementManager.increment("bass_addict", 1)
-
                 } catch (_: Exception) {
                 }
                 delay(1000.milliseconds)
@@ -1979,21 +2080,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun showSleepTimerIslandNotification(isStarted: Boolean, durationText: String? = null) {
         viewModelScope.launch {
-            val title = str("sleep_timer_island_title")
             val subtitle = if (isStarted) {
                 str("sleep_timer_island_started_subtitle", durationText ?: "")
             } else {
                 str("sleep_timer_island_finished_subtitle")
             }
-
-            AchievementNotificationManager.showNotification(
-                AchievementNotification(
-                    title = title,
-                    subtitle = subtitle,
-                    iconEmoji = "ðŸŒ™",
-                    xpReward = null
-                )
-            )
+            emitUiEvent(subtitle)
         }
     }
 
@@ -2249,13 +2341,5 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             .setTrack(track)
             .build()
     }
-}
-
-private fun incrementPlayCount() {
-    val achievements = listOf(
-        "plays_1", "plays_100", "plays_1000", "plays_5000",
-        "plays_10000", "plays_20000", "plays_50000", "plays_100000"
-    )
-    achievements.forEach { AchievementManager.increment(it) }
 }
 

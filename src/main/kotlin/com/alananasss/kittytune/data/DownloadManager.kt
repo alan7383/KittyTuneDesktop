@@ -722,8 +722,6 @@ object DownloadManager {
                 if (existingTrack == null) dao.insertTrack(localTrack) else dao.updateTrack(localTrack)
 
                 _storageTrigger.update { it + 1 }
-                AchievementManager.increment("download_100")
-                AchievementManager.increment("download_1000")
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {

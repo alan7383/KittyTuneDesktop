@@ -1,10 +1,12 @@
 package com.alananasss.kittytune.core
 
+import androidx.compose.material3.AlertDialog
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.unit.dp
 
 /**
  * Desktop replacement for androidx.activity.compose.BackHandler.
@@ -20,9 +22,18 @@ object DesktopBackDispatcher {
     private val entries = HashMap<Any, Entry>()
 
     internal fun register(key: Any, enabled: Boolean, callback: () -> Unit) {
-        val e = entries.getOrPut(key) { Entry(enabled, callback).also { stack.addLast(key) } }
-        e.enabled = enabled
-        e.callback = callback
+        val e = entries[key]
+        if (e != null) {
+            val wasEnabled = e.enabled
+            e.enabled = enabled
+            e.callback = callback
+            if (enabled && !wasEnabled) {
+                stack.remove(key)
+                stack.addLast(key)
+            }
+        } else {
+            entries[key] = Entry(enabled, callback).also { stack.addLast(key) }
+        }
     }
 
     internal fun unregister(key: Any) {
@@ -51,4 +62,30 @@ fun BackHandler(enabled: Boolean = true, onBack: () -> Unit) {
     DisposableEffect(key) {
         onDispose { DesktopBackDispatcher.unregister(key) }
     }
+}
+
+@Composable
+fun EscapableAlertDialog(
+    onDismissRequest: () -> Unit,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    icon: @Composable (() -> Unit)? = null,
+    title: @Composable (() -> Unit)? = null,
+    text: @Composable (() -> Unit)? = null,
+    confirmButton: @Composable () -> Unit,
+    dismissButton: (@Composable () -> Unit)? = null,
+    shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+    containerColor: androidx.compose.ui.graphics.Color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+) {
+    BackHandler(onBack = onDismissRequest)
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        modifier = modifier,
+        icon = icon,
+        title = title,
+        text = text,
+        confirmButton = confirmButton,
+        dismissButton = dismissButton,
+        shape = shape,
+        containerColor = containerColor,
+    )
 }

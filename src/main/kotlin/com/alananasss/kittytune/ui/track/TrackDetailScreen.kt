@@ -17,7 +17,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
@@ -73,12 +73,16 @@ fun TrackDetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text(str("detail_track_title"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                // Removed redundant navigationIcon
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+                    }
+                }
             )
         }
     ) { innerPadding ->
         AnimatedContent(
-            targetState = detailViewModel.isLoading || track == null,
+            targetState = detailViewModel.isLoading,
             transitionSpec = {
                 (fadeIn(tween(300)) + scaleIn(tween(300), initialScale = 0.96f))
                     .togetherWith(fadeOut(tween(200)))
@@ -89,6 +93,10 @@ fun TrackDetailScreen(
             if (isLoadingState) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularWavyProgressIndicator()
+                }
+            } else if (track == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(str("no_tracks_found"), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 Column {

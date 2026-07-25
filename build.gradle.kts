@@ -8,12 +8,16 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.0-SNAPSHOT"
+version = "1.0.1-SNAPSHOT"
 
 repositories {
     google()
     mavenCentral()
-    maven("https://jitpack.io")
+    maven("https://jitpack.io") {
+        content {
+            excludeGroup("com.github.hypfvieh")
+        }
+    }
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
 }
 
@@ -81,6 +85,9 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.14.0")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
 
+    implementation("com.github.hypfvieh:dbus-java-core:4.3.1")
+    implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:4.3.1")
+
     val javafxVersion = "21.0.2"
     val javafxClassifier = when {
         osName.contains("win") -> "win"
@@ -113,7 +120,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.0.0"
+            packageVersion = "1.0.1"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 

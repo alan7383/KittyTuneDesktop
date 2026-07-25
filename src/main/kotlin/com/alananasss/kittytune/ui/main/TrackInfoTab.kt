@@ -13,8 +13,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +37,7 @@ import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Comment
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import com.alananasss.kittytune.ui.player.CommentSort
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.viewableCover
 import kotlinx.coroutines.launch
@@ -44,6 +49,10 @@ import com.alananasss.kittytune.ui.profile.ExpandableDescription
 import com.alananasss.kittytune.ui.profile.getRelativeTime
 import com.alananasss.kittytune.ui.modifiers.squish
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
 
 @Composable
 fun TrackInfoTab(vm: PlayerViewModel) {
@@ -71,6 +80,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
         vm.loadComments(refresh = true, specificTrack = currentTrack)
+        vm.loadSocialProof(currentTrack)
     }
 
     val displayTrack = fullTrack ?: currentTrack
@@ -114,15 +124,23 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = displayTrack.user?.username ?: "",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
                         displayTrack.user?.id?.let { vm.navigateToArtist(it) }
                     }
-                )
+                ) {
+                    Text(
+                        text = displayTrack.user?.username ?: "",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (displayTrack.user?.verified == true) {
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    }
+                }
                 
                 // Stats Row
                 Row(
@@ -151,23 +169,91 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
+        // Social Liked Proof Banner (e.g. "Mandra and 1,400 others liked this track")
+        val socialLiker = vm.socialLikerUser
+        if (socialLiker != null) {
+            item {
+                Surface(
+                    onClick = { vm.navigateToArtist(socialLiker.id) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AsyncImage(
+                            model = socialLiker.avatarUrl?.replace("large", "t500x500"),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentScale = ContentScale.Crop
+                        )
+                        val totalLikes = displayTrack.likesCount ?: 1
+                        val otherCount = (totalLikes - 1).coerceAtLeast(0)
+                        val text = if (otherCount > 0) {
+                            val formattedOthers = NumberFormat.getNumberInstance(Locale.getDefault()).format(otherCount)
+                            str("social_proof_liked_multiple", socialLiker.username ?: str("comment_anonymous"), formattedOthers)
+                        } else {
+                            str("social_proof_liked_single", socialLiker.username ?: str("comment_anonymous"))
+                        }
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+
         // Tags & Details
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
+                val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.CalendarToday,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "${str("detail_release_date")}: $releaseDateStr",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 if (!displayTrack.genre.isNullOrBlank()) {
                     Row(
-                        modifier = Modifier.clickable { vm.navigateToTag(displayTrack.genre!!) }.padding(vertical = 4.dp),
+                        modifier = Modifier
+                            .clickable { vm.navigateToTag(displayTrack.genre) }
+                            .padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically, 
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Rounded.MusicNote, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Genre: ${displayTrack.genre}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-                if (!displayTrack.releaseDate.isNullOrBlank()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Rounded.CalendarToday, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Released: ${displayTrack.releaseDate?.take(10)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(
+                            Icons.Rounded.MusicNote,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${str("detail_genre")}: ${displayTrack.genre}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
                 
@@ -303,12 +389,65 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Comments
+        // Comments header & sort selector
         item {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text("Comments (${displayTrack.commentCount})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                if (vm.isCommentsLoading) {
-                    ContainedLoadingIndicator()
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = str("menu_comments") + " (${displayTrack.commentCount ?: organizedComments.size})",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (vm.isCommentsLoading) {
+                        CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                var isSortMenuExpanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedButton(
+                        onClick = { isSortMenuExpanded = true },
+                        shapes = ButtonDefaults.shapes(),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = str("sorted_by", str(vm.commentSort.labelResId)),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+
+                    DropdownMenu(
+                        expanded = isSortMenuExpanded,
+                        onDismissRequest = { isSortMenuExpanded = false }
+                    ) {
+                        CommentSort.values().forEach { sortOption ->
+                            DropdownMenuItem(
+                                text = { Text(str(sortOption.labelResId)) },
+                                onClick = {
+                                    vm.onCommentSortChanged(sortOption)
+                                    isSortMenuExpanded = false
+                                },
+                                trailingIcon = {
+                                    if (sortOption == vm.commentSort) {
+                                        Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -321,7 +460,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     value = newCommentText,
                     onValueChange = { newCommentText = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("Write a comment...") },
+                    placeholder = { Text(if (vm.replyingToComment != null) str("comment_write_reply") else str("add_comment_hint")) },
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp)
                 )
@@ -338,22 +477,53 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                 }
             }
             if (vm.replyingToComment != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Replying to ${vm.replyingToComment?.user?.username ?: "someone"}", style = MaterialTheme.typography.labelSmall)
-                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() })
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    val targetUser = vm.replyingToComment?.user?.username ?: str("comment_anonymous")
+                    Text(str("comment_replying_to", targetUser), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() }, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
 
+        if (vm.isCommentsLoading && vm.commentsList.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ContainedLoadingIndicator()
+                }
+            }
+        }
 
-
-        items(organizedComments) { comment ->
+        itemsIndexed(organizedComments, key = { _, comment -> comment.id }) { index, comment ->
+            if (index >= organizedComments.size - 3 && !vm.isCommentsLoading && vm.commentNextHref != null) {
+                LaunchedEffect(index) {
+                    vm.loadComments(refresh = false)
+                }
+            }
             CommentItemUI(comment, vm)
+        }
+
+        if (vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
+                }
+            }
         }
 
         if (!vm.isCommentsLoading && vm.commentsList.isEmpty()) {
             item {
-                Text("No comments yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(str("comment_no_comments"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -377,7 +547,7 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        text = comment.user?.username ?: "",
+                        text = comment.user?.username ?: str("comment_anonymous"),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable { comment.user?.id?.let { vm.navigateToArtist(it) } }
@@ -415,7 +585,7 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                         )
                     }
                 }
-                Text(comment.body, style = MaterialTheme.typography.bodyMedium)
+                CommentBodyText(body = comment.body, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
                 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(
@@ -435,7 +605,7 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                     }
                     
                     Text(
-                        "Reply",
+                        str("comment_reply"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.clickable { vm.startReplying(comment) }
@@ -466,7 +636,46 @@ private fun StatItem(icon: ImageVector, count: Int, onClick: (() -> Unit)? = nul
     }
 }
 
+@Composable
+private fun CommentBodyText(body: String, onMentionClick: (String) -> Unit) {
+    val mentionPattern = remember { """@[\w-]+""".toRegex() }
+    val tertiaryColor = MaterialTheme.colorScheme.tertiary
+
+    val annotatedString = remember(body, tertiaryColor) {
+        buildAnnotatedString {
+            append(body)
+            for (match in mentionPattern.findAll(body)) {
+                val username = match.value.removePrefix("@")
+                addLink(
+                    LinkAnnotation.Clickable(
+                        tag = "MENTION",
+                        styles = TextLinkStyles(style = SpanStyle(color = tertiaryColor, fontWeight = FontWeight.SemiBold)),
+                        linkInteractionListener = { onMentionClick(username) }
+                    ),
+                    match.range.first, match.range.last + 1
+                )
+            }
+        }
+    }
+
+    Text(text = annotatedString, style = MaterialTheme.typography.bodyMedium)
+}
+
 private fun parseTags(tagListStr: String): List<String> {
     val regex = """"([^"]*)"|(\S+)""".toRegex()
     return regex.findAll(tagListStr).mapNotNull { it.groupValues[1].takeIf { it.isNotEmpty() } ?: it.groupValues[2].takeIf { it.isNotEmpty() } }.toList()
 }
+
+private fun formatReleaseDate(raw: String?): String {
+    if (raw.isNullOrBlank()) return str("detail_unknown")
+    val date = runCatching { java.time.Instant.parse(raw).let { java.util.Date.from(it) } }.getOrNull()
+        ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).parse(raw) }.getOrNull()
+        ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).parse(raw) }.getOrNull()
+        ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw) }.getOrNull()
+        ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(raw) }.getOrNull()
+        ?: return str("detail_unknown")
+
+    val displayFormat = java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.getDefault())
+    return displayFormat.format(date)
+}
+

@@ -21,6 +21,7 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.Toaster
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +63,12 @@ fun CoverViewerOverlay() {
     val visible = CoverViewerState.visible
     val url = CoverViewerState.currentUrl
     val scope = rememberCoroutineScope()
+
+    if (visible) {
+        BackHandler {
+            CoverViewerState.hide()
+        }
+    }
 
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
         Box(

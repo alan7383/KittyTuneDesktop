@@ -16,6 +16,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.NewReleases
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -63,6 +67,7 @@ fun MainTopBar(
 
     // Observe back stack entry changes to clear forward stack on normal navigation
     val currentEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentEntry?.destination?.route
     
     androidx.compose.runtime.LaunchedEffect(currentEntry) {
         if (!NavigationTracker.isNavigatingBackOrForward) {
@@ -95,17 +100,18 @@ fun MainTopBar(
                     try {
                         val args = entry.arguments
                         if (args != null) {
-                            val possibleKeys = listOf("playlistId", "userId", "query", "albumId", "trackId")
+                            val possibleKeys = listOf("playlistId", "userId", "query", "albumId", "trackId", "section", "tagName", "genreName", "genreQuery", "tabIndex")
                             possibleKeys.forEach { key ->
-                                val value = args?.toString() ?: "" //key)
-                                if (value != null) {
-                                    resolved = resolved.replace("{$key}", value)
+                                val valStr = runCatching { args.read { getString(key) } }.getOrNull()
+                                if (!valStr.isNullOrEmpty()) {
+                                    resolved = resolved.replace("{$key}", valStr)
                                 }
                             }
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
+                    resolved = resolved.replace(Regex("\\?tab=\\{tabIndex\\}"), "").replace(Regex("\\{[^}]+\\}"), "")
                     NavigationTracker.forwardStack.add(resolved)
                 }
                 navController.popBackStack()
@@ -178,7 +184,9 @@ fun MainTopBar(
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
             onClick = {
-                navController.navigate("recognition")
+                if (currentRoute != "recognition") {
+                    navController.navigate("recognition")
+                }
             }
         ) {
             Icon(
@@ -188,6 +196,37 @@ fun MainTopBar(
         }
 
         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+
+        val updateStatus by com.alananasss.kittytune.data.UpdateManager.status.collectAsState()
+        val isUpdateActive = updateStatus == com.alananasss.kittytune.data.UpdateStatus.AVAILABLE ||
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING ||
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.PAUSED ||
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.INSTALLING ||
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES ||
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL
+
+        if (isUpdateActive) {
+            FilledTonalIconButton(
+                shapes = IconButtonDefaults.shapes(),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = if (updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                onClick = { com.alananasss.kittytune.data.UpdateManager.showDialog() }
+            ) {
+                Icon(
+                    imageVector = when (updateStatus) {
+                        com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL -> Icons.Outlined.RestartAlt
+                        com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES -> Icons.Outlined.NewReleases
+                        com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING, com.alananasss.kittytune.data.UpdateStatus.PAUSED, com.alananasss.kittytune.data.UpdateStatus.INSTALLING -> Icons.Outlined.Download
+                        else -> Icons.Outlined.NewReleases
+                    },
+                    contentDescription = str("pref_updates_title"),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+        }
 
         // Avatar -> profile dropdown
         androidx.compose.foundation.layout.Box {

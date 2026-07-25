@@ -52,14 +52,10 @@ fun AppearanceSettingsScreen(
     var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme()) }
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
-    var playerStyle by remember { mutableStateOf(prefs.getPlayerStyle()) }
-    var newPlayerDesign by remember { mutableStateOf(prefs.getNewPlayerDesignEnabled()) }
     var appLanguage by remember { mutableStateOf(prefs.getAppLanguage()) }
-    var achievementPopupsEnabled by remember { mutableStateOf(prefs.getAchievementPopupsEnabled()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
     var customFontEnabled by remember { mutableStateOf(prefs.getCustomFontEnabled()) }
 
-    var showPlayerStyleDialog by remember { mutableStateOf(false) }
     var showStartDestDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showFontConfigDialog by remember { mutableStateOf(false) }
@@ -85,33 +81,6 @@ fun AppearanceSettingsScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showStartDestDialog = false }) { Text(str("btn_cancel")) } }
-        )
-    }
-
-    if (showPlayerStyleDialog) {
-        AlertDialog(
-            onDismissRequest = { showPlayerStyleDialog = false },
-            title = { Text(str("pref_player_style")) },
-            text = {
-                Column {
-                    PlayerStyleRadioButton(str("style_theme"), PlayerBackgroundStyle.THEME, playerStyle) {
-                        playerStyle = it
-                        prefs.setPlayerStyle(it)
-                        showPlayerStyleDialog = false
-                    }
-                    PlayerStyleRadioButton(str("style_gradient"), PlayerBackgroundStyle.GRADIENT, playerStyle) {
-                        playerStyle = it
-                        prefs.setPlayerStyle(it)
-                        showPlayerStyleDialog = false
-                    }
-                    PlayerStyleRadioButton(str("style_blur"), PlayerBackgroundStyle.BLUR, playerStyle) {
-                        playerStyle = it
-                        prefs.setPlayerStyle(it)
-                        showPlayerStyleDialog = false
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showPlayerStyleDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -276,38 +245,6 @@ fun AppearanceSettingsScreen(
 
             item {
                 SettingsGroup(
-                    title = str("settings_cat_player"),
-                    items = listOf(
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_new_player_design"),
-                                hasSwitch = true,
-                                switchState = newPlayerDesign,
-                                onSwitchChange = {
-                                    newPlayerDesign = it
-                                    prefs.setNewPlayerDesignEnabled(it)
-                                }
-                            )
-                        },
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_player_style"),
-                                subtitle = when (playerStyle) {
-                                    PlayerBackgroundStyle.THEME -> str("style_theme")
-                                    PlayerBackgroundStyle.GRADIENT -> str("style_gradient")
-                                    PlayerBackgroundStyle.BLUR -> str("style_blur")
-                                },
-                                onClick = { showPlayerStyleDialog = true }
-                            )
-                        }
-                    )
-                )
-            }
-
-            item {
-                SettingsGroup(
                     title = str("settings_cat_general"),
                     items = listOf(
                         { shape ->
@@ -319,18 +256,6 @@ fun AppearanceSettingsScreen(
                                     StartDestination.LIBRARY -> str("nav_library")
                                 },
                                 onClick = { showStartDestDialog = true }
-                            )
-                        },
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_achievement_popups"),
-                                hasSwitch = true,
-                                switchState = achievementPopupsEnabled,
-                                onSwitchChange = {
-                                    achievementPopupsEnabled = it
-                                    prefs.setAchievementPopupsEnabled(it)
-                                }
                             )
                         },
                         { shape ->
@@ -455,22 +380,6 @@ private fun ThemeOption(
             style = MaterialTheme.typography.labelMedium,
             color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-@Composable
-fun PlayerStyleRadioButton(text: String,
-    style: PlayerBackgroundStyle,
-    selected: PlayerBackgroundStyle,
-    onSelect: (PlayerBackgroundStyle) -> Unit
-) {
-    Row(
-        Modifier.fillMaxWidth().clickable { onSelect(style) }.padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = (style == selected), onClick = null)
-        Spacer(Modifier.width(8.dp))
-        Text(text)
     }
 }
 

@@ -7,8 +7,10 @@ import com.alananasss.kittytune.data.network.GithubClient
 import com.alananasss.kittytune.data.network.GithubRelease
 import com.alananasss.kittytune.utils.AppUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -18,17 +20,22 @@ import java.io.FileOutputStream
 import kotlin.math.max
 
 enum class UpdateStatus {
-    IDLE, CHECKING, AVAILABLE, DOWNLOADING, READY_TO_INSTALL, ERROR, NO_UPDATE
+    IDLE, CHECKING, AVAILABLE, DOWNLOADING, PAUSED, INSTALLING, MULTIPLE_INSTANCES, READY_TO_INSTALL, ERROR, NO_UPDATE
 }
 
 /**
  * Desktop port of the Android UpdateManager.
- * GitHub check + version-compare logic kept verbatim. APK download/install replaced
- * by fetching the Windows installer asset (.msi/.exe) and launching it via Desktop.open.
+ * In-app update flow:
+ * 1. Download asset with KittyTune progress UI (DOWNLOADING)
+ * 2. Silent background installation with KittyTune UI progress (INSTALLING)
+ * 3. App restart button (READY_TO_INSTALL -> restartApp)
  */
 object UpdateManager {
     private val _status = MutableStateFlow(UpdateStatus.IDLE)
     val status = _status.asStateFlow()
+
+    private val _isDialogVisible = MutableStateFlow(false)
+    val isDialogVisible = _isDialogVisible.asStateFlow()
 
     private val _downloadProgress = MutableStateFlow(0f)
     val downloadProgress = _downloadProgress.asStateFlow()
@@ -41,6 +48,98 @@ object UpdateManager {
 
     private const val KEY_LAST_CHECK = "last_check_time"
     private val prefs = NamedPrefs("update_cache")
+
+    fun isAutoUpdateEnabled(): Boolean = com.alananasss.kittytune.data.local.PlayerPreferences().getAutoUpdateEnabled()
+
+    fun setAutoUpdateEnabled(enabled: Boolean) {
+        com.alananasss.kittytune.data.local.PlayerPreferences().setAutoUpdateEnabled(enabled)
+    }
+
+    fun showDialog() {
+        _isDialogVisible.value = true
+    }
+
+    fun hideDialog() {
+        _isDialogVisible.value = false
+    }
+
+    fun pauseDownload() {
+        if (_status.value == UpdateStatus.DOWNLOADING) {
+            _status.value = UpdateStatus.PAUSED
+        }
+    }
+
+    fun getOtherKittyTuneProcesses(): List<ProcessHandle> {
+        return try {
+            val currentPid = ProcessHandle.current().pid()
+            ProcessHandle.allProcesses().filter { handle ->
+                if (handle.pid() == currentPid) return@filter false
+
+                val info = handle.info()
+                val cmd = info.command().orElse("").lowercase()
+                val cmdLine = info.commandLine().orElse("").lowercase()
+
+                // Ignore Gradle Daemons, Gradle Workers, and IDE processes
+                if (cmdLine.contains("gradledaemon") || cmdLine.contains("gradleworkermain") || cmdLine.contains("gradlewrappermain")) {
+                    return@filter false
+                }
+
+                // Check native binary executable name
+                val exeName = cmd.substringAfterLast('/', "").substringAfterLast('\\', "")
+                val isNativeKittyTune = (exeName == "kittytune.exe" || exeName == "kittytune" || exeName == "kitty-tune")
+
+                // Check java process running another KittyTune MainKt instance
+                val isJavaKittyTune = (exeName == "java.exe" || exeName == "javaw.exe" || exeName == "java") &&
+                        cmdLine.contains("com.alananasss.kittytune.mainkt")
+
+                isNativeKittyTune || isJavaKittyTune
+            }.toList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun killOtherKittyTuneProcesses() {
+        try {
+            val currentPid = ProcessHandle.current().pid()
+            getOtherKittyTuneProcesses().forEach { handle ->
+                runCatching { handle.destroyForcibly() }
+            }
+            val osName = System.getProperty("os.name", "").lowercase()
+            when {
+                osName.contains("win") -> {
+                    val currentExeName = "KittyTune.exe"
+                    runCatching { ProcessBuilder("taskkill", "/F", "/FI", "PID ne $currentPid", "/IM", currentExeName).start().waitFor() }
+                }
+                osName.contains("nux") || osName.contains("nix") -> {
+                    runCatching { ProcessBuilder("pkill", "-9", "-f", "kittytune").start().waitFor() }
+                    runCatching { ProcessBuilder("pkill", "-9", "-f", "kitty-tune").start().waitFor() }
+                    runCatching { ProcessBuilder("killall", "-9", "kittytune").start().waitFor() }
+                }
+                osName.contains("mac") -> {
+                    runCatching { ProcessBuilder("pkill", "-9", "-f", "KittyTune").start().waitFor() }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun killInstancesAndContinue() {
+        killOtherKittyTuneProcesses()
+        downloadedInstallerFile?.let { file ->
+            _status.value = UpdateStatus.INSTALLING
+            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                performBackgroundInstall(file)
+            }
+        }
+    }
+
+    suspend fun checkOnStartup() {
+        if (isAutoUpdateEnabled()) {
+            checkForUpdate(isManual = false)
+        }
+    }
 
     private val client = OkHttpClient()
     private const val AUTO_CHECK_COOLDOWN_MS = 15 * 60 * 1000L
@@ -62,10 +161,11 @@ object UpdateManager {
             val release = GithubClient.api.getLatestRelease()
 
             releaseInfo = release
-            val remoteVersion = release.tagName.replace("v", "")
+            val remoteVersion = release.versionName.replace("v", "")
 
             if (isNewerVersion(currentVersion, remoteVersion)) {
                 _status.value = UpdateStatus.AVAILABLE
+                _isDialogVisible.value = true
             } else {
                 _status.value = if (isManual) UpdateStatus.NO_UPDATE else UpdateStatus.IDLE
             }
@@ -91,15 +191,28 @@ object UpdateManager {
                 assets.find { it.name.endsWith(".dmg", ignoreCase = true) }
             }
             osName.contains("nux") || osName.contains("nix") -> {
+                val archName = if (isArm) "aarch64" else "x86_64"
                 val debArch = if (isArm) "arm64" else "amd64"
-                val rpmArch = if (isArm) "aarch64" else "x86_64"
 
-                assets.find { it.name.endsWith(".deb", ignoreCase = true) && it.name.contains(debArch, ignoreCase = true) }
-                    ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) && it.name.contains(rpmArch, ignoreCase = true) }
-                    ?: assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && it.name.contains(rpmArch, ignoreCase = true) }
-                    ?: assets.find { it.name.endsWith(".AppImage", ignoreCase = true) }
-                    ?: assets.find { it.name.endsWith(".deb", ignoreCase = true) }
-                    ?: assets.firstOrNull()
+                val isArch = File("/etc/arch-release").exists() || File("/etc/pacman.conf").exists()
+                val isDebian = File("/etc/debian_version").exists()
+                val isRpm = File("/etc/redhat-release").exists() || File("/etc/fedora-release").exists()
+
+                if (isArch) {
+                    assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && (it.name.contains(archName, ignoreCase = true) || it.name.contains(osArch, ignoreCase = true)) }
+                        ?: assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) }
+                } else if (isDebian) {
+                    assets.find { it.name.endsWith(".deb", ignoreCase = true) && (it.name.contains(debArch, ignoreCase = true) || it.name.contains(archName, ignoreCase = true)) }
+                        ?: assets.find { it.name.endsWith(".deb", ignoreCase = true) }
+                } else if (isRpm) {
+                    assets.find { it.name.endsWith(".rpm", ignoreCase = true) && (it.name.contains(archName, ignoreCase = true) || it.name.contains(osArch, ignoreCase = true)) }
+                        ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) }
+                } else {
+                    assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && it.name.contains(archName, ignoreCase = true) }
+                        ?: assets.find { it.name.endsWith(".deb", ignoreCase = true) }
+                        ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) }
+                        ?: assets.firstOrNull()
+                }
             }
             else -> assets.firstOrNull()
         }
@@ -113,56 +226,118 @@ object UpdateManager {
             return
         }
 
+        val isResuming = _status.value == UpdateStatus.PAUSED
         _status.value = UpdateStatus.DOWNLOADING
-        _downloadProgress.value = 0f
-        _downloadSize.value = asset.size
 
         withContext(Dispatchers.IO) {
             try {
-                val noRedirectClient = client.newBuilder()
-                    .followRedirects(false)
-                    .followSslRedirects(false)
-                    .build()
+                var file = File(AppDirs.cacheDir, "update_${asset.name}")
 
-                val requestGitHub = Request.Builder().url(asset.browserDownloadUrl).build()
-                var response = noRedirectClient.newCall(requestGitHub).execute()
-
-                if (response.code == 302) {
-                    val downloadUrl = response.header("Location")
-                    response.close()
-                    if (downloadUrl != null) {
-                        response = client.newCall(Request.Builder().url(downloadUrl).build()).execute()
-                    } else {
-                        throw Exception("Redirect without location")
+                var existingLength = 0L
+                if (isResuming && file.exists()) {
+                    existingLength = file.length()
+                } else {
+                    cleanupOldUpdateCache()
+                    if (file.exists()) {
+                        val deleted = runCatching { file.delete() }.getOrDefault(false)
+                        if (!deleted) {
+                            file = File(AppDirs.cacheDir, "update_${System.currentTimeMillis()}_${asset.name}")
+                        }
                     }
                 }
 
-                if (!response.isSuccessful) throw Exception("HTTP Error ${response.code}")
+                val downloadClient = client.newBuilder()
+                    .followRedirects(true)
+                    .followSslRedirects(true)
+                    .build()
 
-                val body = response.body ?: throw Exception("Empty response body")
-                val totalSize = body.contentLength()
-                val ext = asset.name.substringAfterLast('.', "installer")
-                val file = File(AppDirs.cacheDir, "update_$ext.${asset.name.substringAfterLast('.', "bin")}")
-                if (file.exists()) file.delete()
+                val requestBuilder = Request.Builder()
+                    .url(asset.browserDownloadUrl)
+                    .header("User-Agent", "KittyTuneDesktop")
 
-                body.byteStream().use { input ->
-                    FileOutputStream(file).use { output ->
-                        val buffer = ByteArray(8 * 1024)
-                        var bytesCopied = 0L
-                        var read: Int
-                        while (input.read(buffer).also { read = it } >= 0) {
-                            output.write(buffer, 0, read)
-                            bytesCopied += read
-                            if (totalSize > 0) {
-                                _downloadProgress.value = bytesCopied.toFloat() / totalSize.toFloat()
+                if (existingLength > 0) {
+                    requestBuilder.header("Range", "bytes=$existingLength-")
+                }
+
+                val response = downloadClient.newCall(requestBuilder.build()).execute()
+
+                if (!response.isSuccessful && response.code != 206) {
+                    throw Exception("HTTP Error ${response.code}")
+                }
+
+                val body = response.body
+                val contentLength = body.contentLength()
+                val totalSize = if (response.code == 206 || existingLength > 0) {
+                    existingLength + (if (contentLength > 0) contentLength else 0L)
+                } else {
+                    if (contentLength > 0) contentLength else asset.size
+                }
+
+                _downloadSize.value = totalSize
+
+                try {
+                    body.byteStream().use { input ->
+                        FileOutputStream(file, existingLength > 0).use { output ->
+                            val buffer = ByteArray(8 * 1024)
+                            var bytesCopied = existingLength
+                            var read: Int
+                            while (input.read(buffer).also { read = it } >= 0) {
+                                if (_status.value == UpdateStatus.PAUSED) {
+                                    return@withContext
+                                }
+                                if (_status.value != UpdateStatus.DOWNLOADING) {
+                                    output.close()
+                                    runCatching { file.delete() }
+                                    return@withContext
+                                }
+                                output.write(buffer, 0, read)
+                                bytesCopied += read
+                                if (totalSize > 0) {
+                                    _downloadProgress.value = bytesCopied.toFloat() / totalSize.toFloat()
+                                }
                             }
+                            output.flush()
                         }
-                        output.flush()
                     }
+                } catch (e: java.io.FileNotFoundException) {
+                    val fallbackFile = File(AppDirs.cacheDir, "update_${System.currentTimeMillis()}_${asset.name}")
+                    body.byteStream().use { input ->
+                        FileOutputStream(fallbackFile, false).use { output ->
+                            val buffer = ByteArray(8 * 1024)
+                            var bytesCopied = 0L
+                            var read: Int
+                            while (input.read(buffer).also { read = it } >= 0) {
+                                if (_status.value == UpdateStatus.PAUSED || _status.value != UpdateStatus.DOWNLOADING) {
+                                    output.close()
+                                    runCatching { fallbackFile.delete() }
+                                    return@withContext
+                                }
+                                output.write(buffer, 0, read)
+                                bytesCopied += read
+                                if (totalSize > 0) {
+                                    _downloadProgress.value = bytesCopied.toFloat() / totalSize.toFloat()
+                                }
+                            }
+                            output.flush()
+                        }
+                    }
+                    file = fallbackFile
+                }
+
+                if (_status.value == UpdateStatus.PAUSED) {
+                    return@withContext
+                }
+
+                if (_status.value != UpdateStatus.DOWNLOADING) {
+                    file.delete()
+                    return@withContext
                 }
 
                 downloadedInstallerFile = file
-                _status.value = UpdateStatus.READY_TO_INSTALL
+
+                // Step 2: Perform background installation within KittyTune UI
+                _status.value = UpdateStatus.INSTALLING
+                performBackgroundInstall(file)
             } catch (e: Exception) {
                 e.printStackTrace()
                 _status.value = UpdateStatus.ERROR
@@ -172,89 +347,169 @@ object UpdateManager {
         }
     }
 
-    /** Launch the downloaded installer silently or natively according to the OS. */
-    fun installUpdate(silent: Boolean = true) {
-        val file = downloadedInstallerFile ?: return
+    private fun performBackgroundInstall(file: File) {
         try {
+            if (getOtherKittyTuneProcesses().isNotEmpty()) {
+                _status.value = UpdateStatus.MULTIPLE_INSTANCES
+                return
+            }
+
             val osName = System.getProperty("os.name", "").lowercase()
-            when {
+            val args = when {
                 osName.contains("win") -> {
                     if (file.name.endsWith(".msi", ignoreCase = true)) {
-                        val args = if (silent) arrayOf("msiexec", "/i", file.absolutePath, "/passive", "/norestart") else arrayOf("msiexec", "/i", file.absolutePath)
-                        ProcessBuilder(*args).start()
+                        arrayOf("msiexec", "/i", file.absolutePath, "/quiet", "/norestart")
                     } else {
-                        val args = if (silent) arrayOf(file.absolutePath, "/passive", "/quiet", "/norestart") else arrayOf(file.absolutePath)
-                        try {
-                            ProcessBuilder(*args).start()
-                        } catch (e: Exception) {
-                            if (Desktop.isDesktopSupported()) {
-                                Desktop.getDesktop().open(file)
-                            } else {
-                                ProcessBuilder("cmd", "/c", "start", "", file.absolutePath).start()
-                            }
-                        }
+                        arrayOf(file.absolutePath, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/passive", "/quiet")
                     }
-                    kotlin.system.exitProcess(0)
                 }
                 osName.contains("nux") || osName.contains("nix") -> {
                     when {
-                        file.name.endsWith(".AppImage", ignoreCase = true) -> {
-                            file.setExecutable(true)
-                            ProcessBuilder(file.absolutePath).start()
+                        file.name.endsWith(".pkg.tar.zst", ignoreCase = true) -> {
+                            arrayOf("pkexec", "pacman", "-U", "--noconfirm", file.absolutePath)
                         }
                         file.name.endsWith(".deb", ignoreCase = true) -> {
-                            try {
-                                ProcessBuilder("pkexec", "dpkg", "-i", file.absolutePath).start()
-                            } catch (e: Exception) {
-                                ProcessBuilder("xdg-open", file.absolutePath).start()
-                            }
+                            arrayOf("pkexec", "apt-get", "install", "-y", file.absolutePath)
                         }
                         file.name.endsWith(".rpm", ignoreCase = true) -> {
-                            try {
-                                ProcessBuilder("pkexec", "rpm", "-Uvh", file.absolutePath).start()
-                            } catch (e: Exception) {
-                                ProcessBuilder("xdg-open", file.absolutePath).start()
-                            }
+                            arrayOf("pkexec", "dnf", "install", "-y", file.absolutePath)
                         }
-                        file.name.endsWith(".pkg.tar.zst", ignoreCase = true) -> {
-                            try {
-                                ProcessBuilder("pkexec", "pacman", "-U", "--noconfirm", file.absolutePath).start()
-                            } catch (e: Exception) {
-                                ProcessBuilder("xdg-open", file.absolutePath).start()
-                            }
+                        file.name.endsWith(".AppImage", ignoreCase = true) -> {
+                            file.setExecutable(true, false)
+                            emptyArray()
                         }
-                        else -> {
-                            ProcessBuilder("xdg-open", file.absolutePath).start()
-                        }
+                        else -> emptyArray()
                     }
-                    kotlin.system.exitProcess(0)
                 }
                 osName.contains("mac") -> {
-                    ProcessBuilder("open", file.absolutePath).start()
-                    kotlin.system.exitProcess(0)
+                    arrayOf("hdiutil", "attach", file.absolutePath)
                 }
-                else -> {
-                    if (Desktop.isDesktopSupported()) {
-                        Desktop.getDesktop().open(file)
-                    }
+                else -> emptyArray()
+            }
+
+            if (args.isNotEmpty()) {
+                val process = ProcessBuilder(*args).start()
+                val isDevMode = System.getProperty("jpackage.app.path").isNullOrBlank()
+                if (isDevMode) {
+                    runCatching { process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS) }
+                } else {
+                    runCatching { process.waitFor() }
                 }
             }
+            _status.value = UpdateStatus.READY_TO_INSTALL
         } catch (e: Exception) {
             e.printStackTrace()
             _status.value = UpdateStatus.ERROR
         }
     }
 
-    fun dismiss() {
-        _status.value = UpdateStatus.IDLE
+    /** Restart the application after in-app installation. */
+    fun restartApp() {
+        try {
+            val osName = System.getProperty("os.name", "").lowercase()
+            when {
+                osName.contains("win") -> {
+                    val jpackagePath = System.getProperty("jpackage.app.path")
+                    val possibleExePaths = listOfNotNull(
+                        jpackagePath?.let { File(it) },
+                        File(System.getProperty("user.dir"), "KittyTune.exe"),
+                        File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
+                        File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
+                        File(System.getenv("ProgramFiles") ?: "", "KittyTune/KittyTune.exe")
+                    )
+
+                    val existingExe = possibleExePaths.firstOrNull { it.exists() && it.isFile }
+                    if (existingExe != null) {
+                        ProcessBuilder(existingExe.absolutePath).start()
+                    } else {
+                        relaunchJavaDevMode()
+                    }
+                }
+                osName.contains("nux") || osName.contains("nix") -> {
+                    val jpackagePath = System.getProperty("jpackage.app.path")
+                    val possibleBinPaths = listOfNotNull(
+                        jpackagePath?.let { File(it) },
+                        File("/usr/bin/kittytune"),
+                        File("/usr/local/bin/kittytune"),
+                        File("/opt/kittytune/bin/kittytune"),
+                        File("/usr/bin/kitty-tune"),
+                        File("/usr/local/bin/kitty-tune")
+                    )
+                    val existingBin = possibleBinPaths.firstOrNull { it.exists() && it.isFile }
+                    if (existingBin != null) {
+                        ProcessBuilder(existingBin.absolutePath).start()
+                    } else {
+                        relaunchJavaDevMode()
+                    }
+                }
+                osName.contains("mac") -> {
+                    val jpackagePath = System.getProperty("jpackage.app.path")
+                    if (!jpackagePath.isNullOrBlank() && File(jpackagePath).exists()) {
+                        ProcessBuilder(jpackagePath).start()
+                    } else {
+                        ProcessBuilder("open", "-a", "KittyTune").start()
+                    }
+                }
+                else -> relaunchJavaDevMode()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        kotlin.system.exitProcess(0)
+    }
+
+    private fun relaunchJavaDevMode() {
+        try {
+            val osName = System.getProperty("os.name", "").lowercase()
+            val javaExeName = if (osName.contains("win")) "bin/java.exe" else "bin/java"
+            val javaBin = File(System.getProperty("java.home"), javaExeName)
+            val classPath = System.getProperty("java.class.path")
+            if (javaBin.exists() && !classPath.isNullOrBlank()) {
+                ProcessBuilder(javaBin.absolutePath, "-cp", classPath, "com.alananasss.kittytune.MainKt").start()
+            } else {
+                com.alananasss.kittytune.core.Toaster.show(com.alananasss.kittytune.core.str("update_restarting_toast"))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun cleanupOldUpdateCache() {
+        try {
+            AppDirs.cacheDir.listFiles()?.forEach { f ->
+                if (f.name.startsWith("update_") && f.isFile) {
+                    runCatching { f.delete() }
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun cancelDownload() {
         _downloadProgress.value = 0f
         _downloadSize.value = 0L
+        if (releaseInfo != null) {
+            _status.value = UpdateStatus.AVAILABLE
+        } else {
+            _status.value = UpdateStatus.IDLE
+        }
+        cleanupOldUpdateCache()
+        _isDialogVisible.value = false
+    }
+
+    fun dismiss() {
+        if (_status.value == UpdateStatus.DOWNLOADING || _status.value == UpdateStatus.PAUSED) {
+            cancelDownload()
+        } else {
+            _isDialogVisible.value = false
+        }
     }
 
     private fun isNewerVersion(current: String, remote: String): Boolean {
         return try {
-            val v1 = current.split(".").map { it.toIntOrNull() ?: 0 }
-            val v2 = remote.split(".").map { it.toIntOrNull() ?: 0 }
+            val cleanCurrent = current.replace(Regex("[^0-9.]"), "")
+            val cleanRemote = remote.replace(Regex("[^0-9.]"), "")
+            val v1 = cleanCurrent.split(".").map { it.toIntOrNull() ?: 0 }
+            val v2 = cleanRemote.split(".").map { it.toIntOrNull() ?: 0 }
             for (i in 0 until max(v1.size, v2.size)) {
                 val v1Part = v1.getOrElse(i) { 0 }
                 val v2Part = v2.getOrElse(i) { 0 }

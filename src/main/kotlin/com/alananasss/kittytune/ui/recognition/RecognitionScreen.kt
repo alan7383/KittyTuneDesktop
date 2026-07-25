@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -45,12 +44,9 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.music.recognition.RecognitionViewModel
 import com.alananasss.kittytune.music.recognition.RecognitionState
 import com.alananasss.kittytune.data.LikeRepository
-import com.alananasss.kittytune.data.AchievementManager
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.History
 
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.ArrowDropDown
 import com.alananasss.kittytune.music.recognition.AudioInputDevice
 
 @Composable
@@ -91,24 +87,6 @@ fun RecognitionScreen(
                     .fillMaxWidth()
                     .height(280.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerLow
-            )
-        }
-
-        FilledTonalIconButton(
-            shapes = IconButtonDefaults.shapes(),
-            onClick = onBackClick,
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(8.dp)
-        ) {
-            Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = str("btn_back")
             )
         }
 
@@ -526,9 +504,6 @@ private fun SuccessView(
                                 LikeRepository.removeLike(track.id)
                             } else {
                                 LikeRepository.addLike(track)
-                                AchievementManager.increment("liker_50")
-                                AchievementManager.increment("liker_1000")
-                                AchievementManager.increment("liker_5000")
                             }
                         }
                     },

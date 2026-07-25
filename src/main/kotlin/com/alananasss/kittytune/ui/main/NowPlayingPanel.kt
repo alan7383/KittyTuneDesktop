@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
 import androidx.compose.material3.ButtonDefaults
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.ui.draw.shadow
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -146,10 +148,10 @@ private fun QueueList(vm: PlayerViewModel) {
         state = listState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
     ) {
-        itemsIndexed(items = vm.queueState, key = { _, track -> track.id }) { index, track ->
+        itemsIndexed(items = vm.queueState, key = { index, track -> "${index}_${track.id}" }) { index, track ->
             ReorderableItem(
                 state = reorderableState,
-                key = track.id
+                key = "${index}_${track.id}"
             ) { isDragging ->
                 val isCurrent = index == vm.currentQueueIndex
                 val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "elevation")
@@ -188,13 +190,19 @@ private fun QueueList(vm: PlayerViewModel) {
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            text = track.user?.username ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = track.user?.username ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (track.user?.verified == true) {
+                                Spacer(Modifier.width(3.dp))
+                                Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                            }
+                        }
                     }
                     Icon(
                         imageVector = Icons.Rounded.DragHandle,
@@ -230,7 +238,7 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
             androidx.compose.material3.FilledTonalButton(
                 onClick = onOpenFullLyrics,
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                shape = RoundedCornerShape(12.dp),
+                shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.height(30.dp)
             ) {
                 Icon(

@@ -14,6 +14,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import androidx.compose.ui.unit.dp
 
@@ -43,7 +44,7 @@ fun DiscordSettingsScreen(
     var showStatusDialog by remember { mutableStateOf(false) }
 
     if (showStatusDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showStatusDialog = false },
             title = { Text(str("pref_discord_status_display")) },
             text = {

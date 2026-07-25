@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilterChip
@@ -796,7 +797,14 @@ private fun SoundCloudResults(
                                     playlist,
                                     onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
                                 ) {
-                                    playerViewModel.navigateToPlaylistId = playlist.id.toString()
+                                    val dest = when {
+                                        playlist.isTrackStation || playlist.permalinkUrl?.contains("track-stations") == true || playlist.urn?.contains("track-stations") == true -> "station:${playlist.numericId}"
+                                        playlist.isArtistStation || playlist.permalinkUrl?.contains("artist-stations") == true || playlist.urn?.contains("artist-stations") == true -> "station_artist:${playlist.numericId}"
+                                        playlist.urn?.startsWith("soundcloud:system-playlists:") == true -> "system_playlist:${playlist.urn}"
+                                        playlist.id < 0 -> "local_playlist:${playlist.id}"
+                                        else -> playlist.id.toString()
+                                    }
+                                    playerViewModel.navigateToPlaylistId = dest
                                 }
                             }
                         }
@@ -970,13 +978,19 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = track.user?.username ?: "",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = track.user?.username ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (track.user?.verified == true) {
+                    Spacer(Modifier.width(3.dp))
+                    Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                }
+            }
         }
         if (durationText.isNotEmpty()) {
             Text(
@@ -1026,13 +1040,25 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = user.username ?: "",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = user.username ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (user.verified) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Rounded.Verified,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
             val followersCount = user.followersCount
             val followersText = when {
                 followersCount >= 1_000_000 -> "${followersCount / 1_000_000}M followers"
@@ -1095,7 +1121,7 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = playlist.user?.username ?: "",
                     style = MaterialTheme.typography.bodySmall,
@@ -1103,6 +1129,10 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (playlist.user?.verified == true) {
+                    Spacer(Modifier.width(3.dp))
+                    Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                }
                 val trackCount = playlist.trackCount ?: 0
                 if (trackCount > 0) {
                     Text(

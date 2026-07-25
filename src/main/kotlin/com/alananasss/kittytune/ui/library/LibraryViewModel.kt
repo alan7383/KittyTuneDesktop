@@ -336,7 +336,7 @@ import com.alananasss.kittytune.core.str
                                 val date = try { item.likedAt?.let { isoParser.parse(it)?.time } ?: 0L } catch (e: Exception) { 0L }
                                 newOnlineItems.add(LibraryItem.PlaylistItem(pl, date))
                             } else if (sp != null) {
-                                val numId = sp.urn?.hashCode()?.toLong() ?: sp.numericId
+                                val numId = if (sp.numericId != 0L) sp.numericId else (sp.urn?.hashCode()?.toLong() ?: 0L)
                                 if (numId != 0L && addedPlaylistIds.add(numId)) {
                                     trulyLikedIds.add(numId)
                                     val stationPermalink = sp.permalinkUrl ?: if (sp.isArtistStation) "https://soundcloud.com/discover/sets/artist-stations:${sp.numericId}" else "https://soundcloud.com/discover/sets/track-stations:${sp.numericId}"
@@ -381,7 +381,7 @@ import com.alananasss.kittytune.core.str
                         // Add liked system playlists and stations from library/all
                         libraryAllResponse?.collection?.forEach { item ->
                             val sp = item.systemPlaylist ?: return@forEach
-                            val numId = sp.urn?.hashCode()?.toLong() ?: sp.numericId
+                            val numId = if (sp.numericId != 0L) sp.numericId else (sp.urn?.hashCode()?.toLong() ?: 0L)
                             if (numId != 0L && addedPlaylistIds.add(numId)) {
                                 trulyLikedIds.add(numId)
                                 val stationPermalink = sp.permalinkUrl ?: if (sp.isArtistStation) "https://soundcloud.com/discover/sets/artist-stations:${sp.numericId}" else "https://soundcloud.com/discover/sets/track-stations:${sp.numericId}"

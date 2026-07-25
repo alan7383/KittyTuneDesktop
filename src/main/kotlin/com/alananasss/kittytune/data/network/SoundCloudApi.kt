@@ -394,6 +394,11 @@
         suspend fun checkFollowState(@Path("userId") userId: Long): retrofit2.Response<Unit>
 
     @POST("https://graph.soundcloud.com/graphql")
+    suspend fun getRelatedLikersGraphQL(
+        @Body request: RelatedLikersRequest
+    ): RelatedLikersResponse
+
+    @POST("https://graph.soundcloud.com/graphql")
     suspend fun getUserFollowersGraphQL(
         @Body request: GraphQlFollowsRequest
     ): GraphQlUserFollowersResponse

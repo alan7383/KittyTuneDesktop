@@ -46,6 +46,8 @@
 
     <string name="btn_close">Fermer</string>
 
+    <string name="btn_fullscreen">Plein écran</string>
+
     <string name="btn_back">Retour</string>
 
     <string name="btn_reset">Réinitialiser</string>
@@ -395,6 +397,7 @@
     <string name="search_library_hint">Filtrer la bibliothèque</string>
 
     <string name="search_playlist_hint">Filtrer la playlist</string>
+    <string name="search_tracks_hint">Filtrer les titres</string>
 
     <string name="lib_offline_mode">Mode Hors Ligne • Accès local uniquement</string>
 
@@ -779,8 +782,6 @@
 
     <string name="profile_menu_login">Se connecter</string>
 
-    <string name="profile_menu_achievements">Succès</string>
-
     <string name="profile_menu_settings">Paramètres</string>
 
     <string name="pref_bottom_menu_fab_stats">Statistiques</string>
@@ -811,7 +812,17 @@
 
     <string name="comment_send_action">Envoyer</string>
 
+    <string name="comment_reply">Répondre</string>
+
+    <string name="comment_replying_to">Réponse à %1$s</string>
+
+    <string name="comment_write_reply">Écrire une réponse&#8230;</string>
+
     <string name="comment_default_avatar">Avatar par défaut</string>
+
+    <string name="social_proof_liked_single">%1$s a aimé ce titre</string>
+
+    <string name="social_proof_liked_multiple">%1$s et %2$s autres ont liké ce titre</string>
 
     <string name="login_to_interact">Connectez-vous pour interagir</string>
 
@@ -1027,12 +1038,6 @@
 
     <string name="pref_theme_pure_black_sub">Économie de batterie pour écrans OLED</string>
 
-    <string name="settings_cat_player">Lecteur</string>
-
-    <string name="pref_new_player_design">Nouveau design du lecteur</string>
-
-    <string name="pref_player_style">Style du lecteur</string>
-
     <string name="pref_language">Langue</string>
 
     <string name="pref_language_sub">Langue de l\'interface</string>
@@ -1042,12 +1047,6 @@
     <string name="theme_light">Clair</string>
 
     <string name="theme_dark">Sombre</string>
-
-    <string name="style_theme">Couleur unie</string>
-
-    <string name="style_gradient">Dégradé</string>
-
-    <string name="style_blur">Flou (Blur)</string>
 
     <string name="lang_french">Français</string>
 
@@ -1359,9 +1358,6 @@
     <string name="update_available_title">Mise à jour disponible</string>
 
     <string name="update_btn_download">Télécharger &amp; Installer</string>
-
-    <string name="update_downloading">Téléchargement&#8230;</string>
-
     <string name="update_error">Échec de la mise à jour</string>
 
     <string name="update_no_update">Aucune mise à jour disponible</string>
@@ -1371,172 +1367,6 @@
     <string name="pref_auto_update">Mise à jour auto</string>
 
     <string name="pref_auto_update_sub">Vérifier au démarrage de l\'app</string>
-
-    <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
-
-    <!-- ACHIEVEMENTS                                                                     -->
-
-    <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
-
-    <string name="achievements_title">Succès</string>
-
-    <string name="achievements_subtitle">%1$d / %2$d débloqués</string>
-
-    <string name="achievements_current_level">Niveau</string>
-
-    <string name="xp_format">%1$d / %2$d XP</string>
-
-    <string name="xp_reward">%d XP</string>
-
-    <string name="achievements_reset_progress">Réinitialiser</string>
-
-    <string name="achievements_replay_legend">Revoir la Légende</string>
-
-    <string name="achievements_status_done">Acquis</string>
-
-    <string name="achievements_secret_title">Secret</string>
-
-    <string name="achievements_reset_success">Progression effacée</string>
-
-    <string name="ach_secret_desc">\?</string>
-
-    <string name="pref_achievement_popups">Notifications de succès</string>
-
-    <string name="pref_achievement_popups_sub">Afficher une alerte lors d\'un déblocage</string>
-
-    <string name="ach_cat_time">Endurance ( ˘_˘) &#8230;</string>
-
-    <string name="ach_cat_volume">Volume ♪└( ＾ω＾ )」</string>
-
-    <string name="ach_cat_loyalty">Séries ( 🔥_🔥 )</string>
-
-    <string name="ach_cat_collection">Collection ( 📦_📦 )</string>
-
-    <string name="ach_cat_player">Maîtrise [ ◉_◉ ]</string>
-
-    <string name="ach_cat_hardcore">Hardcore ( ✖_✖ )</string>
-
-    <string name="ach_cat_secret">Mystères ( ¬‿¬ )</string>
-
-    <!-- TIME -->
-
-    <string name="ach_time_1h_title">Échauffement</string>
-
-    <string name="ach_time_1h_desc">1h d\'écoute</string>
-
-    <string name="ach_time_24h_title">24 Chrono</string>
-
-    <string name="ach_time_24h_desc">24h d\'écoute totale</string>
-
-    <string name="ach_time_100h_title">Addict</string>
-
-    <string name="ach_time_100h_desc">100h d\'écoute</string>
-
-    <string name="ach_time_500h_title">Demi-Mille</string>
-
-    <string name="ach_time_500h_desc">500h d\'écoute</string>
-
-    <string name="ach_time_1000h_title">Vétéran</string>
-
-    <string name="ach_time_1000h_desc">1000h d\'écoute</string>
-
-    <string name="ach_time_2500h_title">Grand Maître</string>
-
-    <string name="ach_time_2500h_desc">2500h d\'écoute</string>
-
-    <string name="ach_time_5000h_title">L\'Éternel</string>
-
-    <string name="ach_time_5000h_desc">5000h d\'écoute</string>
-
-    <string name="ach_time_10000h_title">Transcendance</string>
-
-    <string name="ach_time_10000h_desc">10 000 heures. La maîtrise totale</string>
-
-    <!-- PLAYS -->
-
-    <string name="ach_plays_1_title">Premier Pas</string>
-
-    <string name="ach_plays_1_desc">Écouter 1 titre</string>
-
-    <string name="ach_plays_100_title">Curieux</string>
-
-    <string name="ach_plays_100_desc">100 lectures</string>
-
-    <string name="ach_plays_1000_title">Explorateur</string>
-
-    <string name="ach_plays_1000_desc">1 000 lectures</string>
-
-    <string name="ach_plays_5000_title">Mélomane</string>
-
-    <string name="ach_plays_5000_desc">5 000 lectures</string>
-
-    <string name="ach_plays_10000_title">Machine</string>
-
-    <string name="ach_plays_10000_desc">10 000 lectures</string>
-
-    <string name="ach_plays_20000_title">Visionnaire</string>
-
-    <string name="ach_plays_20000_desc">20 000 lectures</string>
-
-    <string name="ach_plays_50000_title">Oracle</string>
-
-    <string name="ach_plays_50000_desc">50 000 lectures</string>
-
-    <string name="ach_plays_100000_title">Dieu du Son</string>
-
-    <string name="ach_plays_100000_desc">100 000 lectures</string>
-
-    <!-- STREAK -->
-
-    <string name="ach_streak_7_title">Semaine Complète</string>
-
-    <string name="ach_streak_7_desc">7 jours de suite</string>
-
-    <string name="ach_streak_30_title">Habitué</string>
-
-    <string name="ach_streak_30_desc">30 jours de suite</string>
-
-    <string name="ach_streak_100_title">Centenaire</string>
-
-    <string name="ach_streak_100_desc">100 jours de suite</string>
-
-    <string name="ach_streak_200_title">Double Centenaire</string>
-
-    <string name="ach_streak_200_desc">200 jours de suite</string>
-
-    <string name="ach_streak_365_title">Année Parfaite</string>
-
-    <string name="ach_streak_365_desc">365 jours de suite</string>
-
-    <string name="ach_streak_500_title">Invincible</string>
-
-    <string name="ach_streak_500_desc">500 jours de suite</string>
-
-    <string name="ach_early_bird_title">Lève-tôt</string>
-
-    <string name="ach_early_bird_desc">10 écoutes entre 5h et 8h</string>
-
-    <string name="ach_night_owl_title">Oiseau de Nuit</string>
-
-    <string name="ach_night_owl_desc">10 écoutes entre 3h et 5h</string>
-
-    <string name="ach_lunch_break_title">Pause Déj</string>
-
-    <string name="ach_lunch_break_desc">10 écoutes entre 12h et 13h</string>
-
-    <!-- ACTIONS -->
-
-    <string name="ach_liker_50_title">Passionné</string>
-
-    <string name="ach_liker_50_desc">Liker 50 titres</string>
-
-    <string name="ach_liker_1000_title">Cœur d\'Or</string>
-
-    <string name="ach_liker_1000_desc">Liker 1000 titres</string>
-
-    <string name="ach_liker_5000_title">Amour Infini</string>
-
-    <string name="ach_liker_5000_desc">Liker 5000 titres</string>
 
     <string name="ach_playlist_creator_title">Selecta</string>
 
@@ -1606,37 +1436,13 @@
 
     <string name="ach_glitch_title">Glitch in the Matrix</string>
 
-    <string name="dialog_reset_achievements_title">Réinitialiser les succès ?</string>
 
-    <string name="dialog_reset_achievements_msg">Vous perdrez toute votre progression et vos badges. Irréversible</string>
-
-    <string name="dialog_reset_achievements_confirm">Continuer</string>
-
-    <string name="dialog_reset_achievements_final_title">Êtes-vous SÛR ?</string>
-
-    <string name="dialog_reset_achievements_final_msg">Dernière chance. Tout sera effacé</string>
-
-    <string name="dialog_reset_achievements_final_confirm">TOUT EFFACER</string>
-
-    <string name="completion_legend">LÉGENDE</string>
-
-    <string name="completion_message">Vous avez terminé KittyTune</string>
-
-    <string name="completion_thanks">Merci</string>
-
-    <string name="completion_thanks_message">"Terminer tous les succès est un exploit rare. Votre passion pour la musique est la raison d'être de cette app.\n\nMerci pour ce voyage.\n\n~ Alan :3"</string>
-
-    <string name="completion_continue">Appuyez pour continuer</string>
 
     <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
 
     <!-- SYSTEM & NOTIFICATIONS                                                           -->
 
     <!-- �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�? -->
-
-    <string name="achievement_unlocked">Succès déverrouillé !</string>
-
-    <string name="achievement_xp">+%1$d XP</string>
 
     <string name="streak_popup_title">Série en cours</string>
 
@@ -2029,6 +1835,7 @@
     <string name="table_header_album">Album</string>
     <string name="table_header_date_added">Date d\'ajout</string>
     <string name="table_header_release_date">Date de sortie</string>
+    <string name="table_header_plays">Écoutes</string>
 
     <!-- Track list view mode (Compact / List) -->
     <string name="view_mode_compact">Compact</string>
@@ -2098,6 +1905,23 @@
     <string name="update_btn_recheck">Re-vérifier</string>
     <string name="update_error">Impossible de vérifier ou télécharger la mise à jour.</string>
     <string name="update_btn_retry">Réessayer</string>
+    <string name="update_installing_title">Installation en cours dans KittyTune...</string>
+    <string name="update_installing_step">Étape 2/2 : Préparation des fichiers...</string>
+    <string name="update_success_title">Mise à jour installée avec succès</string>
+    <string name="update_btn_restart">Redémarrer l\'application</string>
+    <string name="update_btn_minimize">Réduire en arrière-plan</string>
+    <string name="update_installing_btn">Installation en cours...</string>
+    <string name="update_simulation_title">Simulation de Test</string>
+    <string name="update_simulation_btn">Tester l\'updater (Simulation)</string>
+    <string name="update_restarting_toast">Redémarrage de l\'application...</string>
+    <string name="update_restarted_toast">Application redémarrée avec succès !</string>
+    <string name="update_btn_pause">Mettre en pause</string>
+    <string name="update_btn_resume">Reprendre</string>
+    <string name="update_paused_title">Téléchargement en pause</string>
+    <string name="update_multi_instance_title">Autre instance détectée</string>
+    <string name="update_multi_instance_desc">Une autre instance de KittyTune est actuellement ouverte. Voulez-vous la fermer pour continuer l\'installation ?</string>
+    <string name="update_btn_close_instances">Fermer les instances</string>
+    <string name="update_btn_dont_remind">Ne plus me le rappeler</string>
 </resources>
 
 

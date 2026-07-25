@@ -58,6 +58,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import sh.calvin.reorderable.ReorderableItem
@@ -65,6 +66,8 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.AlbumResolver
 import com.alananasss.kittytune.data.DownloadManager
@@ -311,7 +314,8 @@ fun PlaylistDetailScreen(
         .replace("downloaded_section:", "")
         .replace("system_playlist:", "")
 
-    val currentIdLong = cleanIdStr.toLongOrNull() ?: 0L
+    val stationIdFromUrn = cleanIdStr.substringAfterLast(":").toLongOrNull()
+    val currentIdLong = stationIdFromUrn ?: cleanIdStr.toLongOrNull() ?: 0L
 
     val stableId = remember(playlistId, cleanIdStr, currentIdLong) {
         if (currentIdLong != 0L) currentIdLong else cleanIdStr.hashCode().toLong()
@@ -540,14 +544,26 @@ fun PlaylistDetailScreen(
 
                     val allCollectedTracks = mutableListOf<Track>()
                     val likesResponse = api.getUserTrackLikes(targetUserId, limit = 200)
-                    allCollectedTracks.addAll(likesResponse.collection.mapNotNull { it.track })
+                    allCollectedTracks.addAll(likesResponse.collection.map { item ->
+                        val millis = item.createdAt?.let { raw ->
+                            runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
+                                ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
+                        }
+                        item.track.copy(likedAt = millis ?: item.track.likedAt, createdAt = item.createdAt ?: item.track.createdAt)
+                    })
 
                     var nextUrl = likesResponse.next_href
                     var safetyPageCount = 0
                     while (nextUrl != null && safetyPageCount < 50) {
                         try {
-                            val nextResponse = api.getTrackLikesNextPage(nextUrl!!)
-                            allCollectedTracks.addAll(nextResponse.collection.mapNotNull { it.track })
+                            val nextResponse = api.getTrackLikesNextPage(nextUrl)
+                            allCollectedTracks.addAll(nextResponse.collection.map { item ->
+                                val millis = item.createdAt?.let { raw ->
+                                    runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
+                                        ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
+                                }
+                                item.track.copy(likedAt = millis ?: item.track.likedAt, createdAt = item.createdAt ?: item.track.createdAt)
+                            })
                             nextUrl = nextResponse.next_href
                             safetyPageCount++
                         } catch (e: Exception) {
@@ -589,9 +605,6 @@ fun PlaylistDetailScreen(
                     } else {
                         val isSystemPlaylistRoute = playlistId.startsWith("system_playlist:")
                         if (currentIdLong > 0L || isSystemPlaylistRoute) {
-                            val isArtistStation = playlistId.startsWith("station_artist:")
-                            val isTrackStation = playlistId.startsWith("station:")
-
                             val localFallback = if (currentIdLong != 0L) db.getPlaylist(currentIdLong) else null
                             if (localFallback != null) {
                                 playlistTitle = localFallback.title
@@ -600,11 +613,38 @@ fun PlaylistDetailScreen(
                                 isUserCreated = localFallback.isUserCreated
                             }
 
-                            val playlistObj = when {
-                                isSystemPlaylistRoute -> api.getSystemPlaylist(cleanIdStr)
-                                isArtistStation -> api.getArtistStation(currentIdLong)
-                                isTrackStation -> api.getTrackStation(currentIdLong)
-                                else -> api.getPlaylist(currentIdLong)
+                            val permalinkForCheck = localFallback?.permalinkUrl ?: playlistId
+                            val isArtistStation = playlistId.startsWith("station_artist:") || permalinkForCheck.contains("artist-stations") || cleanIdStr.contains("artist-stations")
+                            val isTrackStation = playlistId.startsWith("station:") || permalinkForCheck.contains("track-stations") || cleanIdStr.contains("track-stations")
+
+                            val playlistObj = try {
+                                when {
+                                    isTrackStation -> api.getTrackStation(currentIdLong)
+                                    isArtistStation -> api.getArtistStation(currentIdLong)
+                                    isSystemPlaylistRoute -> api.getSystemPlaylist(cleanIdStr)
+                                    else -> api.getPlaylist(currentIdLong)
+                                }
+                            } catch (e: Exception) {
+                                if (e is retrofit2.HttpException && e.code() == 404 && currentIdLong > 0L) {
+                                    val fallbackPermalink = localFallback?.permalinkUrl ?: playlistPermalinkUrl ?: ""
+                                    when {
+                                        fallbackPermalink.contains("track-stations") -> api.getTrackStation(currentIdLong)
+                                        fallbackPermalink.contains("artist-stations") -> api.getArtistStation(currentIdLong)
+                                        else -> {
+                                            try {
+                                                api.getTrackStation(currentIdLong)
+                                            } catch (_: Exception) {
+                                                try {
+                                                    api.getArtistStation(currentIdLong)
+                                                } catch (_: Exception) {
+                                                    throw e
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    throw e
+                                }
                             }
                             isAlbum = playlistObj.isAlbum
 
@@ -676,7 +716,7 @@ fun PlaylistDetailScreen(
     // ---------------------------------------------------------------- dialogs
 
     if (showDeleteDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(str(if (isUserCreated) "dialog_delete_playlist_title" else "dialog_delete_playlist_from_lib_title")) },
             text = { Text(str("dialog_delete_playlist_msg")) },
@@ -698,7 +738,7 @@ fun PlaylistDetailScreen(
     }
 
     if (showRemoveDownloadDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showRemoveDownloadDialog = false },
             title = { Text(str("dialog_remove_download_title")) },
             text = { Text(str("dialog_remove_download_msg")) },
@@ -721,7 +761,7 @@ fun PlaylistDetailScreen(
 
     if (showRenameDialog) {
         var newTitle by remember { mutableStateOf(playlistTitle) }
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showRenameDialog = false },
             title = { Text(str("profile_edit")) },
             text = {
@@ -746,6 +786,7 @@ fun PlaylistDetailScreen(
     }
 
     if (showDetailsSheet) {
+        BackHandler(onBack = { showDetailsSheet = false })
         Dialog(onDismissRequest = { showDetailsSheet = false }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
@@ -1142,7 +1183,7 @@ fun PlaylistDetailScreen(
                     !isYoutubeRadio
 
                 if (isReallyEmpty) {
-                    item { EmptyPlaylistView(playlistId = playlistId, isUserCreated = isUserCreated) }
+                    item { EmptyPlaylistView(playlistId = playlistId, isUserCreated = isUserCreated, isEmptySearch = playlistSearchQuery.isNotEmpty()) }
                 } else {
                     if (isYoutubeRadio && rawTracks.isEmpty()) {
                         item {
@@ -1173,7 +1214,7 @@ fun PlaylistDetailScreen(
                                     colors = OutlinedTextFieldDefaults.colors(
                                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                                     ),
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f).trackTextInput()
                                 )
                                 Box {
                                     FilledTonalIconButton(onClick = { showSortMenu = true }) {
@@ -1272,7 +1313,7 @@ fun PlaylistDetailScreen(
                         }
                     }
 
-                    itemsIndexed(items = tracksToDisplay, key = { _, t -> t.id }) { index, track ->
+                    itemsIndexed(items = tracksToDisplay, key = { index, t -> "${index}_${t.id}" }) { index, track ->
                         if (index >= tracksToDisplay.size - 5 && isYoutubeRadio) {
                             LaunchedEffect(Unit) { youtubeRadioViewModel.loadMore() }
                         }
@@ -1476,7 +1517,8 @@ fun TrackTableHeaderRow(
     modifier: Modifier = Modifier,
     showAlbum: Boolean = true,
     showDate: Boolean = true,
-    releaseDateMode: Boolean = false
+    releaseDateMode: Boolean = false,
+    showPlays: Boolean = false
 ) {
     var weightedWidthPx by remember { mutableStateOf(0f) }
     Column(modifier = modifier.fillMaxWidth()) {
@@ -1524,8 +1566,13 @@ fun TrackTableHeaderRow(
                     }
                 }
                 if (showDate) {
+                    val headerText = when {
+                        showPlays -> str("table_header_plays")
+                        releaseDateMode -> str("table_header_release_date")
+                        else -> str("table_header_date_added")
+                    }
                     Text(
-                        text = str(if (releaseDateMode) "table_header_release_date" else "table_header_date_added"),
+                        text = headerText,
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(TrackTableColumns.date),
@@ -1601,6 +1648,8 @@ fun TrackTableItem(
     showAlbum: Boolean = true,
     showDate: Boolean = true,
     useReleaseDate: Boolean = false,
+    showPlays: Boolean = false,
+    onPlayCountClick: (() -> Unit)? = null,
     dragHandleModifier: Modifier = Modifier,
     isDragging: Boolean = false
 ) {
@@ -1738,24 +1787,45 @@ fun TrackTableItem(
                 }
                 }
             }
-            if (showDate) {
-                // Added date (like stamp, playlist cross-ref, or download time) where we
-                // have it; release/upload date on remote playlists where SoundCloud
-                // doesn't expose per-track added-at (header label switches accordingly).
-                val dateStr = remember(track.likedAt, track.releaseDate, track.createdAt, useReleaseDate) {
-                    track.likedAt?.let {
-                        java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(it))
-                    } ?: formatApiDate(track.releaseDate ?: track.createdAt)
-                }
+            if (showDate || showPlays) {
                 Spacer(Modifier.width(COLUMN_GAP))
-                Text(
-                    text = dateStr,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(TrackTableColumns.date),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                val playsCount = track.playbackCount
+                if (showPlays && playsCount != null && playsCount > 0) {
+                    val formattedPlays = remember(playsCount) {
+                        java.text.NumberFormat.getNumberInstance(java.util.Locale.FRANCE).format(playsCount)
+                    }
+                    val interaction = remember { MutableInteractionSource() }
+                    val hovered by interaction.collectIsHoveredAsState()
+                    Text(
+                        text = formattedPlays,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        textDecoration = if (hovered) TextDecoration.Underline else null,
+                        modifier = Modifier
+                            .weight(TrackTableColumns.date)
+                            .hoverable(interaction)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                            .clickable(interactionSource = interaction, indication = null) {
+                                onPlayCountClick?.invoke()
+                            },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else if (showDate) {
+                    val dateStr = remember(track.likedAt, track.releaseDate, track.createdAt, useReleaseDate) {
+                        track.likedAt?.let {
+                            java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(it))
+                        } ?: formatApiDate(if (useReleaseDate) (track.releaseDate ?: track.createdAt) else (track.createdAt ?: track.releaseDate))
+                    }
+                    Text(
+                        text = dateStr,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(TrackTableColumns.date),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             }
             val durationStr = remember(track.durationMs) {

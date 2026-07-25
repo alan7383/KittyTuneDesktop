@@ -186,10 +186,16 @@ private fun FeedItem(
             hovered = hovered,
             interactionSource = interactionSource,
             onClick = {
-                val dest = if (playlist.kind == "system-playlist" && playlist.urn != null) {
-                    "system_playlist:${playlist.urn}"
-                } else {
-                    playlist.id.toString()
+                val permalink = playlist.permalinkUrl
+                val isTrackStation = playlist.isTrackStation || permalink?.contains("track-stations") == true || playlist.urn?.contains("track-stations") == true
+                val isArtistStation = playlist.isArtistStation || permalink?.contains("artist-stations") == true || playlist.urn?.contains("artist-stations") == true
+
+                val dest = when {
+                    isTrackStation -> "station:${playlist.numericId}"
+                    isArtistStation -> "station_artist:${playlist.numericId}"
+                    playlist.kind == "system-playlist" && playlist.urn != null -> "system_playlist:${playlist.urn}"
+                    playlist.id < 0 -> "local_playlist:${playlist.id}"
+                    else -> playlist.id.toString()
                 }
                 playerViewModel.navigateToPlaylistId = dest
             },
@@ -260,15 +266,20 @@ private fun TrackFeedItem(
                 // Track info
                 Column(modifier = Modifier.weight(1f)) {
                     // Artist
-                    Text(
-                        text = track.user?.username ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(onClick = onArtistClick),
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onArtistClick)) {
+                        Text(
+                            text = track.user?.username ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (track.user?.verified == true) {
+                            Spacer(Modifier.width(3.dp))
+                            Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                        }
+                    }
                     // Track title
                     Text(
                         text = track.title ?: "",
@@ -381,15 +392,20 @@ private fun PlaylistFeedItem(
 
                 Column(modifier = Modifier.weight(1f)) {
                     // Artist
-                    Text(
-                        text = playlist.user?.username ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(onClick = onArtistClick),
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onArtistClick)) {
+                        Text(
+                            text = playlist.user?.username ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (playlist.user?.verified == true) {
+                            Spacer(Modifier.width(3.dp))
+                            Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                        }
+                    }
                     // Playlist title
                     Text(
                         text = playlist.title ?: "",

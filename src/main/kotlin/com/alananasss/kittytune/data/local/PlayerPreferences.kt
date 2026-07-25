@@ -15,7 +15,6 @@ import java.io.FileReader
 import java.io.FileWriter
 
 enum class AppThemeMode { SYSTEM, LIGHT, DARK }
-enum class PlayerBackgroundStyle { THEME, GRADIENT, BLUR }
 enum class StartDestination { HOME, LIBRARY }
 enum class LyricsAlignment { LEFT, CENTER, RIGHT }
 
@@ -53,14 +52,12 @@ class PlayerPreferences {
         private const val KEY_DYNAMIC_THEME = "dynamic_theme_enabled"
         private const val KEY_THEME_MODE = "app_theme_mode"
         private const val KEY_PURE_BLACK = "pure_black_enabled"
-        private const val KEY_PLAYER_STYLE = "player_background_style"
         private const val KEY_LOCAL_MEDIA_ENABLED = "local_media_enabled"
         private const val KEY_LOCAL_MEDIA_URIS_SET = "local_media_uris_set_v2"
         private const val KEY_LYRICS_PREFER_LOCAL = "lyrics_prefer_local"
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
         private const val KEY_APP_LANGUAGE = "app_language_code"
-        private const val KEY_ACHIEVEMENT_POPUPS = "achievement_popups_enabled"
         private const val KEY_PRECISE_SPEED = "precise_speed_enabled"
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
@@ -100,7 +97,6 @@ class PlayerPreferences {
         private const val KEY_BOTTOM_MENU_FAB = "bottom_menu_fab"
         private const val KEY_BOTTOM_MENU_BLUR = "bottom_menu_blur_enabled"
         private const val KEY_STOP_ON_TASK_CLEAR = "stop_on_task_clear"
-        private const val KEY_NEW_PLAYER_DESIGN = "new_player_design_enabled"
 
         private val queueLock = Any()
     }
@@ -164,9 +160,6 @@ class PlayerPreferences {
     fun getAutoUpdateEnabled(): Boolean = Prefs.getBoolean(KEY_AUTO_UPDATE, true)
     fun setAutoUpdateEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTO_UPDATE, enabled)
 
-    fun getAchievementPopupsEnabled(): Boolean = Prefs.getBoolean(KEY_ACHIEVEMENT_POPUPS, false)
-    fun setAchievementPopupsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ACHIEVEMENT_POPUPS, enabled)
-
     fun getPreciseSpeedEnabled(): Boolean = Prefs.getBoolean(KEY_PRECISE_SPEED, false)
     fun setPreciseSpeedEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PRECISE_SPEED, enabled)
 
@@ -208,8 +201,6 @@ class PlayerPreferences {
     fun setThemeMode(mode: AppThemeMode) = Prefs.putString(KEY_THEME_MODE, mode.name)
     fun getPureBlack(): Boolean = Prefs.getBoolean(KEY_PURE_BLACK, false)
     fun setPureBlack(enabled: Boolean) = Prefs.putBoolean(KEY_PURE_BLACK, enabled)
-    fun getPlayerStyle(): PlayerBackgroundStyle { val n = Prefs.getString(KEY_PLAYER_STYLE, PlayerBackgroundStyle.BLUR.name); return try { PlayerBackgroundStyle.valueOf(n!!) } catch (_: Exception) { PlayerBackgroundStyle.BLUR } }
-    fun setPlayerStyle(style: PlayerBackgroundStyle) = Prefs.putString(KEY_PLAYER_STYLE, style.name)
     fun getAutoplayEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOPLAY_STATION, true)
     fun setAutoplayEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOPLAY_STATION, enabled)
     fun getListeningStatsEnabled(): Boolean = Prefs.getBoolean(KEY_LISTENING_STATS_ENABLED, true)
@@ -262,8 +253,6 @@ class PlayerPreferences {
 
     fun getStopOnTaskClear(): Boolean = Prefs.getBoolean(KEY_STOP_ON_TASK_CLEAR, true)
     fun setStopOnTaskClear(enabled: Boolean) = Prefs.putBoolean(KEY_STOP_ON_TASK_CLEAR, enabled)
-    fun getNewPlayerDesignEnabled(): Boolean = Prefs.getBoolean(KEY_NEW_PLAYER_DESIGN, true)
-    fun setNewPlayerDesignEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_NEW_PLAYER_DESIGN, enabled)
 
     fun savePlaybackState(track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?, shuffleEnabled: Boolean, repeatMode: RepeatMode) {
         if (!getPersistentQueueEnabled()) {

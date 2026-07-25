@@ -1,18 +1,18 @@
 package com.alananasss.kittytune.music.recognition
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import com.alananasss.kittytune.data.network.RetrofitClient
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.RecognitionHistoryRepository
+import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Track
 import com.metrolist.shazamkit.Shazam
 import com.metrolist.shazamkit.models.RecognitionResult
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import androidx.lifecycle.ViewModel
-import com.alananasss.kittytune.core.str
 
 sealed class RecognitionState {
     object Idle : RecognitionState()
@@ -34,6 +34,9 @@ class RecognitionViewModel : ViewModel() {
 
     private val audioRecorder = AudioRecorder()
     private val api by lazy { RetrofitClient.create() }
+
+    @Volatile
+    private var isChecking = false
 
     init {
         refreshDevices()
@@ -72,6 +75,7 @@ class RecognitionViewModel : ViewModel() {
         return successResult
     }
 
+    @Synchronized
     private fun updateToSuccess(successState: RecognitionState.Success) {
         if (_state.value is RecognitionState.Success) return
         _state.value = successState
@@ -95,12 +99,13 @@ class RecognitionViewModel : ViewModel() {
             return
         }
 
-        CoroutineScope(Dispatchers.Main).launch {
+        viewModelScope.launch(Dispatchers.Main) {
             try {
                 _state.value = RecognitionState.Recording
                 
                 val control = RecordControl()
                 var finalSuccess: RecognitionState.Success? = null
+                isChecking = false
                 
                 val totalDurationMs = 9000L
                 val pcmData = audioRecorder.recordAudio(
@@ -108,30 +113,37 @@ class RecognitionViewModel : ViewModel() {
                     control = control,
                     selectedDeviceName = _selectedDevice.value?.id,
                     onProgress = { currentPcm ->
-                        if (!control.shouldStop) {
-                            CoroutineScope(Dispatchers.Main).launch {
-                                if (!control.shouldStop) {
-                                    val durationOfChunk = currentPcm.size / (16000 * 2) * 1000L
-                                    val result = checkRecognition(currentPcm, durationOfChunk)
-                                    if (result != null && !control.shouldStop) {
-                                        finalSuccess = result
-                                        control.shouldStop = true
-                                        updateToSuccess(result)
+                        if (!control.shouldStop && !isChecking && _state.value !is RecognitionState.Success) {
+                            isChecking = true
+                            viewModelScope.launch(Dispatchers.IO) {
+                                try {
+                                    if (!control.shouldStop && _state.value !is RecognitionState.Success) {
+                                        val durationOfChunk = currentPcm.size / (16000 * 2) * 1000L
+                                        val result = checkRecognition(currentPcm, durationOfChunk)
+                                        if (result != null && !control.shouldStop && _state.value !is RecognitionState.Success) {
+                                            finalSuccess = result
+                                            control.shouldStop = true
+                                            launch(Dispatchers.Main) {
+                                                updateToSuccess(result)
+                                            }
+                                        }
                                     }
+                                } finally {
+                                    isChecking = false
                                 }
                             }
                         }
                     }
                 )
 
-                if (pcmData.size < 1000 && finalSuccess == null) {
+                if (pcmData.size < 1000 && finalSuccess == null && _state.value !is RecognitionState.Success) {
                     if (_state.value !is RecognitionState.Success) {
                         _state.value = RecognitionState.Error(str("error_generic"))
                     }
                     return@launch
                 }
 
-                if (finalSuccess == null) {
+                if (finalSuccess == null && _state.value !is RecognitionState.Success) {
                     val durationOfChunk = pcmData.size / (16000 * 2) * 1000L
                     val result = checkRecognition(pcmData, durationOfChunk)
                     if (result != null) {
@@ -141,7 +153,7 @@ class RecognitionViewModel : ViewModel() {
                             _state.value = RecognitionState.Error(str("recognition_track_not_found"))
                         }
                     }
-                } else {
+                } else if (finalSuccess != null) {
                     updateToSuccess(finalSuccess)
                 }
 
@@ -158,3 +170,4 @@ class RecognitionViewModel : ViewModel() {
         _state.value = RecognitionState.Idle
     }
 }
+

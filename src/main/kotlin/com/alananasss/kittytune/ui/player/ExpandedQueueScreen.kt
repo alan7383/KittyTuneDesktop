@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
@@ -144,11 +145,11 @@ fun ExpandedQueueScreen(
         ) {
             itemsIndexed(
                 items = queueState,
-                key = { _, track -> track.id }
+                key = { index, track -> "${index}_${track.id}" }
             ) { index, track ->
                 ReorderableItem(
                     state = reorderableState,
-                    key = track.id
+                    key = "${index}_${track.id}"
                 ) { isDragging ->
                     val isCurrent = track.id == viewModel.currentTrack?.id
                     val shouldDarken = viewModel.repeatMode == RepeatMode.ONE && !isCurrent
@@ -212,13 +213,19 @@ fun ExpandedQueueScreen(
                                         MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1
                                 )
-                                Text(
-                                    text = track.user?.username
-                                        ?: str("unknown_artist"),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = track.user?.username
+                                            ?: str("unknown_artist"),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                    if (track.user?.verified == true) {
+                                        Spacer(Modifier.width(3.dp))
+                                        Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                                    }
+                                }
                             }
                             Icon(
                                 imageVector = Icons.Rounded.DragHandle,
