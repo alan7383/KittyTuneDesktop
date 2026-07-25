@@ -111,6 +111,20 @@ jobs:
           ar x "$DEB_FILE"
           tar -xf data.tar.* -C arch_build/pkg
           
+          mkdir -p arch_build/pkg/usr/share/applications
+          mkdir -p arch_build/pkg/usr/share/icons/hicolor/256x256/apps
+          
+          cat << 'DESKTOP' > arch_build/pkg/usr/share/applications/kitty-tune.desktop
+          [Desktop Entry]
+          Name=KittyTune
+          Exec=/opt/kitty-tune/bin/KittyTune
+          Icon=kittytune
+          Type=Application
+          Categories=AudioVideo;Audio;
+          DESKTOP
+          
+          cp arch_build/pkg/opt/kitty-tune/lib/KittyTune.png arch_build/pkg/usr/share/icons/hicolor/256x256/apps/kittytune.png
+          
           cat << 'PKGEOF' > arch_build/pkg/.PKGINFO
           pkgname = kitty-tune
           pkgver = 1.0.10-1
@@ -181,6 +195,20 @@ jobs:
           DEB_FILE=$(find build -name "*.deb" | head -n 1)
           ar x "$DEB_FILE"
           tar -xf data.tar.* -C arch_build_arm/pkg
+          
+          mkdir -p arch_build_arm/pkg/usr/share/applications
+          mkdir -p arch_build_arm/pkg/usr/share/icons/hicolor/256x256/apps
+          
+          cat << 'DESKTOP' > arch_build_arm/pkg/usr/share/applications/kitty-tune.desktop
+          [Desktop Entry]
+          Name=KittyTune
+          Exec=/opt/kitty-tune/bin/KittyTune
+          Icon=kittytune
+          Type=Application
+          Categories=AudioVideo;Audio;
+          DESKTOP
+          
+          cp arch_build_arm/pkg/opt/kitty-tune/lib/KittyTune.png arch_build_arm/pkg/usr/share/icons/hicolor/256x256/apps/kittytune.png
           
           cat << 'PKGEOF' > arch_build_arm/pkg/.PKGINFO
           pkgname = kitty-tune
