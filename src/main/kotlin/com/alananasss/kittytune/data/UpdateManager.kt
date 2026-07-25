@@ -208,9 +208,10 @@ object UpdateManager {
                     assets.find { it.name.endsWith(".rpm", ignoreCase = true) && (it.name.contains(archName, ignoreCase = true) || it.name.contains(osArch, ignoreCase = true)) }
                         ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) }
                 } else {
-                    assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && it.name.contains(archName, ignoreCase = true) }
+                    assets.find { it.name.endsWith(".AppImage", ignoreCase = true) }
                         ?: assets.find { it.name.endsWith(".deb", ignoreCase = true) }
                         ?: assets.find { it.name.endsWith(".rpm", ignoreCase = true) }
+                        ?: assets.find { it.name.endsWith(".pkg.tar.zst", ignoreCase = true) && it.name.contains(archName, ignoreCase = true) }
                         ?: assets.firstOrNull()
                 }
             }
@@ -384,7 +385,7 @@ object UpdateManager {
                             file.setExecutable(true, false)
                             ProcessBuilder(file.absolutePath).start()
                             _status.value = UpdateStatus.READY_TO_INSTALL
-                            return
+                            kotlin.system.exitProcess(0)
                         }
                         else -> emptyArray()
                     }
