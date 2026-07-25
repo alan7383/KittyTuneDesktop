@@ -2,7 +2,6 @@ package com.alananasss.kittytune
 
 import com.alananasss.kittytune.core.NetworkMonitor
 import com.alananasss.kittytune.core.Strings
-import com.alananasss.kittytune.data.AchievementManager
 import com.alananasss.kittytune.data.AlbumResolver
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.data.HistoryRepository
@@ -44,7 +43,6 @@ object AppBootstrap {
         ListeningStatsRepository.init()
         RepostRepository.init()
         RecognitionHistoryRepository.init()
-        AchievementManager.init()
         DownloadManager.init()
         AlbumResolver.init()
 
@@ -60,8 +58,5 @@ object AppBootstrap {
 
         // 5. Connectivity watcher (replaces ConnectivityManager callback).
         NetworkMonitor.start()
-
-        // 6. Daily streak check (ON_RESUME on Android).
-        AchievementManager.checkDailyStreak()
     }
 }

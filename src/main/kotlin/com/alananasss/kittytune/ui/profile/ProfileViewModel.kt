@@ -95,10 +95,16 @@
             }
             return allUserTracks
         }
-    
-        fun loadProfile(userId: Long) {
+
+        fun loadProfile(userId: Long, forceReload: Boolean = false) {
+            if (!forceReload && user?.id == userId && (allTracks.isNotEmpty() || likedTracks.isNotEmpty() || popularTracks.isNotEmpty() || userComments.isNotEmpty())) {
+                isLoading = false
+                return
+            }
             viewModelScope.launch {
-                isLoading = true
+                if (user?.id != userId) {
+                    isLoading = true
+                }
                 isCurrentUser = false
                 try {
                     // Check if current user
@@ -108,7 +114,7 @@
                             isCurrentUser = true
                         }
                     } catch (e: Exception) { /* ignore */ }
-    
+
                     // Avoid flickering if reloading same user
                     if (user?.id != userId) {
                         user = fetchUser(userId)
@@ -128,7 +134,13 @@
                             try {
                                 api.getUserReposts(userId, limit = 50).collection
                                     .filter { it.type == "track-repost" && it.track != null }
-                                    .mapNotNull { it.track }
+                                    .mapNotNull { item ->
+                                        val millis = item.createdAt?.let { raw ->
+                                            runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
+                                                ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
+                                        }
+                                        item.track?.copy(likedAt = millis ?: item.track.likedAt, createdAt = item.createdAt ?: item.track.createdAt)
+                                    }
                             } catch (_: Exception) { emptyList() }
                         }
     
@@ -149,12 +161,24 @@
                             try {
                                 var nextUrl: String? = null
                                 val firstPage = api.getUserTrackLikes(userId, limit = 50)
-                                allLikes.addAll(firstPage.collection.mapNotNull { it.track })
+                                allLikes.addAll(firstPage.collection.map { item ->
+                                    val millis = item.createdAt?.let { raw ->
+                                        runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
+                                            ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
+                                    }
+                                    item.track.copy(likedAt = millis ?: item.track.likedAt, createdAt = item.createdAt ?: item.track.createdAt)
+                                })
                                 nextUrl = firstPage.next_href
                                 var safetyCount = 0
                                 while (nextUrl != null && safetyCount < 10) {
                                     val page = api.getTrackLikesNextPage(nextUrl!!)
-                                    allLikes.addAll(page.collection.mapNotNull { it.track })
+                                    allLikes.addAll(page.collection.map { item ->
+                                        val millis = item.createdAt?.let { raw ->
+                                            runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
+                                                ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
+                                        }
+                                        item.track.copy(likedAt = millis ?: item.track.likedAt, createdAt = item.createdAt ?: item.track.createdAt)
+                                    })
                                     nextUrl = page.next_href
                                     safetyCount++
                                 }

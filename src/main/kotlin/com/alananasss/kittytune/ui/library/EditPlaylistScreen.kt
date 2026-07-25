@@ -17,7 +17,9 @@ import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -90,6 +92,7 @@ fun EditPlaylistScreen(
         }
     }
 
+    BackHandler(onBack = onDismissRequest)
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -143,7 +146,7 @@ fun EditPlaylistScreen(
                         value = title,
                         onValueChange = { title = it },
                         label = { Text("Title *") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                     )
@@ -155,7 +158,7 @@ fun EditPlaylistScreen(
                         value = permalink,
                         onValueChange = { permalink = it },
                         label = { Text("Permalink *") },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         isError = !isValidPermalink,
@@ -173,7 +176,7 @@ fun EditPlaylistScreen(
                         value = description,
                         onValueChange = { description = it },
                         label = { Text("Description") },
-                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                        modifier = Modifier.fillMaxWidth().height(120.dp).trackTextInput(),
                         maxLines = 5
                     )
                 }

@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.SettingsGroup
@@ -45,7 +46,7 @@ fun AudioSettingsScreen(
     var showFadeDurationDialog by remember { mutableStateOf(false) }
 
     if (showFadeDurationDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showFadeDurationDialog = false },
             title = { Text(str("sleep_timer_fade_title")) },
             text = {
@@ -76,7 +77,7 @@ fun AudioSettingsScreen(
     }
 
     if (showQualityDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showQualityDialog = false },
             title = { Text(str("pref_quality")) },
             text = {

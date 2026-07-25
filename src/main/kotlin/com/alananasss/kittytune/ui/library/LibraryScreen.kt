@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.*
     import androidx.compose.material3.*
     import androidx.compose.runtime.*
 import androidx.lifecycle.viewmodel.compose.viewModel
+    import com.alananasss.kittytune.core.EscapableAlertDialog
     import com.alananasss.kittytune.core.str
     import coil3.compose.AsyncImage
         import androidx.compose.ui.Alignment
@@ -81,7 +82,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
         val scope = rememberCoroutineScope()
     
         if (showCreateDialog) {
-            AlertDialog(
+            EscapableAlertDialog(
                 onDismissRequest = { if (!isCreatingPlaylist) showCreateDialog = false },
                 title = { Text(str("lib_create_playlist_title")) },
                 text = {
@@ -335,9 +336,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
                         is LibraryItem.PlaylistItem -> {
                             val permalink = item.playlist.permalinkUrl
                             val isYoutubeShortcut = permalink != null && permalink.startsWith("yt_radio:")
-        
+                            val isTrackStation = item.playlist.isTrackStation || permalink?.contains("track-stations") == true || item.playlist.urn?.contains("track-stations") == true
+                            val isArtistStation = item.playlist.isArtistStation || permalink?.contains("artist-stations") == true || item.playlist.urn?.contains("artist-stations") == true
+
                             val navId = if (isYoutubeShortcut) {
-                                java.net.URLEncoder.encode(permalink!!, "UTF-8")
+                                java.net.URLEncoder.encode(permalink, "UTF-8")
+                            } else if (isTrackStation) {
+                                "station:${item.playlist.numericId}"
+                            } else if (isArtistStation) {
+                                "station_artist:${item.playlist.numericId}"
                             } else if (item.playlist.urn?.startsWith("soundcloud:system-playlists:") == true) {
                                 "system_playlist:${item.playlist.urn}"
                             } else {

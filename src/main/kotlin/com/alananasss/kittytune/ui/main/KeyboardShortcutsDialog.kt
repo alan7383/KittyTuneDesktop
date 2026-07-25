@@ -10,10 +10,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
 
 @Composable
 fun KeyboardShortcutsDialog(onDismiss: () -> Unit) {
+    BackHandler(onBack = onDismiss)
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(12.dp),

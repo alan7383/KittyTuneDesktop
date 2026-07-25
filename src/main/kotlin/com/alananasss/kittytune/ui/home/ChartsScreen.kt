@@ -45,6 +45,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
+import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.ChartsData
@@ -93,6 +94,7 @@ fun ChartsScreen(
 
     // Country selector — desktop dialog instead of the Android bottom sheet.
     if (showCountrySelector) {
+        BackHandler(onBack = { showCountrySelector = false })
         Dialog(onDismissRequest = { showCountrySelector = false }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
@@ -130,6 +132,7 @@ fun ChartsScreen(
     // Artist options — desktop dialog instead of the Android bottom sheet.
     if (showArtistMenu != null) {
         val user = showArtistMenu!!
+        BackHandler(onBack = { showArtistMenu = null })
         Dialog(onDismissRequest = { showArtistMenu = null }) {
             Surface(
                 shape = RoundedCornerShape(24.dp),

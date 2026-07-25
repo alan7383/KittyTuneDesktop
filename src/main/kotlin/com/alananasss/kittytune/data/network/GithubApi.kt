@@ -9,10 +9,16 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 
 data class GithubRelease(
-    @SerializedName("tag_name") val tagName: String,
-    @SerializedName("body") val body: String,
-    @SerializedName("assets") val assets: List<GithubAsset>
-)
+    @SerializedName("tag_name") val tagName: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("body") val body: String? = null,
+    @SerializedName("assets") val assets: List<GithubAsset>? = null
+) {
+    val versionName: String
+        get() = tagName?.takeIf { it.isNotBlank() }
+            ?: name?.takeIf { it.isNotBlank() }
+            ?: ""
+}
 
 data class GithubAsset(
     @SerializedName("name") val name: String,

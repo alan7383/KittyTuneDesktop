@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material.icons.outlined.QueueMusic
@@ -54,18 +55,37 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ripple
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import java.awt.Cursor
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.alananasss.kittytune.utils.makeTimeString
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.PointerMatcher
+import androidx.compose.foundation.onClick
+import androidx.compose.ui.input.pointer.PointerButton
 
 /**
  * Bottom full-width playback bar: track info left, transport + progress center,
  * lyrics/effects/queue/volume right — mirrors the reference player bar.
  */
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerBar(
     playerViewModel: PlayerViewModel,
@@ -93,11 +113,15 @@ fun PlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (track != null) {
-                    // Artwork + title/artist open the now-playing panel on the track info tab
+                    // Artwork + title/artist open the now-playing panel on the track info tab (left click), or options popup (right click)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
+                            .onClick(
+                                matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                                onClick = { vm.showTrackOptions(track, fromPlayer = true) }
+                            )
                             .clickable { onOpenTrackInfo() }
                             .padding(4.dp),
                     ) {
@@ -117,13 +141,24 @@ fun PlayerBar(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            Text(
-                                text = track.user?.username ?: "",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = track.user?.username ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (track.user?.verified == true) {
+                                    Spacer(Modifier.width(3.dp))
+                                    Icon(
+                                        Icons.Rounded.Verified,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                     Spacer(Modifier.width(8.dp))
@@ -144,7 +179,10 @@ fun PlayerBar(
                 modifier = Modifier.widthIn(min = 340.dp, max = 560.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     IconButton(
                         shapes = IconButtonDefaults.shapes(),
                         onClick = { vm.toggleShuffle() }
@@ -157,25 +195,112 @@ fun PlayerBar(
                             modifier = Modifier.size(20.dp),
                         )
                     }
-                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.smartPrevious() }) {
-                        Icon(Icons.Filled.SkipPrevious, contentDescription = null, modifier = Modifier.size(28.dp))
+
+                    val backInteractionSource = remember { MutableInteractionSource() }
+                    val nextInteractionSource = remember { MutableInteractionSource() }
+                    val playPauseInteractionSource = remember { MutableInteractionSource() }
+
+                    val isPlayPausePressed by playPauseInteractionSource.collectIsPressedAsState()
+                    val isBackPressed by backInteractionSource.collectIsPressedAsState()
+                    val isNextPressed by nextInteractionSource.collectIsPressedAsState()
+                    val isPlayPauseHovered by playPauseInteractionSource.collectIsHoveredAsState()
+                    val isBackHovered by backInteractionSource.collectIsHoveredAsState()
+                    val isNextHovered by nextInteractionSource.collectIsHoveredAsState()
+
+                    val playPauseWeight by animateFloatAsState(
+                        targetValue = when {
+                            isPlayPausePressed -> 2.0f
+                            isBackPressed || isNextPressed -> 1.1f
+                            isPlayPauseHovered -> 1.5f
+                            else -> 1.3f
+                        },
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 600f),
+                        label = "playPauseWeight"
+                    )
+                    val backButtonWeight by animateFloatAsState(
+                        targetValue = when {
+                            isBackPressed -> 0.7f
+                            isPlayPausePressed -> 0.3f
+                            isBackHovered && !isPlayPauseHovered -> 0.55f
+                            else -> 0.45f
+                        },
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 600f),
+                        label = "backButtonWeight"
+                    )
+                    val nextButtonWeight by animateFloatAsState(
+                        targetValue = when {
+                            isNextPressed -> 0.7f
+                            isPlayPausePressed -> 0.3f
+                            isNextHovered && !isPlayPauseHovered -> 0.55f
+                            else -> 0.45f
+                        },
+                        animationSpec = spring(dampingRatio = 0.7f, stiffness = 600f),
+                        label = "nextButtonWeight"
+                    )
+
+                    val sideHoverColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    val sideIdleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    val playHoverColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+
+                    Box(
+                        modifier = Modifier
+                            .height(42.dp)
+                            .weight(backButtonWeight)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isBackHovered) sideHoverColor else sideIdleColor)
+                            .hoverable(backInteractionSource)
+                            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                            .clickable(
+                                interactionSource = backInteractionSource,
+                                indication = ripple()
+                            ) { vm.smartPrevious() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.SkipPrevious, null, modifier = Modifier.size(22.dp))
                     }
-                    FilledIconButton(
-                        shape = if (vm.isPlaying) RoundedCornerShape(12.dp) else androidx.compose.foundation.shape.CircleShape, 
-                        onClick = { vm.togglePlayPause() },
-                        modifier = Modifier.size(44.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                        ),
+
+                    Spacer(Modifier.width(6.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .height(42.dp)
+                            .weight(playPauseWeight)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isPlayPauseHovered) playHoverColor else MaterialTheme.colorScheme.primary)
+                            .hoverable(playPauseInteractionSource)
+                            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                            .clickable(
+                                interactionSource = playPauseInteractionSource,
+                                indication = ripple()
+                            ) { vm.togglePlayPause() },
+                        contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             if (vm.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
                         )
                     }
-                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.playNext() }) {
-                        Icon(Icons.Filled.SkipNext, contentDescription = null, modifier = Modifier.size(28.dp))
+
+                    Spacer(Modifier.width(6.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .height(42.dp)
+                            .weight(nextButtonWeight)
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isNextHovered) sideHoverColor else sideIdleColor)
+                            .hoverable(nextInteractionSource)
+                            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                            .clickable(
+                                interactionSource = nextInteractionSource,
+                                indication = ripple()
+                            ) { vm.playNext() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.SkipNext, null, modifier = Modifier.size(22.dp))
                     }
+
                     IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleRepeatMode() }) {
                         Icon(
                             if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
@@ -264,23 +389,20 @@ fun PlayerBar(
                     )
                 }
 
-                var volume by remember { mutableFloatStateOf(MusicManager.getVolume()) }
+                val volume = vm.volume
                 Icon(
                     when {
                         volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
                         volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
                         else -> Icons.AutoMirrored.Filled.VolumeUp
                     },
-                    contentDescription = null,
+                    contentDescription = "Mute",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(20.dp).clickable { vm.toggleMute() },
                 )
                 Slider(
                     value = volume,
-                    onValueChange = {
-                        volume = it
-                        MusicManager.setVolume(it)
-                    },
+                    onValueChange = { vm.updateVolume(it) },
                     modifier = Modifier.width(110.dp).padding(start = 4.dp),
                 )
             }

@@ -130,7 +130,7 @@ fun AboutUpdateSettingsScreen() {
                         }
                     }
                     com.alananasss.kittytune.data.UpdateStatus.AVAILABLE -> {
-                        Text(str("update_available", releaseInfo?.tagName ?: ""), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text(str("update_available", releaseInfo?.versionName ?: releaseInfo?.tagName ?: ""), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         if (!releaseInfo?.body.isNullOrEmpty()) {
                             Text("${str("update_release_notes")}\n${releaseInfo?.body}", style = MaterialTheme.typography.bodyMedium)
                         }
@@ -142,10 +142,29 @@ fun AboutUpdateSettingsScreen() {
                         Text(str("update_downloading", (progress * 100).toInt()))
                         LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                     }
+                    com.alananasss.kittytune.data.UpdateStatus.PAUSED -> {
+                        Text(str("update_paused_title"), color = MaterialTheme.colorScheme.primary)
+                        Button(onClick = { scope.launch { com.alananasss.kittytune.data.UpdateManager.downloadUpdate() } }) {
+                            Text(str("update_btn_resume"))
+                        }
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.INSTALLING -> {
+                        Text(str("update_installing_title"), color = MaterialTheme.colorScheme.primary)
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES -> {
+                        Text(str("update_multi_instance_title"), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = { com.alananasss.kittytune.data.UpdateManager.killInstancesAndContinue() },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text(str("update_btn_close_instances"))
+                        }
+                    }
                     com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL -> {
                         Text(str("update_ready"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        Button(onClick = { com.alananasss.kittytune.data.UpdateManager.installUpdate() }) {
-                            Text(str("update_btn_install"))
+                        Button(onClick = { com.alananasss.kittytune.data.UpdateManager.restartApp() }) {
+                            Text(str("update_btn_restart"))
                         }
                     }
                     com.alananasss.kittytune.data.UpdateStatus.NO_UPDATE -> {

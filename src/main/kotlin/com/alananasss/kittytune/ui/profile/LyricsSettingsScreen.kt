@@ -22,6 +22,8 @@ import androidx.compose.material3.ContainedLoadingIndicator
     import androidx.compose.ui.Alignment
     import androidx.compose.ui.Modifier
     import androidx.compose.ui.graphics.Shape
+        import com.alananasss.kittytune.core.EscapableAlertDialog
+        import com.alananasss.kittytune.core.BackHandler
         import com.alananasss.kittytune.core.str
     import androidx.compose.ui.text.font.FontWeight
     import androidx.compose.ui.unit.dp
@@ -54,6 +56,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
         // --- DIALOGS ---
     
         if (showFontSizeDialog) {
+            BackHandler(onBack = { showFontSizeDialog = false })
             Dialog(onDismissRequest = { showFontSizeDialog = false }) {
                 Card(
                     shape = RoundedCornerShape(28.dp),
@@ -90,7 +93,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
         }
     
         if (showAlignmentDialog) {
-            AlertDialog(
+            EscapableAlertDialog(
                 onDismissRequest = { showAlignmentDialog = false },
                 title = { Text(str("pref_lyrics_align")) },
                 text = {

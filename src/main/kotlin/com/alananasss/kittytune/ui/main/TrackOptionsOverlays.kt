@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Comment
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
@@ -43,7 +45,7 @@ import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Verified
-import androidx.compose.material3.AlertDialog
+import com.alananasss.kittytune.core.EscapableAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -74,8 +76,21 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.DownloadManager
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.LaunchedEffect
+import com.alananasss.kittytune.domain.Comment
+import com.alananasss.kittytune.ui.player.CommentSort
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 
@@ -87,12 +102,13 @@ private data class MenuOptionItem(
 
 /**
  * Desktop replacements for the Android modal bottom sheets: track options menu,
- * add-to-playlist picker, repost dialog and sleep timer. Rendered once at the
+ * add-to-playlist picker, repost dialog, comments sheet and sleep timer. Rendered once at the
  * root of MainScreen; each shows as a centered dialog card.
  */
 @Composable
 fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
     if (viewModel.showMenuSheet) {
+        BackHandler(onBack = { viewModel.showMenuSheet = false })
         Dialog(onDismissRequest = { viewModel.showMenuSheet = false }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
@@ -103,7 +119,20 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
             }
         }
     }
+    if (viewModel.showCommentsSheet) {
+        BackHandler(onBack = { viewModel.showCommentsSheet = false })
+        Dialog(onDismissRequest = { viewModel.showCommentsSheet = false }) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.width(540.dp).heightIn(max = 640.dp),
+            ) {
+                CommentsSheetContent(viewModel)
+            }
+        }
+    }
     if (viewModel.showAddToPlaylistSheet) {
+        BackHandler(onBack = { viewModel.showAddToPlaylistSheet = false })
         Dialog(onDismissRequest = { viewModel.showAddToPlaylistSheet = false }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
@@ -115,6 +144,7 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
         }
     }
     if (viewModel.showPlaylistMenuSheet) {
+        BackHandler(onBack = { viewModel.showPlaylistMenuSheet = false })
         Dialog(onDismissRequest = { viewModel.showPlaylistMenuSheet = false }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
@@ -149,7 +179,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
     }
 
     if (showDeleteDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text(if (isLocalFile) str("menu_remove_local_q") else str("menu_remove_download_q")) },
             text = { Text(if (isLocalFile) str("menu_remove_local_body") else str("menu_remove_download_body")) },
@@ -170,7 +200,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
     }
 
     if (showDeleteRepostConfirm) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showDeleteRepostConfirm = false },
             title = { Text(str("dialog_repost_delete_title")) },
             text = { Text(str("dialog_repost_delete_msg")) },
@@ -408,7 +438,7 @@ private fun AddToPlaylistContent(viewModel: PlayerViewModel) {
 private fun RepostDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var caption by remember { mutableStateOf("") }
     val maxChars = 140
-    AlertDialog(
+    EscapableAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(str("dialog_repost_title")) },
         text = {
@@ -450,7 +480,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
         java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(cal.time)
     }
 
-    AlertDialog(
+    EscapableAlertDialog(
         onDismissRequest = { viewModel.showSleepTimerDialog = false },
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(28.dp),
@@ -545,7 +575,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
     val shareUrl = if (!isLocal) permalink.ifEmpty { "https://soundcloud.com/playlists/${playlist.id}" } else ""
 
     if (showRemoveDownloadDialog) {
-        AlertDialog(
+        EscapableAlertDialog(
             onDismissRequest = { showRemoveDownloadDialog = false },
             title = { Text(str("dialog_remove_download_title")) },
             text = { Text(str("dialog_remove_download_msg")) },
@@ -561,6 +591,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
     }
 
     if (showDetailsSheet) {
+        BackHandler(onBack = { showDetailsSheet = false })
         Dialog(onDismissRequest = { showDetailsSheet = false }) {
             Surface(
                 shape = RoundedCornerShape(28.dp),
@@ -758,5 +789,247 @@ private suspend fun loadPlaylistTracksForMenu(
     }
     return rawTracks.map { track ->
         if (track.title.isNullOrBlank() || track.user == null) fetchedMap[track.id] ?: track else track
+    }
+}
+
+@Composable
+private fun CommentsSheetContent(viewModel: PlayerViewModel) {
+    val track = viewModel.selectedTrackForSheet ?: viewModel.trackForMenu ?: viewModel.currentTrack
+    var newCommentText by remember { mutableStateOf("") }
+    val isPosting = viewModel.isPostingComment
+
+    LaunchedEffect(viewModel.replyingToComment) {
+        if (viewModel.replyingToComment != null) {
+            val username = viewModel.replyingToComment?.user?.username ?: ""
+            if (username.isNotBlank() && !newCommentText.startsWith("@$username")) {
+                newCommentText = "@$username "
+            }
+        }
+    }
+
+    val organizedComments = remember(viewModel.commentsList.toList()) {
+        val list = mutableListOf<Comment>()
+        for (comment in viewModel.commentsList) {
+            if (comment.body.trim().startsWith("@") && list.isNotEmpty()) {
+                val parentIndex = list.indexOfLast { it.trackTimestamp == comment.trackTimestamp }
+                if (parentIndex != -1) {
+                    val parent = list[parentIndex]
+                    list[parentIndex] = parent.copy(replies = (parent.replies ?: emptyList()) + comment)
+                    continue
+                }
+            }
+            list.add(comment)
+        }
+        list
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                if (track != null) {
+                    AsyncImage(
+                        model = track.fullResArtwork,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+                Column {
+                    Text(
+                        text = str("menu_comments"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (track != null) {
+                        Text(
+                            text = track.title ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            IconButton(onClick = { viewModel.showCommentsSheet = false }, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Sort Filter Header
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = str("menu_comments") + " (${track?.commentCount ?: organizedComments.size})",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (viewModel.isCommentsLoading) {
+                    CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
+                }
+            }
+
+            var isSortMenuExpanded by remember { mutableStateOf(false) }
+            Box {
+                OutlinedButton(
+                    onClick = { isSortMenuExpanded = true },
+                    shapes = ButtonDefaults.shapes(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = str("sorted_by", str(viewModel.commentSort.labelResId)),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+
+                DropdownMenu(
+                    expanded = isSortMenuExpanded,
+                    onDismissRequest = { isSortMenuExpanded = false }
+                ) {
+                    CommentSort.values().forEach { sortOption ->
+                        DropdownMenuItem(
+                            text = { Text(str(sortOption.labelResId)) },
+                            onClick = {
+                                viewModel.onCommentSortChanged(sortOption)
+                                isSortMenuExpanded = false
+                            },
+                            trailingIcon = {
+                                if (sortOption == viewModel.commentSort) {
+                                    Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Comments Content List
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (viewModel.isCommentsLoading && viewModel.commentsList.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ContainedLoadingIndicator()
+                }
+            } else if (viewModel.commentsList.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = str("comment_no_comments"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    itemsIndexed(organizedComments, key = { _, comment -> comment.id }) { index, comment ->
+                        if (index >= organizedComments.size - 3 && !viewModel.isCommentsLoading && viewModel.commentNextHref != null) {
+                            LaunchedEffect(index) {
+                                viewModel.loadComments(refresh = false)
+                            }
+                        }
+                        CommentItemUI(comment, viewModel)
+                    }
+
+                    if (viewModel.isCommentsLoading && viewModel.commentsList.isNotEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Replying Banner
+        if (viewModel.replyingToComment != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            ) {
+                val targetUser = viewModel.replyingToComment?.user?.username ?: str("comment_anonymous")
+                Text(
+                    text = str("comment_replying_to", targetUser),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp).clickable { viewModel.cancelReplying() },
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        // Comment Input Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = newCommentText,
+                onValueChange = { newCommentText = it },
+                placeholder = { Text(if (viewModel.replyingToComment != null) str("comment_write_reply") else str("add_comment_hint")) },
+                modifier = Modifier.weight(1f),
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+                enabled = !isPosting
+            )
+            IconButton(
+                onClick = {
+                    if (newCommentText.isNotBlank()) {
+                        viewModel.postComment(newCommentText, null)
+                        newCommentText = ""
+                    }
+                },
+                enabled = !isPosting && newCommentText.isNotBlank(),
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                if (isPosting) {
+                    CircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
+                } else {
+                    Icon(
+                        Icons.Rounded.Send,
+                        contentDescription = str("comment_send_action"),
+                        tint = if (newCommentText.isNotBlank()) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }

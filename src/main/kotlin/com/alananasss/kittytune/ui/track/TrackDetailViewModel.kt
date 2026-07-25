@@ -1,4 +1,4 @@
-﻿    package com.alananasss.kittytune.ui.track
+    package com.alananasss.kittytune.ui.track
     
     import com.alananasss.kittytune.core.Application
     import androidx.compose.runtime.getValue
@@ -40,7 +40,14 @@
         var isPlaylistsSortedByLikes by mutableStateOf(false)
 
         fun loadTrackDetails(trackId: Long) {
-            if (trackId == 0L || this.track?.id == trackId) return
+            if (trackId == 0L) {
+                isLoading = false
+                return
+            }
+            if (this.track?.id == trackId) {
+                isLoading = false
+                return
+            }
             viewModelScope.launch {
                 isLoading = true
                 // clean slate

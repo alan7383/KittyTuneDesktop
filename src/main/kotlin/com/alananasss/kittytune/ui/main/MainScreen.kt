@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,20 +84,23 @@ fun MainScreen() {
     // translate into NavHost routes.
     androidx.compose.runtime.LaunchedEffect(playerViewModel.navigateToPlaylistId) {
         playerViewModel.navigateToPlaylistId?.let { destinationId ->
-            playerViewModel.isPlayerExpanded = false
-            showMainLyricsView = false
-            when {
-                destinationId == "expanded_queue" -> {
-                    showNowPlayingPanel = true
-                    nowPlayingTab = NowPlayingTab.QUEUE
-                }
-                destinationId == "recognition" -> navController.navigate("recognition")
-                destinationId == "recognition_history" -> navController.navigate("recognition_history")
-                destinationId.startsWith("profile:") -> navController.navigate("profile/${destinationId.removePrefix("profile:")}")
-                destinationId.startsWith("tag:") -> navController.navigate("tag/${destinationId.removePrefix("tag:")}")
-                destinationId.startsWith("track_detail:") -> navController.navigate("track_detail/${destinationId.removePrefix("track_detail:")}")
-                destinationId.startsWith("playlist_fans/") -> navController.navigate(destinationId)
-                else -> navController.navigate("playlist_detail/${java.net.URLEncoder.encode(destinationId, "UTF-8")}")
+            val targetRoute = when {
+                destinationId == "recognition" -> "recognition"
+                destinationId == "recognition_history" -> "recognition_history"
+                destinationId.startsWith("profile:") -> "profile/${destinationId.removePrefix("profile:")}"
+                destinationId.startsWith("tag:") -> "tag/${destinationId.removePrefix("tag:")}"
+                destinationId.startsWith("track_detail:") -> "track_detail/${destinationId.removePrefix("track_detail:")}"
+                destinationId.startsWith("playlist_fans/") -> destinationId
+                else -> "playlist_detail/${java.net.URLEncoder.encode(destinationId, "UTF-8")}"
+            }
+
+            if (destinationId == "expanded_queue") {
+                showNowPlayingPanel = true
+                nowPlayingTab = NowPlayingTab.QUEUE
+            } else if (!isSameRoute(navController, targetRoute)) {
+                playerViewModel.isPlayerExpanded = false
+                showMainLyricsView = false
+                navController.navigate(targetRoute)
             }
             playerViewModel.onNavigationHandled()
         }
@@ -104,7 +108,15 @@ fun MainScreen() {
 
     var showShortcutsDialog by remember { mutableStateOf(false) }
 
+    // Sync the user's SoundCloud followings into the local DB at app startup.
+    // This enables the social proof "liked by" feature in the player to correctly
+    // detect followed users among track likers (same as Android KittyTune).
     androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.alananasss.kittytune.data.DownloadManager.refreshFollowings()
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+
         var gPressedTime = 0L
         var lastShortcutTime = 0L
         var lastShortcutKey: androidx.compose.ui.input.key.Key? = null
@@ -157,8 +169,8 @@ fun MainScreen() {
                             Key.DirectionLeft -> playerViewModel.smartPrevious()
                             Key.L -> playerViewModel.toggleRepeatMode()
                             Key.S -> playerViewModel.toggleShuffle()
-                            Key.DirectionDown -> com.alananasss.kittytune.data.MusicManager.setVolume((com.alananasss.kittytune.data.MusicManager.getVolume() - 0.1f).coerceIn(0f, 1f))
-                            Key.DirectionUp -> com.alananasss.kittytune.data.MusicManager.setVolume((com.alananasss.kittytune.data.MusicManager.getVolume() + 0.1f).coerceIn(0f, 1f))
+                            Key.DirectionDown -> playerViewModel.volumeDown()
+                            Key.DirectionUp -> playerViewModel.volumeUp()
                         }
                     }
                 } else if (noModifiers) {
@@ -174,7 +186,7 @@ fun MainScreen() {
                             navController.navigate("home")
                             homeViewModel.activateSearch()
                         }
-                        Key.M -> com.alananasss.kittytune.data.MusicManager.setVolume(if (com.alananasss.kittytune.data.MusicManager.getVolume() > 0f) 0f else 1f)
+                        Key.M -> playerViewModel.toggleMute()
                         Key.P -> {
                             val track = playerViewModel.currentTrack
                             if (track != null) {
@@ -334,6 +346,7 @@ fun MainScreen() {
                                             id.startsWith("profile:") -> navController.navigate("profile/${id.removePrefix("profile:")}")
                                             id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                             id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
+                                            id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
                                             else -> navController.navigate("playlist_detail/${java.net.URLEncoder.encode(id, "UTF-8")}")
                                         }
                                     }
@@ -410,6 +423,7 @@ fun MainScreen() {
                                         id.startsWith("profile:") -> navController.navigate("profile/${id.removePrefix("profile:")}")
                                         id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                         id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
+                                        id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
                                         else -> navController.navigate("playlist_detail/${java.net.URLEncoder.encode(id, "UTF-8")}")
                                     }
                                 }
@@ -437,6 +451,21 @@ fun MainScreen() {
                                 onUserClick = { uid -> navController.navigate("profile/$uid") }
                             )
                         }
+                        composable("profile_collection/{userId}/{section}") { backStackEntry ->
+                            val userId = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("userId") } }.getOrNull()
+                            } ?: ""
+                            val section = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("section") } }.getOrNull()
+                            } ?: ""
+                            com.alananasss.kittytune.ui.profile.ProfileCollectionScreen(
+                                userId = userId,
+                                section = section,
+                                onBackClick = { navController.popBackStack() },
+                                playerViewModel = playerViewModel
+                            )
+                        }
+
                         composable("tag/{tagName}") { backStackEntry ->
                             val tagName = backStackEntry.arguments?.let { args ->
                                 runCatching { args.read { getString("tagName") } }.getOrNull()
@@ -448,12 +477,19 @@ fun MainScreen() {
                             )
                         }
                         composable("track_detail/{trackId}?tab={tabIndex}") { backStackEntry ->
-                            val trackId = backStackEntry.arguments?.let { args ->
+                            val rawTrackId = backStackEntry.arguments?.let { args ->
                                 runCatching { args.read { getString("trackId") } }.getOrNull()
-                            }?.toLongOrNull() ?: 0L
-                            val tabIndex = backStackEntry.arguments?.let { args ->
+                            } ?: ""
+                            val cleanTrackId = rawTrackId.substringBefore("?").substringBefore("&")
+                            val trackId = cleanTrackId.toLongOrNull() ?: 0L
+
+                            val rawTab = backStackEntry.arguments?.let { args ->
                                 runCatching { args.read { getString("tabIndex") } }.getOrNull()
-                            }?.toIntOrNull() ?: 0
+                            }
+                            val tabIndex = rawTab?.toIntOrNull()
+                                ?: if (rawTrackId.contains("tab=")) rawTrackId.substringAfter("tab=").substringBefore("&").toIntOrNull() ?: 0
+                                else 0
+
                             com.alananasss.kittytune.ui.track.TrackDetailScreen(
                                 trackId = trackId,
                                 initialTab = tabIndex,
@@ -641,6 +677,26 @@ fun MainScreen() {
     if (showShortcutsDialog) {
         KeyboardShortcutsDialog(onDismiss = { showShortcutsDialog = false })
     }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        com.alananasss.kittytune.data.UpdateManager.checkOnStartup()
+    }
+
+    val updateStatus by com.alananasss.kittytune.data.UpdateManager.status.collectAsState()
+    val isDialogVisible by com.alananasss.kittytune.data.UpdateManager.isDialogVisible.collectAsState()
+    val downloadProgress by com.alananasss.kittytune.data.UpdateManager.downloadProgress.collectAsState()
+    val downloadSize by com.alananasss.kittytune.data.UpdateManager.downloadSize.collectAsState()
+    val releaseInfo = com.alananasss.kittytune.data.UpdateManager.releaseInfo
+
+    if (isDialogVisible) {
+        UpdateDialog(
+            release = releaseInfo,
+            status = updateStatus,
+            progress = downloadProgress,
+            totalSize = downloadSize,
+            onDismiss = { com.alananasss.kittytune.data.UpdateManager.hideDialog() }
+        )
+    }
 }
 
 enum class NowPlayingTab { TRACK, QUEUE, LYRICS, EFFECTS }
@@ -653,5 +709,61 @@ fun PlaceholderScreen(name: String) {
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.padding(24.dp)
         )
+    }
+}
+
+private fun isSameRoute(navController: androidx.navigation.NavController, targetRoute: String): Boolean {
+    val currentEntry = navController.currentBackStackEntry ?: return false
+    val pattern = currentEntry.destination.route ?: return false
+
+    return when {
+        pattern == "playlist_detail/{playlistId}" -> {
+            val rawId = currentEntry.arguments?.let { args ->
+                runCatching { args.read { getString("playlistId") } }.getOrNull()
+            } ?: ""
+            val currentPlaylistId = java.net.URLDecoder.decode(rawId, "UTF-8")
+            val targetPlaylistId = if (targetRoute.startsWith("playlist_detail/")) {
+                java.net.URLDecoder.decode(targetRoute.removePrefix("playlist_detail/"), "UTF-8")
+            } else {
+                targetRoute
+            }
+            currentPlaylistId == targetPlaylistId
+        }
+        pattern == "profile/{userId}" -> {
+            val currentId = currentEntry.arguments?.let { args ->
+                runCatching { args.read { getString("userId") } }.getOrNull()
+            } ?: ""
+            val targetId = targetRoute.removePrefix("profile:").removePrefix("profile/")
+            currentId == targetId
+        }
+        pattern == "followers/{userId}" -> {
+            val currentId = currentEntry.arguments?.let { args ->
+                runCatching { args.read { getString("userId") } }.getOrNull()
+            } ?: ""
+            val targetId = targetRoute.removePrefix("followers/")
+            currentId == targetId
+        }
+        pattern == "followings/{userId}" -> {
+            val currentId = currentEntry.arguments?.let { args ->
+                runCatching { args.read { getString("userId") } }.getOrNull()
+            } ?: ""
+            val targetId = targetRoute.removePrefix("followings/")
+            currentId == targetId
+        }
+        pattern == "tag/{tagName}" -> {
+            val currentTag = currentEntry.arguments?.let { args ->
+                runCatching { args.read { getString("tagName") } }.getOrNull()
+            } ?: ""
+            val targetTag = targetRoute.removePrefix("tag:").removePrefix("tag/")
+            currentTag == targetTag
+        }
+        pattern.startsWith("track_detail/{trackId}") || pattern.startsWith("track_detail") -> {
+            val currentTrackId = currentEntry.arguments?.let { args ->
+                runCatching { args.read { getString("trackId") } }.getOrNull()
+            } ?: ""
+            val targetTrackId = targetRoute.removePrefix("track_detail:").removePrefix("track_detail/").substringBefore("?")
+            currentTrackId == targetTrackId
+        }
+        else -> pattern == targetRoute
     }
 }

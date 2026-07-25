@@ -22,7 +22,7 @@ object TextInputTracker {
 }
 
 fun Modifier.trackTextInput(): Modifier = this.onFocusChanged {
-    if (it.isFocused) {
+    if (it.isFocused || it.hasFocus) {
         TextInputTracker.isTextInputFocused = true
     } else {
         TextInputTracker.isTextInputFocused = false

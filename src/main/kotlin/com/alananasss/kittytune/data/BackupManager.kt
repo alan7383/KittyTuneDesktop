@@ -1,6 +1,5 @@
 package com.alananasss.kittytune.data
 
-import com.alananasss.kittytune.core.NamedPrefs
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.AppDatabase
@@ -41,7 +40,7 @@ data class FullBackupData(
     val savedArtists: List<LocalArtist>,
     val history: List<HistoryItem>,
     val likedTracks: List<Track>,
-    val achievements: Map<String, Any?>,
+    val achievements: Map<String, Any?>? = emptyMap(),
     val playerPrefs: Map<String, Any?>,
     val listeningStats: List<ListeningStatsEvent>? = emptyList()
 )
@@ -67,7 +66,6 @@ object BackupManager {
             val history = dao.getHistory().first()
             val stats = dao.getEventsAfter(0L)
             val likes = LikeRepository.likedTracks.value
-            val achievementPrefs = NamedPrefs("achievements_prefs").all().toPlainMap()
             val playerPrefsMap = Prefs.snapshot().toPlainMap()
 
             val backupData = FullBackupData(
@@ -77,7 +75,7 @@ object BackupManager {
                 savedArtists = artists,
                 history = history,
                 likedTracks = likes,
-                achievements = achievementPrefs,
+                achievements = emptyMap(),
                 playerPrefs = playerPrefsMap,
                 listeningStats = stats
             )
@@ -102,10 +100,7 @@ object BackupManager {
 
             LikeRepository.replaceAllLikes(data.likedTracks)
 
-            restoreAchievementPrefs(data.achievements)
             restorePlayerPrefs(data.playerPrefs)
-
-            AchievementManager.init()
         }
     }
 
@@ -125,12 +120,6 @@ object BackupManager {
     private fun restorePlayerPrefs(map: Map<String, Any?>) {
         val entries = map.mapNotNull { (k, v) -> coerce(k, v)?.let { k to it } }.toMap()
         Prefs.restore(entries)
-    }
-
-    private fun restoreAchievementPrefs(map: Map<String, Any?>) {
-        val prefs = NamedPrefs("achievements_prefs")
-        val entries = map.mapNotNull { (k, v) -> coerce(k, v)?.let { k to it } }.toMap()
-        prefs.restore(entries)
     }
 
     private fun Map<String, JsonElement>.toPlainMap(): Map<String, Any?> = mapValues { (_, v) ->
