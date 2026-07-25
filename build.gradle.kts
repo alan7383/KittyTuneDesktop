@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.0.9-SNAPSHOT"
+version = "1.0.10-SNAPSHOT"
 
 repositories {
     google()
@@ -88,7 +88,7 @@ dependencies {
     implementation("com.github.hypfvieh:dbus-java-core:4.3.1")
     implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:4.3.1")
 
-    val javafxVersion = "21.0.9"
+    val javafxVersion = "21.0.3"
     val javafxClassifier = when {
         osName.contains("win") -> "win"
         osName.contains("mac") -> "mac"
@@ -120,7 +120,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.0.9"
+            packageVersion = "1.0.10"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 
