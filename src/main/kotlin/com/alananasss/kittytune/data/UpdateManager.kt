@@ -369,14 +369,22 @@ object UpdateManager {
                             arrayOf("pkexec", "pacman", "-U", "--noconfirm", file.absolutePath)
                         }
                         file.name.endsWith(".deb", ignoreCase = true) -> {
-                            arrayOf("pkexec", "apt-get", "install", "-y", file.absolutePath)
+                            arrayOf("pkexec", "dpkg", "-i", file.absolutePath)
                         }
                         file.name.endsWith(".rpm", ignoreCase = true) -> {
-                            arrayOf("pkexec", "dnf", "install", "-y", file.absolutePath)
+                            val rpmManager = when {
+                                File("/usr/bin/dnf").exists() -> "dnf"
+                                File("/usr/bin/zypper").exists() -> "zypper"
+                                File("/usr/bin/yum").exists() -> "yum"
+                                else -> "dnf"
+                            }
+                            arrayOf("pkexec", rpmManager, "install", "-y", file.absolutePath)
                         }
                         file.name.endsWith(".AppImage", ignoreCase = true) -> {
                             file.setExecutable(true, false)
-                            emptyArray()
+                            ProcessBuilder(file.absolutePath).start()
+                            _status.value = UpdateStatus.READY_TO_INSTALL
+                            return
                         }
                         else -> emptyArray()
                     }
@@ -429,10 +437,15 @@ object UpdateManager {
                     val jpackagePath = System.getProperty("jpackage.app.path")
                     val possibleBinPaths = listOfNotNull(
                         jpackagePath?.let { File(it) },
+                        File("/opt/kitty-tune/bin/KittyTune"),
+                        File("/opt/kitty-tune/bin/kitty-tune"),
+                        File("/opt/KittyTune/bin/KittyTune"),
+                        File("/opt/KittyTune/bin/kittytune"),
+                        File("/usr/bin/KittyTune"),
                         File("/usr/bin/kittytune"),
-                        File("/usr/local/bin/kittytune"),
-                        File("/opt/kittytune/bin/kittytune"),
                         File("/usr/bin/kitty-tune"),
+                        File("/usr/local/bin/KittyTune"),
+                        File("/usr/local/bin/kittytune"),
                         File("/usr/local/bin/kitty-tune")
                     )
                     val existingBin = possibleBinPaths.firstOrNull { it.exists() && it.isFile }
