@@ -119,8 +119,13 @@ fun AboutUpdateSettingsScreen() {
                 when (status) {
                     com.alananasss.kittytune.data.UpdateStatus.IDLE -> {
                         Text(str("update_idle_desc"))
-                        Button(onClick = { scope.launch { com.alananasss.kittytune.data.UpdateManager.checkForUpdate(isManual = true) } }) {
-                            Text(str("update_btn_check"))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { scope.launch { com.alananasss.kittytune.data.UpdateManager.checkForUpdate(isManual = true) } }) {
+                                Text(str("update_btn_check"))
+                            }
+                            OutlinedButton(onClick = { com.alananasss.kittytune.data.UpdateManager.testLocalInstall() }) {
+                                Text("Test Local Update")
+                            }
                         }
                     }
                     com.alananasss.kittytune.data.UpdateStatus.CHECKING -> {

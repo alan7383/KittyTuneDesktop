@@ -47,6 +47,10 @@ object UpdateManager {
     var downloadedInstallerFile: File? = null
     private var currentInstallProcess: Process? = null
     private var authFailedFile: File? = null
+    // True when we already launched the Windows PowerShell helper script that will
+    // wait for this process to exit, run the installer, and relaunch KittyTune.
+    // When set, restartApp() just needs to exitProcess(0) — the script handles the rest.
+    private var windowsHelperScriptLaunched = false
 
     private const val KEY_LAST_CHECK = "last_check_time"
     private val prefs = NamedPrefs("update_cache")
@@ -55,6 +59,19 @@ object UpdateManager {
 
     fun setAutoUpdateEnabled(enabled: Boolean) {
         com.alananasss.kittytune.data.local.PlayerPreferences().setAutoUpdateEnabled(enabled)
+    }
+
+    fun testLocalInstall(installerFile: File? = null) {
+        val file = installerFile
+            ?: File(AppDirs.cacheDir, "update_KittyTune-1.0.12-Setup-x64.exe").takeIf { it.exists() }
+            ?: File(System.getProperty("user.home"), "Downloads/KittyTune-1.0.12-Setup-x64.exe").takeIf { it.exists() }
+            ?: return
+        downloadedInstallerFile = file
+        _status.value = UpdateStatus.INSTALLING
+        _isDialogVisible.value = true
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            performBackgroundInstall(file)
+        }
     }
 
     fun showDialog() {
@@ -367,14 +384,77 @@ object UpdateManager {
             }
 
             val osName = System.getProperty("os.name", "").lowercase()
-            val args = when {
-                osName.contains("win") -> {
-                    if (file.name.endsWith(".msi", ignoreCase = true)) {
-                        arrayOf("msiexec", "/i", file.absolutePath, "/quiet", "/norestart")
-                    } else {
-                        arrayOf(file.absolutePath, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/passive", "/quiet")
-                    }
+
+            // On Windows, the installer (Inno Setup) cannot replace files that are currently in use.
+            // Strategy:
+            //   1. Write a PowerShell helper script that waits for this process to exit,
+            //      then runs the installer silently, then relaunches KittyTune.
+            //   2. Launch the script detached (it blocks on WaitForExit).
+            //   3. Set status to READY_TO_INSTALL — the user chooses when to restart.
+            //   4. When the user clicks "Restart", restartApp() simply calls exitProcess(0)
+            //      and the already-running PS script takes over.
+            if (osName.contains("win")) {
+                _status.value = UpdateStatus.INSTALLING
+
+                val currentPid = ProcessHandle.current().pid()
+
+                // Determine where KittyTune.exe will be after installation
+                val kittyExePaths = listOfNotNull(
+                    System.getProperty("jpackage.app.path")?.let { File(it).let { f ->
+                        when {
+                            f.isFile -> f
+                            f.isDirectory -> File(f, "KittyTune.exe").takeIf { it.exists() }
+                            else -> null
+                        }
+                    }},
+                    File(System.getProperty("user.dir", ""), "KittyTune.exe"),
+                    File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
+                    File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
+                    File(System.getenv("ProgramFiles") ?: "", "KittyTune/KittyTune.exe")
+                )
+                val kittyExe = kittyExePaths.firstOrNull { it.exists() && it.isFile }
+                    ?: File(System.getenv("LOCALAPPDATA") ?: System.getProperty("user.dir", ""), "Programs/KittyTune/KittyTune.exe")
+
+                val installerPath = file.absolutePath
+                val installerArgs = if (file.name.endsWith(".msi", ignoreCase = true)) {
+                    "msiexec /i \"$installerPath\" /quiet /norestart"
+                } else {
+                    // /VERYSILENT keeps the Inno Setup process alive until done (no detached child).
+                    "\"$installerPath\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-"
                 }
+
+                val targetExePath = kittyExe.absolutePath.replace("'", "''")
+
+                val scriptContent = """
+                    # KittyTune auto-updater helper — launched before user clicks Restart.
+                    # Waits for KittyTune to exit, then installs silently, then relaunches.
+                    ${'$'}targetPid = $currentPid
+                    try { ${'$'}proc = Get-Process -Id ${'$'}targetPid -ErrorAction Stop; ${'$'}proc.WaitForExit(120000) } catch { }
+                    Start-Sleep -Milliseconds 800
+                    Start-Process -FilePath cmd.exe -ArgumentList '/c $installerArgs' -Wait -WindowStyle Hidden
+                    ${'$'}exePath = '$targetExePath'
+                    if (Test-Path ${'$'}exePath) { Start-Process ${'$'}exePath }
+                """.trimIndent()
+
+                val scriptFile = File(System.getProperty("java.io.tmpdir"), "kittytune_updater_${currentPid}.ps1")
+                scriptFile.writeText(scriptContent)
+
+                ProcessBuilder(
+                    "powershell.exe",
+                    "-NonInteractive",
+                    "-WindowStyle", "Hidden",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", scriptFile.absolutePath
+                ).start()
+
+                // Script is now running in background, waiting for us to exit.
+                // Show the Restart button — user decides when to close the app.
+                windowsHelperScriptLaunched = true
+                _status.value = UpdateStatus.READY_TO_INSTALL
+                return
+            }
+
+            val args = when {
                 osName.contains("nux") || osName.contains("nix") -> {
                     when {
                         file.name.endsWith(".pkg.tar.zst", ignoreCase = true) -> {
@@ -462,28 +542,34 @@ object UpdateManager {
             val osName = System.getProperty("os.name", "").lowercase()
             when {
                 osName.contains("win") -> {
-                    val nullDevice = File("NUL")
-                    val jpackagePath = System.getProperty("jpackage.app.path")
-                    val possibleExePaths = mutableListOf<File>()
-                    jpackagePath?.let { p ->
-                        val f = File(p)
-                        if (f.isFile) possibleExePaths.add(f)
-                        else if (f.isDirectory) File(f, "KittyTune.exe").let { if (it.exists()) possibleExePaths.add(it) }
-                    }
-                    possibleExePaths.addAll(listOfNotNull(
-                        File(System.getProperty("user.dir"), "KittyTune.exe"),
-                        File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
-                        File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
-                        File(System.getenv("ProgramFiles") ?: "", "KittyTune/KittyTune.exe")
-                    ))
-
-                    val existingExe = possibleExePaths.firstOrNull { it.exists() && it.isFile }
-                    if (existingExe != null) {
-                        ProcessBuilder(existingExe.absolutePath)
-                            .redirectOutput(nullDevice)
-                            .redirectError(nullDevice)
-                            .start()
+                    if (windowsHelperScriptLaunched) {
+                        // The PowerShell helper script is already running in background;
+                        // it will install and relaunch KittyTune once we exit.
+                        // Nothing to do here — just fall through to exitProcess(0) below.
                         launched = true
+                    } else {
+                        val nullDevice = File("NUL")
+                        val jpackagePath = System.getProperty("jpackage.app.path")
+                        val possibleExePaths = mutableListOf<File>()
+                        jpackagePath?.let { p ->
+                            val f = File(p)
+                            if (f.isFile) possibleExePaths.add(f)
+                            else if (f.isDirectory) File(f, "KittyTune.exe").let { if (it.exists()) possibleExePaths.add(it) }
+                        }
+                        possibleExePaths.addAll(listOfNotNull(
+                            File(System.getProperty("user.dir"), "KittyTune.exe"),
+                            File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
+                            File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
+                            File(System.getenv("ProgramFiles") ?: "", "KittyTune/KittyTune.exe")
+                        ))
+                        val existingExe = possibleExePaths.firstOrNull { it.exists() && it.isFile }
+                        if (existingExe != null) {
+                            ProcessBuilder(existingExe.absolutePath)
+                                .redirectOutput(nullDevice)
+                                .redirectError(nullDevice)
+                                .start()
+                            launched = true
+                        }
                     }
                 }
                 osName.contains("nux") || osName.contains("nix") -> {
