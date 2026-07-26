@@ -166,6 +166,13 @@ fun AboutUpdateSettingsScreen() {
                             Text(str("update_btn_close_instances"))
                         }
                     }
+                    com.alananasss.kittytune.data.UpdateStatus.AUTH_FAILED -> {
+                        Text(str("update_auth_failed_title"), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        Text(str("update_auth_failed_desc"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        Button(onClick = { com.alananasss.kittytune.data.UpdateManager.retryInstall() }) {
+                            Text(str("update_btn_retry_auth"))
+                        }
+                    }
                     com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL -> {
                         Text(str("update_ready"), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         Button(onClick = { com.alananasss.kittytune.data.UpdateManager.restartApp() }) {

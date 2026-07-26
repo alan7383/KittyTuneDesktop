@@ -1852,6 +1852,9 @@
     <string name="update_multi_instance_desc">A KittyTune egy másik példánya jelenleg nyitva van. Bezárja, hogy folytassa a telepítést?</string>
     <string name="update_btn_close_instances">Példányok bezárása</string>
     <string name="update_btn_dont_remind">Ne emlékeztessen újra</string>
+    <string name="update_auth_failed_title">Hitelesítés sikertelen</string>
+    <string name="update_auth_failed_desc">A hitelesítés megszakadt vagy sikertelen. Kérjük, próbálja újra.</string>
+    <string name="update_btn_retry_auth">Hitelesítés újra</string>
     <string name="search_filter_all">Összes</string>
 </resources>
 

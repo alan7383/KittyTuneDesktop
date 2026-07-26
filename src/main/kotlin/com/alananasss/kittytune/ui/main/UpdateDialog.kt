@@ -60,9 +60,10 @@ fun UpdateDialog(
     val isInstalling = status == UpdateStatus.INSTALLING
     val isReady = status == UpdateStatus.READY_TO_INSTALL
     val isMultiInstance = status == UpdateStatus.MULTIPLE_INSTANCES
+    val isAuthFailed = status == UpdateStatus.AUTH_FAILED
 
     Dialog(onDismissRequest = {
-        if (!isDownloading && !isInstalling && !isWaitingForAuth) {
+        if (!isDownloading && !isInstalling && !isWaitingForAuth && !isAuthFailed) {
             onDismiss()
         }
     }) {
@@ -82,6 +83,7 @@ fun UpdateDialog(
                         Text(
                             text = when {
                                 isReady -> str("update_success_title")
+                                isAuthFailed -> str("update_auth_failed_title")
                                 isWaitingForAuth -> str("update_waiting_auth_title")
                                 isInstalling -> str("update_installing_title")
                                 isDownloading -> str("update_downloading", (progress * 100).toInt())
@@ -105,6 +107,12 @@ fun UpdateDialog(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                        } else if (isAuthFailed) {
+                            Text(
+                                text = str("update_auth_failed_desc"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
                 } else if (isInstalling || isWaitingForAuth) {
                             Text(
                                 text = str("update_installing_step"),
@@ -113,7 +121,7 @@ fun UpdateDialog(
                             )
                         }
                     }
-                    if (!isDownloading && !isInstalling && !isWaitingForAuth) {
+                    if (!isDownloading && !isInstalling && !isWaitingForAuth && !isAuthFailed) {
                         IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
                             Icon(Icons.Default.Close, contentDescription = str("btn_cancel"))
                         }
@@ -313,6 +321,23 @@ fun UpdateDialog(
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = str("update_btn_close_instances"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                        UpdateStatus.AUTH_FAILED -> {
+                            OutlinedButton(onClick = { UpdateManager.cancelDownload() }, shapes = ButtonDefaults.shapes()) {
+                                Text(str("btn_cancel"))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Button(
+                                onClick = { UpdateManager.retryInstall() },
+                                shapes = ButtonDefaults.shapes(),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Text(
+                                    text = str("update_btn_retry_auth"),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
