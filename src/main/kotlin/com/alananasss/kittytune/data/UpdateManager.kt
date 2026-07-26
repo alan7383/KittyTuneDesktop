@@ -63,14 +63,16 @@ object UpdateManager {
 
     fun testLocalInstall(installerFile: File? = null) {
         val downloadsDir = File(System.getProperty("user.home"), "Downloads")
+        val isWin = System.getProperty("os.name", "").lowercase().contains("win")
+        val validExts = if (isWin) listOf(".msi") else listOf(".deb", ".rpm", ".pkg.tar.zst", ".dmg", ".appimage")
         val file = installerFile
-            // Check cache dir for any .msi or .exe update file
+            // Check cache dir for valid update file
             ?: AppDirs.cacheDir.listFiles()
-                ?.filter { it.name.startsWith("update_") && (it.name.endsWith(".msi") || it.name.endsWith(".exe")) }
+                ?.filter { f -> f.name.startsWith("update_") && validExts.any { f.name.endsWith(it, ignoreCase = true) } }
                 ?.maxByOrNull { it.lastModified() }
-            // Check Downloads folder for any KittyTune installer
+            // Check Downloads folder for valid KittyTune installer
             ?: downloadsDir.listFiles()
-                ?.filter { (it.name.startsWith("KittyTune") || it.name.startsWith("kitty-tune")) && (it.name.endsWith(".msi") || it.name.endsWith(".exe")) }
+                ?.filter { f -> (f.name.startsWith("KittyTune", ignoreCase = true) || f.name.startsWith("kitty-tune", ignoreCase = true)) && validExts.any { f.name.endsWith(it, ignoreCase = true) } }
                 ?.maxByOrNull { it.lastModified() }
             ?: return
         downloadedInstallerFile = file
