@@ -400,7 +400,7 @@ object UpdateManager {
                 val needsAuth = args.firstOrNull() == "pkexec"
                 if (needsAuth) _status.value = UpdateStatus.WAITING_FOR_AUTH
                 val process = ProcessBuilder(*args).start()
-                _status.value = UpdateStatus.INSTALLING
+                if (!needsAuth) _status.value = UpdateStatus.INSTALLING
                 runCatching { process.waitFor() }
             }
             _status.value = UpdateStatus.READY_TO_INSTALL
@@ -412,30 +412,44 @@ object UpdateManager {
 
     /** Restart the application after in-app installation. */
     fun restartApp() {
+        var launched = false
         try {
             val osName = System.getProperty("os.name", "").lowercase()
             when {
                 osName.contains("win") -> {
                     val jpackagePath = System.getProperty("jpackage.app.path")
-                    val possibleExePaths = listOfNotNull(
-                        jpackagePath?.let { File(it) },
+                    val possibleExePaths = mutableListOf<File>()
+                    jpackagePath?.let { p ->
+                        val f = File(p)
+                        if (f.isFile) possibleExePaths.add(f)
+                        else if (f.isDirectory) File(f, "KittyTune.exe").let { if (it.exists()) possibleExePaths.add(it) }
+                    }
+                    possibleExePaths.addAll(listOfNotNull(
                         File(System.getProperty("user.dir"), "KittyTune.exe"),
                         File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
                         File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
                         File(System.getenv("ProgramFiles") ?: "", "KittyTune/KittyTune.exe")
-                    )
+                    ))
 
                     val existingExe = possibleExePaths.firstOrNull { it.exists() && it.isFile }
                     if (existingExe != null) {
                         ProcessBuilder(existingExe.absolutePath).start()
-                    } else {
-                        relaunchJavaDevMode()
+                        launched = true
                     }
                 }
                 osName.contains("nux") || osName.contains("nix") -> {
                     val jpackagePath = System.getProperty("jpackage.app.path")
-                    val possibleBinPaths = listOfNotNull(
-                        jpackagePath?.let { File(it) },
+                    val possibleBinPaths = mutableListOf<File>()
+                    jpackagePath?.let { p ->
+                        val f = File(p)
+                        if (f.isFile) possibleBinPaths.add(f)
+                        else if (f.isDirectory) {
+                            listOf("bin/KittyTune", "bin/kitty-tune").forEach { sub ->
+                                File(f, sub).let { if (it.exists()) possibleBinPaths.add(it) }
+                            }
+                        }
+                    }
+                    possibleBinPaths.addAll(listOfNotNull(
                         File("/opt/kitty-tune/bin/KittyTune"),
                         File("/opt/kitty-tune/bin/kitty-tune"),
                         File("/opt/KittyTune/bin/KittyTune"),
@@ -446,26 +460,35 @@ object UpdateManager {
                         File("/usr/local/bin/KittyTune"),
                         File("/usr/local/bin/kittytune"),
                         File("/usr/local/bin/kitty-tune")
-                    )
+                    ))
                     val existingBin = possibleBinPaths.firstOrNull { it.exists() && it.isFile }
                     if (existingBin != null) {
-                        ProcessBuilder(existingBin.absolutePath).start()
-                    } else {
-                        relaunchJavaDevMode()
+                        ProcessBuilder("setsid", existingBin.absolutePath)
+                            .redirectErrorStream(true)
+                            .start()
+                        launched = true
                     }
                 }
                 osName.contains("mac") -> {
                     val jpackagePath = System.getProperty("jpackage.app.path")
                     if (!jpackagePath.isNullOrBlank() && File(jpackagePath).exists()) {
-                        ProcessBuilder(jpackagePath).start()
+                        ProcessBuilder("open", "-a", jpackagePath).start()
+                        launched = true
                     } else {
                         ProcessBuilder("open", "-a", "KittyTune").start()
+                        launched = true
                     }
                 }
-                else -> relaunchJavaDevMode()
+            }
+            if (!launched) {
+                relaunchJavaDevMode()
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            relaunchJavaDevMode()
+        }
+        if (launched) {
+            Thread.sleep(500)
         }
         kotlin.system.exitProcess(0)
     }
