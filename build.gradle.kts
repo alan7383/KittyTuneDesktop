@@ -119,7 +119,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.0.11"
+            packageVersion = "1.0.13"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 
@@ -172,3 +172,27 @@ compose.desktop {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.freeCompilerArgs.addAll("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api", "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
 }
+
+// Auto-generate BuildConfig.kt from the project version so it's always in sync.
+val generateBuildConfig by tasks.registering {
+    val versionName = project.version.toString()
+    val outDir = layout.projectDirectory.dir("src/main/kotlin/com/alananasss/kittytune")
+    outputs.file(outDir.file("BuildConfig.kt"))
+    doLast {
+        outDir.file("BuildConfig.kt").asFile.writeText(
+            "package com.alananasss.kittytune\n\n" +
+            "/**\n" +
+            " * Desktop replacement for the Android generated BuildConfig.\n" +
+            " * AUTO-GENERATED \u2014 do not edit manually. Change `version` in build.gradle.kts instead.\n" +
+            " */\n" +
+            "object BuildConfig {\n" +
+            "    const val APPLICATION_ID = \"com.alananasss.kittytune\"\n" +
+            "    const val VERSION_NAME = \"$versionName\"\n" +
+            "    const val VERSION_CODE = 1\n" +
+            "    const val DEBUG = false\n" +
+            "}\n"
+        )
+    }
+}
+
+tasks.named("compileKotlin") { dependsOn(generateBuildConfig) }
