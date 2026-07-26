@@ -449,8 +449,15 @@ object UpdateManager {
                     Start-Sleep -Milliseconds 800
                     $installBlock
                     Start-Sleep -Milliseconds 1500
-                    ${'$'}exePath = '$targetExePath'
-                    if (Test-Path ${'$'}exePath) { Start-Process ${'$'}exePath }
+                    ${'$'}candidatePaths = @(
+                        '$targetExePath',
+                        "${'$'}env:ProgramFiles\KittyTune\KittyTune.exe",
+                        "${'$'}{env:ProgramFiles(x86)}\KittyTune\KittyTune.exe",
+                        "${'$'}env:LOCALAPPDATA\Programs\KittyTune\KittyTune.exe",
+                        "${'$'}env:LOCALAPPDATA\KittyTune\KittyTune.exe"
+                    )
+                    ${'$'}exeToRun = ${'$'}candidatePaths | Where-Object { Test-Path ${'$'}_ } | Select-Object -First 1
+                    if (${'$'}exeToRun) { Start-Process ${'$'}exeToRun }
                 """.trimIndent()
 
                 val scriptFile = File(System.getProperty("java.io.tmpdir"), "kittytune_updater_${currentPid}.ps1")
