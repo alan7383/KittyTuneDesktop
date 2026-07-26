@@ -139,7 +139,8 @@ compose.desktop {
                 "jdk.jsobject",
                 "jdk.unsupported",
                 "jdk.unsupported.desktop",
-                "jdk.xml.dom"
+                "jdk.xml.dom",
+                "jdk.security.auth"
             )
 
             windows {
