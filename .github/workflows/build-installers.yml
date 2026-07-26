@@ -32,9 +32,9 @@ jobs:
       - name: Prepare Windows Distribution Binaries
         run: |
           mkdir dist-win
-          Get-ChildItem -Path build\compose\binaries\main-release\exe\*.exe | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.11.2-Setup-x64.exe" }
-          Get-ChildItem -Path build\compose\binaries\main-release\msi\*.msi | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.11.2-x64.msi" }
-          Compress-Archive -Path build\compose\binaries\main-release\app\* -DestinationPath dist-win\KittyTune-1.0.11.2-Windows-Portable-x64.zip
+          Get-ChildItem -Path build\compose\binaries\main-release\exe\*.exe | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.11.3-Setup-x64.exe" }
+          Get-ChildItem -Path build\compose\binaries\main-release\msi\*.msi | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-1.0.11.3-x64.msi" }
+          Compress-Archive -Path build\compose\binaries\main-release\app\* -DestinationPath dist-win\KittyTune-1.0.11.3-Windows-Portable-x64.zip
         shell: powershell
 
       - name: Upload Windows Artifacts
@@ -67,7 +67,7 @@ jobs:
       - name: Prepare macOS Binaries
         run: |
           mkdir dist-mac
-          cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-1.0.11.2.dmg
+          cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-1.0.11.3.dmg
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -127,7 +127,7 @@ jobs:
           
           cat << 'PKGEOF' > arch_build/pkg/.PKGINFO
           pkgname = kitty-tune
-          pkgver = 1.0.11.2-1
+          pkgver = 1.0.11.3-1
           pkgdesc = KittyTune Desktop Music Player
           url = https://github.com/alan7383/KittyTuneDesktop
           builddate = REPLACE_BUILDDATE
@@ -147,7 +147,7 @@ jobs:
           sed -i "s/REPLACE_BUILDDATE/$PKG_DATE/" arch_build/pkg/.PKGINFO
           
           cd arch_build/pkg
-          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.11.2-1-x86_64.pkg.tar.zst
+          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.11.3-1-x86_64.pkg.tar.zst
           cd ../..
 
       - name: Upload Linux x64 Packages
@@ -158,7 +158,7 @@ jobs:
             build/**/*.deb
             build/**/*.rpm
             build/**/*.AppImage
-            kitty-tune-1.0.11.2-1-x86_64.pkg.tar.zst
+            kitty-tune-1.0.11.3-1-x86_64.pkg.tar.zst
 
   build-linux-arm64:
     name: Build Linux ARM64 Packages (.deb, .rpm, .pkg.tar.zst)
@@ -212,7 +212,7 @@ jobs:
           
           cat << 'PKGEOF' > arch_build_arm/pkg/.PKGINFO
           pkgname = kitty-tune
-          pkgver = 1.0.11.2-1
+          pkgver = 1.0.11.3-1
           pkgdesc = KittyTune Desktop Music Player
           url = https://github.com/alan7383/KittyTuneDesktop
           builddate = REPLACE_BUILDDATE
@@ -232,7 +232,7 @@ jobs:
           sed -i "s/REPLACE_BUILDDATE/$PKG_DATE/" arch_build_arm/pkg/.PKGINFO
           
           cd arch_build_arm/pkg
-          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.11.2-1-aarch64.pkg.tar.zst
+          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-1.0.11.3-1-aarch64.pkg.tar.zst
           cd ../..
 
       - name: Upload Linux ARM64 Packages
@@ -242,7 +242,7 @@ jobs:
           path: |
             build/**/*.deb
             build/**/*.rpm
-            kitty-tune-1.0.11.2-1-aarch64.pkg.tar.zst
+            kitty-tune-1.0.11.3-1-aarch64.pkg.tar.zst
 
   release:
     name: Publish Universal GitHub Release
@@ -279,8 +279,8 @@ jobs:
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.11.2' }}
-          name: ${{ github.ref_type == 'tag' && github.ref_name || 'KittyTune Desktop v1.0.11.2' }}
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.11.3' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'KittyTune Desktop v1.0.11.3' }}
           draft: false
           prerelease: false
           generate_release_notes: true
