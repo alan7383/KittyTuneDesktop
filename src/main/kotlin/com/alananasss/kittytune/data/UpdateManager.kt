@@ -426,11 +426,14 @@ object UpdateManager {
                 val targetExePath = kittyExe.absolutePath.replace("'", "''")
                 val escapedInstallerPath = installerPath.replace("'", "''")
 
-                // For .msi: call msiexec directly (avoids cmd.exe quoting issues)
+                // For .msi: call msiexec directly; fallback to REINSTALLMODE=amus REINSTALL=ALL if same version is installed
                 // For .exe (Inno Setup): call executable directly with silent flags
                 val installBlock = if (isMsi) {
                     """
-                    Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstallerPath', '/quiet', '/norestart') -Wait -WindowStyle Hidden
+                    ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstallerPath', '/quiet', '/norestart') -Wait -PassThru -WindowStyle Hidden
+                    if (${'$'}p.ExitCode -ne 0) {
+                        Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstallerPath', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/quiet', '/norestart') -Wait -WindowStyle Hidden
+                    }
                     """.trimIndent()
                 } else {
                     """
