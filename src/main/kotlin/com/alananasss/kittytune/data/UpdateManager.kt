@@ -462,6 +462,7 @@ object UpdateManager {
             val osName = System.getProperty("os.name", "").lowercase()
             when {
                 osName.contains("win") -> {
+                    val nullDevice = File("NUL")
                     val jpackagePath = System.getProperty("jpackage.app.path")
                     val possibleExePaths = mutableListOf<File>()
                     jpackagePath?.let { p ->
@@ -478,7 +479,10 @@ object UpdateManager {
 
                     val existingExe = possibleExePaths.firstOrNull { it.exists() && it.isFile }
                     if (existingExe != null) {
-                        ProcessBuilder(existingExe.absolutePath).start()
+                        ProcessBuilder(existingExe.absolutePath)
+                            .redirectOutput(nullDevice)
+                            .redirectError(nullDevice)
+                            .start()
                         launched = true
                     }
                 }
@@ -508,19 +512,29 @@ object UpdateManager {
                     ))
                     val existingBin = possibleBinPaths.firstOrNull { it.exists() && it.isFile }
                     if (existingBin != null) {
+                        val devNull = File("/dev/null")
                         ProcessBuilder("setsid", existingBin.absolutePath)
-                            .redirectErrorStream(true)
+                            .directory(File("/"))
+                            .redirectOutput(devNull)
+                            .redirectError(devNull)
                             .start()
                         launched = true
                     }
                 }
                 osName.contains("mac") -> {
+                    val devNull = File("/dev/null")
                     val jpackagePath = System.getProperty("jpackage.app.path")
                     if (!jpackagePath.isNullOrBlank() && File(jpackagePath).exists()) {
-                        ProcessBuilder("open", "-a", jpackagePath).start()
+                        ProcessBuilder("open", "-a", jpackagePath)
+                            .redirectOutput(devNull)
+                            .redirectError(devNull)
+                            .start()
                         launched = true
                     } else {
-                        ProcessBuilder("open", "-a", "KittyTune").start()
+                        ProcessBuilder("open", "-a", "KittyTune")
+                            .redirectOutput(devNull)
+                            .redirectError(devNull)
+                            .start()
                         launched = true
                     }
                 }
@@ -545,7 +559,11 @@ object UpdateManager {
             val javaBin = File(System.getProperty("java.home"), javaExeName)
             val classPath = System.getProperty("java.class.path")
             if (javaBin.exists() && !classPath.isNullOrBlank()) {
-                ProcessBuilder(javaBin.absolutePath, "-cp", classPath, "com.alananasss.kittytune.MainKt").start()
+                val devNull = if (osName.contains("win")) File("NUL") else File("/dev/null")
+                ProcessBuilder(javaBin.absolutePath, "-cp", classPath, "com.alananasss.kittytune.MainKt")
+                    .redirectOutput(devNull)
+                    .redirectError(devNull)
+                    .start()
             } else {
                 com.alananasss.kittytune.core.Toaster.show(com.alananasss.kittytune.core.str("update_restarting_toast"))
             }
