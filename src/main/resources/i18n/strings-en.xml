@@ -2083,6 +2083,9 @@
     <string name="update_btn_restart">Restart application</string>
     <string name="update_btn_minimize">Minimize to background</string>
     <string name="update_installing_btn">Installing...</string>
+    <string name="update_waiting_auth_title">Waiting for authentication…</string>
+    <string name="update_waiting_auth_step">Please confirm in the authentication dialog</string>
+    <string name="update_waiting_auth_btn">Waiting for authentication…</string>
     <string name="update_simulation_title">Test Simulation</string>
     <string name="update_simulation_btn">Test updater (Simulation)</string>
     <string name="update_restarting_toast">Restarting application...</string>

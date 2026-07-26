@@ -1838,6 +1838,9 @@
     <string name="update_btn_restart">Alkalmazás újraindítása</string>
     <string name="update_btn_minimize">Háttérbe kicsinyítés</string>
     <string name="update_installing_btn">Telepítés folyamatban...</string>
+    <string name="update_waiting_auth_title">Hitelesítésre várva…</string>
+    <string name="update_waiting_auth_step">Kérjük, erősítse meg a hitelesítési ablakban</string>
+    <string name="update_waiting_auth_btn">Hitelesítésre várva…</string>
     <string name="update_simulation_title">Teszt szimuláció</string>
     <string name="update_simulation_btn">Frissítő tesztelése (Szimuláció)</string>
     <string name="update_restarting_toast">Alkalmazás újraindítása...</string>
