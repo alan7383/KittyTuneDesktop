@@ -62,9 +62,16 @@ object UpdateManager {
     }
 
     fun testLocalInstall(installerFile: File? = null) {
+        val downloadsDir = File(System.getProperty("user.home"), "Downloads")
         val file = installerFile
-            ?: File(AppDirs.cacheDir, "update_KittyTune-1.0.12-Setup-x64.exe").takeIf { it.exists() }
-            ?: File(System.getProperty("user.home"), "Downloads/KittyTune-1.0.12-Setup-x64.exe").takeIf { it.exists() }
+            // Check cache dir for any .msi or .exe update file
+            ?: AppDirs.cacheDir.listFiles()
+                ?.filter { it.name.startsWith("update_") && (it.name.endsWith(".msi") || it.name.endsWith(".exe")) }
+                ?.maxByOrNull { it.lastModified() }
+            // Check Downloads folder for any KittyTune installer
+            ?: downloadsDir.listFiles()
+                ?.filter { (it.name.startsWith("KittyTune") || it.name.startsWith("kitty-tune")) && (it.name.endsWith(".msi") || it.name.endsWith(".exe")) }
+                ?.maxByOrNull { it.lastModified() }
             ?: return
         downloadedInstallerFile = file
         _status.value = UpdateStatus.INSTALLING
@@ -414,14 +421,22 @@ object UpdateManager {
                     ?: File(System.getenv("LOCALAPPDATA") ?: System.getProperty("user.dir", ""), "Programs/KittyTune/KittyTune.exe")
 
                 val installerPath = file.absolutePath
-                val installerArgs = if (file.name.endsWith(".msi", ignoreCase = true)) {
-                    "msiexec /i \"$installerPath\" /quiet /norestart"
-                } else {
-                    // /VERYSILENT keeps the Inno Setup process alive until done (no detached child).
-                    "\"$installerPath\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-"
-                }
+                val isMsi = file.name.endsWith(".msi", ignoreCase = true)
 
                 val targetExePath = kittyExe.absolutePath.replace("'", "''")
+                val escapedInstallerPath = installerPath.replace("'", "''")
+
+                // For .msi: call msiexec directly (avoids cmd.exe quoting issues)
+                // For .exe (Inno Setup): call executable directly with silent flags
+                val installBlock = if (isMsi) {
+                    """
+                    Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstallerPath', '/quiet', '/norestart') -Wait -WindowStyle Hidden
+                    """.trimIndent()
+                } else {
+                    """
+                    Start-Process -FilePath '$escapedInstallerPath' -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -WindowStyle Hidden
+                    """.trimIndent()
+                }
 
                 val scriptContent = """
                     # KittyTune auto-updater helper — launched before user clicks Restart.
@@ -429,7 +444,8 @@ object UpdateManager {
                     ${'$'}targetPid = $currentPid
                     try { ${'$'}proc = Get-Process -Id ${'$'}targetPid -ErrorAction Stop; ${'$'}proc.WaitForExit(120000) } catch { }
                     Start-Sleep -Milliseconds 800
-                    Start-Process -FilePath cmd.exe -ArgumentList '/c $installerArgs' -Wait -WindowStyle Hidden
+                    $installBlock
+                    Start-Sleep -Milliseconds 1500
                     ${'$'}exePath = '$targetExePath'
                     if (Test-Path ${'$'}exePath) { Start-Process ${'$'}exePath }
                 """.trimIndent()
