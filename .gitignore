@@ -48,3 +48,5 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+arch_build/
+*.pkg.tar.zst
