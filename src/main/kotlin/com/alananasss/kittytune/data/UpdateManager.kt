@@ -211,11 +211,7 @@ object UpdateManager {
 
         return when {
             osName.contains("win") -> {
-                // Prefer .msi: Windows Installer handles it silently via msiexec /quiet in auto-updater,
-                // but shows the full graphical wizard when double-clicked manually by the user.
                 assets.find { it.name.endsWith(".msi", ignoreCase = true) }
-                    ?: assets.find { it.name.contains("Setup", ignoreCase = true) && it.name.endsWith(".exe", ignoreCase = true) }
-                    ?: assets.find { it.name.endsWith(".exe", ignoreCase = true) }
             }
             osName.contains("mac") -> {
                 assets.find { it.name.endsWith(".dmg", ignoreCase = true) }
