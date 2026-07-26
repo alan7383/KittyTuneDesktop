@@ -513,12 +513,38 @@ object UpdateManager {
                     val existingBin = possibleBinPaths.firstOrNull { it.exists() && it.isFile }
                     if (existingBin != null) {
                         val devNull = File("/dev/null")
-                        ProcessBuilder("setsid", existingBin.absolutePath)
-                            .directory(File("/"))
-                            .redirectOutput(devNull)
-                            .redirectError(devNull)
-                            .start()
-                        launched = true
+                        val args = mutableListOf<String>()
+                        when {
+                            File("/usr/bin/systemd-run").exists() -> args.addAll(listOf(
+                                "systemd-run", 
+                                "--user", 
+                                "--setenv=DISPLAY=${System.getenv("DISPLAY") ?: ":0"}",
+                                "--setenv=WAYLAND_DISPLAY=${System.getenv("WAYLAND_DISPLAY") ?: ""}",
+                                "--setenv=XDG_RUNTIME_DIR=${System.getenv("XDG_RUNTIME_DIR") ?: ""}",
+                                existingBin.absolutePath
+                            ))
+                            File("/usr/bin/gtk-launch").exists() -> args.addAll(listOf("gtk-launch", "kitty-tune"))
+                            File("/usr/bin/dex").exists() -> args.addAll(listOf("dex", "/usr/share/applications/kitty-tune.desktop"))
+                            else -> args.add(existingBin.absolutePath)
+                        }
+
+                        try {
+                            ProcessBuilder(args)
+                                .directory(File("/"))
+                                .redirectOutput(devNull)
+                                .redirectError(devNull)
+                                .start()
+                        } catch (e: Exception) {
+                            val cmdStr = args.joinToString(" ") { if (it.contains(" ")) "\"$it\"" else it }
+                            NativeCLibrary.INSTANCE?.system("$cmdStr >/dev/null 2>&1 &")
+                        }
+                        
+                        try {
+                            ProcessBuilder("kill", "-9", ProcessHandle.current().pid().toString()).start()
+                        } catch (e: Exception) {
+                            NativeCLibrary.INSTANCE?.system("kill -9 ${ProcessHandle.current().pid()}")
+                        }
+                        Thread.sleep(1000)
                     }
                 }
                 osName.contains("mac") -> {
@@ -549,7 +575,16 @@ object UpdateManager {
         if (launched) {
             Thread.sleep(500)
         }
-        kotlin.system.exitProcess(0)
+        if (System.getProperty("os.name", "").lowercase().let { it.contains("nux") || it.contains("nix") }) {
+            try {
+                ProcessBuilder("kill", "-9", ProcessHandle.current().pid().toString()).start()
+            } catch (e: Exception) {
+                NativeCLibrary.INSTANCE?.system("kill -9 ${ProcessHandle.current().pid()}")
+            }
+            Thread.sleep(1000)
+        } else {
+            kotlin.system.exitProcess(0)
+        }
     }
 
     private fun relaunchJavaDevMode() {
@@ -617,6 +652,18 @@ object UpdateManager {
             false
         } catch (e: Exception) {
             false
+        }
+    }
+}
+
+private interface NativeCLibrary : com.sun.jna.Library {
+    fun system(cmd: String): Int
+
+    companion object {
+        val INSTANCE: NativeCLibrary? by lazy {
+            runCatching {
+                com.sun.jna.Native.load("c", NativeCLibrary::class.java) as NativeCLibrary
+            }.getOrNull()
         }
     }
 }
