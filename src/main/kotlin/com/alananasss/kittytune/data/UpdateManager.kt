@@ -426,38 +426,68 @@ object UpdateManager {
                 val targetExePath = kittyExe.absolutePath.replace("'", "''")
                 val escapedInstallerPath = installerPath.replace("'", "''")
 
+                val logFilePath = File(System.getProperty("java.io.tmpdir"), "kittytune_updater.log").absolutePath.replace("'", "''")
+
                 // For .msi: call msiexec directly; fallback to REINSTALLMODE=amus REINSTALL=ALL if same version is installed
                 // For .exe (Inno Setup): call executable directly with silent flags
                 val installBlock = if (isMsi) {
                     """
+                    Log "Running msiexec command..."
                     ${'$'}p = Start-Process cmd.exe -ArgumentList '/c msiexec /i "$escapedInstallerPath" /quiet /norestart' -Wait -PassThru -WindowStyle Hidden
+                    Log "msiexec finished with ExitCode: ${'$'}(${'$'}p.ExitCode)"
                     if (${'$'}p.ExitCode -ne 0) {
-                        Start-Process cmd.exe -ArgumentList '/c msiexec /i "$escapedInstallerPath" REINSTALL=ALL REINSTALLMODE=amus /quiet /norestart' -Wait -WindowStyle Hidden
+                        Log "First install attempt failed with exit code ${'$'}(${'$'}p.ExitCode). Retrying with REINSTALL=ALL..."
+                        ${'$'}p2 = Start-Process cmd.exe -ArgumentList '/c msiexec /i "$escapedInstallerPath" REINSTALL=ALL REINSTALLMODE=amus /quiet /norestart' -Wait -PassThru -WindowStyle Hidden
+                        Log "Second install attempt finished with ExitCode: ${'$'}(${'$'}p2.ExitCode)"
                     }
                     """.trimIndent()
                 } else {
                     """
-                    Start-Process cmd.exe -ArgumentList '/c "$escapedInstallerPath" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -WindowStyle Hidden
+                    Log "Running Inno Setup command..."
+                    ${'$'}p = Start-Process cmd.exe -ArgumentList '/c "$escapedInstallerPath" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -PassThru -WindowStyle Hidden
+                    Log "Inno Setup finished with ExitCode: ${'$'}(${'$'}p.ExitCode)"
                     """.trimIndent()
                 }
 
                 val scriptContent = """
                     # KittyTune auto-updater helper — launched before user clicks Restart.
-                    # Waits for KittyTune to exit, then installs silently, then relaunches.
+                    function Log([string]${'$'}msg) {
+                        ${'$'}ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+                        Add-Content -Path '$logFilePath' -Value "[${'$'}ts] ${'$'}msg" -ErrorAction SilentlyContinue
+                    }
+                    Log "========================================"
+                    Log "Updater script started. Target PID: $currentPid"
                     ${'$'}targetPid = $currentPid
-                    try { ${'$'}proc = Get-Process -Id ${'$'}targetPid -ErrorAction Stop; ${'$'}proc.WaitForExit(120000) } catch { }
+                    try {
+                        ${'$'}proc = Get-Process -Id ${'$'}targetPid -ErrorAction Stop
+                        Log "Waiting for process ${'$'}targetPid to exit..."
+                        ${'$'}proc.WaitForExit(120000)
+                        Log "Process ${'$'}targetPid exited."
+                    } catch {
+                        Log "Target process ${'$'}targetPid not running or failed to wait: ${'$'}_"
+                    }
                     Start-Sleep -Milliseconds 800
                     $installBlock
                     Start-Sleep -Milliseconds 1500
                     ${'$'}candidatePaths = @(
                         '$targetExePath',
-                        "${'$'}env:ProgramFiles\KittyTune\KittyTune.exe",
-                        "${'$'}{env:ProgramFiles(x86)}\KittyTune\KittyTune.exe",
+                        "${'$'}env:LOCALAPPDATA\KittyTune\KittyTune.exe",
                         "${'$'}env:LOCALAPPDATA\Programs\KittyTune\KittyTune.exe",
-                        "${'$'}env:LOCALAPPDATA\KittyTune\KittyTune.exe"
+                        "${'$'}env:ProgramFiles\KittyTune\KittyTune.exe",
+                        "${'$'}{env:ProgramFiles(x86)}\KittyTune\KittyTune.exe"
                     )
+                    Log "Searching for KittyTune.exe in candidate paths..."
+                    foreach (${'$'}cp in ${'$'}candidatePaths) {
+                        Log "Checking path: ${'$'}cp -> ${'$'}(Test-Path ${'$'}cp)"
+                    }
                     ${'$'}exeToRun = ${'$'}candidatePaths | Where-Object { Test-Path ${'$'}_ } | Select-Object -First 1
-                    if (${'$'}exeToRun) { Start-Process ${'$'}exeToRun }
+                    if (${'$'}exeToRun) {
+                        Log "Relaunching KittyTune: ${'$'}exeToRun"
+                        Start-Process ${'$'}exeToRun
+                        Log "Relaunch command issued successfully."
+                    } else {
+                        Log "ERROR: No valid KittyTune.exe found to relaunch!"
+                    }
                 """.trimIndent()
 
                 val scriptFile = File(System.getProperty("java.io.tmpdir"), "kittytune_updater_${currentPid}.ps1")
