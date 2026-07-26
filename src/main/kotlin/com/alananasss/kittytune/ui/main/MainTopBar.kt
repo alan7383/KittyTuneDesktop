@@ -201,6 +201,7 @@ fun MainTopBar(
         val isUpdateActive = updateStatus == com.alananasss.kittytune.data.UpdateStatus.AVAILABLE ||
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING ||
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.PAUSED ||
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.WAITING_FOR_AUTH ||
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.INSTALLING ||
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES ||
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL
@@ -218,7 +219,7 @@ fun MainTopBar(
                     imageVector = when (updateStatus) {
                         com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL -> Icons.Outlined.RestartAlt
                         com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES -> Icons.Outlined.NewReleases
-                        com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING, com.alananasss.kittytune.data.UpdateStatus.PAUSED, com.alananasss.kittytune.data.UpdateStatus.INSTALLING -> Icons.Outlined.Download
+                        com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING, com.alananasss.kittytune.data.UpdateStatus.PAUSED, com.alananasss.kittytune.data.UpdateStatus.WAITING_FOR_AUTH, com.alananasss.kittytune.data.UpdateStatus.INSTALLING -> Icons.Outlined.Download
                         else -> Icons.Outlined.NewReleases
                     },
                     contentDescription = str("pref_updates_title"),

@@ -49,19 +49,20 @@ fun UpdateDialog(
     totalSize: Long,
     onDismiss: () -> Unit
 ) {
-    if (release == null && status != UpdateStatus.DOWNLOADING && status != UpdateStatus.INSTALLING && status != UpdateStatus.READY_TO_INSTALL) return
+    if (release == null && status != UpdateStatus.DOWNLOADING && status != UpdateStatus.WAITING_FOR_AUTH && status != UpdateStatus.INSTALLING && status != UpdateStatus.READY_TO_INSTALL) return
 
     BackHandler(onBack = onDismiss)
 
     val scope = rememberCoroutineScope()
     val isDownloading = status == UpdateStatus.DOWNLOADING
     val isPaused = status == UpdateStatus.PAUSED
+    val isWaitingForAuth = status == UpdateStatus.WAITING_FOR_AUTH
     val isInstalling = status == UpdateStatus.INSTALLING
     val isReady = status == UpdateStatus.READY_TO_INSTALL
     val isMultiInstance = status == UpdateStatus.MULTIPLE_INSTANCES
 
     Dialog(onDismissRequest = {
-        if (!isDownloading && !isInstalling) {
+        if (!isDownloading && !isInstalling && !isWaitingForAuth) {
             onDismiss()
         }
     }) {
@@ -81,6 +82,7 @@ fun UpdateDialog(
                         Text(
                             text = when {
                                 isReady -> str("update_success_title")
+                                isWaitingForAuth -> str("update_waiting_auth_title")
                                 isInstalling -> str("update_installing_title")
                                 isDownloading -> str("update_downloading", (progress * 100).toInt())
                                 isPaused -> str("update_paused_title")
@@ -97,7 +99,13 @@ fun UpdateDialog(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.outline
                             )
-                        } else if (isInstalling) {
+                        } else if (isWaitingForAuth) {
+                            Text(
+                                text = str("update_waiting_auth_step"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                } else if (isInstalling || isWaitingForAuth) {
                             Text(
                                 text = str("update_installing_step"),
                                 style = MaterialTheme.typography.bodySmall,
@@ -105,7 +113,7 @@ fun UpdateDialog(
                             )
                         }
                     }
-                    if (!isDownloading && !isInstalling) {
+                    if (!isDownloading && !isInstalling && !isWaitingForAuth) {
                         IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
                             Icon(Icons.Default.Close, contentDescription = str("btn_cancel"))
                         }
@@ -123,7 +131,7 @@ fun UpdateDialog(
                         color = if (isPaused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary
                     )
                     Spacer(Modifier.height(16.dp))
-                } else if (isInstalling) {
+                } else if (isInstalling || isWaitingForAuth) {
                     LinearWavyProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
                         trackColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -310,7 +318,7 @@ fun UpdateDialog(
                                 )
                             }
                         }
-                        UpdateStatus.INSTALLING -> {
+                        UpdateStatus.INSTALLING, UpdateStatus.WAITING_FOR_AUTH -> {
                             FilledTonalButton(
                                 onClick = {},
                                 enabled = false,
@@ -318,7 +326,7 @@ fun UpdateDialog(
                             ) {
                                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                 Spacer(Modifier.width(8.dp))
-                                Text(str("update_installing_btn"))
+                                Text(if (isWaitingForAuth) str("update_waiting_auth_btn") else str("update_installing_btn"))
                             }
                         }
                         UpdateStatus.READY_TO_INSTALL -> {

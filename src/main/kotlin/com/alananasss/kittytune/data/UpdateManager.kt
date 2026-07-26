@@ -20,7 +20,7 @@ import java.io.FileOutputStream
 import kotlin.math.max
 
 enum class UpdateStatus {
-    IDLE, CHECKING, AVAILABLE, DOWNLOADING, PAUSED, INSTALLING, MULTIPLE_INSTANCES, READY_TO_INSTALL, ERROR, NO_UPDATE
+    IDLE, CHECKING, AVAILABLE, DOWNLOADING, PAUSED, WAITING_FOR_AUTH, INSTALLING, MULTIPLE_INSTANCES, READY_TO_INSTALL, ERROR, NO_UPDATE
 }
 
 /**
@@ -397,13 +397,11 @@ object UpdateManager {
             }
 
             if (args.isNotEmpty()) {
+                val needsAuth = args.firstOrNull() == "pkexec"
+                if (needsAuth) _status.value = UpdateStatus.WAITING_FOR_AUTH
                 val process = ProcessBuilder(*args).start()
-                val isDevMode = System.getProperty("jpackage.app.path").isNullOrBlank()
-                if (isDevMode) {
-                    runCatching { process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS) }
-                } else {
-                    runCatching { process.waitFor() }
-                }
+                _status.value = UpdateStatus.INSTALLING
+                runCatching { process.waitFor() }
             }
             _status.value = UpdateStatus.READY_TO_INSTALL
         } catch (e: Exception) {

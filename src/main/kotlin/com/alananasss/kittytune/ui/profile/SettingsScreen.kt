@@ -152,6 +152,11 @@ fun AboutUpdateSettingsScreen() {
                         Text(str("update_installing_title"), color = MaterialTheme.colorScheme.primary)
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
+                    com.alananasss.kittytune.data.UpdateStatus.WAITING_FOR_AUTH -> {
+                        Text(str("update_waiting_auth_title"), color = MaterialTheme.colorScheme.primary)
+                        Text(str("update_waiting_auth_step"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
                     com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES -> {
                         Text(str("update_multi_instance_title"), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                         Button(
