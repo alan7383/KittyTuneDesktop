@@ -13,10 +13,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -44,7 +44,7 @@ jobs:
         shell: powershell
 
       - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: KittyTune-Windows
           path: dist-win/*
@@ -55,10 +55,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -80,7 +80,7 @@ jobs:
           cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-${{ steps.get_version.outputs.VERSION }}.dmg
 
       - name: Upload macOS Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: KittyTune-macOS
           path: dist-mac/*
@@ -91,7 +91,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install packaging tools (rpm, fakeroot, zstd)
         run: |
@@ -99,7 +99,7 @@ jobs:
           sudo apt-get install -y rpm fakeroot zstd binutils
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -166,7 +166,7 @@ jobs:
           cd ../..
 
       - name: Upload Linux x64 Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: KittyTune-Linux-x64
           path: |
@@ -181,7 +181,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install packaging tools (rpm, fakeroot, zstd)
         run: |
@@ -189,7 +189,7 @@ jobs:
           sudo apt-get install -y rpm fakeroot zstd binutils
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -256,7 +256,7 @@ jobs:
           cd ../..
 
       - name: Upload Linux ARM64 Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: KittyTune-Linux-arm64
           path: |
@@ -273,25 +273,25 @@ jobs:
 
     steps:
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: KittyTune-Windows
           path: ./release-files
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: KittyTune-macOS
           path: ./release-files
 
       - name: Download Linux x64 Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: KittyTune-Linux-x64
           path: ./release-files
 
       - name: Download Linux ARM64 Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: KittyTune-Linux-arm64
           path: ./release-files
