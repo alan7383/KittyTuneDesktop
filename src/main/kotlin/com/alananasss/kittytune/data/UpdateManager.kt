@@ -20,7 +20,7 @@ import java.io.FileOutputStream
 import kotlin.math.max
 
 enum class UpdateStatus {
-    IDLE, CHECKING, AVAILABLE, DOWNLOADING, PAUSED, WAITING_FOR_AUTH, INSTALLING, MULTIPLE_INSTANCES, READY_TO_INSTALL, ERROR, NO_UPDATE
+    IDLE, CHECKING, AVAILABLE, DOWNLOADING, PAUSED, WAITING_FOR_AUTH, INSTALLING, MULTIPLE_INSTANCES, READY_TO_INSTALL, ERROR, NO_UPDATE, AUTH_FAILED
 }
 
 /**
@@ -45,6 +45,8 @@ object UpdateManager {
 
     var releaseInfo: GithubRelease? = null
     var downloadedInstallerFile: File? = null
+    private var currentInstallProcess: Process? = null
+    private var authFailedFile: File? = null
 
     private const val KEY_LAST_CHECK = "last_check_time"
     private val prefs = NamedPrefs("update_cache")
@@ -132,6 +134,15 @@ object UpdateManager {
             kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
                 performBackgroundInstall(file)
             }
+        }
+    }
+
+    fun retryInstall() {
+        val file = authFailedFile ?: downloadedInstallerFile ?: return
+        authFailedFile = null
+        _status.value = UpdateStatus.WAITING_FOR_AUTH
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            performBackgroundInstall(file)
         }
     }
 
@@ -399,9 +410,43 @@ object UpdateManager {
             if (args.isNotEmpty()) {
                 val needsAuth = args.firstOrNull() == "pkexec"
                 if (needsAuth) _status.value = UpdateStatus.WAITING_FOR_AUTH
-                val process = ProcessBuilder(*args).start()
-                if (!needsAuth) _status.value = UpdateStatus.INSTALLING
-                runCatching { process.waitFor() }
+                val process = ProcessBuilder(*args)
+                    .redirectErrorStream(true)
+                    .start()
+                currentInstallProcess = process
+
+                if (needsAuth) {
+                    var authDetected = false
+                    val reader = Thread {
+                        try {
+                            process.inputStream.bufferedReader().useLines { lines ->
+                                for (line in lines) {
+                                    if (!authDetected) {
+                                        authDetected = true
+                                        if (_status.value == UpdateStatus.WAITING_FOR_AUTH) {
+                                            _status.value = UpdateStatus.INSTALLING
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                    reader.isDaemon = true
+                    reader.start()
+
+                    val exitCode = process.waitFor()
+                    reader.join(2000)
+
+                    if (exitCode != 0 && !authDetected) {
+                        authFailedFile = file
+                        _status.value = UpdateStatus.AUTH_FAILED
+                        return
+                    }
+                } else {
+                    _status.value = UpdateStatus.INSTALLING
+                    process.waitFor()
+                }
+                currentInstallProcess = null
             }
             _status.value = UpdateStatus.READY_TO_INSTALL
         } catch (e: Exception) {

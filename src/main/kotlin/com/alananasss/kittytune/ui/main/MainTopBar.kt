@@ -204,7 +204,8 @@ fun MainTopBar(
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.WAITING_FOR_AUTH ||
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.INSTALLING ||
                 updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL ||
+                updateStatus == com.alananasss.kittytune.data.UpdateStatus.AUTH_FAILED
 
         if (isUpdateActive) {
             FilledTonalIconButton(

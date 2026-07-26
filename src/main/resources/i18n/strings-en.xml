@@ -2097,6 +2097,9 @@
     <string name="update_multi_instance_desc">Another instance of KittyTune is currently open. Do you want to close it to continue the installation?</string>
     <string name="update_btn_close_instances">Close instances</string>
     <string name="update_btn_dont_remind">Don\'t remind me again</string>
+    <string name="update_auth_failed_title">Authentication failed</string>
+    <string name="update_auth_failed_desc">The authentication was cancelled or failed. Please try again.</string>
+    <string name="update_btn_retry_auth">Retry authentication</string>
 </resources>
 
 
