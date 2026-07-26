@@ -430,14 +430,14 @@ object UpdateManager {
                 // For .exe (Inno Setup): call executable directly with silent flags
                 val installBlock = if (isMsi) {
                     """
-                    ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstallerPath', '/quiet', '/norestart') -Wait -PassThru -WindowStyle Hidden -Verb RunAs
+                    ${'$'}p = Start-Process cmd.exe -ArgumentList '/c msiexec /i "$escapedInstallerPath" /quiet /norestart' -Wait -PassThru -WindowStyle Hidden
                     if (${'$'}p.ExitCode -ne 0) {
-                        Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstallerPath', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/quiet', '/norestart') -Wait -WindowStyle Hidden -Verb RunAs
+                        Start-Process cmd.exe -ArgumentList '/c msiexec /i "$escapedInstallerPath" REINSTALL=ALL REINSTALLMODE=amus /quiet /norestart' -Wait -WindowStyle Hidden
                     }
                     """.trimIndent()
                 } else {
                     """
-                    Start-Process -FilePath '$escapedInstallerPath' -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -WindowStyle Hidden -Verb RunAs
+                    Start-Process cmd.exe -ArgumentList '/c "$escapedInstallerPath" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -WindowStyle Hidden
                     """.trimIndent()
                 }
 
