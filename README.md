@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src/main/resources/icons/kittytune.png" width="128" alt="KittyTune Desktop Logo">
+  <img src="images/logo.png" width="128" alt="KittyTune Desktop Logo">
 </p>
 
 <h1 align="center">KittyTune Desktop (・∀・)ﾉ</h1>
