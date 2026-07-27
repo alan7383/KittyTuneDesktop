@@ -191,15 +191,13 @@ Most desktop music streaming clients are heavy Electron applications that consum
 
 | Feature | Official SoundCloud Web | KittyTune Desktop |
 | :--- | :--- | :--- |
-| **Synchronized karaoke lyrics** | No (Absent) | Yes (LrcLib & KuGou word/line karaoke) |
-| **YouTube audio fallback** | No (Stream fails if missing) | Yes (Automatic audio stream fallback) |
+| **Offline music downloads** | No (Requires Go+ subscription) | Yes (Free offline caching & local files) |
 | **Ad-free experience** | No (Audio/video ads without Go+) | Yes (100% ad-free) |
-| **Material You & system theme sync** | No (Fixed web theme) | Yes (end4 Hyprland / matugen live hot-reload) |
+| **Synchronized karaoke lyrics** | No (Absent) | Yes (LrcLib & KuGou word/line tracking) |
+| **YouTube audio fallback** | No (Stream fails if missing) | Yes (Automatic audio stream routing) |
+| **System-wide theme sync** | No (Fixed web UI) | Yes (end-4 Hyprland / matugen live hot-reload) |
 | **Native Linux MPRIS D-Bus** | No (Browser session dependent) | Yes (Full panel & Waybar media integration) |
-| **Discord Rich Presence (RPC)** | No | Yes (Native Discord status & artwork) |
-| **Variable font customization** | No | Yes (Custom font weight, slant, opsz, roundness) |
-| **AMOLED pure black mode** | No | Yes (True `#000000` OLED dark mode) |
-| **Memory footprint** | Heavy (Chromium/Web tab) | Lightweight (Native JVM / Compose Desktop) |
+| **Discord Rich Presence (RPC)** | No (Requires 3rd party apps) | Yes (Native Discord status & artwork) |
 
 ---
 
