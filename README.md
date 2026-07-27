@@ -27,7 +27,7 @@
 
 KittyTune Desktop is a complete, native desktop port of the KittyTune Android music application. Built from the ground up using **Kotlin 2.4.0**, **Compose Multiplatform (Skiko)**, and **Material 3 Expressive**, it brings the full mobile experience natively to Linux, Windows, and macOS desktops.
 
-Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desktop operates as a lightweight JVM desktop client. It streams high-quality audio with **SoundCloud as its primary music source** (including complete account synchronization for likes, reposts, and playlists just like the official SoundCloud player) and **YouTube as an automatic fallback**, renders real-time synchronized karaoke lyrics, integrates with system media controls (MPRIS / SMTC), and seamlessly synchronizes with system-wide Material You themes.
+Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desktop operates as a lightweight JVM desktop client. It streams high-quality audio with **SoundCloud as its primary music source** (including complete account synchronization for likes, reposts, and playlists just like the official SoundCloud player) and **YouTube as an automatic fallback**, renders real-time synchronized karaoke lyrics, offers a **true full-playlist shuffle** without lazy-loading limits, integrates with system media controls (MPRIS / SMTC), and seamlessly synchronizes with system-wide Material You themes.
 
 ---
 
@@ -40,6 +40,7 @@ Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desk
 *   **SoundCloud-first audio streaming**: Native SoundCloud audio playback engine with seamless YouTube audio fallback when required.
 *   **High-fidelity audio engine**: Built-in FFmpeg and JavaFX Media playback pipelines with buffer optimization and gapless playback.
 *   **Search & discovery**: Instant search across tracks, artists, albums, and playlists with rich suggestion filters.
+*   **True full-playlist shuffle**: Shuffles your entire playlist instantly, bypassing the frustrating "lazy load shuffle" bug present in the official SoundCloud Web player.
 *   **History & stats**: Local listening history, stats tracking, and automatic play counter persistence.
 </details>
 
