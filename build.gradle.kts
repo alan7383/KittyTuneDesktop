@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.0.14"
+version = "1.0.15"
 
 repositories {
     google()
@@ -119,7 +119,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.0.14"
+            packageVersion = "1.0.15"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 
@@ -157,10 +157,6 @@ compose.desktop {
                 appCategory = "AudioVideo"
                 packageName = "kitty-tune"
                 iconFile.set(project.file("src/main/resources/icons/kittytune_linux.png"))
-                
-                
-                
-                
             }
 
             macOS {
@@ -169,6 +165,10 @@ compose.desktop {
             }
         }
     }
+}
+
+tasks.withType<JavaExec>().configureEach {
+    systemProperty("sun.java2d.wm.className", "kitty-tune")
 }
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.freeCompilerArgs.addAll("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api", "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")

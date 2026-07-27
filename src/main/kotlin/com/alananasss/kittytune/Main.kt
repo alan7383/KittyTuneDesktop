@@ -66,6 +66,7 @@ fun AppRouter() {
 }
 
 fun main() {
+    System.setProperty("sun.java2d.wm.className", "kitty-tune")
     AppBootstrap.init()
 
     application {
