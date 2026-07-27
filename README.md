@@ -131,7 +131,7 @@ When end4 dotfiles are detected on your system, KittyTune Desktop unlocks an exc
 
 ### # download & installation
 
-#### **arch linux / cachyos (aur & pkg)**
+#### **arch linux (aur & pkg)**
 Download pre-built Arch packages from the [Releases page](https://github.com/alan7383/KittyTuneDesktop/releases):
 
 ```bash
