@@ -44,9 +44,9 @@ Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desk
 </details>
 
 <details>
-<summary><b>> synchronized lyrics & visuals</b></summary>
+<summary><b>> synchronized lyrics & visuals (not in soundcloud web)</b></summary>
 
-*   **Real-time synchronized lyrics**: Powered by LrcLib and KuGou scrapers with word-by-word / line-by-line karaoke highlights.
+*   **Real-time synchronized lyrics**: Powered by LrcLib and KuGou scrapers with word-by-word / line-by-line karaoke highlights (feature absent from official SoundCloud Web).
 *   **Variable Font customization**: Fine-tune variable typography parameters (font weight, width, slant, roundness, opsz, and grade).
 *   **Immersive Player UI**: Dynamic background gradient blurs matching current album artwork.
 </details>
@@ -182,9 +182,21 @@ cd KittyTuneDesktop
 
 ---
 
-### ? why kittytune desktop?
+### ? why kittytune desktop? (kittytune vs soundcloud web)
 
-Most desktop music streaming clients are heavy Electron applications that consume gigabytes of RAM. KittyTune Desktop was created as a native, lightweight alternative that runs smoothly with minimal CPU and memory footprint, while offering features web players lack: MPRIS system integration, live Material You dotfile synchronization, synchronized karaoke lyrics, and offline database caching.
+Most desktop music streaming clients are heavy Electron applications that consume gigabytes of RAM. KittyTune Desktop was created as a native, lightweight alternative that runs smoothly with minimal CPU and memory footprint, while providing advanced features that the official SoundCloud Web player lacks:
+
+| Feature | Official SoundCloud Web | KittyTune Desktop |
+| :--- | :--- | :--- |
+| **Synchronized Karaoke Lyrics** | No (Absent) | Yes (LrcLib & KuGou word/line karaoke) |
+| **YouTube Audio Fallback** | No (Stream fails if missing) | Yes (Automatic audio stream fallback) |
+| **Ad-Free Experience** | No (Audio/video ads without Go+) | Yes (100% ad-free) |
+| **Material You & System Theme Sync** | No (Fixed web theme) | Yes (end4 Hyprland / matugen live hot-reload) |
+| **Native Linux MPRIS D-Bus** | No (Browser session dependent) | Yes (Full panel & Waybar media integration) |
+| **Discord Rich Presence (RPC)** | No | Yes (Native Discord status & artwork) |
+| **Variable Font Customization** | No | Yes (Custom font weight, slant, opsz, roundness) |
+| **AMOLED Pure Black Mode** | No | Yes (True `#000000` OLED dark mode) |
+| **Memory Footprint** | Heavy (Chromium/Web tab) | Lightweight (Native JVM / Compose Desktop) |
 
 ---
 
