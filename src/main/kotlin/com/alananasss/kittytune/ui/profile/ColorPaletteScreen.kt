@@ -130,7 +130,7 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
     val haptic = LocalHapticFeedback.current
 
     var currentKeyColor by remember { mutableIntStateOf(prefs.getKeyColor()) }
-    var colorStyle by remember { mutableStateOf(parseMaterialKolorPaletteStyle(prefs.getColorStyle()).name) }
+    var colorStyle by remember { mutableStateOf(if (prefs.getColorStyle().contains("end4", ignoreCase = true)) "end4 (Material You)" else parseMaterialKolorPaletteStyle(prefs.getColorStyle()).name) }
     var colorSpec by remember { mutableStateOf(normalizedMaterialKolorColorSpecName(prefs.getColorSpec())) }
     val themeMode = prefs.getThemeMode()
     val pureBlack = prefs.getPureBlack()
@@ -513,7 +513,14 @@ private fun ColorGenerationCard(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 2.dp)
             )
-            val styles = listOf("System") + PaletteStyle.entries.map { it.name }
+            val hasEnd4 = remember { com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled() }
+            val styles = remember(hasEnd4) {
+                if (hasEnd4) {
+                    listOf("end4 (Material You)", "System") + PaletteStyle.entries.map { it.name }
+                } else {
+                    listOf("System") + PaletteStyle.entries.map { it.name }
+                }
+            }
             SettingsDropdownRow(
                 title = str("pref_color_style_title"),
                 items = styles,
