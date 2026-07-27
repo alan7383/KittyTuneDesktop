@@ -48,7 +48,7 @@ Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desk
 
 *   **Real-time synchronized lyrics**: Powered by LrcLib and KuGou scrapers with word-by-word / line-by-line karaoke highlights (feature absent from official SoundCloud Web).
 *   **Variable font customization**: Fine-tune variable typography parameters (font weight, width, slant, roundness, opsz, and grade).
-*   **Immersive player UI**: Dynamic background gradient blurs matching current album artwork.
+*   **Immersive player UI**: Dynamic player colors matching current album artwork.
 </details>
 
 <details>
@@ -100,7 +100,7 @@ When end4 dotfiles are detected on your system, KittyTune Desktop unlocks an exc
 
 <p align="center">
   <img src="images/lyrics.png" width="750" style="border-radius: 12px;" alt="Synchronized Lyrics View">
-  <br><em>Synchronized Karaoke Lyrics view with dynamic artwork background blur.</em>
+  <br><em>Synchronized Karaoke Lyrics view with real-time playback tracking.</em>
 </p>
 
 <br>
