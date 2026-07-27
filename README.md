@@ -63,7 +63,7 @@ Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desk
 <details>
 <summary><b># end4 hyprland dotfiles & material you system theme</b></summary>
 
-*   **Automatic end4 dotfile detection**: Automatically detects if [end4's Hyprland dotfiles](https://github.com/end4/dots-hyprland) are installed on your Linux system.
+*   **Automatic end4 dotfile detection**: Automatically detects if [end4's Hyprland dotfiles](https://github.com/end-4/dots-hyprland) are installed on your Linux system.
 *   **Exclusive theme option**: Unlocks the dedicated `end4 (Material You)` palette style in Settings -> Theme.
 *   **Real-time live reloading**: Listens to `matugen` color updates in `~/.local/state/quickshell/user/generated/colors.json`. KittyTune Desktop updates its entire color scheme live without restart.
 *   **Pure black AMOLED mode**: True `#000000` background toggle for OLED displays.
@@ -73,7 +73,7 @@ Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desk
 
 ### > end4 hyprland dotfiles & material you system integration
 
-KittyTune Desktop integrates natively with [end4's Hyprland dotfiles](https://github.com/end4/dots-hyprland). 
+KittyTune Desktop integrates natively with [end4's Hyprland dotfiles](https://github.com/end-4/dots-hyprland). 
 
 Since both KittyTune Desktop and the end4 dotfiles (`illogical-impulse`) are built around **Material 3 (Material You / Monet)**, they work perfectly together to provide seamless system-wide color harmony.
 
@@ -187,7 +187,7 @@ Most desktop music streaming clients are heavy Electron applications that consum
 ### * credits & license
 
 *   Based on KittyTune for Android.
-*   Material You color system powered by [end4/dots-hyprland](https://github.com/end4/dots-hyprland) and `matugen`.
+*   Material You color system powered by [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) and `matugen`.
 *   Built with [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform) and [MaterialKolor](https://github.com/aj-alt/MaterialKolor).
 
 Licensed under the **MIT License**.
