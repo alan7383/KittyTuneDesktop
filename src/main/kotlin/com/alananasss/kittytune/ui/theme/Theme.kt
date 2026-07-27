@@ -6,6 +6,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,21 @@ internal fun rememberSoundTuneColorScheme(
     colorStyle: String,
     colorSpec: String,
 ): ColorScheme {
+    if (colorStyle.contains("end4", ignoreCase = true)) {
+        val end4Colors by com.alananasss.kittytune.data.theme.End4ThemeManager.colorsMap.collectAsState()
+        @Suppress("UNUSED_VARIABLE")
+        val unused = end4Colors
+        val fallbackScheme = rememberDynamicColorScheme(
+            seedColor = KittyTuneDefaultSeedColor,
+            isDark = useDarkTheme,
+            isAmoled = pureBlack,
+            style = PaletteStyle.Expressive,
+            specVersion = ColorSpec.SpecVersion.SPEC_2025,
+            platform = DynamicScheme.Platform.PHONE,
+        )
+        return com.alananasss.kittytune.data.theme.End4ThemeManager.buildColorScheme(fallbackScheme, pureBlack && useDarkTheme)
+    }
+
     val style = remember(colorStyle) { parseMaterialKolorPaletteStyle(colorStyle) }
     val specVersion = remember(colorSpec) { parseMaterialKolorColorSpec(colorSpec) }
     

@@ -58,5 +58,10 @@ object AppBootstrap {
 
         // 5. Connectivity watcher (replaces ConnectivityManager callback).
         NetworkMonitor.start()
+
+        // 6. End4 dotfiles Material You watcher (live color updates)
+        if (com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled()) {
+            com.alananasss.kittytune.data.theme.End4ThemeManager.startWatching()
+        }
     }
 }
