@@ -18,7 +18,7 @@
 
 <p align="center">
   <strong>A full desktop port of KittyTune Android for Linux, Windows, and macOS.</strong><br>
-  Stream YouTube Music and SoundCloud natively on desktop with zero ads, synchronized lyrics, MPRIS media controls, Discord RPC, and native Material You end4 dotfiles integration.
+  SoundCloud-first music streaming with YouTube fallback, zero ads, synchronized lyrics, MPRIS media controls, Discord RPC, and native Material You end4 dotfiles integration.
 </p>
 
 ---
@@ -27,7 +27,7 @@
 
 KittyTune Desktop is a complete, native desktop port of the KittyTune Android music application. Built from the ground up using **Kotlin 2.4.0**, **Compose Multiplatform (Skiko)**, and **Material 3 Expressive**, it brings the full mobile experience natively to Linux, Windows, and macOS desktops.
 
-Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desktop operates as a lightweight JVM desktop client. It streams high-quality audio directly from YouTube Music and SoundCloud, renders real-time synchronized karaoke lyrics, integrates with system media controls (MPRIS / SMTC), and seamlessly synchronizes with system-wide Material You themes.
+Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desktop operates as a lightweight JVM desktop client. It streams high-quality audio with **SoundCloud as its primary music source** and **YouTube as an automatic fallback**, renders real-time synchronized karaoke lyrics, integrates with system media controls (MPRIS / SMTC), and seamlessly synchronizes with system-wide Material You themes.
 
 ---
 
@@ -36,7 +36,7 @@ Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desk
 <details open>
 <summary><b>~ audio streaming & music sources</b></summary>
 
-*   **YouTube Music & SoundCloud integration**: Stream tracks, playlists, albums, and user libraries without ads or regional restrictions.
+*   **SoundCloud-First Audio Streaming**: Native SoundCloud integration for tracks, playlists, user likes, reposts, and history, with seamless YouTube fallback when needed.
 *   **High-fidelity audio engine**: Built-in FFmpeg and JavaFX Media playback pipelines with buffer optimization and gapless playback.
 *   **Search & Discovery**: Instant search across tracks, artists, albums, and playlists with rich suggestion filters.
 *   **History & Stats**: Local listening history, stats tracking, and automatic play counter persistence.
