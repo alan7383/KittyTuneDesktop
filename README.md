@@ -191,6 +191,7 @@ Most desktop music streaming clients are heavy Electron applications that consum
 
 | Feature | Official SoundCloud Web | KittyTune Desktop |
 | :--- | :--- | :--- |
+| **True full-playlist shuffle** | No (Limited by lazy-loaded tracks) | Yes (Shuffles the entire playlist instantly) |
 | **Offline music downloads** | No (Requires Go+ subscription) | Yes (Free offline caching & local files) |
 | **Ad-free experience** | No (Audio/video ads without Go+) | Yes (100% ad-free) |
 | **Synchronized karaoke lyrics** | No (Absent) | Yes (LrcLib & KuGou word/line tracking) |
