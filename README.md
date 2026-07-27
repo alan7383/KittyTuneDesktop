@@ -18,7 +18,7 @@
 
 <p align="center">
   <strong>A full desktop port of KittyTune Android for Linux, Windows, and macOS.</strong><br>
-  SoundCloud-first music streaming with YouTube fallback, zero ads, synchronized lyrics, MPRIS media controls, Discord RPC, and native Material You end4 dotfiles integration.
+  SoundCloud-first music streaming with full account & likes synchronization, YouTube fallback, zero ads, synchronized lyrics, MPRIS media controls, Discord RPC, and native Material You end4 dotfiles integration.
 </p>
 
 ---
@@ -27,16 +27,17 @@
 
 KittyTune Desktop is a complete, native desktop port of the KittyTune Android music application. Built from the ground up using **Kotlin 2.4.0**, **Compose Multiplatform (Skiko)**, and **Material 3 Expressive**, it brings the full mobile experience natively to Linux, Windows, and macOS desktops.
 
-Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desktop operates as a lightweight JVM desktop client. It streams high-quality audio with **SoundCloud as its primary music source** and **YouTube as an automatic fallback**, renders real-time synchronized karaoke lyrics, integrates with system media controls (MPRIS / SMTC), and seamlessly synchronizes with system-wide Material You themes.
+Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desktop operates as a lightweight JVM desktop client. It streams high-quality audio with **SoundCloud as its primary music source** (including complete account synchronization for likes, reposts, and playlists just like the official SoundCloud player) and **YouTube as an automatic fallback**, renders real-time synchronized karaoke lyrics, integrates with system media controls (MPRIS / SMTC), and seamlessly synchronizes with system-wide Material You themes.
 
 ---
 
 ### * features
 
 <details open>
-<summary><b>~ audio streaming & music sources</b></summary>
+<summary><b>~ audio streaming & soundcloud account sync</b></summary>
 
-*   **SoundCloud-First Audio Streaming**: Native SoundCloud integration for tracks, playlists, user likes, reposts, and history, with seamless YouTube fallback when needed.
+*   **Full SoundCloud Account Synchronization**: Connect your SoundCloud account to automatically sync all your liked tracks, user playlists, reposts, and listening history in real time—just like using the official SoundCloud player.
+*   **SoundCloud-First Audio Streaming**: Native SoundCloud audio playback engine with seamless YouTube audio fallback when required.
 *   **High-fidelity audio engine**: Built-in FFmpeg and JavaFX Media playback pipelines with buffer optimization and gapless playback.
 *   **Search & Discovery**: Instant search across tracks, artists, albums, and playlists with rich suggestion filters.
 *   **History & Stats**: Local listening history, stats tracking, and automatic play counter persistence.
