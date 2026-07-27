@@ -81,8 +81,10 @@ When end4 dotfiles are detected on your system, KittyTune Desktop unlocks an exc
 
 <p align="center">
   <img src="images/option-end4-color.png" width="750" style="border-radius: 12px;" alt="end4 Material You palette option">
+  <br><em>The exclusive end4 (Material You) palette option.</em>
   <br><br>
   <img src="images/musicpanelmpris.png" width="750" style="border-radius: 12px;" alt="Quickshell MPRIS Integration">
+  <br><em>Quickshell MPRIS media control panel integration.</em>
 </p>
 
 ---
