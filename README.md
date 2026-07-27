@@ -138,8 +138,27 @@ Download pre-built Arch packages from the [Releases page](https://github.com/ala
 sudo pacman -U kitty-tune-1.0.17-1-x86_64.pkg.tar.zst
 ```
 
-#### **universal linux (appimage, deb, rpm)**
-Grab `.AppImage`, `.deb`, or `.rpm` packages directly from GitHub Releases.
+#### **debian / ubuntu / linux mint (.deb)**
+Download the `.deb` package from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases) and install it using `apt`:
+
+```bash
+sudo apt install ./kitty-tune_1.0.17_amd64.deb
+```
+
+#### **fedora / opensuse / rhel (.rpm)**
+Download the `.rpm` package from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases) and install it using `dnf`:
+
+```bash
+sudo dnf install ./kitty-tune-1.0.17-1.x86_64.rpm
+```
+
+#### **universal portable linux (.AppImage)**
+Download the `.AppImage` package from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases). Make it executable and run it on any Linux distribution:
+
+```bash
+chmod +x KittyTune-1.0.17-x86_64.AppImage
+./KittyTune-1.0.17-x86_64.AppImage
+```
 
 #### **windows & macos**
 Download the Windows `.msi` installer or portable `.zip`, and macOS `.dmg` bundles directly from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases).
