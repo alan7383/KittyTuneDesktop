@@ -133,29 +133,31 @@ When end4 dotfiles are detected on your system, KittyTune Desktop unlocks an exc
 
 ### # download & installation
 
+Pre-built binaries for Linux, Windows, and macOS are available on the [Releases page](https://github.com/alan7383/KittyTuneDesktop/releases).
+
 #### **arch linux (aur & pkg)**
-Download pre-built Arch packages from the [Releases page](https://github.com/alan7383/KittyTuneDesktop/releases):
+Install the standalone pacman package:
 
 ```bash
 sudo pacman -U kitty-tune-1.0.17-1-x86_64.pkg.tar.zst
 ```
 
 #### **debian / ubuntu / linux mint (.deb)**
-Download the `.deb` package from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases) and install it using `apt`:
+Install using `apt`:
 
 ```bash
 sudo apt install ./kitty-tune_1.0.17_amd64.deb
 ```
 
 #### **fedora / opensuse / rhel (.rpm)**
-Download the `.rpm` package from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases) and install it using `dnf`:
+Install using `dnf`:
 
 ```bash
 sudo dnf install ./kitty-tune-1.0.17-1.x86_64.rpm
 ```
 
 #### **universal portable linux (.AppImage)**
-Download the `.AppImage` package from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases). Make it executable and run it on any Linux distribution:
+Make executable and run directly on any distro:
 
 ```bash
 chmod +x KittyTune-1.0.17-x86_64.AppImage
@@ -163,7 +165,7 @@ chmod +x KittyTune-1.0.17-x86_64.AppImage
 ```
 
 #### **windows & macos**
-Download the Windows `.msi` installer or portable `.zip`, and macOS `.dmg` bundles directly from [Releases](https://github.com/alan7383/KittyTuneDesktop/releases).
+Grab the Windows installer (`.msi`), portable archive (`.zip`), or macOS disk image (`.dmg`).
 
 ---
 
