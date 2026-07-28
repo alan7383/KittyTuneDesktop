@@ -744,6 +744,8 @@ object R {
         const val warning_title = "warning_title"
         const val earrape_warning = "earrape_warning"
         const val sleep_timer_fade_title = "sleep_timer_fade_title"
+        const val pref_crossfade_title = "pref_crossfade_title"
+        const val pref_crossfade_duration = "pref_crossfade_duration"
         const val sleep_timer_fade_subtitle = "sleep_timer_fade_subtitle"
         const val label_duration = "label_duration"
         const val pref_bottom_menu_title = "pref_bottom_menu_title"

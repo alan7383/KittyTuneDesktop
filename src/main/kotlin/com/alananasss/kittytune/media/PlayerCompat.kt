@@ -6,26 +6,13 @@ import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.domain.Track
+import com.alananasss.kittytune.ui.player.AudioEffectsState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-/**
- * Minimal Media3-shaped compatibility layer over the desktop [AudioEngine], so
- * PlayerViewModel ports from the Android version with only its media3 imports rewritten.
- *
- * It reproduces exactly the ExoPlayer surface PlayerViewModel touches:
- *   isPlaying, playWhenReady, currentPosition, duration, volume, repeatMode,
- *   mediaItemCount, currentMediaItem, currentMediaItemIndex,
- *   play/pause/prepare/seekTo/setMediaItem/addMediaItem(s)/removeMediaItem,
- *   addListener/removeListener + Player.Listener callbacks and state constants.
- *
- * The app keeps its own queue in PlayerViewModel and drives ExoPlayer with 1â€“2 items;
- * this shim mirrors that: it holds a small media-item list and plays the current one
- * through the engine (resolving the stream URL first, since the engine needs a real URL).
- */
+import kotlinx.coroutines.delay
 
 /** Metadata attached to a media item (title/artist/artwork for the notification & UI). */
 class MediaMetadata private constructor(
@@ -51,16 +38,13 @@ class MediaMetadata private constructor(
     }
 }
 
-/** Request metadata (Android exposed the original request URI here). */
 class RequestMetadata(val mediaUri: String?)
 
-/** A single playable item: a track id (mediaId) + resolved/placeholder URI + metadata. */
 class MediaItem private constructor(
     val mediaId: String,
     val uri: String?,
     val mediaMetadata: MediaMetadata,
     val requestMetadata: RequestMetadata,
-    /** The domain Track this item was built from (desktop extra: lets the shim resolve streams). */
     val track: Track?,
 ) {
     class Builder {
@@ -76,11 +60,7 @@ class MediaItem private constructor(
     }
 }
 
-/**
- * The desktop "Player" â€” same members PlayerViewModel uses, backed by AudioEngine.
- * Constants live in the [Player] companion to mirror `Player.STATE_*` / `Player.REPEAT_MODE_*`.
- */
-class Player(private val engine: AudioEngine) {
+class Player {
 
     interface Listener {
         fun onIsPlayingChanged(isPlaying: Boolean) {}
@@ -118,30 +98,46 @@ class Player(private val engine: AudioEngine) {
     private var currentIndex = 0
     private val scope = CoroutineScope(Dispatchers.Default)
     private var resolveJob: Job? = null
-    private val tokenManager = TokenManager
+    
+    var onCompletion: (() -> Unit)? = null
+    var onError: ((Throwable) -> Unit)? = null
+
+    var activeEngine = AudioEngine()
+    private var fadingEngine: AudioEngine? = null
+    
+    @Volatile var isCrossfadingOut = false
+    private var lastEffectsState: AudioEffectsState? = null
 
     var playWhenReady: Boolean = false
         set(value) {
             field = value
-            if (value) engine.play() else engine.pause()
+            if (value) activeEngine.play() else activeEngine.pause()
         }
 
     var repeatMode: Int = REPEAT_MODE_OFF
 
-    val isPlaying: Boolean get() = engine.isPlaying
-    val currentPosition: Long get() = engine.positionMs
-    val duration: Long get() = engine.durationMs
-    var volume: Float
-        get() = engine.getVolume()
-        set(value) { engine.setVolume(value) }
+    val isPlaying: Boolean get() = activeEngine.isPlaying
+    val currentPosition: Long get() = activeEngine.positionMs
+    val duration: Long get() = activeEngine.durationMs
+    val isLoading: Boolean get() = activeEngine.state == AudioEngine.State.BUFFERING
+
+    var volume: Float = 1f
+        set(value) {
+            field = value
+            activeEngine.setVolume(value)
+        }
 
     val mediaItemCount: Int get() = items.size
     val currentMediaItem: MediaItem? get() = items.getOrNull(currentIndex)
     val currentMediaItemIndex: Int get() = currentIndex
 
     init {
-        engine.onPlayingChanged = { playing -> listeners.forEach { it.onIsPlayingChanged(playing) } }
-        engine.onStateChanged = { st ->
+        bindEngine(activeEngine)
+    }
+    
+    private fun bindEngine(eng: AudioEngine) {
+        eng.onPlayingChanged = { playing -> listeners.forEach { it.onIsPlayingChanged(playing) } }
+        eng.onStateChanged = { st ->
             val mapped = when (st) {
                 AudioEngine.State.BUFFERING -> STATE_BUFFERING
                 AudioEngine.State.READY -> STATE_READY
@@ -150,48 +146,92 @@ class Player(private val engine: AudioEngine) {
             }
             listeners.forEach { it.onPlaybackStateChanged(mapped) }
         }
-        engine.onError = { err -> listeners.forEach { it.onPlayerError(err) } }
-        engine.onCompletion = {
-            // ExoPlayer would emit STATE_ENDED; the state callback above already does that.
+        eng.onError = { err -> 
+            onError?.invoke(err)
+            listeners.forEach { it.onPlayerError(err) } 
         }
+        eng.onCompletion = { onCompletion?.invoke() }
+    }
+
+    private fun unbindEngine(eng: AudioEngine) {
+        eng.onPlayingChanged = null
+        eng.onStateChanged = null
+        eng.onError = null
+        eng.onCompletion = null
     }
 
     fun addListener(l: Listener) { if (!listeners.contains(l)) listeners.add(l) }
     fun removeListener(l: Listener) { listeners.remove(l) }
 
+    fun setMediaItemUrl(url: String, headers: Map<String, String>, startPositionMs: Long = 0L) {
+        activeEngine.setMediaItem(url, headers, startPositionMs)
+    }
+
     fun setMediaItem(item: MediaItem, startPositionMs: Long = 0L) {
         items.clear()
         items.add(item)
         currentIndex = 0
-        loadCurrent(startPositionMs)
+        loadCurrent(startPositionMs, false, 0L)
         listeners.forEach { it.onMediaItemTransition(currentMediaItem, MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) }
+    }
+
+    fun crossfadeToMediaItem(item: MediaItem, startPositionMs: Long, crossfadeDurationMs: Long) {
+        items.clear()
+        items.add(item)
+        currentIndex = 0
+        
+        isCrossfadingOut = false
+        
+        val oldEngine = activeEngine
+        val newEngine = AudioEngine()
+        
+        unbindEngine(oldEngine)
+        bindEngine(newEngine)
+        
+        activeEngine = newEngine
+        fadingEngine = oldEngine
+        
+        lastEffectsState?.let { newEngine.applyEffects(it) }
+        
+        listeners.forEach { it.onMediaItemTransition(currentMediaItem, MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) }
+        
+        loadCurrent(startPositionMs, true, crossfadeDurationMs)
     }
 
     fun addMediaItem(item: MediaItem) { items.add(item) }
     fun addMediaItems(newItems: List<MediaItem>) { items.addAll(newItems) }
     fun removeMediaItem(index: Int) { if (index in items.indices) items.removeAt(index) }
 
-    fun prepare() { /* engine.prepare() is triggered inside loadCurrent */ }
+    fun prepare() { activeEngine.prepare() }
 
     fun play() { playWhenReady = true }
     fun pause() { playWhenReady = false }
+    fun stop() {
+        fadingEngine?.stop()
+        fadingEngine?.release()
+        fadingEngine = null
+        activeEngine.stop()
+    }
+    fun release() {
+        fadingEngine?.release()
+        activeEngine.release()
+    }
 
     fun seekTo(positionMs: Long) {
-        engine.seekTo(positionMs)
+        activeEngine.seekTo(positionMs)
         val pi = PositionInfo(positionMs)
         listeners.forEach { it.onPositionDiscontinuity(pi, pi, DISCONTINUITY_REASON_SEEK) }
     }
 
-    /** seekTo(mediaItemIndex, positionMs) overload used for queue jumps. */
     fun seekTo(mediaItemIndex: Int, positionMs: Long) {
         if (mediaItemIndex in items.indices) {
             currentIndex = mediaItemIndex
-            loadCurrent(positionMs)
+            loadCurrent(positionMs, false, 0L)
             listeners.forEach { it.onMediaItemTransition(currentMediaItem, MEDIA_ITEM_TRANSITION_REASON_AUTO) }
         }
     }
 
-    private fun loadCurrent(startPositionMs: Long) {
+    private fun loadCurrent(startPositionMs: Long, isCrossfade: Boolean, crossfadeDurationMs: Long) {
         val item = currentMediaItem ?: return
         resolveJob?.cancel()
         resolveJob = scope.launch {
@@ -202,9 +242,64 @@ class Player(private val engine: AudioEngine) {
                 return@launch
             }
             val headers = buildHeaders(item.track)
-            engine.setMediaItem(url, headers, startPositionMs)
-            engine.prepare()
-            if (playWhenReady) engine.play()
+            
+            if (isCrossfade) {
+                val oldEngine = fadingEngine
+                activeEngine.setMediaItem(url, headers, startPositionMs)
+                activeEngine.prepare()
+                
+                val targetVolume = volume
+                activeEngine.setVolume(0f)
+                
+                if (playWhenReady) activeEngine.play()
+                
+                if (oldEngine != null) {
+                    var remainingMs = oldEngine.durationMs - oldEngine.positionMs
+                    if (remainingMs < 0) remainingMs = 0
+                    
+                    val actualCrossfadeMs = if (oldEngine.isPlaying && remainingMs > 0 && remainingMs < crossfadeDurationMs) {
+                        remainingMs
+                    } else if (!oldEngine.isPlaying || remainingMs == 0L) {
+                        0L
+                    } else {
+                        crossfadeDurationMs
+                    }
+
+                    if (actualCrossfadeMs <= 0L) {
+                        activeEngine.setVolume(targetVolume)
+                        oldEngine.stop()
+                        oldEngine.release()
+                        fadingEngine = null
+                    } else {
+                        val steps = 40
+                        val delayMs = actualCrossfadeMs / steps
+                        for (i in 1..steps) {
+                            if (fadingEngine != oldEngine) break // superseded
+                            val ratio = i.toFloat() / steps
+                            activeEngine.setVolume(targetVolume * ratio)
+                            oldEngine.setVolume(targetVolume * (1f - ratio))
+                            delay(delayMs)
+                        }
+                        if (fadingEngine == oldEngine) {
+                            activeEngine.setVolume(targetVolume)
+                            oldEngine.stop()
+                            oldEngine.release()
+                            fadingEngine = null
+                        }
+                    }
+                } else {
+                    activeEngine.setVolume(targetVolume)
+                }
+            } else {
+                fadingEngine?.stop()
+                fadingEngine?.release()
+                fadingEngine = null
+                
+                activeEngine.setVolume(volume)
+                activeEngine.setMediaItem(url, headers, startPositionMs)
+                activeEngine.prepare()
+                if (playWhenReady) activeEngine.play()
+            }
         }
     }
 
@@ -216,5 +311,10 @@ class Player(private val engine: AudioEngine) {
         }
         return headers
     }
+    
+    fun applyEffects(state: AudioEffectsState) {
+        lastEffectsState = state
+        activeEngine.applyEffects(state)
+        fadingEngine?.applyEffects(state)
+    }
 }
-

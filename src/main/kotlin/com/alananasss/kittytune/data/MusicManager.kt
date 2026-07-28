@@ -29,12 +29,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object MusicManager {
 
-    val engine = AudioEngine()
-
     /** Media3-shaped player over the engine, for PlayerViewModel (ported from ExoPlayer). */
-    val player: com.alananasss.kittytune.media.Player by lazy {
-        com.alananasss.kittytune.media.Player(engine)
-    }
+    val player = com.alananasss.kittytune.media.Player()
 
     var currentTrack: Track? = null
 
@@ -61,10 +57,10 @@ object MusicManager {
     @Volatile private var initialized = false
 
     // --- observable playback state (the ViewModel mirrors these into Compose state) ------
-    val isPlaying: Boolean get() = engine.isPlaying
-    val positionMs: Long get() = engine.positionMs
-    val durationMs: Long get() = engine.durationMs
-    val isLoading: Boolean get() = engine.state == AudioEngine.State.BUFFERING
+    val isPlaying: Boolean get() = player.isPlaying
+    val positionMs: Long get() = player.currentPosition
+    val durationMs: Long get() = player.duration
+    val isLoading: Boolean get() = player.isLoading
 
     fun init() {
         if (initialized) return
@@ -75,8 +71,8 @@ object MusicManager {
         val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
         _contextFlow.value = prefs.getLastContext()
 
-        engine.onCompletion = { onCompletion?.invoke() }
-        engine.onError = { it.printStackTrace() }
+        player.onCompletion = { onCompletion?.invoke() }
+        player.onError = { it.printStackTrace() }
     }
 
     /**
@@ -100,10 +96,11 @@ object MusicManager {
                 return@launch
             }
 
+            // Note: playTrack is used for direct URI launches, normal playback uses PlayerViewModel.playRobustly
             val headers = buildStreamHeaders(track)
-            engine.setMediaItem(url, headers, startPositionMs)
-            engine.prepare()
-            if (autoPlay) engine.play()
+            player.setMediaItemUrl(url, headers, startPositionMs)
+            player.prepare()
+            if (autoPlay) player.play()
 
             currentTrack?.let { t -> onTrackChange?.invoke(t) }
         }
@@ -120,21 +117,21 @@ object MusicManager {
         return headers
     }
 
-    fun play() = engine.play()
-    fun pause() = engine.pause()
-    fun seekTo(ms: Long) = engine.seekTo(ms)
-    fun setVolume(v: Float) = engine.setVolume(v)
-    fun getVolume(): Float = engine.getVolume()
-    fun stop() = engine.stop()
+    fun play() = player.play()
+    fun pause() = player.pause()
+    fun seekTo(ms: Long) = player.seekTo(ms)
+    fun setVolume(v: Float) { player.volume = v }
+    fun getVolume(): Float = player.volume
+    fun stop() = player.stop()
 
     fun applyEffects(state: AudioEffectsState) {
-        engine.applyEffects(state)
+        player.applyEffects(state)
         rainPlayer?.setEnabled(state.isRainEnabled)
         rainPlayer?.setVolume(state.rainVolume)
     }
 
     fun releasePlayer() {
-        engine.release()
+        player.release()
         rainPlayer?.release()
         rainPlayer = null
         drmTokenCache.clear()

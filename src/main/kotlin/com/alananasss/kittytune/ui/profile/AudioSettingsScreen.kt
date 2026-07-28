@@ -27,7 +27,6 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 @Composable
 fun AudioSettingsScreen(
     onBackClick: (() -> Unit)? = null,
-    onNavigateToDrmExplanation: () -> Unit,
     playerViewModel: PlayerViewModel
 ) {
     val prefs = remember { PlayerPreferences() }
@@ -38,12 +37,15 @@ fun AudioSettingsScreen(
     var audioQuality by remember { mutableStateOf(prefs.getAudioQuality()) }
 
     var youtubeFallbackEnabled by remember { mutableStateOf(prefs.getYouTubeFallbackEnabled()) }
-    var downloadDrmEnabled by remember { mutableStateOf(prefs.getDownloadDrmStreamsEnabled()) }
     var fadeEnabled by remember { mutableStateOf(prefs.getSleepTimerFadeEnabled()) }
     var fadeDuration by remember { mutableStateOf(prefs.getSleepTimerFadeDuration()) }
 
     var showQualityDialog by remember { mutableStateOf(false) }
     var showFadeDurationDialog by remember { mutableStateOf(false) }
+
+    var crossfadeEnabled by remember { mutableStateOf(prefs.getCrossfadeEnabled()) }
+    var crossfadeDuration by remember { mutableStateOf(prefs.getCrossfadeDuration()) }
+    var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
 
     if (showFadeDurationDialog) {
         EscapableAlertDialog(
@@ -52,7 +54,7 @@ fun AudioSettingsScreen(
             text = {
                 Column {
                     Text(
-                        text = str("sleep_timer_fade_subtitle").replace("%d", fadeDuration.toString()),
+                        text = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -70,6 +72,37 @@ fun AudioSettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showFadeDurationDialog = false }) {
+                    Text(str("btn_ok"))
+                }
+            }
+        )
+    }
+
+    if (showCrossfadeDurationDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showCrossfadeDurationDialog = false },
+            title = { Text(str("pref_crossfade_title")) },
+            text = {
+                Column {
+                    Text(
+                        text = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Slider(
+                        value = crossfadeDuration.toFloat(),
+                        onValueChange = {
+                            crossfadeDuration = it.toInt()
+                            prefs.setCrossfadeDuration(it.toInt())
+                        },
+                        valueRange = 1f..15f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCrossfadeDurationDialog = false }) {
                     Text(str("btn_ok"))
                 }
             }
@@ -157,15 +190,6 @@ fun AudioSettingsScreen(
                             onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) }
                         )
 
-                        SplitSettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 4),
-                            title = str("pref_download_drm"),
-                            subtitle = str("pref_download_drm_sub"),
-                            onClick = onNavigateToDrmExplanation,
-                            switchState = downloadDrmEnabled,
-                            onSwitchChange = { downloadDrmEnabled = it; prefs.setDownloadDrmStreamsEnabled(it) }
-                        )
-
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 5),
                             title = str("pref_precise_speed"),
@@ -174,6 +198,54 @@ fun AudioSettingsScreen(
                             switchState = playerViewModel.isPreciseSpeedEnabled,
                             onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) }
                         )
+                    }
+                }
+            }
+            
+            item {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    SettingsGroupTitle(str("pref_crossfade_title"))
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        val fadeBottomRadius by animateDpAsState(
+                            targetValue = if (crossfadeEnabled) 4.dp else 24.dp,
+                            label = "CrossfadeCornerAnimation"
+                        )
+
+                        SettingsItem(
+                            shape = RoundedCornerShape(
+                                topStart = 24.dp,
+                                topEnd = 24.dp,
+                                bottomStart = fadeBottomRadius,
+                                bottomEnd = fadeBottomRadius
+                            ),
+                            title = str("pref_crossfade_title"),
+                            subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
+                            hasSwitch = true,
+                            switchState = crossfadeEnabled,
+                            onSwitchChange = { 
+                                crossfadeEnabled = it
+                                prefs.setCrossfadeEnabled(it)
+                            }
+                        )
+
+                        AnimatedVisibility(
+                            visible = crossfadeEnabled,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            SettingsItem(
+                                shape = RoundedCornerShape(
+                                    topStart = 4.dp,
+                                    topEnd = 4.dp,
+                                    bottomStart = 24.dp,
+                                    bottomEnd = 24.dp
+                                ),
+                                title = str("label_duration"),
+                                subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
+                                onClick = { showCrossfadeDurationDialog = true }
+                            )
+                        }
                     }
                 }
             }
@@ -196,7 +268,7 @@ fun AudioSettingsScreen(
                                 bottomEnd = fadeBottomRadius
                             ),
                             title = str("sleep_timer_fade_title"),
-                            subtitle = str("sleep_timer_fade_subtitle").replace("%d", fadeDuration.toString()),
+                            subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
                             hasSwitch = true,
                             switchState = fadeEnabled,
                             onSwitchChange = { 
@@ -218,7 +290,7 @@ fun AudioSettingsScreen(
                                     bottomEnd = 24.dp
                                 ),
                                 title = str("label_duration"),
-                                subtitle = str("sleep_timer_fade_subtitle").replace("%d", fadeDuration.toString()),
+                                subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
                                 onClick = { showFadeDurationDialog = true }
                             )
                         }
