@@ -1856,6 +1856,42 @@
     <string name="update_auth_failed_desc">A hitelesítés megszakadt vagy sikertelen. Kérjük, próbálja újra.</string>
     <string name="update_btn_retry_auth">Hitelesítés újra</string>
     <string name="search_filter_all">Összes</string>
+    <string name="search_tracks_hint">Számok szűrése</string>
+    <string name="ach_download_100_title">Gyűjtő</string>
+    <string name="ach_download_100_desc">100 szám letöltése</string>
+    <string name="ach_download_1000_title">Levéltáros</string>
+    <string name="ach_download_1000_desc">1000 szám letöltése</string>
+    <string name="ach_skipper_100_title">Léptető</string>
+    <string name="ach_skipper_100_desc">100 szám átugrása</string>
+    <string name="ach_skipper_1000_title">Sosem Elégedett</string>
+    <string name="ach_skipper_1000_desc">1000 szám átugrása</string>
+    <string name="ach_bass_addict_title">Basszus Függő</string>
+    <string name="ach_bass_addict_desc">10 óra basszuskiemeléssel</string>
+    <string name="ach_speed_demon_title">Nightcore Rajongó</string>
+    <string name="ach_speed_demon_desc">1 óra hallgatás 1.2x-nél nagyobb sebességgel</string>
+    <string name="ach_social_star_title">Virális</string>
+    <string name="ach_social_star_desc">50 szám megosztása</string>
+    <string name="ach_obsessed_50_title">Megszállott</string>
+    <string name="ach_obsessed_50_desc">UGYANAZ a szám 50-szer</string>
+    <string name="ach_obsessed_200_title">Őrület</string>
+    <string name="ach_obsessed_200_desc">UGYANAZ a szám 200-szor</string>
+    <string name="ach_night_shift_pro_title">Vámpír</string>
+    <string name="ach_night_shift_pro_desc">8 óra egyhuzamban 22:00-tól 06:00-ig</string>
+    <string name="ach_marathon_title">Maraton</string>
+    <string name="ach_marathon_desc">8 óra folyamatos zenehallgatás</string>
+    <string name="ach_no_skip_50_title">Fókusz</string>
+    <string name="ach_no_skip_50_desc">50 szám kihagyás nélkül</string>
+    <string name="ach_developer_title">Hacker</string>
+    <string name="ach_weekend_warrior_title">Hétvégi Harcos</string>
+    <string name="ach_ghost_title">Szellem</string>
+    <string name="ach_lucky7_title">Főnyeremény</string>
+    <string name="ach_glitch_title">Hiba a Mátrixban</string>
+    <string name="pref_crossfade_title">Számok átúsztatása</string>
+    <string name="pref_crossfade_duration">Átúsztatás időtartama: %d mp</string>
+    <string name="discord_login_desktop_instruction">Kérjük, add meg a Discord User Token-ed a Rich Presence engedélyezéséhez. A böngésző fejlesztői eszközeivel kinyerheted a Discord weben.</string>
+    <string name="discord_token_label">Discord Token</string>
+    <string name="discord_login_submit">Bejelentkezés</string>
+    <string name="table_header_plays">Lejátszások</string>
 </resources>
 
 
