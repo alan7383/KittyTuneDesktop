@@ -436,15 +436,15 @@ object UpdateManager {
                 val installBlock = if (isMsi) {
                     """
                     Log "Running msiexec silent install command..."
-                    ${'$'}p = Start-Process msiexec.exe -ArgumentList '/i', "`"$escapedInstallerPath`"", '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', '/l*v', "`"$msiLogFilePath`"" -Wait -PassThru -WindowStyle Hidden
+                    ${'$'}p = Start-Process msiexec.exe -ArgumentList "/i `"$escapedInstallerPath`" /qn /norestart MSIINSTALLPERUSER=1 ALLUSERS=2 /l*v `"$msiLogFilePath`"" -Wait -PassThru -WindowStyle Hidden
                     Log "msiexec silent install finished with ExitCode: ${'$'}(${'$'}p.ExitCode)"
                     if (${'$'}p.ExitCode -ne 0) {
                         Log "Silent install attempt failed with exit code ${'$'}(${'$'}p.ExitCode). Retrying with basic UI (/qb)..."
-                        ${'$'}p2 = Start-Process msiexec.exe -ArgumentList '/i', "`"$escapedInstallerPath`"", '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2' -Wait -PassThru
+                        ${'$'}p2 = Start-Process msiexec.exe -ArgumentList "/i `"$escapedInstallerPath`" /qb /norestart MSIINSTALLPERUSER=1 ALLUSERS=2" -Wait -PassThru
                         Log "Basic UI install attempt finished with ExitCode: ${'$'}(${'$'}p2.ExitCode)"
                         if (${'$'}p2.ExitCode -ne 0) {
                             Log "Basic UI install failed with exit code ${'$'}(${'$'}p2.ExitCode). Retrying with full interactive installer UI..."
-                            ${'$'}p3 = Start-Process msiexec.exe -ArgumentList '/i', "`"$escapedInstallerPath`"", '/norestart' -Wait -PassThru
+                            ${'$'}p3 = Start-Process msiexec.exe -ArgumentList "/i `"$escapedInstallerPath`" /norestart" -Wait -PassThru
                             Log "Interactive install attempt finished with ExitCode: ${'$'}(${'$'}p3.ExitCode)"
                         }
                     }
