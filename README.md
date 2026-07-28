@@ -39,6 +39,7 @@ Instead of running heavy web wrappers (Electron or Chromium PWA), KittyTune Desk
 *   **Full SoundCloud account synchronization**: Connect your SoundCloud account to automatically sync all your liked tracks, user playlists, reposts, and listening history in real time—just like using the official SoundCloud player.
 *   **SoundCloud-first audio streaming**: Native SoundCloud audio playback engine with seamless YouTube audio fallback when required.
 *   **High-fidelity audio engine**: Built-in FFmpeg and JavaFX Media playback pipelines with buffer optimization and gapless playback.
+*   **Audio crossfade**: Smooth track transitions with customizable crossfade duration between songs.
 *   **Search & discovery**: Instant search across tracks, artists, albums, and playlists with rich suggestion filters.
 *   **True full-playlist shuffle**: Shuffles your entire playlist instantly, bypassing the frustrating "lazy load shuffle" bug present in the official SoundCloud Web player.
 *   **History & stats**: Local listening history, stats tracking, and automatic play counter persistence.
@@ -196,6 +197,7 @@ Most desktop music streaming clients are heavy Electron applications that consum
 | **Offline music downloads** | No (Requires Go+ subscription) | Yes (Free offline caching & local files) |
 | **Ad-free experience** | No (Audio/video ads without Go+) | Yes (100% ad-free) |
 | **Synchronized karaoke lyrics** | No (Absent) | Yes (LrcLib & KuGou word/line tracking) |
+| **Audio crossfade** | No (Absent) | Yes (Smooth track transitions with customizable duration) |
 | **YouTube audio fallback** | No (Stream fails if missing) | Yes (Automatic audio stream routing) |
 | **System-wide theme sync** | No (Fixed web UI) | Yes (end-4 Hyprland / matugen live hot-reload) |
 | **Native Linux MPRIS D-Bus** | No (Browser session dependent) | Yes (Full panel & Waybar media integration) |
