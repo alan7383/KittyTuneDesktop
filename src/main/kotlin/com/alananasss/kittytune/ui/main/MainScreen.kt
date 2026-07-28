@@ -161,6 +161,29 @@ fun MainScreen() {
                 
                 gPressedTime = 0L
 
+                if (!isCtrl && !isAlt && !isMeta) {
+                    val numberSeekFraction = when (event.key) {
+                        Key.Zero, Key.NumPad0 -> 0.0
+                        Key.One, Key.NumPad1 -> 0.1
+                        Key.Two, Key.NumPad2 -> 0.2
+                        Key.Three, Key.NumPad3 -> 0.3
+                        Key.Four, Key.NumPad4 -> 0.4
+                        Key.Five, Key.NumPad5 -> 0.5
+                        Key.Six, Key.NumPad6 -> 0.6
+                        Key.Seven, Key.NumPad7 -> 0.7
+                        Key.Eight, Key.NumPad8 -> 0.8
+                        Key.Nine, Key.NumPad9 -> 0.9
+                        else -> null
+                    }
+                    if (numberSeekFraction != null) {
+                        val duration = playerViewModel.duration
+                        if (duration > 0) {
+                            playerViewModel.seekTo((duration * numberSeekFraction).toLong())
+                        }
+                        return@collect
+                    }
+                }
+
                 if (isShift && noModifiers.not()) {
                     // Only shift pressed
                     if (isShift && !isCtrl && !isAlt && !isMeta) {
@@ -198,16 +221,6 @@ fun MainScreen() {
                             showNowPlayingPanel = true
                             nowPlayingTab = NowPlayingTab.QUEUE
                         }
-                        Key.Zero -> playerViewModel.seekTo(0L)
-                        Key.One -> playerViewModel.seekTo((playerViewModel.duration * 0.1).toLong())
-                        Key.Two -> playerViewModel.seekTo((playerViewModel.duration * 0.2).toLong())
-                        Key.Three -> playerViewModel.seekTo((playerViewModel.duration * 0.3).toLong())
-                        Key.Four -> playerViewModel.seekTo((playerViewModel.duration * 0.4).toLong())
-                        Key.Five -> playerViewModel.seekTo((playerViewModel.duration * 0.5).toLong())
-                        Key.Six -> playerViewModel.seekTo((playerViewModel.duration * 0.6).toLong())
-                        Key.Seven -> playerViewModel.seekTo((playerViewModel.duration * 0.7).toLong())
-                        Key.Eight -> playerViewModel.seekTo((playerViewModel.duration * 0.8).toLong())
-                        Key.Nine -> playerViewModel.seekTo((playerViewModel.duration * 0.9).toLong())
                     }
                 }
             }

@@ -93,17 +93,26 @@ fun main() {
                     val isAlt = event.isAltPressed
                     val isMeta = event.isMetaPressed
                     val noModifiers = !isShift && !isCtrl && !isAlt && !isMeta
+                    val isNumberKey = when (event.key) {
+                        Key.Zero, Key.One, Key.Two, Key.Three, Key.Four,
+                        Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine,
+                        Key.NumPad0, Key.NumPad1, Key.NumPad2, Key.NumPad3, Key.NumPad4,
+                        Key.NumPad5, Key.NumPad6, Key.NumPad7, Key.NumPad8, Key.NumPad9 -> true
+                        else -> false
+                    }
 
                     val isShortcutKey = when {
-                        noModifiers -> when (event.key) {
-                            Key.Spacebar, Key.M, Key.L, Key.R, Key.S, Key.P, Key.H, Key.Q,
-                            Key.DirectionLeft, Key.DirectionRight, Key.G,
-                            Key.Zero, Key.One, Key.Two, Key.Three, Key.Four,
-                            Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine -> true
-                            else -> false
-                        }
-                        isShift && !isCtrl && !isAlt && !isMeta -> when (event.key) {
-                            Key.DirectionRight, Key.DirectionLeft, Key.DirectionUp, Key.DirectionDown, Key.L, Key.S -> true
+                        !isCtrl && !isAlt && !isMeta -> when {
+                            isNumberKey -> true
+                            noModifiers -> when (event.key) {
+                                Key.Spacebar, Key.M, Key.L, Key.R, Key.S, Key.P, Key.H, Key.Q,
+                                Key.DirectionLeft, Key.DirectionRight, Key.G -> true
+                                else -> false
+                            }
+                            isShift -> when (event.key) {
+                                Key.DirectionRight, Key.DirectionLeft, Key.DirectionUp, Key.DirectionDown, Key.L, Key.S -> true
+                                else -> false
+                            }
                             else -> false
                         }
                         else -> false
