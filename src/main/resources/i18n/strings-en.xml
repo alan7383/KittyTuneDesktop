@@ -22,11 +22,9 @@
 
     <string name="error_security_check">Security check required</string>
 
-    <string name="security_check">Security Check</string>
 
     <string name="no_results">No results found</string>
 
-    <string name="unknown">Unknown</string>
 
 
 
@@ -66,7 +64,6 @@
 
     <string name="btn_play">Play</string>
 
-    <string name="btn_pause">Pause</string>
 
     <string name="btn_shuffle">Shuffle</string>
 
@@ -78,9 +75,7 @@
 
     <string name="btn_follow">Follow</string>
 
-    <string name="all_filters">All</string>
 
-    <string name="captcha_done">I completed the Captcha</string>
 
 
 
@@ -125,15 +120,11 @@
 
     <string name="login_waiting_browser">Waiting for browser…</string>
 
-    <string name="login_no_browser_hint">If the browser didn\'t open, click below.</string>
 
     <string name="login_reopen_browser">Reopen browser</string>
 
-    <string name="permission_notifications">Notifications</string>
 
-    <string name="permission_notifications_description">Allow KittyTune to show playback controls and status</string>
 
-    <string name="permission_grant">Grant</string>
 
 
 
@@ -153,11 +144,9 @@
 
     <string name="home_discovery_subtitle">Fresh tracks based on your taste</string>
 
-    <string name="home_discovery_context_genre">For fans of %1$s</string>
 
 
 
-    <string name="home_recently_played">Recently Played</string>
 
     <string name="home_trending">Trending</string>
 
@@ -195,7 +184,6 @@
 
     <string name="home_discover_stations">Discover with Stations</string>
 
-    <string name="home_artist_station_subtitle">Artist station</string>
 
     <string name="home_liked_by_user_title">Liked by %1$s</string>
 
@@ -219,15 +207,10 @@
 
     <!-- Offline Home Screen -->
 
-    <string name="home_offline_title">Oups, no connection</string>
 
-    <string name="home_offline_desc">KittyTune needs internet to load new tracks. In the meantime, you can listen to your downloads.</string>
 
-    <string name="home_offline_btn_retry">Retry</string>
 
-    <string name="home_offline_btn_downloads">Go to downloads</string>
 
-    <string name="home_offline_banner">Offline mode active</string>
 
 
 
@@ -245,15 +228,12 @@
 
     <string name="explorer_charts">Charts</string>
 
-    <string name="explorer_moods_genres">Moods\n&amp; Genres</string>
 
     <string name="new_releases_popular_tracks">Popular Tracks</string>
 
     <string name="new_releases_all_playlists">All Playlists</string>
 
-    <string name="search_source_soundcloud">SoundCloud</string>
 
-    <string name="search_source_youtube">YouTube</string>
 
     <string name="charts_select_country">Select a country</string>
 
@@ -524,9 +504,7 @@
 
     <string name="dialog_delete_playlist_from_lib_title">Remove from library?</string>
 
-    <string name="dialog_rename_playlist_title">Rename</string>
 
-    <string name="dialog_rename_playlist_hint">New name</string>
 
 
 
@@ -554,7 +532,6 @@
 
 
 
-    <string name="player_audio_settings">Audio Settings</string>
 
     <string name="label_volume">Volume: %d%%</string>
 
@@ -564,15 +541,12 @@
 
     <string name="player_pitch">Pitch</string>
 
-    <string name="player_speed">Speed</string>
 
     <string name="pref_precise_speed">Precise Speed</string>
 
     <string name="pref_precise_speed_sub">0.05x steps instead of 0.1x</string>
 
-    <string name="dialog_speed_value_title">Speed</string>
 
-    <string name="dialog_speed_label_hint">Label (e.g. Nightcore)</string>
 
 
 
@@ -618,9 +592,7 @@
 
     <string name="menu_play_next">Play next</string>
 
-    <string name="menu_make_public">Make public</string>
 
-    <string name="menu_make_private">Make private</string>
 
     <string name="menu_add_queue">Add to queue</string>
 
@@ -722,13 +694,10 @@
 
     <string name="no_details_available">No interactions yet</string>
 
-    <string name="detail_see_similar">See similar tracks &amp; fans</string>
-
-    <string name="detail_see_comments">See comments (%1$s)</string>
 
 
 
-    <string name="detail_stats_plays">Plays</string>
+
 
     <string name="detail_stats_likes">Likes</string>
 
@@ -738,7 +707,6 @@
 
     <string name="detail_genre">Genre</string>
 
-    <string name="detail_tags">Tags</string>
 
     <string name="detail_description">Description</string>
 
@@ -750,7 +718,6 @@
 
     <string name="unknown_artist">Unknown Artist</string>
 
-    <string name="share_via">Share via</string>
 
     <string name="generic_title">Title</string>
 
@@ -758,25 +725,17 @@
 
 
 
-    <string name="detail_file_info">Source File</string>
 
-    <string name="format_default">Audio</string>
 
-    <string name="format_fallback">MP3/Audio</string>
 
     <string name="prefix_local_file_marker">Local file: </string>
 
-    <string name="detail_format">Format</string>
 
-    <string name="detail_size">Size</string>
 
-    <string name="detail_duration">Duration</string>
 
-    <string name="detail_location">Path</string>
 
     <string name="detail_unknown">Unknown</string>
 
-    <string name="detail_file_size_formatted">%.2f MB</string>
 
     <string name="description_local_file">Local file: %1$s</string>
 
@@ -818,11 +777,8 @@
 
     <string name="profile_avatar">Avatar</string>
 
-    <string name="profile_avatar_upload_desc">For best results, upload images of at least 1000x1000 pixels. 2MB file-size limit</string>
 
-    <string name="profile_banner_upload_title">Position your header</string>
 
-    <string name="profile_banner_upload_desc">For best results, upload PNG or JPG images of at least 2480×520 pixels. 2MB file-size limit</string>
 
     <string name="profile_latest_tracks">Latest tracks</string>
 
@@ -878,9 +834,7 @@
 
     <string name="profile_menu_settings">Settings</string>
 
-    <string name="pref_bottom_menu_fab_stats">Listening Stats</string>
 
-    <string name="pref_bottom_menu_fab_playlist">Custom Playlist</string>
 
     <string name="profile_menu_logout">Log Out</string>
 
@@ -916,19 +870,14 @@
 
     <string name="comment_write_reply">Write a reply&#8230;</string>
 
-    <string name="comment_default_avatar">Default Avatar</string>
 
     <string name="social_proof_liked_single">%1$s liked this track</string>
 
     <string name="social_proof_liked_multiple">%1$s and %2$s others liked this track</string>
 
-    <string name="login_to_interact">Log in to interact</string>
 
-    <string name="login_to_comment">Log in to comment</string>
 
-    <string name="dialog_delete_comment_title">Delete Comment?</string>
 
-    <string name="dialog_delete_comment_msg">Are you sure you want to delete this comment?</string>
 
 
 
@@ -940,23 +889,14 @@
 
 
 
-    <string name="notifications_title">Activity</string>
 
-    <string name="notif_type_follow">%1$s followed you</string>
 
-    <string name="notif_type_like_track">%1$s liked %2$s</string>
 
-    <string name="notif_type_like_playlist">%1$s liked playlist %2$s</string>
 
-    <string name="notif_type_repost_track">%1$s reposted %2$s</string>
 
-    <string name="notif_type_repost_playlist">%1$s reposted playlist %2$s</string>
 
-    <string name="notif_type_comment">%1$s commented on %2$s</string>
 
-    <string name="notif_type_mention">%1$s mentioned you in a comment</string>
 
-    <string name="notif_unknown">New activity</string>
 
 
 
@@ -992,7 +932,6 @@
 
     <string name="settings_cat_appearance">Appearance</string>
 
-    <string name="settings_cat_typography">Typography</string>
 
     <string name="settings_cat_playback">Playback</string>
 
@@ -1016,11 +955,8 @@
 
     <string name="pref_appearance_title">Appearance</string>
 
-    <string name="pref_appearance_subtitle">Theme, colors, language</string>
 
-    <string name="pref_color_palette_title">Colors &amp; Theme</string>
 
-    <string name="pref_color_palette_subtitle">Customize palette, colors and specs</string>
 
     <string name="color_palette_screen_title">Theme</string>
 
@@ -1034,7 +970,6 @@
 
     <string name="pref_color_generation_title">Color Engine</string>
 
-    <string name="color_seed_auto">Auto</string>
 
     <string name="color_hex_label">Hex</string>
 
@@ -1142,17 +1077,12 @@
 
     <string name="pref_start_screen">Start Screen</string>
 
-    <string name="pref_theme_dynamic">Dynamic Theme (Material You)</string>
 
-    <string name="pref_theme_dynamic_sub">Match your wallpaper</string>
 
-    <string name="pref_theme_pure_black">Pure Black (AMOLED)</string>
 
-    <string name="pref_theme_pure_black_sub">Saves battery on OLED screens</string>
 
     <string name="pref_language">Language</string>
 
-    <string name="pref_language_sub">App language</string>
 
 
 
@@ -1172,13 +1102,9 @@
 
     <!-- TYPOGRAPHY -->
 
-    <string name="pref_font_custom_title">Google Sans Flex</string>
 
-    <string name="pref_font_custom_subtitle">Use custom variable font</string>
 
-    <string name="pref_font_variations_title">Font Variations</string>
 
-    <string name="pref_font_variations_subtitle">Adjust weight, width, roundness…</string>
 
     <string name="dialog_font_settings_title">Font Settings</string>
 
@@ -1204,7 +1130,6 @@
 
     <string name="pref_audio_title">Audio &amp; Playback</string>
 
-    <string name="pref_audio_subtitle">Quality, Autoplay, Queue</string>
 
     <string name="pref_autoplay">Autoplay</string>
 
@@ -1230,11 +1155,8 @@
 
     <string name="pref_youtube_fallback_sub">Via NewPipe Extractor for Go+ tracks</string>
 
-    <string name="pref_download_drm">Download Native DRM</string>
 
-    <string name="pref_download_drm_sub">Keep enabled to cache DRM natively for internal playback. Disable to force unencrypted MP3 downloads via YouTube fallback.</string>
 
-    <string name="drm_explanation_text">DRM-protected tracks are encrypted by rightsholders to prevent extraction and protect copyrights.\n\n• Enabled (Recommended): The track is downloaded in its native high quality to KittyTune\'s secure internal cache. It can only be played inside the app and will not appear in your configured download folder.\n\n• Disabled: KittyTune will ignore the encrypted version and attempt to find and download the song via YouTube. The file will be converted to a standard MP3 and saved in your designated folder. Warning: Since the search is automatic, it may download incorrect content (such as a music video or a cover) if the track is not well-known.</string>
 
 
 
@@ -1246,7 +1168,6 @@
 
     <string name="pref_lyrics_title">Lyrics</string>
 
-    <string name="pref_lyrics_subtitle">Display &amp; Source</string>
 
     <string name="pref_lyrics_local">Prefer local files</string>
 
@@ -1284,7 +1205,6 @@
 
     <string name="pref_local_title">Local Files</string>
 
-    <string name="pref_local_subtitle">Music on this device</string>
 
     <string name="pref_local_enable">Show Local Files</string>
 
@@ -1326,93 +1246,53 @@
 
     <!-- STORAGE -->
 
-    <string name="pref_storage_title">Storage</string>
 
-    <string name="pref_storage_subtitle">Cache and downloads</string>
 
-    <string name="storage_used">used</string>
 
-    <string name="storage_free_formatted">%1$s free</string>
 
-    <string name="storage_location">Download Location</string>
 
-    <string name="storage_reset">Clear</string>
 
-    <string name="storage_cat_audio">Music</string>
 
-    <string name="storage_cat_images">Images / Cache</string>
 
-    <string name="storage_cat_cache">App Cache</string>
 
-    <string name="storage_cat_db">Database</string>
 
-    <string name="storage_internal_mem">Internal Storage</string>
 
-    <string name="storage_internal_mem_sub">/ %1$s</string>
 
-    <string name="storage_sd_card">SD Card</string>
 
-    <string name="storage_custom_folder">Custom</string>
 
     <string name="storage_change_btn">Change</string>
 
-    <string name="storage_change_cta">Choose location</string>
 
-    <string name="storage_db_subtitle">Index &amp; settings</string>
 
-    <string name="storage_loading">Calculating&#8230;</string>
 
-    <string name="dialog_clean_title">Cleanup</string>
 
-    <string name="dialog_clean_audio_msg">Delete all downloaded music?</string>
 
-    <string name="dialog_clean_images_msg">Clear image cache? (Album covers)</string>
 
-    <string name="dialog_clean_cache_msg">Clear app cache?</string>
 
 
 
     <!-- BACKUP -->
 
-    <string name="pref_backup_title">Backup &amp; Restore</string>
 
-    <string name="pref_backup_subtitle">Export playlists and settings</string>
 
-    <string name="backup_action">Backup</string>
 
-    <string name="restore_action">Restore</string>
 
-    <string name="backup_desc">Export playlists, favorites, history, and settings to a file</string>
 
-    <string name="restore_desc">Import a .backup file</string>
 
-    <string name="backup_info">Note: MP3 files are NOT included in the backup</string>
 
-    <string name="backup_info_guest">Works in Guest mode too</string>
 
-    <string name="backup_success">Backup complete!</string>
 
-    <string name="restore_success">Restore complete. Please restart the app</string>
 
-    <string name="backup_error">Error: %1$s</string>
 
-    <string name="backup_in_progress">Processing&#8230;</string>
 
-    <string name="backup_toast_success">Backup created</string>
 
-    <string name="backup_toast_error">Backup failed</string>
 
-    <string name="restore_toast_success">Data restored</string>
 
-    <string name="restore_toast_error">Restore failed</string>
 
     <string name="error_backup_read">Unreadable file</string>
 
-    <string name="error_access_external_dir">Access denied</string>
 
-    <string name="error_create_external_file">Cannot create file</string>
 
-    <string name="error_open_external_stream">Stream error</string>
 
     <string name="error_empty_body">Empty response</string>
 
@@ -1422,7 +1302,6 @@
 
     <string name="pref_discord_title">Discord Integration</string>
 
-    <string name="pref_discord_subtitle">Rich Presence</string>
 
     <string name="discord_login_title">Discord Login</string>
 
@@ -1459,35 +1338,20 @@
 
     <!-- ABOUT -->
 
-    <string name="pref_about_title">About</string>
 
-    <string name="pref_about_subtitle">Version and credits</string>
 
-    <string name="about_github">Source Code (GitHub)</string>
 
-    <string name="about_licenses">Open Source Licenses</string>
 
-    <string name="about_licenses_title">Licenses</string>
 
-    <string name="about_bug_report">Report a Bug</string>
 
-    <string name="about_help">Help</string>
 
-    <string name="about_app_info">App Info</string>
 
-    <string name="about_collapse">Hide</string>
 
-    <string name="about_credits">Credits</string>
 
-    <string name="about_role_dev">Creator</string>
 
-    <string name="about_role_translation">Translation</string>
 
-    <string name="about_translate_title">Translate the app</string>
 
-    <string name="about_translate_desc">Help translate on Crowdin!</string>
 
-    <string name="about_made_with">Developed by Alan &gt;.&lt;</string>
 
 
 
@@ -1498,75 +1362,44 @@
 
     <string name="update_no_update">No update available</string>
 
-    <string name="update_check_manual">Check for updates</string>
 
     <string name="pref_auto_update">Auto Check Updates</string>
 
-    <string name="pref_auto_update_sub">Check for new versions on startup</string>
 
 
 
-    <string name="ach_download_100_title">Collector</string>
 
-    <string name="ach_download_100_desc">Download 100 tracks</string>
 
-    <string name="ach_download_1000_title">Archivist</string>
 
-    <string name="ach_download_1000_desc">Download 1000 tracks</string>
 
-    <string name="ach_skipper_100_title">Zapper</string>
 
-    <string name="ach_skipper_100_desc">Skip 100 tracks</string>
 
-    <string name="ach_skipper_1000_title">Never Satisfied</string>
 
-    <string name="ach_skipper_1000_desc">Skip 1000 tracks</string>
 
-    <string name="ach_bass_addict_title">Bass Addict</string>
 
-    <string name="ach_bass_addict_desc">10h with Bass Boost</string>
 
-    <string name="ach_speed_demon_title">Nightcore Fan</string>
 
-    <string name="ach_speed_demon_desc">1h listening at Speed > 1.2x</string>
 
-    <string name="ach_social_star_title">Viral</string>
 
-    <string name="ach_social_star_desc">Share 50 tracks</string>
 
 
 
     <!-- SPECIAL -->
 
-    <string name="ach_obsessed_50_title">Obsessed</string>
 
-    <string name="ach_obsessed_50_desc">SAME track 50 times</string>
 
-    <string name="ach_obsessed_200_title">Madness</string>
 
-    <string name="ach_obsessed_200_desc">SAME track 200 times</string>
 
-    <string name="ach_night_shift_pro_title">Vampire</string>
 
-    <string name="ach_night_shift_pro_desc">8h straight from 10pm to 6am</string>
 
-    <string name="ach_marathon_title">Marathon</string>
 
-    <string name="ach_marathon_desc">8h continuous listening</string>
 
-    <string name="ach_no_skip_50_title">Focus</string>
 
-    <string name="ach_no_skip_50_desc">50 tracks without skipping</string>
 
-    <string name="ach_developer_title">Hacker</string>
 
-    <string name="ach_weekend_warrior_title">Weekend Warrior</string>
 
-    <string name="ach_ghost_title">Ghost</string>
 
-    <string name="ach_lucky7_title">Jackpot</string>
 
-    <string name="ach_glitch_title">Glitch in the Matrix</string>
 
 
 
@@ -1582,43 +1415,26 @@
 
 
 
-    <string name="streak_popup_title">Streak</string>
-
-    <string name="streak_popup_subtitle">%1$d Day(s)</string>
-
-    <string name="test_notification_triggered">Test notification sent</string>
 
 
 
-    <string name="channel_name">Player</string>
-
-    <string name="channel_description">Music controls</string>
-
-    <string name="notification_content_default">Playback</string>
-
-    <string name="desc_previous">Previous</string>
-
-    <string name="action_unlike">Unlike</string>
 
 
 
-    <string name="widget_default_title">KittyTune</string>
 
-    <string name="widget_default_artist">Ready</string>
 
-    <string name="widget_unknown">Unknown</string>
 
-    <string name="widget_select_track">Select track</string>
 
-    <string name="widget_config_subtitle">Shortcuts</string>
 
-    <string name="widget_player_desc">Full Player</string>
 
-    <string name="widget_mini_player_desc">Compact Player</string>
 
-    <string name="widget_search_desc">Search</string>
 
-    <string name="widget_search_hint">Search</string>
+
+
+
+
+
+
 
 
 
@@ -1630,17 +1446,11 @@
 
 
 
-    <string name="desc_play">Play</string>
 
-    <string name="desc_pause">Pause</string>
 
-    <string name="desc_next">Next</string>
 
-    <string name="desc_move">Move track</string>
 
-    <string name="desc_like">Like</string>
 
-    <string name="desc_artwork">Artwork</string>
 
     <string name="desc_selected">Selected</string>
 
@@ -1649,7 +1459,6 @@
     <string name="empty_downloads_title">Nothing here yet&#8230;</string>
 
     <string name="empty_downloads_subtitle">Download tracks to listen offline!</string>
-    <string name="playback_offline_unavailable">You\'re offline — only downloaded tracks can play</string>
 
     <string name="empty_downloads_kaomoji">(¬_¬ )</string>
 
@@ -1695,7 +1504,6 @@
 
 
 
-    <string name="search_libraries_hint">Search libraries…</string>
 
     <string name="filter_all">All</string>
 
@@ -1703,11 +1511,8 @@
 
     <string name="filter_liked">Liked</string>
 
-    <string name="libraries_count_format">%1$d Libraries</string>
 
-    <string name="no_libraries_found">No libraries found</string>
 
-    <string name="license_unknown">Unknown license</string>
 
 
 
@@ -1727,17 +1532,11 @@
 
     <string name="sleep_timer_cancel">Cancel Timer</string>
 
-    <string name="sleep_timer_custom">Custom</string>
 
-    <string name="sleep_timer_custom_hint">Minutes</string>
 
-    <string name="sleep_timer_5">5 min</string>
 
-    <string name="sleep_timer_60">1 hour</string>
 
-    <string name="sleep_timer_90">1h 30</string>
 
-    <string name="sleep_timer_minutes_format">%1$d min</string>
 
     <string name="sleep_timer_hours_minutes_format">%1$dh %2$dm</string>
 
@@ -1749,7 +1548,6 @@
 
     <string name="sleep_timer_stop_at">Stops at %1$s</string>
 
-    <string name="sleep_timer_island_title">Sleep Timer</string>
 
     <string name="sleep_timer_island_started_subtitle">Timer set for %1$s</string>
 
@@ -1895,41 +1693,25 @@
 
 
 
-    <string name="pref_bottom_menu_title">Navigation Bar</string>
 
-    <string name="pref_bottom_menu_subtitle">Customize the bottom bar and FAB</string>
 
-    <string name="pref_bottom_menu_style">Menu Style</string>
 
-    <string name="pref_bottom_menu_style_modern">Modern</string>
 
-    <string name="pref_bottom_menu_style_classic">Classic</string>
 
-    <string name="pref_bottom_menu_fab">Floating Action Button</string>
 
-    <string name="pref_bottom_menu_fab_profile">Profile</string>
 
-    <string name="pref_bottom_menu_fab_settings">Settings</string>
 
     <string name="pref_bottom_menu_fab_recognition">Music Recognition</string>
 
-    <string name="pref_bottom_menu_blur">Blur Effect</string>
 
-    <string name="pref_bottom_menu_blur_sub">Apply a frosted glass effect</string>
 
-    <string name="pref_bottom_menu_tabs">Visible Tabs</string>
 
 \n    <string name="fab_settings_no_playlists">No playlist found in your library.</string>
 
-    <string name="fab_settings_hint">Tip: only playlists added to your library appear here. Feel free to like playlists so you can use them as shortcuts!</string>
 
-    <string name="fab_settings_radio">Radio • YouTube</string>
 
-    <string name="welcome_warning_title">Highly Recommended</string>
 
-    <string name="welcome_warning_desc">KittyTune needs notifications to show the music player in the background. Without it, you won\'t be able to pause or skip tracks outside the app.\n\nAre you sure you want to skip?</string>
 
-    <string name="menu_sort_by">Sort by</string>
 
     <string name="sort_first_added">First Added</string>
 
@@ -1939,11 +1721,9 @@
 
     <string name="sort_artist_az">Artist (A-Z)</string>
 
-    <string name="action_play">Play</string>
 
     <string name="action_pause">Pause</string>    <!-- Shazam integration -->
 
-    <string name="recognize_music">Detect Music</string>
 
     <!-- Music Recognition & Recognition History -->
 
@@ -1981,11 +1761,8 @@
 
     <string name="desktop_fx_right_click_hint">Right-click an effect to adjust its intensity</string>
 
-    <string name="discord_login_desktop_instruction">Please enter your Discord User Token to enable Rich Presence. You can extract it using your browser\'s dev tools on Discord web.</string>
 
-    <string name="discord_token_label">Discord Token</string>
 
-    <string name="discord_login_submit">Login</string>
 
 
     <string name="copied_to_clipboard">Copied to clipboard</string>
@@ -2052,7 +1829,6 @@
     <!-- Feed screen -->
     <string name="feed_empty">Nothing in your feed yet. Follow people to see their posts here.</string>
     <string name="feed_refresh">Refresh feed</string>
-    <string name="feed_reposted_by">Reposted by</string>
     <string name="feed_playlist_tracks">%1$d tracks</string>
     <string name="feed_ep">EP</string>
     <string name="detail_album">Album</string>
@@ -2074,7 +1850,6 @@
     <string name="update_btn_download">Download Update</string>
     <string name="update_downloading">Downloading update (%1$d%%)…</string>
     <string name="update_ready">The update is ready to be installed!</string>
-    <string name="update_btn_install">Launch Installer &amp; Exit</string>
     <string name="update_no_update">You are using the latest version of KittyTune!</string>
     <string name="update_btn_recheck">Re-check</string>
     <string name="update_error">Failed to check or download update.</string>
@@ -2088,10 +1863,7 @@
     <string name="update_waiting_auth_title">Waiting for authentication…</string>
     <string name="update_waiting_auth_step">Please confirm in the authentication dialog</string>
     <string name="update_waiting_auth_btn">Waiting for authentication…</string>
-    <string name="update_simulation_title">Test Simulation</string>
-    <string name="update_simulation_btn">Test updater (Simulation)</string>
     <string name="update_restarting_toast">Restarting application...</string>
-    <string name="update_restarted_toast">Application restarted successfully!</string>
     <string name="update_btn_pause">Pause</string>
     <string name="update_btn_resume">Resume</string>
     <string name="update_paused_title">Download paused</string>
