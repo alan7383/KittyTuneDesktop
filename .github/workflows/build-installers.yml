@@ -272,10 +272,6 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
@@ -301,34 +297,6 @@ jobs:
           name: KittyTune-Linux-arm64
           path: ./release-files
 
-      - name: Get previous tag
-        id: prev_tag
-        run: |
-          PREV=$(git describe --tags --abbrev=0 "${{ github.ref_name }}^" 2>/dev/null || echo "")
-          echo "Previous tag found: $PREV"
-          if [ -z "$PREV" ]; then
-            echo "range=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "prev=" >> $GITHUB_OUTPUT
-          else
-            echo "range=${PREV}..${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "prev=$PREV" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Generate changelog
-        uses: orhun/git-cliff-action@v4
-        id: cliff
-        with:
-          config: cliff.toml
-          args: --strip header -- ${{ steps.prev_tag.outputs.range }}
-
-      - name: Write changelog to file
-        run: |
-          echo "${{ steps.cliff.outputs.content }}" > CHANGELOG_RELEASE.md
-          echo "" >> CHANGELOG_RELEASE.md
-          if [ -n "${{ steps.prev_tag.outputs.prev }}" ]; then
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.prev }}...${{ github.ref_name }}" >> CHANGELOG_RELEASE.md
-          fi
-
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
@@ -336,7 +304,7 @@ jobs:
           name: ${{ github.ref_type == 'tag' && github.ref_name || 'KittyTune Desktop v1.0.20' }}
           draft: false
           prerelease: false
-          body_path: CHANGELOG_RELEASE.md
+          generate_release_notes: true
           files: ./release-files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
