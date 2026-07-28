@@ -317,7 +317,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     MusicManager.player.seekTo(0)
                     MusicManager.player.play()
                 } else {
-                    playNext(manual = false)
+                    if (!MusicManager.player.isCrossfadingOut) {
+                        playNext(manual = false, isCrossfade = playerPrefs.getCrossfadeEnabled())
+                    }
                 }
             }
         }
@@ -447,8 +449,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         fetchUserProfile()
 
 
-        MusicManager.onNextClick = { playNext(manual = true) }
-        MusicManager.onPreviousClick = { smartPrevious() }
+        MusicManager.onNextClick = { 
+            val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
+            playNext(manual = true, isCrossfade = crossfadeEnabled) 
+        }
+        MusicManager.onPreviousClick = { 
+            val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
+            smartPrevious(isCrossfade = crossfadeEnabled) 
+        }
 
         MusicManager.onTrackChange = trackChangeHandler@{ newTrack ->
             // Sleep timer: end of track mode â€” stop here
@@ -1346,14 +1354,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun playTrackAtPosition(track: Track, position: Long) { pendingSeekPosition = position; playPlaylist(listOf(track), 0); showCommentsSheet = false; isPlayerExpanded = true }
     fun skipToQueueItem(index: Int) { playTrackAtIndex(index, addToHistory = false) }
 
-    private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true) {
+    private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true, isCrossfade: Boolean = false) {
         if (index < 0 || index >= _queue.size) { currentContext = null; return }
         currentQueueIndex = index
         val trackToPlay = _queue[index]
         
         // Stop current music audio & update UI playback states IMMEDIATELY on skip
-        MusicManager.stop()
-        isPlaying = false
+        if (!isCrossfade) {
+            MusicManager.stop()
+            isPlaying = false
+        }
+        
         isLoading = true; duration = trackToPlay.durationMs ?: 0L; currentPosition = 0L
         currentSessionListenMs = 0L
         hasPushedRecentlyPlayed = false
@@ -1361,7 +1372,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // (Android media-notification refresh — no service on desktop)
 
         // Start playback loading immediately
-        playRobustly(index, autoPlay = true)
+        playRobustly(index, autoPlay = true, isCrossfade = isCrossfade)
 
         trackInitJob?.cancel()
         trackInitJob = viewModelScope.launch {
@@ -1389,7 +1400,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun playNext(manual: Boolean = true) {
+    fun playNext(manual: Boolean = true, isCrossfade: Boolean = false) {
         if (isAutoplayRadioLoading) return
 
         // Record skip stats
@@ -1404,10 +1415,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val nextIndex = currentQueueIndex + 1
 
         if (nextIndex < _queue.size) {
-            playTrackAtIndex(nextIndex, addToHistory = false)
+            playTrackAtIndex(nextIndex, addToHistory = false, isCrossfade = isCrossfade)
         } else {
             if (repeatMode == RepeatMode.ALL) {
-                playTrackAtIndex(0, addToHistory = false)
+                playTrackAtIndex(0, addToHistory = false, isCrossfade = isCrossfade)
             } else {
                 val autoPlayEnabled = playerPrefs.getAutoplayEnabled()
                 val isYoutube = currentTrack?.source == "youtube"
@@ -1424,7 +1435,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                         val newNextIndex = currentQueueIndex + 1
                         if (newNextIndex < _queue.size) {
-                            playTrackAtIndex(newNextIndex, addToHistory = false)
+                            playTrackAtIndex(newNextIndex, addToHistory = false, isCrossfade = isCrossfade)
                         } else {
                             MusicManager.player.pause()
                             MusicManager.player.seekTo(0)
@@ -1519,7 +1530,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } catch (_: Exception) { } finally { isAutoplayRadioLoading = false }
     }
 
-    fun smartPrevious() {
+    fun smartPrevious(isCrossfade: Boolean = false) {
         if (player.currentPosition > 3000) {
             // User is restarting the same track â€” this is a manual replay
             currentTrack?.let { track ->
@@ -1539,7 +1550,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             val prev = currentQueueIndex - 1
             if (prev >= 0) {
-                playTrackAtIndex(prev, addToHistory = false)
+                playTrackAtIndex(prev, addToHistory = false, isCrossfade = isCrossfade)
             } else {
                 currentPosition = 0L
                 player.seekTo(0)
@@ -1848,6 +1859,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             println("Threshold reached, pushing history for track ${currentTrack?.id}")
                             hasPushedRecentlyPlayed = true
                             pushRecentlyPlayedToSoundCloud(currentTrack)
+                        }
+                        
+                        val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
+                        val crossfadeMs = playerPrefs.getCrossfadeDuration() * 1000L
+                        val dur = MusicManager.player.duration
+                        if (crossfadeEnabled && dur > 0 && currentPosition >= (dur - crossfadeMs) && !MusicManager.player.isCrossfadingOut) {
+                            MusicManager.player.isCrossfadingOut = true
+                            playNext(manual = false, isCrossfade = true)
                         }
                     }
                 } catch (_: Exception) {
@@ -2183,7 +2202,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun playRobustly(index: Int, autoPlay: Boolean = true, startPosition: Long = 0L, allowSkipOnFailure: Boolean = true) {
+    private fun playRobustly(index: Int, autoPlay: Boolean = true, startPosition: Long = 0L, allowSkipOnFailure: Boolean = true, isCrossfade: Boolean = false) {
         if (index !in _queue.indices) return
 
         val trackToPlay = _queue[index]
@@ -2245,8 +2264,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 try {
                     queueChunkingJob?.cancel()
                     
-                    MusicManager.player.setMediaItem(newMediaItem, startPosition)
-                    MusicManager.player.prepare()
+                    val crossfadeDurationMs = playerPrefs.getCrossfadeDuration() * 1000L
+                    if (isCrossfade && crossfadeDurationMs > 0 && MusicManager.player.isPlaying && startPosition == 0L) {
+                        MusicManager.player.crossfadeToMediaItem(newMediaItem, startPosition, crossfadeDurationMs)
+                    } else {
+                        MusicManager.player.setMediaItem(newMediaItem, startPosition)
+                        MusicManager.player.prepare()
+                        if (autoPlay) {
+                            MusicManager.player.playWhenReady = true
+                        }
+                    }
 
                     if (autoPlay) {
                         MusicManager.player.play()

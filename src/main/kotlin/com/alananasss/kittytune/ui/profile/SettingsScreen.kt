@@ -87,7 +87,7 @@ fun SettingsScreen(
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
             when (selectedCategory) {
                 "appearance" -> AppearanceSettingsScreen(onNavigateToColors = { navController.navigate("color_palette") }, onBackClick = null)
-                "audio" -> AudioSettingsScreen(onBackClick = null, onNavigateToDrmExplanation = { navController.navigate("drm_explanation") }, playerViewModel = playerViewModel)
+                "audio" -> AudioSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
                 "lyrics" -> LyricsSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
                 "discord" -> DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel)
                 "local" -> LocalMediaSettingsScreen(onBackClick = null)

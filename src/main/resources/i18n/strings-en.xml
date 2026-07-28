@@ -1886,6 +1886,8 @@
     <!-- Sleep Timer Fade-Out -->
 
     <string name="sleep_timer_fade_title">Progressive Fade-out</string>
+    <string name="pref_crossfade_title">Crossfade tracks</string>
+    <string name="pref_crossfade_duration">Crossfade duration: %d s</string>
 
     <string name="sleep_timer_fade_subtitle">Volume will decrease over %1$d seconds</string>
 

@@ -1608,6 +1608,8 @@
     <!-- Sleep Timer Fade-Out -->
 
     <string name="sleep_timer_fade_title">Fondu progressif</string>
+    <string name="pref_crossfade_title">Fondu enchaîné (Crossfade)</string>
+    <string name="pref_crossfade_duration">Durée du fondu : %d s</string>
 
     <string name="sleep_timer_fade_subtitle">Le volume diminuera sur %1$d secondes</string>
 

@@ -380,11 +380,6 @@ fun MainScreen() {
                                 playerViewModel = playerViewModel
                             )
                         }
-                        composable("drm_explanation") {
-                            com.alananasss.kittytune.ui.profile.DrmExplanationScreen(
-                                onBackClick = { navController.popBackStack() }
-                            )
-                        }
                         composable("lyrics_settings") {
                             com.alananasss.kittytune.ui.profile.LyricsSettingsScreen(
                                 onBackClick = { navController.popBackStack() },
