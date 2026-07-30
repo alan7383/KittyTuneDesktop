@@ -19,7 +19,7 @@ object AppDirs {
 
     val cacheDir: File = File(
         System.getenv("LOCALAPPDATA") ?: (System.getProperty("user.home") + "/.cache"),
-        "KittyTune",
+        "KittyTuneCache",
     ).apply { mkdirs() }
 
     val imageCacheDir: File = File(cacheDir, "images").apply { mkdirs() }

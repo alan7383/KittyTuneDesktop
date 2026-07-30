@@ -6,7 +6,7 @@ package com.alananasss.kittytune
  */
 object BuildConfig {
     const val APPLICATION_ID = "com.alananasss.kittytune"
-    const val VERSION_NAME = "1.0.20"
+    const val VERSION_NAME = "1.0.23"
     const val VERSION_CODE = 1
     const val DEBUG = false
 }
