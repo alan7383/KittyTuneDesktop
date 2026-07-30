@@ -360,7 +360,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             isLoading = false
             isPlaying = false
             if (playJob?.isActive != true) {
-                playNext(manual = false)
+                playNext(manual = false, ignoreRepeatOne = true)
             }
         }
 
@@ -1400,7 +1400,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun playNext(manual: Boolean = true, isCrossfade: Boolean = false) {
+    fun playNext(manual: Boolean = true, isCrossfade: Boolean = false, ignoreRepeatOne: Boolean = false) {
         if (isAutoplayRadioLoading) return
 
         // Record skip stats
@@ -1410,6 +1410,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     ListeningStatsRepository.recordEvent(track, "SKIP_NEXT", currentSessionListenMs)
                 }
             }
+        }
+
+        if (!manual && !ignoreRepeatOne && repeatMode == RepeatMode.ONE) {
+            currentTrack?.let { track ->
+                if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
+                    ListeningStatsRepository.recordEvent(track, "REPEAT_ONE_LOOP", currentSessionListenMs)
+                }
+            }
+            currentSessionListenMs = 0L
+            playTrackAtIndex(currentQueueIndex, addToHistory = false, isCrossfade = isCrossfade)
+            return
         }
 
         val nextIndex = currentQueueIndex + 1
@@ -2253,7 +2264,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 withContext(Dispatchers.Main) {
                     isLoading = false
                     isPlaying = false
-                    if (allowSkipOnFailure) playNext(manual = false)
+                    if (allowSkipOnFailure) playNext(manual = false, ignoreRepeatOne = true)
                 }
                 return@launch
             }
