@@ -43,6 +43,8 @@ import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.utils.Config
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -95,6 +97,8 @@ fun LoginScreen(
     val authCodeFromIntent by AuthFlowManager.authCode.collectAsState()
 
     var hasLaunchedBrowser by rememberSaveable { mutableStateOf(false) }
+    var isProtocolReady by remember { mutableStateOf(false) }
+    var serverPort by remember { mutableStateOf<Int?>(null) }
 
     val os = remember { System.getProperty("os.name").lowercase() }
 
@@ -108,63 +112,7 @@ fun LoginScreen(
 
         if (server != null) {
             val port = server.address.port
-
-            if (os.contains("windows")) {
-                try {
-                    val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
-                    if (!appDir.exists()) appDir.mkdirs()
-
-                    val batFile = java.io.File(appDir, "sc_handler.bat")
-                    batFile.writeText("@echo off\r\npowershell.exe -WindowStyle Hidden -Command \"Invoke-RestMethod -Uri 'http://localhost:$port/callback' -Method Post -Body '%1'\"")
-
-                    val cmd1 = arrayOf("REG", "ADD", "HKCU\\Software\\Classes\\sc", "/ve", "/d", "URL:sc Protocol", "/f")
-                    val cmd2 = arrayOf("REG", "ADD", "HKCU\\Software\\Classes\\sc", "/v", "URL Protocol", "/d", "", "/f")
-
-                    val handlerCmd = "\"${batFile.absolutePath}\" \"%1\""
-                    val cmd3 = arrayOf("REG", "ADD", "HKCU\\Software\\Classes\\sc\\shell\\open\\command", "/ve", "/d", handlerCmd, "/f")
-
-                    Runtime.getRuntime().exec(cmd1).waitFor()
-                    Runtime.getRuntime().exec(cmd2).waitFor()
-                    Runtime.getRuntime().exec(cmd3).waitFor()
-                } catch (e: Exception) {
-                    println("Failed to register Windows protocol: ${e.message}")
-                }
-            } else if (os.contains("linux")) {
-                try {
-                    val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
-                    if (!appDir.exists()) appDir.mkdirs()
-
-                    val shellFile = java.io.File(appDir, "sc_handler.sh")
-                    shellFile.writeText(buildString {
-                        append("#!/bin/bash\n")
-                        append("# Only forward the OAuth redirect (contains code= param).\n")
-                        append("# SoundCloud's deep-link check sends sc://auth without code=\n")
-                        append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
-                        append("if [[ \"\$1\" == *\"code=\"* ]]; then\n")
-                        append("  curl -s -X POST 'http://localhost:$port/callback' -d \"\$1\"\n")
-                        append("fi\n")
-                    })
-                    shellFile.setExecutable(true)
-
-                    val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")
-                    mimeDir.mkdirs()
-                    val targetDesktop = java.io.File(mimeDir, "kittytune-sc.desktop")
-                    targetDesktop.writeText(buildString {
-                        append("[Desktop Entry]\n")
-                        append("Name=KittyTune SC Auth\n")
-                        append("Exec=${shellFile.absolutePath} %u\n")
-                        append("Type=Application\n")
-                        append("NoDisplay=true\n")
-                        append("MimeType=x-scheme-handler/sc;\n")
-                        append("Terminal=false\n")
-                    })
-
-                    Runtime.getRuntime().exec(arrayOf("xdg-mime", "default", "kittytune-sc.desktop", "x-scheme-handler/sc")).waitFor()
-                    Runtime.getRuntime().exec(arrayOf("update-desktop-database", mimeDir.absolutePath)).waitFor()
-                } catch (e: Exception) {
-                    println("Failed to register Linux protocol: ${e.message}")
-                }
-            }
+            serverPort = port
 
             server.apply {
                 createContext("/callback") { exchange ->
@@ -196,8 +144,99 @@ fun LoginScreen(
         }
     }
 
-    LaunchedEffect(authUrl) {
-        if (!hasLaunchedBrowser) {
+    LaunchedEffect(serverPort) {
+        if (serverPort != null && !isProtocolReady) {
+            withContext(Dispatchers.IO) {
+                try {
+                    if (os.contains("windows")) {
+                        val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
+                        if (!appDir.exists()) appDir.mkdirs()
+
+                        val vbsFile = java.io.File(appDir, "sc_handler.vbs")
+                        val vbsContent = buildString {
+                            append("If WScript.Arguments.Count > 0 Then\r\n")
+                            append("  url = WScript.Arguments(0)\r\n")
+                            append("  If InStr(url, \"code=\") > 0 Then\r\n")
+                            append("    Set req = CreateObject(\"MSXML2.ServerXMLHTTP.6.0\")\r\n")
+                            append("    req.open \"POST\", \"http://localhost:$serverPort/callback\", False\r\n")
+                            append("    req.setRequestHeader \"Content-Type\", \"text/plain\"\r\n")
+                            append("    req.send url\r\n")
+                            append("  End If\r\n")
+                            append("End If\r\n")
+                        }
+                        vbsFile.writeText(vbsContent)
+                        
+                        if (!vbsFile.exists()) {
+                            throw Exception("VBS file creation failed at ${vbsFile.absolutePath}")
+                        }
+
+                        val handlerCmd = "wscript.exe \"${vbsFile.absolutePath.replace("\\", "\\\\")}\" \"%1\""
+
+                        val psScript = """
+                            New-Item -Path "HKCU:\\Software\\Classes\\sc" -Force | Out-Null
+                            New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "(default)" -Value "URL:sc Protocol" -Force | Out-Null
+                            New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "URL Protocol" -Value "" -Force | Out-Null
+                            New-Item -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Force | Out-Null
+                            Set-ItemProperty -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Name "(default)" -Value '$handlerCmd' -Force
+                        """.trimIndent()
+
+                        val encodedScript = java.util.Base64.getEncoder().encodeToString(psScript.toByteArray(Charsets.UTF_16LE))
+                        val psProc = Runtime.getRuntime().exec(arrayOf(
+                            "powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", encodedScript
+                        ))
+                        psProc.waitFor()
+                        if (psProc.exitValue() != 0) {
+                            val error = String(psProc.errorStream.readBytes())
+                            throw Exception("PowerShell registry update failed: $error")
+                        }
+                        
+                        println("Successfully registered sc:// protocol handler with VBS wrapper")
+                    } else if (os.contains("linux")) {
+                        val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
+                        if (!appDir.exists()) appDir.mkdirs()
+
+                        val shellFile = java.io.File(appDir, "sc_handler.sh")
+                        shellFile.writeText(buildString {
+                            append("#!/bin/bash\n")
+                            append("# Only forward the OAuth redirect (contains code= param).\n")
+                            append("# SoundCloud's deep-link check sends sc://auth without code=\n")
+                            append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
+                            append("if [[ \"\$1\" == *\"code=\"* ]]; then\n")
+                            append("  curl -s -X POST 'http://localhost:$serverPort/callback' -d \"\$1\"\n")
+                            append("fi\n")
+                        })
+                        shellFile.setExecutable(true)
+
+                        val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")
+                        mimeDir.mkdirs()
+                        val targetDesktop = java.io.File(mimeDir, "kittytune-sc.desktop")
+                        targetDesktop.writeText(buildString {
+                            append("[Desktop Entry]\n")
+                            append("Name=KittyTune SC Auth\n")
+                            append("Exec=${shellFile.absolutePath} %u\n")
+                            append("Type=Application\n")
+                            append("NoDisplay=true\n")
+                            append("MimeType=x-scheme-handler/sc;\n")
+                            append("Terminal=false\n")
+                        })
+
+                        Runtime.getRuntime().exec(arrayOf("xdg-mime", "default", "kittytune-sc.desktop", "x-scheme-handler/sc")).waitFor()
+                        Runtime.getRuntime().exec(arrayOf("update-desktop-database", mimeDir.absolutePath)).waitFor()
+                        
+                        println("Successfully registered sc:// protocol handler for Linux")
+                    }
+                } catch (e: Exception) {
+                    println("Failed to register protocol handler: ${e.message}")
+                    e.printStackTrace()
+                } finally {
+                    isProtocolReady = true
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(authUrl, isProtocolReady) {
+        if (!hasLaunchedBrowser && isProtocolReady) {
             hasLaunchedBrowser = true
             launchSoundCloudAuth(authUrl)
         }
