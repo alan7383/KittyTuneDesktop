@@ -119,7 +119,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.0.20"
+            packageVersion = "1.0.21"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 

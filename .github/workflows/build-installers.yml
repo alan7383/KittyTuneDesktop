@@ -165,15 +165,19 @@ jobs:
           tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-${VERSION}-1-x86_64.pkg.tar.zst
           cd ../..
 
+      - name: Prepare Linux x64 Distribution Binaries
+        run: |
+          mkdir -p dist-linux-x64
+          find build -name "*.deb" -exec cp {} dist-linux-x64/ \;
+          find build -name "*.rpm" -exec cp {} dist-linux-x64/ \;
+          find build -name "*.AppImage" -exec cp {} dist-linux-x64/ \;
+          cp kitty-tune-*-x86_64.pkg.tar.zst dist-linux-x64/ 2>/dev/null || true
+
       - name: Upload Linux x64 Packages
         uses: actions/upload-artifact@v4
         with:
           name: KittyTune-Linux-x64
-          path: |
-            build/**/*.deb
-            build/**/*.rpm
-            build/**/*.AppImage
-            kitty-tune-*-x86_64.pkg.tar.zst
+          path: dist-linux-x64/*
 
   build-linux-arm64:
     name: Build Linux ARM64 Packages (.deb, .rpm, .pkg.tar.zst)
@@ -255,14 +259,18 @@ jobs:
           tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-${VERSION}-1-aarch64.pkg.tar.zst
           cd ../..
 
+      - name: Prepare Linux ARM64 Distribution Binaries
+        run: |
+          mkdir -p dist-linux-arm64
+          find build -name "*.deb" -exec cp {} dist-linux-arm64/ \;
+          find build -name "*.rpm" -exec cp {} dist-linux-arm64/ \;
+          cp kitty-tune-*-aarch64.pkg.tar.zst dist-linux-arm64/ 2>/dev/null || true
+
       - name: Upload Linux ARM64 Packages
         uses: actions/upload-artifact@v4
         with:
           name: KittyTune-Linux-arm64
-          path: |
-            build/**/*.deb
-            build/**/*.rpm
-            kitty-tune-*-aarch64.pkg.tar.zst
+          path: dist-linux-arm64/*
 
   release:
     name: Publish Universal GitHub Release
@@ -272,6 +280,10 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
@@ -297,6 +309,32 @@ jobs:
           name: KittyTune-Linux-arm64
           path: ./release-files
 
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          PREV=$(git describe --tags --abbrev=0 "${{ github.ref_name }}^" 2>/dev/null || echo "")
+          if [ -z "$PREV" ]; then
+            echo "range=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "range=${PREV}..${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "prev=$PREV" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate changelog
+        uses: orhun/git-cliff-action@v4
+        id: cliff
+        with:
+          config: cliff.toml
+          args: --strip header -- ${{ steps.prev_tag.outputs.range }}
+
+      - name: Write changelog to file
+        run: |
+          echo "${{ steps.cliff.outputs.content }}" > CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          if [ -n "${{ steps.prev_tag.outputs.prev }}" ]; then
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.prev }}...${{ github.ref_name }}" >> CHANGELOG_RELEASE.md
+          fi
+
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
@@ -304,7 +342,7 @@ jobs:
           name: ${{ github.ref_type == 'tag' && github.ref_name || 'KittyTune Desktop v1.0.20' }}
           draft: false
           prerelease: false
-          generate_release_notes: true
+          body_path: CHANGELOG_RELEASE.md
           files: ./release-files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
