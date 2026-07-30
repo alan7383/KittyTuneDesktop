@@ -1,7 +1,7 @@
 [changelog]
 header = ""
 body = """
-## {{ version }} ({{ timestamp | date(format="%Y-%m-%d") }})
+## {{ version }} ({{ now() | date(format="%Y-%m-%d") }})
 
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
