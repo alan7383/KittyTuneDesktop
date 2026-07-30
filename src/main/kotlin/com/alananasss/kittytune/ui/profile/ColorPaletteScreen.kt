@@ -181,6 +181,15 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
             ) {
                 Spacer(Modifier.height(4.dp))
 
+                SystemAccentCard(
+                    colorStyle = colorStyle,
+                    onStyleSelected = {
+                        colorStyle = it
+                        prefs.setColorStyle(it)
+                    },
+                    modifier = Modifier.padding(start = 8.dp, end = 16.dp)
+                )
+
                 SeedPaletteCard(
                     selectedKeyColor = currentKeyColor,
                     isDark = isDark,
@@ -515,11 +524,14 @@ private fun ColorGenerationCard(
             )
             val hasEnd4 = remember { com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled() }
             val styles = remember(hasEnd4) {
+                val list = mutableListOf<String>()
                 if (hasEnd4) {
-                    listOf("end4 (Material You)", "System") + PaletteStyle.entries.map { it.name }
-                } else {
-                    listOf("System") + PaletteStyle.entries.map { it.name }
+                    list.add("end4 (Material You)")
                 }
+                list.add("Windows Accent")
+                list.add("System")
+                list.addAll(PaletteStyle.entries.map { it.name })
+                list
             }
             SettingsDropdownRow(
                 title = str("pref_color_style_title"),
@@ -892,4 +904,77 @@ fun surfaceColorAtElevation(elevation: androidx.compose.ui.unit.Dp): Color {
     if (elevation == 0.dp) return MaterialTheme.colorScheme.surface
     val alpha = ((4.5f * kotlin.math.ln(elevation.value + 1)) + 2f) / 100f
     return androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.primary, alpha)
+}
+
+@Composable
+private fun SystemAccentCard(
+    colorStyle: String,
+    onStyleSelected: (String) -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth()
+) {
+    val end4Installed = remember { com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled() }
+    val isEnd4 = colorStyle.contains("end4", ignoreCase = true)
+    val isWindows = colorStyle.contains("windows", ignoreCase = true)
+
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (end4Installed) str("setup_end4_detected") else str("setup_windows_color"),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = if (end4Installed) str("setup_use_end4") else str("setup_use_windows_color"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = if (end4Installed) isEnd4 else isWindows,
+                onCheckedChange = { checked ->
+                    if (end4Installed) {
+                        if (checked) {
+                            onStyleSelected("end4 (Material You)")
+                        } else {
+                            onStyleSelected("Vibrant")
+                        }
+                    } else {
+                        if (checked) {
+                            onStyleSelected("Windows Accent")
+                        } else {
+                            onStyleSelected("Vibrant")
+                        }
+                    }
+                },
+                thumbContent = {
+                    val isChecked = if (end4Installed) isEnd4 else isWindows
+                    Icon(
+                        imageVector = if (isChecked) Icons.Rounded.Check else Icons.Rounded.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(SwitchDefaults.IconSize)
+                    )
+                },
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedIconColor = MaterialTheme.colorScheme.primary,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedIconColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
+            )
+        }
+    }
 }
