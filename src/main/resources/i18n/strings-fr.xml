@@ -1702,6 +1702,27 @@
     <string name="update_auth_failed_title">Échec de l\'authentification</string>
     <string name="update_auth_failed_desc">L\'authentification a été annulée ou a échoué. Veuillez réessayer.</string>
     <string name="update_btn_retry_auth">Réessayer l\'authentification</string>
+    <string name="setup_title">Configuration de KittyTune</string>
+    <string name="setup_choose_color">Choisissez votre couleur préférée</string>
+    <string name="setup_end4_detected">Thème End4 détecté</string>
+    <string name="setup_use_end4">Voulez-vous utiliser la configuration du thème End4 ?</string>
+    <string name="setup_windows_color">Couleurs Windows détectées</string>
+    <string name="setup_use_windows_color">Voulez-vous synchroniser l\'application avec la couleur d\'accentuation de Windows ?</string>
+    <string name="setup_appearance">Apparence</string>
+    <string name="setup_general">Général</string>
+    <string name="setup_theme_mode">Thème</string>
+    <string name="setup_theme_system">Système</string>
+    <string name="setup_theme_light">Clair</string>
+    <string name="setup_theme_dark">Sombre</string>
+    <string name="setup_language">Langue</string>
+    <string name="setup_discord_rpc">Rich Presence Discord</string>
+    <string name="setup_discord_rpc_desc">Affichez ce que vous écoutez sur votre profil Discord</string>
+    <string name="setup_discord_connect">Connecter un compte</string>
+    <string name="setup_discord_connected">Connecté</string>
+    <string name="setup_discord_not_connected">Non connecté</string>
+    <string name="setup_discord_change">Changer de compte</string>
+    <string name="setup_discord_disconnect">Déconnecter</string>
+    <string name="setup_continue">Continuer</string>
 </resources>
 
 

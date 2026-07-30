@@ -38,6 +38,11 @@ fun DiscordLoginScreen(
 
         Platform.runLater {
             try {
+                try {
+                    java.net.CookieHandler.setDefault(java.net.CookieManager())
+                    (java.net.CookieHandler.getDefault() as? java.net.CookieManager)?.cookieStore?.removeAll()
+                } catch (_: Exception) {}
+
                 val webView = WebView()
                 val engine = webView.engine
                 engine.isJavaScriptEnabled = true
