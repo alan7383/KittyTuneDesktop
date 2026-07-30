@@ -97,12 +97,16 @@ class PlayerPreferences {
         private const val KEY_BOTTOM_MENU_FAB = "bottom_menu_fab"
         private const val KEY_BOTTOM_MENU_BLUR = "bottom_menu_blur_enabled"
         private const val KEY_STOP_ON_TASK_CLEAR = "stop_on_task_clear"
+        private const val KEY_HAS_COMPLETED_SETUP = "has_completed_setup"
 
         private val queueLock = Any()
     }
 
     fun getSyncLikesEnabled(): Boolean = Prefs.getBoolean(KEY_SYNC_LIKES, true)
     fun setSyncLikesEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SYNC_LIKES, enabled)
+
+    fun getHasCompletedSetup(): Boolean = Prefs.getBoolean(KEY_HAS_COMPLETED_SETUP, false)
+    fun setHasCompletedSetup(completed: Boolean) = Prefs.putBoolean(KEY_HAS_COMPLETED_SETUP, completed)
 
     fun getCrossfadeEnabled(): Boolean = Prefs.getBoolean(KEY_CROSSFADE_ENABLED, false)
     fun setCrossfadeEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_CROSSFADE_ENABLED, enabled)

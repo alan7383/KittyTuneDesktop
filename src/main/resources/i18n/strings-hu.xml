@@ -1664,6 +1664,27 @@
     <string name="pref_crossfade_title">Számok átúsztatása</string>
     <string name="pref_crossfade_duration">Átúsztatás időtartama: %d mp</string>
     <string name="table_header_plays">Lejátszások</string>
+    <string name="setup_title">KittyTune Konfiguráció</string>
+    <string name="setup_choose_color">Válaszd ki a kedvenc színed</string>
+    <string name="setup_end4_detected">End4 Téma észlelve</string>
+    <string name="setup_use_end4">Szeretnéd használni az End4 téma konfigurációt?</string>
+    <string name="setup_windows_color">Windows Színek észlelve</string>
+    <string name="setup_use_windows_color">Szeretnéd szinkronizálni az alkalmazást a Windows kiemelő színével?</string>
+    <string name="setup_appearance">Megjelenés</string>
+    <string name="setup_general">Általános</string>
+    <string name="setup_theme_mode">Téma Mód</string>
+    <string name="setup_theme_system">Rendszer</string>
+    <string name="setup_theme_light">Világos</string>
+    <string name="setup_theme_dark">Sötét</string>
+    <string name="setup_language">Nyelv</string>
+    <string name="setup_discord_rpc">Discord Rich Presence</string>
+    <string name="setup_discord_rpc_desc">Mutasd meg, mit hallgatsz a Discord profilodon</string>
+    <string name="setup_discord_connect">Fiók csatlakoztatása</string>
+    <string name="setup_discord_connected">Csatlakoztatva</string>
+    <string name="setup_discord_not_connected">Nincs csatlakoztatva</string>
+    <string name="setup_discord_change">Fiók módosítása</string>
+    <string name="setup_discord_disconnect">Leválasztás</string>
+    <string name="setup_continue">Folytatás</string>
 </resources>
 
 

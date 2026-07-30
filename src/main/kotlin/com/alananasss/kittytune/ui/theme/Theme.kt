@@ -66,6 +66,29 @@ internal fun rememberSoundTuneColorScheme(
         return com.alananasss.kittytune.data.theme.End4ThemeManager.buildColorScheme(fallbackScheme, pureBlack && useDarkTheme)
     }
 
+    if (colorStyle.contains("windows", ignoreCase = true)) {
+        com.alananasss.kittytune.data.theme.WindowsThemeManager.startWatching()
+        val winColor by com.alananasss.kittytune.data.theme.WindowsThemeManager.accentColor.collectAsState()
+        val effectiveWinColor = ThemeState.previewKeyColor?.let { Color(it) } ?: winColor ?: KittyTuneDefaultSeedColor
+        
+        val style = PaletteStyle.Fidelity
+        val specVersion = parseMaterialKolorColorSpec(colorSpec)
+        
+        return rememberDynamicColorScheme(
+            seedColor = effectiveWinColor,
+            isDark = useDarkTheme,
+            isAmoled = pureBlack,
+            style = style,
+            specVersion = specVersion,
+            platform = DynamicScheme.Platform.PHONE,
+            modifyColorScheme = { scheme ->
+                if (pureBlack && useDarkTheme) scheme.withAmoledSurfaces() else scheme
+            }
+        )
+    } else {
+        com.alananasss.kittytune.data.theme.WindowsThemeManager.stopWatching()
+    }
+
     val style = remember(colorStyle) { parseMaterialKolorPaletteStyle(colorStyle) }
     val specVersion = remember(colorSpec) { parseMaterialKolorColorSpec(colorSpec) }
     

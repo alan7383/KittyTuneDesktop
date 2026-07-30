@@ -23,14 +23,16 @@ import com.alananasss.kittytune.ui.ImageLoaderFactory
 import com.alananasss.kittytune.ui.login.LoginScreen
 import com.alananasss.kittytune.ui.login.WelcomeScreen
 import com.alananasss.kittytune.ui.main.MainScreen
+import com.alananasss.kittytune.ui.setup.SetupScreen
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
+import com.alananasss.kittytune.data.local.PlayerPreferences
 
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 
-enum class AppState { WELCOME, LOGIN, MAIN }
+enum class AppState { WELCOME, LOGIN, SETUP, MAIN }
 
 @Composable
 fun AppRouter() {
@@ -39,7 +41,13 @@ fun AppRouter() {
     val isGuestMode = tokenManager.isGuestMode()
 
     var appState by remember {
-        mutableStateOf(if (isLoggedIn || isGuestMode) AppState.MAIN else AppState.WELCOME)
+        val hasCompletedSetup = PlayerPreferences().getHasCompletedSetup()
+        val initialState = if (isLoggedIn || isGuestMode) {
+            if (hasCompletedSetup) AppState.MAIN else AppState.SETUP
+        } else {
+            AppState.WELCOME
+        }
+        mutableStateOf(initialState)
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -53,13 +61,16 @@ fun AppRouter() {
             onLoginClick = { appState = AppState.LOGIN },
             onGuestClick = { 
                 tokenManager.setGuestMode(true)
-                appState = AppState.MAIN 
+                appState = AppState.SETUP 
             },
             isGuestLoading = false
         )
         AppState.LOGIN -> LoginScreen(
-            onLoginSuccess = { appState = AppState.MAIN },
+            onLoginSuccess = { appState = AppState.SETUP },
             onBackClick = { appState = AppState.WELCOME }
+        )
+        AppState.SETUP -> SetupScreen(
+            onSetupComplete = { appState = AppState.MAIN }
         )
         AppState.MAIN -> MainScreen()
     }

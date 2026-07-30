@@ -16,6 +16,8 @@ build/
 *.py
 *.ps1
 *.txt
+*.msi
+TestColor.kt
 first_token_manager.json
 scratch/
 

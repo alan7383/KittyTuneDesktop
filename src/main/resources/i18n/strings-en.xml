@@ -1874,6 +1874,27 @@
     <string name="update_auth_failed_title">Authentication failed</string>
     <string name="update_auth_failed_desc">The authentication was cancelled or failed. Please try again.</string>
     <string name="update_btn_retry_auth">Retry authentication</string>
+    <string name="setup_title">KittyTune Configuration</string>
+    <string name="setup_choose_color">Choose your favorite color</string>
+    <string name="setup_end4_detected">End4 Theme detected</string>
+    <string name="setup_use_end4">Would you like to use the End4 theme configuration?</string>
+    <string name="setup_windows_color">Windows Colors detected</string>
+    <string name="setup_use_windows_color">Would you like to sync the app with your Windows accent color?</string>
+    <string name="setup_appearance">Appearance</string>
+    <string name="setup_general">General</string>
+    <string name="setup_theme_mode">Theme Mode</string>
+    <string name="setup_theme_system">System</string>
+    <string name="setup_theme_light">Light</string>
+    <string name="setup_theme_dark">Dark</string>
+    <string name="setup_language">Language</string>
+    <string name="setup_discord_rpc">Discord Rich Presence</string>
+    <string name="setup_discord_rpc_desc">Show what you\'re listening to on your Discord profile</string>
+    <string name="setup_discord_connect">Connect Account</string>
+    <string name="setup_discord_connected">Connected</string>
+    <string name="setup_discord_not_connected">Not Connected</string>
+    <string name="setup_discord_change">Change Account</string>
+    <string name="setup_discord_disconnect">Disconnect</string>
+    <string name="setup_continue">Continue</string>
 </resources>
 
 
