@@ -5,6 +5,8 @@ import androidx.compose.material3.IconButtonDefaults
 
 import androidx.compose.material3.ButtonDefaults
 
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -1159,7 +1161,8 @@ fun ExpandableDescription(
 @Composable
 fun UserCommentItem(
     comment: Comment,
-    onTrackClick: () -> Unit
+    onTrackClick: () -> Unit,
+    onMentionClick: (String) -> Unit = {}
 ) {
     val track = comment.track ?: return
 
@@ -1200,13 +1203,46 @@ fun UserCommentItem(
 
                 Spacer(Modifier.height(12.dp))
 
-                Text(
-                    text = comment.body,
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
+                val mentionPattern = remember { """@[\w-]+""".toRegex() }
+                val urlPattern = remember { """https?://[^\s]+""".toRegex() }
+                val tertiaryColor = MaterialTheme.colorScheme.tertiary
+                val primaryColor = MaterialTheme.colorScheme.primary
+            
+                val annotatedString = remember(comment.body, tertiaryColor, primaryColor) {
+                    buildAnnotatedString {
+                        append(comment.body)
+                        for (match in mentionPattern.findAll(comment.body)) {
+                            val username = match.value.removePrefix("@")
+                            addLink(
+                                LinkAnnotation.Clickable(
+                                    tag = "MENTION",
+                                    styles = TextLinkStyles(style = SpanStyle(color = tertiaryColor, fontWeight = FontWeight.SemiBold)),
+                                    linkInteractionListener = { onMentionClick(username) }
+                                ),
+                                match.range.first, match.range.last + 1
+                            )
+                        }
+                        for (match in urlPattern.findAll(comment.body)) {
+                            addLink(
+                                LinkAnnotation.Url(
+                                    url = match.value,
+                                    styles = TextLinkStyles(style = SpanStyle(color = primaryColor, textDecoration = TextDecoration.Underline))
+                                ),
+                                match.range.first, match.range.last + 1
+                            )
+                        }
+                    }
+                }
+
+                SelectionContainer {
+                    Text(
+                        text = annotatedString,
+                        style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
 
                 Text(
                     text = getRelativeTime(comment.createdAt),

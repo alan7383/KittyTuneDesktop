@@ -7,6 +7,9 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -460,7 +463,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     value = newCommentText,
                     onValueChange = { newCommentText = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text(if (vm.replyingToComment != null) str("comment_write_reply") else str("add_comment_hint")) },
+                    placeholder = { Text(str("add_comment_hint")) },
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp)
                 )
@@ -474,13 +477,6 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
                     Icon(Icons.Rounded.Send, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
-            }
-            if (vm.replyingToComment != null) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    val targetUser = vm.replyingToComment?.user?.username ?: str("comment_anonymous")
-                    Text(str("comment_replying_to", targetUser), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() }, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
@@ -621,6 +617,42 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                 }
             }
         }
+
+        if (vm.replyingToComment == comment) {
+            var replyText by remember { mutableStateOf("") }
+            val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+            
+            Column(modifier = Modifier.padding(top = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val targetUser = comment.user?.username ?: str("comment_anonymous")
+                    Text(str("comment_replying_to", targetUser), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() }, tint = MaterialTheme.colorScheme.primary)
+                }
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = replyText,
+                        onValueChange = { replyText = it },
+                        modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                        placeholder = { Text(str("comment_write_reply")) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    IconButton(
+                        onClick = {
+                            if (replyText.isNotBlank()) {
+                                vm.postComment(replyText, null)
+                            }
+                        },
+                        colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
+                        Icon(Icons.Rounded.Send, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    }
+                }
+            }
+            LaunchedEffect(Unit) {
+                focusRequester.requestFocus()
+            }
+        }
     }
 }
 
@@ -639,9 +671,11 @@ private fun StatItem(icon: ImageVector, count: Int, onClick: (() -> Unit)? = nul
 @Composable
 private fun CommentBodyText(body: String, onMentionClick: (String) -> Unit) {
     val mentionPattern = remember { """@[\w-]+""".toRegex() }
+    val urlPattern = remember { """https?://[^\s]+""".toRegex() }
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
+    val primaryColor = MaterialTheme.colorScheme.primary
 
-    val annotatedString = remember(body, tertiaryColor) {
+    val annotatedString = remember(body, tertiaryColor, primaryColor) {
         buildAnnotatedString {
             append(body)
             for (match in mentionPattern.findAll(body)) {
@@ -655,10 +689,21 @@ private fun CommentBodyText(body: String, onMentionClick: (String) -> Unit) {
                     match.range.first, match.range.last + 1
                 )
             }
+            for (match in urlPattern.findAll(body)) {
+                addLink(
+                    LinkAnnotation.Url(
+                        url = match.value,
+                        styles = TextLinkStyles(style = SpanStyle(color = primaryColor, textDecoration = TextDecoration.Underline))
+                    ),
+                    match.range.first, match.range.last + 1
+                )
+            }
         }
     }
 
-    Text(text = annotatedString, style = MaterialTheme.typography.bodyMedium)
+    SelectionContainer {
+        Text(text = annotatedString, style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 private fun parseTags(tagListStr: String): List<String> {
