@@ -71,12 +71,12 @@ fun MainScreen() {
     val navController = rememberNavController()
     var showNowPlayingPanel by remember { mutableStateOf(true) }
     var nowPlayingTab by remember { mutableStateOf(NowPlayingTab.TRACK) }
-    var showMainLyricsView by remember { mutableStateOf(false) }
+
 
     // Close full-screen lyrics when navigation happens (e.g. sidebar click)
     val backStackEntry by navController.currentBackStackEntryAsState()
     androidx.compose.runtime.LaunchedEffect(backStackEntry) {
-        showMainLyricsView = false
+        playerViewModel.showLyricsSheet = false
     }
 
     // Same navigation protocol as the Android MainScreen: PlayerViewModel exposes
@@ -99,7 +99,7 @@ fun MainScreen() {
                 nowPlayingTab = NowPlayingTab.QUEUE
             } else if (!isSameRoute(navController, targetRoute)) {
                 playerViewModel.isPlayerExpanded = false
-                showMainLyricsView = false
+                playerViewModel.showLyricsSheet = false
                 navController.navigate(targetRoute)
             }
             playerViewModel.onNavigationHandled()
@@ -311,10 +311,10 @@ fun MainScreen() {
                 shape = PanelShape,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
-                if (showMainLyricsView) {
+                if (playerViewModel.showLyricsSheet) {
                     com.alananasss.kittytune.ui.player.lyrics.LyricsScreen(
                         viewModel = playerViewModel,
-                        onClose = { showMainLyricsView = false }
+                        onClose = { playerViewModel.showLyricsSheet = false }
                     )
                 } else {
                     Column(Modifier.fillMaxSize()) {
@@ -652,7 +652,7 @@ fun MainScreen() {
                     tab = nowPlayingTab,
                     onTabChange = { nowPlayingTab = it },
                     onClose = { showNowPlayingPanel = false },
-                    onOpenFullLyrics = { showMainLyricsView = true },
+                    onOpenFullLyrics = { playerViewModel.showLyricsSheet = true },
                     modifier = Modifier.width(rightPanelWidth)
                 )
             }
@@ -666,7 +666,7 @@ fun MainScreen() {
                 nowPlayingTab = NowPlayingTab.QUEUE
             },
             onOpenLyrics = {
-                showMainLyricsView = !showMainLyricsView
+                playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
             },
             onOpenTrackInfo = {
                 showNowPlayingPanel = true
