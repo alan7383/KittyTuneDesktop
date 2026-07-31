@@ -130,6 +130,8 @@ fun Sidebar(
                             popUpTo("home")
                             launchSingleTop = true
                         }
+                    } else {
+                        playerViewModel.showLyricsSheet = false
                     }
                 }
                 SidebarNavItem(
@@ -141,6 +143,8 @@ fun Sidebar(
                 ) {
                     if (currentRoute != "feed") {
                         navController.navigate("feed") { launchSingleTop = true }
+                    } else {
+                        playerViewModel.showLyricsSheet = false
                     }
                 }
                 SidebarNavItem(
@@ -152,6 +156,8 @@ fun Sidebar(
                 ) {
                     if (currentRoute != "genres") {
                         navController.navigate("genres") { launchSingleTop = true }
+                    } else {
+                        playerViewModel.showLyricsSheet = false
                     }
                 }
                 SidebarNavItem(
@@ -163,6 +169,8 @@ fun Sidebar(
                 ) {
                     if (currentRoute != "recognition") {
                         navController.navigate("recognition") { launchSingleTop = true }
+                    } else {
+                        playerViewModel.showLyricsSheet = false
                     }
                 }
             }

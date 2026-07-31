@@ -23,10 +23,8 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.TextSnippet
 import androidx.compose.material.icons.rounded.Verified
-import androidx.compose.material.icons.outlined.Mic
-import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
@@ -357,11 +355,11 @@ fun PlayerBar(
                     onClick = onOpenLyrics,
                 ) {
                     Icon(
-                        imageVector = if (vm.hasLyrics) Icons.Rounded.Mic else Icons.Outlined.Mic,
+                        painter = androidx.compose.ui.res.painterResource("icons/lyrics.svg"),
                         contentDescription = "Lyrics",
                         tint = if (vm.hasLyrics) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
                 IconButton(
