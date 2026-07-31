@@ -76,11 +76,11 @@ import androidx.compose.material3.ContainedLoadingIndicator
                             Slider(
                                 value = fontSize,
                                 onValueChange = { playerViewModel.updateLyricsFontSize(it) },
-                                valueRange = 12f..48f,
-                                steps = 17,
+                                valueRange = 12f..100f,
+                                steps = 43,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(48f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(onClick = { playerViewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

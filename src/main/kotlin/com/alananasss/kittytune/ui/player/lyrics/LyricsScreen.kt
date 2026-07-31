@@ -55,6 +55,9 @@ import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
     import com.alananasss.kittytune.core.str
     import androidx.compose.ui.text.AnnotatedString
+    import androidx.compose.ui.text.buildAnnotatedString
+    import androidx.compose.ui.text.withStyle
+    import androidx.compose.ui.text.SpanStyle
     import androidx.compose.ui.text.font.FontWeight
     import androidx.compose.ui.text.input.ImeAction
     import androidx.compose.ui.text.style.TextAlign
@@ -94,6 +97,7 @@ import kotlin.math.roundToInt
         val isSearching = viewModel.isSearchingLyrics
         val currentTrack = viewModel.currentTrack
         var showQuickSettingsDialog by remember { mutableStateOf(false) }
+        var showUploadYamlDialog by remember { mutableStateOf(false) }
 
         val hasSynced = viewModel.lyricsLines.any { it.endTime > 0 }
         val hasPlain = !viewModel.rawPlainLyrics.isNullOrBlank()
@@ -102,6 +106,13 @@ import kotlin.math.roundToInt
             QuickLyricsSettingsDialog(
                 viewModel = viewModel,
                 onDismiss = { showQuickSettingsDialog = false }
+            )
+        }
+        
+        if (showUploadYamlDialog) {
+            UploadYamlDialog(
+                viewModel = viewModel,
+                onDismiss = { showUploadYamlDialog = false }
             )
         }
 
@@ -165,6 +176,10 @@ import kotlin.math.roundToInt
                                 }
                             },
                             actions = {
+                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showUploadYamlDialog = true }) {
+                                    Icon(Icons.Rounded.Add, str("btn_upload_yaml"), tint = Color.White)
+                                }
+                                Spacer(Modifier.width(8.dp))
                                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showQuickSettingsDialog = true }) {
                                     val tint = if (viewModel.lyricsOffset != 0L) MaterialTheme.colorScheme.primary else Color.White
                                     Icon(Icons.Rounded.Settings, str("pref_lyrics_title"), tint = tint)
@@ -373,15 +388,34 @@ import kotlin.math.roundToInt
 
                     val textColor = if (isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
 
+                    val annotatedString = if (line.words.isNotEmpty()) {
+                        buildAnnotatedString {
+                            line.words.forEach { word ->
+                                val isWordActive = adjustedPosition >= word.startTime
+                                val wordColor = if (isActive) {
+                                    if (isWordActive) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                } else {
+                                    textColor
+                                }
+                                withStyle(SpanStyle(color = wordColor)) {
+                                    append(word.text)
+                                }
+                            }
+                        }
+                    } else {
+                        AnnotatedString(line.text)
+                    }
+
                     Text(
-                        text = line.text,
+                        text = annotatedString,
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold,
                             fontSize = fontSize.sp,
                             lineHeight = (fontSize * 1.4).sp,
                             textDecoration = textDecoration
                         ),
-                        color = textColor,
+                        color = if (line.words.isEmpty()) textColor else Color.Unspecified,
                         textAlign = alignment,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -929,11 +963,11 @@ fun QuickLyricsSettingsDialog(
                             Slider(
                                 value = fontSize,
                                 onValueChange = { viewModel.updateLyricsFontSize(it) },
-                                valueRange = 12f..48f,
-                                steps = 17,
+                                valueRange = 12f..100f,
+                                steps = 43,
                                 modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                             )
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(48f)) }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(100f)) }) {
                                 Icon(Icons.Rounded.Add, null)
                             }
                         }
@@ -1083,6 +1117,101 @@ fun <T> ExpressiveConnectedButtonGroup(
                         Spacer(Modifier.width(8.dp))
                     }
                     labelProvider(option)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UploadYamlDialog(
+    viewModel: PlayerViewModel,
+    onDismiss: () -> Unit
+) {
+    BackHandler(onBack = onDismiss)
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            modifier = Modifier.width(460.dp).padding(8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Rounded.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = str("dialog_upload_yaml_title"),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) {
+                        Icon(Icons.Rounded.Close, str("btn_close"))
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+                
+                Text(
+                    text = str("dialog_upload_yaml_desc"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(Modifier.height(12.dp))
+                
+                Text(
+                    text = "Documentation: https://lrclib.net/lyricsfile",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier.clickable {
+                        try {
+                            java.awt.Desktop.getDesktop().browse(java.net.URI("https://lrclib.net/lyricsfile"))
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                )
+
+                Spacer(Modifier.height(24.dp))
+
+                androidx.compose.material3.Button(
+                    onClick = {
+                        val dialog = java.awt.FileDialog(null as java.awt.Frame?, str("btn_upload_yaml"), java.awt.FileDialog.LOAD)
+                        dialog.isVisible = true
+                        if (dialog.directory != null && dialog.file != null) {
+                            val file = java.io.File(dialog.directory, dialog.file)
+                            if (file.exists()) {
+                                viewModel.loadCustomLyrics(file.readText())
+                                onDismiss()
+                            }
+                        }
+                    },
+                    shapes = androidx.compose.material3.ButtonDefaults.shapes(),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.Add, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("btn_upload_yaml"), style = MaterialTheme.typography.labelLarge)
                 }
             }
         }
