@@ -840,9 +840,11 @@
 
     <string name="pref_appearance_title">Megjelenés</string>
 
-
-
-
+    <string name="pref_zoom_level">Nagyítási szint</string>
+    <string name="pref_zoom_compact">Kompakt</string>
+    <string name="pref_zoom_default">Alapértelmezett</string>
+    <string name="pref_zoom_airy">Szellős</string>
+    <string name="pref_zoom_level_sub">A nagyítási szint beállításával a KittyTune alkalmazást az igényeihez vagy preferenciáihoz igazíthatja.\nA nagyítási szintet a Ctrl - vagy Ctrl + gombok megnyomásával is módosíthatja.</string>
     <string name="color_palette_screen_title">Téma</string>
 
     <string name="pref_color_style_title">Paletta stílusa</string>
@@ -1685,6 +1687,9 @@
     <string name="setup_discord_change">Fiók módosítása</string>
     <string name="setup_discord_disconnect">Leválasztás</string>
     <string name="setup_continue">Folytatás</string>
+    <string name="btn_upload_yaml">Feltöltés YAML</string>
+    <string name="dialog_upload_yaml_title">Lyricsfile (YAML) Feltöltése</string>
+    <string name="dialog_upload_yaml_desc">A Lyricsfile egy nyílt, YAML-alapú formátum a szinkronizált dalszövegekhez (Karaoke), amely szavankénti pontosságot tesz lehetővé.\n\nTölts fel egy .lyricsfile.yaml vagy .lrc fájlt a számítógépedről, hogy azonnal tesztelhesd a szavankénti szinkronizációt a KittyTune-ban!</string>
 </resources>
 
 

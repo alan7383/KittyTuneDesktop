@@ -955,9 +955,11 @@
 
     <string name="pref_appearance_title">Appearance</string>
 
-
-
-
+    <string name="pref_zoom_level">Zoom level</string>
+    <string name="pref_zoom_compact">Compact</string>
+    <string name="pref_zoom_default">Default</string>
+    <string name="pref_zoom_airy">Airy</string>
+    <string name="pref_zoom_level_sub">By adjusting the zoom level, you can adapt KittyTune to your preferences or needs.\nYou can also change the zoom level by pressing Ctrl - or Ctrl +.</string>
     <string name="color_palette_screen_title">Theme</string>
 
     <string name="pref_color_style_title">Color Style</string>
@@ -1895,6 +1897,9 @@
     <string name="setup_discord_change">Change Account</string>
     <string name="setup_discord_disconnect">Disconnect</string>
     <string name="setup_continue">Continue</string>
+    <string name="btn_upload_yaml">Upload YAML</string>
+    <string name="dialog_upload_yaml_title">Upload Lyricsfile (YAML)</string>
+    <string name="dialog_upload_yaml_desc">Lyricsfile is an open YAML-based format for lyrics: plain, line-synced, and word-synced (Karaoke). It allows for precise word-by-word highlighting.\n\nYou can upload a .lyricsfile.yaml or .lrc file from your computer to test the word-sync feature directly in KittyTune!</string>
 </resources>
 
 
