@@ -82,6 +82,7 @@ dependencies {
     implementation("org.slf4j:slf4j-simple:2.0.17")
 
     implementation("org.json:json:20260522")
+    implementation("org.yaml:snakeyaml:2.2")
     implementation("net.java.dev.jna:jna:5.14.0")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
 

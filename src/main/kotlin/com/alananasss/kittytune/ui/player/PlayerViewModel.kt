@@ -651,7 +651,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 try {
                     discordRpc?.updatePresence(track, contextText, playing, pos)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    if (e !is kotlinx.coroutines.CancellationException) {
+                        e.printStackTrace()
+                    }
                 }
             }
         } else {
@@ -813,7 +815,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (localTrack != null && localTrack.localAudioPath.isNotEmpty()) {
                     val rawLyrics = LyricsUtils.extractLocalLyrics(localTrack.localAudioPath)
                     if (!rawLyrics.isNullOrBlank()) {
-                        val parsed = LyricsUtils.parseLrc(rawLyrics, track.durationMs ?: 0L)
+                        val parsed = LyricsUtils.parseLyricsContent(rawLyrics, track.durationMs ?: 0L)
                         val finalLines = parsed.ifEmpty { listOf(LyricLine(rawLyrics, 0, track.durationMs ?: 0L)) }
                         withContext(Dispatchers.Main) {
                             lyricsLines.addAll(finalLines)
@@ -861,10 +863,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lyricsOffset += amount
     }
 
+    fun loadCustomLyrics(content: String) {
+        viewModelScope.launch {
+            val trackDuration = currentTrack?.durationMs ?: 0L
+            val resultLines = LyricsUtils.parseLyricsContent(content, trackDuration)
+            withContext(Dispatchers.Main) {
+                lyricsLines.clear()
+                lyricsLines.addAll(resultLines)
+                rawPlainLyrics = if (resultLines.isNotEmpty()) {
+                    resultLines.joinToString("\n") { it.text }
+                } else {
+                    content
+                }
+                lyricsMode = if (resultLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
+                isSearchingLyrics = false
+                isLyricsLoading = false
+            }
+        }
+    }
+
     private suspend fun processLyricsResponse(response: LrcLibResponse?, trackDuration: Long) {
+        val lyricsText = response?.lyricsfile ?: response?.syncedLyrics
         val resultLines = when {
             response == null -> emptyList()
-            !response.syncedLyrics.isNullOrEmpty() -> LyricsUtils.parseLrc(response.syncedLyrics, trackDuration)
+            !lyricsText.isNullOrEmpty() -> LyricsUtils.parseLyricsContent(lyricsText, trackDuration)
 
             else -> emptyList()
         }
@@ -873,7 +895,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             lyricsLines.clear()
             lyricsLines.addAll(resultLines)
 
-            rawPlainLyrics = response?.plainLyrics ?: response?.syncedLyrics
+            rawPlainLyrics = response?.plainLyrics ?: if (resultLines.isNotEmpty()) {
+                resultLines.joinToString("\n") { it.text }
+            } else {
+                response?.syncedLyrics
+            }
 
             lyricsMode = if (resultLines.isNotEmpty()) {
                 LyricsMode.SYNCED
@@ -1863,8 +1889,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         } else {
                             currentPosition = enginePos
                         }
-                        currentSessionListenMs += 1000L
-                        println("Listen MS: $currentSessionListenMs")
+                        currentSessionListenMs += 16L
                         
                         if (currentSessionListenMs >= 30_000L && !hasPushedRecentlyPlayed) {
                             println("Threshold reached, pushing history for track ${currentTrack?.id}")
@@ -1882,7 +1907,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 } catch (_: Exception) {
                 }
-                delay(1000.milliseconds)
+                delay(16.milliseconds)
             }
         }
     }
