@@ -72,6 +72,7 @@ class PlayerPreferences {
         private const val KEY_DISCORD_ASSET_LOGO = "discord_asset_logo"
         private const val KEY_DISCORD_STATUS_DISPLAY = "discord_status_display"
         private const val KEY_CUSTOM_FONT_ENABLED = "custom_font_enabled"
+        private const val KEY_UI_SCALE = "ui_scale_preference"
         private const val KEY_FONT_WGHT = "font_wght"
         private const val KEY_FONT_WDTH = "font_wdth"
         private const val KEY_FONT_SLNT = "font_slnt"
@@ -166,6 +167,10 @@ class PlayerPreferences {
 
     fun getPreciseSpeedEnabled(): Boolean = Prefs.getBoolean(KEY_PRECISE_SPEED, false)
     fun setPreciseSpeedEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PRECISE_SPEED, enabled)
+
+    fun getUiScale(): Float = Prefs.getFloat(KEY_UI_SCALE, 1.0f).coerceIn(0.7f, 1.3f)
+    fun setUiScale(scale: Float) = Prefs.putFloat(KEY_UI_SCALE, scale.coerceIn(0.7f, 1.3f))
+    fun uiScaleFlow(): Flow<Float> = Prefs.floatFlow(KEY_UI_SCALE, 1.0f).map { it?.coerceIn(0.7f, 1.3f) ?: 1.0f }
 
     fun getAppLanguage(): AppLanguage {
         val code = Prefs.getString(KEY_APP_LANGUAGE, AppLanguage.SYSTEM.code)

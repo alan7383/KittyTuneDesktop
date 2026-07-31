@@ -13,6 +13,10 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -104,6 +108,27 @@ fun main() {
                     val isAlt = event.isAltPressed
                     val isMeta = event.isMetaPressed
                     val noModifiers = !isShift && !isCtrl && !isAlt && !isMeta
+
+                    if (isCtrl) {
+                        when (event.key) {
+                            Key.Equals, Key.NumPadAdd -> {
+                                val prefs = PlayerPreferences()
+                                val newScale = (prefs.getUiScale() + 0.1f).coerceAtMost(1.3f)
+                                prefs.setUiScale(newScale)
+                                return@Window true
+                            }
+                            Key.Minus, Key.NumPadSubtract -> {
+                                val prefs = PlayerPreferences()
+                                val newScale = (prefs.getUiScale() - 0.1f).coerceAtLeast(0.7f)
+                                prefs.setUiScale(newScale)
+                                return@Window true
+                            }
+                            Key.Zero, Key.NumPad0 -> {
+                                PlayerPreferences().setUiScale(1.0f)
+                                return@Window true
+                            }
+                        }
+                    }
                     val isNumberKey = when (event.key) {
                         Key.Zero, Key.One, Key.Two, Key.Three, Key.Four,
                         Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine,
@@ -147,8 +172,18 @@ fun main() {
         ) {
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
 
-            KittyTuneTheme {
-                Surface { AppRouter() }
+            val prefs = remember { PlayerPreferences() }
+            val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
+            val currentDensity = LocalDensity.current
+            val customDensity = Density(
+                density = currentDensity.density * uiScale,
+                fontScale = currentDensity.fontScale * uiScale
+            )
+
+            CompositionLocalProvider(LocalDensity provides customDensity) {
+                KittyTuneTheme {
+                    Surface { AppRouter() }
+                }
             }
         }
     }

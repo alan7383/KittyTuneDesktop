@@ -244,6 +244,48 @@ fun AppearanceSettingsScreen(
             }
 
             item {
+                val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    SettingsGroupTitle(str("pref_zoom_level"))
+                    Text(str("pref_zoom_level_sub"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(16.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(24.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(str("pref_zoom_compact"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale < 0.95f) FontWeight.Bold else FontWeight.Normal)
+                                Text(str("pref_zoom_default"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale in 0.95f..1.05f) FontWeight.Bold else FontWeight.Normal)
+                                Text(str("pref_zoom_airy"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale > 1.05f) FontWeight.Bold else FontWeight.Normal)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Slider(
+                                value = uiScale,
+                                onValueChange = { prefs.setUiScale(it) },
+                                valueRange = 0.7f..1.3f,
+                                steps = 5,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                (7..13).forEach { step ->
+                                    Text("${step * 10} %", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                OutlinedButton(onClick = { prefs.setUiScale(1.0f) }) {
+                                    Text(str("btn_reset"))
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+            }
+
+            item {
                 SettingsGroup(
                     title = str("settings_cat_general"),
                     items = listOf(
