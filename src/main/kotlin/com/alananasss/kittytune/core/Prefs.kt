@@ -1,4 +1,4 @@
-﻿package com.alananasss.kittytune.core
+package com.alananasss.kittytune.core
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,19 +49,30 @@ object Prefs {
     @Volatile
     private var savePending = false
 
+    fun flush(force: Boolean = false) {
+        if (!savePending && !force) return
+        savePending = false
+        try {
+            val obj = buildJsonObject { state.value.forEach { (k, v) -> put(k, v) } }
+            val tmp = File(file.parentFile, "prefs.json.tmp")
+            tmp.writeText(json.encodeToString(JsonElement.serializer(), obj))
+            if (file.exists()) file.delete()
+            tmp.renameTo(file)
+        } catch (_: Exception) {
+        }
+    }
+
+    init {
+        Runtime.getRuntime().addShutdownHook(Thread {
+            flush()
+        })
+    }
+
     private fun scheduleSave() {
         if (savePending) return
         savePending = true
         writer.schedule({
-            savePending = false
-            try {
-                val obj = buildJsonObject { state.value.forEach { (k, v) -> put(k, v) } }
-                val tmp = File(file.parentFile, "prefs.json.tmp")
-                tmp.writeText(json.encodeToString(JsonElement.serializer(), obj))
-                if (file.exists()) file.delete()
-                tmp.renameTo(file)
-            } catch (_: Exception) {
-            }
+            flush()
         }, 150, TimeUnit.MILLISECONDS)
     }
 

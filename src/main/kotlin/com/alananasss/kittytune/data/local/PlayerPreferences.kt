@@ -46,8 +46,10 @@ class PlayerPreferences {
         private const val KEY_REPEAT_MODE = "repeat_mode_state"
         private const val KEY_DOWNLOAD_DIR = "download_directory_uri"
         private const val KEY_AUTOPLAY_STATION = "autoplay_station_enabled"
+        private const val KEY_CONTINUOUS_PLAYBACK = "continuous_playback_enabled"
         private const val KEY_AUDIO_QUALITY = "audio_quality_pref"
         private const val KEY_PERSISTENT_QUEUE = "persistent_queue_enabled"
+        private const val KEY_SAVE_POSITION = "save_position_enabled"
         private const val KEY_START_DESTINATION = "start_destination_pref"
         private const val KEY_DYNAMIC_THEME = "dynamic_theme_enabled"
         private const val KEY_THEME_MODE = "app_theme_mode"
@@ -212,12 +214,16 @@ class PlayerPreferences {
     fun setPureBlack(enabled: Boolean) = Prefs.putBoolean(KEY_PURE_BLACK, enabled)
     fun getAutoplayEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOPLAY_STATION, true)
     fun setAutoplayEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOPLAY_STATION, enabled)
+    fun getContinuousPlaybackEnabled(): Boolean = Prefs.getBoolean(KEY_CONTINUOUS_PLAYBACK, true)
+    fun setContinuousPlaybackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_CONTINUOUS_PLAYBACK, enabled)
     fun getListeningStatsEnabled(): Boolean = Prefs.getBoolean(KEY_LISTENING_STATS_ENABLED, true)
     fun setListeningStatsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LISTENING_STATS_ENABLED, enabled)
     fun getAudioQuality(): String = Prefs.getString(KEY_AUDIO_QUALITY, "HIGH") ?: "HIGH"
     fun setAudioQuality(quality: String) = Prefs.putString(KEY_AUDIO_QUALITY, quality)
     fun getPersistentQueueEnabled(): Boolean = Prefs.getBoolean(KEY_PERSISTENT_QUEUE, true)
     fun setPersistentQueueEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PERSISTENT_QUEUE, enabled)
+    fun getSavePositionEnabled(): Boolean = Prefs.getBoolean(KEY_SAVE_POSITION, true)
+    fun setSavePositionEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SAVE_POSITION, enabled)
 
     fun getRightPanelWidth(): Float = Prefs.getFloat("right_panel_width", RIGHT_PANEL_DEFAULT_WIDTH).coerceIn(RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH)
     fun setRightPanelWidth(width: Float) = Prefs.putFloat("right_panel_width", width.coerceIn(RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH))
@@ -262,6 +268,7 @@ class PlayerPreferences {
 
     fun getStopOnTaskClear(): Boolean = Prefs.getBoolean(KEY_STOP_ON_TASK_CLEAR, true)
     fun setStopOnTaskClear(enabled: Boolean) = Prefs.putBoolean(KEY_STOP_ON_TASK_CLEAR, enabled)
+    fun stopOnTaskClearFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_STOP_ON_TASK_CLEAR, true)
 
     fun savePlaybackState(track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?, shuffleEnabled: Boolean, repeatMode: RepeatMode) {
         if (!getPersistentQueueEnabled()) {
@@ -289,16 +296,22 @@ class PlayerPreferences {
 
         track?.let { Prefs.putString(KEY_TRACK_JSON, gson.toJson(it)) }
         Prefs.putString(KEY_CONTEXT_JSON, gson.toJson(context))
-        Prefs.putLong(KEY_POSITION, position)
+        if (getSavePositionEnabled()) Prefs.putLong(KEY_POSITION, position) else Prefs.remove(KEY_POSITION)
         Prefs.putBoolean(KEY_SHUFFLE_MODE, shuffleEnabled)
         Prefs.putString(KEY_REPEAT_MODE, repeatMode.name)
+    }
+
+    fun savePosition(position: Long) {
+        if (getSavePositionEnabled()) {
+            Prefs.putLong(KEY_POSITION, position)
+        }
     }
 
     fun saveEffects(state: AudioEffectsState) = Prefs.putString(KEY_EFFECTS, gson.toJson(state))
     fun saveDownloadLocation(uriString: String?) = if (uriString != null) Prefs.putString(KEY_DOWNLOAD_DIR, uriString) else Prefs.remove(KEY_DOWNLOAD_DIR)
     fun getDownloadLocation(): String? = Prefs.getString(KEY_DOWNLOAD_DIR, null)
     fun getLastTrack(): Track? { if (!getPersistentQueueEnabled()) return null; val json = Prefs.getString(KEY_TRACK_JSON, null) ?: return null; return try { gson.fromJson(json, Track::class.java) } catch (_: Exception) { null } }
-    fun getLastPosition(): Long = Prefs.getLong(KEY_POSITION, 0L)
+    fun getLastPosition(): Long = if (getSavePositionEnabled()) Prefs.getLong(KEY_POSITION, 0L) else 0L
     fun getLastQueue(): List<Track> {
         if (!getPersistentQueueEnabled()) return emptyList()
         if (queueFile.exists()) {
