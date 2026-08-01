@@ -67,6 +67,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var commentSort by mutableStateOf(CommentSort.NEWEST)
 
     var currentContext by mutableStateOf<PlaybackContext?>(null)
+    private var isRestoringSession = true
 
     private var playerInitialized = false
     val player: ExoPlayer
@@ -289,6 +290,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (state == Player.STATE_BUFFERING) isLoading = true
 
             if (state == Player.STATE_ENDED) {
+                if (com.alananasss.kittytune.core.AppInstance.isShuttingDown) return
+
                 // Record listening stats
                 currentTrack?.let { track ->
                     if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
@@ -360,7 +363,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             isLoading = false
             isPlaying = false
             if (playJob?.isActive != true) {
-                playNext(manual = false, ignoreRepeatOne = true)
+                if (!com.alananasss.kittytune.core.AppInstance.isShuttingDown) {
+                    playNext(manual = false, ignoreRepeatOne = true)
+                }
             }
         }
 
@@ -524,13 +529,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             try {
-                isPlaying = MusicManager.player.isPlaying
-                duration = MusicManager.player.duration.coerceAtLeast(0L)
-                currentPosition = MusicManager.player.currentPosition
-                if (isPlaying) startProgressUpdate()
+                if (MusicManager.player.isPlaying) {
+                    isPlaying = true
+                    duration = MusicManager.player.duration.coerceAtLeast(0L)
+                    currentPosition = MusicManager.player.currentPosition
+                    startProgressUpdate()
+                    saveStateAsync(saveQueue = false)
+                }
             } catch (_: Exception) {
             }
-            saveStateAsync(saveQueue = false)
         }
 
         viewModelScope.launch {
@@ -561,6 +568,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 userPlaylists.addAll(sorted)
             }
         }
+        try {
+            Runtime.getRuntime().addShutdownHook(Thread {
+                com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                val t = currentTrack
+                val p = currentPosition
+                val c = currentContext
+                val s = shuffleEnabled
+                val r = repeatMode
+                val q = _originalQueue.toList()
+                if (t != null && p > 0) {
+                    playerPrefs.savePlaybackState(t, p, q, c, s, r)
+                    com.alananasss.kittytune.core.Prefs.flush(force = true)
+                }
+            })
+        } catch (_: Exception) {}
+
         restoreSession()
         syncWithCurrentPlayback()
     }
@@ -1449,6 +1472,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        if (!manual && !playerPrefs.getContinuousPlaybackEnabled()) {
+            MusicManager.player.pause()
+            MusicManager.player.seekTo(0)
+            saveStateAsync()
+            return
+        }
+
+
         val nextIndex = currentQueueIndex + 1
 
         if (nextIndex < _queue.size) {
@@ -1729,6 +1760,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun togglePlayPause() {
         if (player.isPlaying) {
             player.pause()
+            saveStateAsync(savePositionOnly = true)
         } else {
             if (player.currentMediaItem == null && currentTrack != null) {
                 pendingSeekPosition = currentPosition
@@ -1750,7 +1782,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lastSeekTimestamp = System.currentTimeMillis()
         currentPosition = target
         player.seekTo(target)
-        saveStateAsync(saveQueue = false)
+        saveStateAsync(savePositionOnly = true)
         updateDiscordPresence()
     }
     fun toggleLike() {
@@ -1851,22 +1883,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun downloadTrack(track: Track) { if (DownloadManager.isTrackDownloading(track.id)) return; DownloadManager.downloadTrack(track) }
 
     private fun emitUiEvent(msg: String) { viewModelScope.launch { _uiEvent.emit(msg) } }
-    private fun saveStateAsync(saveQueue: Boolean = false) {
+    private fun saveStateAsync(saveQueue: Boolean = false, savePositionOnly: Boolean = false) {
+        if (isRestoringSession) return
         val t = currentTrack
-        val p = MusicManager.player.currentPosition
+        val p = currentPosition
         val c = currentContext
         val s = shuffleEnabled
         val r = repeatMode
+        if (savePositionOnly) {
+            playerPrefs.savePosition(p)
+            return
+        }
         if (saveQueue) {
             saveQueueJob?.cancel()
-            saveQueueJob = viewModelScope.launch(Dispatchers.IO) {
+            saveQueueJob = viewModelScope.launch(Dispatchers.Main) {
                 delay(500.milliseconds)
+                val freshT = currentTrack
+                val freshP = currentPosition
+                val freshC = currentContext
+                val freshS = shuffleEnabled
+                val freshR = repeatMode
                 val qSnapshot = _originalQueue.toList()
-                playerPrefs.savePlaybackState(t, p, qSnapshot, c, s, r)
+                withContext(Dispatchers.IO) {
+                    playerPrefs.savePlaybackState(freshT, freshP, qSnapshot, freshC, freshS, freshR)
+                }
             }
         } else {
+            val q = _originalQueue.toList()
             viewModelScope.launch(Dispatchers.IO) {
-                val q = _originalQueue.toList()
                 playerPrefs.savePlaybackState(t, p, q, c, s, r)
             }
         }
@@ -1877,9 +1921,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         progressUpdateJob = viewModelScope.launch {
             val tokenManager = TokenManager
             val isGuest = tokenManager.isGuestMode()
+            var lastSaveTime = System.currentTimeMillis()
             while (isActive && isPlaying) {
                 try {
                     if (!isScrubbing && !isLoading) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastSaveTime > 5000L) {
+                            lastSaveTime = now
+                            saveStateAsync(savePositionOnly = true)
+                        }
+
                         val enginePos = MusicManager.player.currentPosition.coerceAtLeast(0L)
                         val timeSinceSeek = System.currentTimeMillis() - lastSeekTimestamp
                         if (timeSinceSeek < 800L) {
@@ -1900,7 +1951,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
                         val crossfadeMs = playerPrefs.getCrossfadeDuration() * 1000L
                         val dur = MusicManager.player.duration
-                        if (crossfadeEnabled && dur > 0 && currentPosition >= (dur - crossfadeMs) && !MusicManager.player.isCrossfadingOut) {
+                        val continuousPlaybackEnabled = playerPrefs.getContinuousPlaybackEnabled()
+                        val shouldCrossfade = crossfadeEnabled && (continuousPlaybackEnabled || repeatMode == RepeatMode.ONE)
+                        if (shouldCrossfade && dur > 0 && currentPosition >= (dur - crossfadeMs) && !MusicManager.player.isCrossfadingOut) {
                             MusicManager.player.isCrossfadingOut = true
                             playNext(manual = false, isCrossfade = true)
                         }
@@ -2043,6 +2096,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateScrubPosition(position: Long) {
         isScrubbing = true
         currentPosition = position
+        player.seekTo(position)
     }
 
     // â”€â”€â”€ Sleep Timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2165,28 +2219,37 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         currentQueueIndex = _queue.indexOfFirst { it.id == lastTrack.id }
                         if (currentQueueIndex == -1) { _queue.add(0, lastTrack); _originalQueue.add(0, lastTrack); updateQueueState(); currentQueueIndex = 0 }
                         val currentPlayerMediaId = MusicManager.player.currentMediaItem?.mediaId
-                        if (currentPlayerMediaId == lastTrack.id.toString()) {
-                            isPlaying = MusicManager.player.isPlaying; duration = MusicManager.player.duration.coerceAtLeast(lastTrack.durationMs ?: 0L); currentPosition = MusicManager.player.currentPosition; MusicManager.applyEffects(effectsState)
+                        System.err.println("PlayerViewModel: restoring session. lastPosition = $lastPosition, currentPlayerMediaId = $currentPlayerMediaId, lastTrackId = ${lastTrack.id}")
+                        if (currentPlayerMediaId == lastTrack.id.toString() && MusicManager.player.isPlaying) {
+                            isPlaying = true
+                            duration = MusicManager.player.duration.coerceAtLeast(lastTrack.durationMs ?: 0L)
+                            currentPosition = MusicManager.player.currentPosition
+                            MusicManager.applyEffects(effectsState)
+                            System.err.println("PlayerViewModel: player already has track and is playing. currentPosition set to $currentPosition")
                         } else {
                             currentPosition = lastPosition
-                        duration = lastTrack.durationMs ?: 0L
-                        if (currentQueueIndex >= 0) {
+                            duration = lastTrack.durationMs ?: 0L
+                            System.err.println("PlayerViewModel: calling playRobustly with startPosition = $lastPosition")
+                            if (currentQueueIndex >= 0) {
                                 playRobustly(currentQueueIndex, autoPlay = false, startPosition = lastPosition)
                             }
                         }
                         delay(200.milliseconds)
-        // (Android media-notification refresh â€” no service on desktop)
                     }
+                    isRestoringSession = false
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) { isRestoringSession = false }
+            }
         }
     }
 
     fun syncWithCurrentPlayback() {
         viewModelScope.launch(Dispatchers.Main) {
-            if (MusicManager.currentTrack != null) {
+            val playing = try { MusicManager.player.isPlaying } catch (_: Exception) { false }
+            if (MusicManager.currentTrack != null && playing) {
                 currentTrack = MusicManager.currentTrack
-                isPlaying = try { MusicManager.player.isPlaying } catch (_: Exception) { false }
+                isPlaying = true
                 duration = MusicManager.player.duration.coerceAtLeast(0L)
                 currentPosition = MusicManager.player.currentPosition
             }
@@ -2245,6 +2308,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         playJob?.cancel()
         playJob = viewModelScope.launch(Dispatchers.IO) {
+            System.err.println("PlayerViewModel: playRobustly started for trackId=${trackToPlay.id} with startPosition=$startPosition, autoPlay=$autoPlay")
             var resolvedUrl: String? = null
             var offlineKeySetId: ByteArray? = null
 
