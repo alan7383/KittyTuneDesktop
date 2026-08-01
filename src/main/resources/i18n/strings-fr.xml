@@ -1751,6 +1751,13 @@
     <string name="comment_see_original">Voir l\'original</string>
     <string name="pref_audio_mono">Audio Mono</string>
     <string name="pref_audio_mono_sub">Fusionne les canaux gauche et droit pour jouer exactement le même son dans les deux haut-parleurs.</string>
+    <string name="pref_norm_title">Normaliser le volume</string>
+    <string name="pref_norm_sub">Définissez le même volume pour tous les titres.</string>
+    <string name="pref_norm_level_title">Volume</string>
+    <string name="pref_norm_level_sub">Ajustez en fonction de votre environnement</string>
+    <string name="pref_norm_quiet">Silencieux</string>
+    <string name="pref_norm_normal">Normale</string>
+    <string name="pref_norm_loud">Élevée</string>
 </resources>
 
 

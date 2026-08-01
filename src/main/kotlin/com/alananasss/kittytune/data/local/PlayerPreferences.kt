@@ -355,7 +355,13 @@ class PlayerPreferences {
     fun getLastContext(): PlaybackContext? { if (!getPersistentQueueEnabled()) return null; val json = Prefs.getString(KEY_CONTEXT_JSON, null) ?: return null; return try { gson.fromJson(json, PlaybackContext::class.java) } catch (_: Exception) { null } }
     fun getLastShuffleEnabled(): Boolean = Prefs.getBoolean(KEY_SHUFFLE_MODE, false)
     fun getLastRepeatMode(): RepeatMode { val modeName = Prefs.getString(KEY_REPEAT_MODE, RepeatMode.NONE.name); return try { RepeatMode.valueOf(modeName ?: RepeatMode.NONE.name) } catch (_: Exception) { RepeatMode.NONE } }
-    fun getLastEffects(): AudioEffectsState { val json = Prefs.getString(KEY_EFFECTS, null) ?: return AudioEffectsState(); return try { gson.fromJson(json, AudioEffectsState::class.java) } catch (_: Exception) { AudioEffectsState() } }
+    fun getLastEffects(): AudioEffectsState { 
+        val json = Prefs.getString(KEY_EFFECTS, null) ?: return AudioEffectsState()
+        return try { 
+            val state = gson.fromJson(json, AudioEffectsState::class.java)
+            state.copy(normalizationLevel = state.normalizationLevel ?: com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL)
+        } catch (_: Exception) { AudioEffectsState() } 
+    }
 }
 
 const val RIGHT_PANEL_MIN_WIDTH = 280f

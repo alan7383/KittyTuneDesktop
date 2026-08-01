@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.player
 
 enum class RepeatMode { NONE, ALL, ONE }
+enum class NormalizationLevel { QUIET, NORMAL, LOUD }
 
 data class AudioEffectsState(
     val speed: Float = 1f,
@@ -16,7 +17,9 @@ data class AudioEffectsState(
     val reverbIntensity: Float = 0.5f,
     val muffledIntensity: Float = 0.5f,
     val isEarrapeEnabled: Boolean = false,
-    val isMonoEnabled: Boolean = false
+    val isMonoEnabled: Boolean = false,
+    val isNormalizationEnabled: Boolean = false,
+    val normalizationLevel: NormalizationLevel = NormalizationLevel.NORMAL
 )
 
 data class PlaybackContext(

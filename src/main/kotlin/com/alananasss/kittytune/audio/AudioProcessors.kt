@@ -346,3 +346,45 @@ class MonoAudioProcessor : BaseAudioProcessor() {
     }
 }
 
+// --- 6. NORMALIZATION (Volume Equalization & Limiter) ---
+class NormalizationAudioProcessor : BaseAudioProcessor() {
+    private var enabled = false
+    private var level = com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL
+
+    fun setParameters(enabled: Boolean, level: com.alananasss.kittytune.ui.player.NormalizationLevel) {
+        this.enabled = enabled
+        this.level = level
+    }
+
+    override fun queueInput(input: ByteBuffer) {
+        val remaining = input.remaining()
+        if (remaining == 0) return
+
+        if (!enabled) {
+            val buffer = replaceOutputBuffer(remaining)
+            buffer.put(input)
+            buffer.flip()
+            return
+        }
+
+        val buffer = replaceOutputBuffer(remaining)
+        
+        val multiplier = when (level) {
+            com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET -> 0.6f
+            com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL -> 1.0f
+            com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD -> 2.5f
+        }
+
+        while (input.hasRemaining()) {
+            val raw = input.getShort()
+            val sample = (raw / 32768f) * multiplier
+            
+            val softClipped = sample / (1f + kotlin.math.abs(sample) * 0.15f)
+            val out = softClipped.coerceIn(-1f, 1f)
+            
+            buffer.putShort((out * 32767f).toInt().toShort())
+        }
+        buffer.flip()
+    }
+}
+

@@ -2106,6 +2106,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun setReverbIntensity(v: Float) { effectsState = effectsState.copy(reverbIntensity = v); applyEffectsAndSave() }
     fun toggleEarrape() { val n = !effectsState.isEarrapeEnabled; effectsState = effectsState.copy(isEarrapeEnabled = n); applyEffectsAndSave() }
     fun toggleMono() { val n = !effectsState.isMonoEnabled; effectsState = effectsState.copy(isMonoEnabled = n); applyEffectsAndSave() }
+    fun toggleNormalization(enabled: Boolean) { effectsState = effectsState.copy(isNormalizationEnabled = enabled); applyEffectsAndSave() }
+    fun setNormalizationLevel(level: NormalizationLevel) { effectsState = effectsState.copy(normalizationLevel = level); applyEffectsAndSave() }
 
 
     fun hasSeenEarrapeWarning(): Boolean = playerPrefs.hasSeenEarrapeWarning()

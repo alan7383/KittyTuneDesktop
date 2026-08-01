@@ -811,6 +811,13 @@ object R {
         const val comment_see_original = "comment_see_original"
         const val pref_audio_mono = "pref_audio_mono"
         const val pref_audio_mono_sub = "pref_audio_mono_sub"
+        const val pref_norm_title = "pref_norm_title"
+        const val pref_norm_sub = "pref_norm_sub"
+        const val pref_norm_level_title = "pref_norm_level_title"
+        const val pref_norm_level_sub = "pref_norm_level_sub"
+        const val pref_norm_quiet = "pref_norm_quiet"
+        const val pref_norm_normal = "pref_norm_normal"
+        const val pref_norm_loud = "pref_norm_loud"
     }
     object raw {
         const val rain = "/raw/rain.mp3"
