@@ -109,18 +109,9 @@ import androidx.compose.material3.ContainedLoadingIndicator
     
         // --- MAIN SCREEN ---
     
-        SettingsScaffold(
-            title = str("pref_lyrics_title"),
-            onBackClick = onBackClick
-        ) { innerPadding ->
-            LazyColumn(
-                modifier = Modifier
-                    .padding(innerPadding)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 180.dp)
-            ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
                 // SOURCE
-                item {
+                Box {
                     SettingsGroup(
                         title = str("settings_cat_source"),
                         items = listOf(
@@ -154,7 +145,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
                 }
     
                 // APPEARANCE REWORKED
-                item {
+                Box {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                         SettingsGroupTitle(str("settings_cat_appearance"))
     
@@ -216,8 +207,8 @@ import androidx.compose.material3.ContainedLoadingIndicator
                 }
             }
         }
-    }
     
+
     @Composable
     fun AlignRadioButton(text: String, mode: LyricsAlignment, selected: LyricsAlignment, onSelect: (LyricsAlignment) -> Unit) {
         Row(Modifier.fillMaxWidth().clickable { onSelect(mode) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {

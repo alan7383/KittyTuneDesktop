@@ -1016,14 +1016,16 @@
 
 
     <string name="pref_autoplay">Autoplay</string>
-
     <string name="pref_autoplay_sub">Jouer des titres similaires à la fin de la file</string>
+    <string name="pref_continuous_playback">Lecture en continu</string>
+    <string name="pref_continuous_playback_sub">Passer automatiquement au titre suivant dans la file d\'attente</string>
 
     <string name="pref_stop_on_task_clear">Arrêter la musique à la fermeture</string>
 
-    <string name="pref_persist_queue">Sauvegarder la file d\'attente</string>
-
-    <string name="pref_persist_queue_sub">Restaurer la lecture après redémarrage</string>
+    <string name="pref_persist_queue">Conserver la file d\'attente</string>
+    <string name="pref_persist_queue_sub">Restaurer la musique à la réouverture de l\'application</string>
+    <string name="pref_save_position">Reprendre la lecture</string>
+    <string name="pref_save_position_sub">Mémoriser où j\'en suis dans la musique actuelle à la fermeture</string>
 
     <string name="pref_quality">Qualité Stream</string>
 
@@ -1728,6 +1730,9 @@
     <string name="btn_upload_yaml">Importer YAML</string>
     <string name="dialog_upload_yaml_title">Importer Lyricsfile (YAML)</string>
     <string name="dialog_upload_yaml_desc">Le format Lyricsfile est un format YAML ouvert pour les paroles synchronisées ligne par ligne ou mot par mot (Karaoké). Il permet une précision d\'affichage parfaite pour chaque mot.\n\nVous pouvez importer un fichier .lyricsfile.yaml ou .lrc depuis votre ordinateur pour tester la synchronisation en direct sur KittyTune !</string>
+    <!-- Tray Menu -->
+    <string name="menu_show_window">Afficher KittyTune</string>
+    <string name="menu_exit">Quitter KittyTune</string>
 </resources>
 
 

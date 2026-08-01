@@ -167,18 +167,8 @@ fun AppearanceSettingsScreen(
         )
     }
 
-    SettingsScaffold(
-        title = str("pref_appearance_title"),
-        onBackClick = onBackClick
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp)
-        ) {
-
-            item {
+    Column(modifier = Modifier.fillMaxWidth()) {
+            Box {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SettingsGroupTitle(str("settings_cat_appearance"))
                     ThemeSelector(
@@ -243,7 +233,7 @@ fun AppearanceSettingsScreen(
                 }
             }
 
-            item {
+            Box {
                 val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SettingsGroupTitle(str("pref_zoom_level"))
@@ -285,7 +275,7 @@ fun AppearanceSettingsScreen(
                 }
             }
 
-            item {
+            Box {
                 SettingsGroup(
                     title = str("settings_cat_general"),
                     items = listOf(
@@ -333,7 +323,6 @@ fun AppearanceSettingsScreen(
                 )
             }
         }
-    }
 }
 
 @Composable

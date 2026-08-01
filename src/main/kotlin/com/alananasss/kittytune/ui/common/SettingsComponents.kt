@@ -53,7 +53,7 @@ fun SettingsGroupTitle(title: String) {
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 16.dp, bottom = 12.dp, top = 24.dp)
+        modifier = Modifier.padding(start = 8.dp, bottom = 12.dp, top = 24.dp)
     )
 }
 
@@ -62,7 +62,11 @@ fun SettingsGroup(
     title: String? = null,
     items: List<@Composable (Shape) -> Unit>
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
         if (title != null) {
             SettingsGroupTitle(title)
         }

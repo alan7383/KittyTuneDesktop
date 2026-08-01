@@ -150,6 +150,12 @@ fun MainTopBar(
             onValueChange = {
                 vm.isSearching = it.isNotBlank()
                 vm.onSearchQueryChanged(it)
+                if (currentRoute != "home" && it.isNotBlank()) {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
             },
             placeholder = { Text(str("search_hint")) },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },

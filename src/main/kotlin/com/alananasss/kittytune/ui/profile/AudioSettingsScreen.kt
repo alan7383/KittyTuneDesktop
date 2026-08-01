@@ -32,8 +32,10 @@ fun AudioSettingsScreen(
     val prefs = remember { PlayerPreferences() }
 
     var autoplayEnabled by remember { mutableStateOf(prefs.getAutoplayEnabled()) }
+    var continuousPlaybackEnabled by remember { mutableStateOf(prefs.getContinuousPlaybackEnabled()) }
     var stopOnTaskClear by remember { mutableStateOf(prefs.getStopOnTaskClear()) }
     var persistentQueueEnabled by remember { mutableStateOf(prefs.getPersistentQueueEnabled()) }
+    var savePositionEnabled by remember { mutableStateOf(prefs.getSavePositionEnabled()) }
     var audioQuality by remember { mutableStateOf(prefs.getAudioQuality()) }
 
     var youtubeFallbackEnabled by remember { mutableStateOf(prefs.getYouTubeFallbackEnabled()) }
@@ -137,23 +139,13 @@ fun AudioSettingsScreen(
         )
     }
 
-    SettingsScaffold(
-        title = str("pref_audio_title"),
-        onBackClick = onBackClick
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 180.dp)
-        ) {
-
-            item {
+    Column(modifier = Modifier.fillMaxWidth()) {
+            Box {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SettingsGroupTitle(str("settings_cat_playback"))
 
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val totalVisibleItems = 6
+                        val totalVisibleItems = 8
 
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 0),
@@ -166,6 +158,15 @@ fun AudioSettingsScreen(
 
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 1),
+                            title = str("pref_continuous_playback"),
+                            subtitle = str("pref_continuous_playback_sub"),
+                            hasSwitch = true,
+                            switchState = continuousPlaybackEnabled,
+                            onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) }
+                        )
+
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, 2),
                             title = str("pref_stop_on_task_clear"),
                             hasSwitch = true,
                             switchState = stopOnTaskClear,
@@ -173,7 +174,7 @@ fun AudioSettingsScreen(
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 2),
+                            shape = getSettingsShape(totalVisibleItems, 3),
                             title = str("pref_persist_queue"),
                             subtitle = str("pref_persist_queue_sub"),
                             hasSwitch = true,
@@ -182,7 +183,16 @@ fun AudioSettingsScreen(
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 3),
+                            shape = getSettingsShape(totalVisibleItems, 4),
+                            title = str("pref_save_position"),
+                            subtitle = str("pref_save_position_sub"),
+                            hasSwitch = true,
+                            switchState = savePositionEnabled,
+                            onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) }
+                        )
+
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, 5),
                             title = str("pref_youtube_fallback"),
                             subtitle = str("pref_youtube_fallback_sub"),
                             hasSwitch = true,
@@ -191,7 +201,7 @@ fun AudioSettingsScreen(
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 5),
+                            shape = getSettingsShape(totalVisibleItems, 7),
                             title = str("pref_precise_speed"),
                             subtitle = str("pref_precise_speed_sub"),
                             hasSwitch = true,
@@ -202,7 +212,7 @@ fun AudioSettingsScreen(
                 }
             }
             
-            item {
+            Box {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SettingsGroupTitle(str("pref_crossfade_title"))
                     
@@ -250,7 +260,7 @@ fun AudioSettingsScreen(
                 }
             }
 
-            item {
+            Box {
                 Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                     SettingsGroupTitle(str("sleep_timer_title"))
                     
@@ -298,7 +308,7 @@ fun AudioSettingsScreen(
                 }
             }
 
-            item {
+            Box {
                 SettingsGroup(
                     title = str("settings_cat_audio"),
                     items = listOf(
@@ -315,4 +325,3 @@ fun AudioSettingsScreen(
             }
         }
     }
-}
