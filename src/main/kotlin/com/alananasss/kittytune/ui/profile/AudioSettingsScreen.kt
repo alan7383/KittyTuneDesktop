@@ -49,6 +49,38 @@ fun AudioSettingsScreen(
     var crossfadeDuration by remember { mutableStateOf(prefs.getCrossfadeDuration()) }
     var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
 
+    var showNormDialog by remember { mutableStateOf(false) }
+
+    if (showNormDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showNormDialog = false },
+            title = { Text(str("pref_norm_level_title")) },
+            text = {
+                Column {
+                    val levels = listOf(
+                        com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET to str("pref_norm_quiet"),
+                        com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL to str("pref_norm_normal"),
+                        com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD to str("pref_norm_loud")
+                    )
+                    levels.forEach { (lvl, label) ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { 
+                                playerViewModel.setNormalizationLevel(lvl)
+                                showNormDialog = false 
+                            }.padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = playerViewModel.effectsState.normalizationLevel == lvl, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showNormDialog = false }) { Text(str("btn_cancel")) } }
+        )
+    }
+
     if (showFadeDurationDialog) {
         EscapableAlertDialog(
             onDismissRequest = { showFadeDurationDialog = false },
@@ -145,69 +177,42 @@ fun AudioSettingsScreen(
                     SettingsGroupTitle(str("settings_cat_playback"))
 
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val totalVisibleItems = 8
+                        val isNormEnabled = playerViewModel.effectsState.isNormalizationEnabled
+                        val totalVisibleItems = if (isNormEnabled) 9 else 8
 
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 0),
-                            title = str("pref_autoplay"),
-                            subtitle = str("pref_autoplay_sub"),
-                            hasSwitch = true,
-                            switchState = autoplayEnabled,
-                            onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 1),
-                            title = str("pref_continuous_playback"),
-                            subtitle = str("pref_continuous_playback_sub"),
-                            hasSwitch = true,
-                            switchState = continuousPlaybackEnabled,
-                            onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 2),
-                            title = str("pref_stop_on_task_clear"),
-                            hasSwitch = true,
-                            switchState = stopOnTaskClear,
-                            onSwitchChange = { stopOnTaskClear = it; prefs.setStopOnTaskClear(it) }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 3),
-                            title = str("pref_persist_queue"),
-                            subtitle = str("pref_persist_queue_sub"),
-                            hasSwitch = true,
-                            switchState = persistentQueueEnabled,
-                            onSwitchChange = { persistentQueueEnabled = it; prefs.setPersistentQueueEnabled(it) }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 4),
-                            title = str("pref_save_position"),
-                            subtitle = str("pref_save_position_sub"),
-                            hasSwitch = true,
-                            switchState = savePositionEnabled,
-                            onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 5),
-                            title = str("pref_youtube_fallback"),
-                            subtitle = str("pref_youtube_fallback_sub"),
-                            hasSwitch = true,
-                            switchState = youtubeFallbackEnabled,
-                            onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) }
-                        )
-
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 2), title = str("pref_stop_on_task_clear"), hasSwitch = true, switchState = stopOnTaskClear, onSwitchChange = { stopOnTaskClear = it; prefs.setStopOnTaskClear(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 3), title = str("pref_persist_queue"), subtitle = str("pref_persist_queue_sub"), hasSwitch = true, switchState = persistentQueueEnabled, onSwitchChange = { persistentQueueEnabled = it; prefs.setPersistentQueueEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 4), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) })
+                        
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 7),
-                            title = str("pref_precise_speed"),
-                            subtitle = str("pref_precise_speed_sub"),
+                            title = str("pref_norm_title"),
+                            subtitle = str("pref_norm_sub"),
                             hasSwitch = true,
-                            switchState = playerViewModel.isPreciseSpeedEnabled,
-                            onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) }
+                            switchState = isNormEnabled,
+                            onSwitchChange = { playerViewModel.toggleNormalization(it) }
                         )
+
+                        AnimatedVisibility(
+                            visible = isNormEnabled,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            SettingsItem(
+                                shape = getSettingsShape(totalVisibleItems, 8),
+                                title = str("pref_norm_level_title"),
+                                subtitle = str("pref_norm_level_sub") + " : " + when(playerViewModel.effectsState.normalizationLevel) {
+                                    com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET -> str("pref_norm_quiet")
+                                    com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL -> str("pref_norm_normal")
+                                    com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD -> str("pref_norm_loud")
+                                },
+                                onClick = { showNormDialog = true }
+                            )
+                        }
                     }
                 }
             }

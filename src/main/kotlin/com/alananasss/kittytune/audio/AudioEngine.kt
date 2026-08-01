@@ -45,8 +45,9 @@ class AudioEngine {
     private val reverb = ReverbAudioProcessor()
     private val eightD = EightDAudioProcessor()
     private val earrape = EarrapeAudioProcessor()
+    private val normalization = NormalizationAudioProcessor()
     private val mono = MonoAudioProcessor()
-    private val chain: List<AudioProcessor> = listOf(fx, reverb, eightD, earrape, mono)
+    private val chain: List<AudioProcessor> = listOf(fx, reverb, eightD, earrape, normalization, mono)
     private val stretcher = TimeStretcher(outputSampleRate, outputChannels)
 
     private var effects = AudioEffectsState()
@@ -138,6 +139,7 @@ class AudioEngine {
         eightD.setEnabled(state.is8DEnabled)
         eightD.setSpeed(state.eightDSpeed)
         earrape.setEnabled(state.isEarrapeEnabled)
+        normalization.setParameters(state.isNormalizationEnabled, state.normalizationLevel)
         mono.setEnabled(state.isMonoEnabled)
 
         val pitch = if (state.isPitchEnabled) state.speed else 1f
