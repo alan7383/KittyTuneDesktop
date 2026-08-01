@@ -1733,6 +1733,22 @@
     <!-- Tray Menu -->
     <string name="menu_show_window">Afficher KittyTune</string>
     <string name="menu_exit">Quitter KittyTune</string>
+
+    <string name="pref_lyrics_word_sync">Synchronisation par mot (Karaoké)</string>
+    <string name="pref_lyrics_word_sync_sub">Surligne les paroles mot par mot quand c\'est disponible.</string>
+    <string name="pref_lyrics_apple_effect">Effet de remplissage fluide</string>
+    <string name="pref_lyrics_apple_effect_sub">Remplit les lettres de façon fluide au lieu de sauter d\'un mot à l\'autre.</string>
+    <string name="pref_lyrics_translation_title">Traduire les paroles</string>
+    <string name="pref_lyrics_translation_sub">Affiche la traduction sous chaque ligne (si disponible)</string>
+    <string name="pref_lyrics_translation_lang">Langue de traduction</string>
+    <string name="pref_lyrics_romanization">Afficher la prononciation</string>
+    <string name="pref_lyrics_romanization_sub">Convertit les alphabets étrangers (Japonais, Russe...) en lettres latines.</string>
+    <string name="pref_lyrics_provider_title">Fournisseur de paroles</string>
+    <string name="pref_lyrics_provider_max_quality">Qualité maximale (Musixmatch)</string>
+    <string name="pref_lyrics_provider_open_source">100% Libre (LrcLib)</string>
+    <string name="comment_translate">Traduire en %s</string>
+    <string name="comment_translating">Traduction...</string>
+    <string name="comment_see_original">Voir l\'original</string>
 </resources>
 
 

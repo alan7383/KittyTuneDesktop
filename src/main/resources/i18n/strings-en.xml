@@ -1906,6 +1906,216 @@
     <!-- Tray Menu -->
     <string name="menu_show_window">Show KittyTune</string>
     <string name="menu_exit">Quit KittyTune</string>
+
+    <string name="pref_lyrics_word_sync">Word-by-word sync (Karaoke)</string>
+
+
+
+
+
+
+    <string name="sort_first_added">First Added</string>
+
+    <string name="sort_recently_added">Recently Added</string>
+
+    <string name="sort_title_az">Title (A-Z)</string>
+
+    <string name="sort_artist_az">Artist (A-Z)</string>
+
+
+    <string name="action_pause">Pause</string>    <!-- Shazam integration -->
+
+
+    <!-- Music Recognition & Recognition History -->
+
+    <string name="recognition_history_title">History</string>
+
+    <string name="dialog_clear_history_title">Clear history?</string>
+
+    <string name="dialog_clear_history_msg">Are you sure you want to clear all your music recognition history?</string>
+
+    <string name="btn_clear">Clear</string>
+
+    <string name="desc_clear_history">Clear history</string>
+
+    <string name="search_history_hint">Search history</string>
+
+    <string name="no_history">No history</string>
+
+    <string name="date_today">Today</string>
+
+    <string name="date_yesterday">Yesterday</string>
+
+    <string name="recognition_tap_to_identify">Tap to identify music</string>
+
+    <string name="recognition_listening">Listening&#8230;</string>
+
+    <string name="recognition_listening_desc">Listen to music around you</string>
+
+    <string name="recognition_processing">Analyzing&#8230;</string>
+
+    <string name="recognition_listen_on_kittytune">Listen on KittyTune</string>
+
+    <string name="btn_retry">Retry</string>
+
+    <string name="recognition_track_not_found">Track not found</string>
+
+    <string name="desktop_fx_right_click_hint">Right-click an effect to adjust its intensity</string>
+
+
+
+
+
+    <string name="copied_to_clipboard">Copied to clipboard</string>
+    <string name="nav_profile">Profile</string>
+    <string name="pref_auto_update_subtitle">Automatically check for updates</string>
+    <string name="pref_colors">Colors</string>
+    <string name="pref_colors_subtitle">Customize app colors</string>
+    <string name="pref_custom_font">Custom Font</string>
+    <string name="pref_custom_font_subtitle">Customize app typography</string>
+    <string name="pref_dynamic_theme">Dynamic Theme</string>
+    <string name="pref_pure_black">Pure Black</string>
+    <string name="search_filter_artists">Artists</string>
+    <string name="search_filter_playlists">Playlists</string>
+    <string name="search_filter_tracks">Tracks</string>
+    <string name="search_filter_all">All</string>
+
+    <!-- Table Headers -->
+    <string name="table_header_index">#</string>
+    <string name="table_header_title">Title</string>
+    <string name="table_header_artist">Artist</string>
+    <string name="table_header_album">Album</string>
+    <string name="table_header_date_added">Date added</string>
+    <string name="table_header_release_date">Release date</string>
+    <string name="table_header_plays">Plays</string>
+
+    <!-- Track list view mode (Compact / List) -->
+    <string name="view_mode_compact">Compact</string>
+    <string name="view_mode_list">List</string>
+
+    <!-- Playlist info dialog -->
+    <string name="detail_updated">Updated %1$s</string>
+
+    <!-- Cover viewer -->
+    <string name="cover_copy_link">Copy link</string>
+    <string name="cover_saved">Cover saved</string>
+    <string name="cover_save_error">Could not save the cover</string>
+
+    <!-- Keyboard shortcuts -->
+    <string name="keyboard_shortcuts_title">Keyboard shortcuts</string>
+    <string name="shortcut_key_then">then</string>
+    <string name="shortcut_play_pause">Play or pause</string>
+    <string name="shortcut_next_track">Play next track</string>
+    <string name="shortcut_repeat">Repeat playing track</string>
+    <string name="shortcut_prev_track">Play previous track</string>
+    <string name="shortcut_seek_forward">Seek forward</string>
+    <string name="shortcut_like">Like playing track</string>
+    <string name="shortcut_repost">Repost playing track</string>
+    <string name="shortcut_search">Search</string>
+    <string name="shortcut_nav_likes">Navigate to Likes</string>
+    <string name="shortcut_nav_library">Navigate to Library</string>
+    <string name="shortcut_nav_history">Navigate to History</string>
+    <string name="shortcut_shuffle">Shuffle</string>
+    <string name="shortcut_vol_down">Decrease volume</string>
+    <string name="shortcut_vol_up">Increase volume</string>
+    <string name="shortcut_mute">Mute volume</string>
+    <string name="shortcut_seek_backward">Seek backward</string>
+    <string name="shortcut_seek_position">Seek to position</string>
+    <string name="shortcut_nav_now_playing">Navigate to playing track</string>
+    <string name="shortcut_show_shortcuts">Show keyboard shortcuts</string>
+    <string name="shortcut_nav_feed">Navigate to Feed</string>
+    <string name="shortcut_nav_profile">Navigate to Profile</string>
+    <string name="shortcut_show_queue">Show Next up</string>
+
+    <!-- Feed screen -->
+    <string name="feed_empty">Nothing in your feed yet. Follow people to see their posts here.</string>
+    <string name="feed_refresh">Refresh feed</string>
+    <string name="feed_playlist_tracks">%1$d tracks</string>
+    <string name="feed_ep">EP</string>
+    <string name="detail_album">Album</string>
+
+    <!-- Audio Recognition -->
+    <string name="audio_source_header">Audio recording source</string>
+    <string name="audio_source_desktop">Desktop audio (Computer sound)</string>
+    <string name="audio_source_desktop_tag">Desktop audio</string>
+
+    <!-- Updates & About -->
+    <string name="pref_updates_title">Updates</string>
+    <string name="update_about_title">About &amp; Updates</string>
+    <string name="update_current_version">Current version: v%1$s</string>
+    <string name="update_idle_desc">Check if a new version is available.</string>
+    <string name="update_btn_check">Check for updates</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_available">A new version (%1$s) is available!</string>
+    <string name="update_release_notes">Release Notes:</string>
+    <string name="update_btn_download">Download Update</string>
+    <string name="update_downloading">Downloading update (%1$d%%)…</string>
+    <string name="update_ready">The update is ready to be installed!</string>
+    <string name="update_no_update">You are using the latest version of KittyTune!</string>
+    <string name="update_btn_recheck">Re-check</string>
+    <string name="update_error">Failed to check or download update.</string>
+    <string name="update_btn_retry">Retry</string>
+    <string name="update_installing_title">Installing update in KittyTune...</string>
+    <string name="update_installing_step">Step 2/2: Preparing files...</string>
+    <string name="update_success_title">Update installed successfully</string>
+    <string name="update_btn_restart">Restart application</string>
+    <string name="update_btn_minimize">Minimize to background</string>
+    <string name="update_installing_btn">Installing...</string>
+    <string name="update_waiting_auth_title">Waiting for authentication…</string>
+    <string name="update_waiting_auth_step">Please confirm in the authentication dialog</string>
+    <string name="update_waiting_auth_btn">Waiting for authentication…</string>
+    <string name="update_restarting_toast">Restarting application...</string>
+    <string name="update_btn_pause">Pause</string>
+    <string name="update_btn_resume">Resume</string>
+    <string name="update_paused_title">Download paused</string>
+    <string name="update_multi_instance_title">Another instance detected</string>
+    <string name="update_multi_instance_desc">Another instance of KittyTune is currently open. Do you want to close it to continue the installation?</string>
+    <string name="update_btn_close_instances">Close instances</string>
+    <string name="update_btn_dont_remind">Don\'t remind me again</string>
+    <string name="update_auth_failed_title">Authentication failed</string>
+    <string name="update_auth_failed_desc">The authentication was cancelled or failed. Please try again.</string>
+    <string name="update_btn_retry_auth">Retry authentication</string>
+    <string name="setup_title">KittyTune Configuration</string>
+    <string name="setup_choose_color">Choose your favorite color</string>
+    <string name="setup_end4_detected">End4 Theme detected</string>
+    <string name="setup_use_end4">Would you like to use the End4 theme configuration?</string>
+    <string name="setup_windows_color">Windows Colors detected</string>
+    <string name="setup_use_windows_color">Would you like to sync the app with your Windows accent color?</string>
+    <string name="setup_appearance">Appearance</string>
+    <string name="setup_general">General</string>
+    <string name="setup_theme_mode">Theme Mode</string>
+    <string name="setup_theme_system">System</string>
+    <string name="setup_theme_light">Light</string>
+    <string name="setup_theme_dark">Dark</string>
+    <string name="setup_language">Language</string>
+    <string name="setup_discord_rpc">Discord Rich Presence</string>
+    <string name="setup_discord_rpc_desc">Show what you\'re listening to on your Discord profile</string>
+    <string name="setup_discord_connect">Connect Account</string>
+    <string name="setup_discord_connected">Connected</string>
+    <string name="setup_discord_not_connected">Not Connected</string>
+    <string name="setup_discord_change">Change Account</string>
+    <string name="setup_discord_disconnect">Disconnect</string>
+    <string name="setup_continue">Continue</string>
+    <string name="btn_upload_yaml">Upload YAML</string>
+    <string name="dialog_upload_yaml_title">Upload Lyricsfile (YAML)</string>
+    <string name="dialog_upload_yaml_desc">Lyricsfile is an open YAML-based format for lyrics: plain, line-synced, and word-synced (Karaoke). It allows for precise word-by-word highlighting.\n\nYou can upload a .lyricsfile.yaml or .lrc file from your computer to test the word-sync feature directly in KittyTune!</string>
+    <!-- Tray Menu -->
+    <string name="menu_show_window">Show KittyTune</string>
+    <string name="menu_exit">Quit KittyTune</string>
+
+    <string name="pref_lyrics_word_sync">Word-by-word sync (Karaoke)</string>
+    <string name="pref_lyrics_word_sync_sub">Highlights lyrics word by word when available.</string>
+    <string name="pref_lyrics_apple_effect">Smooth fill effect</string>
+    <string name="pref_lyrics_apple_effect_sub">Fills letters smoothly instead of jumping from word to word.</string>
+    <string name="pref_lyrics_translation_title">Translate lyrics</string>
+    <string name="pref_lyrics_translation_sub">Display line-by-line translation below each line (if available)</string>
+    <string name="pref_lyrics_translation_lang">Translation language</string>
+    <string name="pref_lyrics_romanization">Show pronunciation (Romaji)</string>
+    <string name="pref_lyrics_romanization_sub">Converts foreign alphabets to Latin letters.</string>
+    <string name="pref_lyrics_provider_title">Lyrics provider</string>
+    <string name="pref_lyrics_provider_max_quality">Maximum quality (Musixmatch)</string>
+    <string name="pref_lyrics_provider_open_source">100% Free (LrcLib)</string>
+    <string name="comment_translate">Translate to %s</string>
+    <string name="comment_translating">Translating...</string>
+    <string name="comment_see_original">See original</string>
 </resources>
-
-
