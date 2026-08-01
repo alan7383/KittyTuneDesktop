@@ -1024,45 +1024,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 if (preferLrcLib) {
                     val lrcAll = try { LrcLibClient.api.searchLyrics(query) } catch (e: Exception) { emptyList() }
                     val lrcFiltered = lrcAll.filter { kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
-                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered.take(3) else lrcAll.take(1)
+                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered else lrcAll.take(10)
                     val lrcMatch = topLrc.maxByOrNull { if (!it.syncedLyrics.isNullOrEmpty()) 1 else 0 }
 
                     val lrcLines = lrcMatch?.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) } ?: emptyList()
                     val lrcPlain = lrcMatch?.plainLyrics
 
-                    if (lrcLines.isNotEmpty() || !lrcPlain.isNullOrBlank()) {
+                    if (lrcLines.isNotEmpty()) {
                         finalLines = lrcLines
                         finalPlain = lrcPlain
                         break
                     }
+                    if (!lrcPlain.isNullOrBlank() && finalPlain == null) {
+                        finalPlain = lrcPlain
+                    }
                 } else {
                     val mxmAll = try { MusixmatchClient.search(query) } catch (e: Exception) { emptyList() }
                     val mxmFiltered = mxmAll.filter { kotlin.math.abs(it.trackLength - trackDurationSec) < 15.0 }
-                    val topMxm = if (mxmFiltered.isNotEmpty()) mxmFiltered.take(3) else mxmAll.take(1)
+                    val topMxm = if (mxmFiltered.isNotEmpty()) mxmFiltered else mxmAll.take(10)
                     val mxmMatch = topMxm.maxByOrNull { it.hasRichSync * 2 + it.hasSubtitles }
 
                     val targetLang = if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
                     val mxmData = mxmMatch?.let { MusixmatchClient.getLyricsData(it.trackId, trackDurationMs, targetLang, isRomanizationEnabled) }
-                    
-                    if (mxmData != null && mxmData.first.any { it.words.isNotEmpty() }) {
-                        finalLines = mxmData.first; finalPlain = mxmData.second
-                        break
-                    }
-                    if (mxmData != null && mxmData.first.size > 1 && bestMxmLineSync == null) bestMxmLineSync = mxmData
 
                     val lrcAll = try { LrcLibClient.api.searchLyrics(query) } catch (e: Exception) { emptyList() }
                     val lrcFiltered = lrcAll.filter { kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
-                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered.take(3) else lrcAll.take(1)
+                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered else lrcAll.take(10)
                     val lrcMatch = topLrc.maxByOrNull { if (!it.syncedLyrics.isNullOrEmpty()) 1 else 0 }
 
                     val lrcLines = lrcMatch?.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) } ?: emptyList()
                     val lrcPlain = lrcMatch?.plainLyrics
-
-                    if (lrcLines.any { it.words.isNotEmpty() }) {
-                        finalLines = lrcLines; finalPlain = lrcPlain
-                        break
-                    }
-                    if (lrcLines.size > 1 && bestLrcLineSync == null) bestLrcLineSync = lrcMatch
 
                     val mxmWordSync = mxmData != null && mxmData.first.any { it.words.isNotEmpty() }
                     val lrcWordSync = lrcLines.any { it.words.isNotEmpty() }
@@ -1071,17 +1062,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val hasMxmPlain = !mxmData?.second.isNullOrBlank()
                     val hasLrcPlain = !lrcPlain.isNullOrBlank()
 
-                    if (mxmWordSync || lrcWordSync || mxmLineSync || lrcLineSync || hasMxmPlain || hasLrcPlain) {
-                        when {
-                            mxmWordSync -> { finalLines = mxmData!!.first; finalPlain = mxmData.second }
-                            lrcWordSync -> { finalLines = lrcLines; finalPlain = lrcPlain }
-                            mxmLineSync -> { finalLines = mxmData!!.first; finalPlain = mxmData.second }
-                            lrcLineSync -> { finalLines = lrcLines; finalPlain = lrcPlain }
-                            hasMxmPlain -> { finalPlain = mxmData!!.second }
-                            hasLrcPlain -> { finalPlain = lrcPlain }
-                        }
+                    if (mxmWordSync || lrcWordSync) {
+                        if (mxmWordSync) { finalLines = mxmData!!.first; finalPlain = mxmData.second }
+                        else { finalLines = lrcLines; finalPlain = lrcPlain }
                         break
                     }
+
+                    if (mxmLineSync && bestMxmLineSync == null) bestMxmLineSync = mxmData
+                    if (lrcLineSync && bestLrcLineSync == null) bestLrcLineSync = lrcMatch
+
+                    if (hasMxmPlain && finalPlain == null) finalPlain = mxmData!!.second
+                    if (hasLrcPlain && finalPlain == null) finalPlain = lrcPlain
+                }
+            }
+
+            if (finalLines.isEmpty()) {
+                if (bestMxmLineSync != null) {
+                    finalLines = bestMxmLineSync!!.first
+                    finalPlain = bestMxmLineSync!!.second
+                } else if (bestLrcLineSync != null) {
+                    finalLines = bestLrcLineSync!!.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) } ?: emptyList()
+                    finalPlain = bestLrcLineSync!!.plainLyrics
                 }
             }
 
