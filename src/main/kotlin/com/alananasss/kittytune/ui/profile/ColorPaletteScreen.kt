@@ -523,12 +523,15 @@ private fun ColorGenerationCard(
                 modifier = Modifier.padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 2.dp)
             )
             val hasEnd4 = remember { com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled() }
-            val styles = remember(hasEnd4) {
+            val isWindowsOS = remember { System.getProperty("os.name").lowercase().contains("win") }
+            val styles = remember(hasEnd4, isWindowsOS) {
                 val list = mutableListOf<String>()
                 if (hasEnd4) {
                     list.add("end4 (Material You)")
                 }
-                list.add("Windows Accent")
+                if (isWindowsOS) {
+                    list.add("Windows Accent")
+                }
                 list.add("System")
                 list.addAll(PaletteStyle.entries.map { it.name })
                 list
@@ -913,6 +916,10 @@ private fun SystemAccentCard(
     modifier: Modifier = Modifier.fillMaxWidth()
 ) {
     val end4Installed = remember { com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled() }
+    val isWindowsOS = remember { System.getProperty("os.name").lowercase().contains("win") }
+
+    if (!end4Installed && !isWindowsOS) return
+
     val isEnd4 = colorStyle.contains("end4", ignoreCase = true)
     val isWindows = colorStyle.contains("windows", ignoreCase = true)
 
@@ -950,7 +957,7 @@ private fun SystemAccentCard(
                         } else {
                             onStyleSelected("Vibrant")
                         }
-                    } else {
+                    } else if (isWindowsOS) {
                         if (checked) {
                             onStyleSelected("Windows Accent")
                         } else {

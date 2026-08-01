@@ -377,6 +377,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var discordJob: Job? = null
     private var discordRpc: com.alananasss.kittytune.data.DiscordRPC? = null
     private var mprisService: com.alananasss.kittytune.data.MprisService? = null
+    private var kdeMpris2Service: com.alananasss.kittytune.data.KdeMpris2Service? = null
     private var windowsSmtcService: com.alananasss.kittytune.data.WindowsSmtcService? = null
 
     // Android used a BroadcastReceiver to sync player state across the app<->service
@@ -713,6 +714,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         restoreSession()
         syncWithCurrentPlayback()
+
+        // Eagerly register the KDE Plasma MPRIS2 service at startup so KDE's
+        // media player widget shows KittyTune before any track is played.
+        initKdeMpris2Service()
     }
 
     fun toggleInlineLyrics() {
@@ -760,6 +765,40 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private fun initKdeMpris2Service() {
+        if (kdeMpris2Service == null) {
+            try {
+                kdeMpris2Service = com.alananasss.kittytune.data.KdeMpris2Service(
+                    onPlay        = { player.play() },
+                    onPause       = { player.pause() },
+                    onPlayPause   = { togglePlayPause() },
+                    onNext        = { playNext() },
+                    onPrevious    = { smartPrevious() },
+                    onSeek        = { seekTo(it) },
+                    onVolume      = { v -> updateVolume(v.toFloat()) },
+                    onShuffle     = { s ->
+                        if (s != shuffleEnabled) toggleShuffle()
+                    },
+                    onLoopStatus  = { ls ->
+                        val target = when (ls) {
+                            com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.None     -> RepeatMode.NONE
+                            com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Track    -> RepeatMode.ONE
+                            com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Playlist -> RepeatMode.ALL
+                        }
+                        if (repeatMode != target) {
+                            repeatMode = target
+                            applyRepeatMode()
+                            saveStateAsync(saveQueue = false)
+                            kdeMpris2Service?.updateLoopStatus(ls)
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                println("KDE MPRIS2 service init exception: ${e.message}")
+            }
+        }
+    }
+
     private fun initWindowsSmtcService() {
         if (windowsSmtcService == null) {
             try {
@@ -779,6 +818,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateMprisMedia() {
         initMprisService()
         mprisService?.updateMedia(currentTrack, isPlaying, currentPosition)
+
+        initKdeMpris2Service()
+        // Sync all stateful properties so the KDE widget stays accurate
+        val kdeService = kdeMpris2Service
+        if (kdeService != null) {
+            kdeService.updateMedia(currentTrack, isPlaying, currentPosition)
+            kdeService.updateVolume(volume.toDouble())
+            kdeService.updateShuffle(shuffleEnabled)
+            kdeService.updateLoopStatus(when (repeatMode) {
+                RepeatMode.NONE -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.None
+                RepeatMode.ALL  -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Playlist
+                RepeatMode.ONE  -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Track
+            })
+        }
 
         initWindowsSmtcService()
         windowsSmtcService?.updateMedia(currentTrack, isPlaying)
@@ -818,6 +871,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             mprisService?.close()
         } catch (_: Exception) {}
         mprisService = null
+
+        try {
+            kdeMpris2Service?.close()
+        } catch (_: Exception) {}
+        kdeMpris2Service = null
 
         try {
             windowsSmtcService?.close()
@@ -1926,7 +1984,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
-    fun toggleShuffle() { shuffleEnabled = !shuffleEnabled; if (shuffleEnabled) applyShuffle() else revertShuffle(); updateQueueState(); saveStateAsync(saveQueue = true) }
+    fun toggleShuffle() { 
+        shuffleEnabled = !shuffleEnabled; 
+        if (shuffleEnabled) applyShuffle() else revertShuffle(); 
+        updateQueueState(); 
+        saveStateAsync(saveQueue = true)
+        
+        kdeMpris2Service?.updateShuffle(shuffleEnabled)
+    }
 
     private fun applyShuffle(startIndex: Int = currentQueueIndex, sourceList: List<Track> = _originalQueue) {
         if (sourceList.isEmpty() || startIndex !in sourceList.indices) return
@@ -1955,11 +2020,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleRepeatMode() {
         repeatMode = when (repeatMode) {
             RepeatMode.NONE -> RepeatMode.ALL
-            RepeatMode.ALL -> RepeatMode.ONE
-            RepeatMode.ONE -> RepeatMode.NONE
+            RepeatMode.ALL  -> RepeatMode.ONE
+            RepeatMode.ONE  -> RepeatMode.NONE
         }
         applyRepeatMode()
         saveStateAsync(saveQueue = false)
+        
+        kdeMpris2Service?.updateLoopStatus(when (repeatMode) {
+            RepeatMode.NONE -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.None
+            RepeatMode.ALL  -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Playlist
+            RepeatMode.ONE  -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Track
+        })
     }
 
     fun syncQueueFromPlayer() {
