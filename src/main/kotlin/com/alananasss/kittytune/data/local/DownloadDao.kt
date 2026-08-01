@@ -114,6 +114,13 @@ class DownloadDao(private val db: AppDatabase) {
     suspend fun deleteTrack(trackId: Long) =
         db.exec("DELETE FROM downloaded_tracks WHERE id = ?", trackId)
 
+    suspend fun deleteAll() {
+        db.exec("DELETE FROM downloaded_tracks")
+        db.exec("DELETE FROM downloaded_playlists")
+        db.exec("DELETE FROM playlist_track_cross_ref")
+    }
+
+
     fun getAllTracks(): Flow<List<LocalTrack>> = db.observe {
         db.query("SELECT * FROM downloaded_tracks WHERE localAudioPath != '' ORDER BY downloadedAt DESC", mapper = ::track)
     }

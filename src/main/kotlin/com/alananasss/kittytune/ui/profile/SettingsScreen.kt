@@ -52,6 +52,10 @@ fun SettingsScreen(
             item { MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum) }
             item { DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel) }
             item { Spacer(Modifier.height(32.dp)) }
+
+            item { MainCategoryTitle(str("pref_storage_title"), Icons.Rounded.Storage) }
+            item { StorageSettingsScreen() }
+            item { Spacer(Modifier.height(32.dp)) }
             
             item { MainCategoryTitle(str("pref_local_title"), Icons.Filled.SdStorage) }
             item { LocalMediaSettingsScreen(onBackClick = null) }
