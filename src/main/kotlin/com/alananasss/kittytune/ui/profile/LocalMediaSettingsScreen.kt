@@ -72,17 +72,8 @@ fun LocalMediaSettingsScreen(
         }
     }
 
-    SettingsScaffold(
-        title = str("pref_local_title"),
-        onBackClick = onBackClick
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 180.dp)
-        ) {
-            item {
+    Column(modifier = Modifier.fillMaxWidth()) {
+            Box {
                 SettingsGroup(
                     title = str("settings_cat_general"),
                     items = listOf(
@@ -103,7 +94,7 @@ fun LocalMediaSettingsScreen(
                 )
             }
 
-            item {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 AnimatedVisibility(
                     visible = isEnabled,
                     enter = expandVertically(
@@ -325,7 +316,6 @@ fun LocalMediaSettingsScreen(
                         Spacer(Modifier.height(24.dp))
                     }
                 }
-            }
         }
     }
 }

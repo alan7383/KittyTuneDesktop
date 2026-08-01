@@ -79,12 +79,8 @@ fun DiscordSettingsScreen(
         )
     }
 
-    SettingsScaffold(
-        title = str("discord_rpc_title"),
-        onBackClick = onBackClick
-    ) { innerPadding ->
-        LazyColumn(modifier = Modifier.padding(innerPadding)) {
-            item {
+    Column(modifier = Modifier.fillMaxWidth()) {
+            Box {
                 SettingsGroup(
                     title = str("discord_status_header"),
                     items = listOf(
@@ -163,7 +159,6 @@ fun DiscordSettingsScreen(
                         }
                     }
                 }
-            }
         }
     }
 }

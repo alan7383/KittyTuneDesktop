@@ -11,88 +11,54 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import kotlinx.coroutines.launch
 
+import com.alananasss.kittytune.ui.common.SettingsScaffold
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.graphics.vector.ImageVector
 @Composable
 fun SettingsScreen(
     navController: NavController,
     onBackClick: () -> Unit,
     playerViewModel: PlayerViewModel
 ) {
-    var selectedCategory by remember { mutableStateOf("appearance") }
-
-    Row(modifier = Modifier.fillMaxSize()) {
-        // Navigation Sidebar
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.width(300.dp).fillMaxHeight()
+    SettingsScaffold(
+        title = str("settings_title"),
+        onBackClick = onBackClick
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp, top = 12.dp, start = 8.dp)) {
-                    Text(str("settings_title"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                }
-
-                NavigationDrawerItem(
-                    label = { Text(str("pref_appearance_title")) },
-                    icon = { Icon(Icons.Rounded.Palette, null) },
-                    selected = selectedCategory == "appearance",
-                    onClick = { selectedCategory = "appearance" },
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-                NavigationDrawerItem(
-                    label = { Text(str("pref_audio_title")) },
-                    icon = { Icon(Icons.Rounded.GraphicEq, null) },
-                    selected = selectedCategory == "audio",
-                    onClick = { selectedCategory = "audio" },
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-                NavigationDrawerItem(
-                    label = { Text(str("pref_lyrics_title")) },
-                    icon = { Icon(Icons.Rounded.TextSnippet, null) },
-                    selected = selectedCategory == "lyrics",
-                    onClick = { selectedCategory = "lyrics" },
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-                NavigationDrawerItem(
-                    label = { Text(str("pref_discord_title")) },
-                    icon = { Icon(Icons.Rounded.Forum, null) },
-                    selected = selectedCategory == "discord",
-                    onClick = { selectedCategory = "discord" },
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-                NavigationDrawerItem(
-                    label = { Text(str("pref_local_title")) },
-                    icon = { Icon(Icons.Filled.SdStorage, null) },
-                    selected = selectedCategory == "local",
-                    onClick = { selectedCategory = "local" },
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-                NavigationDrawerItem(
-                    label = { Text(str("pref_updates_title")) },
-                    icon = { Icon(Icons.Rounded.SystemUpdate, null) },
-                    selected = selectedCategory == "update",
-                    onClick = { selectedCategory = "update" },
-                    modifier = Modifier.padding(vertical = 4.dp)
-                )
-            }
-        }
-
-        VerticalDivider()
-
-        // Content
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            when (selectedCategory) {
-                "appearance" -> AppearanceSettingsScreen(onNavigateToColors = { navController.navigate("color_palette") }, onBackClick = null)
-                "audio" -> AudioSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
-                "lyrics" -> LyricsSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
-                "discord" -> DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel)
-                "local" -> LocalMediaSettingsScreen(onBackClick = null)
-                "update" -> AboutUpdateSettingsScreen()
-            }
+            item { MainCategoryTitle(str("pref_appearance_title"), Icons.Rounded.Palette) }
+            item { AppearanceSettingsScreen(onNavigateToColors = { navController.navigate("color_palette") }, onBackClick = null) }
+            item { Spacer(Modifier.height(32.dp)) }
+            
+            item { MainCategoryTitle(str("pref_audio_title"), Icons.Rounded.GraphicEq) }
+            item { AudioSettingsScreen(onBackClick = null, playerViewModel = playerViewModel) }
+            item { Spacer(Modifier.height(32.dp)) }
+            
+            item { MainCategoryTitle(str("pref_lyrics_title"), Icons.Rounded.TextSnippet) }
+            item { LyricsSettingsScreen(onBackClick = null, playerViewModel = playerViewModel) }
+            item { Spacer(Modifier.height(32.dp)) }
+            
+            item { MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum) }
+            item { DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel) }
+            item { Spacer(Modifier.height(32.dp)) }
+            
+            item { MainCategoryTitle(str("pref_local_title"), Icons.Filled.SdStorage) }
+            item { LocalMediaSettingsScreen(onBackClick = null) }
+            item { Spacer(Modifier.height(32.dp)) }
+            
+            item { MainCategoryTitle(str("pref_updates_title"), Icons.Rounded.SystemUpdate) }
+            item { AboutUpdateSettingsScreen() }
         }
     }
 }
@@ -199,5 +165,38 @@ fun AboutUpdateSettingsScreen() {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun MainCategoryTitle(title: String, icon: ImageVector) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(top = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer,
+            shape = androidx.compose.foundation.shape.CircleShape,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(16.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }

@@ -1136,12 +1136,15 @@
     <string name="pref_autoplay">Autoplay</string>
 
     <string name="pref_autoplay_sub">Play similar tracks when queue ends</string>
+    <string name="pref_continuous_playback">Continuous Playback</string>
+    <string name="pref_continuous_playback_sub">Automatically play the next track in the queue</string>
 
     <string name="pref_stop_on_task_clear">Stop music on app close</string>
 
-    <string name="pref_persist_queue">Save Queue</string>
-
-    <string name="pref_persist_queue_sub">Restore playback after restart</string>
+    <string name="pref_persist_queue">Persistent Queue</string>
+    <string name="pref_persist_queue_sub">Restore queue and current track when reopening the app</string>
+    <string name="pref_save_position">Resume Playback Position</string>
+    <string name="pref_save_position_sub">Remember where I left off in the current track when closed</string>
 
     <string name="pref_quality">Stream Quality</string>
 
@@ -1900,6 +1903,9 @@
     <string name="btn_upload_yaml">Upload YAML</string>
     <string name="dialog_upload_yaml_title">Upload Lyricsfile (YAML)</string>
     <string name="dialog_upload_yaml_desc">Lyricsfile is an open YAML-based format for lyrics: plain, line-synced, and word-synced (Karaoke). It allows for precise word-by-word highlighting.\n\nYou can upload a .lyricsfile.yaml or .lrc file from your computer to test the word-sync feature directly in KittyTune!</string>
+    <!-- Tray Menu -->
+    <string name="menu_show_window">Show KittyTune</string>
+    <string name="menu_exit">Quit KittyTune</string>
 </resources>
 
 
