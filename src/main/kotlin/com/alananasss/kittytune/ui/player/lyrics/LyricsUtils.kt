@@ -11,20 +11,19 @@ data class LyricWord(
     val endTime: Long
 )
 
-// basic holder for a timed line
 data class LyricLine(
     val text: String,
     val startTime: Long,
     val endTime: Long,
-    val words: List<LyricWord> = emptyList()
+    val words: List<LyricWord> = emptyList(),
+    val translation: String? = null,
+    val romanization: String? = null
 )
 
 object LyricsUtils {
 
-    // standard lrc regex: [mm:ss.xx] lyrics
     private val LRC_PATTERN = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\](.*)")
     
-    // enhanced LRC word regex: <mm:ss.xx> word
     private val ENHANCED_WORD_PATTERN = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>([^<]*)")
 
     fun parseLyricsContent(content: String, totalDurationMs: Long): List<LyricLine> {
@@ -75,13 +74,11 @@ object LyricsUtils {
                 val min = matcher.group(1)?.toLong() ?: 0
                 val sec = matcher.group(2)?.toLong() ?: 0
                 val msStr = matcher.group(3) ?: "00"
-                // handle 2 digit vs 3 digit milliseconds
                 val ms = if (msStr.length == 2) msStr.toLong() * 10 else msStr.toLong()
 
                 val rawText = matcher.group(4)?.trim() ?: ""
                 val startTime = (min * 60 * 1000) + (sec * 1000) + ms
                 
-                // parse enhanced LRC words
                 val words = mutableListOf<LyricWord>()
                 var cleanText = rawText
                 if (rawText.contains("<")) {
@@ -99,7 +96,6 @@ object LyricsUtils {
                     }
                     if (extractedWords.isNotEmpty()) {
                         cleanText = extractedWords.joinToString("") { it.text }.trim()
-                        // Calculate end times for words
                         for (i in extractedWords.indices) {
                             val current = extractedWords[i]
                             val nextTime = if (i < extractedWords.size - 1) extractedWords[i+1].startTime else 0L
@@ -116,7 +112,6 @@ object LyricsUtils {
 
         if (parsedLines.isEmpty()) return emptyList()
 
-        // calculate end times based on the next line
         return parsedLines.mapIndexed { index, current ->
             val nextTime = if (index < parsedLines.size - 1) {
                 parsedLines[index + 1].startTime
@@ -134,7 +129,6 @@ object LyricsUtils {
 
     private data class ParsedLineTemp(val text: String, val startTime: Long, val words: List<LyricWord> = emptyList())
 
-    // --- local extraction ---
     fun extractLocalLyrics(filePath: String): String? {
         return try {
             val file = File(filePath)
@@ -143,7 +137,6 @@ object LyricsUtils {
             val mp3file = Mp3File(filePath)
             if (mp3file.hasId3v2Tag()) {
                 val tag = mp3file.id3v2Tag
-                // mp3agic handles the uslt tag magic
                 tag.lyrics
             } else {
                 null
