@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.0.26"
+version = "1.0.27"
 
 repositories {
     google()
