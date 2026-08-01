@@ -181,10 +181,7 @@ class AudioEngine {
 
             durationMs = grabber.lengthInTime / 1000L
 
-            if (seekRequestMs > 0) {
-                grabber.timestamp = seekRequestMs * 1000L
-                seekRequestMs = -1L
-            }
+            // Note: initial seek is now fully handled inside the while loop to guarantee it works.
 
             localLine = openLine()
             line = localLine
@@ -198,7 +195,24 @@ class AudioEngine {
                 // handle seek requested during playback
                 val seek = seekRequestMs
                 if (seek >= 0) {
-                    grabber.timestamp = seek * 1000L
+                    val targetTimestamp = seek * 1000L
+                    
+                    System.err.println("AudioEngine: Requested accurate seek to targetTimestamp=$targetTimestamp")
+                    var droppedCount = 0
+                    while (!stopFlag && activeWorkerId == workerId) {
+                        val f = grabber.grabSamples() ?: break
+                        if (grabber.timestamp >= targetTimestamp) {
+                            System.err.println("AudioEngine: Reached targetTimestamp after dropping $droppedCount frames. Current TS: ${grabber.timestamp}")
+                            break
+                        }
+                        droppedCount++
+                        // Increase limit to 50000 (approx 20 minutes of audio) to prevent infinite loops but allow long seeks
+                        if (droppedCount > 50000) {
+                            System.err.println("AudioEngine: Warning - breaking accurate seek loop after $droppedCount frames!")
+                            break
+                        }
+                    }
+                    
                     seekRequestMs = -1L
                     positionMs = seek
                     stretcher.flush()

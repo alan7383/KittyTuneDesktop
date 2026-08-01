@@ -20,7 +20,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.Tray
 import coil3.compose.setSingletonImageLoaderFactory
+import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.DesktopBackDispatcher
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.ui.ImageLoaderFactory
@@ -93,10 +95,34 @@ fun main() {
             }.getOrNull()
         }
 
+        val prefsForTray = remember { PlayerPreferences() }
+        val stopOnTaskClear by prefsForTray.stopOnTaskClearFlow().collectAsState(initial = prefsForTray.getStopOnTaskClear())
+        var isWindowVisible by remember { mutableStateOf(true) }
+
+        if (!stopOnTaskClear && appIcon != null) {
+            Tray(
+                icon = appIcon,
+                tooltip = "KittyTune",
+                onAction = { isWindowVisible = true },
+                menu = {
+                    Item(str("menu_show_window"), onClick = { isWindowVisible = true })
+                    Item(str("menu_exit"), onClick = { com.alananasss.kittytune.core.AppInstance.isShuttingDown = true; exitApplication() })
+                }
+            )
+        }
+
         Window(
-            onCloseRequest = ::exitApplication,
-            title = "KittyTune",
-            icon = appIcon,
+            visible = isWindowVisible,
+            onCloseRequest = {
+                    if (stopOnTaskClear) {
+                        com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                        exitApplication()
+                    } else {
+                        isWindowVisible = false
+                    }
+                },
+                title = "KittyTune",
+                icon = appIcon,
             state = rememberWindowState(size = DpSize(1440.dp, 900.dp), position = androidx.compose.ui.window.WindowPosition(androidx.compose.ui.Alignment.Center)),
             onPreviewKeyEvent = { event ->
                 if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
@@ -185,8 +211,8 @@ fun main() {
                     Surface { AppRouter() }
                 }
             }
-        }
-    }
-}
+        } // End Window
+    } // End application
+} // End main
 
 
