@@ -93,21 +93,25 @@ fun AppearanceSettingsScreen(
                     LanguageRadioButton(str("theme_system"), AppLanguage.SYSTEM, appLanguage) {
                         prefs.setAppLanguage(it)
                         appLanguage = it
+                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
                         showLanguageDialog = false
                     }
                     LanguageRadioButton(str("lang_french"), AppLanguage.FRENCH, appLanguage) {
                         prefs.setAppLanguage(it)
                         appLanguage = it
+                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
                         showLanguageDialog = false
                     }
                     LanguageRadioButton(str("lang_english"), AppLanguage.ENGLISH, appLanguage) {
                         prefs.setAppLanguage(it)
                         appLanguage = it
+                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
                         showLanguageDialog = false
                     }
                     LanguageRadioButton(str("lang_hungarian"), AppLanguage.HUNGARIAN, appLanguage) {
                         prefs.setAppLanguage(it)
                         appLanguage = it
+                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
                         showLanguageDialog = false
                     }
                 }
