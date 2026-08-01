@@ -809,6 +809,8 @@ object R {
         const val comment_translate = "comment_translate"
         const val comment_translating = "comment_translating"
         const val comment_see_original = "comment_see_original"
+        const val pref_audio_mono = "pref_audio_mono"
+        const val pref_audio_mono_sub = "pref_audio_mono_sub"
     }
     object raw {
         const val rain = "/raw/rain.mp3"

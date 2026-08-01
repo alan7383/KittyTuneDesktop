@@ -1907,4 +1907,6 @@
     <string name="comment_translate">Fordítás (%s)</string>
     <string name="comment_translating">Fordítás...</string>
     <string name="comment_see_original">Eredeti megtekintése</string>
+    <string name="pref_audio_mono">Mono hang</string>
+    <string name="pref_audio_mono_sub">Egyesíti a bal és jobb csatornát, hogy mindkét hangszórón ugyanaz a hang szóljon.</string>
 </resources>

@@ -319,6 +319,16 @@ fun AudioSettingsScreen(
                                 subtitle = if (audioQuality == "HIGH") str("quality_high") else str("quality_low"),
                                 onClick = { showQualityDialog = true }
                             )
+                        },
+                        { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_audio_mono"),
+                                subtitle = str("pref_audio_mono_sub"),
+                                hasSwitch = true,
+                                switchState = playerViewModel.effectsState.isMonoEnabled,
+                                onSwitchChange = { playerViewModel.toggleMono() }
+                            )
                         }
                     )
                 )

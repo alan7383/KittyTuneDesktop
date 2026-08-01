@@ -17,20 +17,10 @@ import javax.sound.sampled.SourceDataLine
 import kotlin.concurrent.thread
 import javax.sound.sampled.AudioFormat as JavaAudioFormat
 
-/**
- * The desktop audio engine: FFmpeg (via JavaCV) decodes any source (progressive MP3,
- * HLS/m3u8, local files) to 16-bit PCM, which is pushed through the KittyTune DSP chain
- * (Fx -> Reverb -> 8D -> Earrape) and the pitch/tempo stage, then out to a JavaSound
- * SourceDataLine. This replaces ExoPlayer, which has no desktop equivalent.
- *
- * A single decode+playback thread per track keeps the design close to the Android
- * "one player, app-side queue" model in MusicManager.
- */
 class AudioEngine {
 
     enum class State { IDLE, BUFFERING, READY, ENDED }
 
-    // --- observable callbacks (set by MusicManager) --------------------------------------
     var onStateChanged: ((State) -> Unit)? = null
     var onPlayingChanged: ((Boolean) -> Unit)? = null
     var onCompletion: (() -> Unit)? = null
@@ -42,23 +32,21 @@ class AudioEngine {
     @Volatile var state: State = State.IDLE
         private set
 
-    /** Current playback position in ms. */
     @Volatile var positionMs: Long = 0L
         private set
 
-    /** Track duration in ms (0 if unknown). */
     @Volatile var durationMs: Long = 0L
         private set
 
     private val outputSampleRate = 44100
     private val outputChannels = 2
 
-    // --- DSP chain (order matches Android sink: Fx -> Reverb -> 8D -> Earrape) -----------
     private val fx = FxAudioProcessor()
     private val reverb = ReverbAudioProcessor()
     private val eightD = EightDAudioProcessor()
     private val earrape = EarrapeAudioProcessor()
-    private val chain: List<AudioProcessor> = listOf(fx, reverb, eightD, earrape)
+    private val mono = MonoAudioProcessor()
+    private val chain: List<AudioProcessor> = listOf(fx, reverb, eightD, earrape, mono)
     private val stretcher = TimeStretcher(outputSampleRate, outputChannels)
 
     private var effects = AudioEffectsState()
@@ -82,7 +70,6 @@ class AudioEngine {
         chain.forEach { it.configure(fmt) }
     }
 
-    // --- public control API (mirrors the subset of ExoPlayer MusicManager used) ----------
 
     @Synchronized
     fun setMediaItem(url: String, headers: Map<String, String> = emptyMap(), startPositionMs: Long = 0L) {
@@ -141,7 +128,6 @@ class AudioEngine {
         scope.coroutineContext[Job]?.cancel()
     }
 
-    /** Apply the full effect state (called by MusicManager.applyEffects). */
     fun applyEffects(state: AudioEffectsState) {
         effects = state
         fx.setEffects(state.isMuffledEnabled, state.isBassBoostEnabled)
@@ -152,19 +138,18 @@ class AudioEngine {
         eightD.setEnabled(state.is8DEnabled)
         eightD.setSpeed(state.eightDSpeed)
         earrape.setEnabled(state.isEarrapeEnabled)
+        mono.setEnabled(state.isMonoEnabled)
 
         val pitch = if (state.isPitchEnabled) state.speed else 1f
         stretcher.setParameters(state.speed, pitch)
     }
 
-    // --- decode + playback loop ----------------------------------------------------------
 
     private fun runDecodeLoop(workerId: Long, url: String, headers: Map<String, String>) {
         var grabber: FFmpegFrameGrabber? = null
         var localLine: SourceDataLine? = null
         try {
             grabber = FFmpegFrameGrabber(url).apply {
-                // HLS/HTTP options + spoofed SoundCloud headers (progressive & m3u8).
                 if (headers.isNotEmpty()) {
                     val headerBlob = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
                     setOption("headers", headerBlob + "\r\n")
@@ -181,7 +166,6 @@ class AudioEngine {
 
             durationMs = grabber.lengthInTime / 1000L
 
-            // Note: initial seek is now fully handled inside the while loop to guarantee it works.
 
             localLine = openLine()
             line = localLine
@@ -192,7 +176,6 @@ class AudioEngine {
             val outBuf = ShortArray(8192)
 
             while (!stopFlag && activeWorkerId == workerId) {
-                // handle seek requested during playback
                 val seek = seekRequestMs
                 if (seek >= 0) {
                     val targetTimestamp = seek * 1000L
@@ -257,12 +240,9 @@ class AudioEngine {
         }
     }
 
-    /** Convert an FFmpeg audio Frame's sample buffers to interleaved 16-bit PCM shorts. */
     private fun interleave(buffers: Array<java.nio.Buffer>, frameRate: Int, frameChannels: Int): ShortArray {
-        // JavaCV gives one ShortBuffer per plane (or interleaved in buffer[0]).
         val first = buffers[0]
         if (first is ShortBuffer) {
-            // Already 16-bit; may be planar (one buffer per channel) or packed (buffer[0]).
             return if (buffers.size == frameChannels && frameChannels > 1) {
                 val len = first.limit()
                 val out = ShortArray(len * frameChannels)
@@ -278,7 +258,6 @@ class AudioEngine {
                 out
             }
         }
-        // Fallback: treat as bytes.
         val bb = (first as java.nio.ByteBuffer).order(ByteOrder.LITTLE_ENDIAN)
         val sb = bb.asShortBuffer()
         val out = ShortArray(sb.limit())
@@ -287,8 +266,6 @@ class AudioEngine {
     }
 
     private fun pushThroughDsp(pcm: ShortArray) {
-        // Run the interleaved PCM through the DSP chain (byte domain), then feed the
-        // pitch/tempo stretcher.
         var bytes = shortsToBytes(pcm)
         for (p in chain) {
             val inBuf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
@@ -323,7 +300,6 @@ class AudioEngine {
         } catch (_: Exception) {}
     }
 
-    // --- JavaSound line management -------------------------------------------------------
 
     private fun openLine(): SourceDataLine {
         val fmt = JavaAudioFormat(
@@ -331,7 +307,6 @@ class AudioEngine {
         )
         val info = DataLine.Info(SourceDataLine::class.java, fmt)
         val l = AudioSystem.getLine(info) as SourceDataLine
-        // Use a ~40ms buffer for ultra-low latency (near instant reaction for effects)
         l.open(fmt, outputSampleRate * outputChannels * 2 * 40 / 1000) 
         l.start()
         applyLineVolume(l)
@@ -343,7 +318,6 @@ class AudioEngine {
         try {
             if (l.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                 val ctrl = l.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
-                // Convert linear 0..1 to dB; clamp to control range.
                 val db = if (volume <= 0.0001f) ctrl.minimum
                 else (20.0 * Math.log10(volume.toDouble())).toFloat().coerceIn(ctrl.minimum, ctrl.maximum)
                 ctrl.value = db

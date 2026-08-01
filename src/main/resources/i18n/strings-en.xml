@@ -2118,4 +2118,6 @@
     <string name="comment_translate">Translate to %s</string>
     <string name="comment_translating">Translating...</string>
     <string name="comment_see_original">See original</string>
+    <string name="pref_audio_mono">Mono Audio</string>
+    <string name="pref_audio_mono_sub">Merges left and right channels to play the exact same audio on both speakers.</string>
 </resources>

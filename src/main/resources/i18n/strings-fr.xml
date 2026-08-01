@@ -1749,6 +1749,8 @@
     <string name="comment_translate">Traduire en %s</string>
     <string name="comment_translating">Traduction...</string>
     <string name="comment_see_original">Voir l\'original</string>
+    <string name="pref_audio_mono">Audio Mono</string>
+    <string name="pref_audio_mono_sub">Fusionne les canaux gauche et droit pour jouer exactement le même son dans les deux haut-parleurs.</string>
 </resources>
 
 
