@@ -130,6 +130,11 @@ object MusicManager {
         rainPlayer?.setVolume(state.rainVolume)
     }
 
+    fun hotSwapDevice() {
+        player.activeEngine.pendingDeviceSwap = true
+        rainPlayer?.reloadDevice()
+    }
+
     fun releasePlayer() {
         player.release()
         rainPlayer?.release()

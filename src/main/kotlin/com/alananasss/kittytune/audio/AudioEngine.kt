@@ -13,6 +13,7 @@ import java.nio.ShortBuffer
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
 import javax.sound.sampled.FloatControl
+import javax.sound.sampled.Mixer
 import javax.sound.sampled.SourceDataLine
 import kotlin.concurrent.thread
 import javax.sound.sampled.AudioFormat as JavaAudioFormat
@@ -58,6 +59,8 @@ class AudioEngine {
     @Volatile private var stopFlag = false
 
     @Volatile private var activeWorkerId = 0L
+
+    @Volatile var pendingDeviceSwap = false
 
     private var worker: Thread? = null
     @Volatile private var line: SourceDataLine? = null
@@ -178,6 +181,15 @@ class AudioEngine {
             val outBuf = ShortArray(8192)
 
             while (!stopFlag && activeWorkerId == workerId) {
+                // --- HOT-SWAP DEVICE ---
+                if (pendingDeviceSwap) {
+                    pendingDeviceSwap = false
+                    closeLineInstance(localLine)
+                    localLine = openLine()
+                    line = localLine
+                }
+                // -----------------------
+
                 val seek = seekRequestMs
                 if (seek >= 0) {
                     val targetTimestamp = seek * 1000L
@@ -208,7 +220,7 @@ class AudioEngine {
                     positionMs = seek
                     stretcher.flush()
                     chain.forEach { it.flush() }
-                    localLine.flush()
+                    localLine?.flush()
                 }
 
                 if (paused) {
@@ -308,8 +320,24 @@ class AudioEngine {
             outputSampleRate.toFloat(), 16, outputChannels, true, false, // signed, little-endian
         )
         val info = DataLine.Info(SourceDataLine::class.java, fmt)
-        val l = AudioSystem.getLine(info) as SourceDataLine
-        l.open(fmt, outputSampleRate * outputChannels * 2 * 40 / 1000) 
+
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val deviceName = prefs.getAudioDevice()
+        var mixer: Mixer? = null
+
+        if (deviceName.isNotEmpty()) {
+            val mixerInfos = AudioSystem.getMixerInfo()
+            val targetInfo = mixerInfos.firstOrNull { it.name.trim() == deviceName }
+            if (targetInfo != null) {
+                try {
+                    val m = AudioSystem.getMixer(targetInfo)
+                    if (m.isLineSupported(info)) mixer = m
+                } catch (_: Exception) {}
+            }
+        }
+
+        val l = if (mixer != null) mixer.getLine(info) as SourceDataLine else AudioSystem.getLine(info) as SourceDataLine
+        l.open(fmt, outputSampleRate * outputChannels * 2 * 40 / 1000)
         l.start()
         applyLineVolume(l)
         return l

@@ -69,6 +69,7 @@ class PlayerPreferences {
         private const val KEY_DISCORD_ENABLED = "discord_rpc_enabled"
         private const val KEY_PRECISE_LYRICS_SEARCH = "precise_lyrics_search_enabled"
         private const val KEY_EARRAPE_WARNING = "has_seen_earrape_warning"
+        private const val KEY_AUDIO_DEVICE = "audio_output_device"
 
         private const val KEY_DISCORD_ASSET_LOGO = "discord_asset_logo"
         private const val KEY_DISCORD_STATUS_DISPLAY = "discord_status_display"
@@ -187,6 +188,9 @@ class PlayerPreferences {
 
     fun hasSeenEarrapeWarning(): Boolean = Prefs.getBoolean(KEY_EARRAPE_WARNING, false)
     fun setHasSeenEarrapeWarning(seen: Boolean) = Prefs.putBoolean(KEY_EARRAPE_WARNING, seen)
+
+    fun getAudioDevice(): String = Prefs.getString(KEY_AUDIO_DEVICE, "") ?: ""
+    fun setAudioDevice(deviceName: String) = Prefs.putString(KEY_AUDIO_DEVICE, deviceName)
 
     fun getLyricsAlignment(): LyricsAlignment {
         val name = Prefs.getString(KEY_LYRICS_ALIGNMENT, LyricsAlignment.LEFT.name)
