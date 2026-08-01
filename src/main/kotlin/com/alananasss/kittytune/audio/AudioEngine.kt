@@ -198,6 +198,13 @@ class AudioEngine {
                     val targetTimestamp = seek * 1000L
                     
                     System.err.println("AudioEngine: Requested accurate seek to targetTimestamp=$targetTimestamp")
+                    
+                    try {
+                        grabber.timestamp = targetTimestamp
+                    } catch (e: Exception) {
+                        System.err.println("AudioEngine: FFmpeg seek error - ${e.message}")
+                    }
+
                     var droppedCount = 0
                     while (!stopFlag && activeWorkerId == workerId) {
                         val f = grabber.grabSamples() ?: break
@@ -206,7 +213,6 @@ class AudioEngine {
                             break
                         }
                         droppedCount++
-                        // Increase limit to 50000 (approx 20 minutes of audio) to prevent infinite loops but allow long seeks
                         if (droppedCount > 50000) {
                             System.err.println("AudioEngine: Warning - breaking accurate seek loop after $droppedCount frames!")
                             break
