@@ -19,6 +19,7 @@ filter_unconventional = true
 split_commits = false
 
 commit_parsers = [
+  { message = ".*website.*", skip = true },
   { message = "^feat(\\(.+\\))?!:", group = "Breaking Changes" },
   { message = "^fix(\\(.+\\))?!:",  group = "Breaking Changes" },
   { message = "^feat",              group = "Features" },
