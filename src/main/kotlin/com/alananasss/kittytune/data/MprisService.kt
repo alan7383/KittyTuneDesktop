@@ -96,10 +96,10 @@ class MprisService(
             println("MPRIS [Seeked] emitting Seeked signal: position=${positionUs}us (${positionUs / 1000000}s)")
             val signal = DBusSignal(
                 null,
-                null,
                 "/org/mpris/MediaPlayer2",
                 "org.mpris.MediaPlayer2.Player",
                 "Seeked",
+                "x",
                 positionUs
             )
             connection?.sendMessage(signal)
@@ -163,7 +163,7 @@ class MprisService(
             "/org/mpris/MediaPlayer2",
             "org.mpris.MediaPlayer2.Player",
             changes,
-            ArrayList()
+            ArrayList<String>()
         )
     }
 
@@ -287,11 +287,18 @@ class MprisService(
         @Suppress("UNCHECKED_CAST")
         override fun <A> Set(iface: String, property: String, value: A) {
             println("MPRIS [D-Bus] Set called: iface=$iface, property=$property, value=$value (${value?.javaClass?.simpleName})")
+            
+            val unwrappedValue = if (value is org.freedesktop.dbus.types.Variant<*>) {
+                value.value
+            } else {
+                value
+            }
+            
             when (iface) {
                 "org.mpris.MediaPlayer2.Player" -> when (property) {
                     "Position" -> {
-                        val posUs = (value as? Long) ?: run {
-                            println("MPRIS [Set] Position value is not Long: ${value?.javaClass}")
+                        val posUs = (unwrappedValue as? Long) ?: run {
+                            println("MPRIS [Set] Position value is not Long: ${unwrappedValue?.javaClass}")
                             return
                         }
                         println("MPRIS [Set] Position=$posUs us (${posUs / 1000}ms)")

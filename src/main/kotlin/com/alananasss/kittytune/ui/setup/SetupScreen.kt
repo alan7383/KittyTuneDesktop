@@ -142,6 +142,7 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
     var useWindowsAccent by remember { mutableStateOf(false) }
     
     val end4Installed = remember { End4ThemeManager.isInstalled() }
+    val isWindowsOS = remember { System.getProperty("os.name").lowercase().contains("win") }
 
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var language by remember { mutableStateOf(prefs.getAppLanguage()) }
@@ -324,73 +325,75 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                         }
 
                         // End4 or Windows Accent
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                            ),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                        if (end4Installed || isWindowsOS) {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                ),
+                                shape = RoundedCornerShape(16.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = if (end4Installed) str("setup_end4_detected") else str("setup_windows_color"),
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = if (end4Installed) str("setup_use_end4") else str("setup_use_windows_color"),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = if (end4Installed) str("setup_end4_detected") else str("setup_windows_color"),
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = if (end4Installed) str("setup_use_end4") else str("setup_use_windows_color"),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = if (end4Installed) useEnd4 else useWindowsAccent,
+                                        onCheckedChange = { checked ->
+                                            if (end4Installed) {
+                                                useEnd4 = checked
+                                                if (checked) {
+                                                    useWindowsAccent = false
+                                                    prefs.setColorStyle("end4 (Material You)")
+                                                } else {
+                                                    prefs.setColorStyle("Vibrant")
+                                                    prefs.setKeyColor(selectedColor.toArgb())
+                                                }
+                                            } else if (isWindowsOS) {
+                                                useWindowsAccent = checked
+                                                if (checked) {
+                                                    useEnd4 = false
+                                                    prefs.setColorStyle("Windows Accent")
+                                                } else {
+                                                    prefs.setColorStyle("Vibrant")
+                                                    prefs.setKeyColor(selectedColor.toArgb())
+                                                }
+                                            }
+                                        },
+                                        thumbContent = { 
+                                            val isChecked = if (end4Installed) useEnd4 else useWindowsAccent
+                                            Icon(
+                                                imageVector = if (isChecked) Icons.Filled.Check else Icons.Rounded.Close, 
+                                                contentDescription = null, 
+                                                modifier = Modifier.size(SwitchDefaults.IconSize)
+                                            ) 
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                            checkedIconColor = MaterialTheme.colorScheme.primary,
+                                            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                                            uncheckedIconColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                                        )
                                     )
                                 }
-                                Switch(
-                                    checked = if (end4Installed) useEnd4 else useWindowsAccent,
-                                    onCheckedChange = { checked ->
-                                        if (end4Installed) {
-                                            useEnd4 = checked
-                                            if (checked) {
-                                                useWindowsAccent = false
-                                                prefs.setColorStyle("end4 (Material You)")
-                                            } else {
-                                                prefs.setColorStyle("Vibrant")
-                                                prefs.setKeyColor(selectedColor.toArgb())
-                                            }
-                                        } else {
-                                            useWindowsAccent = checked
-                                            if (checked) {
-                                                useEnd4 = false
-                                                prefs.setColorStyle("Windows Accent")
-                                            } else {
-                                                prefs.setColorStyle("Vibrant")
-                                                prefs.setKeyColor(selectedColor.toArgb())
-                                            }
-                                        }
-                                    },
-                                    thumbContent = { 
-                                        val isChecked = if (end4Installed) useEnd4 else useWindowsAccent
-                                        Icon(
-                                            imageVector = if (isChecked) Icons.Filled.Check else Icons.Rounded.Close, 
-                                            contentDescription = null, 
-                                            modifier = Modifier.size(SwitchDefaults.IconSize)
-                                        ) 
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                                        checkedIconColor = MaterialTheme.colorScheme.primary,
-                                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                                        uncheckedIconColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                                    )
-                                )
                             }
                         }
 

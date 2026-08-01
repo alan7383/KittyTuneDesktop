@@ -234,7 +234,14 @@ class PlayerPreferences {
     fun getKeyColor(): Int = Prefs.getInt(KEY_KEY_COLOR, 0)
     fun setKeyColor(color: Int) = Prefs.putInt(KEY_KEY_COLOR, color)
 
-    fun getColorStyle(): String = Prefs.getString(KEY_COLOR_STYLE, "System") ?: "System"
+    fun getColorStyle(): String {
+        val style = Prefs.getString(KEY_COLOR_STYLE, "System") ?: "System"
+        val isWindowsOS = System.getProperty("os.name").lowercase().contains("win")
+        if (!isWindowsOS && style.contains("windows", ignoreCase = true)) {
+            return "Vibrant"
+        }
+        return style
+    }
     fun setColorStyle(style: String) = Prefs.putString(KEY_COLOR_STYLE, style)
 
     fun getColorSpec(): String = Prefs.getString(KEY_COLOR_SPEC, "SPEC_2025") ?: "SPEC_2025"

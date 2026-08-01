@@ -17,14 +17,15 @@ import kotlinx.coroutines.launch
  * Manages detection and real-time live synchronization with the Windows OS Accent Color.
  */
 object WindowsThemeManager {
+    private val isWindows: Boolean = System.getProperty("os.name").lowercase().contains("win")
+
     private val _accentColor = MutableStateFlow<Color?>(null)
     val accentColor: StateFlow<Color?> = _accentColor.asStateFlow()
 
     private var pollingJob: Job? = null
     
-    // We only poll when needed, similar to End4ThemeManager
     fun startWatching() {
-        if (pollingJob != null) return
+        if (!isWindows || pollingJob != null) return
         
         // Initial load
         reloadColor()
@@ -43,16 +44,13 @@ object WindowsThemeManager {
     }
 
     private fun reloadColor() {
+        if (!isWindows) return
         try {
             val palette = Advapi32Util.registryGetBinaryValue(
                 WinReg.HKEY_CURRENT_USER,
                 "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Accent",
                 "AccentPalette"
             )
-            // AccentPalette contains 8 colors (4 bytes each: R, G, B, A)
-            // Index 0: Light3, Index 1: Light2, Index 2: Light1, Index 3: Base
-            // We use Light3 (Index 0) as the seed color because it is the brightest/purest 
-            // version of the hue. Combined with PaletteStyle.Fidelity, it creates a perfect theme.
             val r = palette[0].toInt() and 0xFF
             val g = palette[1].toInt() and 0xFF
             val b = palette[2].toInt() and 0xFF
@@ -62,7 +60,7 @@ object WindowsThemeManager {
             if (_accentColor.value != newColor) {
                 _accentColor.value = newColor
             }
-        } catch (e: Exception) {
+        } catch (t: Throwable) {
             // Fallback to ColorizationColor if AccentPalette fails
             try {
                 val colorInt = Advapi32Util.registryGetIntValue(
@@ -75,7 +73,7 @@ object WindowsThemeManager {
                 val b = colorInt and 0xFF
                 val newColor = Color(r, g, b, 0xFF)
                 if (_accentColor.value != newColor) _accentColor.value = newColor
-            } catch (ex: Exception) {}
+            } catch (ex: Throwable) {}
         }
     }
 }
