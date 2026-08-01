@@ -1909,6 +1909,8 @@
     <string name="comment_see_original">Eredeti megtekintése</string>
     <string name="pref_audio_mono">Mono hang</string>
     <string name="pref_audio_mono_sub">Egyesíti a bal és jobb csatornát, hogy mindkét hangszórón ugyanaz a hang szóljon.</string>
+    <string name="pref_audio_device_title">Lejátszási eszköz</string>
+    <string name="pref_audio_device_default">Rendszer alapértelmezett</string>
     <string name="pref_norm_title">Hangerő kiegyenlítése</string>
     <string name="pref_norm_sub">Állíts be azonos hangerőt minden számhoz.</string>
     <string name="pref_norm_level_title">Hangerő szintje</string>

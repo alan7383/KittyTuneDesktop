@@ -2120,6 +2120,8 @@
     <string name="comment_see_original">See original</string>
     <string name="pref_audio_mono">Mono Audio</string>
     <string name="pref_audio_mono_sub">Merges left and right channels to play the exact same audio on both speakers.</string>
+    <string name="pref_audio_device_title">Playback device</string>
+    <string name="pref_audio_device_default">System default</string>
     <string name="pref_norm_title">Normalize volume</string>
     <string name="pref_norm_sub">Set the same volume level for all tracks.</string>
     <string name="pref_norm_level_title">Volume level</string>

@@ -811,6 +811,8 @@ object R {
         const val comment_see_original = "comment_see_original"
         const val pref_audio_mono = "pref_audio_mono"
         const val pref_audio_mono_sub = "pref_audio_mono_sub"
+        const val pref_audio_device_title = "pref_audio_device_title"
+        const val pref_audio_device_default = "pref_audio_device_default"
         const val pref_norm_title = "pref_norm_title"
         const val pref_norm_sub = "pref_norm_sub"
         const val pref_norm_level_title = "pref_norm_level_title"

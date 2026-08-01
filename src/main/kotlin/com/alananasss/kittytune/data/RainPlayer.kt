@@ -44,14 +44,45 @@ class RainPlayer {
         try {
             val wav = ensureDecodedWav()
             val stream = AudioSystem.getAudioInputStream(wav)
-            val c = AudioSystem.getClip()
-            c.open(stream)
+            val c = openClipForStream(stream)
             c.loop(Clip.LOOP_CONTINUOUSLY)
             clip = c
             applyVolume()
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun openClipForStream(stream: javax.sound.sampled.AudioInputStream): Clip {
+        val fmt = stream.format
+        val info = javax.sound.sampled.DataLine.Info(Clip::class.java, fmt)
+
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val deviceName = prefs.getAudioDevice()
+        var clip: Clip? = null
+
+        if (deviceName.isNotEmpty()) {
+            val mixerInfos = AudioSystem.getMixerInfo()
+            val targetInfo = mixerInfos.firstOrNull { it.name.trim() == deviceName }
+            if (targetInfo != null) {
+                try {
+                    val m = AudioSystem.getMixer(targetInfo)
+                    if (m.isLineSupported(info)) clip = m.getLine(info) as Clip
+                } catch (_: Exception) {}
+            }
+        }
+
+        val c = clip ?: AudioSystem.getClip()
+        c.open(stream)
+        return c
+    }
+
+    fun reloadDevice() {
+        if (!isEnabled) return
+        val wasPlaying = clip?.isRunning == true
+        release()
+        initPlayer()
+        if (wasPlaying) clip?.start()
     }
 
     fun setEnabled(enabled: Boolean) {

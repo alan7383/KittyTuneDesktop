@@ -4,14 +4,16 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
@@ -44,6 +46,30 @@ fun AudioSettingsScreen(
 
     var showQualityDialog by remember { mutableStateOf(false) }
     var showFadeDurationDialog by remember { mutableStateOf(false) }
+
+    var showDeviceDialog by remember { mutableStateOf(false) }
+    var currentDevice by remember { mutableStateOf(prefs.getAudioDevice()) }
+
+    val availableDevices = remember {
+        val list = mutableListOf<String>()
+        try {
+            val mixerInfos = javax.sound.sampled.AudioSystem.getMixerInfo()
+            val seenNames = mutableSetOf<String>()
+            for (info in mixerInfos) {
+                val rawName = info.name.trim()
+                if (rawName.isNotEmpty() && !seenNames.contains(rawName) && !rawName.contains("Port")) {
+                    try {
+                        val mixer = javax.sound.sampled.AudioSystem.getMixer(info)
+                        if (mixer.isLineSupported(javax.sound.sampled.DataLine.Info(javax.sound.sampled.SourceDataLine::class.java, null))) {
+                            seenNames.add(rawName)
+                            list.add(rawName)
+                        }
+                    } catch (e: Exception) {}
+                }
+            }
+        } catch (e: Exception) {}
+        list
+    }
 
     var crossfadeEnabled by remember { mutableStateOf(prefs.getCrossfadeEnabled()) }
     var crossfadeDuration by remember { mutableStateOf(prefs.getCrossfadeDuration()) }
@@ -168,6 +194,56 @@ fun AudioSettingsScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showQualityDialog = false }) { Text(str("btn_cancel")) } }
+        )
+    }
+
+    if (showDeviceDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showDeviceDialog = false },
+            title = { Text(str("pref_audio_device_title")) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                currentDevice = ""
+                                playerViewModel.changeOutputDevice("")
+                                showDeviceDialog = false
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = currentDevice == "", onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("pref_audio_device_default"))
+                    }
+
+                    availableDevices.forEach { dev ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    currentDevice = dev
+                                    playerViewModel.changeOutputDevice(dev)
+                                    showDeviceDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = currentDevice == dev, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(dev, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDeviceDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -317,6 +393,14 @@ fun AudioSettingsScreen(
                 SettingsGroup(
                     title = str("settings_cat_audio"),
                     items = listOf(
+                        { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_audio_device_title"),
+                                subtitle = if (currentDevice.isEmpty()) str("pref_audio_device_default") else currentDevice,
+                                onClick = { showDeviceDialog = true }
+                            )
+                        },
                         { shape ->
                             SettingsItem(
                                 shape = shape,

@@ -124,6 +124,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         updateVolume(volume - delta)
     }
 
+    fun changeOutputDevice(deviceName: String) {
+        playerPrefs.setAudioDevice(deviceName)
+        MusicManager.hotSwapDevice()
+    }
+
     var repeatMode by mutableStateOf(playerPrefs.getLastRepeatMode())
     var shuffleEnabled by mutableStateOf(playerPrefs.getLastShuffleEnabled())
     private var isAutoplayRadioLoading by mutableStateOf(false)
