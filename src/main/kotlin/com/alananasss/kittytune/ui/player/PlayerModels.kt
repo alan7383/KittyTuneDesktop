@@ -25,5 +25,4 @@
         val artistName: String? = null,
         val isVerified: Boolean = false
     )
-
-
+enum class LyricsProvider { MAX_QUALITY, OPEN_SOURCE }
