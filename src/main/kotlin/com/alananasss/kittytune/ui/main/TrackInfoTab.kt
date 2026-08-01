@@ -581,7 +581,67 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                         )
                     }
                 }
+            var translatedText by remember { mutableStateOf<String?>(null) }
+            var showTranslation by remember { mutableStateOf(false) }
+            var isTranslating by remember { mutableStateOf(false) }
+            val scope = rememberCoroutineScope()
+
+            if (showTranslation && !translatedText.isNullOrEmpty()) {
+                CommentBodyText(body = translatedText!!, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
+            } else {
                 CommentBodyText(body = comment.body, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
+            }
+
+            val currentLocale = java.util.Locale.getDefault()
+            val langName = remember(currentLocale) {
+                currentLocale.getDisplayLanguage(currentLocale).replaceFirstChar { if (it.isLowerCase()) it.titlecase(currentLocale) else it.toString() }
+            }
+            val langCode = currentLocale.language
+
+            if (translatedText == null && !isTranslating) {
+                Text(
+                    text = str("comment_translate", langName),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable {
+                            isTranslating = true
+                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                val res = com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(listOf(comment.body), langCode)
+                                val t = res[comment.body.trim()]
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    if (t != null && t.lowercase() != comment.body.trim().lowercase()) {
+                                        translatedText = t
+                                        showTranslation = true
+                                    } else {
+                                        translatedText = "" 
+                                    }
+                                    isTranslating = false
+                                }
+                            }
+                        }
+                        .padding(vertical = 2.dp)
+                )
+            } else if (isTranslating) {
+                Text(
+                    text = str("comment_translating"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(vertical = 2.dp)
+                )
+            } else if (translatedText!!.isNotEmpty()) {
+                Text(
+                    text = if (showTranslation) str("comment_see_original") else str("comment_translate", langName),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .clickable { showTranslation = !showTranslation }
+                        .padding(vertical = 2.dp)
+                )
+            }
                 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(

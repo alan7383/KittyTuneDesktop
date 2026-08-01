@@ -1203,15 +1203,22 @@ fun UserCommentItem(
 
                 Spacer(Modifier.height(12.dp))
 
+                var translatedText by remember { mutableStateOf<String?>(null) }
+                var showTranslation by remember { mutableStateOf(false) }
+                var isTranslating by remember { mutableStateOf(false) }
+                val scope = rememberCoroutineScope()
+
+                val textToDisplay = if (showTranslation && !translatedText.isNullOrEmpty()) translatedText!! else comment.body
+
                 val mentionPattern = remember { """@[\w-]+""".toRegex() }
                 val urlPattern = remember { """https?://[^\s]+""".toRegex() }
                 val tertiaryColor = MaterialTheme.colorScheme.tertiary
                 val primaryColor = MaterialTheme.colorScheme.primary
             
-                val annotatedString = remember(comment.body, tertiaryColor, primaryColor) {
+                val annotatedString = remember(textToDisplay, tertiaryColor, primaryColor) {
                     buildAnnotatedString {
-                        append(comment.body)
-                        for (match in mentionPattern.findAll(comment.body)) {
+                        append(textToDisplay)
+                        for (match in mentionPattern.findAll(textToDisplay)) {
                             val username = match.value.removePrefix("@")
                             addLink(
                                 LinkAnnotation.Clickable(
@@ -1222,7 +1229,7 @@ fun UserCommentItem(
                                 match.range.first, match.range.last + 1
                             )
                         }
-                        for (match in urlPattern.findAll(comment.body)) {
+                        for (match in urlPattern.findAll(textToDisplay)) {
                             addLink(
                                 LinkAnnotation.Url(
                                     url = match.value,
@@ -1244,11 +1251,62 @@ fun UserCommentItem(
                     )
                 }
 
+                val currentLocale = java.util.Locale.getDefault()
+                val langName = remember(currentLocale) {
+                    currentLocale.getDisplayLanguage(currentLocale).replaceFirstChar { if (it.isLowerCase()) it.titlecase(currentLocale) else it.toString() }
+                }
+                val langCode = currentLocale.language
+
+                if (translatedText == null && !isTranslating) {
+                    Text(
+                        text = str("comment_translate", langName),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable {
+                                isTranslating = true
+                                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                    val res = com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(listOf(comment.body), langCode)
+                                    val t = res[comment.body.trim()]
+                                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        if (t != null && t.lowercase() != comment.body.trim().lowercase()) {
+                                            translatedText = t
+                                            showTranslation = true
+                                        } else {
+                                            translatedText = ""
+                                        }
+                                        isTranslating = false
+                                    }
+                                }
+                            }
+                            .padding(vertical = 4.dp)
+                    )
+                } else if (isTranslating) {
+                    Text(
+                        text = str("comment_translating"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                } else if (translatedText!!.isNotEmpty()) {
+                    Text(
+                        text = if (showTranslation) str("comment_see_original") else str("comment_translate", langName),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { showTranslation = !showTranslation }
+                            .padding(vertical = 4.dp)
+                    )
+                }
+
                 Text(
                     text = getRelativeTime(comment.createdAt),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp)
+                    modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
                 )
             }
         }
