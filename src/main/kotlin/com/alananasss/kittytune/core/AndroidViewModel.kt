@@ -22,4 +22,5 @@ abstract class AndroidViewModel(private val application: Application) : androidx
 /** Single shared Application instance for ViewModels constructed without a factory. */
 object AppInstance {
     val application = Application()
+    @Volatile var isShuttingDown = false
 }
