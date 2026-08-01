@@ -312,3 +312,37 @@ class EarrapeAudioProcessor : BaseAudioProcessor() {
         buffer.flip()
     }
 }
+
+class MonoAudioProcessor : BaseAudioProcessor() {
+    private var enabled = false
+
+    fun setEnabled(enabled: Boolean) {
+        this.enabled = enabled
+    }
+
+    override fun queueInput(input: ByteBuffer) {
+        val remaining = input.remaining()
+        if (remaining == 0) return
+
+        if (!enabled || inputAudioFormat.channelCount != 2) {
+            val buffer = replaceOutputBuffer(remaining)
+            buffer.put(input)
+            buffer.flip()
+            return
+        }
+
+        val buffer = replaceOutputBuffer(remaining)
+
+        while (input.remaining() >= 4) {
+            val left = input.getShort().toInt()
+            val right = input.getShort().toInt()
+
+            val mixed = ((left + right) / 2).toShort()
+
+            buffer.putShort(mixed)
+            buffer.putShort(mixed)
+        }
+        buffer.flip()
+    }
+}
+
