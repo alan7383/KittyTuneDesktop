@@ -27,11 +27,6 @@ enum class AppLanguage(val code: String) {
     HUNGARIAN("hu")
 }
 
-/**
- * Desktop port of the Android PlayerPreferences.
- * SharedPreferences("player_state") -> the global [Prefs] JSON store (same keys/defaults).
- * queue_cache.json kept in the app data dir; Flows come from Prefs' reactive map.
- */
 class PlayerPreferences {
     private val gson = Gson()
     private val queueFile = File(AppDirs.dataDir, "queue_cache.json")
@@ -59,6 +54,10 @@ class PlayerPreferences {
         private const val KEY_LYRICS_PREFER_LOCAL = "lyrics_prefer_local"
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
+        private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
+        private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
+        private const val KEY_LYRICS_TRANSLATION_ENABLED = "lyrics_translation_enabled"
+        private const val KEY_LYRICS_TRANSLATION_LANG = "lyrics_translation_lang"
         private const val KEY_APP_LANGUAGE = "app_language_code"
         private const val KEY_PRECISE_SPEED = "precise_speed_enabled"
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
@@ -269,6 +268,31 @@ class PlayerPreferences {
     fun getStopOnTaskClear(): Boolean = Prefs.getBoolean(KEY_STOP_ON_TASK_CLEAR, true)
     fun setStopOnTaskClear(enabled: Boolean) = Prefs.putBoolean(KEY_STOP_ON_TASK_CLEAR, enabled)
     fun stopOnTaskClearFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_STOP_ON_TASK_CLEAR, true)
+
+    fun getLyricsAppleEffectEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_APPLE_EFFECT, true)
+    fun setLyricsAppleEffectEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_APPLE_EFFECT, enabled)
+
+    fun getLyricsWordSyncEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_WORD_SYNC, true)
+    fun setLyricsWordSyncEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_WORD_SYNC, enabled)
+
+    fun getLyricsTranslationEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_TRANSLATION_ENABLED, false)
+    fun setLyricsTranslationEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_TRANSLATION_ENABLED, enabled)
+
+    fun getLyricsTranslationLang(): String {
+        val code = Prefs.getString(KEY_LYRICS_TRANSLATION_LANG, null)
+        if (code != null) return code
+        return java.util.Locale.getDefault().language.take(2).lowercase()
+    }
+    fun setLyricsTranslationLang(lang: String) = Prefs.putString(KEY_LYRICS_TRANSLATION_LANG, lang)
+
+    fun getLyricsRomanizationEnabled(): Boolean = Prefs.getBoolean("lyrics_romanization_enabled", false)
+    fun setLyricsRomanizationEnabled(enabled: Boolean) = Prefs.putBoolean("lyrics_romanization_enabled", enabled)
+
+    fun getLyricsProvider(): com.alananasss.kittytune.ui.player.LyricsProvider {
+        val name = Prefs.getString("lyrics_provider", com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY.name)
+        return try { com.alananasss.kittytune.ui.player.LyricsProvider.valueOf(name!!) } catch(_: Exception) { com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY }
+    }
+    fun setLyricsProvider(provider: com.alananasss.kittytune.ui.player.LyricsProvider) = Prefs.putString("lyrics_provider", provider.name)
 
     fun savePlaybackState(track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?, shuffleEnabled: Boolean, repeatMode: RepeatMode) {
         if (!getPersistentQueueEnabled()) {

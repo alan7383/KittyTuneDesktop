@@ -32,6 +32,7 @@ import java.net.URLEncoder
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.alananasss.kittytune.data.network.MusixmatchClient
 import kotlin.time.Duration.Companion.milliseconds
 
 enum class CommentSort(val value: String, val labelResId: String) {
@@ -41,6 +42,17 @@ enum class CommentSort(val value: String, val labelResId: String) {
 }
 
 enum class LyricsMode { SYNCED, PLAIN }
+
+data class UnifiedLyricResult(
+    val id: String,
+    val name: String,
+    val artistName: String,
+    val albumName: String?,
+    val durationSec: Double,
+    val hasLineSync: Boolean,
+    val hasWordSync: Boolean,
+    val provider: String // "LRCLIB" ou "MUSIXMATCH"
+)
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -191,12 +203,122 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var currentQueueIndex by mutableIntStateOf(-1)
 
     var isPreciseLyricsSearchEnabled by mutableStateOf(playerPrefs.getPreciseLyricsSearchEnabled())
+    var isAppleMusicEffectEnabled by mutableStateOf(playerPrefs.getLyricsAppleEffectEnabled())
+    var isWordSyncEnabled by mutableStateOf(playerPrefs.getLyricsWordSyncEnabled())
+
+    fun toggleAppleMusicEffect(enabled: Boolean) {
+        isAppleMusicEffectEnabled = enabled
+        playerPrefs.setLyricsAppleEffectEnabled(enabled)
+    }
+
+    fun toggleWordSync(enabled: Boolean) {
+        isWordSyncEnabled = enabled
+        playerPrefs.setLyricsWordSyncEnabled(enabled)
+    }
+
+    var isRomanizationEnabled by mutableStateOf(playerPrefs.getLyricsRomanizationEnabled())
+
+    fun toggleRomanization(enabled: Boolean) {
+        isRomanizationEnabled = enabled
+        playerPrefs.setLyricsRomanizationEnabled(enabled)
+        if (enabled && lyricsLines.isNotEmpty()) {
+            fetchRomanizationForCurrentLines()
+        }
+    }
+
+    fun fetchRomanizationForCurrentLines() {
+        if (lyricsLines.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val originalLines = lyricsLines.map { it.text }.filter { it.isNotBlank() }.distinct()
+            val romMap = com.alananasss.kittytune.data.network.FreeTranslator.getRomanization(originalLines)
+            withContext(Dispatchers.Main) {
+                for (i in lyricsLines.indices) {
+                    val oldLine = lyricsLines[i]
+                    val rom = romMap[oldLine.text.trim()]
+                    lyricsLines[i] = oldLine.copy(romanization = rom)
+                }
+            }
+        }
+    }
+
+    var lyricsProvider by mutableStateOf(playerPrefs.getLyricsProvider())
+        private set
+
+    fun updateLyricsProvider(provider: LyricsProvider) {
+        lyricsProvider = provider
+        playerPrefs.setLyricsProvider(provider)
+        reloadLyrics()
+    }
+
+    var isLyricsTranslationEnabled by mutableStateOf(playerPrefs.getLyricsTranslationEnabled())
+    var lyricsTranslationLang by mutableStateOf(playerPrefs.getLyricsTranslationLang())
+    var isTranslatingLyrics by mutableStateOf(false)
+    var lastFetchedMxmTrackId: Long? = null
+    private var translationJob: Job? = null
+
+    fun toggleLyricsTranslation(enabled: Boolean) {
+        isLyricsTranslationEnabled = enabled
+        playerPrefs.setLyricsTranslationEnabled(enabled)
+        if (enabled && lyricsLines.isNotEmpty()) {
+            fetchTranslationsForCurrentLines(lyricsTranslationLang)
+        }
+    }
+
+    fun setLyricsTranslationLanguage(lang: String) {
+        lyricsTranslationLang = lang
+        playerPrefs.setLyricsTranslationLang(lang)
+        if (isLyricsTranslationEnabled && lyricsLines.isNotEmpty()) {
+            fetchTranslationsForCurrentLines(lang)
+        }
+    }
+
+    fun fetchTranslationsForCurrentLines(targetLang: String = lyricsTranslationLang) {
+        translationJob?.cancel()
+        if (lyricsLines.isEmpty()) return
+        isTranslatingLyrics = true
+        val trackId = lastFetchedMxmTrackId
+        val originalLines = lyricsLines.map { it.text }.filter { it.isNotBlank() }.distinct()
+
+        translationJob = viewModelScope.launch(Dispatchers.IO) {
+            val translationMap = mutableMapOf<String, String>()
+
+            if (trackId != null) {
+                try {
+                    val token = com.alananasss.kittytune.data.network.MusixmatchClient.getValidToken()
+                    val translationsRes = com.alananasss.kittytune.data.network.MusixmatchClient.api.getTranslations(trackId = trackId, lang = targetLang, token = token)
+                    translationsRes.message.body?.translationsList?.forEach { wrapper ->
+                        wrapper.translation?.let { t ->
+                            translationMap[t.matchedLine.trim()] = t.description.trim()
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+
+            val missingLines = originalLines.filter { !translationMap.containsKey(it.trim()) }
+            if (missingLines.isNotEmpty()) {
+                val machineTranslations = com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(missingLines, targetLang)
+                translationMap.putAll(machineTranslations)
+            }
+
+            withContext(Dispatchers.Main) {
+                for (i in lyricsLines.indices) {
+                    val oldLine = lyricsLines[i]
+                    val newTranslation = translationMap[oldLine.text.trim()]
+                    lyricsLines[i] = oldLine.copy(translation = newTranslation)
+                }
+                isTranslatingLyrics = false
+            }
+        }
+    }
+
     var showLyricsSheet by mutableStateOf(false)
     var lyricsLines = mutableStateListOf<LyricLine>()
     var isLyricsLoading by mutableStateOf(false)
     var isSearchingLyrics by mutableStateOf(false)
     var manualSearchQuery by mutableStateOf("")
     val lyricSearchResults = mutableStateListOf<LrcLibResponse>()
+    var manualSearchProvider by mutableStateOf("MUSIXMATCH") // Par défaut sur Musixmatch !
+    val unifiedLyricSearchResults = mutableStateListOf<UnifiedLyricResult>()
 
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
     var lyricsAlignment by mutableStateOf(playerPrefs.getLyricsAlignment())
@@ -800,6 +922,56 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    // Générateur intelligent de requêtes pour déjouer les titres SoundCloud
+    private fun generateSearchQueries(title: String, uploader: String): List<String> {
+        val queries = mutableSetOf<String>()
+
+        // 1. Nettoyage EXTRÊME de l'artiste (Détruit les emojis, étoiles, symboles bizarres)
+        // Ne garde que les lettres, chiffres, espaces, tirets, &, ', et $ (pour $uicideboy$ ou A$AP)
+        val cleanArtist = uploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
+
+        // 2. Nettoyage de base du titre (Enlève tout ce qui est entre parenthèses ou crochets)
+        val cleanTitle = title.replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
+
+        var parsedArtist = cleanArtist
+        var parsedTitle = cleanTitle
+
+        // 3. Détection du format "Artiste - Titre" (très courant sur SoundCloud)
+        if (cleanTitle.contains("-")) {
+            val parts = cleanTitle.split("-", limit = 2)
+            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
+            parsedTitle = parts[1].trim()
+        } else if (title.contains("-")) {
+            val parts = title.split("-", limit = 2)
+            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
+            parsedTitle = parts[1].replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
+        }
+
+        // 4. Nettoyage "Ultra" du titre (Coupe tout ce qui suit w/, feat, ft, prod, x)
+        // Ça transforme "giving girls cocaine w/ lil tracy" en "giving girls cocaine"
+        val ultraCleanTitle = parsedTitle.replace(Regex("(?i)\\s+(w/|feat\\.?|ft\\.?|prod\\.?|x(?=\\s)).*"), "").trim()
+
+        // 5. Génération des requêtes (de la plus stricte/parfaite à la plus large)
+        
+        // A. La perfection (Ex: "giving girls cocaine LiL PEEP")
+        if (ultraCleanTitle.isNotBlank() && parsedArtist.isNotBlank()) queries.add("$ultraCleanTitle $parsedArtist")
+        if (ultraCleanTitle.isNotBlank() && cleanArtist.isNotBlank() && cleanArtist != parsedArtist) queries.add("$ultraCleanTitle $cleanArtist")
+        
+        // B. Le titre nettoyé mais avec les featurings + artiste
+        if (parsedTitle.isNotBlank() && parsedArtist.isNotBlank()) queries.add("$parsedTitle $parsedArtist")
+        
+        // C. Juste le titre pur (Sans artiste, si la chanson est très connue)
+        if (ultraCleanTitle.isNotBlank()) queries.add(ultraCleanTitle)
+        
+        // D. Juste le titre avec featurings
+        if (parsedTitle.isNotBlank()) queries.add(parsedTitle)
+
+        // E. En tout dernier recours, la chaîne brute
+        queries.add(cleanTitle)
+
+        return queries.filter { it.length > 2 }.toList()
+    }
+
     private fun loadLyrics(track: Track) {
         lyricsJob?.cancel()
         lyricsLines.clear()
@@ -809,77 +981,143 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         isSearchingLyrics = false
         rawPlainLyrics = null
 
-        val originalTitle = track.title ?: ""
-        val cleanTitle = cleanTitleNoise(originalTitle)
-        val uploader = track.user?.username ?: ""
+        val trackDurationMs = track.durationMs ?: 0L
+        val trackDurationSec = trackDurationMs / 1000.0
 
-        val searchQueries = mutableListOf<String>()
+        val queries = generateSearchQueries(track.title ?: "", track.user?.username ?: "")
+        manualSearchQuery = queries.firstOrNull() ?: ""
 
-        if (isPreciseLyricsSearchEnabled) {
-            if (cleanTitle.contains(" - ")) {
-                searchQueries.add(cleanTitle)
-                searchQueries.add(cleanTitle.substringAfter(" - ").trim())
-                searchQueries.add("$cleanTitle $uploader".trim())
-            } else {
-                searchQueries.add("$cleanTitle $uploader".trim())
-                searchQueries.add(cleanTitle)
-            }
-        } else {
-            searchQueries.add(cleanTitle)
-        }
-
-        manualSearchQuery = searchQueries.first()
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
             val preferLocal = playerPrefs.getLyricsPreferLocal()
-            var localLyricsFound = false
-
             if (preferLocal) {
                 val localTrack = DownloadManager.getLocalTrack(track.id)
                 if (localTrack != null && localTrack.localAudioPath.isNotEmpty()) {
                     val rawLyrics = LyricsUtils.extractLocalLyrics(localTrack.localAudioPath)
                     if (!rawLyrics.isNullOrBlank()) {
-                        val parsed = LyricsUtils.parseLyricsContent(rawLyrics, track.durationMs ?: 0L)
-                        val finalLines = parsed.ifEmpty { listOf(LyricLine(rawLyrics, 0, track.durationMs ?: 0L)) }
+                        val parsed = LyricsUtils.parseLyricsContent(rawLyrics, trackDurationMs)
                         withContext(Dispatchers.Main) {
-                            lyricsLines.addAll(finalLines)
+                            lyricsLines.addAll(parsed.ifEmpty { listOf(LyricLine(rawLyrics, 0, trackDurationMs)) })
                             lyricsMode = LyricsMode.SYNCED
                             isLyricsLoading = false
                         }
-                        localLyricsFound = true
+                        return@launch
                     }
                 }
             }
 
-            if (!localLyricsFound) {
-                try {
-                    val trackDurationSec = (track.durationMs ?: 0L) / 1000.0
-                    var results: List<LrcLibResponse> = emptyList()
+            var bestMxmLineSync: Pair<List<LyricLine>, String?>? = null
+            var bestLrcLineSync: LrcLibResponse? = null
 
-                    for (query in searchQueries) {
-                        if (!isActive) return@launch
+            var finalLines = emptyList<LyricLine>()
+            var finalPlain: String? = null
 
-                        if (query.isBlank()) continue
-                        results = LrcLibClient.api.searchLyrics(query)
+            val preferLrcLib = lyricsProvider == LyricsProvider.OPEN_SOURCE
 
-                        if (results.isNotEmpty()) {
-                            withContext(Dispatchers.Main) {
-                                manualSearchQuery = query
-                            }
-                            break
-                        }
+            for (query in queries) {
+                if (!isActive) return@launch
+
+                if (preferLrcLib) {
+                    val lrcAll = try { LrcLibClient.api.searchLyrics(query) } catch (e: Exception) { emptyList() }
+                    val lrcFiltered = lrcAll.filter { kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
+                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered.take(3) else lrcAll.take(1)
+                    val lrcMatch = topLrc.maxByOrNull { if (!it.syncedLyrics.isNullOrEmpty()) 1 else 0 }
+
+                    val lrcLines = lrcMatch?.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) } ?: emptyList()
+                    val lrcPlain = lrcMatch?.plainLyrics
+
+                    if (lrcLines.isNotEmpty() || !lrcPlain.isNullOrBlank()) {
+                        finalLines = lrcLines
+                        finalPlain = lrcPlain
+                        break
                     }
+                } else {
+                    val mxmAll = try { MusixmatchClient.search(query) } catch (e: Exception) { emptyList() }
+                    val mxmFiltered = mxmAll.filter { kotlin.math.abs(it.trackLength - trackDurationSec) < 15.0 }
+                    val topMxm = if (mxmFiltered.isNotEmpty()) mxmFiltered.take(3) else mxmAll.take(1)
+                    val mxmMatch = topMxm.maxByOrNull { it.hasRichSync * 2 + it.hasSubtitles }
 
-                    if (!isActive) return@launch
+                    val targetLang = if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
+                    val mxmData = mxmMatch?.let { MusixmatchClient.getLyricsData(it.trackId, trackDurationMs, targetLang, isRomanizationEnabled) }
+                    
+                    if (mxmData != null && mxmData.first.any { it.words.isNotEmpty() }) {
+                        finalLines = mxmData.first; finalPlain = mxmData.second
+                        break
+                    }
+                    if (mxmData != null && mxmData.first.size > 1 && bestMxmLineSync == null) bestMxmLineSync = mxmData
 
-                    val bestMatch = results.filter { abs(it.duration - trackDurationSec) < 4.0 }.find { !it.syncedLyrics.isNullOrEmpty() } ?: results.firstOrNull()
-                    processLyricsResponse(bestMatch, track.durationMs ?: 0L)
-                } catch (e: Exception) {
-                    if (e !is CancellationException) {
-                        withContext(Dispatchers.Main) { isLyricsLoading = false }
+                    val lrcAll = try { LrcLibClient.api.searchLyrics(query) } catch (e: Exception) { emptyList() }
+                    val lrcFiltered = lrcAll.filter { kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
+                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered.take(3) else lrcAll.take(1)
+                    val lrcMatch = topLrc.maxByOrNull { if (!it.syncedLyrics.isNullOrEmpty()) 1 else 0 }
+
+                    val lrcLines = lrcMatch?.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) } ?: emptyList()
+                    val lrcPlain = lrcMatch?.plainLyrics
+
+                    if (lrcLines.any { it.words.isNotEmpty() }) {
+                        finalLines = lrcLines; finalPlain = lrcPlain
+                        break
+                    }
+                    if (lrcLines.size > 1 && bestLrcLineSync == null) bestLrcLineSync = lrcMatch
+
+                    val mxmWordSync = mxmData != null && mxmData.first.any { it.words.isNotEmpty() }
+                    val lrcWordSync = lrcLines.any { it.words.isNotEmpty() }
+                    val mxmLineSync = mxmData != null && mxmData.first.size > 1
+                    val lrcLineSync = lrcLines.size > 1
+                    val hasMxmPlain = !mxmData?.second.isNullOrBlank()
+                    val hasLrcPlain = !lrcPlain.isNullOrBlank()
+
+                    if (mxmWordSync || lrcWordSync || mxmLineSync || lrcLineSync || hasMxmPlain || hasLrcPlain) {
+                        when {
+                            mxmWordSync -> { finalLines = mxmData!!.first; finalPlain = mxmData.second }
+                            lrcWordSync -> { finalLines = lrcLines; finalPlain = lrcPlain }
+                            mxmLineSync -> { finalLines = mxmData!!.first; finalPlain = mxmData.second }
+                            lrcLineSync -> { finalLines = lrcLines; finalPlain = lrcPlain }
+                            hasMxmPlain -> { finalPlain = mxmData!!.second }
+                            hasLrcPlain -> { finalPlain = lrcPlain }
+                        }
+                        break
                     }
                 }
+            }
+
+            if (finalLines.isEmpty() && finalPlain.isNullOrBlank()) {
+                for (query in queries) {
+                    if (!isActive) break
+                    val lrcPlain = try { LrcLibClient.api.searchLyrics(query).firstOrNull { !it.plainLyrics.isNullOrBlank() }?.plainLyrics } catch(e:Exception){null}
+                    if (lrcPlain != null) { finalPlain = lrcPlain; break }
+                }
+            }
+
+            if (finalLines.isNotEmpty() && (preferLrcLib || (finalLines.firstOrNull()?.translation == null && finalLines.firstOrNull()?.romanization == null))) {
+                val targetLang = if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
+                val wantsRomanization = isRomanizationEnabled
+
+                if (targetLang != null || wantsRomanization) {
+                    val originalTexts = finalLines.map { it.text }.filter { it.isNotBlank() }.distinct()
+                    val translations = if (targetLang != null) com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(originalTexts, targetLang) else emptyMap()
+                    val romanizations = if (wantsRomanization) com.alananasss.kittytune.data.network.FreeTranslator.getRomanization(originalTexts) else emptyMap()
+
+                    finalLines = finalLines.map { line ->
+                        line.copy(
+                            translation = line.translation ?: translations[line.text.trim()],
+                            romanization = line.romanization ?: romanizations[line.text.trim()]
+                        )
+                    }
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                lyricsLines.addAll(finalLines)
+                rawPlainLyrics = finalPlain
+                lyricsMode = if (finalLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
+                isLyricsLoading = false
+                if (finalLines.isNotEmpty() || !rawPlainLyrics.isNullOrBlank()) isSearchingLyrics = false
             }
         }
+    }
+
+    fun reloadLyrics() {
+        currentTrack?.let { loadLyrics(it) }
     }
 
     fun adjustLyricsOffset(amount: Long) {
@@ -935,7 +1173,64 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun searchLyricsManual(query: String) { if (query.isBlank()) return; isLyricsLoading = true; lyricSearchResults.clear(); viewModelScope.launch(Dispatchers.IO) { try { val results = LrcLibClient.api.searchLyrics(query); withContext(Dispatchers.Main) { lyricSearchResults.addAll(results) } } catch (e: Exception) { e.printStackTrace() } finally { withContext(Dispatchers.Main) { isLyricsLoading = false } } } }
+    fun searchLyricsManual(query: String, provider: String = manualSearchProvider) {
+        if (query.isBlank()) return
+        isLyricsLoading = true
+        unifiedLyricSearchResults.clear()
+        manualSearchProvider = provider
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                if (provider == "LRCLIB") {
+                    val results = LrcLibClient.api.searchLyrics(query)
+                    val mapped = results.map {
+                        UnifiedLyricResult(it.id.toString(), it.name, it.artistName, it.albumName, it.duration, !it.syncedLyrics.isNullOrEmpty(), false, "LRCLIB")
+                    }
+                    withContext(Dispatchers.Main) { unifiedLyricSearchResults.addAll(mapped) }
+                } else {
+                    val results = MusixmatchClient.search(query)
+                    val mapped = results.map {
+                        UnifiedLyricResult(it.trackId.toString(), it.trackName, it.artistName, it.albumName, it.trackLength.toDouble(), it.hasSubtitles == 1, it.hasRichSync == 1, "MUSIXMATCH")
+                    }
+                    withContext(Dispatchers.Main) { unifiedLyricSearchResults.addAll(mapped) }
+                }
+            } catch (e: Exception) { e.printStackTrace() }
+            finally { withContext(Dispatchers.Main) { isLyricsLoading = false } }
+        }
+    }
+
+    fun selectUnifiedLyricResult(result: UnifiedLyricResult) {
+        viewModelScope.launch(Dispatchers.IO) {
+            isLyricsLoading = true
+            var finalLines = emptyList<LyricLine>()
+            var finalPlain: String? = null
+
+            if (result.provider == "LRCLIB") {
+                try {
+                    val lrcData = LrcLibClient.api.searchLyrics(result.name + " " + result.artistName).find { it.id.toString() == result.id }
+                    val lyricsText = lrcData?.lyricsfile ?: lrcData?.syncedLyrics
+                    if (!lyricsText.isNullOrEmpty()) finalLines = LyricsUtils.parseLyricsContent(lyricsText, duration)
+                    finalPlain = lrcData?.plainLyrics
+                } catch (e: Exception) {}
+            } else {
+                val targetLang = if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
+                lastFetchedMxmTrackId = result.id.toLongOrNull()
+                val data = MusixmatchClient.getLyricsData(result.id.toLong(), duration, targetLang, isRomanizationEnabled)
+                finalLines = data.first
+                finalPlain = data.second
+            }
+
+            withContext(Dispatchers.Main) {
+                lyricsLines.clear()
+                lyricsLines.addAll(finalLines)
+                rawPlainLyrics = finalPlain
+                lyricsMode = if (finalLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
+                isLyricsLoading = false
+                isSearchingLyrics = false
+            }
+        }
+    }
+
     fun selectLyricResult(result: LrcLibResponse) { viewModelScope.launch(Dispatchers.IO) { processLyricsResponse(result, duration) } }
     private fun cleanTitleNoise(title: String): String = title.replace(Regex("\\(.*?\\)|\\[.*?]"), "").replace(Regex("(?i)(official video|lyrics|ft\\.|feat\\.|prod\\.)"), "").trim()
 

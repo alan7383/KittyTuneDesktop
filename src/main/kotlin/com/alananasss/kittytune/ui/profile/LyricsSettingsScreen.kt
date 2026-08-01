@@ -7,6 +7,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.foundation.clickable
     import androidx.compose.foundation.layout.*
     import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+    import androidx.compose.foundation.lazy.items
     import androidx.compose.foundation.shape.RoundedCornerShape
     import androidx.compose.material.icons.Icons
     import androidx.compose.material.icons.rounded.Add
@@ -52,6 +53,88 @@ import androidx.compose.material3.ContainedLoadingIndicator
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
+        var provider by remember { mutableStateOf(playerViewModel.lyricsProvider) }
+        var showProviderDialog by remember { mutableStateOf(false) }
+
+        var enableTranslation by remember { mutableStateOf(prefs.getLyricsTranslationEnabled()) }
+        var targetLang by remember { mutableStateOf(prefs.getLyricsTranslationLang()) }
+        var showLangDialog by remember { mutableStateOf(false) }
+
+        if (showProviderDialog) {
+            EscapableAlertDialog(
+                onDismissRequest = { showProviderDialog = false },
+                title = { Text(str("pref_lyrics_provider_title")) },
+                text = {
+                    Column {
+                        Row(Modifier.fillMaxWidth().clickable { 
+                            provider = com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY
+                            playerViewModel.updateLyricsProvider(provider)
+                            showProviderDialog = false 
+                        }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = (provider == com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY), onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(str("pref_lyrics_provider_max_quality"))
+                        }
+                        Row(Modifier.fillMaxWidth().clickable { 
+                            provider = com.alananasss.kittytune.ui.player.LyricsProvider.OPEN_SOURCE
+                            playerViewModel.updateLyricsProvider(provider)
+                            showProviderDialog = false 
+                        }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(selected = (provider == com.alananasss.kittytune.ui.player.LyricsProvider.OPEN_SOURCE), onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(str("pref_lyrics_provider_open_source"))
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showProviderDialog = false }) { Text(str("btn_cancel")) } }
+            )
+        }
+
+        if (showLangDialog) {
+            val systemLangCode = java.util.Locale.getDefault().language
+            val allLanguages = remember {
+                val locales = java.util.Locale.getISOLanguages()
+                    .map { code ->
+                        val loc = java.util.Locale(code)
+                        code to loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
+                    }
+                    .filter { it.second.isNotBlank() && it.first.length == 2 }
+                    .distinctBy { it.first }
+                    .sortedBy { it.second }
+
+                val list = mutableListOf<Pair<String, String>>()
+                val systemLoc = locales.find { it.first == systemLangCode }
+                if (systemLoc != null) {
+                    list.add(systemLoc.first to "${systemLoc.second} (${str("theme_system")})")
+                }
+                list.addAll(locales.filter { it.first != systemLangCode })
+                list
+            }
+
+            EscapableAlertDialog(
+                onDismissRequest = { showLangDialog = false },
+                title = { Text(str("pref_lyrics_translation_lang")) },
+                text = {
+                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                        items(allLanguages) { (code, name) ->
+                            Row(
+                                Modifier.fillMaxWidth().clickable { 
+                                    targetLang = code
+                                    showLangDialog = false 
+                                    playerViewModel.setLyricsTranslationLanguage(code)
+                                }.padding(vertical = 12.dp), 
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = (targetLang == code), onClick = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(name)
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showLangDialog = false }) { Text(str("btn_cancel")) } }
+            )
+        }
     
         // --- DIALOGS ---
     
@@ -128,17 +211,69 @@ import androidx.compose.material3.ContainedLoadingIndicator
                                     }
                                 )
                             },
+
                             { shape ->
                                 SettingsItem(
                                     shape = shape,
-                                    title = str("pref_lyrics_precise"),
-                                    subtitle = str("pref_lyrics_precise_sub"),
+                                    title = str("pref_lyrics_word_sync"),
+                                    subtitle = str("pref_lyrics_word_sync_sub"),
                                     hasSwitch = true,
-                                    switchState = playerViewModel.isPreciseLyricsSearchEnabled,
+                                    switchState = playerViewModel.isWordSyncEnabled,
+                                    onSwitchChange = { playerViewModel.toggleWordSync(it) }
+                                )
+                            },
+                            { shape ->
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = playerViewModel.isWordSyncEnabled,
+                                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                                ) {
+                                    SettingsItem(
+                                        shape = shape,
+                                        title = str("pref_lyrics_apple_effect"),
+                                        subtitle = str("pref_lyrics_apple_effect_sub"),
+                                        hasSwitch = true,
+                                        switchState = playerViewModel.isAppleMusicEffectEnabled,
+                                        onSwitchChange = { playerViewModel.toggleAppleMusicEffect(it) }
+                                    )
+                                }
+                            },
+                            { shape ->
+                                SettingsItem(
+                                    shape = shape,
+                                    title = str("pref_lyrics_romanization"),
+                                    subtitle = str("pref_lyrics_romanization_sub"),
+                                    hasSwitch = true,
+                                    switchState = playerViewModel.isRomanizationEnabled,
+                                    onSwitchChange = { playerViewModel.toggleRomanization(it) }
+                                )
+                            },
+                            { shape ->
+                                SettingsItem(
+                                    shape = shape,
+                                    title = str("pref_lyrics_translation_title"),
+                                    subtitle = str("pref_lyrics_translation_sub"),
+                                    hasSwitch = true,
+                                    switchState = enableTranslation,
                                     onSwitchChange = {
-                                        playerViewModel.togglePreciseLyricsSearch(it)
+                                        enableTranslation = it
+                                        playerViewModel.toggleLyricsTranslation(it)
                                     }
                                 )
+                            },
+                            { shape ->
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = enableTranslation,
+                                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                                ) {
+                                    SettingsItem(
+                                        shape = shape,
+                                        title = str("pref_lyrics_translation_lang"),
+                                        subtitle = targetLang.uppercase(),
+                                        onClick = { showLangDialog = true }
+                                    )
+                                }
                             }
                         )
                     )
@@ -151,10 +286,17 @@ import androidx.compose.material3.ContainedLoadingIndicator
     
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
     
-                            val totalVisibleItems = if (showLyricsButton) 4 else 3
+                            val totalVisibleItems = if (showLyricsButton) 5 else 4
     
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 0),
+                                title = str("pref_lyrics_provider_title"),
+                                subtitle = if (provider == com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY) str("pref_lyrics_provider_max_quality") else str("pref_lyrics_provider_open_source"),
+                                onClick = { showProviderDialog = true }
+                            )
+
+                            SettingsItem(
+                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 1),
                                 title = str("pref_lyrics_show_button"),
                                 subtitle = str("pref_lyrics_show_button_sub"),
                                 hasSwitch = true,
@@ -171,7 +313,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
                                 exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                             ) {
                                 SettingsItem(
-                                    shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 1),
+                                    shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 2),
                                     title = str("pref_lyrics_inline"),
                                     subtitle = str("pref_lyrics_inline_sub"),
                                     hasSwitch = true,
@@ -183,7 +325,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
                                 )
                             }
     
-                            val alignIndex = if (showLyricsButton) 2 else 1
+                            val alignIndex = if (showLyricsButton) 3 else 2
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, alignIndex),
                                 title = str("pref_lyrics_align"),
@@ -195,7 +337,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
                                 onClick = { showAlignmentDialog = true }
                             )
     
-                            val sizeIndex = if (showLyricsButton) 3 else 2
+                            val sizeIndex = if (showLyricsButton) 4 else 3
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, sizeIndex),
                                 title = str("pref_lyrics_size"),
