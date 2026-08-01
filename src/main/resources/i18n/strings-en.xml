@@ -2129,4 +2129,13 @@
     <string name="pref_norm_quiet">Quiet</string>
     <string name="pref_norm_normal">Normal</string>
     <string name="pref_norm_loud">Loud</string>
+    <string name="pref_storage_title">Storage</string>
+    <string name="pref_storage_downloads">Downloads</string>
+    <string name="pref_storage_downloads_desc">Content you\'ve downloaded to listen offline</string>
+    <string name="pref_storage_downloads_clear">Delete all downloads</string>
+    <string name="pref_storage_cache">Cache</string>
+    <string name="pref_storage_cache_desc">Temporary files stored by the application for a faster experience</string>
+    <string name="pref_storage_cache_clear">Clear cache</string>
+    <string name="pref_storage_location">Offline storage location</string>
+    <string name="pref_storage_location_change">Change location</string>
 </resources>

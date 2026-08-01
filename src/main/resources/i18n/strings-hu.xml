@@ -1918,4 +1918,13 @@
     <string name="pref_norm_quiet">Csendes</string>
     <string name="pref_norm_normal">Normál</string>
     <string name="pref_norm_loud">Hangos</string>
+    <string name="pref_storage_title">Tárhely</string>
+    <string name="pref_storage_downloads">Letöltések</string>
+    <string name="pref_storage_downloads_desc">Offline hallgatáshoz letöltött tartalom</string>
+    <string name="pref_storage_downloads_clear">Összes letöltés törlése</string>
+    <string name="pref_storage_cache">Gyorsítótár</string>
+    <string name="pref_storage_cache_desc">Az alkalmazás által tárolt ideiglenes fájlok a gyorsabb élmény érdekében</string>
+    <string name="pref_storage_cache_clear">Gyorsítótár törlése</string>
+    <string name="pref_storage_location">Offline tárhely helye</string>
+    <string name="pref_storage_location_change">Hely módosítása</string>
 </resources>
