@@ -1097,16 +1097,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         finalPlain = lrcPlain
                     }
                 } else {
-                    val mxmAll = try { MusixmatchClient.search(query) } catch (e: Exception) { emptyList() }
-                    val mxmFiltered = mxmAll.filter { kotlin.math.abs(it.trackLength - trackDurationSec) < 15.0 }
+                    val (mxmAll, lrcAll) = kotlinx.coroutines.coroutineScope {
+                        val mxmDeferred = async {
+                            try { MusixmatchClient.search(query) } catch (e: Exception) {
+                                println("MXM search exception: ${e.message}")
+                                emptyList()
+                            }
+                        }
+                        val lrcDeferred = async {
+                            try { LrcLibClient.api.searchLyrics(query) } catch (e: Exception) { emptyList() }
+                        }
+                        Pair(mxmDeferred.await(), lrcDeferred.await())
+                    }
+
+                    println("LyricsFetch: MXM search results: ${mxmAll.size} | LRC search results: ${lrcAll.size}")
+
+                    val mxmFiltered = mxmAll.filter { it.trackLength == 0 || kotlin.math.abs(it.trackLength - trackDurationSec) < 15.0 }
                     val topMxm = if (mxmFiltered.isNotEmpty()) mxmFiltered else mxmAll.take(10)
                     val mxmMatch = topMxm.maxByOrNull { it.hasRichSync * 2 + it.hasSubtitles }
+
+                    println("LyricsFetch: MXM best match: ${mxmMatch?.trackName} | hasRichSync=${mxmMatch?.hasRichSync} | hasSubtitles=${mxmMatch?.hasSubtitles}")
 
                     val targetLang = if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
                     val mxmData = mxmMatch?.let { MusixmatchClient.getLyricsData(it.trackId, trackDurationMs, targetLang, isRomanizationEnabled) }
 
-                    val lrcAll = try { LrcLibClient.api.searchLyrics(query) } catch (e: Exception) { emptyList() }
-                    val lrcFiltered = lrcAll.filter { kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
+                    val lrcFiltered = lrcAll.filter { it.duration == 0.0 || kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
                     val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered else lrcAll.take(10)
                     val lrcMatch = topLrc.maxByOrNull { if (!it.syncedLyrics.isNullOrEmpty()) 1 else 0 }
 
@@ -1120,17 +1135,39 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val hasMxmPlain = !mxmData?.second.isNullOrBlank()
                     val hasLrcPlain = !lrcPlain.isNullOrBlank()
 
-                    if (mxmWordSync || lrcWordSync) {
-                        if (mxmWordSync) { finalLines = mxmData!!.first; finalPlain = mxmData.second }
-                        else { finalLines = lrcLines; finalPlain = lrcPlain }
-                        break
+                    println("LyricsFetch: MXM: wordSync=$mxmWordSync lineSync=$mxmLineSync plain=$hasMxmPlain linesCount=${mxmData?.first?.size}")
+                    println("LyricsFetch: LRC: wordSync=$lrcWordSync lineSync=$lrcLineSync plain=$hasLrcPlain linesCount=${lrcLines.size}")
+
+                    when {
+                        mxmWordSync -> {
+                            println("LyricsFetch: ✅ Picked: MXM word-sync")
+                            finalLines = mxmData!!.first
+                            finalPlain = mxmData.second
+                            break
+                        }
+                        lrcWordSync -> {
+                            println("LyricsFetch: ✅ Picked: LRC word-sync")
+                            finalLines = lrcLines
+                            finalPlain = lrcPlain
+                            break
+                        }
+                        mxmLineSync -> {
+                            println("LyricsFetch: ✅ Picked: MXM line-sync")
+                            // MXM line-sync wins over LRCLib even if LRC also has line-sync
+                            bestMxmLineSync = mxmData
+                            if (hasMxmPlain) finalPlain = mxmData!!.second
+                            break
+                        }
+                        lrcLineSync -> {
+                            println("LyricsFetch: ✅ Picked: LRC line-sync (MXM had nothing)")
+                            // Only use LRCLib line-sync if MXM found nothing synced
+                            bestLrcLineSync = lrcMatch
+                            if (hasLrcPlain) finalPlain = lrcPlain
+                            break
+                        }
+                        hasMxmPlain -> { if (finalPlain == null) finalPlain = mxmData!!.second }
+                        hasLrcPlain -> { if (finalPlain == null) finalPlain = lrcPlain }
                     }
-
-                    if (mxmLineSync && bestMxmLineSync == null) bestMxmLineSync = mxmData
-                    if (lrcLineSync && bestLrcLineSync == null) bestLrcLineSync = lrcMatch
-
-                    if (hasMxmPlain && finalPlain == null) finalPlain = mxmData!!.second
-                    if (hasLrcPlain && finalPlain == null) finalPlain = lrcPlain
                 }
             }
 

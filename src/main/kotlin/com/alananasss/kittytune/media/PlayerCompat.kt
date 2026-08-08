@@ -151,6 +151,12 @@ class Player {
             listeners.forEach { it.onPlayerError(err) } 
         }
         eng.onCompletion = { onCompletion?.invoke() }
+        eng.onReResolveUrl = {
+            currentMediaItem?.track?.let { track ->
+                StreamResolver.evictStream(track.id)
+                StreamResolver.resolveStream(track)
+            }
+        }
     }
 
     private fun unbindEngine(eng: AudioEngine) {
@@ -158,6 +164,7 @@ class Player {
         eng.onStateChanged = null
         eng.onError = null
         eng.onCompletion = null
+        eng.onReResolveUrl = null
     }
 
     fun addListener(l: Listener) { if (!listeners.contains(l)) listeners.add(l) }
