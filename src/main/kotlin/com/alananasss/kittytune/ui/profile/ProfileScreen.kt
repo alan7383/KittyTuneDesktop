@@ -1251,13 +1251,29 @@ fun UserCommentItem(
                     )
                 }
 
-                val currentLocale = java.util.Locale.getDefault()
-                val langName = remember(currentLocale) {
-                    currentLocale.getDisplayLanguage(currentLocale).replaceFirstChar { if (it.isLowerCase()) it.titlecase(currentLocale) else it.toString() }
+                val appLang = com.alananasss.kittytune.core.Strings.appLanguage
+                val langCode = if (appLang == "system" || appLang.isBlank()) java.util.Locale.getDefault().language else appLang
+                val langName = remember(langCode) {
+                    val loc = java.util.Locale(langCode)
+                    loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
                 }
-                val langCode = currentLocale.language
 
-                if (translatedText == null && !isTranslating) {
+                var isTargetLanguage by remember(comment.body, langCode) { mutableStateOf(false) }
+                LaunchedEffect(comment.body, langCode) {
+                    val cleanText = comment.body.replace(Regex("[^\\p{L}\\p{Nd}\\s]"), "").trim()
+                    if (cleanText.isBlank()) {
+                        isTargetLanguage = true
+                    } else {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            val language = com.alananasss.kittytune.util.LanguageDetection.identifyLanguage(cleanText)
+                            if (language == langCode || language == "und") {
+                                isTargetLanguage = true
+                            }
+                        }
+                    }
+                }
+
+                if (translatedText == null && !isTranslating && !isTargetLanguage) {
                     Text(
                         text = str("comment_translate", langName),
                         style = MaterialTheme.typography.labelMedium,
@@ -1289,7 +1305,7 @@ fun UserCommentItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier.padding(vertical = 4.dp)
                     )
-                } else if (translatedText!!.isNotEmpty()) {
+                } else if (!translatedText.isNullOrEmpty()) {
                     Text(
                         text = if (showTranslation) str("comment_see_original") else str("comment_translate", langName),
                         style = MaterialTheme.typography.labelMedium,

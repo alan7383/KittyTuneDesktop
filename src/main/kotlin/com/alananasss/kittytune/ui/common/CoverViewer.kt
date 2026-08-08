@@ -47,7 +47,6 @@ object CoverViewerState {
 
     fun hide() {
         visible = false
-        currentUrl = null
     }
 }
 
