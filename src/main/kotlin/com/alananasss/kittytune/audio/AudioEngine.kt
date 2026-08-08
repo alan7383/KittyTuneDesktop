@@ -150,27 +150,98 @@ class AudioEngine {
     }
 
 
-    private fun runDecodeLoop(workerId: Long, url: String, headers: Map<String, String>) {
-        var grabber: FFmpegFrameGrabber? = null
-        var localLine: SourceDataLine? = null
-        try {
-            grabber = FFmpegFrameGrabber(url).apply {
-                if (headers.isNotEmpty()) {
-                    val headerBlob = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
-                    setOption("headers", headerBlob + "\r\n")
-                }
+    var onReResolveUrl: (suspend () -> String?)? = null
+
+    private fun createGrabber(targetUrl: String, headers: Map<String, String>): FFmpegFrameGrabber {
+        return FFmpegFrameGrabber(targetUrl).apply {
+            if (headers.isNotEmpty()) {
+                val headerBlob = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
+                setOption("headers", headerBlob + "\r\n")
+            }
+            if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+                setOption("http_seekable", "1")
                 setOption("reconnect", "1")
                 setOption("reconnect_streamed", "1")
                 setOption("reconnect_delay_max", "5")
-                sampleRate = outputSampleRate
-                audioChannels = outputChannels
-                start()
+                setOption("rw_timeout", "15000000") // 15s in us
             }
+            sampleRate = outputSampleRate
+            audioChannels = outputChannels
+        }
+    }
+
+    private fun recoverStream(
+        oldGrabber: FFmpegFrameGrabber?,
+        url: String,
+        headers: Map<String, String>,
+        resumePosMs: Long
+    ): Pair<FFmpegFrameGrabber?, String?> {
+        try {
+            oldGrabber?.stop()
+            oldGrabber?.release()
+        } catch (_: Exception) {}
+
+        var currentUrlToTry = url
+        val targetTs = resumePosMs * 1000L
+
+        // Attempt 1: Reopen with current URL
+        for (attempt in 1..2) {
+            if (stopFlag) return Pair(null, null)
+            try {
+                val newG = createGrabber(currentUrlToTry, headers)
+                newG.start()
+                if (targetTs > 0) {
+                    try { newG.timestamp = targetTs } catch (_: Exception) {}
+                }
+                return Pair(newG, currentUrlToTry)
+            } catch (e: Exception) {
+                System.err.println("AudioEngine: Reopen attempt $attempt failed: ${e.message}")
+                try { Thread.sleep(300) } catch (_: InterruptedException) {}
+            }
+        }
+
+        // Attempt 2: Re-resolve fresh stream URL (in case URL / token expired after long pause)
+        val reResolver = onReResolveUrl
+        if (reResolver != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+            System.err.println("AudioEngine: Attempting to re-resolve fresh stream URL...")
+            var freshUrl: String? = null
+            kotlinx.coroutines.runBlocking {
+                try {
+                    freshUrl = reResolver.invoke()
+                } catch (e: Exception) {
+                    System.err.println("AudioEngine: Re-resolve failed: ${e.message}")
+                }
+            }
+            val nonNullUrl = freshUrl
+            if (!nonNullUrl.isNullOrEmpty()) {
+                currentUrlToTry = nonNullUrl
+                try {
+                    val newG = createGrabber(currentUrlToTry, headers)
+                    newG.start()
+                    if (targetTs > 0) {
+                        try { newG.timestamp = targetTs } catch (_: Exception) {}
+                    }
+                    return Pair(newG, currentUrlToTry)
+                } catch (e: Exception) {
+                    System.err.println("AudioEngine: Fresh URL open failed: ${e.message}")
+                }
+            }
+        }
+
+        return Pair(null, null)
+    }
+
+    private fun runDecodeLoop(workerId: Long, url: String, headers: Map<String, String>) {
+        var grabber: FFmpegFrameGrabber? = null
+        var localLine: SourceDataLine? = null
+        var activeUrl = url
+        try {
+            grabber = createGrabber(activeUrl, headers)
+            grabber.start()
 
             if (stopFlag || activeWorkerId != workerId) return
 
             durationMs = grabber.lengthInTime / 1000L
-
 
             localLine = openLine()
             line = localLine
@@ -193,30 +264,45 @@ class AudioEngine {
                 val seek = seekRequestMs
                 if (seek >= 0) {
                     val targetTimestamp = seek * 1000L
-                    
-                    System.err.println("AudioEngine: Requested accurate seek to targetTimestamp=$targetTimestamp")
-                    
+                    seekRequestMs = -1L
+
+                    System.err.println("AudioEngine: Seeking to targetTimestamp=$targetTimestamp (ms=$seek)")
+
+                    var seekOk = false
                     try {
-                        grabber.timestamp = targetTimestamp
+                        grabber?.timestamp = targetTimestamp
+                        val currentTs = grabber?.timestamp ?: 0L
+                        if (currentTs <= targetTimestamp + 1_500_000L && (currentTs >= targetTimestamp - 5_000_000L || targetTimestamp < 5_000_000L)) {
+                            seekOk = true
+                        } else {
+                            System.err.println("AudioEngine: setTimestamp landed at $currentTs, expected near $targetTimestamp. Will reopen stream.")
+                        }
                     } catch (e: Exception) {
                         System.err.println("AudioEngine: FFmpeg seek error - ${e.message}")
                     }
 
-                    var droppedCount = 0
-                    while (!stopFlag && activeWorkerId == workerId) {
-                        val f = grabber.grabSamples() ?: break
-                        if (grabber.timestamp >= targetTimestamp) {
-                            System.err.println("AudioEngine: Reached targetTimestamp after dropping $droppedCount frames. Current TS: ${grabber.timestamp}")
-                            break
-                        }
-                        droppedCount++
-                        if (droppedCount > 50000) {
-                            System.err.println("AudioEngine: Warning - breaking accurate seek loop after $droppedCount frames!")
-                            break
+                    if (!seekOk) {
+                        val recovered = recoverStream(grabber, activeUrl, headers, seek)
+                        if (recovered.first != null) {
+                            grabber = recovered.first
+                            if (recovered.second != null) activeUrl = recovered.second!!
+                            seekOk = true
                         }
                     }
-                    
-                    seekRequestMs = -1L
+
+                    val activeG = grabber
+                    if (seekOk && activeG != null) {
+                        var droppedCount = 0
+                        while (!stopFlag && activeWorkerId == workerId) {
+                            val ts = activeG.timestamp
+                            if (ts >= targetTimestamp) break
+                            val f = try { activeG.grabSamples() } catch (_: Exception) { null }
+                            if (f == null) break
+                            droppedCount++
+                            if (droppedCount > 20000) break
+                        }
+                    }
+
                     positionMs = seek
                     stretcher.flush()
                     chain.forEach { it.flush() }
@@ -228,13 +314,39 @@ class AudioEngine {
                     continue
                 }
 
-                val frame: Frame? = grabber.grabSamples()
+                var frame: Frame? = null
+                try {
+                    frame = grabber?.grabSamples()
+                } catch (e: Exception) {
+                    System.err.println("AudioEngine: Read error from grabber: ${e.message}")
+                    frame = null
+                }
+
                 if (frame == null) {
                     if (!stopFlag && activeWorkerId == workerId) {
-                        drainStretcher(outBuf, localLine)
-                        setStateAsync(State.ENDED)
+                        val isNearEnd = durationMs > 0 && positionMs >= durationMs - 3000L
+                        if (isNearEnd) {
+                            drainStretcher(outBuf, localLine)
+                            setStateAsync(State.ENDED)
+                            break
+                        } else {
+                            System.err.println("AudioEngine: Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream...")
+                            val recovered = recoverStream(grabber, activeUrl, headers, positionMs)
+                            if (recovered.first != null) {
+                                grabber = recovered.first
+                                if (recovered.second != null) activeUrl = recovered.second!!
+                                System.err.println("AudioEngine: Stream recovery succeeded at $positionMs ms!")
+                                continue
+                            } else {
+                                System.err.println("AudioEngine: Stream recovery failed. Ending track.")
+                                drainStretcher(outBuf, localLine)
+                                setStateAsync(State.ENDED)
+                                break
+                            }
+                        }
+                    } else {
+                        break
                     }
-                    break
                 }
 
                 val samples = frame.samples ?: continue
@@ -242,7 +354,7 @@ class AudioEngine {
                 pushThroughDsp(pcm)
                 drainStretcher(outBuf, localLine)
 
-                positionMs = grabber.timestamp / 1000L
+                positionMs = (grabber?.timestamp ?: 0L) / 1000L
             }
         } catch (t: Throwable) {
             if (!stopFlag && activeWorkerId == workerId) {
@@ -326,13 +438,26 @@ class AudioEngine {
         var mixer: Mixer? = null
 
         if (deviceName.isNotEmpty()) {
-            val mixerInfos = AudioSystem.getMixerInfo()
-            val targetInfo = mixerInfos.firstOrNull { it.name.trim() == deviceName }
-            if (targetInfo != null) {
+            val isLinux = System.getProperty("os.name").lowercase().contains("linux")
+            if (isLinux && deviceName.startsWith("alsa_output.")) {
+                // pactl sink ID: set PULSE_SINK so Java Sound routes through PipeWire/PulseAudio
+                // This is the standard way to select a specific PipeWire sink from a JVM app
+                System.setProperty("javax.sound.sampled.SourceDataLine", "")
                 try {
-                    val m = AudioSystem.getMixer(targetInfo)
-                    if (m.isLineSupported(info)) mixer = m
+                    val pb = ProcessBuilder("sh", "-c", "pactl set-default-sink '$deviceName'")
+                    pb.start().waitFor()
                 } catch (_: Exception) {}
+                // Java Sound will then use the default PipeWire sink which we just set
+            } else {
+                // Windows/macOS or Java Sound mixer name
+                val mixerInfos = AudioSystem.getMixerInfo()
+                val targetInfo = mixerInfos.firstOrNull { it.name.trim() == deviceName }
+                if (targetInfo != null) {
+                    try {
+                        val m = AudioSystem.getMixer(targetInfo)
+                        if (m.isLineSupported(info)) mixer = m
+                    } catch (_: Exception) {}
+                }
             }
         }
 
