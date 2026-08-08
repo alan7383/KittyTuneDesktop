@@ -84,7 +84,7 @@ fun HeroSection(onDownloadClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.secondaryContainer,
                 ) {
                     Text(
-                        text = "v1.0.27 · Material 3 Expressive",
+                        text = "v1.0.28 · Material 3 Expressive",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
