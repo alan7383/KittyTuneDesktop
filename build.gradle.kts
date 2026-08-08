@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.0.29"
+version = "1.0.30"
 
 repositories {
     google()
@@ -221,6 +221,7 @@ val compileNativeDSP by tasks.registering(Exec::class) {
         compiler, "-shared", "-fPIC", "-O3",
         "-I$javaHome/include",
         "-I$javaHome/include/$osIncludeDir",
+        "-I${File(cppDir, "ebur128/queue").absolutePath}",
         File(cppDir, "KittyTuneAudioDSP.cpp").absolutePath,
         File(cppDir, "ebur128/ebur128.c").absolutePath,
         "-o", outFile.absolutePath
