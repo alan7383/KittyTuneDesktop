@@ -83,6 +83,7 @@ dependencies {
 
     implementation("org.json:json:20260522")
     implementation("org.yaml:snakeyaml:2.2")
+    implementation("com.github.pemistahl:lingua:1.2.2")
     implementation("net.java.dev.jna:jna:5.14.0")
     implementation("net.java.dev.jna:jna-platform:5.14.0")
 
@@ -198,3 +199,34 @@ val generateBuildConfig by tasks.registering {
 }
 
 tasks.named("compileKotlin") { dependsOn(generateBuildConfig) }
+
+val compileNativeDSP by tasks.registering(Exec::class) {
+    val cppDir = project.file("src/main/cpp")
+    val outDir = project.file("src/main/resources/native")
+    
+    doFirst { outDir.mkdirs() }
+    
+    val osName = System.getProperty("os.name").lowercase()
+    val isMac = osName.contains("mac")
+    val isWin = osName.contains("win")
+    val libExt = if (isWin) "dll" else if (isMac) "dylib" else "so"
+    val osIncludeDir = if (isWin) "win32" else if (isMac) "darwin" else "linux"
+    
+    val outFile = File(outDir, "libkittytune_audio_dsp.$libExt")
+    
+    val javaHome = System.getProperty("java.home")
+    val compiler = if (isWin) "g++" else "g++" // assuming MSYS2 or MinGW on Windows, or just gcc/clang
+    
+    commandLine(
+        compiler, "-shared", "-fPIC", "-O3",
+        "-I$javaHome/include",
+        "-I$javaHome/include/$osIncludeDir",
+        File(cppDir, "KittyTuneAudioDSP.cpp").absolutePath,
+        File(cppDir, "ebur128/ebur128.c").absolutePath,
+        "-o", outFile.absolutePath
+    )
+}
+
+tasks.named("processResources") {
+    dependsOn(compileNativeDSP)
+}
