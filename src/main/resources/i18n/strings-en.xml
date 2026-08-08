@@ -2138,4 +2138,7 @@
     <string name="pref_storage_cache_clear">Clear cache</string>
     <string name="pref_storage_location">Offline storage location</string>
     <string name="pref_storage_location_change">Change location</string>
+    <string name="pref_norm_info_title">Understanding Volume Normalization</string>
+    <string name="pref_norm_info_body_1">Different songs are often recorded at different loudness levels. Volume normalization automatically balances your tracks so that every song plays at a consistent, comfortable volume without you needing to adjust it constantly.</string>
+    <string name="pref_norm_info_body_2">How it works:\n• KittyTune measures the true loudness of each song (in LUFS).\n• During playback, volume is dynamically adjusted to match your selected target level.\n• An integrated limiter prevents any distortion or clipping.\n\nLevels:\n• Quiet (-19 LUFS): Ideal for nighttime listening or headphones.\n• Normal (-14 LUFS): The standard used by Spotify &amp; YouTube.\n• Loud (-11 LUFS): Best for noisy environments or outdoor speakers.</string>
 </resources>

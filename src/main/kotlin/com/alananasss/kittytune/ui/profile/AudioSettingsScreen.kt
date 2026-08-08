@@ -10,8 +10,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,8 +57,43 @@ fun AudioSettingsScreen(
     var showDeviceDialog by remember { mutableStateOf(false) }
     var currentDevice by remember { mutableStateOf(prefs.getAudioDevice()) }
 
+    // Track the current system default sink (updated every 2s to react to KDE/system changes)
+    var systemDefaultSinkDesc by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        var lastSystemDefaultId: String? = null
+        while (isActive) {
+            val newDefaultId = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.alananasss.kittytune.util.LinuxAudioManager.getDefaultSinkId()
+            }
+            val newDefaultDesc = if (newDefaultId != null) {
+                com.alananasss.kittytune.util.LinuxAudioManager.getOutputSinks()
+                    .firstOrNull { it.id == newDefaultId }?.description
+            } else null
+
+            systemDefaultSinkDesc = newDefaultDesc
+
+            // If the system default changed externally (e.g., user changed it in KDE),
+            // auto-follow: reset currentDevice to "" so it follows the system
+            if (newDefaultId != null && newDefaultId != lastSystemDefaultId && lastSystemDefaultId != null) {
+                currentDevice = ""
+                prefs.setAudioDevice("")
+                playerViewModel.changeOutputDevice("")
+            }
+            lastSystemDefaultId = newDefaultId
+
+            delay(2000)
+        }
+    }
+
     val availableDevices = remember {
-        val list = mutableListOf<String>()
+        val isLinux = System.getProperty("os.name").lowercase().contains("linux")
+        if (isLinux) {
+            // On Linux: use pactl to get real device names (same as KDE/GNOME audio settings)
+            val sinks = com.alananasss.kittytune.util.LinuxAudioManager.getOutputSinks()
+            if (sinks.isNotEmpty()) return@remember sinks.map { it.id to it.description }
+        }
+        // Fallback: Java Sound (Windows, macOS, or Linux without pactl)
+        val list = mutableListOf<Pair<String, String>>()
         try {
             val mixerInfos = javax.sound.sampled.AudioSystem.getMixerInfo()
             val seenNames = mutableSetOf<String>()
@@ -62,7 +104,7 @@ fun AudioSettingsScreen(
                         val mixer = javax.sound.sampled.AudioSystem.getMixer(info)
                         if (mixer.isLineSupported(javax.sound.sampled.DataLine.Info(javax.sound.sampled.SourceDataLine::class.java, null))) {
                             seenNames.add(rawName)
-                            list.add(rawName)
+                            list.add(rawName to com.alananasss.kittytune.util.LinuxAudioManager.cleanName(rawName))
                         }
                     } catch (e: Exception) {}
                 }
@@ -76,34 +118,115 @@ fun AudioSettingsScreen(
     var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
 
     var showNormDialog by remember { mutableStateOf(false) }
+    var showNormalizationInfoDialog by remember { mutableStateOf(false) }
 
     if (showNormDialog) {
         EscapableAlertDialog(
             onDismissRequest = { showNormDialog = false },
-            title = { Text(str("pref_norm_level_title")) },
-            text = {
-                Column {
-                    val levels = listOf(
-                        com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET to str("pref_norm_quiet"),
-                        com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL to str("pref_norm_normal"),
-                        com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD to str("pref_norm_loud")
+            icon = { Icon(androidx.compose.material.icons.Icons.Rounded.Equalizer, null) },
+            title = {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = str("pref_norm_title"),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 32.dp)
                     )
-                    levels.forEach { (lvl, label) ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable { 
-                                playerViewModel.setNormalizationLevel(lvl)
-                                showNormDialog = false 
-                            }.padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = playerViewModel.effectsState.normalizationLevel == lvl, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(label)
-                        }
+                    IconButton(
+                        onClick = { showNormalizationInfoDialog = true },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .size(32.dp),
+                        colors = IconButtonDefaults.iconButtonColors()
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Rounded.Info,
+                            contentDescription = str("pref_norm_info_title"),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showNormDialog = false }) { Text(str("btn_cancel")) } }
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text(str("pref_norm_sub"), style = MaterialTheme.typography.bodyMedium, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    Spacer(Modifier.height(16.dp))
+                    com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                        options = com.alananasss.kittytune.ui.player.NormalizationLevel.entries,
+                        selectedOption = playerViewModel.effectsState.normalizationLevel,
+                        onOptionSelected = { level ->
+                            playerViewModel.setNormalizationLevel(level)
+                            if (!playerViewModel.effectsState.isNormalizationEnabled) playerViewModel.toggleNormalization(true)
+                        },
+                        labelProvider = { level ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = when (level) {
+                                        com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET -> str("pref_norm_quiet")
+                                        com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL -> str("pref_norm_normal")
+                                        com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD -> str("pref_norm_loud")
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = when (level) {
+                                        com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET -> "\u221219 LUFS"
+                                        com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL -> "\u221214 LUFS"
+                                        com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD -> "\u221211 LUFS"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.8f),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    )
+                }
+            },
+            confirmButton = { TextButton(onClick = { showNormDialog = false }) { Text(str("btn_ok")) } }
+        )
+    }
+
+    if (showNormalizationInfoDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showNormalizationInfoDialog = false },
+            icon = { Icon(androidx.compose.material.icons.Icons.Rounded.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = {
+                Text(
+                    text = str("pref_norm_info_title"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = str("pref_norm_info_body_1"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = str("pref_norm_info_body_2"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showNormalizationInfoDialog = false }) {
+                    Text(str("btn_ok"))
+                }
+            }
         )
     }
 
@@ -221,24 +344,33 @@ fun AudioSettingsScreen(
                     ) {
                         RadioButton(selected = currentDevice == "", onClick = null)
                         Spacer(Modifier.width(8.dp))
-                        Text(str("pref_audio_device_default"))
+                        Column {
+                            Text(str("pref_audio_device_default"))
+                            if (currentDevice.isEmpty() && systemDefaultSinkDesc != null) {
+                                Text(
+                                    text = systemDefaultSinkDesc!!,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
 
-                    availableDevices.forEach { dev ->
+                    availableDevices.forEach { (devId, devLabel) ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    currentDevice = dev
-                                    playerViewModel.changeOutputDevice(dev)
+                                    currentDevice = devId
+                                    playerViewModel.changeOutputDevice(devId)
                                     showDeviceDialog = false
                                 }
                                 .padding(vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            RadioButton(selected = currentDevice == dev, onClick = null)
+                            RadioButton(selected = currentDevice == devId, onClick = null)
                             Spacer(Modifier.width(8.dp))
-                            Text(dev, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(devLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -254,7 +386,7 @@ fun AudioSettingsScreen(
 
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         val isNormEnabled = playerViewModel.effectsState.isNormalizationEnabled
-                        val totalVisibleItems = if (isNormEnabled) 9 else 8
+                        val totalVisibleItems = 8
 
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) })
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) })
@@ -264,31 +396,14 @@ fun AudioSettingsScreen(
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) })
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) })
                         
-                        SettingsItem(
+                        SplitSettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 7),
                             title = str("pref_norm_title"),
                             subtitle = str("pref_norm_sub"),
-                            hasSwitch = true,
+                            onClick = { showNormDialog = true },
                             switchState = isNormEnabled,
                             onSwitchChange = { playerViewModel.toggleNormalization(it) }
                         )
-
-                        AnimatedVisibility(
-                            visible = isNormEnabled,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 8),
-                                title = str("pref_norm_level_title"),
-                                subtitle = str("pref_norm_level_sub") + " : " + when(playerViewModel.effectsState.normalizationLevel) {
-                                    com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET -> str("pref_norm_quiet")
-                                    com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL -> str("pref_norm_normal")
-                                    com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD -> str("pref_norm_loud")
-                                },
-                                onClick = { showNormDialog = true }
-                            )
-                        }
                     }
                 }
             }
@@ -397,7 +512,12 @@ fun AudioSettingsScreen(
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_audio_device_title"),
-                                subtitle = if (currentDevice.isEmpty()) str("pref_audio_device_default") else currentDevice,
+                                subtitle = if (currentDevice.isEmpty()) {
+                                    systemDefaultSinkDesc ?: str("pref_audio_device_default")
+                                } else {
+                                    availableDevices.firstOrNull { it.first == currentDevice }?.second
+                                        ?: com.alananasss.kittytune.util.LinuxAudioManager.cleanName(currentDevice)
+                                },
                                 onClick = { showDeviceDialog = true }
                             )
                         },

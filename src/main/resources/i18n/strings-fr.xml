@@ -1769,6 +1769,9 @@
     <string name="pref_storage_cache_clear">Effacer le cache</string>
     <string name="pref_storage_location">Emplacement de stockage hors ligne</string>
     <string name="pref_storage_location_change">Modifier l\'emplacement</string>
+    <string name="pref_norm_info_title">Comprendre la normalisation du volume</string>
+    <string name="pref_norm_info_body_1">Certaines chansons sont enregistrées très fort et d\'autres beaucoup plus doucement. La normalisation ajuste automatiquement le volume de chaque morceau pour que toutes vos musiques s\'enchaînent au même niveau sonore, sans que vous n\'ayez besoin de régler le volume sans arrêt.</string>
+    <string name="pref_norm_info_body_2">Comment ça marche ?\n• KittyTune mesure le niveau sonore réel de chaque musique (en LUFS).\n• Pendant la lecture, le volume est ajusté de manière fluide pour atteindre le niveau cible que vous avez choisi.\n• Un limiteur intégré empêche toute saturation ou grésillement.\n\nNiveaux disponibles :\n• Calme (-19 LUFS) : Idéal pour une écoute détendue au casque ou au calme.\n• Normal (-14 LUFS) : Le standard utilisé par Spotify et YouTube, équilibré pour la plupart des morceaux.\n• Fort (-11 LUFS) : Pour les environnements bruyants (voiture, extérieur) ou enceintes.</string>
 </resources>
 
 
