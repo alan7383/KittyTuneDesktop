@@ -212,7 +212,8 @@ private fun AudioDeviceSelector(
     var expanded by remember { mutableStateOf(false) }
 
     fun cleanName(name: String): String {
-        return name.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF\\u2600-\\u27BF]"), "").trim()
+        val withoutEmojis = name.replace(Regex("[\\uD83C-\\uDBFF\\uDC00-\\uDFFF\\u2600-\\u27BF]"), "").trim()
+        return com.alananasss.kittytune.util.LinuxAudioManager.cleanName(withoutEmojis)
     }
 
     if (availableDevices.isNotEmpty()) {
@@ -614,7 +615,7 @@ private fun ErrorView(error: String, onRetry: () -> Unit) {
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer
             ),
-
+            shapes = ButtonDefaults.shapes()
         ) {
             Text(str("btn_retry"))
         }

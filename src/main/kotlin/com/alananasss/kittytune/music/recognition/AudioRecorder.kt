@@ -26,10 +26,26 @@ data class AudioInputDevice(
 )
 
 object AudioDeviceManager {
+    private val isLinux = System.getProperty("os.name").lowercase().contains("linux")
+
+    /**
+     * On Linux with PipeWire/PulseAudio, uses `pactl list sources` to get real device names
+     * exactly as shown in system settings (KDE, GNOME, etc.).
+     * Falls back to Java Sound for Windows/macOS or if pactl is not available.
+     */
     fun getAvailableInputDevices(): List<AudioInputDevice> {
         val list = mutableListOf<AudioInputDevice>()
         list.add(AudioInputDevice("desktop_audio", str("audio_source_desktop"), isDesktopAudio = true))
 
+        if (isLinux) {
+            val pactlDevices = getPactlSources()
+            if (pactlDevices.isNotEmpty()) {
+                list.addAll(pactlDevices)
+                return list.distinctBy { it.id }
+            }
+        }
+
+        // Fallback: Java Sound (Windows, macOS, or Linux without pactl)
         try {
             val mixerInfos = AudioSystem.getMixerInfo()
             val seenNames = mutableSetOf<String>()
@@ -62,7 +78,53 @@ object AudioDeviceManager {
 
         return list.distinctBy { it.id }
     }
+
+    /**
+     * Queries pactl (PipeWire/PulseAudio) for real source names and descriptions.
+     * Filters out Monitor sources (those are for desktop audio capture, handled separately).
+     * Returns empty list if pactl is unavailable.
+     */
+    private fun getPactlSources(): List<AudioInputDevice> {
+        return try {
+            val process = ProcessBuilder("pactl", "list", "sources")
+                .redirectErrorStream(true)
+                .start()
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor()
+
+            val devices = mutableListOf<AudioInputDevice>()
+            var currentName: String? = null
+            var currentDescription: String? = null
+
+            for (line in output.lines()) {
+                val trimmed = line.trim()
+                when {
+                    trimmed.startsWith("Name:") -> {
+                        currentName = trimmed.removePrefix("Name:").trim()
+                        currentDescription = null
+                    }
+                    trimmed.startsWith("Description:") -> {
+                        val name = currentName
+                        val desc = trimmed.removePrefix("Description:").trim()
+                        currentName = null
+
+                        if (name != null) {
+                            // Monitor = desktop audio (handled by the "Audio du bureau" entry)
+                            val isMonitor = name.contains(".monitor") || desc.lowercase().startsWith("monitor of")
+                            if (!isMonitor && name.startsWith("alsa_input.")) {
+                                devices.add(AudioInputDevice(id = name, name = desc, isDesktopAudio = false))
+                            }
+                        }
+                    }
+                }
+            }
+            devices
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
 }
+
 
 /**
  * Records audio in 16-bit PCM mono at 16kHz, which is the required format for Shazam DejaVu signatures.
@@ -160,6 +222,23 @@ class AudioRecorder {
                 }
             }
 
+            // On Linux: if device ID is a pactl source name (alsa_input.*), use parec to capture
+            if (targetDataLine == null &&
+                selectedDeviceName != null &&
+                selectedDeviceName.startsWith("alsa_input.") &&
+                System.getProperty("os.name").lowercase().contains("linux")
+            ) {
+                try {
+                    val pcm = recordWithParec(selectedDeviceName, durationMs, control, onProgress)
+                    if (pcm != null && pcm.isNotEmpty()) {
+                        saveWavFile(pcm, File("last_recorded_audio.wav"))
+                        return@withContext pcm
+                    }
+                } catch (e: Exception) {
+                    println("DEBUG: [AudioRecorder] parec failed: ${e.message}, falling back to Java Sound")
+                }
+            }
+
             // Fallback: Default input line
             if (targetDataLine == null) {
                 for (fmt in candidateFormats) {
@@ -213,6 +292,61 @@ class AudioRecorder {
             saveWavFile(finalPcm, File("last_recorded_audio.wav"))
             finalPcm
         }
+    }
+
+    /**
+     * Uses `parec` (PipeWire/PulseAudio) to capture PCM audio from a named source.
+     * Works on any Linux distro with PipeWire or PulseAudio installed.
+     */
+    private suspend fun recordWithParec(
+        sourceName: String,
+        durationMs: Long,
+        control: RecordControl?,
+        onProgress: ((ByteArray) -> Unit)?
+    ): ByteArray? = withContext(Dispatchers.IO) {
+        // parec outputs raw s16le stereo 44100 by default — explicitly specify format
+        val process = ProcessBuilder(
+            "parec",
+            "--device=$sourceName",
+            "--format=s16le",
+            "--rate=44100",
+            "--channels=2",
+            "--latency-msec=50"
+        ).redirectErrorStream(true).start()
+
+        val rawStream = ByteArrayOutputStream()
+        val buffer = ByteArray(4096)
+        val inputStream = process.inputStream
+        val startTime = System.currentTimeMillis()
+        var lastCheckTime = startTime
+        val captureFormat = AudioFormat(44100f, 16, 2, true, false)
+
+        try {
+            while (coroutineContext.isActive && (System.currentTimeMillis() - startTime) < durationMs) {
+                if (control?.shouldStop == true) break
+
+                val available = inputStream.available()
+                if (available > 0) {
+                    val toRead = minOf(available, buffer.size)
+                    val read = inputStream.read(buffer, 0, toRead)
+                    if (read > 0) rawStream.write(buffer, 0, read)
+                } else {
+                    kotlinx.coroutines.delay(20)
+                }
+
+                if (onProgress != null && (System.currentTimeMillis() - lastCheckTime) >= 3000L) {
+                    lastCheckTime = System.currentTimeMillis()
+                    val resampled = convertTo16kHzMono(rawStream.toByteArray(), captureFormat)
+                    onProgress(resampled)
+                }
+            }
+        } finally {
+            process.destroy()
+        }
+
+        val raw = rawStream.toByteArray()
+        if (raw.isEmpty()) return@withContext null
+        convertTo16kHzMono(raw, captureFormat)
     }
 
     private fun convertTo16kHzMono(inputPcm: ByteArray, sourceFormat: AudioFormat): ByteArray {
