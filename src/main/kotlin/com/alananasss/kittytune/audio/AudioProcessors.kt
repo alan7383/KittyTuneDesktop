@@ -350,41 +350,122 @@ class MonoAudioProcessor : BaseAudioProcessor() {
 class NormalizationAudioProcessor : BaseAudioProcessor() {
     private var enabled = false
     private var level = com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL
+    private var nativeHandle: Long = 0
+    private var lastChannels = 0
+    private var lastSampleRate = 0
+
+    init {
+        try {
+            System.loadLibrary("kittytune_audio_dsp")
+        } catch (e: UnsatisfiedLinkError) {
+            val osName = System.getProperty("os.name").lowercase()
+            val isMac = osName.contains("mac")
+            val isWin = osName.contains("win")
+            val libExt = if (isWin) "dll" else if (isMac) "dylib" else "so"
+            val libFile = java.io.File(System.getProperty("user.dir"), "src/main/resources/native/libkittytune_audio_dsp.$libExt")
+            if (libFile.exists()) {
+                System.load(libFile.absolutePath)
+            } else {
+                try {
+                    val stream = NormalizationAudioProcessor::class.java.getResourceAsStream("/native/libkittytune_audio_dsp.$libExt")
+                    if (stream != null) {
+                        val tempFile = java.io.File.createTempFile("libkittytune_audio_dsp", ".$libExt")
+                        tempFile.deleteOnExit()
+                        tempFile.outputStream().use { stream.copyTo(it) }
+                        System.load(tempFile.absolutePath)
+                    } else {
+                        throw e
+                    }
+                } catch (ex: Exception) {
+                    throw e
+                }
+            }
+        }
+    }
 
     fun setParameters(enabled: Boolean, level: com.alananasss.kittytune.ui.player.NormalizationLevel) {
         this.enabled = enabled
         this.level = level
+        if (nativeHandle != 0L) {
+            nativeSetTargetLevel(nativeHandle, getTargetLufs())
+        }
     }
 
-    override fun queueInput(input: ByteBuffer) {
-        val remaining = input.remaining()
+    private fun getTargetLufs(): Float = when (level) {
+        com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET -> -19f
+        com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL -> -14f
+        com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD -> -11f
+    }
+
+    private fun ensureNativeHandle(channels: Int, sampleRate: Int) {
+        if (nativeHandle == 0L || channels != lastChannels || sampleRate != lastSampleRate) {
+            destroyNative()
+            lastChannels = channels
+            lastSampleRate = sampleRate
+            nativeHandle = nativeInit(channels, sampleRate)
+            nativeSetTargetLevel(nativeHandle, getTargetLufs())
+        }
+    }
+
+    private fun destroyNative() {
+        if (nativeHandle != 0L) {
+            nativeDestroy(nativeHandle)
+            nativeHandle = 0
+        }
+    }
+
+    override fun onConfigure(inputAudioFormat: AudioFormat): AudioFormat {
+        ensureNativeHandle(inputAudioFormat.channelCount, inputAudioFormat.sampleRate)
+        return inputAudioFormat
+    }
+
+    override fun onFlush() {
+        if (nativeHandle != 0L) {
+            nativeResetLoudness(nativeHandle)
+        }
+    }
+
+    fun reset() {
+        destroyNative()
+    }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
-        if (!enabled) {
-            val buffer = replaceOutputBuffer(remaining)
-            buffer.put(input)
-            buffer.flip()
+        if (!enabled || nativeHandle == 0L) {
+            val outputBuffer = replaceOutputBuffer(remaining)
+            outputBuffer.put(inputBuffer)
+            outputBuffer.flip()
             return
         }
 
-        val buffer = replaceOutputBuffer(remaining)
+        val numFrames = remaining / (2 * inputAudioFormat.channelCount)
+        val outputBuffer = replaceOutputBuffer(remaining)
         
-        val multiplier = when (level) {
-            com.alananasss.kittytune.ui.player.NormalizationLevel.QUIET -> 0.6f
-            com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL -> 1.0f
-            com.alananasss.kittytune.ui.player.NormalizationLevel.LOUD -> 2.5f
-        }
+        nativeProcessShort(nativeHandle, inputBuffer, outputBuffer, numFrames, inputBuffer.position())
+        
+        inputBuffer.position(inputBuffer.position() + remaining)
+        outputBuffer.position(remaining)
+        outputBuffer.flip()
+    }
 
-        while (input.hasRemaining()) {
-            val raw = input.getShort()
-            val sample = (raw / 32768f) * multiplier
-            
-            val softClipped = sample / (1f + kotlin.math.abs(sample) * 0.15f)
-            val out = softClipped.coerceIn(-1f, 1f)
-            
-            buffer.putShort((out * 32767f).toInt().toShort())
-        }
-        buffer.flip()
+    companion object {
+        @JvmStatic private external fun nativeInit(channels: Int, sampleRate: Int): Long
+        @JvmStatic private external fun nativeDestroy(handle: Long)
+        @JvmStatic private external fun nativeSetTargetLevel(handle: Long, targetLUFS: Float)
+        @JvmStatic private external fun nativeResetLoudness(handle: Long)
+        @JvmStatic private external fun nativeProcessShort(
+            handle: Long,
+            inputBuffer: ByteBuffer,
+            outputBuffer: ByteBuffer,
+            numFrames: Int,
+            inOffset: Int
+        )
+        @JvmStatic private external fun nativeGetShortTermLoudness(handle: Long): Float
+        @JvmStatic private external fun nativeGetIntegratedLoudness(handle: Long): Float
+        @JvmStatic private external fun nativeGetTruePeakDb(handle: Long): Float
+        @JvmStatic private external fun nativeGetCurrentGainDb(handle: Long): Float
     }
 }
 
