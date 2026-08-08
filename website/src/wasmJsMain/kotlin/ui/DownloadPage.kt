@@ -21,7 +21,7 @@ data class ReleaseNote(val version: String, val date: String, val highlights: Li
 
 val releases = listOf(
     ReleaseNote(
-        "v1.0.27", "August 2026",
+        "v1.0.28", "August 2026",
         listOf(
             "Google Sans Flex variable font integration",
             "Material 3 Expressive Spec 2025 implementation",
