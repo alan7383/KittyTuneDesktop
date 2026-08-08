@@ -7,7 +7,7 @@
 #include <cstdint>
 
 extern "C" {
-#include "ebur128.h"
+#include "ebur128/ebur128.h"
 }
 
 #define LOG_TAG "KittyTuneAudioDSP"
