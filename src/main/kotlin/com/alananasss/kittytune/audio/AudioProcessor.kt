@@ -51,7 +51,7 @@ abstract class BaseAudioProcessor : AudioProcessor {
     /** Allocates (or reuses) a little-endian output buffer of [size] bytes. */
     protected fun replaceOutputBuffer(size: Int): ByteBuffer {
         if (buffer.capacity() < size) {
-            buffer = ByteBuffer.allocate(size).order(ByteOrder.LITTLE_ENDIAN)
+            buffer = ByteBuffer.allocateDirect(size).order(ByteOrder.LITTLE_ENDIAN)
         } else {
             buffer.clear()
         }
@@ -66,6 +66,6 @@ abstract class BaseAudioProcessor : AudioProcessor {
     }
 
     companion object {
-        val EMPTY: ByteBuffer = ByteBuffer.allocate(0).order(ByteOrder.LITTLE_ENDIAN)
+        val EMPTY: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.LITTLE_ENDIAN)
     }
 }

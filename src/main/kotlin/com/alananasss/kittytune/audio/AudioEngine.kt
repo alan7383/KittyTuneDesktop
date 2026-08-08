@@ -391,16 +391,26 @@ class AudioEngine {
         return out
     }
 
+    private var dspInputBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.LITTLE_ENDIAN)
+
     private fun pushThroughDsp(pcm: ShortArray) {
-        var bytes = shortsToBytes(pcm)
-        for (p in chain) {
-            val inBuf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-            p.queueInput(inBuf)
-            val out = p.getOutput()
-            bytes = ByteArray(out.remaining())
-            out.get(bytes)
+        val requiredBytes = pcm.size * 2
+        var buf = if (dspInputBuffer.capacity() < requiredBytes) {
+            dspInputBuffer = ByteBuffer.allocateDirect(requiredBytes).order(ByteOrder.LITTLE_ENDIAN)
+            dspInputBuffer
+        } else {
+            dspInputBuffer.clear()
+            dspInputBuffer
         }
-        val processed = bytesToShorts(bytes)
+        buf.asShortBuffer().put(pcm)
+        
+        for (p in chain) {
+            p.queueInput(buf)
+            buf = p.getOutput()
+        }
+        
+        val processed = ShortArray(buf.remaining() / 2)
+        buf.asShortBuffer().get(processed)
         stretcher.queue(processed, processed.size)
     }
 
