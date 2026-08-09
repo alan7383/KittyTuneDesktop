@@ -2,9 +2,11 @@ package com.alananasss.kittytune.data.local
 
 import com.alananasss.kittytune.core.AppDirs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
@@ -13,19 +15,11 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 
-/**
- * Desktop port of the Room AppDatabase — plain SQLite over JDBC (org.xerial:sqlite-jdbc).
- *
- * Same DB name ("soundtune_db"), same 7-table schema (version 14), same DAO query
- * strings. `Flow`-returning DAO methods re-query on an invalidation signal so Compose
- * collectors update, mirroring Room's observable queries.
- */
 object AppDatabase {
 
     private val dbFile = File(AppDirs.dataDir, "soundtune_db.sqlite")
     private lateinit var conn: Connection
 
-    // Invalidation tick per table group — bumped on writes so Flow queries re-run.
     private val invalidation = MutableStateFlow(0L)
 
     private fun invalidate() {
@@ -43,6 +37,8 @@ object AppDatabase {
         conn.createStatement().use { st ->
             st.execute("PRAGMA journal_mode=WAL")
             st.execute("PRAGMA foreign_keys=ON")
+            st.execute("PRAGMA synchronous=NORMAL")
+            st.execute("PRAGMA busy_timeout=5000")
         }
         createSchema()
     }
@@ -83,7 +79,6 @@ object AppDatabase {
         conn.createStatement().use { st -> ddl.forEach { st.execute(it) } }
     }
 
-    // --- low-level helpers (used by the DAO classes) --------------------------------------
 
     internal suspend fun <T> query(sql: String, vararg args: Any?, mapper: (ResultSet) -> T): List<T> =
         withContext(Dispatchers.IO) {
@@ -106,8 +101,6 @@ object AppDatabase {
         invalidate()
     }
 
-    /** Like [exec] but without bumping the invalidation tick — for high-volume cache writes
-     *  (e.g. track_album_cache) that must not re-run every observable query in the app. */
     internal suspend fun execSilent(sql: String, vararg args: Any?) = withContext(Dispatchers.IO) {
         conn.prepareStatement(sql).use { ps ->
             bind(ps, args)
@@ -121,9 +114,9 @@ object AppDatabase {
     internal suspend fun scalarInt(sql: String, vararg args: Any?): Int =
         queryOne(sql, *args) { it.getInt(1) } ?: 0
 
-    /** Wrap an observable query as a Flow that re-emits on any DB write. */
+    @OptIn(FlowPreview::class)
     internal fun <T> observe(block: suspend () -> T): Flow<T> =
-        invalidation.map { block() }.onStart { emit(block()) }
+        invalidation.debounce(250L).map { block() }.onStart { emit(block()) }
 
     private fun bind(ps: java.sql.PreparedStatement, args: Array<out Any?>) {
         args.forEachIndexed { i, a ->
@@ -138,6 +131,5 @@ object AppDatabase {
         }
     }
 
-    // exposed for BackupManager batch operations
     internal fun raw(): Connection = conn
 }

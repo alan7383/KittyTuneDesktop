@@ -10,10 +10,6 @@ import kotlinx.coroutines.launch
 import java.net.InetSocketAddress
 import java.net.Socket
 
-/**
- * Desktop replacement for Android's ConnectivityManager.NetworkCallback.
- * Polls a TCP connect to well-known hosts; exposes a StateFlow<Boolean>.
- */
 object NetworkMonitor {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -28,9 +24,7 @@ object NetworkMonitor {
         scope.launch {
             while (true) {
                 _isOnline.value = probe()
-                // Check more often while offline so recovery is snappy (like the
-                // instant NetworkCallback on Android).
-                delay(if (_isOnline.value) 15_000 else 3_000)
+                delay(if (_isOnline.value) 30_000 else 10_000)
             }
         }
     }

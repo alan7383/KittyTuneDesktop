@@ -14,11 +14,7 @@ import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
 @Composable
 fun GlowView(modifier: Modifier = Modifier, color: Color = Color.Transparent) {
-    // Lecture du fichier JSON depuis le dossier resources/raw/
-    val jsonString = remember {
-        object {}.javaClass.getResourceAsStream("/raw/background_animation.json")
-            ?.bufferedReader()?.readText() ?: ""
-    }
+    val jsonString = AnimationCache.backgroundJson
 
     if (jsonString.isNotEmpty()) {
         val composition by rememberLottieComposition(LottieCompositionSpec.JsonString(jsonString))
