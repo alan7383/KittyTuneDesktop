@@ -45,11 +45,15 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             nextPage = null
             try {
                 val response = api.getFollowingFeedGraphQL(FollowingFeedGraphQl.request(page = null))
+                if (response.errors != null) {
+                    println("GraphQL Error: ${response.errors}")
+                }
                 response.errorMessage()?.let { throw IllegalStateException(it) }
                 val streamResponse = response.toStreamResponse()
                 feedItems.addAll(streamResponse.collection)
                 nextPage = streamResponse.next_href
             } catch (e: Exception) {
+                e.printStackTrace()
                 error = e.message
             } finally {
                 isLoading = false
