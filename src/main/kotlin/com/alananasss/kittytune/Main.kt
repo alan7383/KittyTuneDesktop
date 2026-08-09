@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
@@ -134,6 +135,7 @@ fun main() {
                     val isAlt = event.isAltPressed
                     val isMeta = event.isMetaPressed
                     val noModifiers = !isShift && !isCtrl && !isAlt && !isMeta
+                    val char = event.utf16CodePoint.toChar()
 
                     if (isCtrl) {
                         when (event.key) {
@@ -149,7 +151,7 @@ fun main() {
                                 prefs.setUiScale(newScale)
                                 return@Window true
                             }
-                            Key.Zero, Key.NumPad0 -> {
+                            else -> if (char == '0' || char == 'à') {
                                 PlayerPreferences().setUiScale(1.0f)
                                 return@Window true
                             }
@@ -160,7 +162,7 @@ fun main() {
                         Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine,
                         Key.NumPad0, Key.NumPad1, Key.NumPad2, Key.NumPad3, Key.NumPad4,
                         Key.NumPad5, Key.NumPad6, Key.NumPad7, Key.NumPad8, Key.NumPad9 -> true
-                        else -> false
+                        else -> char in '0'..'9' || char in listOf('à', '&', 'é', '"', '\'', '(', '-', 'è', '_', 'ç')
                     }
 
                     val isShortcutKey = when {
