@@ -84,8 +84,8 @@ dependencies {
     implementation("org.json:json:20260522")
     implementation("org.yaml:snakeyaml:2.2")
     implementation("com.github.pemistahl:lingua:1.2.2")
-    implementation("net.java.dev.jna:jna:5.14.0")
-    implementation("net.java.dev.jna:jna-platform:5.14.0")
+    implementation("net.java.dev.jna:jna:5.19.1")
+    implementation("net.java.dev.jna:jna-platform:5.19.1")
 
     implementation("com.github.hypfvieh:dbus-java-core:4.3.1")
     implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:4.3.1")
