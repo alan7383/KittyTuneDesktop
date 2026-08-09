@@ -33,7 +33,7 @@ dependencies {
     implementation(project(":kizzy"))
     implementation(project(":shazamkit"))
 
-    implementation("io.github.alexzhirkevich:compottie:1.1.1")
+    implementation("io.github.alexzhirkevich:compottie:2.2.4")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
