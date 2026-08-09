@@ -11,10 +11,6 @@ import com.alananasss.kittytune.core.AppDirs
 import okhttp3.OkHttpClient
 import okio.Path.Companion.toOkioPath
 
-/**
- * Global Coil 3 ImageLoader — the desktop replacement for the Android Coil 2 setup used by
- * every AsyncImage. Disk cache lives under the app image cache dir, matching Android behavior.
- */
 object ImageLoaderFactory {
 
     fun create(): ImageLoader {
@@ -25,13 +21,13 @@ object ImageLoaderFactory {
             }
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(PlatformContext.INSTANCE, 0.25)
+                    .maxSizeBytes(128L * 1024 * 1024)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(AppDirs.imageCacheDir.toOkioPath())
-                    .maxSizeBytes(256L * 1024 * 1024) // 256 MB
+                    .maxSizeBytes(256L * 1024 * 1024)
                     .build()
             }
             .crossfade(true)

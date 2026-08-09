@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.audio
 
 import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,16 +28,20 @@ class AudioEngine {
     var onCompletion: (() -> Unit)? = null
     var onError: ((Throwable) -> Unit)? = null
 
-    @Volatile var isPlaying: Boolean = false
+    @Volatile
+    var isPlaying: Boolean = false
         private set
 
-    @Volatile var state: State = State.IDLE
+    @Volatile
+    var state: State = State.IDLE
         private set
 
-    @Volatile var positionMs: Long = 0L
+    @Volatile
+    var positionMs: Long = 0L
         private set
 
-    @Volatile var durationMs: Long = 0L
+    @Volatile
+    var durationMs: Long = 0L
         private set
 
     private val outputSampleRate = 44100
@@ -53,17 +58,28 @@ class AudioEngine {
 
     private var effects = AudioEffectsState()
 
-    @Volatile private var volume: Float = 1f
-    @Volatile private var seekRequestMs: Long = -1L
-    @Volatile private var paused = true
-    @Volatile private var stopFlag = false
+    @Volatile
+    private var volume: Float = 1f
 
-    @Volatile private var activeWorkerId = 0L
+    @Volatile
+    private var seekRequestMs: Long = -1L
 
-    @Volatile var pendingDeviceSwap = false
+    @Volatile
+    private var paused = true
+
+    @Volatile
+    private var stopFlag = false
+
+    @Volatile
+    private var activeWorkerId = 0L
+
+    @Volatile
+    var pendingDeviceSwap = false
 
     private var worker: Thread? = null
-    @Volatile private var line: SourceDataLine? = null
+
+    @Volatile
+    private var line: SourceDataLine? = null
     private val scope = CoroutineScope(Dispatchers.Default)
 
     private var currentUrl: String? = null
@@ -165,7 +181,7 @@ class AudioEngine {
                 setOption("reconnect_on_network_error", "1")
                 setOption("reconnect_on_http_error", "4xx,5xx")
                 setOption("reconnect_delay_max", "5")
-                setOption("rw_timeout", "1000000") // 1s timeout in us
+                setOption("rw_timeout", "1000000")
                 setOption("tcp_nodelay", "1")
             }
             sampleRate = outputSampleRate
@@ -182,32 +198,33 @@ class AudioEngine {
         try {
             oldGrabber?.stop()
             oldGrabber?.release()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
 
         var currentUrlToTry = url
         val targetTs = resumePosMs * 1000L
         var attempt = 0
 
-        // Retry indefinitely until the stream is recovered or the engine is stopped.
         while (!stopFlag) {
             attempt++
-            val backoffMs = (attempt * 1000L).coerceAtMost(5000L) // cap at 5s
-            System.err.println("AudioEngine: Network recovery attempt $attempt (backoff=${backoffMs}ms) at $resumePosMs ms...")
+            val backoffMs = (attempt * 1000L).coerceAtMost(5000L)
+            Logger.e("AudioEngine", "Network recovery attempt $attempt (backoff=${backoffMs}ms) at $resumePosMs ms...")
 
             try {
                 val newG = createGrabber(currentUrlToTry, headers)
                 newG.start()
                 if (targetTs > 0) {
-                    try { newG.timestamp = targetTs } catch (_: Exception) {}
+                    try {
+                        newG.timestamp = targetTs
+                    } catch (_: Exception) {
+                    }
                 }
-                System.err.println("AudioEngine: Reopen succeeded on attempt $attempt!")
+                Logger.e("AudioEngine", "Reopen succeeded on attempt $attempt!")
                 return Pair(newG, currentUrlToTry)
             } catch (e: Exception) {
-                System.err.println("AudioEngine: Reopen attempt $attempt failed (${e.message}).")
+                Logger.e("AudioEngine", "Reopen attempt $attempt failed (${e.message}).")
             }
 
-            // On every other attempt also try to re-resolve a fresh stream URL
-            // (CDN tokens can expire during a long network outage).
             if (attempt % 2 == 0) {
                 val reResolver = onReResolveUrl
                 if (reResolver != null && (url.startsWith("http://") || url.startsWith("https://"))) {
@@ -216,7 +233,7 @@ class AudioEngine {
                         try {
                             freshUrl = reResolver.invoke()
                         } catch (e: Exception) {
-                            System.err.println("AudioEngine: Re-resolve on attempt $attempt failed: ${e.message}")
+                            Logger.e("AudioEngine", "Re-resolve on attempt $attempt failed: ${e.message}")
                         }
                     }
                     if (!freshUrl.isNullOrEmpty()) {
@@ -225,18 +242,25 @@ class AudioEngine {
                             val newG = createGrabber(currentUrlToTry, headers)
                             newG.start()
                             if (targetTs > 0) {
-                                try { newG.timestamp = targetTs } catch (_: Exception) {}
+                                try {
+                                    newG.timestamp = targetTs
+                                } catch (_: Exception) {
+                                }
                             }
-                            System.err.println("AudioEngine: Recovery via fresh URL succeeded on attempt $attempt!")
+                            Logger.e("AudioEngine", "Recovery via fresh URL succeeded on attempt $attempt!")
                             return Pair(newG, currentUrlToTry)
                         } catch (e: Exception) {
-                            System.err.println("AudioEngine: Fresh URL open failed on attempt $attempt: ${e.message}")
+                            Logger.e("AudioEngine", "Fresh URL open failed on attempt $attempt: ${e.message}")
                         }
                     }
                 }
             }
 
-            try { Thread.sleep(backoffMs) } catch (_: InterruptedException) { break }
+            try {
+                Thread.sleep(backoffMs)
+            } catch (_: InterruptedException) {
+                break
+            }
         }
 
         return Pair(null, null)
@@ -263,21 +287,19 @@ class AudioEngine {
             val outBuf = ShortArray(8192)
 
             while (!stopFlag && activeWorkerId == workerId) {
-                // --- HOT-SWAP DEVICE ---
                 if (pendingDeviceSwap) {
                     pendingDeviceSwap = false
                     closeLineInstance(localLine)
                     localLine = openLine()
                     line = localLine
                 }
-                // -----------------------
 
                 val seek = seekRequestMs
                 if (seek >= 0) {
                     val targetTimestamp = seek * 1000L
                     seekRequestMs = -1L
 
-                    System.err.println("AudioEngine: Seeking to targetTimestamp=$targetTimestamp (ms=$seek)")
+                    Logger.e("AudioEngine", "Seeking to targetTimestamp=$targetTimestamp (ms=$seek)")
 
                     var seekOk = false
                     try {
@@ -286,10 +308,13 @@ class AudioEngine {
                         if (currentTs <= targetTimestamp + 1_500_000L && (currentTs >= targetTimestamp - 5_000_000L || targetTimestamp < 5_000_000L)) {
                             seekOk = true
                         } else {
-                            System.err.println("AudioEngine: setTimestamp landed at $currentTs, expected near $targetTimestamp. Will reopen stream.")
+                            Logger.e(
+                                "AudioEngine",
+                                "setTimestamp landed at $currentTs, expected near $targetTimestamp. Will reopen stream."
+                            )
                         }
                     } catch (e: Exception) {
-                        System.err.println("AudioEngine: FFmpeg seek error - ${e.message}")
+                        Logger.e("AudioEngine", "FFmpeg seek error - ${e.message}")
                     }
 
                     if (!seekOk) {
@@ -307,7 +332,11 @@ class AudioEngine {
                         while (!stopFlag && activeWorkerId == workerId) {
                             val ts = activeG.timestamp
                             if (ts >= targetTimestamp) break
-                            val f = try { activeG.grabSamples() } catch (_: Exception) { null }
+                            val f = try {
+                                activeG.grabSamples()
+                            } catch (_: Exception) {
+                                null
+                            }
                             if (f == null) break
                             droppedCount++
                             if (droppedCount > 20000) break
@@ -329,7 +358,7 @@ class AudioEngine {
                 try {
                     frame = grabber?.grabSamples()
                 } catch (e: Exception) {
-                    System.err.println("AudioEngine: Read error from grabber: ${e.message}")
+                    Logger.e("AudioEngine", "Read error from grabber: ${e.message}")
                     frame = null
                 }
 
@@ -341,15 +370,17 @@ class AudioEngine {
                             setStateAsync(State.ENDED)
                             break
                         } else {
-                            System.err.println("AudioEngine: Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream (will retry until success)...")
+                            Logger.e(
+                                "AudioEngine",
+                                "Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream (will retry until success)..."
+                            )
                             val recovered = recoverStream(grabber, activeUrl, headers, positionMs)
                             if (recovered.first != null) {
                                 grabber = recovered.first
                                 if (recovered.second != null) activeUrl = recovered.second!!
-                                System.err.println("AudioEngine: Stream recovery succeeded at $positionMs ms!")
+                                Logger.e("AudioEngine", "Stream recovery succeeded at $positionMs ms!")
                                 continue
                             } else {
-                                // Only reaches here if stopFlag was set — the engine was intentionally stopped.
                                 break
                             }
                         }
@@ -359,8 +390,8 @@ class AudioEngine {
                 }
 
                 val samples = frame.samples ?: continue
-                val pcm = interleave(samples, frame.sampleRate, frame.audioChannels)
-                pushThroughDsp(pcm)
+                val (pcm, pcmLen) = interleave(samples, frame.sampleRate, frame.audioChannels)
+                pushThroughDsp(pcm, pcmLen)
                 drainStretcher(outBuf, localLine)
 
                 positionMs = (grabber?.timestamp ?: 0L) / 1000L
@@ -370,40 +401,55 @@ class AudioEngine {
                 onError?.invoke(t)
             }
         } finally {
-            try { grabber?.stop(); grabber?.release() } catch (_: Exception) {}
+            try {
+                grabber?.stop(); grabber?.release()
+            } catch (_: Exception) {
+            }
             closeLineInstance(localLine)
         }
     }
 
-    private fun interleave(buffers: Array<java.nio.Buffer>, frameRate: Int, frameChannels: Int): ShortArray {
+    private var interleaveBuffer = ShortArray(0)
+
+    private fun interleave(buffers: Array<java.nio.Buffer>, frameRate: Int, frameChannels: Int): Pair<ShortArray, Int> {
         val first = buffers[0]
         if (first is ShortBuffer) {
-            return if (buffers.size == frameChannels && frameChannels > 1) {
+            if (buffers.size == frameChannels && frameChannels > 1) {
                 val len = first.limit()
-                val out = ShortArray(len * frameChannels)
+                val required = len * frameChannels
+                if (interleaveBuffer.size < required) {
+                    interleaveBuffer = ShortArray(required)
+                }
                 for (ch in 0 until frameChannels) {
                     val b = buffers[ch] as ShortBuffer
-                    for (i in 0 until len) out[i * frameChannels + ch] = b.get(i)
+                    for (i in 0 until len) interleaveBuffer[i * frameChannels + ch] = b.get(i)
                 }
-                out
+                return Pair(interleaveBuffer, required)
             } else {
-                val out = ShortArray(first.limit())
+                val len = first.limit()
+                if (interleaveBuffer.size < len) {
+                    interleaveBuffer = ShortArray(len)
+                }
                 first.rewind()
-                first.get(out)
-                out
+                first.get(interleaveBuffer, 0, len)
+                return Pair(interleaveBuffer, len)
             }
         }
         val bb = (first as java.nio.ByteBuffer).order(ByteOrder.LITTLE_ENDIAN)
         val sb = bb.asShortBuffer()
-        val out = ShortArray(sb.limit())
-        sb.get(out)
-        return out
+        val len = sb.limit()
+        if (interleaveBuffer.size < len) {
+            interleaveBuffer = ShortArray(len)
+        }
+        sb.get(interleaveBuffer, 0, len)
+        return Pair(interleaveBuffer, len)
     }
 
     private var dspInputBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.LITTLE_ENDIAN)
+    private var processedBuffer = ShortArray(0)
 
-    private fun pushThroughDsp(pcm: ShortArray) {
-        val requiredBytes = pcm.size * 2
+    private fun pushThroughDsp(pcm: ShortArray, length: Int = pcm.size) {
+        val requiredBytes = length * 2
         var buf = if (dspInputBuffer.capacity() < requiredBytes) {
             dspInputBuffer = ByteBuffer.allocateDirect(requiredBytes).order(ByteOrder.LITTLE_ENDIAN)
             dspInputBuffer
@@ -411,16 +457,19 @@ class AudioEngine {
             dspInputBuffer.clear()
             dspInputBuffer
         }
-        buf.asShortBuffer().put(pcm)
-        
+        buf.asShortBuffer().put(pcm, 0, length)
+
         for (p in chain) {
             p.queueInput(buf)
             buf = p.getOutput()
         }
-        
-        val processed = ShortArray(buf.remaining() / 2)
-        buf.asShortBuffer().get(processed)
-        stretcher.queue(processed, processed.size)
+
+        val requiredShorts = buf.remaining() / 2
+        if (processedBuffer.size < requiredShorts) {
+            processedBuffer = ShortArray(requiredShorts)
+        }
+        buf.asShortBuffer().get(processedBuffer, 0, requiredShorts)
+        stretcher.queue(processedBuffer, requiredShorts)
     }
 
     private fun drainStretcher(outBuf: ShortArray, localLine: SourceDataLine?) {
@@ -431,24 +480,30 @@ class AudioEngine {
         }
     }
 
+    private var lineWriteBuffer = ByteArray(0)
+
     private fun writeToLine(samples: ShortArray, count: Int, localLine: SourceDataLine?) {
         val l = localLine ?: line ?: return
-        val bytes = ByteArray(count * 2)
+        val requiredBytes = count * 2
+        if (lineWriteBuffer.size < requiredBytes) {
+            lineWriteBuffer = ByteArray(requiredBytes)
+        }
         var bi = 0
         for (i in 0 until count) {
             val s = samples[i].toInt()
-            bytes[bi++] = (s and 0xFF).toByte()
-            bytes[bi++] = ((s shr 8) and 0xFF).toByte()
+            lineWriteBuffer[bi++] = (s and 0xFF).toByte()
+            lineWriteBuffer[bi++] = ((s shr 8) and 0xFF).toByte()
         }
         try {
-            l.write(bytes, 0, bytes.size)
-        } catch (_: Exception) {}
+            l.write(lineWriteBuffer, 0, requiredBytes)
+        } catch (_: Exception) {
+        }
     }
 
 
     private fun openLine(): SourceDataLine {
         val fmt = JavaAudioFormat(
-            outputSampleRate.toFloat(), 16, outputChannels, true, false, // signed, little-endian
+            outputSampleRate.toFloat(), 16, outputChannels, true, false,
         )
         val info = DataLine.Info(SourceDataLine::class.java, fmt)
 
@@ -459,28 +514,27 @@ class AudioEngine {
         if (deviceName.isNotEmpty()) {
             val isLinux = System.getProperty("os.name").lowercase().contains("linux")
             if (isLinux && deviceName.startsWith("alsa_output.")) {
-                // pactl sink ID: set PULSE_SINK so Java Sound routes through PipeWire/PulseAudio
-                // This is the standard way to select a specific PipeWire sink from a JVM app
                 System.setProperty("javax.sound.sampled.SourceDataLine", "")
                 try {
                     val pb = ProcessBuilder("sh", "-c", "pactl set-default-sink '$deviceName'")
                     pb.start().waitFor()
-                } catch (_: Exception) {}
-                // Java Sound will then use the default PipeWire sink which we just set
+                } catch (_: Exception) {
+                }
             } else {
-                // Windows/macOS or Java Sound mixer name
                 val mixerInfos = AudioSystem.getMixerInfo()
                 val targetInfo = mixerInfos.firstOrNull { it.name.trim() == deviceName }
                 if (targetInfo != null) {
                     try {
                         val m = AudioSystem.getMixer(targetInfo)
                         if (m.isLineSupported(info)) mixer = m
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
 
-        val l = if (mixer != null) mixer.getLine(info) as SourceDataLine else AudioSystem.getLine(info) as SourceDataLine
+        val l =
+            if (mixer != null) mixer.getLine(info) as SourceDataLine else AudioSystem.getLine(info) as SourceDataLine
         l.open(fmt, outputSampleRate * outputChannels * 2 * 40 / 1000)
         l.start()
         applyLineVolume(l)
@@ -505,7 +559,8 @@ class AudioEngine {
             localLine?.drain()
             localLine?.stop()
             localLine?.close()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         if (line == localLine) {
             line = null
         }
@@ -518,7 +573,10 @@ class AudioEngine {
         paused = true
         val currentWorker = worker
         if (currentWorker != null && Thread.currentThread() != currentWorker) {
-            try { currentWorker.join(300) } catch (_: InterruptedException) {}
+            try {
+                currentWorker.join(300)
+            } catch (_: InterruptedException) {
+            }
         }
         worker = null
         closeLineInstance(line)
