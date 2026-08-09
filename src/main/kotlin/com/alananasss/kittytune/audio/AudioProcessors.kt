@@ -5,16 +5,6 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/**
- * Desktop port of ui/player/audio/AudioProcessors.kt — the exact same DSP algorithms
- * as the Android app, so playback effects sound sample-for-sample identical.
- *
- * All processors operate on interleaved 16-bit signed little-endian PCM shorts at the
- * stream's native rate/channels. Disabled processors are byte-for-byte pass-through.
- * Sink chain order: Fx (muffle -> bass) -> Reverb -> 8D -> Earrape.
- */
-
-// --- 1. 8D AUDIO (Auto-Pan) ---
 class EightDAudioProcessor : BaseAudioProcessor() {
     private var enabled = false
     private var time: Double = 0.0
@@ -70,7 +60,6 @@ class EightDAudioProcessor : BaseAudioProcessor() {
     }
 }
 
-// --- 2. MULTI-FX (Simultaneous Bass Boost + Muffled) ---
 class FxAudioProcessor : BaseAudioProcessor() {
 
     private var isMuffled = false
@@ -78,17 +67,25 @@ class FxAudioProcessor : BaseAudioProcessor() {
     private var bassBoostGain = 10f // dB
     private var muffledCutoff = 800f // Hz
 
-    // MUFFLED filter (Low Pass) coefficients + shared DF-I history
-    private var b0_m = 0f; private var b1_m = 0f; private var b2_m = 0f
-    private var a1_m = 0f; private var a2_m = 0f
-    private var x1_m = 0f; private var x2_m = 0f
-    private var y1_m = 0f; private var y2_m = 0f
+    private var b0_m = 0f;
+    private var b1_m = 0f;
+    private var b2_m = 0f
+    private var a1_m = 0f;
+    private var a2_m = 0f
+    private var x1_m = 0f;
+    private var x2_m = 0f
+    private var y1_m = 0f;
+    private var y2_m = 0f
 
-    // BASS BOOST filter (Low Shelf) coefficients + shared DF-I history
-    private var b0_b = 0f; private var b1_b = 0f; private var b2_b = 0f
-    private var a1_b = 0f; private var a2_b = 0f
-    private var x1_b = 0f; private var x2_b = 0f
-    private var y1_b = 0f; private var y2_b = 0f
+    private var b0_b = 0f;
+    private var b1_b = 0f;
+    private var b2_b = 0f
+    private var a1_b = 0f;
+    private var a2_b = 0f
+    private var x1_b = 0f;
+    private var x2_b = 0f
+    private var y1_b = 0f;
+    private var y2_b = 0f
 
     fun setEffects(muffled: Boolean, bassBoost: Boolean) {
         if (this.isMuffled != muffled || this.isBassBoost != bassBoost) {
@@ -139,7 +136,6 @@ class FxAudioProcessor : BaseAudioProcessor() {
     private fun calculateCoefficients() {
         val fs = inputAudioFormat.sampleRate.toFloat().coerceAtLeast(44100f)
 
-        // muffled (low pass), Q = 0.707
         if (isMuffled) {
             val f0 = muffledCutoff
             val q = 0.707f
@@ -155,7 +151,6 @@ class FxAudioProcessor : BaseAudioProcessor() {
             a2_m = (1f - alpha) / a0
         }
 
-        // bass boost (low shelf) at 100 Hz, S = 1
         if (isBassBoost) {
             val f0 = 100f
             val gain = bassBoostGain
@@ -213,7 +208,6 @@ class FxAudioProcessor : BaseAudioProcessor() {
     }
 }
 
-// --- 3. REVERB (Simple Delay Line) ---
 class ReverbAudioProcessor : BaseAudioProcessor() {
     private var enabled = false
     private var buffer: ShortArray = ShortArray(0)
@@ -275,7 +269,6 @@ class ReverbAudioProcessor : BaseAudioProcessor() {
     }
 }
 
-// --- 4. EARRAPE (Hard Clipping Distortion) ---
 class EarrapeAudioProcessor : BaseAudioProcessor() {
     private var enabled = false
 
@@ -346,7 +339,6 @@ class MonoAudioProcessor : BaseAudioProcessor() {
     }
 }
 
-// --- 6. NORMALIZATION (Volume Equalization & Limiter) ---
 class NormalizationAudioProcessor : BaseAudioProcessor() {
     private var enabled = false
     private var level = com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL
@@ -362,16 +354,19 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
             val isMac = osName.contains("mac")
             val isWin = osName.contains("win")
             val libExt = if (isWin) "dll" else if (isMac) "dylib" else "so"
-            val libFile = java.io.File(System.getProperty("user.dir"), "src/main/resources/native/libkittytune_audio_dsp.$libExt")
+            val libFile =
+                java.io.File(System.getProperty("user.dir"), "src/main/resources/native/libkittytune_audio_dsp.$libExt")
             if (libFile.exists()) {
                 System.load(libFile.absolutePath)
             } else {
                 try {
-                    val stream = NormalizationAudioProcessor::class.java.getResourceAsStream("/native/libkittytune_audio_dsp.$libExt")
+                    val stream =
+                        NormalizationAudioProcessor::class.java.getResourceAsStream("/native/libkittytune_audio_dsp.$libExt")
                     if (stream != null) {
-                        val tempFile = java.io.File.createTempFile("libkittytune_audio_dsp", ".$libExt")
-                        tempFile.deleteOnExit()
-                        tempFile.outputStream().use { stream.copyTo(it) }
+                        val tempFile = java.io.File(System.getProperty("java.io.tmpdir"), "kittytune_dsp_lib.$libExt")
+                        if (!tempFile.exists() || tempFile.length() == 0L) {
+                            tempFile.outputStream().use { stream.copyTo(it) }
+                        }
                         System.load(tempFile.absolutePath)
                     } else {
                         throw e
@@ -442,30 +437,40 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
 
         val numFrames = remaining / (2 * inputAudioFormat.channelCount)
         val outputBuffer = replaceOutputBuffer(remaining)
-        
+
         nativeProcessShort(nativeHandle, inputBuffer, outputBuffer, numFrames, inputBuffer.position())
-        
+
         inputBuffer.position(inputBuffer.position() + remaining)
         outputBuffer.position(remaining)
         outputBuffer.flip()
     }
 
     companion object {
-        @JvmStatic private external fun nativeInit(channels: Int, sampleRate: Int): Long
-        @JvmStatic private external fun nativeDestroy(handle: Long)
-        @JvmStatic private external fun nativeSetTargetLevel(handle: Long, targetLUFS: Float)
-        @JvmStatic private external fun nativeResetLoudness(handle: Long)
-        @JvmStatic private external fun nativeProcessShort(
+        @JvmStatic
+        private external fun nativeInit(channels: Int, sampleRate: Int): Long
+        @JvmStatic
+        private external fun nativeDestroy(handle: Long)
+        @JvmStatic
+        private external fun nativeSetTargetLevel(handle: Long, targetLUFS: Float)
+        @JvmStatic
+        private external fun nativeResetLoudness(handle: Long)
+        @JvmStatic
+        private external fun nativeProcessShort(
             handle: Long,
             inputBuffer: ByteBuffer,
             outputBuffer: ByteBuffer,
             numFrames: Int,
             inOffset: Int
         )
-        @JvmStatic private external fun nativeGetShortTermLoudness(handle: Long): Float
-        @JvmStatic private external fun nativeGetIntegratedLoudness(handle: Long): Float
-        @JvmStatic private external fun nativeGetTruePeakDb(handle: Long): Float
-        @JvmStatic private external fun nativeGetCurrentGainDb(handle: Long): Float
+
+        @JvmStatic
+        private external fun nativeGetShortTermLoudness(handle: Long): Float
+        @JvmStatic
+        private external fun nativeGetIntegratedLoudness(handle: Long): Float
+        @JvmStatic
+        private external fun nativeGetTruePeakDb(handle: Long): Float
+        @JvmStatic
+        private external fun nativeGetCurrentGainDb(handle: Long): Float
     }
 }
 
