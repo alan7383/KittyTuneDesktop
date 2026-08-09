@@ -178,14 +178,7 @@ class KdeMpris2Service(
 
     private fun emitSeeked(positionUs: Long) {
         try {
-            val signal = DBusSignal(
-                null,
-                "/org/mpris/MediaPlayer2",
-                "org.mpris.MediaPlayer2.Player",
-                "Seeked",
-                "x",
-                positionUs
-            )
+            val signal = MprisPlayerInterface.Seeked("/org/mpris/MediaPlayer2", positionUs)
             connection?.sendMessage(signal)
         } catch (e: Exception) {
             println("KDE-MPRIS2 [Seeked] FAILED: ${e.message}")
@@ -307,6 +300,8 @@ class KdeMpris2Service(
         fun Seek(Offset: Long)
         fun SetPosition(TrackId: DBusPath, Position: Long)
         fun OpenUri(Uri: String)
+        
+        class Seeked(path: String, val Position: Long) : DBusSignal(null, path, "org.mpris.MediaPlayer2.Player", "Seeked", "x", Position)
     }
 
     // ---------------------------------------------------------------------------

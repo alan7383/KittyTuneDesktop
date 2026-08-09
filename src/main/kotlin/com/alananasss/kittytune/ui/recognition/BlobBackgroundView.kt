@@ -8,7 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import io.github.alexzhirkevich.compottie.LottieCompositionSpec
-import io.github.alexzhirkevich.compottie.LottieConstants
+
 import io.github.alexzhirkevich.compottie.rememberLottieComposition
 import io.github.alexzhirkevich.compottie.rememberLottiePainter
 
@@ -26,7 +26,8 @@ fun BlobBackgroundView(modifier: Modifier = Modifier) {
     
     // 3. On crée le Painter animé en boucle infinie
     val painter = rememberLottiePainter(
-        composition = composition
+        composition = composition,
+        iterations = io.github.alexzhirkevich.compottie.Compottie.IterateForever
     )
 
     // 4. On l'affiche en remplissant tout l'écran
