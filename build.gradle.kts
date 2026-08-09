@@ -87,8 +87,8 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.19.1")
     implementation("net.java.dev.jna:jna-platform:5.19.1")
 
-    implementation("com.github.hypfvieh:dbus-java-core:4.3.1")
-    implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:4.3.1")
+    implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
+    implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:5.2.0")
 
     val javafxVersion = "21.0.3"
     val javafxClassifier = when {
