@@ -336,7 +336,7 @@ jobs:
           fi
 
       - name: Publish Release to GitHub
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'v1.0.20' }}
           name: ${{ github.ref_type == 'tag' && github.ref_name || 'KittyTune Desktop v1.0.20' }}
