@@ -162,8 +162,11 @@ class AudioEngine {
                 setOption("http_seekable", "1")
                 setOption("reconnect", "1")
                 setOption("reconnect_streamed", "1")
+                setOption("reconnect_on_network_error", "1")
+                setOption("reconnect_on_http_error", "4xx,5xx")
                 setOption("reconnect_delay_max", "5")
-                setOption("rw_timeout", "15000000") // 15s in us
+                setOption("rw_timeout", "1000000") // 1s timeout in us
+                setOption("tcp_nodelay", "1")
             }
             sampleRate = outputSampleRate
             audioChannels = outputChannels
@@ -183,49 +186,57 @@ class AudioEngine {
 
         var currentUrlToTry = url
         val targetTs = resumePosMs * 1000L
+        var attempt = 0
 
-        // Attempt 1: Reopen with current URL
-        for (attempt in 1..2) {
-            if (stopFlag) return Pair(null, null)
+        // Retry indefinitely until the stream is recovered or the engine is stopped.
+        while (!stopFlag) {
+            attempt++
+            val backoffMs = (attempt * 1000L).coerceAtMost(5000L) // cap at 5s
+            System.err.println("AudioEngine: Network recovery attempt $attempt (backoff=${backoffMs}ms) at $resumePosMs ms...")
+
             try {
                 val newG = createGrabber(currentUrlToTry, headers)
                 newG.start()
                 if (targetTs > 0) {
                     try { newG.timestamp = targetTs } catch (_: Exception) {}
                 }
+                System.err.println("AudioEngine: Reopen succeeded on attempt $attempt!")
                 return Pair(newG, currentUrlToTry)
             } catch (e: Exception) {
-                System.err.println("AudioEngine: Reopen attempt $attempt failed: ${e.message}")
-                try { Thread.sleep(300) } catch (_: InterruptedException) {}
+                System.err.println("AudioEngine: Reopen attempt $attempt failed (${e.message}).")
             }
-        }
 
-        // Attempt 2: Re-resolve fresh stream URL (in case URL / token expired after long pause)
-        val reResolver = onReResolveUrl
-        if (reResolver != null && (url.startsWith("http://") || url.startsWith("https://"))) {
-            System.err.println("AudioEngine: Attempting to re-resolve fresh stream URL...")
-            var freshUrl: String? = null
-            kotlinx.coroutines.runBlocking {
-                try {
-                    freshUrl = reResolver.invoke()
-                } catch (e: Exception) {
-                    System.err.println("AudioEngine: Re-resolve failed: ${e.message}")
-                }
-            }
-            val nonNullUrl = freshUrl
-            if (!nonNullUrl.isNullOrEmpty()) {
-                currentUrlToTry = nonNullUrl
-                try {
-                    val newG = createGrabber(currentUrlToTry, headers)
-                    newG.start()
-                    if (targetTs > 0) {
-                        try { newG.timestamp = targetTs } catch (_: Exception) {}
+            // On every other attempt also try to re-resolve a fresh stream URL
+            // (CDN tokens can expire during a long network outage).
+            if (attempt % 2 == 0) {
+                val reResolver = onReResolveUrl
+                if (reResolver != null && (url.startsWith("http://") || url.startsWith("https://"))) {
+                    var freshUrl: String? = null
+                    kotlinx.coroutines.runBlocking {
+                        try {
+                            freshUrl = reResolver.invoke()
+                        } catch (e: Exception) {
+                            System.err.println("AudioEngine: Re-resolve on attempt $attempt failed: ${e.message}")
+                        }
                     }
-                    return Pair(newG, currentUrlToTry)
-                } catch (e: Exception) {
-                    System.err.println("AudioEngine: Fresh URL open failed: ${e.message}")
+                    if (!freshUrl.isNullOrEmpty()) {
+                        currentUrlToTry = freshUrl
+                        try {
+                            val newG = createGrabber(currentUrlToTry, headers)
+                            newG.start()
+                            if (targetTs > 0) {
+                                try { newG.timestamp = targetTs } catch (_: Exception) {}
+                            }
+                            System.err.println("AudioEngine: Recovery via fresh URL succeeded on attempt $attempt!")
+                            return Pair(newG, currentUrlToTry)
+                        } catch (e: Exception) {
+                            System.err.println("AudioEngine: Fresh URL open failed on attempt $attempt: ${e.message}")
+                        }
+                    }
                 }
             }
+
+            try { Thread.sleep(backoffMs) } catch (_: InterruptedException) { break }
         }
 
         return Pair(null, null)
@@ -330,7 +341,7 @@ class AudioEngine {
                             setStateAsync(State.ENDED)
                             break
                         } else {
-                            System.err.println("AudioEngine: Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream...")
+                            System.err.println("AudioEngine: Premature EOF/error at $positionMs ms (duration=$durationMs ms). Recovering stream (will retry until success)...")
                             val recovered = recoverStream(grabber, activeUrl, headers, positionMs)
                             if (recovered.first != null) {
                                 grabber = recovered.first
@@ -338,9 +349,7 @@ class AudioEngine {
                                 System.err.println("AudioEngine: Stream recovery succeeded at $positionMs ms!")
                                 continue
                             } else {
-                                System.err.println("AudioEngine: Stream recovery failed. Ending track.")
-                                drainStretcher(outBuf, localLine)
-                                setStateAsync(State.ENDED)
+                                // Only reaches here if stopFlag was set — the engine was intentionally stopped.
                                 break
                             }
                         }
