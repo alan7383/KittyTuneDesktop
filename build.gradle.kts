@@ -1,7 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("jvm") version "2.4.0"
+    kotlin("jvm") version "2.4.10"
     kotlin("plugin.serialization") version "2.4.10"
     id("org.jetbrains.compose") version "1.12.0-beta01"
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"
@@ -78,7 +78,7 @@ dependencies {
 
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("com.materialkolor:material-kolor:5.0.0")
-    implementation("org.xerial:sqlite-jdbc:3.45.3.0")
+    implementation("org.xerial:sqlite-jdbc:3.53.2.1")
     implementation("org.slf4j:slf4j-simple:2.0.17")
 
     implementation("org.json:json:20260719")
