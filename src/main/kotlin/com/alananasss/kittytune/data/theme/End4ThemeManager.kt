@@ -4,6 +4,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,16 +13,19 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
+import java.nio.file.ClosedWatchServiceException
+import java.nio.file.FileSystems
+import java.nio.file.Path
+import java.nio.file.StandardWatchEventKinds.ENTRY_CREATE
+import java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY
+import java.nio.file.StandardWatchEventKinds.OVERFLOW
+import java.nio.file.WatchKey
+import java.nio.file.WatchService
 
-/**
- * Manages detection, color extraction, and real-time live synchronization
- * with end4's Hyprland dotfiles (matugen / quickshell generated Material You colors).
- */
 object End4ThemeManager {
 
     private val userHome: String = System.getProperty("user.home") ?: ""
 
-    // File paths associated with end4 dotfiles
     val colorsFile: File = File(userHome, ".local/state/quickshell/user/generated/colors.json")
     private val quickshellIiDir: File = File(userHome, ".config/quickshell/ii")
     private val dotsHyprlandDir: File = File(userHome, "dots-hyprland")
@@ -31,12 +35,9 @@ object End4ThemeManager {
     val colorsMap: StateFlow<Map<String, Color>> = _colorsMap.asStateFlow()
 
     private var watchingStarted = false
-    private var lastModifiedTime: Long = 0L
+    private var watchJob: Job? = null
+    private var watchService: WatchService? = null
 
-    /**
-     * Checks if end4 dotfiles are installed on this system.
-     * True if matugen config AND (quickshell ii OR generated colors OR dots-hyprland repo) exist.
-     */
     fun isInstalled(): Boolean {
         if (userHome.isEmpty()) return false
         val hasMatugen = matugenConfigDir.isDirectory
@@ -44,29 +45,70 @@ object End4ThemeManager {
         return hasMatugen && hasEnd4Artifacts
     }
 
-    /**
-     * Starts watching colors.json for real-time live color updates when matugen generates new colors.
-     */
     fun startWatching() {
-        if (watchingStarted) return
+        if (watchingStarted || watchJob?.isActive == true) return
         watchingStarted = true
 
-        // Initial load
         reloadColors()
 
-        // Background poller for file modification timestamp changes
-        CoroutineScope(Dispatchers.IO).launch {
-            while (isActive) {
-                if (colorsFile.exists()) {
-                    val currentModified = colorsFile.lastModified()
-                    if (currentModified != lastModifiedTime) {
-                        lastModifiedTime = currentModified
-                        reloadColors()
+        val parentDir = colorsFile.parentFile ?: return
+        if (!parentDir.exists()) {
+            parentDir.mkdirs()
+        }
+
+        runCatching {
+            val ws = FileSystems.getDefault().newWatchService()
+            watchService = ws
+            parentDir.toPath().register(ws, ENTRY_CREATE, ENTRY_MODIFY)
+
+            watchJob = CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    while (isActive) {
+                        val key: WatchKey = try {
+                            ws.take()
+                        } catch (_: ClosedWatchServiceException) {
+                            break
+                        } catch (_: InterruptedException) {
+                            break
+                        }
+
+                        var shouldReload = false
+                        for (event in key.pollEvents()) {
+                            if (event.kind() == OVERFLOW) continue
+
+                            val changedPath = event.context() as? Path
+                            if (changedPath?.toString() == colorsFile.name) {
+                                shouldReload = true
+                            }
+                        }
+
+                        val valid = key.reset()
+                        if (shouldReload) {
+                            delay(50L)
+                            reloadColors()
+                        }
+
+                        if (!valid) {
+                            break
+                        }
+                    }
+                } catch (_: Throwable) {
+                } finally {
+                    runCatching { ws.close() }
+                    if (watchService === ws) {
+                        watchService = null
                     }
                 }
-                delay(1000L)
             }
         }
+    }
+
+    fun stopWatching() {
+        watchJob?.cancel()
+        watchJob = null
+        runCatching { watchService?.close() }
+        watchService = null
+        watchingStarted = false
     }
 
     fun reloadColors() {

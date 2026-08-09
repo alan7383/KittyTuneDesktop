@@ -61,7 +61,8 @@ class WindowsSmtcService(
                                     }
                                 }
                             }
-                        } catch (_: Exception) {}
+                        } catch (_: Exception) {
+                        }
                     }
                 }
             }
@@ -75,25 +76,25 @@ class WindowsSmtcService(
 
     private fun prepareExecutable(): File? {
         val exeName = "WindowsSmtcBridge.exe"
-        val tempDir = File(System.getProperty("java.io.tmpdir"), "kittytune_smtc_${System.currentTimeMillis()}")
+        val tempDir = File(System.getProperty("java.io.tmpdir"), "kittytune_smtc")
         if (!tempDir.exists()) tempDir.mkdirs()
-        // Name the extracted file KittyTune.exe so the Windows SMTC overlay uses this name
         val targetFile = File(tempDir, "KittyTune.exe")
 
-        // Prioritize freshly compiled dev file
         val devFile = File("src/main/resources/native/$exeName")
         if (devFile.exists()) {
-            devFile.copyTo(targetFile, overwrite = true)
-            return targetFile
+            runCatching { devFile.copyTo(targetFile, overwrite = true) }
+            if (targetFile.exists()) return targetFile
         }
 
         val resourceStream = javaClass.getResourceAsStream("/native/$exeName")
         if (resourceStream != null) {
-            targetFile.outputStream().use { out -> resourceStream.copyTo(out) }
-            return targetFile
+            runCatching {
+                targetFile.outputStream().use { out -> resourceStream.copyTo(out) }
+            }
+            if (targetFile.exists()) return targetFile
         }
 
-        return null
+        return if (targetFile.exists()) targetFile else null
     }
 
     fun updateMedia(track: Track?, isPlaying: Boolean) {
@@ -116,7 +117,8 @@ class WindowsSmtcService(
             writer?.println("QUIT")
             writer?.flush()
             process?.destroy()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         process = null
         writer = null
         isConnected = false
