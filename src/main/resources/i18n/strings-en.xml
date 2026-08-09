@@ -2141,4 +2141,15 @@
     <string name="pref_norm_info_title">Understanding Volume Normalization</string>
     <string name="pref_norm_info_body_1">Different songs are often recorded at different loudness levels. Volume normalization automatically balances your tracks so that every song plays at a consistent, comfortable volume without you needing to adjust it constantly.</string>
     <string name="pref_norm_info_body_2">How it works:\n• KittyTune measures the true loudness of each song (in LUFS).\n• During playback, volume is dynamically adjusted to match your selected target level.\n• An integrated limiter prevents any distortion or clipping.\n\nLevels:\n• Quiet (-19 LUFS): Ideal for nighttime listening or headphones.\n• Normal (-14 LUFS): The standard used by Spotify &amp; YouTube.\n• Loud (-11 LUFS): Best for noisy environments or outdoor speakers.</string>
+    <string name="about_kofi_title">Support KittyTune</string>
+    <string name="about_kofi_desc">The app is 100% free and ad-free. If you enjoy it, you can buy me a small coffee!</string>
+    <string name="about_website_group">Website &amp; Links</string>
+    <string name="about_website_title">Official Website</string>
+    <string name="about_downloads_title">Downloads</string>
+    <string name="about_downloads_desc">Get the app for Android, Linux, or Windows</string>
+    <string name="about_help_group">Help &amp; Open Source</string>
+    <string name="about_credits">Credits</string>
+    <string name="about_github">Source Code on GitHub</string>
+    <string name="about_bug_report">Report a bug</string>
+    <string name="about_check_updates">Check for updates</string>
 </resources>

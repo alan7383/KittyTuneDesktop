@@ -16,6 +16,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.material.icons.rounded.Notifications
     import androidx.compose.material.icons.rounded.Mail
     import androidx.compose.material.icons.rounded.Settings
+    import androidx.compose.material.icons.rounded.Info
     import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
     import androidx.compose.runtime.Composable
@@ -36,6 +37,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
         isGuest: Boolean,
         onDismiss: () -> Unit,
         onViewProfile: () -> Unit,
+        onViewAbout: (() -> Unit)? = null,
         onNotificationsClick: () -> Unit,
         onMessagesClick: () -> Unit,
         onListeningStatsClick: () -> Unit,
@@ -170,6 +172,14 @@ import androidx.compose.material3.ContainedLoadingIndicator
                         icon = Icons.Rounded.Settings,
                         label = str("profile_menu_settings"),
                         onClick = { onDismiss(); onSettingsClick() }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.surface, thickness = 1.dp)
+
+                    MenuRowItem(
+                        icon = Icons.Rounded.Info,
+                        label = "À propos / Support",
+                        onClick = { onDismiss(); onViewAbout?.invoke() }
                     )
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.surface, thickness = 1.dp)

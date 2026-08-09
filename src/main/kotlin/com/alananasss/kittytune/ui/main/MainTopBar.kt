@@ -203,42 +203,14 @@ fun MainTopBar(
 
         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
 
-        val updateStatus by com.alananasss.kittytune.data.UpdateManager.status.collectAsState()
-        val isUpdateActive = updateStatus == com.alananasss.kittytune.data.UpdateStatus.AVAILABLE ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.PAUSED ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.WAITING_FOR_AUTH ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.INSTALLING ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL ||
-                updateStatus == com.alananasss.kittytune.data.UpdateStatus.AUTH_FAILED
-
-        if (isUpdateActive) {
-            FilledTonalIconButton(
-                shapes = IconButtonDefaults.shapes(),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = if (updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = if (updateStatus == com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                onClick = { com.alananasss.kittytune.data.UpdateManager.showDialog() }
-            ) {
-                Icon(
-                    imageVector = when (updateStatus) {
-                        com.alananasss.kittytune.data.UpdateStatus.READY_TO_INSTALL -> Icons.Outlined.RestartAlt
-                        com.alananasss.kittytune.data.UpdateStatus.MULTIPLE_INSTANCES -> Icons.Outlined.NewReleases
-                        com.alananasss.kittytune.data.UpdateStatus.DOWNLOADING, com.alananasss.kittytune.data.UpdateStatus.PAUSED, com.alananasss.kittytune.data.UpdateStatus.WAITING_FOR_AUTH, com.alananasss.kittytune.data.UpdateStatus.INSTALLING -> Icons.Outlined.Download
-                        else -> Icons.Outlined.NewReleases
-                    },
-                    contentDescription = str("pref_updates_title"),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
-        }
-
         // Avatar -> profile dropdown
         androidx.compose.foundation.layout.Box {
             var showProfileMenu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+            var showAboutDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+
+            if (showAboutDialog) {
+                com.alananasss.kittytune.ui.profile.AboutDialog(onDismiss = { showAboutDialog = false })
+            }
 
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 if (playerViewModel.currentUser == null) {
@@ -285,6 +257,13 @@ fun MainTopBar(
                     onClick = {
                         showProfileMenu = false
                         navController.navigate("settings")
+                    }
+                )
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text("À propos / Support") },
+                    onClick = {
+                        showProfileMenu = false
+                        showAboutDialog = true
                     }
                 )
                 androidx.compose.material3.HorizontalDivider()
