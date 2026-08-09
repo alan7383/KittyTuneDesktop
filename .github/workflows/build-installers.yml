@@ -286,25 +286,25 @@ jobs:
           fetch-depth: 0
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: KittyTune-Windows
           path: ./release-files
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: KittyTune-macOS
           path: ./release-files
 
       - name: Download Linux x64 Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: KittyTune-Linux-x64
           path: ./release-files
 
       - name: Download Linux ARM64 Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: KittyTune-Linux-arm64
           path: ./release-files
