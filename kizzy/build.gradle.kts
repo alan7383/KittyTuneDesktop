@@ -7,7 +7,7 @@ kotlin {
     jvmToolchain(21)
 }
 
-val ktorVersion = "2.3.12"
+val ktorVersion = "3.5.2"
 val serializationVersion = "1.7.1"
 val coroutinesVersion = "1.11.0"
 
