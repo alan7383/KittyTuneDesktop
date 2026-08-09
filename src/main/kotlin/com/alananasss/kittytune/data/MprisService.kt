@@ -94,14 +94,7 @@ class MprisService(
     private fun emitSeeked(positionUs: Long) {
         try {
             println("MPRIS [Seeked] emitting Seeked signal: position=${positionUs}us (${positionUs / 1000000}s)")
-            val signal = DBusSignal(
-                null,
-                "/org/mpris/MediaPlayer2",
-                "org.mpris.MediaPlayer2.Player",
-                "Seeked",
-                "x",
-                positionUs
-            )
+            val signal = MprisPlayerInterface.Seeked("/org/mpris/MediaPlayer2", positionUs)
             connection?.sendMessage(signal)
         } catch (e: Exception) {
             println("MPRIS [Seeked] FAILED: ${e.message}")
@@ -186,6 +179,8 @@ class MprisService(
         fun Previous()
         fun Seek(Offset: Long)
         fun SetPosition(TrackId: DBusPath, Position: Long)
+        
+        class Seeked(path: String, val Position: Long) : DBusSignal(null, path, "org.mpris.MediaPlayer2.Player", "Seeked", "x", Position)
     }
 
     @DBusInterfaceName("org.mpris.MediaPlayer2")
