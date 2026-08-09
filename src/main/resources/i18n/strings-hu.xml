@@ -1930,4 +1930,15 @@
     <string name="pref_norm_info_title">A Hangerő Kiegyenlítés Működése</string>
     <string name="pref_norm_info_body_1">A különböző számokat gyakran eltérő hangerővel rögzítik. A hangerő kiegyenlítése automatikusan egyensúlyba hozza a sávokat, így minden szám egyenletes, kényelmes hangerővel szól anélkül, hogy folyamatosan állítani kellene.</string>
     <string name="pref_norm_info_body_2">Hogyan működik:\n• A KittyTune megméri minden dal tényleges hangerejét (LUFS-ben).\n• Lejátszás közben a hangerő dinamikusan igazodik a kiválasztott célszinthez.\n• Egy beépített limiter megakadályozza a torzítást vagy pattogást.\n\nSzintek:\n• Csendes (-19 LUFS): Ideális éjszakai zenehallgatáshoz vagy fejhallgatóhoz.\n• Normál (-14 LUFS): A Spotify és a YouTube által használt szabvány.\n• Hangos (-11 LUFS): A legjobb zajos környezetekhez vagy szabadtéri hangszórókhoz.</string>
+    <string name="about_kofi_title">KittyTune támogatása</string>
+    <string name="about_kofi_desc">Az alkalmazás 100% ingyenes és reklámmentes. Ha tetszik, meghívhatsz egy kávéra!</string>
+    <string name="about_website_group">Weboldal és Linkek</string>
+    <string name="about_website_title">Hivatalos weboldal</string>
+    <string name="about_downloads_title">Letöltések</string>
+    <string name="about_downloads_desc">Töltsd le az alkalmazást Androidra, Linuxra vagy Windowsra</string>
+    <string name="about_help_group">Súgó és Nyílt forráskód</string>
+    <string name="about_credits">Készítők</string>
+    <string name="about_github">Forráskód a GitHubon</string>
+    <string name="about_bug_report">Hiba bejelentése</string>
+    <string name="about_check_updates">Frissítések keresése</string>
 </resources>
