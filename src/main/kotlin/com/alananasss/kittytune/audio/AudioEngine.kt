@@ -84,6 +84,7 @@ class AudioEngine {
 
     private var currentUrl: String? = null
     private var currentHeaders: Map<String, String> = emptyMap()
+    private var hlsAdapter: HlsStreamAdapter? = null
 
     init {
         val fmt = AudioFormat(outputSampleRate, outputChannels)
@@ -99,6 +100,15 @@ class AudioEngine {
         positionMs = startPositionMs
         durationMs = 0L
         seekRequestMs = if (startPositionMs > 0) startPositionMs else -1L
+        Logger.e("AudioEngine", "setMediaItem called with url: $url")
+        try {
+            hlsAdapter = if (url.contains(".m3u8")) HlsStreamAdapter(url, headers) else null
+            Logger.e("AudioEngine", "hlsAdapter initialized: ${hlsAdapter != null}")
+        } catch (e: Exception) {
+            Logger.e("AudioEngine", "Failed to init HlsStreamAdapter: ${e.message}")
+            hlsAdapter = null
+        }
+        
         setState(State.BUFFERING)
     }
 
@@ -127,7 +137,9 @@ class AudioEngine {
     }
 
     fun seekTo(ms: Long) {
-        seekRequestMs = ms.coerceAtLeast(0)
+        val coerced = ms.coerceAtLeast(0)
+        seekRequestMs = coerced
+        positionMs = coerced
     }
 
     fun setVolume(v: Float) {
@@ -168,24 +180,39 @@ class AudioEngine {
 
     var onReResolveUrl: (suspend () -> String?)? = null
 
-    private fun createGrabber(targetUrl: String, headers: Map<String, String>): FFmpegFrameGrabber {
-        return FFmpegFrameGrabber(targetUrl).apply {
-            if (headers.isNotEmpty()) {
-                val headerBlob = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
-                setOption("headers", headerBlob + "\r\n")
+    private fun createGrabber(targetUrl: String, headers: Map<String, String>, startPositionMs: Long = 0L): FFmpegFrameGrabber {
+        val adapter = hlsAdapter
+        val isHls = targetUrl.contains(".m3u8")
+        
+        return if (isHls && adapter != null) {
+            FFmpegFrameGrabber(adapter.getInputStream(startPositionMs)).apply {
+                format = "mp4" // Fragments are ISOBMFF (mp4)
+                setOption("probesize", "32768") // 32KB is enough for MOOV atom + some audio
+                setOption("analyzeduration", "0")
+                sampleRate = outputSampleRate
+                audioChannels = outputChannels
             }
-            if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
-                setOption("http_seekable", "1")
-                setOption("reconnect", "1")
-                setOption("reconnect_streamed", "1")
-                setOption("reconnect_on_network_error", "1")
-                setOption("reconnect_on_http_error", "4xx,5xx")
-                setOption("reconnect_delay_max", "5")
-                setOption("rw_timeout", "1000000")
-                setOption("tcp_nodelay", "1")
+        } else {
+            FFmpegFrameGrabber(targetUrl).apply {
+                if (headers.isNotEmpty()) {
+                    val headerBlob = headers.entries.joinToString("\r\n") { "${it.key}: ${it.value}" }
+                    setOption("headers", headerBlob + "\r\n")
+                }
+                if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
+                    setOption("probesize", "32768") // Bypass default 5MB probing
+                    setOption("analyzeduration", "0") // Bypass duration analysis
+                    setOption("http_seekable", "1")
+                    setOption("reconnect", "1")
+                    setOption("reconnect_streamed", "1")
+                    setOption("reconnect_on_network_error", "1")
+                    setOption("reconnect_on_http_error", "4xx,5xx")
+                    setOption("reconnect_delay_max", "5")
+                    setOption("rw_timeout", "1000000")
+                    setOption("tcp_nodelay", "1")
+                }
+                sampleRate = outputSampleRate
+                audioChannels = outputChannels
             }
-            sampleRate = outputSampleRate
-            audioChannels = outputChannels
         }
     }
 
@@ -214,9 +241,43 @@ class AudioEngine {
                 val newG = createGrabber(currentUrlToTry, headers)
                 newG.start()
                 if (targetTs > 0) {
-                    try {
-                        newG.timestamp = targetTs
-                    } catch (_: Exception) {
+                    val isHls = currentUrlToTry.contains(".m3u8")
+                    if (!isHls) {
+                        try {
+                            newG.timestamp = targetTs
+                        } catch (_: Exception) {}
+                    }
+                    
+                    var f: Frame? = try { newG.grabSamples() } catch (_: Exception) { null }
+                    if (f == null) {
+                        Logger.e("AudioEngine", "Grab failed at start/seek, falling back to manual catch-up")
+                        try {
+                            newG.stop()
+                            newG.release()
+                        } catch (_: Exception) {}
+                        
+                        val fallbackG = createGrabber(currentUrlToTry, headers, targetTs / 1000L)
+                        fallbackG.start()
+                        var droppedCount = 0
+                        f = try { fallbackG.grabSamples() } catch (_: Exception) { null }
+                        while (f != null && fallbackG.timestamp < targetTs - 100_000L && !stopFlag) {
+                            f = try { fallbackG.grabSamples() } catch (_: Exception) { null }
+                            droppedCount++
+                            if (droppedCount > 20000) break
+                        }
+                        if (f == null) throw Exception("EOF during manual catch-up")
+                        Logger.e("AudioEngine", "Recovery (fallback catchup) succeeded on attempt $attempt!")
+                        return Pair(fallbackG, currentUrlToTry)
+                    } else {
+                        var droppedCount = 0
+                        while (f != null && newG.timestamp < targetTs - 100_000L && !stopFlag) {
+                            f = try { newG.grabSamples() } catch (_: Exception) { null }
+                            droppedCount++
+                            if (droppedCount > 10000) break
+                        }
+                        if (f == null) throw Exception("EOF during post-seek catch-up")
+                        Logger.e("AudioEngine", "Recovery (native/fast catchup) succeeded on attempt $attempt!")
+                        return Pair(newG, currentUrlToTry)
                     }
                 }
                 Logger.e("AudioEngine", "Reopen succeeded on attempt $attempt!")
@@ -239,18 +300,29 @@ class AudioEngine {
                     if (!freshUrl.isNullOrEmpty()) {
                         currentUrlToTry = freshUrl
                         try {
-                            val newG = createGrabber(currentUrlToTry, headers)
+                            val newG = createGrabber(currentUrlToTry, headers, targetTs / 1000L)
                             newG.start()
                             if (targetTs > 0) {
-                                try {
-                                    newG.timestamp = targetTs
-                                } catch (_: Exception) {
+                                val isHls = currentUrlToTry.contains(".m3u8")
+                                if (!isHls) {
+                                    try {
+                                        newG.timestamp = targetTs
+                                    } catch (_: Exception) {}
                                 }
+                                var f: Frame? = try { newG.grabSamples() } catch (_: Exception) { null }
+                                if (f == null) throw Exception("EOF on fresh URL seek")
+                                var droppedCount = 0
+                                while (f != null && newG.timestamp < targetTs - 100_000L && !stopFlag) {
+                                    f = try { newG.grabSamples() } catch (_: Exception) { null }
+                                    droppedCount++
+                                    if (droppedCount > 10000) break
+                                }
+                                if (f == null) throw Exception("EOF on fresh URL catchup")
                             }
                             Logger.e("AudioEngine", "Recovery via fresh URL succeeded on attempt $attempt!")
                             return Pair(newG, currentUrlToTry)
                         } catch (e: Exception) {
-                            Logger.e("AudioEngine", "Fresh URL open failed on attempt $attempt: ${e.message}")
+                            Logger.e("AudioEngine", "Fresh URL reopen failed: ${e.message}")
                         }
                     }
                 }
@@ -271,12 +343,13 @@ class AudioEngine {
         var localLine: SourceDataLine? = null
         var activeUrl = url
         try {
-            grabber = createGrabber(activeUrl, headers)
+            grabber = createGrabber(activeUrl, headers, positionMs)
             grabber.start()
 
             if (stopFlag || activeWorkerId != workerId) return
 
-            durationMs = grabber.lengthInTime / 1000L
+            val adapter = hlsAdapter
+            durationMs = if (adapter != null) adapter.totalDurationMs else (grabber.lengthInTime / 1000L)
 
             localLine = openLine()
             line = localLine
@@ -301,17 +374,32 @@ class AudioEngine {
 
                     Logger.e("AudioEngine", "Seeking to targetTimestamp=$targetTimestamp (ms=$seek)")
 
+                    val isHls = activeUrl?.contains(".m3u8") == true
+                    val currentTsForCheck = grabber?.timestamp ?: 0L
+
                     var seekOk = false
+                    var seekFrame: Frame? = null
                     try {
-                        grabber?.timestamp = targetTimestamp
-                        val currentTs = grabber?.timestamp ?: 0L
-                        if (currentTs <= targetTimestamp + 1_500_000L && (currentTs >= targetTimestamp - 5_000_000L || targetTimestamp < 5_000_000L)) {
-                            seekOk = true
+                        if (isHls && hlsAdapter != null) {
+                            grabber?.stop()
+                            grabber?.release()
+                            
+                            grabber = createGrabber(activeUrl, headers, targetTimestamp / 1000L)
+                            grabber.start()
+                            seekFrame = try { grabber.grabSamples() } catch (_: Exception) { null }
+                            seekOk = seekFrame != null
                         } else {
-                            Logger.e(
-                                "AudioEngine",
-                                "setTimestamp landed at $currentTs, expected near $targetTimestamp. Will reopen stream."
-                            )
+                            grabber?.timestamp = targetTimestamp
+                            seekFrame = grabber?.grabSamples()
+                            val currentTs = grabber?.timestamp ?: 0L
+                            if (seekFrame != null && currentTs <= targetTimestamp + 3_000_000L && (currentTs >= targetTimestamp - 5_000_000L || targetTimestamp < 5_000_000L)) {
+                                seekOk = true
+                            } else {
+                                Logger.e(
+                                    "AudioEngine",
+                                    "setTimestamp landed at $currentTs, expected near $targetTimestamp. Will reopen stream."
+                                )
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("AudioEngine", "FFmpeg seek error - ${e.message}")
@@ -322,24 +410,31 @@ class AudioEngine {
                         if (recovered.first != null) {
                             grabber = recovered.first
                             if (recovered.second != null) activeUrl = recovered.second!!
-                            seekOk = true
+                            seekFrame = try { grabber?.grabSamples() } catch (_: Exception) { null }
+                            seekOk = seekFrame != null
                         }
                     }
 
-                    val activeG = grabber
-                    if (seekOk && activeG != null) {
+                    if (seekOk && grabber != null) {
+                        var f = seekFrame
                         var droppedCount = 0
-                        while (!stopFlag && activeWorkerId == workerId) {
-                            val ts = activeG.timestamp
-                            if (ts >= targetTimestamp) break
-                            val f = try {
-                                activeG.grabSamples()
+                        while (f != null && !stopFlag && activeWorkerId == workerId) {
+                            val ts = grabber.timestamp
+                            if (ts >= targetTimestamp - 50_000L) {
+                                val samples = f.samples
+                                if (samples != null) {
+                                    val (pcm, pcmLen) = interleave(samples, f.sampleRate, f.audioChannels)
+                                    pushThroughDsp(pcm, pcmLen)
+                                }
+                                break
+                            }
+                            f = try {
+                                grabber.grabSamples()
                             } catch (_: Exception) {
                                 null
                             }
-                            if (f == null) break
                             droppedCount++
-                            if (droppedCount > 20000) break
+                            if (droppedCount > 6000) break
                         }
                     }
 
@@ -394,7 +489,9 @@ class AudioEngine {
                 pushThroughDsp(pcm, pcmLen)
                 drainStretcher(outBuf, localLine)
 
-                positionMs = (grabber?.timestamp ?: 0L) / 1000L
+                if (seekRequestMs == -1L) {
+                    positionMs = (grabber?.timestamp ?: 0L) / 1000L
+                }
             }
         } catch (t: Throwable) {
             if (!stopFlag && activeWorkerId == workerId) {
@@ -415,33 +512,68 @@ class AudioEngine {
         val first = buffers[0]
         if (first is ShortBuffer) {
             if (buffers.size == frameChannels && frameChannels > 1) {
-                val len = first.limit()
+                val len = first.remaining()
                 val required = len * frameChannels
                 if (interleaveBuffer.size < required) {
                     interleaveBuffer = ShortArray(required)
                 }
                 for (ch in 0 until frameChannels) {
                     val b = buffers[ch] as ShortBuffer
-                    for (i in 0 until len) interleaveBuffer[i * frameChannels + ch] = b.get(i)
+                    val bPos = b.position()
+                    for (i in 0 until len) interleaveBuffer[i * frameChannels + ch] = b.get(bPos + i)
                 }
                 return Pair(interleaveBuffer, required)
             } else {
-                val len = first.limit()
+                val len = first.remaining()
                 if (interleaveBuffer.size < len) {
                     interleaveBuffer = ShortArray(len)
                 }
-                first.rewind()
-                first.get(interleaveBuffer, 0, len)
+                val pos = first.position()
+                for (i in 0 until len) {
+                    interleaveBuffer[i] = first.get(pos + i)
+                }
+                return Pair(interleaveBuffer, len)
+            }
+        }
+        if (first is java.nio.FloatBuffer) {
+            if (buffers.size == frameChannels && frameChannels > 1) {
+                val len = first.remaining()
+                val required = len * frameChannels
+                if (interleaveBuffer.size < required) {
+                    interleaveBuffer = ShortArray(required)
+                }
+                for (ch in 0 until frameChannels) {
+                    val b = buffers[ch] as java.nio.FloatBuffer
+                    val bPos = b.position()
+                    for (i in 0 until len) {
+                        val f = b.get(bPos + i)
+                        interleaveBuffer[i * frameChannels + ch] = (f * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                    }
+                }
+                return Pair(interleaveBuffer, required)
+            } else {
+                val len = first.remaining()
+                if (interleaveBuffer.size < len) {
+                    interleaveBuffer = ShortArray(len)
+                }
+                val pos = first.position()
+                for (i in 0 until len) {
+                    val f = first.get(pos + i)
+                    interleaveBuffer[i] = (f * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+                }
                 return Pair(interleaveBuffer, len)
             }
         }
         val bb = (first as java.nio.ByteBuffer).order(ByteOrder.LITTLE_ENDIAN)
         val sb = bb.asShortBuffer()
-        val len = sb.limit()
+        val len = sb.remaining()
         if (interleaveBuffer.size < len) {
             interleaveBuffer = ShortArray(len)
         }
-        sb.get(interleaveBuffer, 0, len)
+        val pos = sb.position()
+        for (i in 0 until len) {
+            interleaveBuffer[i] = sb.get(pos + i)
+        }
         return Pair(interleaveBuffer, len)
     }
 
@@ -458,6 +590,8 @@ class AudioEngine {
             dspInputBuffer
         }
         buf.asShortBuffer().put(pcm, 0, length)
+        buf.position(0)
+        buf.limit(requiredBytes)
 
         for (p in chain) {
             p.queueInput(buf)
@@ -468,7 +602,11 @@ class AudioEngine {
         if (processedBuffer.size < requiredShorts) {
             processedBuffer = ShortArray(requiredShorts)
         }
-        buf.asShortBuffer().get(processedBuffer, 0, requiredShorts)
+        val sb = buf.asShortBuffer()
+        val pos = sb.position()
+        for (i in 0 until requiredShorts) {
+            processedBuffer[i] = sb.get(pos + i)
+        }
         stretcher.queue(processedBuffer, requiredShorts)
     }
 
@@ -535,7 +673,7 @@ class AudioEngine {
 
         val l =
             if (mixer != null) mixer.getLine(info) as SourceDataLine else AudioSystem.getLine(info) as SourceDataLine
-        l.open(fmt, outputSampleRate * outputChannels * 2 * 40 / 1000)
+        l.open(fmt, outputSampleRate * outputChannels * 2 * 200 / 1000)
         l.start()
         applyLineVolume(l)
         return l
