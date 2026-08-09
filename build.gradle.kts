@@ -79,7 +79,7 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("com.materialkolor:material-kolor:5.0.0")
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
-    implementation("org.slf4j:slf4j-simple:2.0.17")
+    implementation("org.slf4j:slf4j-simple:2.0.18")
 
     implementation("org.json:json:20260719")
     implementation("org.yaml:snakeyaml:2.6")
