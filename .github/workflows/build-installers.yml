@@ -44,7 +44,7 @@ jobs:
         shell: powershell
 
       - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-Windows
           path: dist-win/*
@@ -80,7 +80,7 @@ jobs:
           cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-${{ steps.get_version.outputs.VERSION }}.dmg
 
       - name: Upload macOS Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-macOS
           path: dist-mac/*
@@ -174,7 +174,7 @@ jobs:
           cp kitty-tune-*-x86_64.pkg.tar.zst dist-linux-x64/ 2>/dev/null || true
 
       - name: Upload Linux x64 Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-Linux-x64
           path: dist-linux-x64/*
@@ -267,7 +267,7 @@ jobs:
           cp kitty-tune-*-aarch64.pkg.tar.zst dist-linux-arm64/ 2>/dev/null || true
 
       - name: Upload Linux ARM64 Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-Linux-arm64
           path: dist-linux-arm64/*
