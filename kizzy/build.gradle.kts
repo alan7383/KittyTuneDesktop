@@ -20,7 +20,7 @@ dependencies {
     
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-    implementation("org.json:json:20240303")
+    implementation("org.json:json:20260719")
     
     testImplementation(kotlin("test"))
 }
