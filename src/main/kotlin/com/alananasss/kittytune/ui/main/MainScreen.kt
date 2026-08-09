@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isMetaPressed
@@ -162,17 +163,18 @@ fun MainScreen() {
                 gPressedTime = 0L
 
                 if (!isCtrl && !isAlt && !isMeta) {
-                    val numberSeekFraction = when (event.key) {
-                        Key.Zero, Key.NumPad0 -> 0.0
-                        Key.One, Key.NumPad1 -> 0.1
-                        Key.Two, Key.NumPad2 -> 0.2
-                        Key.Three, Key.NumPad3 -> 0.3
-                        Key.Four, Key.NumPad4 -> 0.4
-                        Key.Five, Key.NumPad5 -> 0.5
-                        Key.Six, Key.NumPad6 -> 0.6
-                        Key.Seven, Key.NumPad7 -> 0.7
-                        Key.Eight, Key.NumPad8 -> 0.8
-                        Key.Nine, Key.NumPad9 -> 0.9
+                    val char = event.utf16CodePoint.toChar()
+                    val numberSeekFraction = when {
+                        event.key == Key.Zero || event.key == Key.NumPad0 || char == '0' || char == 'à' -> 0.0
+                        event.key == Key.One || event.key == Key.NumPad1 || char == '1' || char == '&' -> 0.1
+                        event.key == Key.Two || event.key == Key.NumPad2 || char == '2' || char == 'é' -> 0.2
+                        event.key == Key.Three || event.key == Key.NumPad3 || char == '3' || char == '"' -> 0.3
+                        event.key == Key.Four || event.key == Key.NumPad4 || char == '4' || char == '\'' -> 0.4
+                        event.key == Key.Five || event.key == Key.NumPad5 || char == '5' || char == '(' -> 0.5
+                        event.key == Key.Six || event.key == Key.NumPad6 || char == '6' || char == '-' -> 0.6
+                        event.key == Key.Seven || event.key == Key.NumPad7 || char == '7' || char == 'è' -> 0.7
+                        event.key == Key.Eight || event.key == Key.NumPad8 || char == '8' || char == '_' -> 0.8
+                        event.key == Key.Nine || event.key == Key.NumPad9 || char == '9' || char == 'ç' -> 0.9
                         else -> null
                     }
                     if (numberSeekFraction != null) {
