@@ -22,6 +22,8 @@ object AppDirs {
         "KittyTuneCache",
     ).apply { mkdirs() }
 
+    val lastRecordedAudioFile: File = File(cacheDir, "last_recorded_audio.wav")
+
     val imageCacheDir: File = File(cacheDir, "images").apply { mkdirs() }
     val audioCacheDir: File = File(cacheDir, "audio").apply { mkdirs() }
 

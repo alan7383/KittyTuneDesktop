@@ -20,7 +20,6 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
@@ -197,7 +196,7 @@ private fun IdleView(viewModel: RecognitionViewModel, onTap: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         AudioDeviceSelector(viewModel = viewModel)
-        
+
         Spacer(modifier = Modifier.weight(0.45f))
     }
 }

@@ -13,6 +13,7 @@ import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
 import javax.sound.sampled.TargetDataLine
 
+import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.str
 
 class RecordControl {
@@ -81,7 +82,6 @@ object AudioDeviceManager {
 
     /**
      * Queries pactl (PipeWire/PulseAudio) for real source names and descriptions.
-     * Filters out Monitor sources (those are for desktop audio capture, handled separately).
      * Returns empty list if pactl is unavailable.
      */
     private fun getPactlSources(): List<AudioInputDevice> {
@@ -94,14 +94,12 @@ object AudioDeviceManager {
 
             val devices = mutableListOf<AudioInputDevice>()
             var currentName: String? = null
-            var currentDescription: String? = null
 
             for (line in output.lines()) {
                 val trimmed = line.trim()
                 when {
                     trimmed.startsWith("Name:") -> {
                         currentName = trimmed.removePrefix("Name:").trim()
-                        currentDescription = null
                     }
                     trimmed.startsWith("Description:") -> {
                         val name = currentName
@@ -109,9 +107,11 @@ object AudioDeviceManager {
                         currentName = null
 
                         if (name != null) {
-                            // Monitor = desktop audio (handled by the "Audio du bureau" entry)
                             val isMonitor = name.contains(".monitor") || desc.lowercase().startsWith("monitor of")
-                            if (!isMonitor && name.startsWith("alsa_input.")) {
+                            if (isMonitor) {
+                                val label = "$desc (${str("audio_source_desktop_tag")})"
+                                devices.add(AudioInputDevice(id = name, name = label, isDesktopAudio = true))
+                            } else if (name.startsWith("alsa_input.")) {
                                 devices.add(AudioInputDevice(id = name, name = desc, isDesktopAudio = false))
                             }
                         }
@@ -149,20 +149,37 @@ class AudioRecorder {
 
             var targetDataLine: TargetDataLine? = null
             var actualFormat: AudioFormat? = null
+            val isLinux = System.getProperty("os.name").lowercase().contains("linux")
 
-            // Handle explicit Desktop Audio selection via WASAPI Loopback on Windows out-of-the-box
+            // Handle explicit Desktop Audio selection
             if (selectedDeviceName == "desktop_audio" || selectedDeviceName == null) {
-                try {
-                    println("DEBUG: [AudioRecorder] Attempting WASAPI Loopback capture for device: $selectedDeviceName")
-                    val wasapiPcm = WasapiLoopbackRecorder.recordDesktopAudio(durationMs, control, onProgress)
-                    if (wasapiPcm != null && wasapiPcm.isNotEmpty()) {
-                        println("DEBUG: [AudioRecorder] WASAPI Loopback capture returned ${wasapiPcm.size} bytes successfully")
-                        saveWavFile(wasapiPcm, File("last_recorded_audio.wav"))
-                        return@withContext wasapiPcm
+                if (isLinux) {
+                    try {
+                        println("DEBUG: [AudioRecorder] Attempting Linux desktop audio capture via parec")
+                        val defaultMonitor = getDefaultMonitorName() ?: "@DEFAULT_MONITOR@"
+                        val linuxPcm = recordWithParec(defaultMonitor, durationMs, control, onProgress)
+                        if (linuxPcm != null && linuxPcm.isNotEmpty()) {
+                            println("DEBUG: [AudioRecorder] parec desktop capture returned ${linuxPcm.size} bytes successfully")
+                            saveWavFile(linuxPcm, File("last_recorded_audio.wav"))
+                            return@withContext linuxPcm
+                        }
+                        println("DEBUG: [AudioRecorder] parec desktop capture returned empty/null, trying Java Sound fallback...")
+                    } catch (e: Exception) {
+                        println("DEBUG: [AudioRecorder] parec desktop capture failed: ${e.message}")
                     }
-                    println("DEBUG: [AudioRecorder] WASAPI Loopback returned null or empty, falling back to Java Sound mixers...")
-                } catch (e: Exception) {
-                    println("DEBUG: [AudioRecorder] WASAPI Loopback threw exception: ${e.message}")
+                } else {
+                    try {
+                        println("DEBUG: [AudioRecorder] Attempting WASAPI Loopback capture for device: $selectedDeviceName")
+                        val wasapiPcm = WasapiLoopbackRecorder.recordDesktopAudio(durationMs, control, onProgress)
+                        if (wasapiPcm != null && wasapiPcm.isNotEmpty()) {
+                            println("DEBUG: [AudioRecorder] WASAPI Loopback capture returned ${wasapiPcm.size} bytes successfully")
+                            saveWavFile(wasapiPcm, File("last_recorded_audio.wav"))
+                            return@withContext wasapiPcm
+                        }
+                        println("DEBUG: [AudioRecorder] WASAPI Loopback returned null or empty, falling back to Java Sound mixers...")
+                    } catch (e: Exception) {
+                        println("DEBUG: [AudioRecorder] WASAPI Loopback threw exception: ${e.message}")
+                    }
                 }
 
                 val mixerInfos = AudioSystem.getMixerInfo()
@@ -222,11 +239,11 @@ class AudioRecorder {
                 }
             }
 
-            // On Linux: if device ID is a pactl source name (alsa_input.*), use parec to capture
+            // On Linux: if device ID is a pactl source name (alsa_input.*, alsa_output.*, or .monitor), use parec to capture
             if (targetDataLine == null &&
                 selectedDeviceName != null &&
-                selectedDeviceName.startsWith("alsa_input.") &&
-                System.getProperty("os.name").lowercase().contains("linux")
+                (selectedDeviceName.startsWith("alsa_input.") || selectedDeviceName.startsWith("alsa_output.") || selectedDeviceName.contains(".monitor")) &&
+                isLinux
             ) {
                 try {
                     val pcm = recordWithParec(selectedDeviceName, durationMs, control, onProgress)
@@ -291,6 +308,23 @@ class AudioRecorder {
             val finalPcm = convertTo16kHzMono(rawStream.toByteArray(), fmt)
             saveWavFile(finalPcm, File("last_recorded_audio.wav"))
             finalPcm
+        }
+    }
+
+    private fun getDefaultMonitorName(): String? {
+        return try {
+            val process = ProcessBuilder("pactl", "get-default-sink")
+                .redirectErrorStream(true)
+                .start()
+            val defaultSink = process.inputStream.bufferedReader().readText().trim()
+            process.waitFor()
+            if (defaultSink.isNotEmpty() && !defaultSink.contains(" ") && !defaultSink.contains("Error", ignoreCase = true)) {
+                "$defaultSink.monitor"
+            } else {
+                "@DEFAULT_MONITOR@"
+            }
+        } catch (_: Exception) {
+            "@DEFAULT_MONITOR@"
         }
     }
 
@@ -396,7 +430,7 @@ class AudioRecorder {
             if (absS > maxSample) maxSample = absS
         }
 
-        if (maxSample in 10..25999) {
+        if (maxSample in 1000..25999) {
             val gain = 28000.0 / maxSample.toDouble()
             for (i in monoShorts.indices) {
                 monoShorts[i] = (monoShorts[i] * gain).toInt().coerceIn(-32768, 32767).toShort()
@@ -441,34 +475,38 @@ class AudioRecorder {
     companion object {
         fun saveWavFile(pcmData: ByteArray, outputFile: File) {
             if (pcmData.isEmpty()) return
-            try {
-                outputFile.outputStream().use { os ->
-                    val bw = DataOutputStream(os)
-                    val sampleRate = 16000
-                    val channels = 1
-                    val bitsPerSample = 16
-                    val byteRate = sampleRate * channels * bitsPerSample / 8
-                    val blockAlign = channels * bitsPerSample / 8
+            val targets = listOf(outputFile, AppDirs.lastRecordedAudioFile).distinctBy { it.absolutePath }
+            for (target in targets) {
+                try {
+                    target.parentFile?.mkdirs()
+                    target.outputStream().use { os ->
+                        val bw = DataOutputStream(os)
+                        val sampleRate = 16000
+                        val channels = 1
+                        val bitsPerSample = 16
+                        val byteRate = sampleRate * channels * bitsPerSample / 8
+                        val blockAlign = channels * bitsPerSample / 8
 
-                    bw.writeBytes("RIFF")
-                    bw.writeInt(Integer.reverseBytes(36 + pcmData.size))
-                    bw.writeBytes("WAVE")
-                    bw.writeBytes("fmt ")
-                    bw.writeInt(Integer.reverseBytes(16))
-                    bw.writeShort(java.lang.Short.reverseBytes(1.toShort()).toInt())
-                    bw.writeShort(java.lang.Short.reverseBytes(channels.toShort()).toInt())
-                    bw.writeInt(Integer.reverseBytes(sampleRate))
-                    bw.writeInt(Integer.reverseBytes(byteRate))
-                    bw.writeShort(java.lang.Short.reverseBytes(blockAlign.toShort()).toInt())
-                    bw.writeShort(java.lang.Short.reverseBytes(bitsPerSample.toShort()).toInt())
-                    bw.writeBytes("data")
-                    bw.writeInt(Integer.reverseBytes(pcmData.size))
-                    bw.write(pcmData)
-                    bw.flush()
+                        bw.writeBytes("RIFF")
+                        bw.writeInt(Integer.reverseBytes(36 + pcmData.size))
+                        bw.writeBytes("WAVE")
+                        bw.writeBytes("fmt ")
+                        bw.writeInt(Integer.reverseBytes(16))
+                        bw.writeShort(java.lang.Short.reverseBytes(1.toShort()).toInt())
+                        bw.writeShort(java.lang.Short.reverseBytes(channels.toShort()).toInt())
+                        bw.writeInt(Integer.reverseBytes(sampleRate))
+                        bw.writeInt(Integer.reverseBytes(byteRate))
+                        bw.writeShort(java.lang.Short.reverseBytes(blockAlign.toShort()).toInt())
+                        bw.writeShort(java.lang.Short.reverseBytes(bitsPerSample.toShort()).toInt())
+                        bw.writeBytes("data")
+                        bw.writeInt(Integer.reverseBytes(pcmData.size))
+                        bw.write(pcmData)
+                        bw.flush()
+                    }
+                    println("DEBUG: [AudioRecorder] Saved recorded audio WAV file: ${target.absolutePath}")
+                } catch (e: Exception) {
+                    println("DEBUG: [AudioRecorder] Failed to save WAV file to ${target.absolutePath}: ${e.message}")
                 }
-                println("DEBUG: [AudioRecorder] Saved recorded audio WAV file: ${outputFile.absolutePath}")
-            } catch (e: Exception) {
-                println("DEBUG: [AudioRecorder] Failed to save WAV file: ${e.message}")
             }
         }
     }
