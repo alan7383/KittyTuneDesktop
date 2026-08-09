@@ -36,8 +36,11 @@ class AudioDecoder(
         if (source.startsWith("http")) {
             setOption("reconnect", "1")
             setOption("reconnect_streamed", "1")
+            setOption("reconnect_on_network_error", "1")
+            setOption("reconnect_on_http_error", "4xx,5xx")
             setOption("reconnect_delay_max", "5")
-            setOption("rw_timeout", "15000000") // 15s in µs
+            setOption("rw_timeout", "1000000") // 1s in µs
+            setOption("tcp_nodelay", "1")
         }
     }
 

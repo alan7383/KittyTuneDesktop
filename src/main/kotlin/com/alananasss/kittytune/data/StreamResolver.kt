@@ -25,6 +25,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 private object ExtractorDownloader : Downloader() {
     private val client = OkHttpClient.Builder()
+        .retryOnConnectionFailure(true)
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
         .cookieJar(object : CookieJar {
             private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
 
@@ -100,7 +103,12 @@ private object ExtractorDownloader : Downloader() {
  */
 object StreamResolver {
 
-    private val client = OkHttpClient.Builder().cookieJar(CookieStore).build()
+    private val client = OkHttpClient.Builder()
+        .retryOnConnectionFailure(true)
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .cookieJar(CookieStore)
+        .build()
     private val streamCache = ConcurrentHashMap<Long, Pair<Long, ResolvedStream>>()
     private const val CACHE_TTL_MS = 30 * 60 * 1000L // 30 minutes
 
