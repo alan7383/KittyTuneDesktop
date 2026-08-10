@@ -23,4 +23,5 @@ dependencyResolutionManagement {
 rootProject.name = "KittyTuneWindows"
 include(":shazamkit")
 include(":kizzy")
+include(":innertube")
 include(":website")

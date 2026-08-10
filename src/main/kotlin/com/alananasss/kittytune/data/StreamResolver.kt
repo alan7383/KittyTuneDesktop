@@ -13,85 +13,10 @@ import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import org.schabi.newpipe.extractor.NewPipe
-import org.schabi.newpipe.extractor.ServiceList
-import org.schabi.newpipe.extractor.downloader.Downloader
-import org.schabi.newpipe.extractor.downloader.Request
-import org.schabi.newpipe.extractor.downloader.Response
-import org.schabi.newpipe.extractor.search.SearchInfo
-import org.schabi.newpipe.extractor.stream.StreamInfoItem
+
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
-private object ExtractorDownloader : Downloader() {
-    private val client = OkHttpClient.Builder()
-        .retryOnConnectionFailure(true)
-        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .cookieJar(object : CookieJar {
-            private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
-
-            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                val host = url.host
-                val existing = cookieStore.getOrPut(host) { mutableListOf() }
-                val updated = existing.associateBy { it.name }.toMutableMap()
-                cookies.forEach { updated[it.name] = it }
-                cookieStore[host] = updated.values.toMutableList()
-            }
-
-            override fun loadForRequest(url: HttpUrl): List<Cookie> {
-                val host = url.host
-                val validCookies = mutableListOf<Cookie>()
-                cookieStore.forEach { (domain, domainCookies) ->
-                    if (host == domain || host.endsWith(".$domain")) {
-                        validCookies.addAll(domainCookies)
-                    }
-                }
-                return validCookies
-            }
-        })
-        .addInterceptor { chain ->
-            val request = chain.request()
-            val host = request.url.host
-            if (host.contains("youtube.com") || host.contains("youtu.be")) {
-                val existingCookies = request.headers("Cookie").joinToString("; ")
-                if (!existingCookies.contains("CONSENT=")) {
-                    val newCookie = if (existingCookies.isNotEmpty()) "$existingCookies; CONSENT=YES+cb" else "CONSENT=YES+cb"
-                    val newRequest = request.newBuilder().header("Cookie", newCookie).build()
-                    return@addInterceptor chain.proceed(newRequest)
-                }
-            }
-            chain.proceed(request)
-        }
-        .build()
-
-    @Throws(IOException::class)
-    override fun execute(request: Request): Response {
-        val okHttpRequest = okhttp3.Request.Builder().url(request.url())
-        request.headers().forEach { (key, values) ->
-            values.forEach { value -> okHttpRequest.addHeader(key, value) }
-        }
-
-        when (request.httpMethod()) {
-            "GET" -> okHttpRequest.get()
-            "HEAD" -> okHttpRequest.head()
-            "POST" -> {
-                val body = request.dataToSend()?.toRequestBody() ?: byteArrayOf().toRequestBody()
-                okHttpRequest.post(body)
-            }
-            else -> throw IOException("unsupported http method: ${request.httpMethod()}")
-        }
-
-        val response = client.newCall(okHttpRequest.build()).execute()
-        return Response(
-            response.code,
-            response.message,
-            response.headers.toMultimap(),
-            response.body?.string(),
-            response.request.url.toString()
-        )
-    }
-}
 
 /**
  * Desktop port of the Android StreamResolver.
@@ -116,13 +41,7 @@ object StreamResolver {
         streamCache.remove(trackId)
     }
 
-    init {
-        try {
-            NewPipe.init(ExtractorDownloader)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
+
 
     fun isRestricted(track: Track): Boolean {
         return track.policy == "SNIP" ||
@@ -177,75 +96,38 @@ object StreamResolver {
         return result
     }
 
-    private fun resolveViaNewPipe(track: Track): String? {
+    private suspend fun resolveViaNewPipe(track: Track): String? {
         return try {
             val cleanTitle = track.title?.replace(Regex("(?i)(\\[.*?\\]|\\(.*?\\))"), "")?.trim() ?: ""
             val artistName = track.user?.username ?: ""
             val query = "$cleanTitle $artistName audio"
 
-            val youtubeService = ServiceList.YouTube
-            val searchInfo = SearchInfo.getInfo(youtubeService, youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), ""))
-            val videoResults = searchInfo.relatedItems.filterIsInstance<StreamInfoItem>()
+            val searchResult = com.zionhuang.innertube.YouTube.search(query, com.zionhuang.innertube.YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+            if (searchResult == null || searchResult.items.isEmpty()) return null
+            
+            val firstVideoId = searchResult.items.first().id
+            val playerResponse = com.zionhuang.innertube.YouTube.player(firstVideoId).getOrNull() ?: return null
 
-            if (videoResults.isEmpty()) return null
-
-            val firstResultUrl = videoResults.first().url
-            val extractor = youtubeService.getStreamExtractor(firstResultUrl)
-            extractor.fetchPage()
-
-            val audioStreams = try {
-                extractor.audioStreams
-            } catch (e: Exception) {
-                emptyList()
-            }
-
-            val bestAudioStream = audioStreams
-                .filter { it.deliveryMethod == org.schabi.newpipe.extractor.stream.DeliveryMethod.PROGRESSIVE_HTTP && it.format == org.schabi.newpipe.extractor.MediaFormat.M4A && it.url != null }
-                .maxByOrNull { it.averageBitrate }
-                ?: audioStreams
-                    .filter { it.deliveryMethod == org.schabi.newpipe.extractor.stream.DeliveryMethod.PROGRESSIVE_HTTP && it.url != null }
-                    .maxByOrNull { it.averageBitrate }
-                ?: audioStreams
-                    .filter { it.url != null }
-                    .maxByOrNull { it.averageBitrate }
-
-            if (bestAudioStream != null) return bestAudioStream.url
-
-            val videoStreams = try {
-                extractor.videoStreams
-            } catch (e: Exception) {
-                emptyList()
-            }
-
-            val bestVideoStream = videoStreams
-                .filter { it.url != null }
-                .minByOrNull { it.getResolution()?.replace("p", "")?.toIntOrNull() ?: Int.MAX_VALUE }
-
-            bestVideoStream?.url
+            val formats = playerResponse.streamingData?.adaptiveFormats ?: emptyList()
+            val bestAudio = formats.filter { it.isAudio && it.url != null }.maxByOrNull { it.averageBitrate ?: 0 }
+            
+            bestAudio?.url ?: formats.firstOrNull { it.url != null }?.url
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
 
-    private fun resolveFromYoutubeDirect(track: Track): String? {
+    private suspend fun resolveFromYoutubeDirect(track: Track): String? {
         val url = track.permalinkUrl ?: return null
         return try {
-            val service = ServiceList.YouTube
-            val extractor = service.getStreamExtractor(url)
-            extractor.fetchPage()
-            val best = extractor.audioStreams
-                .filter { it.deliveryMethod == org.schabi.newpipe.extractor.stream.DeliveryMethod.PROGRESSIVE_HTTP && it.url != null }
-                .maxByOrNull { it.averageBitrate }
-                ?: extractor.audioStreams
-                    .filter { it.url != null }
-                    .maxByOrNull { it.averageBitrate }
-            if (best != null) return best.url
+            val videoId = url.substringAfter("v=").substringBefore("&")
+            val playerResponse = com.zionhuang.innertube.YouTube.player(videoId).getOrNull() ?: return null
 
-            val muxed = extractor.videoStreams
-                .filter { it.url != null }
-                .minByOrNull { it.getResolution()?.replace("p", "")?.toIntOrNull() ?: Int.MAX_VALUE }
-            muxed?.url
+            val formats = playerResponse.streamingData?.adaptiveFormats ?: emptyList()
+            val bestAudio = formats.filter { it.isAudio && it.url != null }.maxByOrNull { it.averageBitrate ?: 0 }
+            
+            bestAudio?.url ?: formats.firstOrNull { it.url != null }?.url
         } catch (e: Exception) {
             e.printStackTrace()
             null

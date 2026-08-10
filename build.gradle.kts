@@ -22,7 +22,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.z-huang.InnerTune:innertube:0.5.10")
+    implementation(project(":innertube"))
     implementation("com.github.z-huang.InnerTune:lrclib:0.5.10")
     implementation("com.github.z-huang.InnerTune:kugou:0.5.10")
     implementation(compose.desktop.currentOs)
@@ -53,7 +53,6 @@ dependencies {
 
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.mpatric:mp3agic:0.9.1")
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.2")
 
     val javacvVersion = "1.5.10"
     implementation("org.bytedeco:javacv:$javacvVersion") {
