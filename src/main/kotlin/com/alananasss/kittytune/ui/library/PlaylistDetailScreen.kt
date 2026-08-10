@@ -65,6 +65,9 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.size.Size
+import coil3.PlatformContext
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.EscapableAlertDialog
@@ -873,9 +876,12 @@ fun PlaylistDetailScreen(
         if (!playlistCover.isNullOrEmpty()) {
             Box(modifier = Modifier.fillMaxWidth().height(340.dp)) {
                 AsyncImage(
-                    model = playlistCover,
+                    model = ImageRequest.Builder(PlatformContext.INSTANCE)
+                        .data(playlistCover)
+                        .size(Size(128, 128))
+                        .build(),
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize().blur(100.dp).alpha(0.5f),
+                    modifier = Modifier.fillMaxSize().blur(40.dp).alpha(0.5f),
                     contentScale = ContentScale.Crop
                 )
                 Box(

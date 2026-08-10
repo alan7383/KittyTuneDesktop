@@ -1,10 +1,11 @@
 package com.alananasss.kittytune.audio
 
-import com.alananasss.kittytune.audio.AudioDecoder.Companion.SAMPLE_RATE
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+
+private const val SAMPLE_RATE = 44100.0
 
 /**
  * DSP building blocks for the effect chain. Interleaved stereo Float PCM at 48 kHz.

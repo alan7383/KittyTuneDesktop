@@ -776,6 +776,9 @@
     <string name="profile_banner">Banner</string>
 
     <string name="profile_avatar">Avatar</string>
+    <string name="profile_avatar_upload_desc">For best results, upload images of at least 1000x1000 pixels. 2MB file-size limit</string>
+    <string name="profile_banner_upload_title">Position your header</string>
+    <string name="profile_banner_upload_desc">For best results, upload PNG or JPG images of at least 2480×520 pixels. 2MB file-size limit</string>
 
 
 

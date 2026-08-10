@@ -2535,15 +2535,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val freshC = currentContext
                 val freshS = shuffleEnabled
                 val freshR = repeatMode
-                val qSnapshot = _originalQueue.toList()
                 withContext(Dispatchers.IO) {
+                    val qSnapshot = _originalQueue.toList()
                     playerPrefs.savePlaybackState(freshT, freshP, qSnapshot, freshC, freshS, freshR)
                 }
             }
         } else {
-            val q = _originalQueue.toList()
             viewModelScope.launch(Dispatchers.IO) {
-                playerPrefs.savePlaybackState(t, p, q, c, s, r)
+                playerPrefs.savePlaybackState(t, p, emptyList(), c, s, r, saveQueue = false)
             }
         }
     }

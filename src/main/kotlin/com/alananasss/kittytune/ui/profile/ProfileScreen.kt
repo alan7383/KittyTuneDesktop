@@ -77,6 +77,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.size.Size
+import coil3.PlatformContext
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.EscapableAlertDialog
@@ -112,6 +115,15 @@ fun ProfileScreen(
     var showEditSheet by remember { mutableStateOf(false) }
     var userListDialogType by remember { mutableStateOf<String?>(null) }
     val uriHandler = LocalUriHandler.current
+
+    LaunchedEffect(profileViewModel, playerViewModel) {
+        profileViewModel.onUserUpdated = { updated ->
+            if (updated.id == playerViewModel.currentUserId || playerViewModel.currentUserId == 0L) {
+                playerViewModel.currentUser = updated
+                playerViewModel.currentUserId = updated.id
+            }
+        }
+    }
 
     LaunchedEffect(userId) {
         val id = userId.toLongOrNull()
@@ -416,7 +428,15 @@ fun ModernProfileHeader(
 ) {
     Box(modifier = Modifier.fillMaxWidth().height(420.dp)) {
         val bgModel = user.bannerUrl ?: user.avatarUrl
-        AsyncImage(model = bgModel, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(60.dp).alpha(0.6f))
+        AsyncImage(
+            model = ImageRequest.Builder(PlatformContext.INSTANCE)
+                .data(bgModel)
+                .size(Size(128, 128))
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().blur(32.dp).alpha(0.6f)
+        )
         Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.5f), MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background), startY = 0f)))
 
         Column(
@@ -536,11 +556,18 @@ fun EditProfileDialog(
             title = { Text(str("dialog_delete_avatar_title")) },
             text = { Text(str("dialog_delete_avatar_msg")) },
             confirmButton = {
-                TextButton(onClick = { profileViewModel.deleteAvatar(); showDeleteConfirm = false },
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = { profileViewModel.deleteAvatar(); showDeleteConfirm = false },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text(str("btn_delete")) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteConfirm = false }) { Text(str("btn_cancel")) } }
+            dismissButton = {
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = { showDeleteConfirm = false }
+                ) { Text(str("btn_cancel")) }
+            }
         )
     }
 
@@ -550,11 +577,41 @@ fun EditProfileDialog(
             title = { Text(str("dialog_delete_header_title")) },
             text = { Text(str("dialog_delete_header_msg")) },
             confirmButton = {
-                TextButton(onClick = { profileViewModel.deleteBanner(); showDeleteBannerConfirm = false },
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = { profileViewModel.deleteBanner(); showDeleteBannerConfirm = false },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text(str("btn_delete")) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteBannerConfirm = false }) { Text(str("btn_cancel")) } }
+            dismissButton = {
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = { showDeleteBannerConfirm = false }
+                ) { Text(str("btn_cancel")) }
+            }
+        )
+    }
+
+    profileViewModel.avatarToCrop?.let { bmp ->
+        AvatarCropDialog(
+            bitmap = bmp,
+            username = user.username ?: "",
+            onDismiss = { profileViewModel.avatarToCrop = null },
+            onSave = { cropped ->
+                profileViewModel.avatarToCrop = null
+                profileViewModel.updateAvatarFromBitmap(cropped)
+            }
+        )
+    }
+
+    profileViewModel.bannerToCrop?.let { bmp ->
+        BannerCropDialog(
+            bitmap = bmp,
+            onDismiss = { profileViewModel.bannerToCrop = null },
+            onSave = { cropped ->
+                profileViewModel.bannerToCrop = null
+                profileViewModel.updateBannerFromBitmap(cropped)
+            }
         )
     }
 
@@ -572,7 +629,10 @@ fun EditProfileDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(str("profile_edit_title"), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, str("btn_close")) }
+                    IconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = onDismiss
+                    ) { Icon(Icons.Default.Close, str("btn_close")) }
                 }
 
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp)) {
@@ -681,9 +741,10 @@ fun EditProfileDialog(
                         shape = RoundedCornerShape(12.dp)
                     )
                     Spacer(Modifier.height(24.dp))
-                    Button(onClick = { onSave(name, bio, city) },
+                    Button(
+                        shapes = ButtonDefaults.shapes(),
+                        onClick = { onSave(name, bio, city) },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
-                        shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text(str("btn_save_changes"))
