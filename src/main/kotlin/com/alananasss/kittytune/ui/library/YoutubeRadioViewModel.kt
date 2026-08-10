@@ -1,4 +1,4 @@
-﻿    package com.alananasss.kittytune.ui.library
+    package com.alananasss.kittytune.ui.library
     
     import com.alananasss.kittytune.core.Application
     import androidx.compose.runtime.getValue
@@ -9,9 +9,7 @@
     import androidx.lifecycle.viewModelScope
     import com.alananasss.kittytune.domain.Track
     import com.alananasss.kittytune.domain.User
-    import com.zionhuang.innertube.YouTube
-    import com.zionhuang.innertube.models.SongItem
-    import com.zionhuang.innertube.models.WatchEndpoint
+
     import kotlinx.coroutines.Dispatchers
     import kotlinx.coroutines.launch
     import kotlinx.coroutines.withContext
@@ -36,19 +34,23 @@
                         val cleanId = youtubeUrl.substringAfter("v=").substringBefore("&")
                         videoId = cleanId
     
-                        val endpoint = WatchEndpoint(videoId = cleanId)
-                        val result = YouTube.next(endpoint).getOrNull()
+                        com.alananasss.kittytune.data.StreamResolver.init()
+                        val youtubeService = org.schabi.newpipe.extractor.ServiceList.YouTube
+                        val streamInfo = org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(
+                            youtubeService, 
+                            "https://youtube.com/watch?v=$cleanId"
+                        )
     
-                        val items = result?.items ?: emptyList()
+                        val items = streamInfo.relatedItems.filterIsInstance<org.schabi.newpipe.extractor.stream.StreamInfoItem>()
     
-                        val newTracks = items.filterIsInstance<SongItem>().map { item ->
+                        val newTracks = items.map { item ->
                             Track(
-                                id = item.id.hashCode().toLong(),
-                                title = item.title,
-                                user = User(0L, item.artists.firstOrNull()?.name ?: "YouTube", null),
-                                artworkUrl = item.thumbnail,
-                                durationMs = (item.duration ?: 0) * 1000L,
-                                permalinkUrl = "https://youtube.com/watch?v=${item.id}",
+                                id = item.url.hashCode().toLong(),
+                                title = item.name,
+                                user = User(0L, item.uploaderName ?: "YouTube", null),
+                                artworkUrl = item.thumbnails.firstOrNull()?.url,
+                                durationMs = item.duration * 1000L,
+                                permalinkUrl = item.url,
                                 source = "youtube"
                             )
                         }
@@ -78,19 +80,24 @@
                 withContext(Dispatchers.IO) {
                     try {
                         val query = tracks.randomOrNull()?.title ?: "music"
-                        val result = YouTube.search(query, YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+                        com.alananasss.kittytune.data.StreamResolver.init()
+                        val youtubeService = org.schabi.newpipe.extractor.ServiceList.YouTube
+                        val searchInfo = org.schabi.newpipe.extractor.search.SearchInfo.getInfo(
+                            youtubeService, 
+                            youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), "")
+                        )
     
-                        val newTracks = result?.items?.filterIsInstance<SongItem>()?.map { item ->
+                        val newTracks = searchInfo.relatedItems.filterIsInstance<org.schabi.newpipe.extractor.stream.StreamInfoItem>().map { item ->
                             Track(
-                                id = item.id.hashCode().toLong(),
-                                title = item.title,
-                                user = User(0L, item.artists.firstOrNull()?.name ?: "YouTube", null),
-                                artworkUrl = item.thumbnail,
-                                durationMs = (item.duration ?: 0) * 1000L,
-                                permalinkUrl = "https://youtube.com/watch?v=${item.id}",
+                                id = item.url.hashCode().toLong(),
+                                title = item.name,
+                                user = User(0L, item.uploaderName ?: "YouTube", null),
+                                artworkUrl = item.thumbnails.firstOrNull()?.url,
+                                durationMs = item.duration * 1000L,
+                                permalinkUrl = item.url,
                                 source = "youtube"
                             )
-                        } ?: emptyList()
+                        }
     
                         withContext(Dispatchers.Main) {
                             val existingIds = tracks.map { it.id }.toSet()

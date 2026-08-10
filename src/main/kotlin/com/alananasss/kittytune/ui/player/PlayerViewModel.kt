@@ -26,7 +26,8 @@ import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-
+import org.schabi.newpipe.extractor.ServiceList
+import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import java.net.URLEncoder
 import java.io.File
 import kotlin.math.abs
@@ -2038,21 +2039,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 saveStateAsync(saveQueue = false)
             }
 
-            val result = com.zionhuang.innertube.YouTube.next(com.zionhuang.innertube.models.WatchEndpoint(videoId = videoId, playlistId = "RD$videoId")).getOrNull()
-            val items = result?.items ?: emptyList()
+            val youtubeService = ServiceList.YouTube
+            val extractor = youtubeService.getPlaylistExtractor(radioUrl)
 
-            val radioTracks = items.filterIsInstance<com.zionhuang.innertube.models.SongItem>().map {
+            withContext(Dispatchers.IO) {
+                extractor.fetchPage()
+            }
+
+            val streamItems = extractor.initialPage.items.filterIsInstance<StreamInfoItem>()
+            val radioTracks = streamItems.map {
                 Track(
-                    id = kotlin.math.abs(it.id.hashCode().toLong()),
-                    title = it.title,
+                    id = abs(it.url.hashCode().toLong()),
+                    title = it.name,
                     user = User(
-                        id = 0L,
-                        username = it.artists.firstOrNull()?.name ?: "YouTube",
-                        avatarUrl = null
+                        id = it.uploaderUrl?.hashCode()?.toLong() ?: 0L,
+                        username = it.uploaderName,
+                        avatarUrl = it.uploaderAvatars.firstOrNull()?.url
                     ),
-                    artworkUrl = it.thumbnail,
-                    durationMs = (it.duration ?: 0) * 1000L,
-                    permalinkUrl = "https://youtube.com/watch?v=${it.id}",
+                    artworkUrl = it.thumbnails.firstOrNull()?.url,
+                    durationMs = it.duration * 1000,
+                    permalinkUrl = it.url,
                     source = "youtube"
                 )
             }
