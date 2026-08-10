@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.FileReader
-import java.io.FileWriter
+
 
 enum class AppThemeMode { SYSTEM, LIGHT, DARK }
 enum class StartDestination { HOME, LIBRARY }
@@ -305,7 +305,7 @@ class PlayerPreferences {
     }
     fun setLyricsProvider(provider: com.alananasss.kittytune.ui.player.LyricsProvider) = Prefs.putString("lyrics_provider", provider.name)
 
-    fun savePlaybackState(track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?, shuffleEnabled: Boolean, repeatMode: RepeatMode) {
+    fun savePlaybackState(track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?, shuffleEnabled: Boolean, repeatMode: RepeatMode, saveQueue: Boolean = true) {
         if (!getPersistentQueueEnabled()) {
             Prefs.putBoolean(KEY_SHUFFLE_MODE, shuffleEnabled)
             Prefs.putString(KEY_REPEAT_MODE, repeatMode.name)
@@ -316,13 +316,12 @@ class PlayerPreferences {
             return
         }
 
-        if (queue.isNotEmpty()) {
+        if (saveQueue && queue.isNotEmpty()) {
             synchronized(queueLock) {
                 try {
                     val tempFile = File(queueFile.parentFile, "queue_cache.tmp")
-                    FileWriter(tempFile).use { writer -> gson.toJson(queue, writer) }
-                    tempFile.copyTo(queueFile, overwrite = true)
-                    tempFile.delete()
+                    tempFile.writeText(gson.toJson(queue))
+                    tempFile.renameTo(queueFile)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }

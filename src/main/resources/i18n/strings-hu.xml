@@ -689,6 +689,9 @@
     <string name="profile_banner">Banner</string>
 
     <string name="profile_avatar">Avatar</string>
+    <string name="profile_avatar_upload_desc">A legjobb eredmény érdekében legalább 1000x1000 pixeles képet tölts fel. 2 MB limit</string>
+    <string name="profile_banner_upload_title">Fejléc igazítása</string>
+    <string name="profile_banner_upload_desc">A legjobb eredmény érdekében legalább 2480×520 pixeles képet használj. 2 MB limit</string>
 
 
 

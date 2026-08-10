@@ -692,9 +692,9 @@ class AudioEngine {
         }
     }
 
-    private fun closeLineInstance(localLine: SourceDataLine?) {
+    private fun closeLineInstance(localLine: SourceDataLine?, drain: Boolean = true) {
         try {
-            localLine?.drain()
+            if (drain) localLine?.drain() else localLine?.flush()
             localLine?.stop()
             localLine?.close()
         } catch (_: Exception) {
@@ -712,12 +712,12 @@ class AudioEngine {
         val currentWorker = worker
         if (currentWorker != null && Thread.currentThread() != currentWorker) {
             try {
-                currentWorker.join(300)
+                currentWorker.join(50)
             } catch (_: InterruptedException) {
             }
         }
         worker = null
-        closeLineInstance(line)
+        closeLineInstance(line, drain = false)
         stretcher.flush()
         chain.forEach { it.flush() }
         setPlaying(false)

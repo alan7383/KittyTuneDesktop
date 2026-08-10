@@ -690,6 +690,9 @@
     <string name="profile_banner">Bannière</string>
 
     <string name="profile_avatar">Avatar</string>
+    <string name="profile_avatar_upload_desc">Pour un meilleur résultat, utilisez une image d\'au moins 1000x1000 pixels. Limite de 2 Mo</string>
+    <string name="profile_banner_upload_title">Positionnez votre bannière</string>
+    <string name="profile_banner_upload_desc">Pour un meilleur résultat, utilisez des images d\'au moins 2480×520 pixels. Limite de 2 Mo</string>
 
 
 
