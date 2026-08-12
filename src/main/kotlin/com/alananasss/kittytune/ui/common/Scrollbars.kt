@@ -87,18 +87,22 @@ fun ScrollableColumn(
     state: ScrollState = rememberScrollState(),
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
     horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    hideScrollbar: Boolean = false,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable ColumnScope.() -> Unit
 ) {
     Box(modifier = modifier) {
         Column(
-            modifier = Modifier.fillMaxSize().verticalScroll(state),
+            modifier = Modifier.fillMaxSize().verticalScroll(state).padding(contentPadding),
             verticalArrangement = verticalArrangement,
             horizontalAlignment = horizontalAlignment,
             content = content
         )
-        VerticalScrollbar(
-            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp, horizontal = 2.dp),
-            adapter = rememberScrollbarAdapter(scrollState = state)
-        )
+        if (!hideScrollbar) {
+            VerticalScrollbar(
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp, horizontal = 2.dp),
+                adapter = rememberScrollbarAdapter(scrollState = state)
+            )
+        }
     }
 }

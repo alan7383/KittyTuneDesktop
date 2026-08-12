@@ -351,10 +351,14 @@ fun PlaylistDetailScreen(
     val canReorder = isUserCreated && playlistSearchQuery.isEmpty() && playlistSortBy == TrackSortBy.FIRST_ADDED
     val reorderableState = rememberReorderableLazyListState(lazyListState = listState) { from, to ->
         if (canReorder) {
-            val fromIndex = tracks.indexOfFirst { it.id == from.key as? Long }
-            val toIndex = tracks.indexOfFirst { it.id == to.key as? Long }
-            if (fromIndex != -1 && toIndex != -1 && fromIndex != toIndex) {
-                tracks.add(toIndex, tracks.removeAt(fromIndex))
+            val fromKey = from.key as? String
+            val toKey = to.key as? String
+            if (fromKey != null && toKey != null && fromKey != toKey) {
+                val fromIndex = tracks.indices.firstOrNull { i -> getPlaylistTrackStableKey(i, tracks[i].id, tracks) == fromKey } ?: -1
+                val toIndex = tracks.indices.firstOrNull { i -> getPlaylistTrackStableKey(i, tracks[i].id, tracks) == toKey } ?: -1
+                if (fromIndex != -1 && toIndex != -1 && fromIndex != toIndex) {
+                    tracks.add(toIndex, tracks.removeAt(fromIndex))
+                }
             }
         }
     }
@@ -1319,7 +1323,10 @@ fun PlaylistDetailScreen(
                         }
                     }
 
-                    itemsIndexed(items = tracksToDisplay, key = { index, t -> "${index}_${t.id}" }) { index, track ->
+                    itemsIndexed(
+                        items = tracksToDisplay,
+                        key = { index, t -> getPlaylistTrackStableKey(index, t.id, tracksToDisplay) }
+                    ) { index, track ->
                         if (index >= tracksToDisplay.size - 5 && isYoutubeRadio) {
                             LaunchedEffect(Unit) { youtubeRadioViewModel.loadMore() }
                         }
@@ -1330,7 +1337,8 @@ fun PlaylistDetailScreen(
                             (track.id < 0 && track.source != "youtube") || downloadedIds.contains(track.id)
                         }
 
-                        ReorderableItem(reorderableState, key = track.id) { isDraggingThis ->
+                        val itemKey = getPlaylistTrackStableKey(index, track.id, tracksToDisplay)
+                        ReorderableItem(reorderableState, key = itemKey) { isDraggingThis ->
                             val dragHandleModifier = if (canReorder)
                                 Modifier.draggableHandle()
                             else Modifier
@@ -1692,7 +1700,7 @@ fun TrackTableItem(
                         Icons.Rounded.DragHandle,
                         null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp).then(dragHandleModifier)
+                        modifier = Modifier.size(20.dp).then(dragHandleModifier).pointerHoverIcon(PointerIcon.Hand)
                     )
                 } else if (isCurrent && !isDownloading) {
                     Icon(Icons.Rounded.GraphicEq, str("player_playing_now"), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
@@ -2034,7 +2042,7 @@ fun TrackCompactItem(
                         Icons.Rounded.DragHandle,
                         null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp).then(dragHandleModifier)
+                        modifier = Modifier.size(16.dp).then(dragHandleModifier).pointerHoverIcon(PointerIcon.Hand)
                     )
                     isDownloading -> CircularWavyProgressIndicator(
                         progress = { downloadProgress / 100f },
@@ -2215,3 +2223,11 @@ fun EmptyPlaylistView(
     }
 }
 
+private fun getPlaylistTrackStableKey(index: Int, trackId: Long, trackList: List<Track>): String {
+    var occurrence = 0
+    val max = index.coerceAtMost(trackList.size)
+    for (i in 0 until max) {
+        if (trackList[i].id == trackId) occurrence++
+    }
+    return "${trackId}_dup$occurrence"
+}

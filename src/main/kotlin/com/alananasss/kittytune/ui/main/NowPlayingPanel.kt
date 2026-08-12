@@ -20,6 +20,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.PointerMatcher
 import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.PaddingValues
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.ui.draw.shadow
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+import com.alananasss.kittytune.domain.Track
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -137,10 +140,13 @@ private fun QueueList(vm: PlayerViewModel) {
         }
     )
 
-    val currentIndex = vm.currentQueueIndex
-    androidx.compose.runtime.LaunchedEffect(currentIndex) {
-        if (currentIndex >= 0 && currentIndex < vm.queueState.size) {
-            listState.animateScrollToItem(maxOf(0, currentIndex - 2))
+    val currentTrack = vm.currentTrack
+    androidx.compose.runtime.LaunchedEffect(currentTrack) {
+        if (currentTrack != null && vm.queueState.isNotEmpty()) {
+            val index = vm.queueState.indexOfFirst { it.id == currentTrack.id }
+            if (index >= 0) {
+                listState.animateScrollToItem(maxOf(0, index - 2))
+            }
         }
     }
 
@@ -148,10 +154,11 @@ private fun QueueList(vm: PlayerViewModel) {
         state = listState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
     ) {
-        itemsIndexed(items = vm.queueState, key = { index, track -> "${index}_${track.id}" }) { index, track ->
+        itemsIndexed(items = vm.queueState, key = { index, track -> getQueueTrackStableKey(index, track.id, vm.queueState) }) { index, track ->
+            val itemKey = getQueueTrackStableKey(index, track.id, vm.queueState)
             ReorderableItem(
                 state = reorderableState,
-                key = "${index}_${track.id}"
+                key = itemKey
             ) { isDragging ->
                 val isCurrent = index == vm.currentQueueIndex
                 val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "elevation")
@@ -211,6 +218,7 @@ private fun QueueList(vm: PlayerViewModel) {
                         modifier = Modifier
                             .size(24.dp)
                             .draggableHandle()
+                            .pointerHoverIcon(PointerIcon.Hand)
                     )
                 }
             }
@@ -279,3 +287,13 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
         }
     }
 }
+
+private fun getQueueTrackStableKey(index: Int, trackId: Long, trackList: List<Track>): String {
+    var occurrence = 0
+    val max = index.coerceAtMost(trackList.size)
+    for (i in 0 until max) {
+        if (trackList[i].id == trackId) occurrence++
+    }
+    return "${trackId}_dup$occurrence"
+}
+
