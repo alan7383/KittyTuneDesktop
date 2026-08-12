@@ -3021,9 +3021,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             if (resolvedUrl == null) {
                 withContext(Dispatchers.Main) {
-                    isLoading = false
-                    isPlaying = false
-                    if (allowSkipOnFailure) playNext(manual = false, ignoreRepeatOne = true)
+                    if (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
+                        isLoading = true
+                        isPlaying = false
+                        viewModelScope.launch(Dispatchers.IO) {
+                            while (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
+                                delay(2000)
+                            }
+                            withContext(Dispatchers.Main) {
+                                if (currentQueueIndex == index) {
+                                    playRobustly(index, autoPlay, startPosition, allowSkipOnFailure, isCrossfade)
+                                }
+                            }
+                        }
+                    } else {
+                        isLoading = false
+                        isPlaying = false
+                        if (allowSkipOnFailure) playNext(manual = false, ignoreRepeatOne = true)
+                    }
                 }
                 return@launch
             }

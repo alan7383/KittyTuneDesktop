@@ -181,6 +181,7 @@ fun Sidebar(
             libraryViewModel = libraryViewModel,
             playerViewModel = playerViewModel,
             fullScreen = false,
+            onImport = { navController.navigate("music_import") },
             modifier = Modifier.weight(1f),
         )
     }
@@ -224,6 +225,7 @@ fun LibraryPanel(
     libraryViewModel: LibraryViewModel,
     playerViewModel: PlayerViewModel,
     fullScreen: Boolean,
+    onImport: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -254,6 +256,7 @@ fun LibraryPanel(
                     libraryViewModel = libraryViewModel,
                     fullScreen = fullScreen,
                     onCreate = { showCreateDialog = true },
+                    onImport = onImport,
                 )
                 LibraryFilterChips(libraryViewModel)
                 LibrarySearchRow(libraryViewModel)
@@ -375,6 +378,7 @@ private fun LibraryHeader(
     libraryViewModel: LibraryViewModel,
     fullScreen: Boolean,
     onCreate: () -> Unit,
+    onImport: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 4.dp),
@@ -443,6 +447,21 @@ private fun LibraryHeader(
                 ) {
                     Icon(Icons.Rounded.Add, contentDescription = str("lib_create_playlist_tooltip"), modifier = Modifier.size(18.dp))
                 }
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        Tip(str("lib_import_playlist")) {
+            IconButton(
+                shapes = IconButtonDefaults.shapes(),
+                onClick = onImport,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    Icons.Rounded.ImportExport,
+                    contentDescription = str("lib_import_playlist"),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
         Spacer(Modifier.width(4.dp))

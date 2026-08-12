@@ -32,6 +32,9 @@ import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
+import com.alananasss.kittytune.domain.Track
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -145,11 +148,12 @@ fun ExpandedQueueScreen(
         ) {
             itemsIndexed(
                 items = queueState,
-                key = { index, track -> "${index}_${track.id}" }
+                key = { index, track -> getQueueTrackStableKey(index, track.id, queueState) }
             ) { index, track ->
+                val itemKey = getQueueTrackStableKey(index, track.id, queueState)
                 ReorderableItem(
                     state = reorderableState,
-                    key = "${index}_${track.id}"
+                    key = itemKey
                 ) { isDragging ->
                     val isCurrent = track.id == viewModel.currentTrack?.id
                     val shouldDarken = viewModel.repeatMode == RepeatMode.ONE && !isCurrent
@@ -244,6 +248,7 @@ fun ExpandedQueueScreen(
                                             
                                         }
                                     )
+                                    .pointerHoverIcon(PointerIcon.Hand)
                             )
                         }
                     }
@@ -359,3 +364,13 @@ private fun SwipeToDeleteItem(
         }
     }
 }
+
+private fun getQueueTrackStableKey(index: Int, trackId: Long, trackList: List<Track>): String {
+    var occurrence = 0
+    val max = index.coerceAtMost(trackList.size)
+    for (i in 0 until max) {
+        if (trackList[i].id == trackId) occurrence++
+    }
+    return "${trackId}_dup$occurrence"
+}
+

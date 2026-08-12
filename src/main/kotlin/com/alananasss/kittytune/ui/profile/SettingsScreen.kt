@@ -18,48 +18,73 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import kotlinx.coroutines.launch
 
+import com.alananasss.kittytune.ui.common.SettingsGroup
+import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsScaffold
-import androidx.compose.foundation.lazy.LazyColumn
+import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.ui.graphics.vector.ImageVector
 @Composable
 fun SettingsScreen(
     navController: NavController,
-    onBackClick: () -> Unit,
+    onBackClick: (() -> Unit)? = null,
     playerViewModel: PlayerViewModel
 ) {
+    val scrollState = androidx.compose.foundation.rememberScrollState()
     SettingsScaffold(
         title = str("settings_title"),
-        onBackClick = onBackClick
+        onBackClick = onBackClick,
+        scrollState = scrollState
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 80.dp)
+        com.alananasss.kittytune.ui.common.ScrollableColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = scrollState,
+            hideScrollbar = true,
+            contentPadding = innerPadding
         ) {
-            item { MainCategoryTitle(str("pref_appearance_title"), Icons.Rounded.Palette) }
-            item { AppearanceSettingsScreen(onNavigateToColors = { navController.navigate("color_palette") }, onBackClick = null) }
-            item { Spacer(Modifier.height(32.dp)) }
+            MainCategoryTitle(str("pref_appearance_title"), Icons.Rounded.Palette)
+            AppearanceSettingsScreen(onNavigateToColors = { navController.navigate("color_palette") }, onBackClick = null)
+            Spacer(Modifier.height(32.dp))
             
-            item { MainCategoryTitle(str("pref_audio_title"), Icons.Rounded.GraphicEq) }
-            item { AudioSettingsScreen(onBackClick = null, playerViewModel = playerViewModel) }
-            item { Spacer(Modifier.height(32.dp)) }
+            MainCategoryTitle(str("music_import_title"), Icons.Rounded.ImportExport)
             
-            item { MainCategoryTitle(str("pref_lyrics_title"), Icons.Rounded.TextSnippet) }
-            item { LyricsSettingsScreen(onBackClick = null, playerViewModel = playerViewModel) }
-            item { Spacer(Modifier.height(32.dp)) }
+            SettingsGroup(
+                title = str("music_import_title"),
+                items = listOf(
+                    { shape ->
+                        SettingsItem(
+                            shape = shape,
+                            title = str("music_import_title"),
+                            subtitle = str("music_import_settings_subtitle"),
+                            icon = Icons.Rounded.ImportExport,
+                            onClick = { navController.navigate("music_import") }
+                        )
+                    }
+                )
+            )
             
-            item { MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum) }
-            item { DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel) }
-            item { Spacer(Modifier.height(32.dp)) }
+            Spacer(Modifier.height(32.dp))
 
-            item { MainCategoryTitle(str("pref_storage_title"), Icons.Rounded.Storage) }
-            item { StorageSettingsScreen() }
-            item { Spacer(Modifier.height(32.dp)) }
+            MainCategoryTitle(str("pref_audio_title"), Icons.Rounded.GraphicEq)
+            AudioSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
+            Spacer(Modifier.height(32.dp))
             
-            item { MainCategoryTitle(str("pref_local_title"), Icons.Filled.SdStorage) }
-            item { LocalMediaSettingsScreen(onBackClick = null) }
-            item { Spacer(Modifier.height(32.dp)) }
+            MainCategoryTitle(str("pref_lyrics_title"), Icons.Rounded.TextSnippet)
+            LyricsSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
+            Spacer(Modifier.height(32.dp))
+            
+            MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum)
+            DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel)
+            Spacer(Modifier.height(32.dp))
+
+            MainCategoryTitle(str("pref_storage_title"), Icons.Rounded.Storage)
+            StorageSettingsScreen()
+            Spacer(Modifier.height(32.dp))
+            
+            MainCategoryTitle(str("pref_local_title"), Icons.Filled.SdStorage)
+            LocalMediaSettingsScreen(onBackClick = null)
+            Spacer(Modifier.height(32.dp))
+
+            Spacer(Modifier.height(80.dp))
         }
     }
 }

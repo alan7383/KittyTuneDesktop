@@ -13,6 +13,8 @@ version = "1.0.34"
 repositories {
     google()
     mavenCentral()
+    maven("https://central.sonatype.com/repository/maven-snapshots")
+    maven("https://oss.sonatype.org/content/repositories/snapshots")
     maven("https://jitpack.io") {
         content {
             excludeGroup("com.github.hypfvieh")
@@ -32,7 +34,7 @@ dependencies {
     implementation(project(":kizzy"))
     implementation(project(":shazamkit"))
 
-    implementation("io.github.alexzhirkevich:compottie:2.2.4")
+    implementation("io.github.alexzhirkevich:compottie:2.2.4-compose-1.12-SNAPSHOT")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")

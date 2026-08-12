@@ -225,37 +225,63 @@ fun SettingsItem(
 fun SettingsScaffold(
     title: String,
     onBackClick: (() -> Unit)? = null,
+    scrollState: androidx.compose.foundation.ScrollState? = null,
+    actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Text(title, fontWeight = FontWeight.Bold, maxLines = 1)
-                },
-                navigationIcon = {
-                    if (onBackClick != null) {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                contentDescription = null
-                            )
-                        }
+    androidx.compose.runtime.LaunchedEffect(scrollState) {
+        if (scrollState != null) {
+            androidx.compose.runtime.snapshotFlow { scrollState.value }.collect { value ->
+                if (scrollBehavior.state.heightOffsetLimit < 0f) {
+                    scrollBehavior.state.heightOffset = (-value.toFloat()).coerceIn(scrollBehavior.state.heightOffsetLimit, 0f)
+                }
+            }
+        }
+    }
+
+    val topBarContent = @Composable {
+        LargeTopAppBar(
+            title = { Text(title, fontWeight = FontWeight.Bold, maxLines = 1) },
+            navigationIcon = {
+                if (onBackClick != null) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
                     }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
+                }
+            },
+            actions = actions,
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.background,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        content(padding)
+        )
+    }
+
+    if (scrollState == null) {
+        Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+            topBar = topBarContent,
+            containerColor = MaterialTheme.colorScheme.background
+        ) { padding ->
+            content(padding)
+        }
+    } else {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            // Content
+            content(PaddingValues(top = 152.dp))
+
+            // TopAppBar
+            topBarContent()
+
+            // Scrollbar OVER TopAppBar
+            androidx.compose.foundation.VerticalScrollbar(
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 4.dp, horizontal = 2.dp),
+                adapter = androidx.compose.foundation.rememberScrollbarAdapter(scrollState = scrollState)
+            )
+        }
     }
 }
 

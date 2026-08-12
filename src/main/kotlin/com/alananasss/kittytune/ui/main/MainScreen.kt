@@ -247,6 +247,10 @@ fun MainScreen() {
                     libraryViewModel = libraryViewModel,
                     playerViewModel = playerViewModel,
                     fullScreen = true,
+                    onImport = {
+                        libraryViewModel.isLibraryFullScreen = false
+                        navController.navigate("music_import")
+                    },
                     modifier = Modifier.weight(1f).fillMaxSize()
                 )
             } else {
@@ -373,7 +377,7 @@ fun MainScreen() {
                         composable("settings") {
                             com.alananasss.kittytune.ui.profile.SettingsScreen(
                                 navController = navController,
-                                onBackClick = { navController.popBackStack() },
+                                onBackClick = null,
                                 playerViewModel = playerViewModel
                             )
                         }
@@ -593,6 +597,58 @@ fun MainScreen() {
                                 onBackClick = { navController.popBackStack() },
                                 onNavigate = { dest -> navController.navigate(dest) },
                                 playerViewModel = playerViewModel
+                            )
+                        }
+                        composable("music_import") {
+                            com.alananasss.kittytune.ui.musicimport.MusicImportScreen(
+                                onBackClick = null,
+                                onPlatformSelected = { provider ->
+                                    navController.navigate("music_import_selection/$provider")
+                                },
+                                onAuthRequested = { provider ->
+                                    navController.navigate("music_import_auth/$provider")
+                                },
+                                onLoginClick = { navController.navigate("login") }
+                            )
+                        }
+                        composable("music_import_auth/{provider}") { backStackEntry ->
+                            val provider = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("provider") } }.getOrNull()
+                            } ?: ""
+                            val platform = com.alananasss.kittytune.data.musicimport.MusicApi.fromProviderName(provider)
+                            if (platform != null) {
+                                com.alananasss.kittytune.ui.musicimport.MusicApiAuthScreen(
+                                    platform = platform,
+                                    onAuthSuccess = { successProvider ->
+                                        navController.navigate("music_import_selection/$successProvider") {
+                                            popUpTo("music_import_auth/$provider") { inclusive = true }
+                                        }
+                                    },
+                                    onBackClick = null
+                                )
+                            }
+                        }
+                        composable("music_import_selection/{provider}") { backStackEntry ->
+                            val provider = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("provider") } }.getOrNull()
+                            } ?: ""
+                            com.alananasss.kittytune.ui.musicimport.MusicImportSelectionScreen(
+                                platformProviderName = provider,
+                                onBackClick = null,
+                                onStartTransfer = {
+                                    navController.navigate("music_import_transfer") {
+                                        popUpTo("music_import_selection/$provider") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+                        composable("music_import_transfer") {
+                            com.alananasss.kittytune.ui.musicimport.MusicImportTransferScreen(
+                                onBackClick = null,
+                                onDone = {
+                                    com.alananasss.kittytune.data.DownloadManager.notifyLibraryUpdated()
+                                    navController.popBackStack("music_import", inclusive = false)
+                                }
                             )
                         }
                     }
