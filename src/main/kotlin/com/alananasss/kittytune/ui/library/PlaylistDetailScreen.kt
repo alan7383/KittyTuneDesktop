@@ -474,8 +474,14 @@ fun PlaylistDetailScreen(
             val isLocalUser = currentIdLong < 0 || (playlistInDb!!.isUserCreated && isOwnedByCurrentAccount)
             isLocalPlaylist = isDownloadedView || currentIdLong < 0
             isUserCreated = isLocalUser
-            playlistTitle = playlistInDb!!.title
-            playlistCover = playlistInDb!!.localCoverPath ?: playlistInDb!!.artworkUrl
+            val dbTitle = playlistInDb!!.title
+            if (!dbTitle.isNullOrBlank() && dbTitle != str("untitled_track") && dbTitle != "Untitled Track") {
+                playlistTitle = dbTitle
+            }
+            val dbCover = playlistInDb!!.localCoverPath ?: playlistInDb!!.artworkUrl
+            if (!dbCover.isNullOrBlank()) {
+                playlistCover = dbCover
+            }
         } else {
             isLocalPlaylist = currentIdLong < 0
             val isOwnedByCurrentAccount = (playlistUser?.id != null && playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
@@ -688,6 +694,7 @@ fun PlaylistDetailScreen(
                             }
                             isAlbum = playlistObj.isAlbum
 
+                            playlistTitle = playlistObj.title.takeIf { !it.isNullOrBlank() } ?: playlistTitle
                             val rawOnlineArt = playlistObj.fullResArtwork
                             if (rawOnlineArt.isNotBlank() && !rawOnlineArt.contains("picsum")) {
                                 playlistCover = rawOnlineArt
@@ -737,6 +744,12 @@ fun PlaylistDetailScreen(
                     val firstArt = newTracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") }?.fullResArtwork
                     if (!firstArt.isNullOrBlank()) {
                         playlistCover = firstArt
+                    }
+                }
+                if (stableId != 0L) {
+                    val localInDb = db.getPlaylist(stableId)
+                    if (localInDb != null && localInDb.artworkUrl.isBlank() && !playlistCover.isNullOrBlank()) {
+                        db.updatePlaylist(localInDb.copy(artworkUrl = playlistCover!!))
                     }
                 }
             }

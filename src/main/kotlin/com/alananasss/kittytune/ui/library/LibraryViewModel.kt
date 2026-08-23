@@ -640,9 +640,16 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 DownloadManager.clearDeletedPlaylistIds(localIds)
                 localItemsCache = localPlaylists.map { local ->
                     val rawArt = if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else local.artworkUrl
-                    val finalArtwork = if (rawArt?.contains("avatars-") == true || rawArt?.contains("/avatars/") == true) {
+                    val validArt = if (rawArt?.contains("avatars-") == true || rawArt?.contains("/avatars/") == true) {
                         if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else ""
-                    } else rawArt
+                    } else (rawArt ?: "")
+                    val finalArtwork = if (validArt.isNotEmpty()) {
+                        validArt
+                    } else {
+                        db.getTracksForPlaylistSync(local.id).firstOrNull { it.localArtworkPath.isNotEmpty() || it.artworkUrl.isNotEmpty() }?.let {
+                            if (it.localArtworkPath.isNotEmpty()) it.localArtworkPath else it.artworkUrl
+                        } ?: ""
+                    }
                     val p = Playlist(
                         id = local.id,
                         title = local.title,
