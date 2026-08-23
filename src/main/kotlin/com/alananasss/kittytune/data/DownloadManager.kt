@@ -478,10 +478,10 @@ object DownloadManager {
             val isDownloadedFinal = isDownloaded ?: (existing?.isDownloaded ?: false)
             val baseTime = System.currentTimeMillis()
 
-            val firstTrackArt = tracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") }?.fullResArtwork ?: ""
-            val rawArt = if (!playlist.artworkUrl.isNullOrEmpty()) {
+            val firstTrackArt = tracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") && !it.fullResArtwork.contains("avatars") }?.fullResArtwork ?: ""
+            val rawArt = if (!playlist.artworkUrl.isNullOrEmpty() && !playlist.artworkUrl.contains("avatars")) {
                 playlist.artworkUrl.replace("large", "t500x500")
-            } else if (!playlist.calculatedArtworkUrl.isNullOrEmpty()) {
+            } else if (!playlist.calculatedArtworkUrl.isNullOrEmpty() && !playlist.calculatedArtworkUrl.contains("avatars")) {
                 playlist.calculatedArtworkUrl.replace("large", "t500x500")
             } else {
                 firstTrackArt

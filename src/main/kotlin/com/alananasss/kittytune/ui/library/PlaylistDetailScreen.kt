@@ -695,13 +695,20 @@ fun PlaylistDetailScreen(
                             isAlbum = playlistObj.isAlbum
 
                             playlistTitle = playlistObj.title.takeIf { !it.isNullOrBlank() } ?: playlistTitle
-                            val rawOnlineArt = playlistObj.fullResArtwork
-                            if (rawOnlineArt.isNotBlank() && !rawOnlineArt.contains("picsum")) {
-                                playlistCover = rawOnlineArt
-                            }
                             playlistUser = playlistObj.user ?: playlistUser
                             isUserCreated = (playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
                                 (playerViewModel.currentUser != null && playlistUser?.username == playerViewModel.currentUser?.username)
+
+                            val rawOnlineArt = if (isUserCreated) {
+                                val validCustom = playlistObj.artworkUrl?.takeIf { !it.contains("avatars") && !it.contains("default_avatar") }
+                                val validCalc = playlistObj.calculatedArtworkUrl?.takeIf { !it.contains("avatars") && !it.contains("default_avatar") }
+                                validCustom ?: validCalc ?: ""
+                            } else {
+                                playlistObj.fullResArtwork
+                            }
+                            if (rawOnlineArt.isNotBlank() && !rawOnlineArt.contains("picsum")) {
+                                playlistCover = rawOnlineArt
+                            }
                             playlistSharing = playlistObj.sharing
                             playlistDescription = playlistObj.description
                             playlistUrn = playlistObj.urn
@@ -740,15 +747,15 @@ fun PlaylistDetailScreen(
             if (playlistId != "likes") {
                 tracks.clear()
                 tracks.addAll(newTracks)
-                if (playlistCover.isNullOrBlank() && newTracks.isNotEmpty()) {
-                    val firstArt = newTracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") }?.fullResArtwork
+                if ((playlistCover.isNullOrBlank() || (isUserCreated && playlistCover?.contains("avatars") == true)) && newTracks.isNotEmpty()) {
+                    val firstArt = newTracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") && !it.fullResArtwork.contains("avatars") }?.fullResArtwork
                     if (!firstArt.isNullOrBlank()) {
                         playlistCover = firstArt
                     }
                 }
                 if (stableId != 0L) {
                     val localInDb = db.getPlaylist(stableId)
-                    if (localInDb != null && localInDb.artworkUrl.isBlank() && !playlistCover.isNullOrBlank()) {
+                    if (localInDb != null && (localInDb.artworkUrl.isBlank() || localInDb.artworkUrl.contains("avatars")) && !playlistCover.isNullOrBlank()) {
                         db.updatePlaylist(localInDb.copy(artworkUrl = playlistCover!!))
                     }
                 }
