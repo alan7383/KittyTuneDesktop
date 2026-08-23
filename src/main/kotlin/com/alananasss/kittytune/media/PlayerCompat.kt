@@ -152,9 +152,12 @@ class Player {
         }
         eng.onCompletion = { onCompletion?.invoke() }
         eng.onReResolveUrl = {
-            currentMediaItem?.track?.let { track ->
-                StreamResolver.evictStream(track.id)
-                StreamResolver.resolveStream(track)
+            val track = currentMediaItem?.track ?: com.alananasss.kittytune.data.MusicManager.currentTrack
+            track?.let { t ->
+                com.alananasss.kittytune.data.StreamResolver.evictStream(t.id)
+                withContext(Dispatchers.IO) {
+                    com.alananasss.kittytune.data.StreamResolver.resolveStream(t)
+                }
             }
         }
     }

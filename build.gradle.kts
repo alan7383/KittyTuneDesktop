@@ -103,6 +103,9 @@ dependencies {
             implementation("org.openjfx:$module:$javafxVersion:$javafxClassifier")
         }
     }
+
+    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2")
 }
 
 compose.desktop {
