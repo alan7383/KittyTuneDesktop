@@ -129,7 +129,7 @@ object RetrofitClient {
             }
         }
 
-        return OkHttpClient.Builder()
+        val builder = OkHttpClient.Builder()
             .retryOnConnectionFailure(true)
             .cookieJar(CookieStore)
             .addInterceptor(authInterceptor)
@@ -138,8 +138,14 @@ object RetrofitClient {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
+
+        return ProxyManager.configureOkHttpClient(builder)
             .build()
             .also { okHttpClient = it }
+    }
+
+    fun resetClient() {
+        okHttpClient = null
     }
 
     private fun isAuthFailure(code: Int): Boolean = code == 401

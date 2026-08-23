@@ -34,21 +34,25 @@ interface LrcLibApiService {
 object LrcLibClient {
     private const val BASE_URL = "https://lrclib.net/api/"
 
-    private val okHttpClient = okhttp3.OkHttpClient.Builder()
-        .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .header("User-Agent", "KittyTuneWindows/1.0 (https://github.com/alan7383/KittyTuneDesktop)")
-                .build()
-            chain.proceed(request)
-        }
-        .build()
+    private val baseHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("User-Agent", "KittyTuneWindows/1.0 (https://github.com/alan7383/KittyTuneDesktop)")
+                    .build()
+                chain.proceed(request)
+            }
+            .build()
+    }
 
-    val api: LrcLibApiService by lazy {
-        Retrofit.Builder()
+    private val okHttpClient: okhttp3.OkHttpClient
+        get() = ProxyManager.configureOkHttpClient(baseHttpClient.newBuilder()).build()
+
+    val api: LrcLibApiService
+        get() = Retrofit.Builder()
             .baseUrl(BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(LrcLibApiService::class.java)
-    }
 }

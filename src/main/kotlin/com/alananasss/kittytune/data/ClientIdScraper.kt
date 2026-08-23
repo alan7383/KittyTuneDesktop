@@ -15,11 +15,16 @@ import java.util.concurrent.TimeUnit
  */
 object ClientIdScraper {
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .build()
+    private val baseClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .build()
+    }
+
+    private val client: OkHttpClient
+        get() = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(baseClient.newBuilder()).build()
 
     private val scriptUrlRegex = Regex("""src="(https://a-v2\.sndcdn\.com/assets/[^"]+\.js)"""")
     private val clientIdRegex = Regex("""client_id\s*[:=]\s*"([A-Za-z0-9]{32})"""")

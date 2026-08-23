@@ -1,4 +1,4 @@
-﻿package com.alananasss.kittytune.data
+package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.data.network.CookieStore
@@ -60,12 +60,17 @@ object SessionManager {
     private val apiRefreshLock = Any()
     private var pendingApiRefresh: CompletableDeferred<String?>? = null
 
-    private val authClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .cookieJar(CookieStore)
-        .build()
+    private val baseAuthClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .cookieJar(CookieStore)
+            .build()
+    }
+
+    private val authClient: OkHttpClient
+        get() = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(baseAuthClient.newBuilder()).build()
 
     private val gson = Gson()
 

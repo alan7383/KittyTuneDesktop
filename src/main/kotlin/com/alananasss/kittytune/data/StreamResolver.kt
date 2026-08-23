@@ -24,46 +24,51 @@ import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 private object ExtractorDownloader : Downloader() {
-    private val client = OkHttpClient.Builder()
-        .retryOnConnectionFailure(true)
-        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .cookieJar(object : CookieJar {
-            private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
+    private val baseClient by lazy {
+        OkHttpClient.Builder()
+            .retryOnConnectionFailure(true)
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .cookieJar(object : CookieJar {
+                private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
 
-            override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                val host = url.host
-                val existing = cookieStore.getOrPut(host) { mutableListOf() }
-                val updated = existing.associateBy { it.name }.toMutableMap()
-                cookies.forEach { updated[it.name] = it }
-                cookieStore[host] = updated.values.toMutableList()
-            }
+                override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+                    val host = url.host
+                    val existing = cookieStore.getOrPut(host) { mutableListOf() }
+                    val updated = existing.associateBy { it.name }.toMutableMap()
+                    cookies.forEach { updated[it.name] = it }
+                    cookieStore[host] = updated.values.toMutableList()
+                }
 
-            override fun loadForRequest(url: HttpUrl): List<Cookie> {
-                val host = url.host
-                val validCookies = mutableListOf<Cookie>()
-                cookieStore.forEach { (domain, domainCookies) ->
-                    if (host == domain || host.endsWith(".$domain")) {
-                        validCookies.addAll(domainCookies)
+                override fun loadForRequest(url: HttpUrl): List<Cookie> {
+                    val host = url.host
+                    val validCookies = mutableListOf<Cookie>()
+                    cookieStore.forEach { (domain, domainCookies) ->
+                        if (host == domain || host.endsWith(".$domain")) {
+                            validCookies.addAll(domainCookies)
+                        }
+                    }
+                    return validCookies
+                }
+            })
+            .addInterceptor { chain ->
+                val request = chain.request()
+                val host = request.url.host
+                if (host.contains("youtube.com") || host.contains("youtu.be")) {
+                    val existingCookies = request.headers("Cookie").joinToString("; ")
+                    if (!existingCookies.contains("CONSENT=")) {
+                        val newCookie = if (existingCookies.isNotEmpty()) "$existingCookies; CONSENT=YES+cb" else "CONSENT=YES+cb"
+                        val newRequest = request.newBuilder().header("Cookie", newCookie).build()
+                        return@addInterceptor chain.proceed(newRequest)
                     }
                 }
-                return validCookies
+                chain.proceed(request)
             }
-        })
-        .addInterceptor { chain ->
-            val request = chain.request()
-            val host = request.url.host
-            if (host.contains("youtube.com") || host.contains("youtu.be")) {
-                val existingCookies = request.headers("Cookie").joinToString("; ")
-                if (!existingCookies.contains("CONSENT=")) {
-                    val newCookie = if (existingCookies.isNotEmpty()) "$existingCookies; CONSENT=YES+cb" else "CONSENT=YES+cb"
-                    val newRequest = request.newBuilder().header("Cookie", newCookie).build()
-                    return@addInterceptor chain.proceed(newRequest)
-                }
-            }
-            chain.proceed(request)
-        }
-        .build()
+            .build()
+    }
+
+    private val client: OkHttpClient
+        get() = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(baseClient.newBuilder()).build()
 
     @Throws(IOException::class)
     override fun execute(request: Request): Response {
@@ -103,12 +108,17 @@ private object ExtractorDownloader : Downloader() {
  */
 object StreamResolver {
 
-    private val client = OkHttpClient.Builder()
-        .retryOnConnectionFailure(true)
-        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-        .cookieJar(CookieStore)
-        .build()
+    private val baseClient by lazy {
+        OkHttpClient.Builder()
+            .retryOnConnectionFailure(true)
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .cookieJar(CookieStore)
+            .build()
+    }
+
+    private val client: OkHttpClient
+        get() = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(baseClient.newBuilder()).build()
     private val streamCache = ConcurrentHashMap<Long, Pair<Long, ResolvedStream>>()
     private const val CACHE_TTL_MS = 30 * 60 * 1000L // 30 minutes
 
