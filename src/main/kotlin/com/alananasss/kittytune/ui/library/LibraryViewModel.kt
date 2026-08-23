@@ -640,13 +640,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 DownloadManager.clearDeletedPlaylistIds(localIds)
                 localItemsCache = localPlaylists.map { local ->
                     val rawArt = if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else local.artworkUrl
-                    val validArt = if (rawArt?.contains("avatars-") == true || rawArt?.contains("/avatars/") == true) {
+                    val validArt = if (rawArt?.contains("avatars") == true) {
                         if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else ""
                     } else (rawArt ?: "")
                     val finalArtwork = if (validArt.isNotEmpty()) {
                         validArt
                     } else {
-                        db.getTracksForPlaylistSync(local.id).firstOrNull { it.localArtworkPath.isNotEmpty() || it.artworkUrl.isNotEmpty() }?.let {
+                        db.getTracksForPlaylistSync(local.id).firstOrNull { it.localArtworkPath.isNotEmpty() || (it.artworkUrl.isNotEmpty() && !it.artworkUrl.contains("avatars")) }?.let {
                             if (it.localArtworkPath.isNotEmpty()) it.localArtworkPath else it.artworkUrl
                         } ?: ""
                     }
@@ -855,11 +855,26 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                 val dateStr = playlist.lastModified ?: playlist.createdAt
                                 dateStr?.let { isoParser.parse(it)?.time } ?: 0L
                             } catch (e: Exception) { 0L }
-                            val plForDisplay = if (playlist.artworkUrl.isNullOrEmpty() && playlist.calculatedArtworkUrl.isNullOrEmpty() && playlist.tracks.isNullOrEmpty()) {
-                                playlist.copy(user = playlist.user?.copy(avatarUrl = null))
-                            } else {
-                                playlist
-                            }
+
+                            val validCustomArt = playlist.artworkUrl?.takeIf { !it.contains("avatars") && !it.contains("default_avatar") }
+                            val validCalcArt = playlist.calculatedArtworkUrl?.takeIf { !it.contains("avatars") && !it.contains("default_avatar") }
+                            val trackArtFromTracks = playlist.tracks?.firstOrNull { 
+                                it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") && !it.fullResArtwork.contains("avatars") 
+                            }?.fullResArtwork
+
+                            val localTrackArt = if (validCustomArt == null && validCalcArt == null && trackArtFromTracks == null) {
+                                db.getTracksForPlaylistSync(playlist.id).firstOrNull {
+                                    it.localArtworkPath.isNotEmpty() || (it.artworkUrl.isNotEmpty() && !it.artworkUrl.contains("avatars"))
+                                }?.let { if (it.localArtworkPath.isNotEmpty()) it.localArtworkPath else it.artworkUrl }
+                            } else null
+
+                            val resolvedArt = validCustomArt ?: validCalcArt ?: trackArtFromTracks ?: localTrackArt ?: ""
+
+                            val plForDisplay = playlist.copy(
+                                artworkUrl = resolvedArt.ifEmpty { null },
+                                calculatedArtworkUrl = null,
+                                user = playlist.user?.copy(avatarUrl = null)
+                            )
                             newOnlineItems.add(LibraryItem.PlaylistItem(plForDisplay, date))
                         }
                     }
