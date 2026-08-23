@@ -121,6 +121,9 @@ object DownloadManager {
     private val _deletedPlaylistIds = MutableStateFlow<Set<Long>>(emptySet())
     val deletedPlaylistIds = _deletedPlaylistIds.asStateFlow()
 
+    private val _trackRemovedFromPlaylist = MutableSharedFlow<Pair<Long, Long>>(extraBufferCapacity = 64)
+    val trackRemovedFromPlaylist = _trackRemovedFromPlaylist.asSharedFlow()
+
     fun addDeletedPlaylistId(playlistId: Long) {
         _deletedPlaylistIds.update { it + playlistId }
         _libraryUpdated.tryEmit(Unit)
@@ -356,6 +359,7 @@ object DownloadManager {
     }
 
     fun removeTrackFromPlaylist(playlistId: Long, trackId: Long, syncToCloud: Boolean = true) {
+        _trackRemovedFromPlaylist.tryEmit(playlistId to trackId)
         scope.launch {
             dao.removeTrackFromPlaylist(playlistId, trackId)
             val playlist = dao.getPlaylist(playlistId)
@@ -974,6 +978,7 @@ object DownloadManager {
     }
 
     fun deleteTrack(trackId: Long) {
+        _trackRemovedFromPlaylist.tryEmit(-2L to trackId)
         scope.launch {
             if (trackId == 0L) return@launch
             val track = dao.getTrack(trackId)
