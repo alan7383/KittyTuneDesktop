@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.RestartAlt
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.savedstate.read
 import com.alananasss.kittytune.ui.modifiers.squish
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -44,6 +46,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.domain.getHighResAvatarUrl
+import com.alananasss.kittytune.domain.isDefaultAvatar
 import com.alananasss.kittytune.ui.home.HomeViewModel
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
@@ -225,18 +228,21 @@ fun MainTopBar(
                 shapes = IconButtonDefaults.shapes(),
                 onClick = { showProfileMenu = true }
             ) {
-                if (!avatarUrl.isNullOrEmpty()) {
+                if (!avatarUrl.isNullOrEmpty() && !rawAvatar.isDefaultAvatar()) {
                     AsyncImage(
                         model = avatarUrl,
                         contentDescription = null,
+                        error = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
+                        fallback = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
                         modifier = Modifier.size(32.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop,
                     )
                 } else {
-                    Icon(
-                        imageVector = Icons.Rounded.AccountCircle,
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
                         contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(32.dp).clip(CircleShape),
                     )
                 }
             }
@@ -250,6 +256,13 @@ fun MainTopBar(
                     onClick = {
                         showProfileMenu = false
                         playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
+                    }
+                )
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(str("nav_upload")) },
+                    onClick = {
+                        showProfileMenu = false
+                        navController.navigate("upload")
                     }
                 )
                 androidx.compose.material3.DropdownMenuItem(

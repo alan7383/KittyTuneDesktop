@@ -86,8 +86,11 @@ fun MainScreen() {
     androidx.compose.runtime.LaunchedEffect(playerViewModel.navigateToPlaylistId) {
         playerViewModel.navigateToPlaylistId?.let { destinationId ->
             val targetRoute = when {
+                destinationId == "history" -> "history"
+                destinationId == "upload" -> "upload"
                 destinationId == "recognition" -> "recognition"
                 destinationId == "recognition_history" -> "recognition_history"
+                destinationId.startsWith("edit_track:") -> "edit_track/${destinationId.removePrefix("edit_track:")}"
                 destinationId.startsWith("profile:") -> "profile/${destinationId.removePrefix("profile:")}"
                 destinationId.startsWith("tag:") -> "tag/${destinationId.removePrefix("tag:")}"
                 destinationId.startsWith("track_detail:") -> "track_detail/${destinationId.removePrefix("track_detail:")}"
@@ -149,7 +152,7 @@ fun MainScreen() {
                     when (event.key) {
                         Key.L -> navController.navigate("playlist_detail/likes")
                         Key.C -> navController.navigate("home") // Actually, navigating to library root? I'll use home for now. Or maybe there is no library route, Sidebar has it.
-                        Key.H -> navController.navigate("playlist_detail/history")
+                        Key.H -> navController.navigate("history")
                         Key.S -> navController.navigate("feed")
                         Key.P -> {
                             val selfId = playerViewModel.currentUserId.takeIf { it != 0L }?.toString()
@@ -251,6 +254,14 @@ fun MainScreen() {
                         libraryViewModel.isLibraryFullScreen = false
                         navController.navigate("music_import")
                     },
+                    onHistory = {
+                        libraryViewModel.isLibraryFullScreen = false
+                        navController.navigate("history")
+                    },
+                    onUpload = {
+                        libraryViewModel.isLibraryFullScreen = false
+                        navController.navigate("upload")
+                    },
                     modifier = Modifier.weight(1f).fillMaxSize()
                 )
             } else {
@@ -270,6 +281,7 @@ fun MainScreen() {
                 navController = navController,
                 libraryViewModel = libraryViewModel,
                 playerViewModel = playerViewModel,
+                homeViewModel = homeViewModel,
                 modifier = Modifier.width(sidebarWidth)
             )
 
@@ -362,6 +374,8 @@ fun MainScreen() {
                                     playerViewModel = playerViewModel,
                                     onNavigate = { id ->
                                         when {
+                                            id == "history" -> navController.navigate("history")
+                                            id == "recognition_history" -> navController.navigate("recognition_history")
                                             id.startsWith("profile:") -> navController.navigate("profile/${id.removePrefix("profile:")}")
                                             id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                             id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
@@ -415,6 +429,8 @@ fun MainScreen() {
                                 onBackClick = { navController.popBackStack() },
                                 onNavigate = { dest ->
                                     when {
+                                        dest == "history" -> navController.navigate("history")
+                                        dest == "recognition_history" -> navController.navigate("recognition_history")
                                         dest.startsWith("tag:") -> navController.navigate("tag/${dest.removePrefix("tag:")}")
                                         dest.startsWith("profile:") -> navController.navigate("profile/${dest.removePrefix("profile:")}")
                                         dest.startsWith("playlist_fans/") -> navController.navigate(dest)
@@ -434,6 +450,8 @@ fun MainScreen() {
                                 playerViewModel = playerViewModel,
                                 onNavigate = { id ->
                                     when {
+                                        id == "history" -> navController.navigate("history")
+                                        id == "recognition_history" -> navController.navigate("recognition_history")
                                         id.startsWith("profile:") -> navController.navigate("profile/${id.removePrefix("profile:")}")
                                         id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                         id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
@@ -594,9 +612,20 @@ fun MainScreen() {
                         }
                         composable("recognition_history") {
                             com.alananasss.kittytune.ui.recognition.RecognitionHistoryScreen(
-                                onBackClick = { navController.popBackStack() },
+                                onBackClick = null,
                                 onNavigate = { dest -> navController.navigate(dest) },
                                 playerViewModel = playerViewModel
+                            )
+                        }
+                        composable("history") {
+                            val historyViewModel: com.alananasss.kittytune.ui.history.HistoryViewModel = androidx.lifecycle.viewmodel.compose.viewModel {
+                                com.alananasss.kittytune.ui.history.HistoryViewModel(com.alananasss.kittytune.core.AppInstance.application)
+                            }
+                            com.alananasss.kittytune.ui.history.HistoryScreen(
+                                onBackClick = null,
+                                onNavigate = { dest -> navController.navigate(dest) },
+                                playerViewModel = playerViewModel,
+                                historyViewModel = historyViewModel
                             )
                         }
                         composable("music_import") {
@@ -649,6 +678,53 @@ fun MainScreen() {
                                     com.alananasss.kittytune.data.DownloadManager.notifyLibraryUpdated()
                                     navController.popBackStack("music_import", inclusive = false)
                                 }
+                            )
+                        }
+                        composable("upload") {
+                            val uploadViewModel = remember { com.alananasss.kittytune.ui.upload.UploadViewModel() }
+                            com.alananasss.kittytune.ui.upload.UploadScreen(
+                                viewModel = uploadViewModel,
+                                trackIdToEdit = null,
+                                onBackClick = { navController.popBackStack() },
+                                onNavigateToProfile = {
+                                    val selfId = playerViewModel.currentUserId
+                                    com.alananasss.kittytune.ui.profile.ProfileViewModel.triggerRefresh(selfId)
+                                    libraryViewModel.loadData(forceRefresh = true)
+                                    if (selfId > 0L) {
+                                        navController.navigate("profile/$selfId") {
+                                            popUpTo("home") { inclusive = false }
+                                            launchSingleTop = true
+                                        }
+                                    } else {
+                                        navController.popBackStack()
+                                    }
+                                },
+                                onLoginClick = { navController.navigate("profile") }
+                            )
+                        }
+                        composable("edit_track/{trackId}") { backStackEntry ->
+                            val trackId = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("trackId") } }.getOrNull()
+                            }
+                            val uploadViewModel = remember { com.alananasss.kittytune.ui.upload.UploadViewModel() }
+                            com.alananasss.kittytune.ui.upload.UploadScreen(
+                                viewModel = uploadViewModel,
+                                trackIdToEdit = trackId,
+                                onBackClick = { navController.popBackStack() },
+                                onNavigateToProfile = {
+                                    val selfId = playerViewModel.currentUserId
+                                    com.alananasss.kittytune.ui.profile.ProfileViewModel.triggerRefresh(selfId)
+                                    libraryViewModel.loadData(forceRefresh = true)
+                                    if (selfId > 0L) {
+                                        navController.navigate("profile/$selfId") {
+                                            popUpTo("home") { inclusive = false }
+                                            launchSingleTop = true
+                                        }
+                                    } else {
+                                        navController.popBackStack()
+                                    }
+                                },
+                                onLoginClick = { navController.navigate("profile") }
                             )
                         }
                     }

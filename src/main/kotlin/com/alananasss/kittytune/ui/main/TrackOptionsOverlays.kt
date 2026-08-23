@@ -32,14 +32,17 @@ import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.rounded.Bedtime
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Radio
 import androidx.compose.material.icons.rounded.Repeat
@@ -163,6 +166,8 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
     val track = viewModel.trackForMenu ?: viewModel.currentTrack ?: return
     val downloadProgress by DownloadManager.downloadProgress.collectAsState()
     val storageTrigger by DownloadManager.storageTrigger.collectAsState()
+    val likedTracks by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
+    val isTrackLiked = remember(track.id, likedTracks) { com.alananasss.kittytune.data.LikeRepository.isTrackLiked(track.id) }
     val isLocalFile = track.id < 0 && track.source != "youtube"
 
     val isReposted = viewModel.isTrackReposted(track.id) || track.userReposted
@@ -245,6 +250,16 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
         }
 
         val gridItems = mutableListOf<MenuOptionItem>().apply {
+            if (!isLocalFile && !viewModel.isMenuContextFromPlayer) {
+                add(
+                    MenuOptionItem(
+                        if (isTrackLiked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+                        if (isTrackLiked) str("action_unlike") else str("player_like_action")
+                    ) {
+                        viewModel.toggleTrackLike(track)
+                    }
+                )
+            }
             if (viewModel.isMenuContextFromPlayer) {
                 add(MenuOptionItem(Icons.Rounded.Shuffle, str("menu_shuffle")) { viewModel.toggleShuffle() })
                 add(MenuOptionItem(Icons.Rounded.Repeat, str("menu_repeat")) { viewModel.toggleRepeatMode() })
@@ -268,6 +283,13 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             add(MenuOptionItem(Icons.Default.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
             if (track.source != "youtube" && !isLocalFile) {
                 add(MenuOptionItem(Icons.Default.Person, str("menu_go_artist")) { track.user?.id?.let { viewModel.navigateToArtist(it) } })
+                val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
+                if (isOwnTrack) {
+                    add(MenuOptionItem(Icons.Default.Edit, str("menu_edit_track")) {
+                        viewModel.showMenuSheet = false
+                        viewModel.navigateToEditTrack(track.id)
+                    })
+                }
             }
             if (!isLocalFile) {
                 add(MenuOptionItem(Icons.Rounded.Radio, str("menu_track_radio")) {
@@ -275,7 +297,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 })
                 add(MenuOptionItem(Icons.Outlined.Share, str("btn_share")) { viewModel.shareTrack(track) })
             }
-            if (viewModel.menuContextPlaylistId != null && viewModel.menuContextPlaylistId!! < 0) {
+            if (viewModel.menuContextPlaylistId != null && (viewModel.menuContextPlaylistId!! < 0 || viewModel.menuContextPlaylistId == -2L)) {
                 add(MenuOptionItem(Icons.Outlined.Delete, str("menu_remove")) { viewModel.removeFromContextPlaylist(viewModel.menuContextPlaylistId!!, track) })
             }
             if (viewModel.isMenuContextFromPlayer) {
@@ -295,6 +317,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 var tint = inactiveColor
                 var text = item.text
 
+                if (item.text == str("action_unlike")) tint = activeColor
                 if (item.text == str("menu_shuffle") && viewModel.shuffleEnabled) tint = activeColor
                 if (item.text == str("menu_reposted")) tint = activeColor
                 if (item.text == str("menu_repeat")) {
@@ -447,7 +470,7 @@ private fun RepostDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
                     value = caption,
                     onValueChange = { if (it.length <= maxChars) caption = it },
                     placeholder = { Text(str("dialog_repost_caption_hint")) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -746,7 +769,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
  * from SQLite, stations/system playlists/regular playlists from the API — with the
  * same stub-hydration as PlaylistDetailScreen.
  */
-private suspend fun loadPlaylistTracksForMenu(
+internal suspend fun loadPlaylistTracksForMenu(
     playlist: com.alananasss.kittytune.domain.Playlist,
 ): List<com.alananasss.kittytune.domain.Track> {
     val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
@@ -1002,7 +1025,7 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                 value = newCommentText,
                 onValueChange = { newCommentText = it },
                 placeholder = { Text(if (viewModel.replyingToComment != null) str("comment_write_reply") else str("add_comment_hint")) },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).trackTextInput(),
                 singleLine = true,
                 shape = RoundedCornerShape(24.dp),
                 enabled = !isPosting

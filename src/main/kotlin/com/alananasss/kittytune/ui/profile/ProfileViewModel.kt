@@ -17,6 +17,9 @@
     import kotlinx.coroutines.Dispatchers
     import kotlinx.coroutines.async
     import kotlinx.coroutines.coroutineScope
+    import kotlinx.coroutines.flow.MutableSharedFlow
+    import kotlinx.coroutines.flow.SharedFlow
+    import kotlinx.coroutines.flow.asSharedFlow
     import kotlinx.coroutines.launch
     import kotlinx.coroutines.withContext
     import java.io.ByteArrayOutputStream
@@ -32,6 +35,15 @@
     }
     
     class ProfileViewModel(application: Application) : AndroidViewModel(application) {
+        companion object {
+            private val _refreshTrigger = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+            val refreshTrigger: SharedFlow<Long> = _refreshTrigger.asSharedFlow()
+
+            fun triggerRefresh(userId: Long = 0L) {
+                _refreshTrigger.tryEmit(userId)
+            }
+        }
+
         private val api = RetrofitClient.create()
     
         var user by mutableStateOf<User?>(null)
@@ -55,10 +67,44 @@
 
     init {
         viewModelScope.launch {
+            _refreshTrigger.collect { targetUserId ->
+                val currentId = user?.id
+                if (currentId != null && (targetUserId == 0L || targetUserId == currentId)) {
+                    loadProfile(currentId, forceReload = true)
+                }
+            }
+        }
+
+        viewModelScope.launch {
             com.alananasss.kittytune.data.RepostRepository.repostedTrackIds.collect { repostedIds ->
                 if (isCurrentUser) {
                     repostedTracks.removeAll { track -> !repostedIds.contains(track.id) }
                 }
+            }
+        }
+
+        viewModelScope.launch {
+            com.alananasss.kittytune.data.MusicManager.trackUpdatedFlow.collect { updatedTrack ->
+                val popIdx = popularTracks.indexOfFirst { it.id == updatedTrack.id }
+                if (popIdx != -1) popularTracks[popIdx] = updatedTrack
+
+                val allIdx = allTracks.indexOfFirst { it.id == updatedTrack.id }
+                if (allIdx != -1) allTracks[allIdx] = updatedTrack
+
+                val repIdx = repostedTracks.indexOfFirst { it.id == updatedTrack.id }
+                if (repIdx != -1) repostedTracks[repIdx] = updatedTrack
+
+                val likeIdx = likedTracks.indexOfFirst { it.id == updatedTrack.id }
+                if (likeIdx != -1) likedTracks[likeIdx] = updatedTrack
+            }
+        }
+
+        viewModelScope.launch {
+            com.alananasss.kittytune.data.MusicManager.trackDeletedFlow.collect { deletedTrackId ->
+                popularTracks.removeAll { it.id == deletedTrackId }
+                allTracks.removeAll { it.id == deletedTrackId }
+                repostedTracks.removeAll { it.id == deletedTrackId }
+                likedTracks.removeAll { it.id == deletedTrackId }
             }
         }
     }

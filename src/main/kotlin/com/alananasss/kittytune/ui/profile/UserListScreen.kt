@@ -208,10 +208,9 @@ fun UserRow(user: User, onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.size(56.dp)
         ) {
-            AsyncImage(
-                model = user.avatarUrl,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize().clip(CircleShape)
+            ArtistAvatar(
+                avatarUrl = user.avatarUrl,
+                modifier = Modifier.fillMaxSize()
             )
         }
 

@@ -16,4 +16,5 @@ sealed class Screen(val route: String, val titleResId: String, val icon: ImageVe
     data object Login : Screen("login", "nav_login", null)
     data object Recognition : Screen("recognition", "nav_search", null)
     data object RecognitionHistory : Screen("recognition_history", "nav_search", null)
+    data object Upload : Screen("upload", "nav_upload", null)
 }

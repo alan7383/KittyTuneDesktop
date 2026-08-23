@@ -51,7 +51,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -90,6 +90,8 @@ import com.alananasss.kittytune.domain.Comment
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
+import com.alananasss.kittytune.domain.isDefaultAvatar
+import com.alananasss.kittytune.domain.getHighResAvatarUrl
 import com.alananasss.kittytune.ui.common.ShimmerLine
 import com.alananasss.kittytune.ui.common.viewableCover
 import com.alananasss.kittytune.ui.common.TrackListItemShimmer
@@ -128,6 +130,15 @@ fun ProfileScreen(
     LaunchedEffect(userId) {
         val id = userId.toLongOrNull()
         if (id != null) profileViewModel.loadProfile(id)
+    }
+
+    LaunchedEffect(userId) {
+        ProfileViewModel.refreshTrigger.collect { targetUserId ->
+            val id = userId.toLongOrNull()
+            if (id != null && (targetUserId == 0L || targetUserId == id)) {
+                profileViewModel.loadProfile(id, forceReload = true)
+            }
+        }
     }
 
     val user = profileViewModel.user
@@ -392,23 +403,27 @@ fun ProfileScreenShimmer(onBackClick: () -> Unit) {
 
 @Composable
 fun ArtistAvatar(modifier: Modifier = Modifier, avatarUrl: String?) {
+    val isDefault = remember(avatarUrl) { avatarUrl.isDefaultAvatar() }
+
     Box(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        if (!avatarUrl.isNullOrEmpty()) {
+        if (!isDefault && !avatarUrl.isNullOrEmpty()) {
             AsyncImage(
-                model = avatarUrl.replace("large", "t500x500"),
+                model = avatarUrl.getHighResAvatarUrl() ?: avatarUrl,
                 contentDescription = str("profile_avatar"),
                 contentScale = ContentScale.Crop,
+                error = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
+                fallback = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            Icon(
-                Icons.Default.Person,
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
                 contentDescription = str("profile_avatar"),
-                modifier = Modifier.fillMaxSize(0.6f),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
@@ -427,16 +442,18 @@ fun ModernProfileHeader(
     onFollowingClick: () -> Unit = {}
 ) {
     Box(modifier = Modifier.fillMaxWidth().height(420.dp)) {
-        val bgModel = user.bannerUrl ?: user.avatarUrl
-        AsyncImage(
-            model = ImageRequest.Builder(PlatformContext.INSTANCE)
-                .data(bgModel)
-                .size(Size(128, 128))
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().blur(32.dp).alpha(0.6f)
-        )
+        val bgModel = if (user.bannerUrl != null) user.bannerUrl else if (!user.avatarUrl.isDefaultAvatar()) user.avatarUrl else null
+        if (bgModel != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(PlatformContext.INSTANCE)
+                    .data(bgModel)
+                    .size(Size(128, 128))
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().blur(32.dp).alpha(0.6f)
+            )
+        }
         Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.5f), MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background), startY = 0f)))
 
         Column(
@@ -445,7 +462,8 @@ fun ModernProfileHeader(
         ) {
             Box {
                 Surface(shape = CircleShape, shadowElevation = 12.dp, color = Color.Transparent, modifier = Modifier.size(140.dp)) {
-                    ArtistAvatar(avatarUrl = user.avatarUrl, modifier = Modifier.fillMaxSize().viewableCover(user.avatarUrl?.replace("large", "t500x500")))
+                    val coverUrl = if (!user.avatarUrl.isDefaultAvatar()) user.avatarUrl.getHighResAvatarUrl() else null
+                    ArtistAvatar(avatarUrl = user.avatarUrl, modifier = Modifier.fillMaxSize().viewableCover(coverUrl))
                 }
                 if (isCurrentUser) {
                     Surface(
@@ -500,11 +518,46 @@ fun ModernProfileHeader(
             Spacer(Modifier.height(32.dp))
 
             if (isCurrentUser) {
-                Button(shapes = ButtonDefaults.shapes(), onClick = onEditClick,
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(str("profile_edit"), fontWeight = FontWeight.SemiBold)
+                    Button(
+                        onClick = onEditClick,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shapes = ButtonDefaults.shapes(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ) {
+                        Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("profile_edit"), fontWeight = FontWeight.SemiBold)
+                    }
+                    Button(
+                        onClick = { onNavigate("upload") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shapes = ButtonDefaults.shapes(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+                    ) {
+                        Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("upload_screen_title"), fontWeight = FontWeight.SemiBold)
+                    }
+                    FilledTonalButton(
+                        onClick = { onNavigate("history") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shapes = ButtonDefaults.shapes(),
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)
+                    ) {
+                        Icon(Icons.Rounded.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("history_title"), fontWeight = FontWeight.SemiBold)
+                    }
                 }
             } else {
                 if (user.trackCount > 0) {
@@ -690,7 +743,7 @@ fun EditProfileDialog(
                             }
                         }
 
-                        val hasCustomAvatar = user.avatarUrl != null && !user.avatarUrl.contains("default_avatar")
+                        val hasCustomAvatar = !user.avatarUrl.isDefaultAvatar()
                         if (hasCustomAvatar) {
                             Surface(
                                 onClick = { showDeleteConfirm = true },

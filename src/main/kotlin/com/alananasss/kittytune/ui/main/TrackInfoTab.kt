@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Comment
+import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.CommentSort
@@ -462,7 +463,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                 OutlinedTextField(
                     value = newCommentText,
                     onValueChange = { newCommentText = it },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).trackTextInput(),
                     placeholder = { Text(str("add_comment_hint")) },
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp)
@@ -708,7 +709,7 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                     OutlinedTextField(
                         value = replyText,
                         onValueChange = { replyText = it },
-                        modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                        modifier = Modifier.weight(1f).trackTextInput().focusRequester(focusRequester),
                         placeholder = { Text(str("comment_write_reply")) },
                         singleLine = true,
                         shape = RoundedCornerShape(24.dp)

@@ -44,14 +44,21 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
             feedItems.clear()
             nextPage = null
             try {
-                val response = api.getFollowingFeedGraphQL(FollowingFeedGraphQl.request(page = null))
-                if (response.errors != null) {
-                    println("GraphQL Error: ${response.errors}")
+                try {
+                    val response = api.getFollowingFeedGraphQL(FollowingFeedGraphQl.request(page = null))
+                    if (response.errors != null) {
+                        println("GraphQL Error: ${response.errors}")
+                    }
+                    response.errorMessage()?.let { throw IllegalStateException(it) }
+                    val streamResponse = response.toStreamResponse()
+                    feedItems.addAll(streamResponse.collection)
+                    nextPage = streamResponse.next_href
+                } catch (gqlEx: Exception) {
+                    gqlEx.printStackTrace()
+                    val restResponse = api.getMyStream(limit = 20)
+                    feedItems.addAll(restResponse.collection)
+                    nextPage = restResponse.next_href
                 }
-                response.errorMessage()?.let { throw IllegalStateException(it) }
-                val streamResponse = response.toStreamResponse()
-                feedItems.addAll(streamResponse.collection)
-                nextPage = streamResponse.next_href
             } catch (e: Exception) {
                 e.printStackTrace()
                 error = e.message
@@ -67,10 +74,16 @@ class FeedViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             isLoadingMore = true
             try {
-                val response = api.getFollowingFeedGraphQL(FollowingFeedGraphQl.request(page = page))
-                val streamResponse = response.toStreamResponse()
-                feedItems.addAll(streamResponse.collection)
-                nextPage = streamResponse.next_href
+                if (page.startsWith("http")) {
+                    val streamResponse = api.getStreamNextPage(page)
+                    feedItems.addAll(streamResponse.collection)
+                    nextPage = streamResponse.next_href
+                } else {
+                    val response = api.getFollowingFeedGraphQL(FollowingFeedGraphQl.request(page = page))
+                    val streamResponse = response.toStreamResponse()
+                    feedItems.addAll(streamResponse.collection)
+                    nextPage = streamResponse.next_href
+                }
             } catch (e: Exception) {
                 // silent
             } finally {
