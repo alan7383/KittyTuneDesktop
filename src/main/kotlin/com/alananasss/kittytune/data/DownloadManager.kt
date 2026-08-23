@@ -542,9 +542,12 @@ object DownloadManager {
 
             if (playlistToDelete != null) {
                 val folderName = sanitizeFilename(playlistToDelete.title)
+                val folderNameWithId = sanitizeFilename("${playlistToDelete.title}_${playlistToDelete.id}")
                 try {
-                    val playlistDir = File(outputDirFor(null), folderName)
-                    if (playlistDir.exists() && playlistDir.isDirectory) playlistDir.deleteRecursively()
+                    listOf(folderName, folderNameWithId).distinct().forEach { fName ->
+                        val playlistDir = File(outputDirFor(null), fName)
+                        if (playlistDir.exists() && playlistDir.isDirectory) playlistDir.deleteRecursively()
+                    }
                 } catch (e: Exception) { e.printStackTrace() }
             }
 
@@ -585,10 +588,13 @@ object DownloadManager {
             val playlist = dao.getPlaylist(playlistId)
             if (playlist != null) {
                 val folderName = sanitizeFilename(playlist.title)
+                val folderNameWithId = sanitizeFilename("${playlist.title}_${playlist.id}")
                 try {
-                    val playlistDir = File(outputDirFor(null), folderName)
-                    if (playlistDir.exists() && playlistDir.isDirectory) {
-                        playlistDir.deleteRecursively()
+                    listOf(folderName, folderNameWithId).distinct().forEach { fName ->
+                        val playlistDir = File(outputDirFor(null), fName)
+                        if (playlistDir.exists() && playlistDir.isDirectory) {
+                            playlistDir.deleteRecursively()
+                        }
                     }
                 } catch (e: Exception) {
                     Logger.e("DownloadManager", "Failed to delete playlist folder: $folderName", e)
