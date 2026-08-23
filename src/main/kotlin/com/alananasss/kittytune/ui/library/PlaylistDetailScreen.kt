@@ -529,7 +529,7 @@ fun PlaylistDetailScreen(
                         val firstTrackArt = tracksInPlaylist.firstOrNull { it.localArtworkPath.isNotEmpty() || it.artworkUrl.isNotEmpty() }?.let {
                             if (it.localArtworkPath.isNotEmpty()) it.localArtworkPath else it.artworkUrl
                         }
-                        val finalArt = local.artworkUrl.ifEmpty { firstTrackArt ?: "" }
+                        val finalArt = local.localCoverPath ?: local.artworkUrl.ifEmpty { firstTrackArt ?: "" }
                         Playlist(
                             id = local.id,
                             title = local.title,
@@ -540,7 +540,7 @@ fun PlaylistDetailScreen(
                             tracks = null
                         )
                     })
-                    val allDownloadedTracks = db.getAllTracksList()
+                    val allDownloadedTracks = db.getAllTracksList().filter { it.localAudioPath.isNotEmpty() }
                     newTracks.addAll(allDownloadedTracks.map { local ->
                         Track(
                             id = local.id,
@@ -617,21 +617,21 @@ fun PlaylistDetailScreen(
                 else -> {
                     val isOffline = !NetworkUtils.isInternetAvailable()
                     val forceLocal = isOffline || isDownloadedView || currentIdLong < 0
-                    val localPlaylist = if (currentIdLong != 0L && forceLocal) db.getPlaylist(currentIdLong) else null
+                    val localPlaylist = if (stableId != 0L && forceLocal) db.getPlaylist(stableId) else null
                     if (localPlaylist != null) {
                         playlistTitle = localPlaylist.title
                         playlistCover = localPlaylist.localCoverPath ?: localPlaylist.artworkUrl
                         playlistUser = User(0, localPlaylist.artist, null)
                         isUserCreated = localPlaylist.isUserCreated || currentIdLong < 0
-                        isLocalPlaylist = true
+                        isLocalPlaylist = isDownloadedView || currentIdLong < 0
                         playlistPermalinkUrl = localPlaylist.permalinkUrl
 
-                        val playlistTracks = db.getTracksForPlaylistSync(currentIdLong)
+                        val playlistTracks = db.getTracksForPlaylistSync(stableId)
                         val filteredTracks = if (isDownloadedView) {
                             playlistTracks.filter { it.localAudioPath.isNotEmpty() }
                         } else playlistTracks
 
-                        val addedAtMap = db.getAddedAtForPlaylist(currentIdLong)
+                        val addedAtMap = db.getAddedAtForPlaylist(stableId)
                         newTracks.addAll(filteredTracks.map { local ->
                             Track(
                                 id = local.id,
@@ -788,8 +788,8 @@ fun PlaylistDetailScreen(
                         // Full list, not tracksToDisplay — an active search must not
                         // limit the removal to the visible subset.
                         DownloadManager.removeDownloads(rawTracks.toList())
-                    } else if (currentIdLong != 0L) {
-                        DownloadManager.removePlaylistDownloads(currentIdLong, rawTracks.toList())
+                    } else if (stableId != 0L) {
+                        DownloadManager.removePlaylistDownloads(stableId, rawTracks.toList())
                     }
                     showRemoveDownloadDialog = false
                     if (isDownloadedView) onBackClick()
@@ -1058,7 +1058,32 @@ fun PlaylistDetailScreen(
                                 } else {
                                     val isPlaylistLiked = likedPlaylistsRepo.contains(stableId)
                                     IconButton(onClick = {
-                                        LikeRepository.togglePlaylistLike(stableId, !isPlaylistLiked, playlistPermalinkUrl, playlistUrn)
+                                        if (!isPlaylistLiked) {
+                                            val targetPlaylist = Playlist(
+                                                id = stableId,
+                                                title = playlistTitle,
+                                                artworkUrl = playlistCover,
+                                                calculatedArtworkUrl = null,
+                                                trackCount = tracksToDisplay.size,
+                                                user = playlistUser ?: User(0, playlistUser?.username ?: "", null),
+                                                tracks = tracksToDisplay.toList(),
+                                                isAlbum = isAlbum,
+                                                permalinkUrl = playlistPermalinkUrl ?: shareUrl,
+                                                urn = playlistUrn
+                                            )
+                                            DownloadManager.importPlaylistToLibrary(
+                                                playlist = targetPlaylist,
+                                                tracks = tracksToDisplay.toList(),
+                                                syncToCloud = !(playlistId.startsWith("spotify") || playlistId.startsWith("station_spotify") || playlistUrn?.startsWith("spotify:") == true || playlistPermalinkUrl?.contains("spotify") == true)
+                                            )
+                                        } else {
+                                            LikeRepository.togglePlaylistLike(
+                                                stableId,
+                                                false,
+                                                playlistPermalinkUrl,
+                                                playlistUrn
+                                            )
+                                        }
                                     }) {
                                         if (isPlaylistLiked) Icon(Icons.Rounded.Favorite, str("lib_liked_tracks"), tint = MaterialTheme.colorScheme.primary)
                                         else Icon(Icons.Outlined.FavoriteBorder, str("menu_add_playlist"))
@@ -1069,22 +1094,33 @@ fun PlaylistDetailScreen(
                             if (!isYoutubeRadio && playlistId != "downloads" && tracksToDisplay.isNotEmpty()) {
                                 IconButton(onClick = {
                                     val targetBatchId = if (playlistId == "likes") DownloadManager.LIKES_BATCH_ID else stableId
-                                    if (isFullyDownloaded || isDownloadedView) {
-                                        showRemoveDownloadDialog = true
-                                    } else if (isPlaylistDownloading) {
+                                    if (isPlaylistDownloading) {
                                         DownloadManager.cancelBatch(targetBatchId)
+                                    } else if (isFullyDownloaded) {
+                                        showRemoveDownloadDialog = true
                                     } else {
                                         if (playlistId == "likes") {
                                             DownloadManager.downloadBatch(tracksToDisplay.toList(), DownloadManager.LIKES_BATCH_ID)
                                         } else if (stableId != 0L) {
-                                            val fakePlaylist = Playlist(stableId, playlistTitle, playlistCover, null, tracks.size, playlistUser, null)
+                                            val fakePlaylist = Playlist(
+                                                id = stableId,
+                                                title = playlistTitle,
+                                                artworkUrl = playlistCover,
+                                                calculatedArtworkUrl = null,
+                                                trackCount = tracks.size,
+                                                user = playlistUser,
+                                                tracks = null,
+                                                permalinkUrl = playlistPermalinkUrl,
+                                                urn = playlistUrn,
+                                                isAlbum = isAlbum
+                                            )
                                             DownloadManager.downloadPlaylist(fakePlaylist, tracks.toList())
                                         }
                                     }
                                 }) {
                                     when {
-                                        isFullyDownloaded || isDownloadedView -> Icon(Icons.Rounded.Delete, str("btn_delete"), tint = MaterialTheme.colorScheme.error)
                                         isPlaylistDownloading -> Icon(Icons.Rounded.Close, str("btn_cancel"))
+                                        isFullyDownloaded -> Icon(Icons.Rounded.Delete, str("btn_delete"), tint = MaterialTheme.colorScheme.error)
                                         else -> Icon(Icons.Rounded.Download, str("btn_download"))
                                     }
                                 }
