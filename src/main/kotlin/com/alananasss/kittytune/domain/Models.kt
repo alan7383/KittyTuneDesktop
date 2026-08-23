@@ -358,6 +358,7 @@
         // fields to detect soundcloud go restrictions
         @SerializedName("policy") val policy: String? = null,
         @SerializedName("monetization_model") val monetizationModel: String? = null,
+        @SerializedName("sharing") val sharing: String? = null,
     
         // fixed: source is now nullable to prevent gson crashes
         val source: String? = "soundcloud",
@@ -365,7 +366,21 @@
         @SerializedName("publisher_metadata") val publisherMetadata: PublisherMetadata? = null,
         @SerializedName("set_type") val setType: String? = null,
         @SerializedName("kind") val kind: String? = null,
-        val permalink: String? = null
+        val permalink: String? = null,
+        @SerializedName("caption") val caption: String? = null,
+        @SerializedName("label_name") val labelName: String? = null,
+        @SerializedName("license") val license: String? = null,
+        @SerializedName("purchase_title") val purchaseTitle: String? = null,
+        @SerializedName("purchase_url") val purchaseUrl: String? = null,
+        @SerializedName("waveform_url") val waveformUrl: String? = null,
+        @SerializedName("secret_token") val secretToken: String? = null,
+        @SerializedName("downloadable") val downloadable: Boolean? = null,
+        @SerializedName("feedable") val feedable: Boolean? = null,
+        @SerializedName("embeddable") val embeddable: Boolean? = null,
+        @SerializedName("streamable") val streamable: Boolean? = null,
+        @SerializedName("commentable") val commentable: Boolean? = null,
+        @SerializedName("reveal_comments") val revealComments: Boolean? = null,
+        @SerializedName("display_stats") val displayStats: Boolean? = null
     ) {
         data class PublisherMetadata(
             val id: String? = null,
@@ -376,11 +391,15 @@
             val publisher: String? = null
         )
 
+        val displayArtist: String
+            get() = publisherMetadata?.artist?.takeIf { it.isNotBlank() }
+                ?: user?.username?.takeIf { it.isNotBlank() }
+                ?: ""
+
         val fullResArtwork: String
             get() {
                 if (artworkUrl != null) return artworkUrl.replace("large", "t500x500")
-                if (user != null && user.avatarUrl != null) return user.avatarUrl.getHighResAvatarUrl()!!
-                return "https://picsum.photos/200"
+                return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
             }
     }
     
@@ -436,6 +455,7 @@
     
     // banner upload body — mobile API: {"image_data": base64 JPEG}
     data class BannerUploadRequest(@SerializedName("image_data") val imageData: String)
+    data class ArtworkUploadRequest(@SerializedName("image_data") val imageData: String)
     
     // Mixed Selections
     data class MixedSelectionsResponse(
@@ -599,9 +619,16 @@
 
 
 
+// Helper to safely check if avatar is a default placeholder
+fun String?.isDefaultAvatar(): Boolean {
+    if (this.isNullOrBlank()) return true
+    if (this.contains("default_avatar", ignoreCase = true)) return true
+    if (this.startsWith("https://a1.sndcdn.com/images/default_avatar_")) return true
+    return false
+}
+
 // Helper to safely get high-res avatar without breaking default avatars
 fun String?.getHighResAvatarUrl(): String? {
-    if (this == null) return null
-    if (this.contains("default_avatar")) return this
+    if (this == null || this.isDefaultAvatar()) return null
     return this.replace("large", "t500x500")
 }

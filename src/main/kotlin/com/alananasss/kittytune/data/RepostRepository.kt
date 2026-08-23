@@ -1,4 +1,4 @@
-﻿package com.alananasss.kittytune.data
+package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.data.network.SoundCloudApi
@@ -21,6 +21,11 @@ object RepostRepository {
     val repostedTrackIds = _repostedTrackIds.asStateFlow()
 
     fun init() {}
+
+    fun clear() {
+        currentUserId = 0L
+        _repostedTrackIds.value = emptySet()
+    }
 
     fun clearUser() {
         currentUserId = 0L

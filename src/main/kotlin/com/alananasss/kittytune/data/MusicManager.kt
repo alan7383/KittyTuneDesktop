@@ -9,6 +9,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
@@ -43,6 +46,30 @@ object MusicManager {
     private val _contextFlow = MutableStateFlow<PlaybackContext?>(null)
     val contextFlow = _contextFlow.asStateFlow()
     fun updateContext(context: PlaybackContext?) { _contextFlow.value = context }
+
+    private val _trackDeletedFlow = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+    val trackDeletedFlow: SharedFlow<Long> = _trackDeletedFlow.asSharedFlow()
+
+    private val _playlistDeletedFlow = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+    val playlistDeletedFlow: SharedFlow<Long> = _playlistDeletedFlow.asSharedFlow()
+
+    private val _trackUpdatedFlow = MutableSharedFlow<Track>(extraBufferCapacity = 1)
+    val trackUpdatedFlow: SharedFlow<Track> = _trackUpdatedFlow.asSharedFlow()
+
+    fun updateTrackMetadata(updatedTrack: Track) {
+        if (currentTrack?.id == updatedTrack.id) {
+            currentTrack = updatedTrack
+        }
+        _trackUpdatedFlow.tryEmit(updatedTrack)
+    }
+
+    fun notifyTrackDeleted(trackId: Long) {
+        _trackDeletedFlow.tryEmit(trackId)
+    }
+
+    fun notifyPlaylistDeleted(playlistId: Long) {
+        _playlistDeletedFlow.tryEmit(playlistId)
+    }
 
     var onTrackChange: ((Track) -> Unit)? = null
     var onNextClick: (() -> Unit)? = null
@@ -126,6 +153,7 @@ object MusicManager {
 
     fun applyEffects(state: AudioEffectsState) {
         player.applyEffects(state)
+        rainPlayer?.setAmbientType(state.ambientType)
         rainPlayer?.setEnabled(state.isRainEnabled)
         rainPlayer?.setVolume(state.rainVolume)
     }

@@ -32,6 +32,7 @@ class DownloadDao(private val db: AppDatabase) {
         permalinkUrl = rs.getString("permalinkUrl"),
         isAlbum = rs.getInt("isAlbum") == 1,
         addedAt = rs.getLong("addedAt"),
+        isDownloaded = runCatching { rs.getInt("isDownloaded") == 1 }.getOrDefault(false)
     )
 
     private fun ref(rs: ResultSet) = PlaylistTrackCrossRef(
@@ -120,7 +121,6 @@ class DownloadDao(private val db: AppDatabase) {
         db.exec("DELETE FROM playlist_track_cross_ref")
     }
 
-
     fun getAllTracks(): Flow<List<LocalTrack>> = db.observe {
         db.query("SELECT * FROM downloaded_tracks WHERE localAudioPath != '' ORDER BY downloadedAt DESC", mapper = ::track)
     }
@@ -128,15 +128,18 @@ class DownloadDao(private val db: AppDatabase) {
     suspend fun getAllTracksList(): List<LocalTrack> =
         db.query("SELECT * FROM downloaded_tracks WHERE localAudioPath != '' ORDER BY downloadedAt DESC", mapper = ::track)
 
+    suspend fun getAllStoredTracksList(): List<LocalTrack> =
+        db.query("SELECT * FROM downloaded_tracks", mapper = ::track)
+
     // --- playlists -------------------------------------------------------------------------
     suspend fun insertPlaylist(p: LocalPlaylist) = db.exec(
-        "INSERT OR REPLACE INTO downloaded_playlists(id,title,artist,artworkUrl,trackCount,isUserCreated,localCoverPath,permalinkUrl,isAlbum,addedAt) VALUES(?,?,?,?,?,?,?,?,?,?)",
-        p.id, p.title, p.artist, p.artworkUrl, p.trackCount, p.isUserCreated, p.localCoverPath, p.permalinkUrl, p.isAlbum, p.addedAt,
+        "INSERT OR REPLACE INTO downloaded_playlists(id,title,artist,artworkUrl,trackCount,isUserCreated,localCoverPath,permalinkUrl,isAlbum,addedAt,isDownloaded) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        p.id, p.title, p.artist, p.artworkUrl, p.trackCount, p.isUserCreated, p.localCoverPath, p.permalinkUrl, p.isAlbum, p.addedAt, if (p.isDownloaded) 1 else 0
     )
 
     suspend fun updatePlaylist(p: LocalPlaylist) = db.exec(
-        "UPDATE downloaded_playlists SET title=?,artist=?,artworkUrl=?,trackCount=?,isUserCreated=?,localCoverPath=?,permalinkUrl=?,isAlbum=?,addedAt=? WHERE id=?",
-        p.title, p.artist, p.artworkUrl, p.trackCount, p.isUserCreated, p.localCoverPath, p.permalinkUrl, p.isAlbum, p.addedAt, p.id,
+        "UPDATE downloaded_playlists SET title=?,artist=?,artworkUrl=?,trackCount=?,isUserCreated=?,localCoverPath=?,permalinkUrl=?,isAlbum=?,addedAt=?,isDownloaded=? WHERE id=?",
+        p.title, p.artist, p.artworkUrl, p.trackCount, p.isUserCreated, p.localCoverPath, p.permalinkUrl, p.isAlbum, p.addedAt, if (p.isDownloaded) 1 else 0, p.id
     )
 
     suspend fun insertPlaylistTrackRef(r: PlaylistTrackCrossRef) = db.exec(
@@ -165,19 +168,30 @@ class DownloadDao(private val db: AppDatabase) {
         db.query("SELECT * FROM downloaded_playlists", mapper = ::playlist)
     }
 
+    suspend fun setPlaylistDownloaded(playlistId: Long, isDownloaded: Boolean) =
+        db.exec("UPDATE downloaded_playlists SET isDownloaded = ? WHERE id = ?", if (isDownloaded) 1 else 0, playlistId)
+
     fun getDownloadedPlaylists(): Flow<List<LocalPlaylist>> = db.observe {
-        db.query(
-            """SELECT DISTINCT P.* FROM downloaded_playlists P
-               INNER JOIN playlist_track_cross_ref R ON P.id = R.playlistId
-               INNER JOIN downloaded_tracks T ON R.trackId = T.id
-               WHERE T.localAudioPath != ''""",
-            mapper = ::playlist,
-        )
+        db.query("SELECT * FROM downloaded_playlists WHERE isDownloaded = 1 ORDER BY addedAt DESC", mapper = ::playlist)
     }
 
+    suspend fun getDownloadedPlaylistRefCount(trackId: Long, excludePlaylistId: Long): Int =
+        db.queryOne(
+            """SELECT COUNT(*) FROM playlist_track_cross_ref R
+               INNER JOIN downloaded_playlists P ON R.playlistId = P.id
+               WHERE R.trackId = ? AND P.id != ? AND P.isDownloaded = 1""",
+            trackId, excludePlaylistId
+        ) { rs -> rs.getInt(1) } ?: 0
+
     fun getUserPlaylists(): Flow<List<LocalPlaylist>> = db.observe {
-        db.query("SELECT * FROM downloaded_playlists WHERE isUserCreated = 1", mapper = ::playlist)
+        db.query("SELECT * FROM downloaded_playlists WHERE isUserCreated = 1 OR id < 0", mapper = ::playlist)
     }
+
+    suspend fun fixNegativeIdPlaylistsUserCreated() =
+        db.exec("UPDATE downloaded_playlists SET isUserCreated = 1 WHERE id < 0")
+
+    suspend fun updateHistoryItemImageUrl(itemId: String, newImageUrl: String) =
+        db.exec("UPDATE play_history SET imageUrl = ? WHERE id = ?", newImageUrl, itemId)
 
     suspend fun getPlaylist(playlistId: Long): LocalPlaylist? =
         db.queryOne("SELECT * FROM downloaded_playlists WHERE id = ?", playlistId, mapper = ::playlist)
@@ -193,6 +207,15 @@ class DownloadDao(private val db: AppDatabase) {
         "SELECT * FROM downloaded_tracks WHERE localAudioPath != '' AND id NOT IN (SELECT trackId FROM playlist_track_cross_ref) ORDER BY downloadedAt DESC",
         mapper = ::track,
     )
+
+    suspend fun cleanUnreferencedEmptyTracks() =
+        db.exec("DELETE FROM downloaded_tracks WHERE localAudioPath = '' AND id NOT IN (SELECT trackId FROM playlist_track_cross_ref)")
+
+    suspend fun deleteNonDownloadedOnlinePlaylists() =
+        db.exec("DELETE FROM downloaded_playlists WHERE id > 0 AND isDownloaded = 0 AND (permalinkUrl IS NULL OR permalinkUrl NOT LIKE '%spotify%')")
+
+    suspend fun getPlaylistRefCount(trackId: Long): Int =
+        db.queryOne("SELECT COUNT(*) FROM playlist_track_cross_ref WHERE trackId = ?", trackId) { rs -> rs.getInt(1) } ?: 0
 
     fun getTracksForPlaylist(playlistId: Long): Flow<List<LocalTrack>> = db.observe {
         getTracksForPlaylistSync(playlistId)
@@ -246,6 +269,18 @@ class DownloadDao(private val db: AppDatabase) {
         db.exec("DELETE FROM play_history WHERE id = ?", itemId)
 
     suspend fun clearHistory() = db.exec("DELETE FROM play_history")
+
+    suspend fun clearTracksHistory() = db.exec("DELETE FROM play_history WHERE type = 'TRACK'")
+
+    suspend fun clearContextsHistory() = db.exec("DELETE FROM play_history WHERE type != 'TRACK'")
+
+    suspend fun insertHistoryList(items: List<HistoryItem>) {
+        for (item in items) insertHistory(item)
+    }
+
+    fun getHistoryUnlimited(): Flow<List<HistoryItem>> = db.observe {
+        db.query("SELECT * FROM play_history ORDER BY timestamp DESC", mapper = ::history)
+    }
 
     // --- listening stats -------------------------------------------------------------------
     suspend fun insertStatsEvent(e: ListeningStatsEvent) = db.exec(

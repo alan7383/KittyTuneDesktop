@@ -29,7 +29,8 @@ data class LocalPlaylist(
     val localCoverPath: String? = null,
     val permalinkUrl: String? = null,
     val isAlbum: Boolean = false,
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    val isDownloaded: Boolean = false
 )
 
 // table: playlist_track_cross_ref (PK [playlistId, trackId])
@@ -108,3 +109,21 @@ data class TopArtistResult(
     val playCount: Int,
     val totalListenMs: Long
 )
+
+// table: library_folders
+data class LibraryFolder(
+    val id: Long = 0,
+    val name: String,
+    val parentFolderId: Long? = null,
+    val isPinned: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+// table: library_item_meta
+data class LibraryItemMeta(
+    val itemKey: String,
+    val folderId: Long? = null,
+    val isPinned: Boolean = false,
+    val addedAt: Long = System.currentTimeMillis()
+)
+

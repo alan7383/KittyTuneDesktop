@@ -151,6 +151,8 @@ object TokenManager {
         clearTokens()
         values[KEY_IS_GUEST_MODE] = JsonPrimitive(false)
         save()
+        LikeRepository.clear()
+        RepostRepository.clear()
         com.alananasss.kittytune.data.network.CookieStore.clear()
         logoutFlow.tryEmit(Unit)
     }

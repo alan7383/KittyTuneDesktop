@@ -84,5 +84,21 @@ object HistoryRepository {
         }
     }
 
-    fun getHistory() = dao.getHistory()
+    fun getHistory() = dao.getHistoryUnlimited()
+
+    suspend fun insertHistoryList(items: List<com.alananasss.kittytune.data.local.HistoryItem>) {
+        dao.insertHistoryList(items)
+    }
+
+    fun clearAllHistory() {
+        scope.launch { dao.clearHistory() }
+    }
+
+    fun clearTracksHistory() {
+        scope.launch { dao.clearTracksHistory() }
+    }
+
+    fun clearContextsHistory() {
+        scope.launch { dao.clearContextsHistory() }
+    }
 }

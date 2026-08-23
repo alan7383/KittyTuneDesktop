@@ -160,7 +160,13 @@ object LikeRepository {
 
     fun togglePlaylistLike(playlistId: Long, isLiked: Boolean, permalink: String? = null, urn: String? = null) {
         val current = _likedPlaylists.value.toMutableSet()
-        if (isLiked) current.add(playlistId) else current.remove(playlistId)
+        if (isLiked) {
+            current.add(playlistId)
+            DownloadManager.clearDeletedPlaylistId(playlistId)
+        } else {
+            current.remove(playlistId)
+            DownloadManager.clearDeletedPlaylistId(playlistId)
+        }
         _likedPlaylists.value = current
         DownloadManager.notifyLibraryUpdated()
         scope.launch {
@@ -191,7 +197,15 @@ object LikeRepository {
         }
     }
 
-    fun replaceAllLikes(serverTracks: List<Track>) {
+    fun replaceAllLikes(serverTracks: List<Track>, currentUserId: Long? = null) {
+        if (currentUserId != null) {
+            val lastUserId = prefs.getLong("last_synced_user_id", -1L)
+            if (lastUserId != -1L && lastUserId != currentUserId) {
+                prefs.remove(KEY_LOCALLY_UNLIKED_IDS)
+            }
+            prefs.putLong("last_synced_user_id", currentUserId)
+        }
+
         _likedTracks.update { currentLocalList ->
             val blacklist = getBlacklist()
 
@@ -199,7 +213,11 @@ object LikeRepository {
                 .filter { !blacklist.contains(it.id) }
                 .map { it.copy(isLiked = true) }
 
-            val combined = currentLocalList + serverList
+            val localNonSoundcloud = currentLocalList.filter {
+                (it.source != "soundcloud" || it.id <= 0L) && !blacklist.contains(it.id)
+            }
+
+            val combined = localNonSoundcloud + serverList
 
             val mergedAndDeduplicated = combined
                 .groupBy { it.id }
@@ -210,6 +228,17 @@ object LikeRepository {
 
         scope.launch { saveToPrefs() }
         _isSyncing.value = false
+    }
+
+    fun clear() {
+        cachedUserId = null
+        _likedTracks.value = emptyList()
+        _likedPlaylists.value = emptySet()
+        _isSyncing.value = false
+        prefs.remove(KEY_LIKED_TRACKS)
+        prefs.remove(KEY_LIKED_PLAYLISTS)
+        prefs.remove(KEY_LOCALLY_UNLIKED_IDS)
+        prefs.remove("last_synced_user_id")
     }
 
     fun setSyncing(isSync: Boolean) {

@@ -29,6 +29,7 @@ object AppDatabase {
     val downloadDao: DownloadDao by lazy { DownloadDao(this) }
     val recognitionHistoryDao: RecognitionHistoryDao by lazy { RecognitionHistoryDao(this) }
     val albumCacheDao: AlbumCacheDao by lazy { AlbumCacheDao(this) }
+    val folderDao: FolderDao by lazy { FolderDao(this) }
 
     fun init() {
         Class.forName("org.sqlite.JDBC")
@@ -52,7 +53,8 @@ object AppDatabase {
             """CREATE TABLE IF NOT EXISTS downloaded_playlists (
                 id INTEGER PRIMARY KEY NOT NULL, title TEXT NOT NULL, artist TEXT NOT NULL,
                 artworkUrl TEXT NOT NULL, trackCount INTEGER NOT NULL, isUserCreated INTEGER NOT NULL DEFAULT 0,
-                localCoverPath TEXT, permalinkUrl TEXT, isAlbum INTEGER NOT NULL DEFAULT 0, addedAt INTEGER NOT NULL)""",
+                localCoverPath TEXT, permalinkUrl TEXT, isAlbum INTEGER NOT NULL DEFAULT 0, addedAt INTEGER NOT NULL,
+                isDownloaded INTEGER NOT NULL DEFAULT 0)""",
             """CREATE TABLE IF NOT EXISTS playlist_track_cross_ref (
                 playlistId INTEGER NOT NULL, trackId INTEGER NOT NULL, addedAt INTEGER NOT NULL,
                 PRIMARY KEY (playlistId, trackId))""",
@@ -75,8 +77,21 @@ object AppDatabase {
             """CREATE TABLE IF NOT EXISTS track_album_cache (
                 trackId INTEGER PRIMARY KEY NOT NULL, albumPlaylistId INTEGER, albumTitle TEXT,
                 resolvedAt INTEGER NOT NULL)""",
+            """CREATE TABLE IF NOT EXISTS library_folders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, parentFolderId INTEGER,
+                isPinned INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL)""",
+            """CREATE TABLE IF NOT EXISTS library_item_meta (
+                itemKey TEXT PRIMARY KEY NOT NULL, folderId INTEGER, isPinned INTEGER NOT NULL DEFAULT 0,
+                addedAt INTEGER NOT NULL)""",
         )
-        conn.createStatement().use { st -> ddl.forEach { st.execute(it) } }
+        conn.createStatement().use { st ->
+            ddl.forEach { st.execute(it) }
+            try {
+                st.execute("ALTER TABLE downloaded_playlists ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
+            } catch (_: Exception) {}
+            st.execute("UPDATE library_folders SET parentFolderId = NULL WHERE parentFolderId = 0")
+            st.execute("UPDATE library_item_meta SET folderId = NULL WHERE folderId = 0")
+        }
     }
 
 
