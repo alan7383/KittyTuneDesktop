@@ -855,7 +855,12 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                 val dateStr = playlist.lastModified ?: playlist.createdAt
                                 dateStr?.let { isoParser.parse(it)?.time } ?: 0L
                             } catch (e: Exception) { 0L }
-                            newOnlineItems.add(LibraryItem.PlaylistItem(playlist, date))
+                            val plForDisplay = if (playlist.artworkUrl.isNullOrEmpty() && playlist.calculatedArtworkUrl.isNullOrEmpty() && playlist.tracks.isNullOrEmpty()) {
+                                playlist.copy(user = playlist.user?.copy(avatarUrl = null))
+                            } else {
+                                playlist
+                            }
+                            newOnlineItems.add(LibraryItem.PlaylistItem(plForDisplay, date))
                         }
                     }
 
