@@ -190,7 +190,9 @@ import com.alananasss.kittytune.utils.Logger
 
         private suspend fun unshortenUrl(shortUrl: String): String = withContext(Dispatchers.IO) {
             try {
-                val client = OkHttpClient.Builder().followRedirects(true).followSslRedirects(true).build()
+                val client = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(
+                    OkHttpClient.Builder().followRedirects(true).followSslRedirects(true)
+                ).build()
                 val request = Request.Builder().url(shortUrl).head().build()
                 val response = client.newCall(request).execute()
                 response.request.url.toString()

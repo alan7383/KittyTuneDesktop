@@ -122,6 +122,16 @@ class PlayerPreferences {
         private const val KEY_STOP_ON_TASK_CLEAR = "stop_on_task_clear"
         private const val KEY_HAS_COMPLETED_SETUP = "has_completed_setup"
 
+        private const val KEY_PROXY_ENABLED = "proxy_enabled"
+        private const val KEY_PROXY_TYPE = "proxy_type"
+        private const val KEY_PROXY_HOST = "proxy_host"
+        private const val KEY_PROXY_PORT = "proxy_port"
+        private const val KEY_PROXY_AUTH_ENABLED = "proxy_auth_enabled"
+        private const val KEY_PROXY_USERNAME = "proxy_username"
+        private const val KEY_PROXY_PASSWORD = "proxy_password"
+        private const val KEY_PROXY_PROFILES = "proxy_profiles_json"
+        private const val KEY_SELECTED_PROXY_PROFILE_ID = "selected_proxy_profile_id"
+
         private val queueLock = Any()
     }
 
@@ -431,6 +441,68 @@ class PlayerPreferences {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    fun getProxyEnabled(): Boolean = Prefs.getBoolean(KEY_PROXY_ENABLED, false)
+    fun setProxyEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PROXY_ENABLED, enabled)
+
+    fun getProxyType(): String = Prefs.getString(KEY_PROXY_TYPE, "HTTP") ?: "HTTP"
+    fun setProxyType(type: String) = Prefs.putString(KEY_PROXY_TYPE, type)
+
+    fun getProxyHost(): String = Prefs.getString(KEY_PROXY_HOST, "") ?: ""
+    fun setProxyHost(host: String) = Prefs.putString(KEY_PROXY_HOST, host.trim())
+
+    fun getProxyPort(): Int = Prefs.getInt(KEY_PROXY_PORT, 8080)
+    fun setProxyPort(port: Int) = Prefs.putInt(KEY_PROXY_PORT, port)
+
+    fun getProxyAuthEnabled(): Boolean = Prefs.getBoolean(KEY_PROXY_AUTH_ENABLED, false)
+    fun setProxyAuthEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PROXY_AUTH_ENABLED, enabled)
+
+    fun getProxyUsername(): String = Prefs.getString(KEY_PROXY_USERNAME, "") ?: ""
+    fun setProxyUsername(username: String) = Prefs.putString(KEY_PROXY_USERNAME, username.trim())
+
+    fun getProxyPassword(): String = Prefs.getString(KEY_PROXY_PASSWORD, "") ?: ""
+    fun setProxyPassword(password: String) = Prefs.putString(KEY_PROXY_PASSWORD, password)
+
+    // Proxy Profiles (Multi-proxy list)
+    fun getSavedProxyProfiles(): List<com.alananasss.kittytune.data.network.ProxyProfile> {
+        val json = Prefs.getString(KEY_PROXY_PROFILES, null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<com.alananasss.kittytune.data.network.ProxyProfile>>() {}.type
+            gson.fromJson(json, type) ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun saveProxyProfiles(profiles: List<com.alananasss.kittytune.data.network.ProxyProfile>) {
+        Prefs.putString(KEY_PROXY_PROFILES, gson.toJson(profiles))
+    }
+
+    fun addOrUpdateProxyProfile(profile: com.alananasss.kittytune.data.network.ProxyProfile) {
+        val list = getSavedProxyProfiles().toMutableList()
+        val index = list.indexOfFirst { it.id == profile.id }
+        if (index >= 0) {
+            list[index] = profile
+        } else {
+            list.add(profile)
+        }
+        saveProxyProfiles(list)
+    }
+
+    fun deleteProxyProfile(profileId: String) {
+        val list = getSavedProxyProfiles().filterNot { it.id == profileId }
+        saveProxyProfiles(list)
+        if (getSelectedProxyProfileId() == profileId) {
+            setSelectedProxyProfileId(null)
+        }
+    }
+
+    fun getSelectedProxyProfileId(): String? = Prefs.getString(KEY_SELECTED_PROXY_PROFILE_ID, null)
+
+    fun setSelectedProxyProfileId(id: String?) {
+        if (id != null) Prefs.putString(KEY_SELECTED_PROXY_PROFILE_ID, id)
+        else Prefs.remove(KEY_SELECTED_PROXY_PROFILE_ID)
     }
 }
 

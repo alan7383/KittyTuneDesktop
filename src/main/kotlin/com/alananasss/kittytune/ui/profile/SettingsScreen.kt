@@ -84,6 +84,30 @@ fun SettingsScreen(
             LocalMediaSettingsScreen(onBackClick = null)
             Spacer(Modifier.height(32.dp))
 
+            MainCategoryTitle(str("pref_proxy_title"), Icons.Rounded.Dns)
+            SettingsGroup(
+                title = str("pref_proxy_title"),
+                items = listOf(
+                    { shape ->
+                        val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+                        val isProxyEnabled = prefs.getProxyEnabled()
+                        val proxySubtitle = if (isProxyEnabled) {
+                            str("proxy_status_enabled", prefs.getProxyType(), prefs.getProxyHost().ifBlank { "127.0.0.1" }, prefs.getProxyPort())
+                        } else {
+                            str("proxy_status_disabled")
+                        }
+                        SettingsItem(
+                            shape = shape,
+                            title = str("proxy_settings_title"),
+                            subtitle = proxySubtitle,
+                            icon = Icons.Rounded.VpnLock,
+                            onClick = { navController.navigate("proxy_settings") }
+                        )
+                    }
+                )
+            )
+            Spacer(Modifier.height(32.dp))
+
             Spacer(Modifier.height(80.dp))
         }
     }

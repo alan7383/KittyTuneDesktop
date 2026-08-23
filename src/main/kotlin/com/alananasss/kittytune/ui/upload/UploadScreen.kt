@@ -3050,7 +3050,7 @@ private fun AdvancedTabContent(
         waveformSamples = null
         withContext(Dispatchers.IO) {
             try {
-                val client = OkHttpClient()
+                val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
                 val req = Request.Builder().url(waveformUrl).build()
                 val body = client.newCall(req).execute().use { resp ->
                     resp.body?.string()

@@ -419,6 +419,11 @@ fun MainScreen() {
                                 playerViewModel = playerViewModel
                             )
                         }
+                        composable("proxy_settings") {
+                            com.alananasss.kittytune.ui.profile.ProxySettingsScreen(
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
                         // Settings sub-pages are now handled within SettingsScreen's Split Pane layout
                         composable("playlist_detail/{playlistId}") { backStackEntry ->
                             val id = backStackEntry.arguments?.let { args ->

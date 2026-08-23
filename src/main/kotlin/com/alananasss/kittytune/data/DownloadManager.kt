@@ -45,7 +45,8 @@ object DownloadManager {
 
     private val api: SoundCloudApi by lazy { RetrofitClient.create() }
     private val scope = CoroutineScope(Dispatchers.IO)
-    private val client = OkHttpClient()
+    private val client: OkHttpClient
+        get() = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
 
     private fun trackUrns(trackIds: List<Long>): List<String> =
         trackIds.filter { it > 0 }.map { "soundcloud:tracks:$it" }

@@ -47,11 +47,13 @@ object SoundCloudTelemetryTracker {
     private val gson = Gson()
 
     private val playerPrefs = com.alananasss.kittytune.data.local.PlayerPreferences()
-    private val directHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val directHttpClient: OkHttpClient
+        get() = ProxyManager.configureOkHttpClient(
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(15, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
+        ).build()
 
     // Session-level IDs
     private val sessionId: String = UUID.randomUUID().toString()

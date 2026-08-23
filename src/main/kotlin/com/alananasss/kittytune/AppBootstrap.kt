@@ -34,6 +34,9 @@ object AppBootstrap {
         Config.init()
         AppDatabase.init()
 
+        // 1b. Network Proxy (applies system properties and OkHttp hooks)
+        com.alananasss.kittytune.data.network.ProxyManager.applyConfiguration()
+
         // 2. Language (mirrors KittyTuneApp locale setup).
         Strings.appLanguage = PlayerPreferences().getAppLanguage().code
 
