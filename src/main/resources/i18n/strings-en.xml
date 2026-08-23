@@ -405,6 +405,7 @@
     <string name="dialog_delete_header_title">Delete Header?</string>
     <string name="dialog_delete_playlist_from_lib_title">Remove from library?</string>
     <string name="dialog_delete_playlist_msg">This action cannot be undone</string>
+    <string name="menu_delete_playlist">Delete playlist</string>
     <string name="dialog_delete_playlist_title">Delete playlist?</string>
     <string name="dialog_font_roundness">Roundness (ROND): %1$d</string>
     <string name="dialog_font_settings_title">Font Settings</string>

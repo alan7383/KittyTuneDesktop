@@ -252,6 +252,7 @@ object R {
         const val add_to_playlist_title_single = "add_to_playlist_title_single"
         const val add_to_playlist_title_multi = "add_to_playlist_title_multi"
         const val dialog_delete_playlist_title = "dialog_delete_playlist_title"
+        const val menu_delete_playlist = "menu_delete_playlist"
         const val dialog_delete_playlist_msg = "dialog_delete_playlist_msg"
         const val dialog_delete_playlist_from_lib_title = "dialog_delete_playlist_from_lib_title"
         const val dialog_rename_playlist_title = "dialog_rename_playlist_title"
