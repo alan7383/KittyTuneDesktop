@@ -3,7 +3,7 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 plugins {
     kotlin("jvm") version "2.4.10"
     kotlin("plugin.serialization") version "2.4.10"
-    id("org.jetbrains.compose") version "1.12.0-beta01"
+    id("org.jetbrains.compose") version "1.12.0-rc01"
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"
 }
 
@@ -49,8 +49,8 @@ dependencies {
 
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
-    implementation("com.squareup.okhttp3:okhttp:5.4.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:5.4.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
 
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.mpatric:mp3agic:0.9.1")
@@ -82,7 +82,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
     implementation("org.slf4j:slf4j-simple:2.0.18")
 
-    implementation("org.json:json:20260719")
+    implementation("org.json:json:20260814")
     implementation("org.yaml:snakeyaml:2.6")
     implementation("com.github.pemistahl:lingua:1.2.2")
     implementation("net.java.dev.jna:jna:5.19.1")
