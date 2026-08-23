@@ -7,10 +7,10 @@ import javax.sound.sampled.FloatControl
 import java.io.File
 
 /**
- * Desktop port of the Android RainPlayer.
- * A second, independent audio output looping the bundled rain.mp3, mixing at the OS level
- * alongside the main music (unaffected by the player's speed/effects), exactly like the
- * Android version's second ExoPlayer.
+ * Desktop port of the Android RainPlayer / Ambient Soundscape Player.
+ * A second, independent audio output looping the selected ambient sound (rain, fireplace, ocean, cafe),
+ * mixing at the OS level alongside the main music (unaffected by the player's speed/effects),
+ * exactly like the Android version's second ExoPlayer.
  *
  * Uses javax.sound Clip with LOOP_CONTINUOUSLY. Since Clip can't decode MP3 directly, the
  * asset is decoded once (via FFmpeg through a temp WAV) and cached on disk.
@@ -20,10 +20,23 @@ class RainPlayer {
     private var clip: Clip? = null
     private var isEnabled = false
     private var volume: Float = 1.0f
+    private var currentType: String = "rain"
 
     fun setVolume(volume: Float) {
         this.volume = volume.coerceIn(0f, 1f)
         applyVolume()
+    }
+
+    fun setAmbientType(type: String) {
+        val safeType = if (type.isBlank()) "rain" else type.lowercase()
+        if (currentType == safeType) return
+        currentType = safeType
+        if (isEnabled) {
+            val wasPlaying = clip?.isRunning == true
+            releaseClip()
+            initPlayer()
+            if (wasPlaying) clip?.start()
+        }
     }
 
     private fun applyVolume() {
@@ -42,7 +55,7 @@ class RainPlayer {
     private fun initPlayer() {
         if (clip != null) return
         try {
-            val wav = ensureDecodedWav()
+            val wav = ensureDecodedWav(currentType)
             val stream = AudioSystem.getAudioInputStream(wav)
             val c = openClipForStream(stream)
             c.loop(Clip.LOOP_CONTINUOUSLY)
@@ -80,36 +93,58 @@ class RainPlayer {
     fun reloadDevice() {
         if (!isEnabled) return
         val wasPlaying = clip?.isRunning == true
-        release()
+        releaseClip()
         initPlayer()
         if (wasPlaying) clip?.start()
     }
 
     fun setEnabled(enabled: Boolean) {
-        this.isEnabled = enabled
-        if (enabled) {
-            initPlayer()
-            clip?.start()
-        } else {
-            clip?.stop()
+        if (this.isEnabled != enabled) {
+            this.isEnabled = enabled
+            if (enabled) {
+                initPlayer()
+                clip?.start()
+            } else {
+                clip?.stop()
+            }
         }
     }
 
-    fun release() {
-        clip?.stop()
-        clip?.close()
+    private fun releaseClip() {
+        try {
+            clip?.stop()
+            clip?.close()
+        } catch (_: Exception) {}
         clip = null
     }
 
+    fun release() {
+        releaseClip()
+        isEnabled = false
+    }
+
     companion object {
-        /** Decode the bundled rain.mp3 to a cached WAV that javax.sound Clip can play. */
-        private fun ensureDecodedWav(): File {
-            val wav = File(AppDirs.cacheDir, "rain.wav")
+        private fun getResourceName(type: String): String {
+            return when (type) {
+                "fireplace" -> "fireplace.mp3"
+                "ocean" -> "ocean.mp3"
+                "cafe" -> "cafe.mp3"
+                else -> "rain.mp3"
+            }
+        }
+
+        /** Decode the bundled ambient MP3 to a cached WAV that javax.sound Clip can play. */
+        private fun ensureDecodedWav(type: String): File {
+            val resName = getResourceName(type)
+            val wavName = resName.removeSuffix(".mp3") + ".wav"
+            val wav = File(AppDirs.cacheDir, wavName)
             if (wav.exists() && wav.length() > 0) return wav
 
-            val tmpMp3 = File.createTempFile("kittytune-rain", ".mp3")
+            val tmpMp3 = File.createTempFile("kittytune-ambient-$type", ".mp3")
             tmpMp3.deleteOnExit()
-            RainPlayer::class.java.getResourceAsStream("/raw/rain.mp3")!!.use { input ->
+            val stream = RainPlayer::class.java.getResourceAsStream("/raw/$resName")
+                ?: RainPlayer::class.java.getResourceAsStream("/raw/rain.mp3")!!
+            stream.use { input ->
                 tmpMp3.outputStream().use { input.copyTo(it) }
             }
 

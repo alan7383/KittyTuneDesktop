@@ -33,6 +33,7 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.alananasss.kittytune.data.network.MusixmatchClient
+import com.alananasss.kittytune.data.network.SoundCloudTelemetryTracker
 import com.alananasss.kittytune.utils.Logger
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -410,7 +411,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onIsPlayingChanged(isPlayingState: Boolean) {
             isPlaying = isPlayingState
             saveStateAsync(saveQueue = false)
-            if (isPlayingState) startProgressUpdate()
+            if (isPlayingState) {
+                startProgressUpdate()
+                SoundCloudTelemetryTracker.onTrackResumed(currentPosition)
+            } else {
+                SoundCloudTelemetryTracker.onTrackPaused(currentPosition)
+            }
             updateDiscordPresence()
         }
 
@@ -424,6 +430,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (state == Player.STATE_BUFFERING) isLoading = true
 
             if (state == Player.STATE_ENDED) {
+                SoundCloudTelemetryTracker.onTrackCompleted()
                 if (com.alananasss.kittytune.core.AppInstance.isShuttingDown) return
 
                 currentTrack?.let { track ->
@@ -696,6 +703,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val sorted =
                     playlists.sortedWith(compareByDescending<LocalPlaylist> { it.isUserCreated || it.id < 0 }.thenByDescending { it.addedAt })
                 userPlaylists.addAll(sorted)
+            }
+        }
+
+        viewModelScope.launch {
+            MusicManager.trackDeletedFlow.collect { deletedTrackId: Long ->
+                val wasCurrentTrack = currentTrack?.id == deletedTrackId
+                val idx = _queue.indexOfFirst { it.id == deletedTrackId }
+                if (idx != -1) {
+                    removeTrackFromQueue(idx)
+                } else {
+                    _originalQueue.removeAll { it.id == deletedTrackId }
+                }
+
+                if (_queue.isEmpty()) {
+                    MusicManager.player.stop()
+                    currentTrack = null
+                    isPlaying = false
+                } else if (wasCurrentTrack) {
+                    val targetIdx = currentQueueIndex.coerceIn(0, _queue.size - 1)
+                    playTrackAtIndex(targetIdx, addToHistory = false)
+                }
             }
         }
         try {
@@ -1540,6 +1568,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         navigateToPlaylistId = "profile:$userId"
     }
 
+    fun navigateToEditTrack(trackId: Long) {
+        if (trackId <= 0) return
+        showDetailsSheet = false
+        showMenuSheet = false
+        showCommentsSheet = false
+        isPlayerExpanded = false
+        navigateToPlaylistId = "edit_track:$trackId"
+    }
+
+    fun navigateToUpload() {
+        showDetailsSheet = false
+        showMenuSheet = false
+        showCommentsSheet = false
+        isPlayerExpanded = false
+        navigateToPlaylistId = "upload"
+    }
+
     fun navigateToContext() {
         currentContext?.let { context ->
             var destination = context.navigationId
@@ -1809,6 +1854,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 val me = api.getMe()
                 currentUserId = me.id
                 currentUser = me
+                SoundCloudTelemetryTracker.updateCurrentUserId(me.id)
                 com.alananasss.kittytune.data.RepostRepository.refreshReposts()
             } catch (_: Exception) {
             }
@@ -1837,12 +1883,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (!maintainPlayerState) {
             isPlayerExpanded = false
         }
+        SoundCloudTelemetryTracker.onQueueReset()
         _originalQueue.clear(); _originalQueue.addAll(tracks)
         _queue.clear()
         this.currentContext = context
         MusicManager.updateContext(context)
 
         val effectiveStartIndex = if (startIndex in tracks.indices) startIndex else 0
+        val isHistoryContext = context?.navigationId == "history" || context?.navigationId?.startsWith("history") == true
 
         if (shuffleEnabled) {
             val clickedTrack = tracks[effectiveStartIndex]
@@ -1850,15 +1898,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 tracks.filterIndexed { index, _ -> index != effectiveStartIndex }.shuffled()
             _queue.add(clickedTrack)
             _queue.addAll(rest)
-            playTrackAtIndex(0, addToHistory = (context == null))
+            playTrackAtIndex(0, addToHistory = (context == null || isHistoryContext))
         } else {
             _queue.addAll(tracks)
-            playTrackAtIndex(effectiveStartIndex, addToHistory = (context == null))
+            playTrackAtIndex(effectiveStartIndex, addToHistory = (context == null || isHistoryContext))
         }
 
         updateQueueState(); saveStateAsync(saveQueue = true)
 
-        if (context != null) {
+        if (context != null && !isHistoryContext) {
             val isStation =
                 context.navigationId.contains("station") || context.navigationId.contains("yt_radio")
             val isProfile = context.navigationId.contains("profile")
@@ -1867,7 +1915,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 "downloads" -> -2L
                 else -> context.navigationId.substringAfter(":").toLongOrNull() ?: 0L
             }
-            val cleanTitle = context.displayText.substringAfter("â€¢").trim()
+            val cleanTitle = when {
+                context.displayText.contains("•") -> context.displayText.substringAfter("•").trim()
+                context.displayText.contains("â€¢") -> context.displayText.substringAfter("â€¢").trim()
+                else -> context.displayText.trim()
+            }
 
             val playlistCreator = if (context.artistName != null) User(
                 0,
@@ -1941,6 +1993,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             loadLyrics(finalTrack)
             loadSocialProof(finalTrack)
             saveStateAsync(saveQueue = false)
+
+            SoundCloudTelemetryTracker.onTrackStarted(
+                track = finalTrack,
+                context = currentContext,
+                isManual = true,
+                startPositionMs = if (isCrossfade) currentPosition else 0L
+            )
 
             if (addToHistory && currentContext?.navigationId?.startsWith("station:") != true && currentContext?.navigationId?.startsWith(
                     "yt_radio:"
@@ -2027,9 +2086,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val radioUrl = "https://www.youtube.com/watch?v=$videoId&list=RD$videoId"
 
             withContext(Dispatchers.Main) {
+                val encodedUrl = if (lastTrack.permalinkUrl != null) URLEncoder.encode(lastTrack.permalinkUrl, "UTF-8") else ""
                 val ctx = PlaybackContext(
-                    displayText = "YouTube Mix â€¢ ${lastTrack.title}",
-                    navigationId = "yt_radio:${URLEncoder.encode(lastTrack.permalinkUrl, "UTF-8")}",
+                    displayText = "YouTube Mix • ${lastTrack.title}",
+                    navigationId = "yt_radio:$encodedUrl",
                     imageUrl = lastTrack.fullResArtwork,
                     artistName = lastTrack.user?.username,
                     isVerified = false
@@ -2037,6 +2097,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 currentContext = ctx
                 MusicManager.updateContext(ctx)
                 saveStateAsync(saveQueue = false)
+
+                val historyPlaylist = Playlist(
+                    id = kotlin.math.abs((lastTrack.permalinkUrl ?: lastTrack.title ?: "").hashCode().toLong()),
+                    title = "YouTube Mix • ${lastTrack.title}",
+                    artworkUrl = lastTrack.fullResArtwork,
+                    calculatedArtworkUrl = null,
+                    trackCount = 0,
+                    user = lastTrack.user,
+                    tracks = null,
+                    permalinkUrl = "yt_radio:$encodedUrl"
+                )
+                HistoryRepository.addToHistory(historyPlaylist, isStation = true)
             }
 
             val youtubeService = ServiceList.YouTube
@@ -2049,7 +2121,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             val streamItems = extractor.initialPage.items.filterIsInstance<StreamInfoItem>()
             val radioTracks = streamItems.map {
                 Track(
-                    id = abs(it.url.hashCode().toLong()),
+                    id = kotlin.math.abs(it.url.hashCode().toLong()),
                     title = it.name,
                     user = User(
                         id = it.uploaderUrl?.hashCode()?.toLong() ?: 0L,
@@ -2092,13 +2164,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     _queue.addAll(orderedFullTracks); _originalQueue.addAll(orderedFullTracks); updateQueueState()
                 }
                 if (currentContext == null) {
+                    val stationTitle = str("context_station", lastTrack.title ?: "")
                     val ctx = PlaybackContext(
-                        str("context_station", lastTrack.title ?: ""),
+                        stationTitle,
                         "station:${lastTrack.id}",
                         lastTrack.fullResArtwork
                     )
                     currentContext = ctx
                     MusicManager.updateContext(ctx)
+
+                    val historyPlaylist = Playlist(
+                        id = lastTrack.id,
+                        title = stationTitle,
+                        artworkUrl = lastTrack.fullResArtwork,
+                        calculatedArtworkUrl = null,
+                        trackCount = 0,
+                        user = lastTrack.user,
+                        tracks = null,
+                        permalinkUrl = "station:${lastTrack.id}"
+                    )
+                    HistoryRepository.addToHistory(historyPlaylist, isStation = true)
                 }
             }
         } catch (_: Exception) {
@@ -2318,6 +2403,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lastSeekTimestamp = System.currentTimeMillis()
         currentPosition = target
         player.seekTo(target)
+        SoundCloudTelemetryTracker.onTrackSeeked(target)
         saveStateAsync(savePositionOnly = true)
         updateDiscordPresence()
     }
@@ -2401,7 +2487,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val n = !effectsState.isMonoEnabled; effectsState = effectsState.copy(isMonoEnabled = n); applyEffectsAndSave()
     }
 
-    fun toggleNormalization(enabled: Boolean) {
+    fun toggleNormalization(enabled: Boolean = !effectsState.isNormalizationEnabled) {
         effectsState = effectsState.copy(isNormalizationEnabled = enabled); applyEffectsAndSave()
     }
 
@@ -2409,6 +2495,144 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         effectsState = effectsState.copy(normalizationLevel = level); applyEffectsAndSave()
     }
 
+    fun setAmbientType(type: String) {
+        effectsState = effectsState.copy(ambientType = type); applyEffectsAndSave()
+    }
+
+    fun setEarrapeIntensity(v: Float) {
+        effectsState = effectsState.copy(earrapeIntensity = v); applyEffectsAndSave()
+    }
+
+    fun toggleVintageMp3() { val n = !effectsState.isVintageMp3Enabled; effectsState = effectsState.copy(isVintageMp3Enabled = n); applyEffectsAndSave() }
+    fun setVintageMp3Compression(v: Float) { effectsState = effectsState.copy(vintageMp3Compression = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleVocalRemover() { val n = !effectsState.isVocalRemoverEnabled; effectsState = effectsState.copy(isVocalRemoverEnabled = n); applyEffectsAndSave() }
+    fun setVocalRemoverLevel(v: Float) { effectsState = effectsState.copy(vocalRemoverLevel = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleVocalBoost() { val n = !effectsState.isVocalBoostEnabled; effectsState = effectsState.copy(isVocalBoostEnabled = n); applyEffectsAndSave() }
+    fun setVocalBoostIntensity(v: Float) { effectsState = effectsState.copy(vocalBoostIntensity = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleFlanger() { val n = !effectsState.isFlangerEnabled; effectsState = effectsState.copy(isFlangerEnabled = n); applyEffectsAndSave() }
+    fun setFlangerIntensity(v: Float) { effectsState = effectsState.copy(flangerIntensity = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setFlangerSpeed(v: Float) { effectsState = effectsState.copy(flangerSpeed = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun togglePartyNextDoor() { val n = !effectsState.isPartyNextDoorEnabled; effectsState = effectsState.copy(isPartyNextDoorEnabled = n); applyEffectsAndSave() }
+    fun setPartyNextDoorIsolation(v: Float) { effectsState = effectsState.copy(partyNextDoorIsolation = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setPartyNextDoorReverb(v: Float) { effectsState = effectsState.copy(partyNextDoorReverb = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setPartyNextDoorBassRumble(v: Float) { effectsState = effectsState.copy(partyNextDoorBassRumble = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleSuperWide() { val n = !effectsState.isSuperWideEnabled; effectsState = effectsState.copy(isSuperWideEnabled = n); applyEffectsAndSave() }
+    fun setSuperWideWidth(v: Float) { effectsState = effectsState.copy(superWideWidth = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setSuperWideDepth(v: Float) { effectsState = effectsState.copy(superWideDepth = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleVinylLoFi() { val n = !effectsState.isVinylLoFiEnabled; effectsState = effectsState.copy(isVinylLoFiEnabled = n); applyEffectsAndSave() }
+    fun setVinylCrackles(v: Float) { effectsState = effectsState.copy(vinylCrackles = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setVinylFlutter(v: Float) { effectsState = effectsState.copy(vinylFlutter = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun togglePhaser() { val n = !effectsState.isPhaserEnabled; effectsState = effectsState.copy(isPhaserEnabled = n); applyEffectsAndSave() }
+    fun setPhaserSpeed(v: Float) { effectsState = effectsState.copy(phaserSpeed = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setPhaserFeedback(v: Float) { effectsState = effectsState.copy(phaserFeedback = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleMegaphone() { val n = !effectsState.isMegaphoneEnabled; effectsState = effectsState.copy(isMegaphoneEnabled = n); applyEffectsAndSave() }
+    fun setMegaphoneTone(v: Float) { effectsState = effectsState.copy(megaphoneTone = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setMegaphoneDrive(v: Float) { effectsState = effectsState.copy(megaphoneDrive = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleRobotVocoder() { val n = !effectsState.isRobotVocoderEnabled; effectsState = effectsState.copy(isRobotVocoderEnabled = n); applyEffectsAndSave() }
+    fun setRobotFrequency(v: Float) { effectsState = effectsState.copy(robotFrequency = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setRobotMix(v: Float) { effectsState = effectsState.copy(robotMix = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleChorus() { val n = !effectsState.isChorusEnabled; effectsState = effectsState.copy(isChorusEnabled = n); applyEffectsAndSave() }
+    fun setChorusRate(v: Float) { effectsState = effectsState.copy(chorusRate = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setChorusDepth(v: Float) { effectsState = effectsState.copy(chorusDepth = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleUnderwater() { val n = !effectsState.isUnderwaterEnabled; effectsState = effectsState.copy(isUnderwaterEnabled = n); applyEffectsAndSave() }
+    fun setUnderwaterDepth(v: Float) { effectsState = effectsState.copy(underwaterDepth = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setUnderwaterBubbles(v: Float) { effectsState = effectsState.copy(underwaterBubbles = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleTranceGate() { val n = !effectsState.isTranceGateEnabled; effectsState = effectsState.copy(isTranceGateEnabled = n); applyEffectsAndSave() }
+    fun setTranceGateSpeed(v: Float) { effectsState = effectsState.copy(tranceGateSpeed = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setTranceGatePattern(v: Float) { effectsState = effectsState.copy(tranceGatePattern = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setTranceGateMix(v: Float) { effectsState = effectsState.copy(tranceGateMix = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun togglePingPongDelay() { val n = !effectsState.isPingPongDelayEnabled; effectsState = effectsState.copy(isPingPongDelayEnabled = n); applyEffectsAndSave() }
+    fun setPingPongDelayTime(v: Float) { effectsState = effectsState.copy(pingPongDelayTime = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setPingPongFeedback(v: Float) { effectsState = effectsState.copy(pingPongFeedback = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleChiptune() { val n = !effectsState.isChiptuneEnabled; effectsState = effectsState.copy(isChiptuneEnabled = n); applyEffectsAndSave() }
+    fun setChiptuneBits(v: Float) { effectsState = effectsState.copy(chiptuneBits = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setChiptuneSampleRate(v: Float) { effectsState = effectsState.copy(chiptuneSampleRate = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleShimmerReverb() { val n = !effectsState.isShimmerReverbEnabled; effectsState = effectsState.copy(isShimmerReverbEnabled = n); applyEffectsAndSave() }
+    fun setShimmerSize(v: Float) { effectsState = effectsState.copy(shimmerSize = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setShimmerMix(v: Float) { effectsState = effectsState.copy(shimmerMix = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleRotarySpeaker() { val n = !effectsState.isRotarySpeakerEnabled; effectsState = effectsState.copy(isRotarySpeakerEnabled = n); applyEffectsAndSave() }
+    fun setRotarySpeed(v: Float) { effectsState = effectsState.copy(rotarySpeed = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setRotaryDepth(v: Float) { effectsState = effectsState.copy(rotaryDepth = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleTapeSaturation() { val n = !effectsState.isTapeSaturationEnabled; effectsState = effectsState.copy(isTapeSaturationEnabled = n); applyEffectsAndSave() }
+    fun setTapeWarmth(v: Float) { effectsState = effectsState.copy(tapeWarmth = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setTapeExciter(v: Float) { effectsState = effectsState.copy(tapeExciter = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleSubOctaver() { val n = !effectsState.isSubOctaverEnabled; effectsState = effectsState.copy(isSubOctaverEnabled = n); applyEffectsAndSave() }
+    fun setSubOctaverLevel(v: Float) { effectsState = effectsState.copy(subOctaverLevel = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setSubOctaverCutoff(v: Float) { effectsState = effectsState.copy(subOctaverCutoff = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleEmptyMall() { val n = !effectsState.isEmptyMallEnabled; effectsState = effectsState.copy(isEmptyMallEnabled = n); applyEffectsAndSave() }
+    fun setEmptyMallDistance(v: Float) { effectsState = effectsState.copy(emptyMallDistance = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setEmptyMallReverb(v: Float) { effectsState = effectsState.copy(emptyMallReverb = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleGramophone() { val n = !effectsState.isGramophoneEnabled; effectsState = effectsState.copy(isGramophoneEnabled = n); applyEffectsAndSave() }
+    fun setGramophoneAge(v: Float) { effectsState = effectsState.copy(gramophoneAge = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setGramophoneHorn(v: Float) { effectsState = effectsState.copy(gramophoneHorn = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleReverseEcho() { val n = !effectsState.isReverseEchoEnabled; effectsState = effectsState.copy(isReverseEchoEnabled = n); applyEffectsAndSave() }
+    fun setReverseEchoTime(v: Float) { effectsState = effectsState.copy(reverseEchoTime = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setReverseEchoFeedback(v: Float) { effectsState = effectsState.copy(reverseEchoFeedback = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleStadium() { val n = !effectsState.isStadiumEnabled; effectsState = effectsState.copy(isStadiumEnabled = n); applyEffectsAndSave() }
+    fun setStadiumSize(v: Float) { effectsState = effectsState.copy(stadiumSize = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setStadiumAtmosphere(v: Float) { effectsState = effectsState.copy(stadiumAtmosphere = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleWalkman() { val n = !effectsState.isWalkmanEnabled; effectsState = effectsState.copy(isWalkmanEnabled = n); applyEffectsAndSave() }
+    fun setWalkmanDrive(v: Float) { effectsState = effectsState.copy(walkmanDrive = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setWalkmanHiss(v: Float) { effectsState = effectsState.copy(walkmanHiss = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleAsmrVocal() { val n = !effectsState.isAsmrVocalEnabled; effectsState = effectsState.copy(isAsmrVocalEnabled = n); applyEffectsAndSave() }
+    fun setAsmrProximity(v: Float) { effectsState = effectsState.copy(asmrProximity = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setAsmrAir(v: Float) { effectsState = effectsState.copy(asmrAir = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    fun toggleNightDrive() { val n = !effectsState.isNightDriveEnabled; effectsState = effectsState.copy(isNightDriveEnabled = n); applyEffectsAndSave() }
+    fun setNightDriveCabin(v: Float) { effectsState = effectsState.copy(nightDriveCabin = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+    fun setNightDriveRoad(v: Float) { effectsState = effectsState.copy(nightDriveRoad = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
+
+    var pinnedAudioFx by mutableStateOf(playerPrefs.getPinnedAudioFx())
+        private set
+
+    fun togglePinAudioFx(fxId: String): Boolean {
+        val current = pinnedAudioFx.toMutableList()
+        val isPinned = current.contains(fxId)
+        if (isPinned) {
+            current.remove(fxId)
+        } else {
+            current.add(fxId)
+        }
+        pinnedAudioFx = current
+        playerPrefs.setPinnedAudioFx(current)
+        return true
+    }
+
+    fun updatePinnedAudioFx(fxIds: List<String>) {
+        pinnedAudioFx = fxIds
+        playerPrefs.setPinnedAudioFx(fxIds)
+    }
+
+    fun resetPinnedAudioFx() {
+        pinnedAudioFx = PlayerPreferences.DEFAULT_PINNED_AUDIO_FX
+        playerPrefs.setPinnedAudioFx(PlayerPreferences.DEFAULT_PINNED_AUDIO_FX)
+    }
+
+    fun isAudioFxPinned(fxId: String): Boolean = pinnedAudioFx.contains(fxId)
 
     fun hasSeenEarrapeWarning(): Boolean = playerPrefs.hasSeenEarrapeWarning()
     fun setHasSeenEarrapeWarning(seen: Boolean) {
@@ -2485,9 +2709,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun toggleTrackLike(track: Track) {
+        if (track.id == currentTrack?.id) {
+            toggleLike()
+        } else {
+            val isCurrentlyLiked = LikeRepository.isTrackLiked(track.id)
+            if (isCurrentlyLiked) {
+                LikeRepository.removeLike(track.id)
+            } else {
+                LikeRepository.addLike(track)
+            }
+        }
+    }
+
     fun removeFromContextPlaylist(playlistId: Long, track: Track) {
-        DownloadManager.removeTrackFromPlaylist(playlistId, track.id); showMenuSheet =
-            false; emitUiEvent(str("success_generic"))
+        if (playlistId == -2L) {
+            DownloadManager.deleteTrack(track.id)
+        } else {
+            val syncToCloud = playlistId > 0 && currentContext?.navigationId?.startsWith("downloaded_section:") != true && currentContext?.navigationId != "downloads"
+            DownloadManager.removeTrackFromPlaylist(playlistId, track.id, syncToCloud = syncToCloud)
+        }
+        showMenuSheet = false
+        emitUiEvent(str("success_generic"))
     }
 
     fun addToQueue(tracks: List<Track>) {
@@ -2573,11 +2816,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         }
                         currentSessionListenMs += 250L
 
-                        if (currentSessionListenMs >= 30_000L && !hasPushedRecentlyPlayed) {
-                            println("Threshold reached, pushing history for track ${currentTrack?.id}")
-                            hasPushedRecentlyPlayed = true
-                            pushRecentlyPlayedToSoundCloud(currentTrack)
-                        }
+                        // Dispatch progress to SoundCloud Telemetry Tracker (handles 5s threshold and 30s checkpoints)
+                        SoundCloudTelemetryTracker.onProgressUpdate(currentPosition)
 
                         val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
                         val crossfadeMs = playerPrefs.getCrossfadeDuration() * 1000L
@@ -2593,139 +2833,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } catch (_: Exception) {
                 }
                 delay(250.milliseconds)
-            }
-        }
-    }
-
-    private fun pushRecentlyPlayedToSoundCloud(track: Track?) {
-        println("pushRecentlyPlayedToSoundCloud called for track ${track?.id}, source: ${track?.source}")
-        track ?: return
-        if (track.source != null && track.source != "soundcloud") {
-            println("Ignoring track because source is not soundcloud: ${track.source}")
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val tokenManager = TokenManager
-                if (tokenManager.isGuestMode()) {
-                    println("Skipping history sync for track ${track.id} (Guest Mode)")
-                    return@launch
-                }
-
-                val now = System.currentTimeMillis()
-
-                // Sync individual track history
-                val trackUrn = "soundcloud:tracks:${track.id}"
-
-                // 1) api-mobile endpoint (used by the Android app)
-                val trackEntry = com.alananasss.kittytune.data.network.ApiRecentlyPlayed(
-                    playedAt = now,
-                    urn = trackUrn
-                )
-                val trackCollection = com.alananasss.kittytune.data.network.ApiCollection(
-                    collection = listOf(trackEntry)
-                )
-                val trackResponse = api.pushPlayHistory(trackCollection)
-                if (trackResponse.isSuccessful) {
-                    println("Synced track ${track.id} to mobile history")
-                } else {
-                    println("Failed to sync mobile history: ${trackResponse.code()}")
-                }
-
-                // 2) api-v2 endpoint (used by the Web app)
-                val bodyV2 = com.google.gson.JsonObject().apply { addProperty("track_urn", trackUrn) }
-                val respV2 = api.pushPlayHistoryV2Me(bodyV2)
-                if (respV2.isSuccessful) {
-                    println("Synced track ${track.id} to web history")
-                } else {
-                    println("Failed to sync web history: ${respV2.code()}")
-                }
-
-                // 3) Sync context history (updates recently played carousel on SoundCloud home)
-                val contextUrn = currentContext?.let { ctx ->
-                    val navId = ctx.navigationId
-                    when {
-                        navId == "likes" -> {
-                            if (currentUserId == 0L) {
-                                try {
-                                    val me = api.getMe()
-                                    currentUserId = me.id
-                                    currentUser = me
-                                } catch (_: Exception) {
-                                    println("Failed to fetch user ID for recently-played context")
-                                }
-                            }
-                            if (currentUserId != 0L) {
-                                "soundcloud:liked-tracks:$currentUserId"
-                            } else {
-                                null
-                            }
-                        }
-
-                        navId.startsWith("station:") -> {
-                            val id = navId.removePrefix("station:")
-                            if (id.toLongOrNull() != null) {
-                                "soundcloud:system-playlists:track-stations:$id"
-                            } else {
-                                null
-                            }
-                        }
-
-                        navId.startsWith("station_artist:") -> {
-                            val id = navId.removePrefix("station_artist:")
-                            if (id.toLongOrNull() != null) {
-                                "soundcloud:system-playlists:artist-stations:$id"
-                            } else {
-                                null
-                            }
-                        }
-
-                        navId.startsWith("profile:") -> {
-                            val id = navId.removePrefix("profile:")
-                            if (id.toLongOrNull() != null) {
-                                "soundcloud:users:$id"
-                            } else {
-                                null
-                            }
-                        }
-
-                        navId == "downloads" || navId.startsWith("local_playlist:") || navId.startsWith("yt_radio:") -> {
-                            null
-                        }
-
-                        else -> {
-                            // Assume it's a playlist or album if it parses to a valid positive long
-                            val playlistId = navId.toLongOrNull()
-                            if (playlistId != null && playlistId > 0L) {
-                                "soundcloud:playlists:$playlistId"
-                            } else {
-                                null
-                            }
-                        }
-                    }
-                }
-
-                if (contextUrn != null) {
-                    val contextEntry = com.alananasss.kittytune.data.network.ApiRecentlyPlayed(
-                        playedAt = now,
-                        urn = contextUrn
-                    )
-                    val contextCollection = com.alananasss.kittytune.data.network.ApiCollection(
-                        collection = listOf(contextEntry)
-                    )
-                    val contextResponse = api.pushRecentlyPlayed(contextCollection)
-                    if (contextResponse.isSuccessful) {
-                        println("Synced context $contextUrn to recently played")
-                    } else {
-                        println("Failed to sync context $contextUrn: ${contextResponse.code()}")
-                    }
-                } else {
-                    println("No valid SoundCloud context URN to sync")
-                }
-
-            } catch (e: Exception) {
-                println("Error syncing history")
             }
         }
     }

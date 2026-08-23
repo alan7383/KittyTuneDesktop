@@ -43,6 +43,8 @@ abstract class BaseAudioProcessor : AudioProcessor {
 
     protected open fun onFlush() {}
 
+    protected open fun onReset() {}
+
     final override fun flush() {
         outputBuffer = EMPTY
         onFlush()
