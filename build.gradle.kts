@@ -82,7 +82,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
     implementation("org.slf4j:slf4j-simple:2.0.18")
 
-    implementation("org.json:json:20260719")
+    implementation("org.json:json:20260814")
     implementation("org.yaml:snakeyaml:2.6")
     implementation("com.github.pemistahl:lingua:1.2.2")
     implementation("net.java.dev.jna:jna:5.19.1")
