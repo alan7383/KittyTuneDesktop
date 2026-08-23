@@ -688,8 +688,10 @@ fun PlaylistDetailScreen(
                             }
                             isAlbum = playlistObj.isAlbum
 
-                            playlistTitle = playlistObj.title.takeIf { !it.isNullOrBlank() } ?: playlistTitle
-                            playlistCover = playlistObj.fullResArtwork ?: playlistCover
+                            val rawOnlineArt = playlistObj.fullResArtwork
+                            if (rawOnlineArt.isNotBlank() && !rawOnlineArt.contains("picsum")) {
+                                playlistCover = rawOnlineArt
+                            }
                             playlistUser = playlistObj.user ?: playlistUser
                             isUserCreated = (playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
                                 (playerViewModel.currentUser != null && playlistUser?.username == playerViewModel.currentUser?.username)
@@ -731,6 +733,12 @@ fun PlaylistDetailScreen(
             if (playlistId != "likes") {
                 tracks.clear()
                 tracks.addAll(newTracks)
+                if (playlistCover.isNullOrBlank() && newTracks.isNotEmpty()) {
+                    val firstArt = newTracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") }?.fullResArtwork
+                    if (!firstArt.isNullOrBlank()) {
+                        playlistCover = firstArt
+                    }
+                }
             }
 
             if (playlistId == "downloads") {

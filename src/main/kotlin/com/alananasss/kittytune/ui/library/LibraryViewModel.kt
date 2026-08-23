@@ -639,7 +639,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 val localIds = localPlaylists.map { it.id }.toSet()
                 DownloadManager.clearDeletedPlaylistIds(localIds)
                 localItemsCache = localPlaylists.map { local ->
-                    val finalArtwork = if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else local.artworkUrl
+                    val rawArt = if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else local.artworkUrl
+                    val finalArtwork = if (rawArt?.contains("avatars-") == true || rawArt?.contains("/avatars/") == true) {
+                        if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else ""
+                    } else rawArt
                     val p = Playlist(
                         id = local.id,
                         title = local.title,

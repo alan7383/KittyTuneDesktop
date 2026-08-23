@@ -478,11 +478,20 @@ object DownloadManager {
             val isDownloadedFinal = isDownloaded ?: (existing?.isDownloaded ?: false)
             val baseTime = System.currentTimeMillis()
 
+            val firstTrackArt = tracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") }?.fullResArtwork ?: ""
+            val rawArt = if (!playlist.artworkUrl.isNullOrEmpty()) {
+                playlist.artworkUrl.replace("large", "t500x500")
+            } else if (!playlist.calculatedArtworkUrl.isNullOrEmpty()) {
+                playlist.calculatedArtworkUrl.replace("large", "t500x500")
+            } else {
+                firstTrackArt
+            }
+
             val localPlaylist = LocalPlaylist(
                 id = playlist.id,
                 title = playlist.title ?: str("untitled_track"),
                 artist = playlist.user?.username ?: str("unknown_artist"),
-                artworkUrl = playlist.fullResArtwork,
+                artworkUrl = rawArt,
                 localCoverPath = localCover,
                 trackCount = tracks.size,
                 isUserCreated = isUserCreatedFinal,
