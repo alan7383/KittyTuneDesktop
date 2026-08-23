@@ -447,7 +447,14 @@
             get() {
                 if (!artworkUrl.isNullOrEmpty()) return artworkUrl.replace("large", "t500x500")
                 if (!calculatedArtworkUrl.isNullOrEmpty()) return calculatedArtworkUrl.replace("large", "t500x500")
-                return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
+                if (!tracks.isNullOrEmpty()) {
+                    val firstTrackArt = tracks.firstOrNull { !it.fullResArtwork.isNullOrEmpty() && !it.fullResArtwork.contains("picsum") }?.fullResArtwork
+                    if (!firstTrackArt.isNullOrEmpty()) return firstTrackArt
+                }
+                if (isArtistStation) {
+                    return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
+                }
+                return ""
             }
     }
     data class UpdateProfileRequest(val username: String?, val description: String?, val city: String?, @SerializedName("country_code") val countryCode: String?, @SerializedName("first_name") val firstName: String? = null, @SerializedName("last_name") val lastName: String? = null)
@@ -545,10 +552,13 @@
                 if (!artworkUrl.isNullOrEmpty()) return artworkUrl.replace("large", "t500x500")
                 if (!calculatedArtworkUrl.isNullOrEmpty()) return calculatedArtworkUrl.replace("large", "t500x500")
                 if (!tracks.isNullOrEmpty()) {
-                    val firstTrackArt = tracks[0].fullResArtwork
-                    if (!firstTrackArt.contains("picsum")) return firstTrackArt
+                    val firstTrackArt = tracks.firstOrNull { !it.fullResArtwork.isNullOrEmpty() && !it.fullResArtwork.contains("picsum") }?.fullResArtwork
+                    if (!firstTrackArt.isNullOrEmpty()) return firstTrackArt
                 }
-                return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
+                if (isArtistStation) {
+                    return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
+                }
+                return ""
             }
     }
     

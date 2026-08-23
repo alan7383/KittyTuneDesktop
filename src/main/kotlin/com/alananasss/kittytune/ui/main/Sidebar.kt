@@ -1401,13 +1401,25 @@ private fun EntryArtwork(
                 modifier = Modifier.size(maxWidth * iconFraction),
             )
         }
-    } else {
+    } else if (!entry.artworkUrl.isNullOrBlank()) {
         AsyncImage(
             model = entry.artworkUrl,
             contentDescription = entry.title,
             contentScale = ContentScale.Crop,
             modifier = boxModifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
         )
+    } else {
+        androidx.compose.foundation.layout.Box(
+            modifier = boxModifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Rounded.QueueMusic,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
+        }
     }
 }
 
