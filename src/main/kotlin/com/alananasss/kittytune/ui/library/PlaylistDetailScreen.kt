@@ -333,11 +333,11 @@ fun PlaylistDetailScreen(
 
     var isUserCreated by remember { mutableStateOf(false) }
     var isLocalPlaylist by remember { mutableStateOf(false) }
-    var localPlaylistState by remember { mutableStateOf<com.alananasss.kittytune.data.local.LocalPlaylist?>(null) }
-    LaunchedEffect(currentIdLong) {
-        if (currentIdLong != 0L) {
-            DownloadManager.isPlaylistInLibraryFlow(currentIdLong).collect { lp ->
-                localPlaylistState = lp
+
+    LaunchedEffect(stableId, playlistId) {
+        DownloadManager.trackRemovedFromPlaylist.collect { (targetPlaylistId, removedTrackId) ->
+            if (targetPlaylistId == stableId || (playlistId == "downloads" && targetPlaylistId == -2L)) {
+                tracks.removeAll { it.id == removedTrackId }
             }
         }
     }
@@ -422,18 +422,23 @@ fun PlaylistDetailScreen(
     val showDateColumn = true
     val useReleaseDate = tracksToDisplay.any { it.likedAt == null }
 
-    val downloadedCount = remember(tracksToDisplay, downloadedIds) {
+    val downloadedCount = remember(tracks.size, tracksToDisplay.size, downloadedIds) {
         if (tracksToDisplay.isEmpty()) 0
-        else tracksToDisplay.count { track -> track.id < 0 || downloadedIds.contains(track.id) }
+        else tracksToDisplay.count { track -> downloadedIds.contains(track.id) }
     }
 
-    val isFullyDownloaded = remember(tracksToDisplay.size, downloadedCount, isPlaylistDownloading, localPlaylistState?.isDownloaded) {
-        if (localPlaylistState?.isDownloaded == true) true
-        else if (tracksToDisplay.isEmpty()) false
-        else {
-            val ratio = downloadedCount.toFloat() / tracksToDisplay.size.toFloat()
-            downloadedCount == tracksToDisplay.size || (ratio > 0.9f && !isPlaylistDownloading)
-        }
+    val isFullyDownloaded = remember(
+        tracksToDisplay.size,
+        downloadedCount,
+        isPlaylistDownloading,
+        isDownloadedView,
+        playlistInDb,
+        playlistId
+    ) {
+        if (tracksToDisplay.isEmpty()) false
+        else if (isDownloadedView) true
+        else if (playlistId == "likes") downloadedCount == tracksToDisplay.size && !isPlaylistDownloading
+        else (playlistInDb != null && playlistInDb?.isDownloaded == true && downloadedCount == tracksToDisplay.size && !isPlaylistDownloading)
     }
     val refreshTrigger =
         if (playlistId == "downloads" || playlistId == "local_files" || currentIdLong < 0L || isDownloadedView) debouncedStorageTrigger else 0
