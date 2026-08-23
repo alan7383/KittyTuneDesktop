@@ -26,9 +26,28 @@ object Strings {
     private val tables = ConcurrentHashMap<String, Map<String, String>>()
     private val cache = ConcurrentHashMap<String, String>()
 
-    /** The concrete language in use after resolving "system": "en", "fr" or "hu". */
+    /** The concrete language in use after resolving "system": "en", "fr", "hu" or "ru". */
     val resolvedLanguage: String
         get() = effectiveLang()
+
+    fun getAcceptLanguage(): String {
+        return when (effectiveLang()) {
+            "fr" -> "fr-FR,fr;q=0.9,en;q=0.8"
+            "hu" -> "hu-HU,hu;q=0.9,en;q=0.8"
+            "ru" -> "ru-RU,ru;q=0.9,en;q=0.8"
+            "en" -> "en-US,en;q=0.9"
+            else -> {
+                val defaultLocale = Locale.getDefault()
+                val lang = defaultLocale.language.ifBlank { "en" }
+                val country = defaultLocale.country
+                if (country.isNotBlank()) {
+                    "$lang-$country,$lang;q=0.9,en;q=0.8"
+                } else {
+                    "$lang;q=0.9,en;q=0.8"
+                }
+            }
+        }
+    }
 
     private fun effectiveLang(): String = when (appLanguage) {
         "fr", "en", "hu", "ru" -> appLanguage

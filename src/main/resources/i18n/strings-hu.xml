@@ -1789,4 +1789,5 @@
     <string name="upload_perm_geo_exclusive_explanation">Ez a szám csak a kiválasztott országokban lesz lejátszható.</string>
     <string name="upload_perm_geo_blocked_explanation">Ez a szám le lesz tiltva és elérhetetlen lesz a kiválasztott országokban.</string>
     <string name="upload_perm_geo_suggestions_label">Gyors javaslatok</string>
+    <string name="track_sorted_by_popularity">Népszerűség szerint rendezve</string>
 </resources>
