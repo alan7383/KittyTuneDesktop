@@ -332,6 +332,21 @@ fun PlaylistDetailScreen(
 
     var isUserCreated by remember { mutableStateOf(false) }
     var isLocalPlaylist by remember { mutableStateOf(false) }
+    var localPlaylistState by remember { mutableStateOf<com.alananasss.kittytune.data.local.LocalPlaylist?>(null) }
+    LaunchedEffect(currentIdLong) {
+        if (currentIdLong != 0L) {
+            DownloadManager.isPlaylistInLibraryFlow(currentIdLong).collect { lp ->
+                localPlaylistState = lp
+            }
+        }
+    }
+
+    LaunchedEffect(playlistCover, playlistId) {
+        if (!playlistCover.isNullOrEmpty() && playlistId != "downloads" && playlistId != "likes" && currentIdLong != 0L) {
+            val db = AppDatabase.downloadDao
+            db.updateHistoryItemImageUrl(playlistId, playlistCover!!)
+        }
+    }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRemoveDownloadDialog by remember { mutableStateOf(false) }
@@ -411,8 +426,9 @@ fun PlaylistDetailScreen(
         else tracksToDisplay.count { track -> track.id < 0 || downloadedIds.contains(track.id) }
     }
 
-    val isFullyDownloaded = remember(tracksToDisplay.size, downloadedCount, isPlaylistDownloading) {
-        if (tracksToDisplay.isEmpty()) false
+    val isFullyDownloaded = remember(tracksToDisplay.size, downloadedCount, isPlaylistDownloading, localPlaylistState?.isDownloaded) {
+        if (localPlaylistState?.isDownloaded == true) true
+        else if (tracksToDisplay.isEmpty()) false
         else {
             val ratio = downloadedCount.toFloat() / tracksToDisplay.size.toFloat()
             downloadedCount == tracksToDisplay.size || (ratio > 0.9f && !isPlaylistDownloading)
@@ -756,7 +772,7 @@ fun PlaylistDetailScreen(
                         // limit the removal to the visible subset.
                         DownloadManager.removeDownloads(rawTracks.toList())
                     } else if (currentIdLong != 0L) {
-                        DownloadManager.removePlaylistDownloads(currentIdLong)
+                        DownloadManager.removePlaylistDownloads(currentIdLong, rawTracks.toList())
                     }
                     showRemoveDownloadDialog = false
                     if (isDownloadedView) onBackClick()
@@ -776,7 +792,7 @@ fun PlaylistDetailScreen(
                     value = newTitle,
                     onValueChange = { newTitle = it },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().trackTextInput()
                 )
             },
             confirmButton = {

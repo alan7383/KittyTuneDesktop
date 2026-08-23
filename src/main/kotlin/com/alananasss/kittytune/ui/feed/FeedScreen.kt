@@ -545,23 +545,55 @@ private fun formatCount(count: Int): String {
     }
 }
 
-private fun formatRelativeTime(isoTime: String): String {
-    return try {
-        val instant = Instant.parse(isoTime)
-        val now = Instant.now()
-        val minutesAgo = ChronoUnit.MINUTES.between(instant, now)
-        val hoursAgo = ChronoUnit.HOURS.between(instant, now)
-        val daysAgo = ChronoUnit.DAYS.between(instant, now)
-        when {
-            minutesAgo < 60 -> "${minutesAgo}m"
-            hoursAgo < 24 -> "${hoursAgo}h"
-            daysAgo < 7 -> "${daysAgo}d"
-            else -> {
-                val formatter = DateTimeFormatter.ofPattern("d MMM yyyy").withZone(ZoneId.systemDefault())
-                formatter.format(instant)
+private fun parseDateToMillis(raw: String): Long? {
+    val trimmed = raw.trim()
+    if (trimmed.isEmpty()) return null
+    trimmed.toLongOrNull()?.let { return it }
+
+    val formats = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy/MM/dd HH:mm:ss Z",
+        "yyyy/MM/dd HH:mm:ss",
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd"
+    )
+
+    for (pattern in formats) {
+        try {
+            val sdf = java.text.SimpleDateFormat(pattern, java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
             }
-        }
-    } catch (e: Exception) {
-        isoTime
+            val date = sdf.parse(trimmed)
+            if (date != null) return date.time
+        } catch (_: Exception) {}
+    }
+    return null
+}
+
+private fun formatRelativeTime(rawTime: String): String {
+    val timeMillis = parseDateToMillis(rawTime) ?: return rawTime
+    val now = System.currentTimeMillis()
+    val diff = (now - timeMillis).coerceAtLeast(0)
+
+    val seconds = diff / 1000
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    val days = hours / 24
+    val weeks = days / 7
+    val months = days / 30
+    val years = days / 365
+
+    return when {
+        minutes < 1 -> str("time_now")
+        minutes < 60 -> str("time_minutes_ago", minutes.toInt())
+        hours < 24 -> str("time_hours_ago", hours.toInt())
+        days < 7 -> str("time_days_ago", days.toInt())
+        weeks < 5 -> str("time_weeks_ago", weeks.toInt())
+        months < 12 -> str("time_months_ago", months.toInt())
+        years == 1L -> str("time_one_year_ago")
+        else -> str("time_years_ago", years.toInt())
     }
 }

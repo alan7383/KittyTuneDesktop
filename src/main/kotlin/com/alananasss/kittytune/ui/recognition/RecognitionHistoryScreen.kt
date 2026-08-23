@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,7 +43,7 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecognitionHistoryScreen(
-    onBackClick: () -> Unit,
+    onBackClick: (() -> Unit)? = null,
     onNavigate: (String) -> Unit,
     playerViewModel: PlayerViewModel
 ) {
@@ -139,6 +140,7 @@ fun RecognitionHistoryScreen(
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .trackTextInput()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = TextFieldDefaults.colors(

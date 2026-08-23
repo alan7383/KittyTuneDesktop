@@ -114,6 +114,12 @@ fun AppearanceSettingsScreen(
                         com.alananasss.kittytune.core.Strings.appLanguage = it.code
                         showLanguageDialog = false
                     }
+                    LanguageRadioButton(str("lang_russian"), AppLanguage.RUSSIAN, appLanguage) {
+                        prefs.setAppLanguage(it)
+                        appLanguage = it
+                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
+                        showLanguageDialog = false
+                    }
                 }
             },
             confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(str("btn_cancel")) } }
@@ -194,6 +200,7 @@ fun AppearanceSettingsScreen(
                                 AppLanguage.FRENCH -> str("lang_french")
                                 AppLanguage.ENGLISH -> str("lang_english")
                                 AppLanguage.HUNGARIAN -> str("lang_hungarian")
+                                AppLanguage.RUSSIAN -> str("lang_russian")
                             },
                             onClick = { showLanguageDialog = true }
                         )

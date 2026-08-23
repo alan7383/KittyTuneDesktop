@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -451,7 +452,7 @@ private fun CustomSeedPickerCard(
                             onSeedChanged(it)
                         }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).trackTextInput(),
                     singleLine = true,
                     label = { Text(str("color_hex_label")) },
                     keyboardOptions = KeyboardOptions(

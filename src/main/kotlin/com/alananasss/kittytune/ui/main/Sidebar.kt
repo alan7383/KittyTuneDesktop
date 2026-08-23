@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
@@ -41,8 +42,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
-import androidx.compose.material.icons.automirrored.rounded.ViewList
+import androidx.compose.material.icons.automirrored.rounded.*
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
@@ -85,8 +85,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
-import com.alananasss.kittytune.ui.library.LibraryItem
-import com.alananasss.kittytune.ui.library.LibraryViewMode
+import com.alananasss.kittytune.core.trackTextInput
+import com.alananasss.kittytune.ui.library.*
 import com.alananasss.kittytune.ui.library.LibraryViewModel
 import com.alananasss.kittytune.ui.library.OwnershipFilter
 import androidx.compose.material3.*
@@ -95,6 +95,8 @@ import androidx.compose.material.icons.rounded.*
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.alananasss.kittytune.ui.modifiers.squish
+
+import com.alananasss.kittytune.ui.home.HomeViewModel
 
 /**
  * Left panel: primary navigation on top, then "Your Library" — search, create,
@@ -107,6 +109,7 @@ fun Sidebar(
     navController: NavController,
     libraryViewModel: LibraryViewModel,
     playerViewModel: PlayerViewModel,
+    homeViewModel: HomeViewModel? = null,
     modifier: Modifier = Modifier,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -125,6 +128,7 @@ fun Sidebar(
                     iconUnselected = Icons.Outlined.Home,
                     compact = collapsed,
                 ) {
+                    homeViewModel?.clearSearch()
                     if (currentRoute != "home") {
                         navController.navigate("home") {
                             popUpTo("home")
@@ -182,6 +186,8 @@ fun Sidebar(
             playerViewModel = playerViewModel,
             fullScreen = false,
             onImport = { navController.navigate("music_import") },
+            onHistory = { navController.navigate("history") },
+            onUpload = { navController.navigate("upload") },
             modifier = Modifier.weight(1f),
         )
     }
@@ -212,6 +218,9 @@ private data class LibEntry(
     val round: Boolean = false,
     val destination: String,
     val playlist: com.alananasss.kittytune.domain.Playlist? = null,
+    val folder: com.alananasss.kittytune.data.local.LibraryFolder? = null,
+    val track: com.alananasss.kittytune.domain.Track? = null,
+    val isPinned: Boolean = false,
 )
 
 /**
@@ -226,17 +235,46 @@ fun LibraryPanel(
     playerViewModel: PlayerViewModel,
     fullScreen: Boolean,
     onImport: () -> Unit = {},
+    onHistory: () -> Unit = {},
+    onUpload: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    var showCreateDialog by remember { mutableStateOf(false) }
+    var showCreatePlaylistDialog by remember { mutableStateOf(false) }
+    var showCreateFolderDialog by remember { mutableStateOf(false) }
+    var folderForMenu by remember { mutableStateOf<com.alananasss.kittytune.data.local.LibraryFolder?>(null) }
+    var folderToRename by remember { mutableStateOf<com.alananasss.kittytune.data.local.LibraryFolder?>(null) }
+    var folderToDelete by remember { mutableStateOf<com.alananasss.kittytune.data.local.LibraryFolder?>(null) }
+    var playlistForMenu by remember { mutableStateOf<com.alananasss.kittytune.domain.Playlist?>(null) }
+    var movingItemKey by remember { mutableStateOf<String?>(null) }
+    var playlistForDetails by remember { mutableStateOf<com.alananasss.kittytune.domain.Playlist?>(null) }
 
     val openEntry: (LibEntry) -> Unit = { entry ->
-        playerViewModel.navigateToPlaylistId = entry.destination
-        if (fullScreen) libraryViewModel.isLibraryFullScreen = false
+        if (entry.track != null) {
+            val tracks = libraryViewModel.uploadedTracks.toList()
+            val idx = tracks.indexOfFirst { it.id == entry.track.id }.coerceAtLeast(0)
+            playerViewModel.playPlaylist(tracks, idx)
+        } else if (entry.destination.startsWith("folder_")) {
+            val fId = entry.destination.removePrefix("folder_").toLongOrNull()
+            val folderItem = libraryViewModel.displayedItems.filterIsInstance<LibraryItem.FolderItem>().find { it.folder.id == fId }
+            if (folderItem != null) {
+                libraryViewModel.navigateToFolder(folderItem.folder)
+            }
+        } else {
+            playerViewModel.navigateToPlaylistId = entry.destination
+            if (fullScreen) libraryViewModel.isLibraryFullScreen = false
+        }
     }
-    // Right-click on a playlist/album/station = Android 3-dot options sheet.
+    // Right-click on a playlist/album/station = Android 3-dot options sheet. On folder = folder menu.
     val rightClickEntry: (LibEntry) -> (() -> Unit)? = { entry ->
-        entry.playlist?.let { pl -> { playerViewModel.showPlaylistOptions(pl) } }
+        when {
+            entry.folder != null -> {
+                { folderForMenu = entry.folder }
+            }
+            entry.playlist != null -> {
+                { playlistForMenu = entry.playlist }
+            }
+            else -> null
+        }
     }
 
     val entries = buildLibraryEntries(libraryViewModel)
@@ -246,7 +284,8 @@ fun LibraryPanel(
             CollapsedLibraryRail(
                 entries = entries,
                 onExpand = { libraryViewModel.toggleSidebarCollapsed() },
-                onCreate = { showCreateDialog = true },
+                onCreate = { showCreatePlaylistDialog = true },
+                onHistory = onHistory,
                 onOpen = openEntry,
                 onRightClick = rightClickEntry,
             )
@@ -254,9 +293,13 @@ fun LibraryPanel(
             Column(Modifier.fillMaxSize()) {
                 LibraryHeader(
                     libraryViewModel = libraryViewModel,
+                    playerViewModel = playerViewModel,
                     fullScreen = fullScreen,
-                    onCreate = { showCreateDialog = true },
+                    onCreatePlaylist = { showCreatePlaylistDialog = true },
+                    onCreateFolder = { showCreateFolderDialog = true },
                     onImport = onImport,
+                    onHistory = onHistory,
+                    onUpload = onUpload,
                 )
                 LibraryFilterChips(libraryViewModel)
                 LibrarySearchRow(libraryViewModel)
@@ -271,25 +314,182 @@ fun LibraryPanel(
         }
     }
 
-    if (showCreateDialog) {
+    if (showCreatePlaylistDialog) {
         CreatePlaylistDialog(
             isCreating = libraryViewModel.isCreatingPlaylist,
-            onDismiss = { if (!libraryViewModel.isCreatingPlaylist) showCreateDialog = false },
+            onDismiss = { if (!libraryViewModel.isCreatingPlaylist) showCreatePlaylistDialog = false },
             onCreate = { name, isPublic ->
                 libraryViewModel.createPlaylist(name, isPublic) { id ->
-                    showCreateDialog = false
+                    showCreatePlaylistDialog = false
                     playerViewModel.navigateToPlaylistId = id.toString()
                     if (fullScreen) libraryViewModel.isLibraryFullScreen = false
                 }
             },
         )
     }
+
+    if (showCreateFolderDialog) {
+        CreateFolderDialog(
+            onDismiss = { showCreateFolderDialog = false },
+            onCreate = { name ->
+                libraryViewModel.createFolder(name)
+                showCreateFolderDialog = false
+            }
+        )
+    }
+
+    folderToRename?.let { folder ->
+        RenameFolderDialog(
+            folder = folder,
+            onDismiss = { folderToRename = null },
+            onRename = { newName ->
+                libraryViewModel.renameFolder(folder.id, newName)
+                folderToRename = null
+            }
+        )
+    }
+
+    folderToDelete?.let { folder ->
+        DeleteFolderDialog(
+            folder = folder,
+            onDismiss = { folderToDelete = null },
+            onDelete = {
+                libraryViewModel.deleteFolder(folder)
+                folderToDelete = null
+            }
+        )
+    }
+
+    folderForMenu?.let { folder ->
+        FolderOptionsMenu(
+            folder = folder,
+            onDismiss = { folderForMenu = null },
+            onPlayOrdered = {
+                libraryViewModel.playFolder(folder.id, playerViewModel, shuffle = false)
+            },
+            onPlayShuffle = {
+                libraryViewModel.playFolder(folder.id, playerViewModel, shuffle = true)
+            },
+            onPlayRecursiveOrdered = {
+                libraryViewModel.playFolder(folder.id, playerViewModel, shuffle = false, recursive = true)
+            },
+            onPlayRecursiveShuffle = {
+                libraryViewModel.playFolder(folder.id, playerViewModel, shuffle = true, recursive = true)
+            },
+            onTogglePin = {
+                libraryViewModel.togglePinFolder(folder.id)
+            },
+            onRename = {
+                folderToRename = folder
+            },
+            onDelete = {
+                folderToDelete = folder
+            }
+        )
+    }
+
+    playlistForMenu?.let { playlist ->
+        LibraryPlaylistOptionsDialog(
+            playlist = playlist,
+            libraryViewModel = libraryViewModel,
+            playerViewModel = playerViewModel,
+            onDismiss = { playlistForMenu = null },
+            onShowDetails = { playlistForDetails = it },
+            onMoveToFolder = { key -> movingItemKey = key }
+        )
+    }
+
+    movingItemKey?.let { itemKey ->
+        val availableFolders = libraryViewModel.getAvailableTargetFolders(null)
+        MoveToFolderDialog(
+            availableFolders = availableFolders,
+            isInsideFolder = libraryViewModel.currentFolderId != null,
+            onDismiss = { movingItemKey = null },
+            onMoveToRoot = {
+                libraryViewModel.moveItemToFolder(itemKey, null)
+                movingItemKey = null
+            },
+            onMoveToFolder = { targetFolderId ->
+                libraryViewModel.moveItemToFolder(itemKey, targetFolderId)
+                movingItemKey = null
+            },
+            onCreateNewFolder = {
+                movingItemKey = null
+                showCreateFolderDialog = true
+            }
+        )
+    }
+
+    if (playlistForDetails != null) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { playlistForDetails = null }) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.width(620.dp).heightIn(max = 680.dp),
+            ) {
+                PlaylistDetailsSheet(
+                    playlistId = playlistForDetails!!.id.toString(),
+                    onDismiss = { playlistForDetails = null },
+                    onViewAll = { tabIndex ->
+                        val pid = playlistForDetails!!.id
+                        playlistForDetails = null
+                        playerViewModel.navigateToPlaylistId = "playlist_fans/$pid?tab=$tabIndex"
+                    },
+                    onNavigate = { id ->
+                        playlistForDetails = null
+                        playerViewModel.navigateToPlaylistId = id
+                    },
+                    onMentionClick = { username ->
+                        playlistForDetails = null
+                        playerViewModel.resolveAndNavigateToArtist(username)
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEntry> {
     val query = libraryViewModel.searchQuery
-    val pinned = if (libraryViewModel.selectedFilter == null) {
+    val isInsideFolder = libraryViewModel.currentFolderId != null
+
+    if (libraryViewModel.selectedFilter == str("lib_your_uploads")) {
+        val searched = if (query.isBlank()) {
+            libraryViewModel.uploadedTracks
+        } else {
+            libraryViewModel.uploadedTracks.filter {
+                it.title?.contains(query, ignoreCase = true) == true ||
+                it.user?.username?.contains(query, ignoreCase = true) == true
+            }
+        }
+
+        val privacyFiltered = when (libraryViewModel.uploadsPrivacyFilter) {
+            UploadsPrivacyFilter.ALL -> searched
+            UploadsPrivacyFilter.PUBLIC -> searched.filter { it.sharing?.equals("private", ignoreCase = true) != true }
+            UploadsPrivacyFilter.PRIVATE -> searched.filter { it.sharing?.equals("private", ignoreCase = true) == true }
+        }
+
+        val sortedTracks = when (libraryViewModel.uploadsSortOption) {
+            UploadsSortOption.RECENTLY_ADDED -> privacyFiltered
+            UploadsSortOption.FIRST_ADDED -> privacyFiltered.reversed()
+            UploadsSortOption.TITLE -> privacyFiltered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title.orEmpty() })
+            UploadsSortOption.ARTIST -> privacyFiltered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.user?.username.orEmpty() })
+        }
+
+        return sortedTracks.map { track ->
+            LibEntry(
+                key = "upload_track_${track.id}",
+                title = track.title ?: str("untitled_track"),
+                subtitle = track.displayArtist.ifBlank { str("unknown_artist") },
+                artworkUrl = track.fullResArtwork,
+                destination = "track_${track.id}",
+                track = track
+            )
+        }
+    }
+
+    val pinned = if (libraryViewModel.selectedFilter == null && !isInsideFolder) {
         listOf(
             LibEntry(
                 key = "pin_likes",
@@ -298,6 +498,7 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                 icon = Icons.Filled.Favorite,
                 gradient = listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)),
                 destination = "likes",
+                isPinned = true,
             ),
             LibEntry(
                 key = "pin_downloads",
@@ -306,6 +507,7 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                 icon = Icons.Outlined.DownloadForOffline,
                 gradient = listOf(Color(0xFF00C853), Color(0xFF69F0AE)),
                 destination = "downloads",
+                isPinned = true,
             ),
             LibEntry(
                 key = "pin_local",
@@ -314,12 +516,30 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                 icon = Icons.Outlined.FolderOpen,
                 gradient = listOf(Color(0xFF0091EA), Color(0xFF40C4FF)),
                 destination = "local_files",
+                isPinned = true,
             ),
         ).filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
     } else emptyList()
 
     val items = libraryViewModel.displayedItems.map { item ->
+        val showPin = item.isPinned && !isInsideFolder
         when (item) {
+            is LibraryItem.FolderItem -> {
+                val folder = item.folder
+                val subtitleText = if (item.playlistCount == 0 && item.folderCount == 0) str("lib_folder_empty")
+                else "${item.playlistCount} ${str("lib_playlists")}" +
+                        (if (item.folderCount > 0) " • ${item.folderCount} ${str("lib_folders")}" else "")
+                LibEntry(
+                    key = item.key,
+                    title = folder.name,
+                    subtitle = subtitleText,
+                    icon = Icons.Rounded.Folder,
+                    gradient = listOf(Color(0xFF5C6BC0), Color(0xFF9FA8DA)),
+                    destination = "folder_${folder.id}",
+                    folder = folder,
+                    isPinned = showPin,
+                )
+            }
             is LibraryItem.PlaylistItem -> {
                 val pl = item.playlist
                 val permalink = pl.permalinkUrl
@@ -350,6 +570,7 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                     artworkUrl = pl.fullResArtwork,
                     destination = dest,
                     playlist = pl,
+                    isPinned = showPin,
                 )
             }
             is LibraryItem.ArtistItem -> {
@@ -361,6 +582,7 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                     artworkUrl = artist.avatarUrl,
                     round = true,
                     destination = "profile:${artist.id}",
+                    isPinned = showPin,
                 )
             }
         }
@@ -376,15 +598,51 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
 @Composable
 private fun LibraryHeader(
     libraryViewModel: LibraryViewModel,
+    playerViewModel: PlayerViewModel,
     fullScreen: Boolean,
-    onCreate: () -> Unit,
+    onCreatePlaylist: () -> Unit,
+    onCreateFolder: () -> Unit,
     onImport: () -> Unit,
+    onHistory: () -> Unit,
+    onUpload: () -> Unit = {},
 ) {
+    var showCreateMenu by remember { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (fullScreen) {
+        val currentFolder = libraryViewModel.currentFolder
+        if (currentFolder != null) {
+            IconButton(
+                onClick = { libraryViewModel.navigateUp() },
+                shapes = IconButtonDefaults.shapes(),
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = str("btn_back"),
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = currentFolder.name,
+                style = if (fullScreen) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            FolderPlaySplitButton(
+                folder = currentFolder,
+                libraryViewModel = libraryViewModel,
+                playerViewModel = playerViewModel
+            )
+            Spacer(Modifier.width(6.dp))
+        } else if (fullScreen) {
             Icon(
                 Icons.Filled.LibraryMusic,
                 contentDescription = null,
@@ -398,6 +656,7 @@ private fun LibraryHeader(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            Spacer(Modifier.weight(1f))
         } else {
             Tip(str("lib_collapse_tooltip")) {
                 Row(
@@ -421,32 +680,77 @@ private fun LibraryHeader(
                     )
                 }
             }
+            Spacer(Modifier.weight(1f))
         }
 
-        Spacer(Modifier.weight(1f))
-
-        // Extended "+ Créer" whenever there is room (wide sidebar or full screen),
-        // icon-only otherwise. Expressive shapes morph the corners on press.
+        // Extended "+ Créer" with dropdown menu
         val extendedCreate = fullScreen || libraryViewModel.sidebarWidth >= 340f
-        Tip(str("lib_create_playlist_tooltip")) {
-            if (extendedCreate) {
-                FilledTonalButton(
-                    onClick = onCreate,
-                    shapes = ButtonDefaults.shapes(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(str("lib_create"))
+        Box {
+            Tip(str("lib_create_playlist_tooltip")) {
+                if (extendedCreate) {
+                    FilledTonalButton(
+                        onClick = { showCreateMenu = true },
+                        shapes = ButtonDefaults.shapes(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(str("lib_create"))
+                    }
+                } else {
+                    FilledTonalIconButton(
+                        onClick = { showCreateMenu = true },
+                        shapes = IconButtonDefaults.shapes(),
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = str("lib_create_playlist_tooltip"), modifier = Modifier.size(18.dp))
+                    }
                 }
-            } else {
-                FilledTonalIconButton(
-                    onClick = onCreate,
-                    shapes = IconButtonDefaults.shapes(),
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = str("lib_create_playlist_tooltip"), modifier = Modifier.size(18.dp))
-                }
+            }
+
+            DropdownMenu(
+                expanded = showCreateMenu,
+                onDismissRequest = { showCreateMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(str("lib_create_playlist_title")) },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null) },
+                    onClick = {
+                        showCreateMenu = false
+                        onCreatePlaylist()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(str("lib_create_folder_title")) },
+                    leadingIcon = { Icon(Icons.Rounded.CreateNewFolder, contentDescription = null) },
+                    onClick = {
+                        showCreateMenu = false
+                        onCreateFolder()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(str("upload_screen_title")) },
+                    leadingIcon = { Icon(Icons.Rounded.CloudUpload, contentDescription = null) },
+                    onClick = {
+                        showCreateMenu = false
+                        onUpload()
+                    }
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+        Tip(str("history_title")) {
+            IconButton(
+                shapes = IconButtonDefaults.shapes(),
+                onClick = onHistory,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    Icons.Rounded.History,
+                    contentDescription = str("history_title"),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
         Spacer(Modifier.width(4.dp))
@@ -490,12 +794,24 @@ private fun LibraryHeader(
 
 @Composable
 private fun LibraryFilterChips(libraryViewModel: LibraryViewModel) {
-    val filters = listOf(
-        str("lib_playlists"),
-        str("lib_albums"),
-        str("lib_artists"),
-        str("lib_stations"),
-    )
+    val filters = remember(libraryViewModel.uploadedTracks.size) {
+        if (libraryViewModel.uploadedTracks.isNotEmpty()) {
+            listOf(
+                str("lib_playlists"),
+                str("lib_albums"),
+                str("lib_artists"),
+                str("lib_stations"),
+                str("lib_your_uploads"),
+            )
+        } else {
+            listOf(
+                str("lib_playlists"),
+                str("lib_albums"),
+                str("lib_artists"),
+                str("lib_stations"),
+            )
+        }
+    }
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
 
@@ -658,6 +974,7 @@ private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .trackTextInput()
                                 .focusRequester(focusRequester)
                                 .onPreviewKeyEvent { event ->
                                     if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
@@ -867,6 +1184,11 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
         return
     }
 
+    if (entries.isEmpty() && libraryViewModel.currentFolderId != null) {
+        EmptyFolderView(modifier = Modifier.weight(1f))
+        return
+    }
+
     when (libraryViewModel.viewMode) {
         LibraryViewMode.COMPACT_LIST -> LazyColumn(Modifier.weight(1f).padding(horizontal = 8.dp)) {
             items(entries, key = { it.key }) { entry ->
@@ -926,14 +1248,24 @@ private fun CompactListRow(entry: LibEntry, onRightClick: (() -> Unit)? = null, 
             .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        entry.icon?.let { icon ->
+        if (entry.isPinned) {
             Icon(
-                icon,
-                contentDescription = null,
+                Icons.Rounded.PushPin,
+                contentDescription = "Pinned",
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(13.dp),
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(4.dp))
+        } else {
+            entry.icon?.let { icon ->
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+            }
         }
         Text(
             entry.title,
@@ -967,7 +1299,7 @@ private fun LibraryRow(entry: LibEntry, onRightClick: (() -> Unit)? = null, onCl
     ) {
         EntryArtwork(entry, Modifier.size(48.dp), iconFraction = 0.5f)
         Spacer(Modifier.width(12.dp))
-        Column {
+        Column(modifier = Modifier.weight(1f, fill = false)) {
             Text(
                 entry.title,
                 style = MaterialTheme.typography.bodyLarge,
@@ -975,13 +1307,25 @@ private fun LibraryRow(entry: LibEntry, onRightClick: (() -> Unit)? = null, onCl
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                entry.subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (entry.isPinned) {
+                    Icon(
+                        imageVector = Icons.Rounded.PushPin,
+                        contentDescription = "Pinned",
+                        modifier = Modifier.size(13.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(3.dp))
+                }
+                Text(
+                    entry.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -1009,13 +1353,25 @@ private fun GridCell(entry: LibEntry, onRightClick: (() -> Unit)? = null, onClic
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            entry.subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Spacer(Modifier.height(2.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (entry.isPinned) {
+                Icon(
+                    imageVector = Icons.Rounded.PushPin,
+                    contentDescription = "Pinned",
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(3.dp))
+            }
+            Text(
+                entry.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
@@ -1064,6 +1420,7 @@ private fun CollapsedLibraryRail(
     entries: List<LibEntry>,
     onExpand: () -> Unit,
     onCreate: () -> Unit,
+    onHistory: () -> Unit,
     onOpen: (LibEntry) -> Unit,
     onRightClick: (LibEntry) -> (() -> Unit)?,
 ) {
@@ -1072,9 +1429,12 @@ private fun CollapsedLibraryRail(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Tip(str("lib_open_tooltip")) {
-            IconButton(onClick = onExpand, ) {
+            IconButton(
+                onClick = onExpand,
+                shapes = IconButtonDefaults.shapes()
+            ) {
                 Icon(
-                    Icons.Rounded.ViewSidebar,
+                    Icons.AutoMirrored.Rounded.ViewSidebar,
                     contentDescription = str("lib_open_tooltip"),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1084,10 +1444,25 @@ private fun CollapsedLibraryRail(
         Tip(str("lib_create_playlist_tooltip")) {
             FilledTonalIconButton(
                 onClick = onCreate,
-
+                shapes = IconButtonDefaults.shapes(),
                 modifier = Modifier.size(36.dp),
             ) {
                 Icon(Icons.Rounded.Add, contentDescription = str("lib_create_playlist_tooltip"), modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Tip(str("history_title")) {
+            IconButton(
+                onClick = onHistory,
+                shapes = IconButtonDefaults.shapes(),
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    Icons.Rounded.History,
+                    contentDescription = str("history_title"),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -1112,91 +1487,9 @@ private fun CollapsedLibraryRail(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Create playlist dialog (synced with SoundCloud when logged in)
-// ---------------------------------------------------------------------------
 
-@Composable
-private fun CreatePlaylistDialog(
-    isCreating: Boolean,
-    onDismiss: () -> Unit,
-    onCreate: (name: String, isPublic: Boolean) -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var isPublic by remember { mutableStateOf(true) }
-    val focusRequester = remember { FocusRequester() }
 
-    EscapableAlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = null) },
-        title = { Text(str("lib_create_playlist_title")) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    placeholder = { Text(str("lib_create_playlist_hint")) },
-                    singleLine = true,
-                    enabled = !isCreating,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(str("lib_playlist_public"), style = MaterialTheme.typography.bodyLarge)
-                        Text(
-                            str("lib_playlist_public_desc"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Switch(
-                        checked = isPublic,
-                        onCheckedChange = { isPublic = it },
-                        enabled = !isCreating,
-                        colors = SwitchDefaults.colors(
-                            // The checked thumb is onPrimary (dark navy in this theme):
-                            // tint the icon with primary so it stays visible.
-                            checkedIconColor = MaterialTheme.colorScheme.primary,
-                            uncheckedIconColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        ),
-                        thumbContent = {
-                            Icon(
-                                if (isPublic) Icons.Rounded.Check else Icons.Rounded.Close,
-                                contentDescription = null,
-                                modifier = Modifier.size(SwitchDefaults.IconSize),
-                            )
-                        },
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onCreate(name, isPublic) },
 
-                enabled = name.isNotBlank() && !isCreating,
-            ) {
-                if (isCreating) {
-                    ContainedLoadingIndicator()
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(str("lib_create"))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isCreating) {
-                Text(str("btn_cancel"))
-            }
-        },
-    )
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-}
 
 // ---------------------------------------------------------------------------
 // Shared bits

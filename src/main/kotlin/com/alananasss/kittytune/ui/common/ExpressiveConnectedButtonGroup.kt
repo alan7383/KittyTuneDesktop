@@ -12,6 +12,7 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -21,20 +22,26 @@ fun <T> ExpressiveConnectedButtonGroup(
     selectedOption: T?,
     onOptionSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
+    fillMaxWidth: Boolean = false,
+    contentPadding: PaddingValues? = null,
     labelProvider: @Composable (T) -> Unit,
     iconProvider: (@Composable (T) -> Unit)? = null
 ) {
+    val rowModifier = if (fillMaxWidth || contentPadding != null) {
+        modifier.fillMaxWidth().padding(vertical = 4.dp)
+    } else {
+        modifier.padding(vertical = 4.dp)
+    }
     Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = rowModifier,
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         options.forEachIndexed { index, option ->
+            val buttonModifier = if (fillMaxWidth) Modifier.weight(1f) else Modifier
             ToggleButton(
                 checked = selectedOption != null && selectedOption == option,
                 onCheckedChange = { onOptionSelected(option) },
-                modifier = Modifier.weight(1f),
+                modifier = buttonModifier,
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
@@ -47,7 +54,7 @@ fun <T> ExpressiveConnectedButtonGroup(
                 ) {
                     if (iconProvider != null) {
                         iconProvider(option)
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(4.dp))
                     }
                     labelProvider(option)
                 }

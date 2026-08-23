@@ -1,23 +1,24 @@
     package com.alananasss.kittytune.ui.home
 
 import com.alananasss.kittytune.core.str
-    
-    import com.alananasss.kittytune.core.Application
-    import androidx.compose.runtime.getValue
-    import androidx.compose.runtime.mutableStateListOf
-    import androidx.compose.runtime.mutableStateOf
-    import androidx.compose.runtime.setValue
-    import com.alananasss.kittytune.core.AndroidViewModel
-    import androidx.lifecycle.viewModelScope
-        import com.alananasss.kittytune.data.GenreData
-    import com.alananasss.kittytune.data.HistoryRepository
-    import com.alananasss.kittytune.data.LikeRepository
-    import com.alananasss.kittytune.data.SearchCategory
-    import com.alananasss.kittytune.data.TokenManager
-    import com.alananasss.kittytune.data.network.RetrofitClient
-    import com.alananasss.kittytune.domain.Playlist
-    import com.alananasss.kittytune.domain.Track
-    import com.alananasss.kittytune.domain.User
+import com.alananasss.kittytune.core.Application
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.alananasss.kittytune.core.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.alananasss.kittytune.data.GenreData
+import com.alananasss.kittytune.data.HistoryRepository
+import com.alananasss.kittytune.data.LikeRepository
+import com.alananasss.kittytune.data.SearchCategory
+import com.alananasss.kittytune.data.TokenManager
+import com.alananasss.kittytune.data.local.HistoryItem
+import com.alananasss.kittytune.data.network.RetrofitClient
+import com.alananasss.kittytune.domain.Playlist
+import com.alananasss.kittytune.domain.Track
+import com.alananasss.kittytune.domain.User
+import com.alananasss.kittytune.utils.Logger
     import com.alananasss.kittytune.data.SessionManager
     import com.google.gson.Gson
     import com.google.gson.reflect.TypeToken
@@ -906,8 +907,69 @@ import com.alananasss.kittytune.core.str
                     homeSections.addAll(allSections)
                     saveToCache()
                 }
+
+                syncServerHistory()
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+
+        private fun syncServerHistory() {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val response = api.getPlayHistory(limit = 50)
+                    if (response.isSuccessful && response.body() != null) {
+                        val entries = response.body()!!.collection
+                        val trackIds = entries.mapNotNull { entry ->
+                            entry.urn.substringAfterLast(":").toLongOrNull()
+                        }.distinct()
+
+                        if (trackIds.isNotEmpty()) {
+                            val chunkedIds = trackIds.chunked(50)
+                            val fetchedTracksMap = mutableMapOf<Long, Track>()
+                            for (chunk in chunkedIds) {
+                                try {
+                                    val tracks = api.getTracksByIds(chunk.joinToString(","))
+                                    tracks.forEach { fetchedTracksMap[it.id] = it }
+                                } catch (e: Exception) {
+                                    Logger.e("HomeViewModel", "Failed to fetch history tracks chunk", e)
+                                }
+                            }
+
+                            val dbItemsToCache = mutableListOf<HistoryItem>()
+                            for (entry in entries) {
+                                val id = entry.urn.substringAfterLast(":").toLongOrNull() ?: continue
+                                val track = fetchedTracksMap[id] ?: continue
+
+                                val effectiveArtwork = track.artworkUrl?.takeIf { it.isNotBlank() }
+                                    ?: track.fullResArtwork.takeIf { it.isNotBlank() && !it.contains("picsum.photos") }
+                                    ?: track.user?.avatarUrl?.takeIf { it.isNotBlank() }
+                                    ?: ""
+
+                                dbItemsToCache.add(
+                                    HistoryItem(
+                                        id = "track:${track.id}",
+                                        numericId = track.id,
+                                        title = track.title ?: str("history_untitled_track"),
+                                        subtitle = track.user?.username ?: str("history_unknown_artist"),
+                                        imageUrl = effectiveArtwork,
+                                        type = "TRACK",
+                                        isVerified = track.user?.verified == true,
+                                        source = (track.source as? String) ?: "soundcloud",
+                                        originalUrl = track.permalinkUrl,
+                                        timestamp = entry.playedAt
+                                    )
+                                )
+                            }
+
+                            if (dbItemsToCache.isNotEmpty()) {
+                                HistoryRepository.insertHistoryList(dbItemsToCache)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Logger.e("HomeViewModel", "Background history sync error: ${e.message}")
+                }
             }
         }
     

@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,6 +50,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import com.alananasss.kittytune.domain.isDefaultAvatar
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -56,6 +60,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Verified
+import com.alananasss.kittytune.data.local.HistoryItem
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilterChip
@@ -70,6 +75,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.launch
@@ -124,6 +131,16 @@ fun HomeContent(
 
     val history by vm.historyFlow.collectAsState(initial = emptyList())
 
+    val contextHistory = remember(history) {
+        history.filter { it.id != "playlist:0" && !it.title.equals("history", ignoreCase = true) }
+            .distinctBy { it.id }
+    }
+
+    var quickPage by remember { mutableStateOf(0) }
+    val pageSize = 6
+    val maxPages = ((contextHistory.size + pageSize - 1) / pageSize).coerceAtLeast(1)
+    val currentPage = quickPage.coerceIn(0, maxPages - 1)
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -137,23 +154,49 @@ fun HomeContent(
             // Desktop-only greeting (no Android key for this) — localized by app language.
             val lang = Strings.resolvedLanguage
             val greeting = when (hour) {
-                in 5..11 -> when (lang) { "fr" -> "Bonjour"; "hu" -> "Jó reggelt"; else -> "Good morning" }
-                in 12..17 -> when (lang) { "fr" -> "Bon après-midi"; "hu" -> "Jó napot"; else -> "Good afternoon" }
-                else -> when (lang) { "fr" -> "Bonsoir"; "hu" -> "Jó estét"; else -> "Good evening" }
+                in 5..11 -> when (lang) { "fr" -> "Bonjour"; "hu" -> "Jó reggelt"; "ru" -> "Доброе утро"; else -> "Good morning" }
+                in 12..17 -> when (lang) { "fr" -> "Bon après-midi"; "hu" -> "Jó napot"; "ru" -> "Добрый день"; else -> "Good afternoon" }
+                else -> when (lang) { "fr" -> "Bonsoir"; "hu" -> "Jó estét"; "ru" -> "Добрый вечер"; else -> "Good evening" }
             }
-            Text(
-                text = greeting,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                if (maxPages > 1) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { if (currentPage > 0) quickPage = currentPage - 1 },
+                            enabled = currentPage > 0,
+                            modifier = Modifier.size(32.dp),
+                            shapes = IconButtonDefaults.shapes()
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(
+                            onClick = { if (currentPage < maxPages - 1) quickPage = currentPage + 1 },
+                            enabled = currentPage < maxPages - 1,
+                            modifier = Modifier.size(32.dp),
+                            shapes = IconButtonDefaults.shapes()
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
         }
 
-        // Quick tiles: recently played (2 rows x 3 cols like the reference)
-        if (history.isNotEmpty()) {
+        // Quick tiles: recently played contexts (2 rows x 3 cols with pagination)
+        if (contextHistory.isNotEmpty()) {
             item {
-                val quick = history.take(6)
+                val pageItems = contextHistory.drop(currentPage * pageSize).take(pageSize)
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    quick.chunked(3).forEach { rowItems ->
+                    pageItems.chunked(3).forEach { rowItems ->
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             rowItems.forEach { entry ->
                                 QuickTile(
@@ -449,11 +492,14 @@ fun MediaCard(
     ) {
         Column {
             AsyncImage(
-                model = artworkUrl,
+                model = if (round && artworkUrl.isDefaultAvatar()) null else artworkUrl,
                 contentDescription = null,
+                error = if (round) androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml") else null,
+                fallback = if (round) androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml") else null,
                 modifier = Modifier
                     .size(148.dp)
                     .clip(if (round) CircleShape else RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop,
             )
             Spacer(Modifier.height(8.dp))
             Text(
@@ -504,57 +550,59 @@ private fun SearchResults(
 
     Column(Modifier.fillMaxSize()) {
         // ── Top bar: Source toggle + Filter chips ──
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Source chips (SoundCloud / YouTube)
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SourceChip(
-                    label = "SoundCloud",
-                    selected = vm.activeSearchSource == SearchSource.SOUNDCLOUD,
-                    onClick = { vm.onSearchSourceChanged(SearchSource.SOUNDCLOUD) }
-                )
-                SourceChip(
-                    label = "YouTube",
-                    selected = vm.activeSearchSource == SearchSource.YOUTUBE,
-                    onClick = { vm.onSearchSourceChanged(SearchSource.YOUTUBE) }
-                )
-            }
-
-            // Filter chips (only for SoundCloud)
-            if (vm.activeSearchSource == SearchSource.SOUNDCLOUD) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    val filters = listOf(
-                        SearchFilter.ALL to str("search_filter_all"),
-                        SearchFilter.TRACKS to str("search_filter_tracks"),
-                        SearchFilter.ARTISTS to str("lib_artists"),
-                        SearchFilter.PLAYLISTS to str("lib_playlists"),
+            com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                options = listOf(SearchSource.SOUNDCLOUD, SearchSource.YOUTUBE),
+                selectedOption = vm.activeSearchSource,
+                onOptionSelected = { vm.onSearchSourceChanged(it) },
+                fillMaxWidth = false,
+                labelProvider = { source ->
+                    Text(
+                        text = if (source == SearchSource.SOUNDCLOUD) "SoundCloud" else "YouTube",
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
                     )
-                    filters.forEach { (filter, label) ->
-                        val isSelected = vm.activeFilter == filter
-                        androidx.compose.material3.Button(
-                            onClick = { vm.onFilterChanged(filter) },
-                            shapes = androidx.compose.material3.ButtonDefaults.shapes(),
-                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                            ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                            modifier = Modifier.height(32.dp)
-                        ) {
-                            Text(label, style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
                 }
+            )
+
+            if (vm.activeSearchSource == SearchSource.SOUNDCLOUD) {
+                VerticalDivider(
+                    modifier = Modifier.height(20.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
+
+                val filters = listOf(
+                    SearchFilter.ALL,
+                    SearchFilter.TRACKS,
+                    SearchFilter.ARTISTS,
+                    SearchFilter.PLAYLISTS,
+                )
+                com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                    options = filters,
+                    selectedOption = vm.activeFilter,
+                    onOptionSelected = { vm.onFilterChanged(it) },
+                    fillMaxWidth = false,
+                    labelProvider = { filter ->
+                        val label = when (filter) {
+                            SearchFilter.ALL -> str("search_filter_all")
+                            SearchFilter.TRACKS -> str("search_filter_tracks")
+                            SearchFilter.ARTISTS -> str("lib_artists")
+                            SearchFilter.PLAYLISTS -> str("lib_playlists")
+                        }
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    }
+                )
             }
         }
 
@@ -1030,8 +1078,10 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
-            model = user.avatarUrl,
+            model = if (user.avatarUrl.isDefaultAvatar()) null else user.avatarUrl,
             contentDescription = null,
+            error = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
+            fallback = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)

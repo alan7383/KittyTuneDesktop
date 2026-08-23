@@ -36,8 +36,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.AuthFlowManager
+import com.alananasss.kittytune.data.GuestDataSummary
+import com.alananasss.kittytune.data.GuestDataTransferManager
 import com.alananasss.kittytune.data.PkceHelper
 import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
@@ -97,6 +101,12 @@ fun LoginScreen(
     val authCodeFromIntent by AuthFlowManager.authCode.collectAsState()
 
     var hasLaunchedBrowser by rememberSaveable { mutableStateOf(false) }
+    var showTransferDialog by remember { mutableStateOf(false) }
+    var isTransferring by remember { mutableStateOf(false) }
+    var transferProgress by remember { mutableFloatStateOf(0f) }
+    var guestSummary by remember { mutableStateOf<GuestDataSummary?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
     var isProtocolReady by remember { mutableStateOf(false) }
     var serverPort by remember { mutableStateOf<Int?>(null) }
 
@@ -263,11 +273,49 @@ fun LoginScreen(
             if (success) {
                 SessionManager.harvestStoredSession()
                 SessionManager.requestSessionRefresh(force = true)
-                onLoginSuccess()
+
+                val summary = GuestDataTransferManager.getGuestDataSummary()
+                if (summary.hasData) {
+                    guestSummary = summary
+                    showTransferDialog = true
+                } else {
+                    onLoginSuccess()
+                }
             } else {
                 println("Token exchange failed after OAuth callback")
             }
         }
+    }
+
+    if (showTransferDialog && guestSummary != null) {
+        TransferGuestDataDialog(
+            summary = guestSummary!!,
+            isTransferring = isTransferring,
+            progress = transferProgress,
+            onTransfer = { transferLikes, transferUserPlaylists, transferLikedPlaylists ->
+                isTransferring = true
+                coroutineScope.launch {
+                    val ok = GuestDataTransferManager.transferData(
+                        transferLikes = transferLikes,
+                        transferUserPlaylists = transferUserPlaylists,
+                        transferLikedPlaylists = transferLikedPlaylists,
+                        onProgress = { transferProgress = it }
+                    )
+                    isTransferring = false
+                    showTransferDialog = false
+                    val msgKey = if (ok) "transfer_guest_success" else "transfer_guest_error"
+                    com.alananasss.kittytune.core.Toaster.show(str(msgKey))
+                    onLoginSuccess()
+                }
+            },
+            onDismiss = {
+                showTransferDialog = false
+                coroutineScope.launch {
+                    GuestDataTransferManager.clearGuestData()
+                    onLoginSuccess()
+                }
+            }
+        )
     }
 
     Scaffold(

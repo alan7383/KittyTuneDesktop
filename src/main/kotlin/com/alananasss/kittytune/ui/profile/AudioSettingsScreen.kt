@@ -386,7 +386,8 @@ fun AudioSettingsScreen(
 
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         val isNormEnabled = playerViewModel.effectsState.isNormalizationEnabled
-                        val totalVisibleItems = 8
+                        val isGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
+                        val totalVisibleItems = if (!isGuest) 9 else 8
 
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) })
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) })
@@ -404,6 +405,21 @@ fun AudioSettingsScreen(
                             switchState = isNormEnabled,
                             onSwitchChange = { playerViewModel.toggleNormalization(it) }
                         )
+
+                        if (!isGuest) {
+                            var scHistorySyncEnabled by remember { mutableStateOf(prefs.getSoundCloudHistorySyncEnabled()) }
+                            SettingsItem(
+                                shape = getSettingsShape(totalVisibleItems, 8),
+                                title = str("pref_sc_sync_title"),
+                                subtitle = str("pref_sc_sync_sub"),
+                                hasSwitch = true,
+                                switchState = scHistorySyncEnabled,
+                                onSwitchChange = {
+                                    scHistorySyncEnabled = it
+                                    prefs.setSoundCloudHistorySyncEnabled(it)
+                                }
+                            )
+                        }
                     }
                 }
             }
