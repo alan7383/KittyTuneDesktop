@@ -1785,4 +1785,5 @@
     <string name="upload_perm_geo_exclusive_explanation">Этот трек будет воспроизводиться только в выбранных странах.</string>
     <string name="upload_perm_geo_blocked_explanation">Этот трек будет заблокирован и недоступен в выбранных странах.</string>
     <string name="upload_perm_geo_suggestions_label">Быстрые варианты</string>
+    <string name="track_sorted_by_popularity">Сортировка по популярности</string>
 </resources>

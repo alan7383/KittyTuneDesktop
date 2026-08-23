@@ -66,6 +66,7 @@ object RetrofitClient {
                 .url(newUrl)
                 .header("User-Agent", customUserAgent)
                 .header("Accept", "application/json")
+                .header("Accept-Language", com.alananasss.kittytune.core.Strings.getAcceptLanguage())
                 .header("App-Version", "330120")
                 .header("UDID", deviceId)
 

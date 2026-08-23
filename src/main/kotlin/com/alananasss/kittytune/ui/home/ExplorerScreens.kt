@@ -248,10 +248,14 @@ class GenreDetailViewModel(application: Application) : ViewModel() {
     }
 
     private fun autodetectCountry() {
-        val deviceCountryCode = Locale.getDefault().country.lowercase(Locale.ROOT)
+        val langCountryCode = when (com.alananasss.kittytune.core.Strings.resolvedLanguage) {
+            "fr" -> "fr"
+            "en" -> "us"
+            else -> Locale.getDefault().country.lowercase(Locale.ROOT)
+        }
         val matchedIndex = OfficialPlaylistsData.sources.indexOfFirst {
             val sourceCode = it.soundCloudUsername.substringAfter("sc-playlists-").lowercase(Locale.ROOT)
-            sourceCode == deviceCountryCode || (deviceCountryCode == "gb" && sourceCode == "uk")
+            sourceCode == langCountryCode || (langCountryCode == "gb" && sourceCode == "uk")
         }
         if (matchedIndex != -1) selectedSourceIndex = matchedIndex
     }

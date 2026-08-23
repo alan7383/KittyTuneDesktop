@@ -267,7 +267,7 @@ fun PlaylistList(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Sorted by popularity",
+                    text = str("track_sorted_by_popularity"),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,

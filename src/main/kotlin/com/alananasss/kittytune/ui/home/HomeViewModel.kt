@@ -404,9 +404,14 @@ import com.alananasss.kittytune.utils.Logger
             }
         }
     
+        private fun getHomeCacheKey(): String {
+            val langCode = com.alananasss.kittytune.core.Strings.resolvedLanguage
+            return "cached_home_data_$langCode"
+        }
+
         private fun loadFromCache() {
             try {
-                val json = prefs.getString("cached_home_data", null)
+                val json = prefs.getString(getHomeCacheKey(), null)
                 if (json != null) {
                     val data: HomeCacheData = gson.fromJson(json, object : TypeToken<HomeCacheData>() {}.type)
                     userProfile = data.user
@@ -432,7 +437,7 @@ import com.alananasss.kittytune.utils.Logger
                 try {
                     val sectionsCache = homeSections.map { section -> HomeSectionCache(section.title, section.subtitle, section.type, section.content.filterIsInstance<Track>(), section.content.filterIsInstance<Playlist>(), section.content.filterIsInstance<User>()) }
                     val data = HomeCacheData(userProfile, sectionsCache)
-                    prefs.putString("cached_home_data", gson.toJson(data))
+                    prefs.putString(getHomeCacheKey(), gson.toJson(data))
                 } catch (e: Exception) { e.printStackTrace() }
             }
         }
