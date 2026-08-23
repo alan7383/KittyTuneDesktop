@@ -172,8 +172,26 @@ class DownloadDao(private val db: AppDatabase) {
         db.exec("UPDATE downloaded_playlists SET isDownloaded = ? WHERE id = ?", if (isDownloaded) 1 else 0, playlistId)
 
     fun getDownloadedPlaylists(): Flow<List<LocalPlaylist>> = db.observe {
-        db.query("SELECT * FROM downloaded_playlists WHERE isDownloaded = 1 ORDER BY addedAt DESC", mapper = ::playlist)
+        db.query("""
+            SELECT DISTINCT P.* FROM downloaded_playlists P
+            LEFT JOIN playlist_track_cross_ref R ON R.playlistId = P.id
+            LEFT JOIN downloaded_tracks T ON T.id = R.trackId AND T.localAudioPath != ''
+            WHERE P.isDownloaded = 1 OR T.id IS NOT NULL
+            ORDER BY P.addedAt DESC
+        """, mapper = ::playlist)
     }
+
+    suspend fun cleanEmptyDownloadedPlaylists() = db.exec("""
+        UPDATE downloaded_playlists
+        SET isDownloaded = 0
+        WHERE isDownloaded = 1
+          AND id NOT IN (
+            SELECT DISTINCT R.playlistId
+            FROM playlist_track_cross_ref R
+            INNER JOIN downloaded_tracks T ON T.id = R.trackId
+            WHERE T.localAudioPath != ''
+          )
+    """)
 
     suspend fun getDownloadedPlaylistRefCount(trackId: Long, excludePlaylistId: Long): Int =
         db.queryOne(

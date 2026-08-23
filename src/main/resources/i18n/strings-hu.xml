@@ -405,6 +405,7 @@
     <string name="dialog_delete_header_title">Banner törlése?</string>
     <string name="dialog_delete_playlist_from_lib_title">Eltávolítja a könyvtárból?</string>
     <string name="dialog_delete_playlist_msg">Ez a művelet nem vonható vissza</string>
+    <string name="menu_delete_playlist">Playlist törlése</string>
     <string name="dialog_delete_playlist_title">Playlist törlése?</string>
     <string name="dialog_font_roundness">Kerekítés (ROND): %1$d</string>
     <string name="dialog_font_settings_title">Betűtípus beállításai</string>

@@ -1,6 +1,9 @@
 package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.core.AppDirs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -155,6 +158,17 @@ object TokenManager {
         RepostRepository.clear()
         com.alananasss.kittytune.data.network.CookieStore.clear()
         logoutFlow.tryEmit(Unit)
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+                dao.deleteNonDownloadedOnlinePlaylists()
+                dao.cleanUnreferencedEmptyTracks()
+                DownloadManager.notifyLibraryUpdated()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun resolveExpiresAt(now: Long, expiresInSeconds: Long?, scope: String?): Long {

@@ -276,6 +276,7 @@ fun PlaylistDetailScreen(
 ) {
     val api = remember { RetrofitClient.create() }
     val storageTrigger by DownloadManager.storageTrigger.collectAsState()
+    val debouncedStorageTrigger by DownloadManager.debouncedStorageTrigger.collectAsState(0)
     val scope = rememberCoroutineScope()
     val isYoutubeRadio = playlistId.startsWith("yt_radio:")
 
@@ -434,7 +435,8 @@ fun PlaylistDetailScreen(
             downloadedCount == tracksToDisplay.size || (ratio > 0.9f && !isPlaylistDownloading)
         }
     }
-    val refreshTrigger = if (playlistId == "downloads" || playlistId == "local_files") storageTrigger else 0
+    val refreshTrigger =
+        if (playlistId == "downloads" || playlistId == "local_files" || currentIdLong < 0L || isDownloadedView) debouncedStorageTrigger else 0
 
     val shareUrl = remember(playlistId, currentIdLong, playlistPermalinkUrl, playlistUser) {
         when {
@@ -460,15 +462,20 @@ fun PlaylistDetailScreen(
         }
     }
 
-    LaunchedEffect(playlistInDb) {
+    LaunchedEffect(playlistInDb, currentIdLong, playlistUser, playerViewModel.currentUserId) {
         if (playlistInDb != null) {
-            isLocalPlaylist = true
-            isUserCreated = playlistInDb!!.isUserCreated || currentIdLong < 0
+            val isOwnedByCurrentAccount = (playlistUser?.id != null && playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
+                (playerViewModel.currentUser != null && (playlistInDb!!.artist == playerViewModel.currentUser?.username || playlistUser?.username == playerViewModel.currentUser?.username))
+            val isLocalUser = currentIdLong < 0 || (playlistInDb!!.isUserCreated && isOwnedByCurrentAccount)
+            isLocalPlaylist = isDownloadedView || currentIdLong < 0
+            isUserCreated = isLocalUser
             playlistTitle = playlistInDb!!.title
             playlistCover = playlistInDb!!.localCoverPath ?: playlistInDb!!.artworkUrl
         } else {
             isLocalPlaylist = currentIdLong < 0
-            isUserCreated = currentIdLong < 0
+            val isOwnedByCurrentAccount = (playlistUser?.id != null && playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
+                (playerViewModel.currentUser != null && playlistUser?.username == playerViewModel.currentUser?.username)
+            isUserCreated = currentIdLong < 0 || isOwnedByCurrentAccount
         }
     }
 
@@ -510,13 +517,18 @@ fun PlaylistDetailScreen(
                     defaultIcon = Icons.Rounded.Folder
                     isLocalPlaylist = false
                     val localPlaylists = db.getDownloadedPlaylists().first()
-                    newDownloadedPlaylists.addAll(localPlaylists.map { local ->
+                    newDownloadedPlaylists.addAll(localPlaylists.mapNotNull { local ->
                         val tracksInPlaylist = db.getTracksForPlaylistSync(local.id)
                         val realDownloadedCount = tracksInPlaylist.count { it.localAudioPath.isNotEmpty() }
+                        if (realDownloadedCount == 0) return@mapNotNull null
+                        val firstTrackArt = tracksInPlaylist.firstOrNull { it.localArtworkPath.isNotEmpty() || it.artworkUrl.isNotEmpty() }?.let {
+                            if (it.localArtworkPath.isNotEmpty()) it.localArtworkPath else it.artworkUrl
+                        }
+                        val finalArt = local.artworkUrl.ifEmpty { firstTrackArt ?: "" }
                         Playlist(
                             id = local.id,
                             title = local.title,
-                            artworkUrl = local.artworkUrl,
+                            artworkUrl = finalArt,
                             calculatedArtworkUrl = local.localCoverPath,
                             trackCount = realDownloadedCount,
                             user = User(0, local.artist, null),
@@ -983,7 +995,7 @@ fun PlaylistDetailScreen(
                             isYoutubeRadio -> str("radio") + " â€¢ YouTube"
                             isLoading && playlistId != "likes" -> "..."
                             else -> {
-                                val count = tracksToDisplay.size + downloadedPlaylists.sumOf { it.trackCount ?: 0 }
+                                val count = tracksToDisplay.size
                                 if (count == 0 && playlistSearchQuery.isNotEmpty()) str("no_tracks_found_filter")
                                 else str("playlist_num_tracks", count)
                             }
@@ -1121,6 +1133,18 @@ fun PlaylistDetailScreen(
                                             onClick = {
                                                 Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(shareUrl), null)
                                                 showOptionsMenu = false
+                                            }
+                                        )
+                                    }
+                                    if (!isYoutubeRadio && stableId != 0L &&
+                                        playlistId != "likes" && playlistId != "downloads" && playlistId != "local_files"
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text(str(if (isUserCreated) "menu_delete_playlist" else "dialog_delete_playlist_from_lib_title")) },
+                                            leadingIcon = { Icon(Icons.Rounded.Delete, null) },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                showDeleteDialog = true
                                             }
                                         )
                                     }
@@ -1369,7 +1393,7 @@ fun PlaylistDetailScreen(
                                     downloadProgress = progress ?: 0,
                                     onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList(), index, playbackContext) },
                                     onOptionClick = {
-                                        val contextId = if (playlistId == "downloads") -2L else if (isUserCreated) currentIdLong else null
+                                        val contextId = if (isUserCreated || isDownloadedView) currentIdLong else null
                                         playerViewModel.showTrackOptions(track, contextId)
                                     },
                                     onAlbumClick = { onNavigate(it) },
@@ -1390,7 +1414,7 @@ fun PlaylistDetailScreen(
                                     showVerifiedBadge = false,
                                     onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList(), index, playbackContext) },
                                     onOptionClick = {
-                                        val contextId = if (playlistId == "downloads") -2L else if (isUserCreated) currentIdLong else null
+                                        val contextId = if (isUserCreated || isDownloadedView) currentIdLong else null
                                         playerViewModel.showTrackOptions(track, contextId)
                                     },
                                     onAlbumClick = { onNavigate(it) },
