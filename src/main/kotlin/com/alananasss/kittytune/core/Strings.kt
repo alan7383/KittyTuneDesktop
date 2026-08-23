@@ -31,10 +31,11 @@ object Strings {
         get() = effectiveLang()
 
     private fun effectiveLang(): String = when (appLanguage) {
-        "fr", "en", "hu" -> appLanguage
+        "fr", "en", "hu", "ru" -> appLanguage
         else -> when (Locale.getDefault().language) {
             "fr" -> "fr"
             "hu" -> "hu"
+            "ru" -> "ru"
             else -> "en"
         }
     }

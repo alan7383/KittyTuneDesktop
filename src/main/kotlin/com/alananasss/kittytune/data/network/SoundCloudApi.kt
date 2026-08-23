@@ -474,19 +474,33 @@
             @Body request: ApiCollection<ApiRecentlyPlayed>
         ): retrofit2.Response<Unit>
 
-        @POST("https://api-mobile.soundcloud.com/recently-played/tracks")
-        suspend fun pushPlayHistory(
-            @Body request: ApiCollection<ApiRecentlyPlayed>
-        ): retrofit2.Response<Unit>
+        @GET("https://api-mobile.soundcloud.com/recently-played/contexts/v2")
+        suspend fun getRecentlyPlayedContexts(
+            @Query("limit") limit: Int = 100,
+            @Query("offset") offset: Int? = null
+        ): retrofit2.Response<ApiCollection<ApiRecentlyPlayed>>
 
-        @POST("https://api-v2.soundcloud.com/me/play-history/tracks")
-        suspend fun pushPlayHistoryV2TrackId(@Body body: com.google.gson.JsonObject): retrofit2.Response<Unit>
+        @GET
+        suspend fun getRecentlyPlayedContextsNext(
+            @Url url: String
+        ): retrofit2.Response<ApiCollection<ApiRecentlyPlayed>>
 
-        @POST("https://api-v2.soundcloud.com/me/play-history")
-        suspend fun pushPlayHistoryV2Me(@Body body: com.google.gson.JsonObject): retrofit2.Response<Unit>
+        @DELETE("https://api-mobile.soundcloud.com/recently-played/contexts/all")
+        suspend fun clearRecentlyPlayedContexts(): retrofit2.Response<Unit>
 
-        @POST("https://api-mobile.soundcloud.com/tracks/{id}/plays")
-        suspend fun pushTrackPlays(@Path("id") id: Long): retrofit2.Response<Unit>
+        @GET("https://api-mobile.soundcloud.com/recently-played/tracks")
+        suspend fun getPlayHistory(
+            @Query("limit") limit: Int = 100,
+            @Query("offset") offset: Int? = null
+        ): retrofit2.Response<ApiCollection<ApiRecentlyPlayed>>
+
+        @GET
+        suspend fun getPlayHistoryNext(
+            @Url url: String
+        ): retrofit2.Response<ApiCollection<ApiRecentlyPlayed>>
+
+        @DELETE("https://api-mobile.soundcloud.com/recently-played/tracks/all")
+        suspend fun clearPlayHistory(): retrofit2.Response<Unit>
 
         @POST
         suspend fun postGraphQl(@Url url: String, @Body request: GraphQlRequest): JsonObject
@@ -495,6 +509,76 @@
 
         @POST("https://graph.soundcloud.com/graphql")
         suspend fun postMusicImportGraphQl(@Body request: GraphQlRequest): JsonObject
+
+        @PUT("https://api-mobile.soundcloud.com/playlists/{playlistUrn}/artwork")
+        suspend fun uploadPlaylistArtwork(
+            @Path("playlistUrn", encoded = true) playlistUrn: String,
+            @Body request: com.alananasss.kittytune.domain.ArtworkUploadRequest
+        ): retrofit2.Response<Unit>
+
+        @GET("https://api-mobile.soundcloud.com/you/upload-eligibility")
+        suspend fun getUploadEligibility(): com.alananasss.kittytune.data.upload.UploadEligibilityResponse
+
+        @POST("https://api-mobile.soundcloud.com/you/upload-policy")
+        suspend fun fetchUploadPolicy(
+            @Body request: com.alananasss.kittytune.data.upload.UploadPolicyRequest
+        ): com.alananasss.kittytune.data.upload.UploadPolicyResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun createTrackGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.CreateTrackGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.CreateTrackGraphQlResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun createTranscodingGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.CreateTranscodingGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.CreateTranscodingGraphQlResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun getTranscodingStatusGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.TranscodingStatusGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.TranscodingStatusGraphQlResponse
+
+        @PUT("https://api-mobile.soundcloud.com/tracks/{trackUrn}/artwork")
+        suspend fun uploadTrackArtwork(
+            @Path("trackUrn", encoded = true) trackUrn: String,
+            @Body request: com.alananasss.kittytune.domain.ArtworkUploadRequest
+        ): retrofit2.Response<Unit>
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun fetchEditableTrackGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.FetchEditableTrackGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.FetchEditableTrackGraphQlResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun editTrackGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.EditTrackGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.EditTrackGraphQlResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun deleteTrackGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.DeleteTrackGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.DeleteTrackGraphQlResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun fetchBuyModuleGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.FetchBuyModuleGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.FetchBuyModuleGraphQlResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun createBuyModuleGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.CreateBuyModuleGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.CreateBuyModuleGraphQlResponse
+
+        @POST("https://graph.soundcloud.com/graphql")
+        suspend fun deleteBuyModuleGraphQl(
+            @Body request: com.alananasss.kittytune.data.upload.DeleteBuyModuleGraphQlRequest
+        ): com.alananasss.kittytune.data.upload.DeleteBuyModuleGraphQlResponse
+
+        @DELETE("https://api-v2.soundcloud.com/tracks/{trackId}")
+        suspend fun deleteTrackRest(
+            @Path("trackId") trackId: Long
+        ): retrofit2.Response<Unit>
     }
 
 data class ApiRecentlyPlayed(
@@ -502,9 +586,19 @@ data class ApiRecentlyPlayed(
     @com.google.gson.annotations.SerializedName("urn") val urn: String
 )
 
-data class ApiCollection<T>(
-    @com.google.gson.annotations.SerializedName("collection") val collection: List<T>
+data class ApiLink(
+    @com.google.gson.annotations.SerializedName("href") val href: String? = null
 )
+
+data class ApiCollection<T>(
+    @com.google.gson.annotations.SerializedName("collection") val collection: List<T> = emptyList(),
+    @com.google.gson.annotations.SerializedName("next_href") val nextHref: String? = null,
+    @com.google.gson.annotations.SerializedName("query_urn") val queryUrn: String? = null,
+    @com.google.gson.annotations.SerializedName("_links") val links: Map<String, ApiLink>? = null
+) {
+    val nextUrl: String?
+        get() = nextHref ?: links?.get("next")?.href
+}
 
 data class TrackLikeItem(
     @com.google.gson.annotations.SerializedName("target_urn") val targetUrn: String

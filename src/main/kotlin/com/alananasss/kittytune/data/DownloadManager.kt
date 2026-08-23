@@ -8,6 +8,7 @@ import com.alananasss.kittytune.data.network.PlaylistLikeRequest
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.data.network.SoundCloudApi
 import com.alananasss.kittytune.domain.*
+import com.alananasss.kittytune.utils.Logger
 import com.mpatric.mp3agic.ID3v24Tag
 import com.mpatric.mp3agic.Mp3File
 import kotlinx.coroutines.*
@@ -116,10 +117,30 @@ object DownloadManager {
     private val _deletedPlaylistIds = MutableStateFlow<Set<Long>>(emptySet())
     val deletedPlaylistIds = _deletedPlaylistIds.asStateFlow()
 
+    fun clearDeletedPlaylistId(playlistId: Long) {
+        _deletedPlaylistIds.update { it - playlistId }
+        _libraryUpdated.tryEmit(Unit)
+    }
+
+    fun clearDeletedPlaylistIds(ids: Set<Long>) {
+        _deletedPlaylistIds.update { it - ids }
+        _libraryUpdated.tryEmit(Unit)
+    }
+
     lateinit var downloadedIds: StateFlow<Set<Long>>
 
-    private val activeJobs = mutableMapOf<Long, Job>()
-    private val activePlaylistJobs = mutableMapOf<Long, Job>()
+    private val activeJobs = ConcurrentHashMap<Long, Job>()
+    private val activePlaylistJobs = ConcurrentHashMap<Long, Job>()
+    private val batchTrackIds = ConcurrentHashMap<Long, Set<Long>>()
+
+    fun hasEnoughFreeStorage(minBytes: Long = 25L * 1024 * 1024): Boolean {
+        return try {
+            val freeSpace = AppDirs.audioCacheDir.usableSpace
+            freeSpace > minBytes
+        } catch (e: Exception) {
+            true
+        }
+    }
 
     fun init() {
         downloadedIds = dao.getAllTracks()
@@ -128,6 +149,34 @@ object DownloadManager {
 
         scope.launch {
             try {
+                dao.fixNegativeIdPlaylistsUserCreated()
+
+                val storedTracks = dao.getAllStoredTracksList()
+                val brokenTracks = storedTracks.filter { track ->
+                    track.id > 0 && !track.artworkUrl.startsWith("http") &&
+                    (track.localArtworkPath.isEmpty() || !File(track.localArtworkPath).exists() || File(track.localArtworkPath).length() == 0L)
+                }
+
+                if (brokenTracks.isNotEmpty()) {
+                    val chunks = brokenTracks.chunked(50)
+                    chunks.forEach { chunk ->
+                        try {
+                            val idsStr = chunk.map { it.id }.joinToString(",")
+                            val onlineTracks = api.getTracksByIds(idsStr)
+                            val onlineMap = onlineTracks.associateBy { it.id }
+                            chunk.forEach { localTrack ->
+                                val online = onlineMap[localTrack.id]
+                                if (online != null && online.fullResArtwork.startsWith("http")) {
+                                    dao.updateTrack(localTrack.copy(artworkUrl = online.fullResArtwork))
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Logger.e("DownloadManager", "Failed to repair track artworks", e)
+                        }
+                    }
+                    _libraryUpdated.tryEmit(Unit)
+                }
+
                 val allPlaylists = dao.getAllPlaylists().first()
                 allPlaylists.forEach { localPlaylist ->
                     if (!localPlaylist.isUserCreated && localPlaylist.id > 0) {
@@ -139,8 +188,28 @@ object DownloadManager {
                         }
                     }
                 }
+
+                val allDownloadedTracks = dao.getAllTracksList()
+                var cleanedAny = false
+                allDownloadedTracks.forEach { track ->
+                    if (track.id > 0 && track.localAudioPath.isNotEmpty()) {
+                        if (!File(track.localAudioPath).exists()) {
+                            val refCount = dao.getPlaylistRefCount(track.id)
+                            if (refCount > 0) {
+                                dao.updateTrack(track.copy(localAudioPath = "", localArtworkPath = ""))
+                            } else {
+                                dao.deleteTrack(track.id)
+                            }
+                            cleanedAny = true
+                        }
+                    }
+                }
+                if (cleanedAny) {
+                    dao.cleanUnreferencedEmptyTracks()
+                    _storageTrigger.update { it + 1 }
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Logger.e("DownloadManager", "Failed to cleanup legacy cached playlists or verify integrity", e)
             }
         }
     }
@@ -277,13 +346,13 @@ object DownloadManager {
         }
     }
 
-    fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) {
+    fun removeTrackFromPlaylist(playlistId: Long, trackId: Long, syncToCloud: Boolean = true) {
         scope.launch {
             dao.removeTrackFromPlaylist(playlistId, trackId)
             val playlist = dao.getPlaylist(playlistId)
             if (playlist != null) dao.updatePlaylist(playlist.copy(trackCount = (playlist.trackCount - 1).coerceAtLeast(0)))
 
-            if (playlistId > 0 && !tokenManager.isGuestMode()) {
+            if (syncToCloud && playlistId > 0 && !tokenManager.isGuestMode()) {
                 try {
                     val onlinePlaylist = api.getPlaylist(playlistId)
                     val trackIds = (onlinePlaylist.tracks ?: emptyList()).map { it.id }.toMutableList()
@@ -291,6 +360,8 @@ object DownloadManager {
                     updateRemotePlaylist(playlistId, playlistUpdateRequest(onlinePlaylist, trackIds))
                 } catch (e: Exception) { e.printStackTrace() }
             }
+            _storageTrigger.update { it + 1 }
+            _libraryUpdated.tryEmit(Unit)
         }
     }
 
@@ -341,11 +412,11 @@ object DownloadManager {
     fun editPlaylistMetadata(
         playlistId: Long, newTitle: String, newDescription: String? = null, newSharing: String? = null,
         newTagList: String? = null, newPermalink: String? = null, newGenre: String? = null,
-        newSetType: String? = null, newReleaseDate: String? = null
+        newSetType: String? = null, newReleaseDate: String? = null, syncToCloud: Boolean = true
     ) {
         scope.launch {
             dao.updatePlaylistTitle(playlistId, newTitle)
-            if (playlistId > 0 && !tokenManager.isGuestMode()) {
+            if (syncToCloud && playlistId > 0 && !tokenManager.isGuestMode()) {
                 try {
                     val onlinePlaylist = api.getPlaylist(playlistId)
                     val request = playlistUpdateRequest(
@@ -363,6 +434,7 @@ object DownloadManager {
                     updateRemotePlaylist(playlistId, request)
                 } catch (e: Exception) { e.printStackTrace() }
             }
+            _storageTrigger.update { it + 1 }
             _libraryUpdated.tryEmit(Unit)
         }
     }
@@ -371,35 +443,40 @@ object DownloadManager {
     fun getUserPlaylistsFlow() = dao.getUserPlaylists()
     fun isPlaylistInLibraryFlow(playlistId: Long) = dao.getPlaylistFlow(playlistId)
 
-    fun importPlaylistToLibrary(playlist: Playlist, tracks: List<Track>, syncToCloud: Boolean = true) {
+    fun importPlaylistToLibrary(
+        playlist: Playlist,
+        tracks: List<Track>,
+        syncToCloud: Boolean = true,
+        isDownloaded: Boolean? = null
+    ) {
         scope.launch {
-            if (syncToCloud && playlist.id > 0 && !tokenManager.isGuestMode()) {
-                val token = tokenManager.getAccessToken()
-                if (!token.isNullOrEmpty()) {
-                    try {
-                        val permalink = playlist.permalinkUrl ?: ""
-                        val targetUrn = playlist.urn ?: when {
-                            permalink.contains("artist-stations") -> "soundcloud:system-playlists:artist-stations:${playlist.id}"
-                            permalink.contains("track-stations") -> "soundcloud:system-playlists:track-stations:${playlist.id}"
-                            else -> "soundcloud:playlists:${playlist.id}"
-                        }
-                        val payload = PlaylistLikeRequest(likes = listOf(PlaylistLikeItem(targetUrn)))
-                        val response = api.likePlaylist(payload)
-                        if (response.code() == 401) SessionManager.requestSessionRefresh(force = true)
-                    } catch (e: Exception) { e.printStackTrace() }
-                }
+            if (syncToCloud && playlist.id != 0L) {
+                LikeRepository.togglePlaylistLike(
+                    playlistId = playlist.id,
+                    isLiked = true,
+                    permalink = playlist.permalinkUrl,
+                    urn = playlist.urn
+                )
             }
 
+            val existing = dao.getPlaylist(playlist.id)
+            val isUserCreatedFinal = playlist.id < 0 || (existing?.isUserCreated == true)
+            val localCover = existing?.localCoverPath ?: (if (playlist.id < 0) playlist.calculatedArtworkUrl ?: playlist.artworkUrl else null)
+            val isDownloadedFinal = isDownloaded ?: (existing?.isDownloaded ?: false)
             val baseTime = System.currentTimeMillis()
+
             val localPlaylist = LocalPlaylist(
                 id = playlist.id,
                 title = playlist.title ?: str("untitled_track"),
                 artist = playlist.user?.username ?: str("unknown_artist"),
                 artworkUrl = playlist.fullResArtwork,
+                localCoverPath = localCover,
                 trackCount = tracks.size,
-                isUserCreated = false,
+                isUserCreated = isUserCreatedFinal,
                 permalinkUrl = playlist.permalinkUrl,
-                isAlbum = playlist.isAlbum
+                isAlbum = playlist.isAlbum,
+                addedAt = existing?.addedAt ?: baseTime,
+                isDownloaded = isDownloadedFinal
             )
             dao.insertPlaylist(localPlaylist)
 
@@ -451,51 +528,126 @@ object DownloadManager {
             }
 
             if (playlistToDelete != null) {
-                val folderName = sanitizeFilename("${playlistToDelete.title}_${playlistToDelete.id}")
+                val folderName = sanitizeFilename(playlistToDelete.title)
                 try {
                     val playlistDir = File(outputDirFor(null), folderName)
                     if (playlistDir.exists() && playlistDir.isDirectory) playlistDir.deleteRecursively()
                 } catch (e: Exception) { e.printStackTrace() }
             }
 
+            val playlistTracks = dao.getTracksForPlaylistSync(playlistId)
             dao.deletePlaylist(playlistId)
             dao.deletePlaylistRefs(playlistId)
-            HistoryRepository.removeFromHistory(playlistId)
-
-            val orphans = dao.getOrphanTracksList()
-            orphans.forEach { track ->
-                deleteFileByPath(track.localAudioPath)
-                deleteFileByPath(track.localArtworkPath)
-                dao.deleteTrack(track.id)
+            if (syncToCloud) {
+                HistoryRepository.removeFromHistory(playlistId)
+                _deletedPlaylistIds.update { it + playlistId }
             }
 
+            playlistTracks.forEach { track ->
+                val remainingRefCount = dao.getPlaylistRefCount(track.id)
+                val remainingDownloadedRefCount = dao.getDownloadedPlaylistRefCount(track.id, excludePlaylistId = playlistId)
+                if (remainingRefCount == 0 && track.id != 0L) {
+                    deleteFileByPath(track.localAudioPath)
+                    deleteFileByPath(track.localArtworkPath)
+                    dao.deleteTrack(track.id)
+                    MusicManager.notifyTrackDeleted(track.id)
+                } else if (remainingDownloadedRefCount == 0 && track.id != 0L) {
+                    val local = dao.getTrack(track.id)
+                    if (local != null) {
+                        deleteFileByPath(local.localAudioPath)
+                        dao.updateTrack(local.copy(localAudioPath = ""))
+                    }
+                }
+            }
+            dao.cleanUnreferencedEmptyTracks()
+
             _storageTrigger.update { it + 1 }
-            _deletedPlaylistIds.update { it + playlistId }
             _libraryUpdated.tryEmit(Unit)
+            MusicManager.notifyPlaylistDeleted(playlistId)
         }
     }
 
-    fun removePlaylistDownloads(playlistId: Long) {
+    fun removePlaylistDownloads(playlistId: Long, tracks: List<Track>? = null) {
         scope.launch {
-            val localTracks = dao.getTracksForPlaylistSync(playlistId)
-            val domainTracks = localTracks.map { local ->
-                Track(id = local.id, title = local.title, artworkUrl = local.artworkUrl, durationMs = local.duration, user = User(0, local.artist, null))
+            val playlist = dao.getPlaylist(playlistId)
+            if (playlist != null) {
+                val folderName = sanitizeFilename(playlist.title)
+                try {
+                    val playlistDir = File(outputDirFor(null), folderName)
+                    if (playlistDir.exists() && playlistDir.isDirectory) {
+                        playlistDir.deleteRecursively()
+                    }
+                } catch (e: Exception) {
+                    Logger.e("DownloadManager", "Failed to delete playlist folder: $folderName", e)
+                }
+                dao.setPlaylistDownloaded(playlistId, false)
             }
-            removeDownloads(domainTracks)
+
+            val dbTracks = dao.getTracksForPlaylistSync(playlistId)
+            val allTrackIds = (dbTracks.map { it.id } + (tracks?.map { it.id } ?: emptyList())).toSet()
+            val isUserOrLiked = playlist?.isUserCreated == true || playlistId < 0L || LikeRepository.isPlaylistLiked(playlistId)
+
+            if (!isUserOrLiked) {
+                dao.deletePlaylistRefs(playlistId)
+            }
+
+            allTrackIds.forEach { trackId ->
+                if (trackId != 0L) {
+                    val otherDownloadedRefs = dao.getDownloadedPlaylistRefCount(trackId, excludePlaylistId = playlistId)
+                    if (otherDownloadedRefs == 0) {
+                        val local = dao.getTrack(trackId)
+                        if (local != null) {
+                            deleteFileByPath(local.localAudioPath)
+                            val refCount = dao.getPlaylistRefCount(trackId)
+                            if (refCount > 0 || isUserOrLiked) {
+                                dao.updateTrack(local.copy(localAudioPath = ""))
+                            } else {
+                                deleteFileByPath(local.localArtworkPath)
+                                dao.deleteTrack(trackId)
+                            }
+                            MusicManager.notifyTrackDeleted(trackId)
+                        }
+                    }
+                }
+            }
+
+            if (!isUserOrLiked) {
+                if (playlist != null) {
+                    dao.deletePlaylist(playlistId)
+                }
+                MusicManager.notifyPlaylistDeleted(playlistId)
+            }
+
+            dao.cleanUnreferencedEmptyTracks()
+            _storageTrigger.update { it + 1 }
+            _libraryUpdated.tryEmit(Unit)
         }
     }
 
     fun removeDownloads(tracks: List<Track>) {
         scope.launch {
             tracks.forEach { track ->
-                val local = dao.getTrack(track.id)
-                if (local != null) {
-                    deleteFileByPath(local.localAudioPath)
-                    deleteFileByPath(local.localArtworkPath)
-                    dao.updateTrack(local.copy(localAudioPath = "", localArtworkPath = ""))
+                if (track.id != 0L) {
+                    val downloadedRefs = dao.getDownloadedPlaylistRefCount(track.id, excludePlaylistId = -1L)
+                    if (downloadedRefs == 0) {
+                        val local = dao.getTrack(track.id)
+                        if (local != null) {
+                            deleteFileByPath(local.localAudioPath)
+                            val refCount = dao.getPlaylistRefCount(track.id)
+                            if (refCount > 0) {
+                                dao.updateTrack(local.copy(localAudioPath = ""))
+                            } else {
+                                deleteFileByPath(local.localArtworkPath)
+                                dao.deleteTrack(track.id)
+                            }
+                            MusicManager.notifyTrackDeleted(track.id)
+                        }
+                    }
                 }
             }
+            dao.cleanUnreferencedEmptyTracks()
             _storageTrigger.update { it + 1 }
+            _libraryUpdated.tryEmit(Unit)
         }
     }
 
@@ -561,7 +713,7 @@ object DownloadManager {
     }
 
     fun downloadPlaylist(playlist: Playlist, tracks: List<Track>) {
-        importPlaylistToLibrary(playlist, tracks)
+        importPlaylistToLibrary(playlist, tracks, isDownloaded = true)
         val title = playlist.title ?: "Playlist"
         val folderName = sanitizeFilename("${title}_${playlist.id}")
         downloadBatch(tracks, playlist.id, folderName)
@@ -573,6 +725,7 @@ object DownloadManager {
 
         val batchJob = scope.launch {
             val trackIdsToDownload = tracks.map { it.id }.toSet()
+            batchTrackIds[batchId] = trackIdsToDownload
             try {
                 _playlistDownloadProgress.update { it + (batchId to 0f) }
 
@@ -610,6 +763,10 @@ object DownloadManager {
                     progressJob.cancel()
                 }
 
+                if (batchId > 0 || (batchId < 0 && batchId != LIKES_BATCH_ID)) {
+                    dao.setPlaylistDownloaded(batchId, true)
+                }
+
                 _playlistDownloadProgress.update { it + (batchId to 1f) }
                 delay(500)
                 _storageTrigger.update { it + 1 }
@@ -618,7 +775,9 @@ object DownloadManager {
             } finally {
                 _playlistDownloadProgress.update { it - batchId }
                 activePlaylistJobs.remove(batchId)
+                batchTrackIds.remove(batchId)
                 _storageTrigger.update { it + 1 }
+                _libraryUpdated.tryEmit(Unit)
             }
         }
         activePlaylistJobs[batchId] = batchJob
@@ -635,6 +794,13 @@ object DownloadManager {
 
     private fun startDownloadJob(track: Track, subFolderName: String? = null): Job {
         val job = scope.launch {
+            if (!hasEnoughFreeStorage()) {
+                Logger.e("DownloadManager", "Not enough storage space to download track: ${track.title}")
+                withContext(Dispatchers.Main) {
+                    com.alananasss.kittytune.core.Toaster.show(str("error_not_enough_space"))
+                }
+                return@launch
+            }
             trackMutexes.getOrPut(track.id) { Mutex() }.withLock {
                 var tempAudioFile: File? = null
                 var tempImageFile: File? = null
@@ -722,6 +888,7 @@ object DownloadManager {
                 if (existingTrack == null) dao.insertTrack(localTrack) else dao.updateTrack(localTrack)
 
                 _storageTrigger.update { it + 1 }
+                _libraryUpdated.tryEmit(Unit)
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -852,13 +1019,26 @@ object DownloadManager {
 
     fun deleteTrack(trackId: Long) {
         scope.launch {
+            if (trackId == 0L) return@launch
             val track = dao.getTrack(trackId)
             if (track != null) {
-                deleteFileByPath(track.localAudioPath)
-                deleteFileByPath(track.localArtworkPath)
-                dao.updateTrack(track.copy(localAudioPath = "", localArtworkPath = ""))
+                val downloadedRefs = dao.getDownloadedPlaylistRefCount(trackId, excludePlaylistId = -1L)
+                val refCount = dao.getPlaylistRefCount(trackId)
+                if (refCount > 0) {
+                    if (downloadedRefs == 0) {
+                        deleteFileByPath(track.localAudioPath)
+                        dao.updateTrack(track.copy(localAudioPath = "", localArtworkPath = ""))
+                    }
+                } else {
+                    deleteFileByPath(track.localAudioPath)
+                    deleteFileByPath(track.localArtworkPath)
+                    dao.deleteTrack(trackId)
+                }
+                MusicManager.notifyTrackDeleted(trackId)
             }
+            dao.cleanUnreferencedEmptyTracks()
             _storageTrigger.update { it + 1 }
+            _libraryUpdated.tryEmit(Unit)
         }
     }
 
@@ -868,6 +1048,7 @@ object DownloadManager {
         _downloadProgress.update { it - trackId }
         try { File(AppDirs.audioCacheDir, "temp_$trackId.mp3").delete() } catch (e: Exception) {}
         _storageTrigger.update { it + 1 }
+        _libraryUpdated.tryEmit(Unit)
     }
 
     fun isPlaylistDownloading(playlistId: Long): Boolean = activePlaylistJobs.containsKey(playlistId)
@@ -918,8 +1099,13 @@ object DownloadManager {
             job.cancel()
             activePlaylistJobs.remove(batchId)
             _playlistDownloadProgress.update { it - batchId }
-            _storageTrigger.update { it + 1 }
         }
+        batchTrackIds[batchId]?.forEach { trackId ->
+            cancelDownload(trackId)
+        }
+        batchTrackIds.remove(batchId)
+        _storageTrigger.update { it + 1 }
+        _libraryUpdated.tryEmit(Unit)
     }
 }
 

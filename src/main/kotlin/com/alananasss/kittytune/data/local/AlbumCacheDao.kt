@@ -17,12 +17,15 @@ data class TrackAlbumCacheRow(
 class AlbumCacheDao(private val db: AppDatabase) {
 
     private fun row(rs: ResultSet): TrackAlbumCacheRow {
-        val playlistId = rs.getLong("albumPlaylistId")
+        val trackId = rs.getLong("trackId")
+        val albumPlaylistId = rs.getLong("albumPlaylistId").let { if (rs.wasNull()) null else it }
+        val albumTitle = rs.getString("albumTitle")
+        val resolvedAt = rs.getLong("resolvedAt")
         return TrackAlbumCacheRow(
-            trackId = rs.getLong("trackId"),
-            albumPlaylistId = if (rs.wasNull()) null else playlistId,
-            albumTitle = rs.getString("albumTitle"),
-            resolvedAt = rs.getLong("resolvedAt")
+            trackId = trackId,
+            albumPlaylistId = albumPlaylistId,
+            albumTitle = albumTitle,
+            resolvedAt = resolvedAt
         )
     }
 

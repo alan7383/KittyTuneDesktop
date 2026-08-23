@@ -37,22 +37,35 @@ object FollowingFeedGraphQl {
             consentParams: ${'$'}consentParams
           ) {
             items {
-              __typename
               ... on RepostedItem {
+                __typename
                 createdAt
+                item {
+                  ...PlaylistFragment
+                  ...TrackFragment
+                }
+                reposter {
+                  ...UserFragment
+                }
                 caption
-                item { ...TrackFields ...PlaylistFields }
-                reposter { ...UserFields }
               }
               ... on PostedItem {
+                __typename
                 createdAt
+                item {
+                  ...PlaylistFragment
+                  ...TrackFragment
+                }
                 caption
-                item { ...TrackFields ...PlaylistFields }
               }
               ... on PromotedItem {
-                createdAt
+                __typename
                 promotedUrn
-                item { ...TrackFields ...PlaylistFields }
+                createdAt
+                item {
+                  ...PlaylistFragment
+                  ...TrackFragment
+                }
                 promoter {
                   urn
                   name
@@ -68,7 +81,7 @@ object FollowingFeedGraphQl {
           }
         }
 
-        fragment UserFields on User {
+        fragment UserFragment on User {
           urn
           name
           username
@@ -83,11 +96,13 @@ object FollowingFeedGraphQl {
           verified
         }
 
-        fragment TrackFields on Track {
+        fragment TrackFragment on Track {
           __typename
           urn
           title
-          user { ...UserFields }
+          user {
+            ...UserFragment
+          }
           fullDuration
           snipDuration
           counts {
@@ -115,23 +130,28 @@ object FollowingFeedGraphQl {
           }
         }
 
-        fragment PlaylistFields on Playlist {
+        fragment PlaylistFragment on Playlist {
           __typename
           urn
-          title
+          playlistTitle: title
           artworkUrl
           releaseDate
           duration
           trackCount
           createdAt
           playlistCategory
-          user { ...UserFields }
+          playlistUser: user {
+            ...UserFragment
+          }
           paginatedTracks(first: ${'$'}first) {
+            __typename
             pageInfo {
               nextPage
               hasNextPage
             }
-            tracks { ...TrackFields }
+            tracks {
+              ...TrackFragment
+            }
           }
         }
     """.trimIndent()
@@ -227,7 +247,9 @@ data class FollowingFeedEntity(
     @SerializedName("__typename") val typename: String?,
     val urn: String?,
     val title: String?,
+    val playlistTitle: String?,
     val user: FollowingFeedUser?,
+    val playlistUser: FollowingFeedUser?,
     val fullDuration: Long?,
     val snipDuration: Long?,
     val counts: FollowingFeedCounts?,
@@ -252,10 +274,10 @@ data class FollowingFeedEntity(
 
         return Track(
             id = id,
-            title = title,
+            title = title ?: playlistTitle,
             artworkUrl = artworkUrlTemplate.toArtworkUrl(),
             durationMs = fullDuration ?: snipDuration,
-            user = user?.toUser(),
+            user = (user ?: playlistUser)?.toUser(),
             media = transcodings
                 ?.mapNotNull { it.toTranscoding() }
                 ?.takeIf { it.isNotEmpty() }
@@ -284,11 +306,11 @@ data class FollowingFeedEntity(
 
         return Playlist(
             id = id,
-            title = title,
+            title = playlistTitle ?: title,
             artworkUrl = artworkUrl,
             calculatedArtworkUrl = null,
             trackCount = trackCount,
-            user = user?.toUser(),
+            user = (playlistUser ?: user)?.toUser(),
             tracks = paginatedTracks?.tracks?.mapNotNull { it.toTrack() },
             isAlbum = isAlbum,
             permalinkUrl = permalinkUrl,

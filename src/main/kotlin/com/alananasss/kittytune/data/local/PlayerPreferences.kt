@@ -24,15 +24,35 @@ enum class AppLanguage(val code: String) {
     SYSTEM("system"),
     FRENCH("fr"),
     ENGLISH("en"),
-    HUNGARIAN("hu")
+    HUNGARIAN("hu"),
+    RUSSIAN("ru")
 }
+
+val DEFAULT_PINNED_AUDIO_FX = listOf(
+    "bass_boost",
+    "earrape",
+    "eight_d",
+    "muffled",
+    "reverb",
+    "rain"
+)
 
 class PlayerPreferences {
     private val gson = Gson()
     private val queueFile = File(AppDirs.dataDir, "queue_cache.json")
 
     companion object {
+        val DEFAULT_PINNED_AUDIO_FX = listOf(
+            "bass_boost",
+            "earrape",
+            "eight_d",
+            "muffled",
+            "reverb",
+            "rain"
+        )
         const val KEY_LISTENING_STATS_ENABLED = "listening_stats_enabled"
+        private const val KEY_PINNED_AUDIO_FX = "pinned_audio_fx_list_v1"
+        private const val KEY_SOUNDCLOUD_HISTORY_SYNC = "soundcloud_history_sync_enabled"
         private const val KEY_TRACK_JSON = "last_track_json"
         private const val KEY_POSITION = "last_position"
         private const val KEY_EFFECTS = "audio_effects"
@@ -371,6 +391,46 @@ class PlayerPreferences {
             val state = gson.fromJson(json, AudioEffectsState::class.java)
             state.copy(normalizationLevel = state.normalizationLevel ?: com.alananasss.kittytune.ui.player.NormalizationLevel.NORMAL)
         } catch (_: Exception) { AudioEffectsState() } 
+    }
+
+    fun getPinnedAudioFx(): List<String> {
+        val json = Prefs.getString(KEY_PINNED_AUDIO_FX, null) ?: return DEFAULT_PINNED_AUDIO_FX
+        return try {
+            val type = object : TypeToken<List<String>>() {}.type
+            val list: List<String>? = gson.fromJson(json, type)
+            if (list.isNullOrEmpty()) DEFAULT_PINNED_AUDIO_FX else list
+        } catch (_: Exception) {
+            DEFAULT_PINNED_AUDIO_FX
+        }
+    }
+
+    fun setPinnedAudioFx(fxIds: List<String>) {
+        Prefs.putString(KEY_PINNED_AUDIO_FX, gson.toJson(fxIds))
+    }
+
+    fun getSoundCloudHistorySyncEnabled(): Boolean = Prefs.getBoolean(KEY_SOUNDCLOUD_HISTORY_SYNC, true)
+
+    fun setSoundCloudHistorySyncEnabled(enabled: Boolean) {
+        Prefs.putBoolean(KEY_SOUNDCLOUD_HISTORY_SYNC, enabled)
+    }
+
+    fun getCachedUserUploads(): List<Track> {
+        val json = Prefs.getString("cached_user_uploads", null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<Track>>() {}.type
+            gson.fromJson(json, type) ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun setCachedUserUploads(tracks: List<Track>) {
+        try {
+            val json = gson.toJson(tracks)
+            Prefs.putString("cached_user_uploads", json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 
