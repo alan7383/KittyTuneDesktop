@@ -159,16 +159,34 @@ class AudioEngine {
     @Volatile
     private var pausedTimestamp = 0L
 
+    private companion object {
+        /** How long a pause has to last before resuming reconnects instead of trusting the socket. */
+        const val RECONNECT_AFTER_PAUSE_MS = 30_000L
+    }
+
     fun play() {
-        val wasLongPause = paused && pausedTimestamp > 0L && (System.currentTimeMillis() - pausedTimestamp > 2 * 60 * 1000L)
+        val pausedFor = if (paused && pausedTimestamp > 0L) System.currentTimeMillis() - pausedTimestamp else 0L
         paused = false
         pausedTimestamp = 0L
+
+        // The decode loop can exit on its own — a recovery that ran out of attempts, an
+        // unexpected throw — without ever reaching ENDED. The engine then still looks READY
+        // while nothing is feeding the line, and pressing play did nothing at all: the
+        // "stop a song, come back later, it never starts" report in issue #27. Restarting
+        // whenever no worker is alive covers that regardless of how the thread went away.
+        val workerAlive = worker?.isAlive == true
+
         if (state == State.ENDED) {
             setState(State.BUFFERING)
             prepare()
-        } else if (wasLongPause && currentUrl?.startsWith("http") == true) {
-            // After a long pause (> 2 min), the CDN TCP connection or signed token may have expired.
-            // Seek to current position to cleanly reconnect without hanging.
+        } else if (!workerAlive && currentUrl != null) {
+            Logger.e("AudioEngine", "play() with no live decoder; re-preparing at $positionMs ms")
+            setState(State.BUFFERING)
+            seekRequestMs = positionMs
+            prepare()
+        } else if (pausedFor > RECONNECT_AFTER_PAUSE_MS && currentUrl?.startsWith("http") == true) {
+            // A CDN keep-alive rarely survives even half a minute, and SoundCloud's signed
+            // URLs expire outright. Seeking forces a clean reconnect instead of a stall.
             seekTo(positionMs)
         }
         setPlaying(true)
