@@ -20,6 +20,9 @@ import com.materialkolor.scheme.DynamicScheme
 
 object ThemeState {
     var previewKeyColor by mutableStateOf<Int?>(null)
+
+    /** Dominant color extracted from the current track artwork (null = none). */
+    var coverSeedColor by mutableStateOf<Int?>(null)
 }
 
 internal val KittyTuneDefaultSeedColor = Color(0xFFFF7A1A)
@@ -94,10 +97,17 @@ internal fun rememberSoundTuneColorScheme(
 
     val style = remember(colorStyle) { parseMaterialKolorPaletteStyle(colorStyle) }
     val specVersion = remember(colorSpec) { parseMaterialKolorColorSpec(colorSpec) }
-    
+
     val effectiveKeyColor = ThemeState.previewKeyColor ?: keyColor
-    val seedColor = remember(effectiveKeyColor) {
-        if (effectiveKeyColor != 0) Color(effectiveKeyColor) else KittyTuneDefaultSeedColor
+    // Dynamic theme: seed the whole palette from the current track's dominant
+    // artwork color; fall back to the user's key color otherwise.
+    val coverSeed = if (dynamicColor) ThemeState.coverSeedColor else null
+    val seedColor = remember(effectiveKeyColor, coverSeed, useDarkTheme) {
+        when {
+            coverSeed != null -> Color(coverSeed)
+            effectiveKeyColor != 0 -> Color(effectiveKeyColor)
+            else -> KittyTuneDefaultSeedColor
+        }
     }
 
     return rememberDynamicColorScheme(
