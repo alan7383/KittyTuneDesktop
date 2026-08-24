@@ -8,6 +8,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.Frame
+import org.bytedeco.javacv.FrameGrabber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
@@ -89,6 +90,12 @@ class AudioEngine {
         reverseEcho, stadium, walkman, asmrVocal, nightDrive
     )
     private val stretcher = TimeStretcher(outputSampleRate, outputChannels)
+
+    /**
+     * Catches the inter-sample overshoot lossy decoders leave above full scale, before
+     * the 16-bit conversion turns it into flat-topped crackle. See [PeakLimiter].
+     */
+    private val limiter = PeakLimiter(outputSampleRate, outputChannels)
 
     private var effects = AudioEffectsState()
 
@@ -341,6 +348,8 @@ class AudioEngine {
 
         val pitch = if (state.isPitchEnabled) state.speed else 1f
         stretcher.setParameters(state.speed, pitch)
+
+        limiter.setCeiling(peakLimiterCeilingFor(state))
     }
 
 
@@ -360,6 +369,9 @@ class AudioEngine {
                 setOption("analyzeduration", "0")
                 sampleRate = outputSampleRate
                 audioChannels = outputChannels
+                // Hand us the decoder's own float output. javacv's default (SHORT) would
+                // resample straight to s16 and saturate every overshoot on the way.
+                sampleMode = FrameGrabber.SampleMode.FLOAT
             }
         } else {
             return FFmpegFrameGrabber(targetUrl).apply {
@@ -381,6 +393,7 @@ class AudioEngine {
                 }
                 sampleRate = outputSampleRate
                 audioChannels = outputChannels
+                sampleMode = FrameGrabber.SampleMode.FLOAT
             }
         }
     }
@@ -433,8 +446,7 @@ class AudioEngine {
                 if (f != null) {
                     val samples = f.samples
                     if (samples != null) {
-                        val (pcm, pcmLen) = interleave(samples, f.sampleRate, f.audioChannels)
-                        pushThroughDsp(pcm, pcmLen)
+                        pushFrame(samples, f.audioChannels)
                     }
                     Logger.e("AudioEngine", "Recovery succeeded on attempt $attempt!")
                     return Pair(newG, currentUrlToTry)
@@ -527,8 +539,7 @@ class AudioEngine {
                             // On HLS, createGrabber(seek) already positioned at the requested segment.
                             val samples = seekFrame?.samples
                             if (samples != null) {
-                                val (pcm, pcmLen) = interleave(samples, seekFrame!!.sampleRate, seekFrame!!.audioChannels)
-                                pushThroughDsp(pcm, pcmLen)
+                                pushFrame(samples, seekFrame!!.audioChannels)
                             }
                         } else {
                             var f = seekFrame
@@ -538,8 +549,7 @@ class AudioEngine {
                                 if (ts >= targetTimestamp - 50_000L) {
                                     val samples = f.samples
                                     if (samples != null) {
-                                        val (pcm, pcmLen) = interleave(samples, f.sampleRate, f.audioChannels)
-                                        pushThroughDsp(pcm, pcmLen)
+                                        pushFrame(samples, f.audioChannels)
                                     }
                                     break
                                 }
@@ -556,6 +566,7 @@ class AudioEngine {
 
                     positionMs = seek
                     stretcher.flush()
+                    limiter.flush()
                     chain.forEach { it.flush() }
                     localLine?.flush()
                 }
@@ -601,8 +612,7 @@ class AudioEngine {
                 }
 
                 val samples = frame.samples ?: continue
-                val (pcm, pcmLen) = interleave(samples, frame.sampleRate, frame.audioChannels)
-                pushThroughDsp(pcm, pcmLen)
+                pushFrame(samples, frame.audioChannels)
                 drainStretcher(outBuf, localLine)
 
                 if (seekRequestMs == -1L) {
@@ -623,74 +633,75 @@ class AudioEngine {
     }
 
     private var interleaveBuffer = ShortArray(0)
+    private var decodeBuffer = FloatArray(0)
 
-    private fun interleave(buffers: Array<java.nio.Buffer>, frameRate: Int, frameChannels: Int): Pair<ShortArray, Int> {
+    /**
+     * Decodes one frame into the 16-bit effect chain: de-interleaves to float, limits the
+     * peaks, then quantises. The limiter has to run while we are still in float — once the
+     * samples are Shorts the overshoot has already been flat-topped.
+     */
+    private fun pushFrame(buffers: Array<java.nio.Buffer>, frameChannels: Int) {
+        val n = decodeToFloat(buffers, frameChannels)
+        if (n <= 0) return
+
+        limiter.process(decodeBuffer, n)
+
+        if (interleaveBuffer.size < n) interleaveBuffer = ShortArray(n)
+        for (i in 0 until n) {
+            interleaveBuffer[i] = (decodeBuffer[i] * 32767f).toInt().coerceIn(-32768, 32767).toShort()
+        }
+        pushThroughDsp(interleaveBuffer, n)
+    }
+
+    /**
+     * Normalises whatever sample format the grabber handed us into interleaved floats in
+     * [-1, 1] in [decodeBuffer]. Returns the number of samples written.
+     */
+    private fun decodeToFloat(buffers: Array<java.nio.Buffer>, frameChannels: Int): Int {
+        if (buffers.isEmpty()) return 0
         val first = buffers[0]
-        if (first is ShortBuffer) {
-            if (buffers.size == frameChannels && frameChannels > 1) {
-                val len = first.remaining()
-                val required = len * frameChannels
-                if (interleaveBuffer.size < required) {
-                    interleaveBuffer = ShortArray(required)
-                }
-                for (ch in 0 until frameChannels) {
-                    val b = buffers[ch] as ShortBuffer
-                    val bPos = b.position()
-                    for (i in 0 until len) interleaveBuffer[i * frameChannels + ch] = b.get(bPos + i)
-                }
-                return Pair(interleaveBuffer, required)
-            } else {
-                val len = first.remaining()
-                if (interleaveBuffer.size < len) {
-                    interleaveBuffer = ShortArray(len)
-                }
-                val pos = first.position()
+        val planar = buffers.size == frameChannels && frameChannels > 1
+        val len = first.remaining()
+        val required = if (planar) len * frameChannels else len
+        if (required <= 0) return 0
+        if (decodeBuffer.size < required) decodeBuffer = FloatArray(required)
+
+        if (!planar && first is java.nio.FloatBuffer) {
+            // The case that actually happens: SampleMode.FLOAT hands back packed floats,
+            // already in [-1, 1], so take the block wholesale and leave the grabber's
+            // buffer position where we found it.
+            val pos = first.position()
+            first.get(decodeBuffer, 0, len)
+            first.position(pos)
+            return required
+        }
+
+        if (planar) {
+            for (ch in 0 until frameChannels) {
+                val b = buffers[ch]
+                val bPos = b.position()
                 for (i in 0 until len) {
-                    interleaveBuffer[i] = first.get(pos + i)
+                    decodeBuffer[i * frameChannels + ch] = sampleAt(b, bPos + i)
                 }
-                return Pair(interleaveBuffer, len)
+            }
+        } else {
+            val pos = first.position()
+            for (i in 0 until len) {
+                decodeBuffer[i] = sampleAt(first, pos + i)
             }
         }
-        if (first is java.nio.FloatBuffer) {
-            if (buffers.size == frameChannels && frameChannels > 1) {
-                val len = first.remaining()
-                val required = len * frameChannels
-                if (interleaveBuffer.size < required) {
-                    interleaveBuffer = ShortArray(required)
-                }
-                for (ch in 0 until frameChannels) {
-                    val b = buffers[ch] as java.nio.FloatBuffer
-                    val bPos = b.position()
-                    for (i in 0 until len) {
-                        val f = b.get(bPos + i)
-                        interleaveBuffer[i * frameChannels + ch] = (f * 32767f).toInt().coerceIn(-32768, 32767).toShort()
-                    }
-                }
-                return Pair(interleaveBuffer, required)
-            } else {
-                val len = first.remaining()
-                if (interleaveBuffer.size < len) {
-                    interleaveBuffer = ShortArray(len)
-                }
-                val pos = first.position()
-                for (i in 0 until len) {
-                    val f = first.get(pos + i)
-                    interleaveBuffer[i] = (f * 32767f).toInt().coerceIn(-32768, 32767).toShort()
-                }
-                return Pair(interleaveBuffer, len)
-            }
-        }
-        val bb = (first as java.nio.ByteBuffer).order(ByteOrder.LITTLE_ENDIAN)
-        val sb = bb.asShortBuffer()
-        val len = sb.remaining()
-        if (interleaveBuffer.size < len) {
-            interleaveBuffer = ShortArray(len)
-        }
-        val pos = sb.position()
-        for (i in 0 until len) {
-            interleaveBuffer[i] = sb.get(pos + i)
-        }
-        return Pair(interleaveBuffer, len)
+        return required
+    }
+
+    /** Reads one sample from [buffer] at [index], scaled to [-1, 1]. */
+    private fun sampleAt(buffer: java.nio.Buffer, index: Int): Float = when (buffer) {
+        is java.nio.FloatBuffer -> buffer.get(index)
+        is ShortBuffer -> buffer.get(index) / 32768f
+        is java.nio.IntBuffer -> buffer.get(index) / 2147483648f
+        is java.nio.DoubleBuffer -> buffer.get(index).toFloat()
+        // javacv only hands back a plain ByteBuffer for unsigned 8-bit samples.
+        is ByteBuffer -> ((buffer.get(index).toInt() and 0xFF) - 128) / 128f
+        else -> 0f
     }
 
     private var dspInputBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.LITTLE_ENDIAN)
@@ -835,6 +846,7 @@ class AudioEngine {
         worker = null
         closeLineInstance(line, drain = false)
         stretcher.flush()
+        limiter.flush()
         chain.forEach { it.flush() }
         setPlaying(false)
     }
