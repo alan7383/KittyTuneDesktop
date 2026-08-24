@@ -37,9 +37,32 @@ object HistoryRepository {
     }
 
     fun addToHistory(playlist: Playlist, isStation: Boolean = false, isProfile: Boolean = false) {
+        if ((playlist.id == 0L && playlist.permalinkUrl.isNullOrBlank() && playlist.urn.isNullOrBlank()) || playlist.title.equals(
+                "history",
+                ignoreCase = true
+            ) || playlist.permalinkUrl == "history"
+        ) {
+            return
+        }
         scope.launch {
             val isYoutubeRadio = playlist.permalinkUrl?.startsWith("yt_radio:") == true
+            val rawNav = playlist.permalinkUrl ?: playlist.urn ?: ""
+            val isSpotifyArtist = isProfile && (rawNav.contains("spotify") || rawNav.startsWith("spotify_artist:"))
+            val isSpotifyRadio = isStation && (rawNav.contains("spotify") || rawNav.startsWith("spotify_radio:"))
+            val isSpotifyItem = rawNav.contains("spotify") || rawNav.startsWith("spotify_")
+
             val (stringId, type) = when {
+                isSpotifyArtist -> {
+                    "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(rawNav)}" to "PROFILE"
+                }
+                isSpotifyRadio -> {
+                    "spotify_radio:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(rawNav)}" to "STATION"
+                }
+                isSpotifyItem -> {
+                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(rawNav)
+                    if (rawNav.contains("album")) "spotify:album:$clean" to "PLAYLIST"
+                    else "spotify:playlist:$clean" to "PLAYLIST"
+                }
                 isProfile -> "profile:${playlist.id}" to "PROFILE"
                 isYoutubeRadio -> playlist.permalinkUrl!! to "STATION"
                 isStation -> "station:${playlist.id}" to "STATION"
@@ -52,6 +75,7 @@ object HistoryRepository {
             val finalSubtitle = when {
                 isProfile -> str("history_type_artist")
                 isYoutubeRadio -> "YouTube"
+                isSpotifyRadio || isSpotifyItem -> "Spotify"
                 isStation -> playlist.user?.username ?: str("history_type_station")
                 playlist.id == -1L || playlist.id == -2L -> str("history_source_library")
                 playlist.id < 0 -> str("history_type_local_playlist")
@@ -64,12 +88,14 @@ object HistoryRepository {
                 else -> playlist.title ?: str("history_default_playlist_title")
             }
 
+            val finalArtwork = if (playlist.id == -1L || stringId == "likes" || playlist.id == -2L || stringId == "downloads") "" else playlist.fullResArtwork
+
             val item = HistoryItem(
                 id = stringId,
                 numericId = playlist.id,
                 title = finalTitle,
                 subtitle = finalSubtitle,
-                imageUrl = playlist.fullResArtwork,
+                imageUrl = finalArtwork,
                 type = type,
                 isVerified = playlist.user?.verified == true
             )
