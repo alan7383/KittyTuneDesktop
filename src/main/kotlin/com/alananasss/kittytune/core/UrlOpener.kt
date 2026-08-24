@@ -5,15 +5,30 @@ import java.net.URI
 
 fun openUrl(url: String) {
     try {
-        Desktop.getDesktop().browse(URI(url))
-    } catch (_: Exception) {
-        try {
-            val os = System.getProperty("os.name").lowercase()
-            when {
-                os.contains("linux") -> Runtime.getRuntime().exec(arrayOf("xdg-open", url))
-                os.contains("mac") -> Runtime.getRuntime().exec(arrayOf("open", url))
-                os.contains("win") -> Runtime.getRuntime().exec(arrayOf("cmd", "/c", "start", url))
+        if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            Desktop.getDesktop().browse(URI(url))
+            return
+        }
+    } catch (_: Throwable) {}
+
+    try {
+        val os = System.getProperty("os.name").lowercase()
+        when {
+            os.contains("linux") || os.contains("nix") -> {
+                ProcessBuilder("xdg-open", url).start()
             }
-        } catch (_: Exception) {}
-    }
+            os.contains("mac") -> {
+                ProcessBuilder("open", url).start()
+            }
+            os.contains("win") -> {
+                ProcessBuilder("cmd", "/c", "start", "", url).start()
+            }
+            else -> {
+                if (Desktop.isDesktopSupported()) {
+                    Desktop.getDesktop().browse(URI(url))
+                }
+            }
+        }
+    } catch (_: Throwable) {}
 }
+
