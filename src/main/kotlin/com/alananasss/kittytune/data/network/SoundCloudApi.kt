@@ -174,7 +174,8 @@
         @GET("users/{userId}/playlist_likes")
         suspend fun getUserPlaylistLikes(
             @Path("userId") userId: Long,
-            @Query("limit") limit: Int = 50
+            @Query("limit") limit: Int = 200,
+            @Query("linked_partitioning") linkedPartitioning: Int = 1
         ): PlaylistLikesResponse
     
         @GET("me/library/all")
@@ -310,6 +311,9 @@
         suspend fun getUserTracksNextPage(@Url url: String): BasicTrackCollection
     
         @GET
+        suspend fun getPlaylistLikesNextPage(@Url url: String): PlaylistLikesResponse
+
+        @GET
         suspend fun getCommentsNextPage(@Url url: String): CommentCollection
     
         // --- Playlists ---
@@ -317,7 +321,8 @@
         @GET("users/{userId}/playlists")
         suspend fun getUserCreatedPlaylists(
             @Path("userId") userId: Long,
-            @Query("limit") limit: Int = 50
+            @Query("limit") limit: Int = 200,
+            @Query("linked_partitioning") linkedPartitioning: Int = 1
         ): UserPlaylistsResponse
 
         @GET("https://api-mobile.soundcloud.com/you/posts_and_reposts/playlists")

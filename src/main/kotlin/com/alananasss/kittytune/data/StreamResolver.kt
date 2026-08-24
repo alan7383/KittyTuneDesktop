@@ -171,6 +171,26 @@ object StreamResolver {
                 return@withContext url?.let { ResolvedStream(it) }
             }
 
+            if (track.source == "spotify") {
+                println("StreamResolver: Resolving Spotify track via YouTube / SoundCloud: ${track.title} by ${track.displayArtist}")
+                val streamUrl = resolveViaNewPipe(track)
+                if (streamUrl != null) {
+                    return@withContext ResolvedStream(streamUrl)
+                }
+                try {
+                    val query = "${track.displayArtist} ${track.title}".trim()
+                    val scResults = RetrofitClient.create().searchTracks(query, limit = 5)
+                    val bestScTrack = scResults.collection.firstOrNull()
+                    if (bestScTrack != null) {
+                        val scStream = resolveFromSoundCloudWithDrm(bestScTrack, forDownload)
+                        if (scStream != null) return@withContext scStream
+                    }
+                } catch (e: Exception) {
+                    println("StreamResolver: Failed SoundCloud fallback for Spotify track: ${e.message}")
+                }
+                return@withContext null
+            }
+
             val prefs = PlayerPreferences()
             val allowYoutube = prefs.getYouTubeFallbackEnabled()
 

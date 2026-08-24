@@ -380,7 +380,9 @@
         @SerializedName("streamable") val streamable: Boolean? = null,
         @SerializedName("commentable") val commentable: Boolean? = null,
         @SerializedName("reveal_comments") val revealComments: Boolean? = null,
-        @SerializedName("display_stats") val displayStats: Boolean? = null
+        @SerializedName("display_stats") val displayStats: Boolean? = null,
+        val playCount: Long? = null,
+        val artists: List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>? = null
     ) {
         data class PublisherMetadata(
             val id: String? = null,

@@ -73,7 +73,7 @@ import com.alananasss.kittytune.utils.Logger
     }
     
     enum class SearchSource {
-        SOUNDCLOUD, YOUTUBE
+        SOUNDCLOUD, YOUTUBE, SPOTIFY
     }
     
     class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -111,6 +111,10 @@ import com.alananasss.kittytune.utils.Logger
         val searchResultsArtists = mutableStateListOf<User>()
         val searchResultsPlaylists = mutableStateListOf<Playlist>()
         val searchResultsYoutube = mutableStateListOf<Track>()
+        val searchResultsSpotify = mutableStateListOf<Track>()
+        val searchResultsSpotifyAlbums = mutableStateListOf<com.alananasss.kittytune.data.spotify.SpotifyAlbum>()
+        val searchResultsSpotifyPlaylists = mutableStateListOf<com.alananasss.kittytune.data.spotify.SpotifyPlaylist>()
+        val searchResultsSpotifyArtists = mutableStateListOf<com.alananasss.kittytune.data.spotify.SpotifyArtist>()
     
         private var tracksNextUrl: String? = null
         private var artistsNextUrl: String? = null
@@ -149,11 +153,15 @@ import com.alananasss.kittytune.utils.Logger
 
             val trimmed = query.trim()
 
-            val isSoundCloudUrl = trimmed.startsWith("https://soundcloud.com") || trimmed.startsWith("https://on.soundcloud.com")
-            val isYoutubeUrl = trimmed.contains("youtube.com") || trimmed.contains("youtu.be")
+            val isSoundCloudUrl = trimmed.contains("soundcloud.com") || trimmed.startsWith("soundcloud:")
+            val isSpotifyUrl = trimmed.contains("open.spotify.com") || trimmed.contains("spotify.link") ||
+                    trimmed.startsWith("spotify:") || trimmed.startsWith("spotify_") || trimmed.startsWith("station_spotify:")
+            val isYoutubeUrl = trimmed.contains("youtube.com") || trimmed.contains("youtu.be") || trimmed.startsWith("yt_radio:")
 
             if (isSoundCloudUrl) {
                 handleSoundCloudUrl(trimmed)
+            } else if (isSpotifyUrl) {
+                handleSpotifyUrl(trimmed)
             } else if (isYoutubeUrl) {
                 handleYoutubeUrl(trimmed)
             } else {
@@ -213,14 +221,35 @@ import com.alananasss.kittytune.utils.Logger
                     val decodedUrl = try { URLDecoder.decode(processedUrl, "UTF-8") } catch (e: Exception) { processedUrl }
                     val stationTrackRegex = Regex("track-stations:(\\d+)")
                     val stationArtistRegex = Regex("artist-stations:(\\d+)")
-    
+                    val scTrackUriRegex = Regex("soundcloud:tracks:(\\d+)")
+                    val scPlaylistUriRegex = Regex("soundcloud:playlists:(\\d+)")
+                    val scUserUriRegex = Regex("soundcloud:users:(\\d+)")
+
                     stationTrackRegex.find(decodedUrl)?.groupValues?.get(1)?.let { id ->
                         _navigateTo.emit("station:$id"); clearSearch(); isSearchLoading = false; return@launch
                     }
                     stationArtistRegex.find(decodedUrl)?.groupValues?.get(1)?.let { id ->
                         _navigateTo.emit("station_artist:$id"); clearSearch(); isSearchLoading = false; return@launch
                     }
-                    val cleanUrl = decodedUrl.substringBefore("?")
+                    scTrackUriRegex.find(decodedUrl)?.groupValues?.get(1)?.toLongOrNull()?.let { trackId ->
+                        val track = withContext(Dispatchers.IO) {
+                            try { api.getTracksByIds(trackId.toString()).firstOrNull() } catch (e: Exception) { null }
+                        }
+                        if (track != null) {
+                            _playTrack.emit(track); clearSearch(); isSearchLoading = false; return@launch
+                        }
+                    }
+                    scPlaylistUriRegex.find(decodedUrl)?.groupValues?.get(1)?.let { plId ->
+                        _navigateTo.emit("playlist_detail/$plId"); clearSearch(); isSearchLoading = false; return@launch
+                    }
+                    scUserUriRegex.find(decodedUrl)?.groupValues?.get(1)?.let { userId ->
+                        _navigateTo.emit("profile/$userId"); clearSearch(); isSearchLoading = false; return@launch
+                    }
+
+                    var cleanUrl = decodedUrl.substringBefore("?")
+                    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://") && cleanUrl.contains("soundcloud.com")) {
+                        cleanUrl = "https://$cleanUrl"
+                    }
                     val resolvedObject = api.resolveUrl(cleanUrl)
                     val kind = resolvedObject.get("kind")?.asString ?: ""
                     when (kind) {
@@ -252,6 +281,82 @@ import com.alananasss.kittytune.utils.Logger
                 }
             }
         }
+
+        private fun handleSpotifyUrl(url: String) {
+            isSearchLoading = true
+            clearSearchResults()
+            viewModelScope.launch {
+                try {
+                    var processedUrl = url
+                    if (processedUrl.contains("spotify.link")) {
+                        processedUrl = unshortenUrl(processedUrl)
+                    }
+                    val decodedUrl = try { URLDecoder.decode(processedUrl, "UTF-8") } catch (e: Exception) { processedUrl }
+                    val cleanUrl = decodedUrl.substringBefore("?")
+
+                    val stationTrackRegex = Regex("(?:spotify:station:track:|station/track/|spotify_radio:|station_spotify:)([a-zA-Z0-9]+)")
+                    val stationArtistRegex = Regex("(?:spotify:station:artist:|station/artist/)([a-zA-Z0-9]+)")
+                    stationTrackRegex.find(cleanUrl)?.groupValues?.get(1)?.let { id ->
+                        _navigateTo.emit("playlist_detail/spotify_radio:$id")
+                        clearSearch()
+                        isSearchLoading = false
+                        return@launch
+                    }
+                    stationArtistRegex.find(cleanUrl)?.groupValues?.get(1)?.let { id ->
+                        _navigateTo.emit("playlist_detail/spotify_radio:$id")
+                        clearSearch()
+                        isSearchLoading = false
+                        return@launch
+                    }
+
+                    // Regionalized share URLs (open.spotify.com/intl-fr/track/...)
+                    // are matched by the optional intl-xx path segment.
+                    val trackRegex = Regex("(?:spotify:track:|spotify_track:|open\\.spotify\\.com/(?:intl-[a-zA-Z]+/)?track/)([a-zA-Z0-9]+)")
+                    trackRegex.find(cleanUrl)?.groupValues?.get(1)?.let { trackId ->
+                        val spotifyTrack = withContext(Dispatchers.IO) {
+                            com.alananasss.kittytune.data.spotify.SpotifyRepository.getTrack(trackId)
+                        }
+                        if (spotifyTrack != null) {
+                            _playTrack.emit(spotifyTrack.toTrack())
+                            clearSearch()
+                            isSearchLoading = false
+                            return@launch
+                        }
+                    }
+
+                    val playlistRegex = Regex("(?:spotify:playlist:|spotify_playlist:|open\\.spotify\\.com/(?:intl-[a-zA-Z]+/)?playlist/)([a-zA-Z0-9]+)")
+                    playlistRegex.find(cleanUrl)?.groupValues?.get(1)?.let { playlistId ->
+                        _navigateTo.emit("playlist_detail/spotify:playlist:$playlistId")
+                        clearSearch()
+                        isSearchLoading = false
+                        return@launch
+                    }
+
+                    val albumRegex = Regex("(?:spotify:album:|spotify_album:|open\\.spotify\\.com/(?:intl-[a-zA-Z]+/)?album/)([a-zA-Z0-9]+)")
+                    albumRegex.find(cleanUrl)?.groupValues?.get(1)?.let { albumId ->
+                        _navigateTo.emit("playlist_detail/spotify:album:$albumId")
+                        clearSearch()
+                        isSearchLoading = false
+                        return@launch
+                    }
+
+                    val artistRegex = Regex("(?:spotify:artist:|spotify_artist:|open\\.spotify\\.com/(?:intl-[a-zA-Z]+/)?artist/)([a-zA-Z0-9]+)")
+                    artistRegex.find(cleanUrl)?.groupValues?.get(1)?.let { artistId ->
+                        _navigateTo.emit("spotify_artist:$artistId")
+                        clearSearch()
+                        isSearchLoading = false
+                        return@launch
+                    }
+
+                    performSearch(url)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    performSearch(url)
+                } finally {
+                    isSearchLoading = false
+                }
+            }
+        }
     
         var searchTrigger by mutableStateOf(0)
         fun activateSearch() { isSearching = true; searchTrigger++ }
@@ -269,6 +374,7 @@ import com.alananasss.kittytune.utils.Logger
     
         private fun clearSearchResults() {
             searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear(); searchResultsYoutube.clear()
+            searchResultsSpotify.clear(); searchResultsSpotifyAlbums.clear(); searchResultsSpotifyPlaylists.clear(); searchResultsSpotifyArtists.clear()
             tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
         }
     
@@ -278,11 +384,57 @@ import com.alananasss.kittytune.utils.Logger
                 when (activeSearchSource) {
                     SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
                     SearchSource.YOUTUBE -> performYoutubeSearch(query)
+                    SearchSource.SPOTIFY -> performSpotifySearch(query)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isSearchLoading = false
+            }
+        }
+
+        private suspend fun performSpotifySearch(query: String) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val results = com.alananasss.kittytune.data.spotify.SpotifyRepository.search(query, limit = 30)
+                    val artistMap = results.artists.associateBy { it.id }
+                    val mappedTracks = results.tracks.map { track ->
+                        val enrichedArtists = track.artists.map { a ->
+                            val matched = artistMap[a.id]
+                            if (matched != null) {
+                                a.copy(
+                                    verified = matched.verified,
+                                    avatarUrl = matched.avatarUrl ?: a.avatarUrl
+                                )
+                            } else a
+                        }
+                        val firstA = enrichedArtists.firstOrNull()
+                        val baseTrack = track.copy(artists = enrichedArtists).toTrack()
+                        if (firstA != null) {
+                            baseTrack.copy(
+                                artists = enrichedArtists,
+                                user = baseTrack.user?.copy(
+                                    verified = firstA.verified,
+                                    avatarUrl = firstA.avatarUrl ?: baseTrack.user?.avatarUrl
+                                )
+                            )
+                        } else {
+                            baseTrack.copy(artists = enrichedArtists)
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        searchResultsSpotify.clear()
+                        searchResultsSpotify.addAll(mappedTracks)
+                        searchResultsSpotifyAlbums.clear()
+                        searchResultsSpotifyAlbums.addAll(results.albums)
+                        searchResultsSpotifyPlaylists.clear()
+                        searchResultsSpotifyPlaylists.addAll(results.playlists)
+                        searchResultsSpotifyArtists.clear()
+                        searchResultsSpotifyArtists.addAll(results.artists)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     
@@ -628,7 +780,20 @@ import com.alananasss.kittytune.utils.Logger
                         val habitSeeds = recentTracks.distinctBy { it.id }.take(10)
                         val habitStations = habitSeeds.map { track ->
                             val isYoutube = track.source == "youtube" && !track.permalinkUrl.isNullOrEmpty()
-                            val permalink = if (isYoutube) "yt_radio:${track.permalinkUrl}" else "track_station_marker"
+                            val isSpotify = track.source == "spotify" || (track.permalinkUrl != null && track.permalinkUrl!!.contains("spotify"))
+                            val spotifyTrackId = if (isSpotify) {
+                                track.permalink?.ifBlank { null }
+                                    ?: track.permalinkUrl?.substringAfter("track/")?.substringBefore("?")?.substringBefore("/")
+                                    ?: track.user?.urn?.removePrefix("spotify:track:")
+                                    ?: track.id.toString()
+                            } else null
+                            val permalink = if (isYoutube) {
+                                "yt_radio:${track.permalinkUrl}"
+                            } else if (isSpotify && spotifyTrackId != null) {
+                                "spotify_radio:$spotifyTrackId"
+                            } else {
+                                "track_station_marker"
+                            }
                             Playlist(
                                 id = track.id,
                                 title = str("home_station_track_title", track.title ?: ""),
@@ -648,7 +813,20 @@ import com.alananasss.kittytune.utils.Logger
                         val rediscoverySeeds = sourceTracks.shuffled().take(10)
                         val rediscoveryStations = rediscoverySeeds.map { track ->
                             val isYoutube = track.source == "youtube" && !track.permalinkUrl.isNullOrEmpty()
-                            val permalink = if (isYoutube) "yt_radio:${track.permalinkUrl}" else "track_station_marker"
+                            val isSpotify = track.source == "spotify" || (track.permalinkUrl != null && track.permalinkUrl!!.contains("spotify"))
+                            val spotifyTrackId = if (isSpotify) {
+                                track.permalink?.ifBlank { null }
+                                    ?: track.permalinkUrl?.substringAfter("track/")?.substringBefore("?")?.substringBefore("/")
+                                    ?: track.user?.urn?.removePrefix("spotify:track:")
+                                    ?: track.id.toString()
+                            } else null
+                            val permalink = if (isYoutube) {
+                                "yt_radio:${track.permalinkUrl}"
+                            } else if (isSpotify && spotifyTrackId != null) {
+                                "spotify_radio:$spotifyTrackId"
+                            } else {
+                                "track_station_marker"
+                            }
                             Playlist(
                                 id = track.id,
                                 title = str("home_station_track_title", track.title ?: ""),

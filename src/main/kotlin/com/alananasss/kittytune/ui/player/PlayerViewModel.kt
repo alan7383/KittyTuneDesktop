@@ -1638,6 +1638,142 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         navigateToPlaylistId = "profile:$userId"
     }
 
+    /** True when the track comes from the Spotify catalog (metadata-only source). */
+    fun isSpotifyTrack(track: Track?): Boolean {
+        if (track == null) return false
+        return track.source == "spotify"
+            || track.user?.urn?.startsWith("spotify") == true
+            || track.permalinkUrl?.contains("open.spotify.com") == true
+    }
+
+    /**
+     * Best-effort extraction of the Spotify base62 id from any track form:
+     * permalink, share URL or artist URN. Only meaningful for catalog tracks.
+     */
+    fun getSpotifyTrackId(track: Track?): String? {
+        if (!isSpotifyTrack(track)) return null
+        val t = track ?: return null
+
+        // Catalog tracks carry the raw base62 id as permalink.
+        t.permalink?.takeIf { it.isNotBlank() && !it.contains('/') && !it.contains(':') && !it.contains('.') }
+            ?.let { return it }
+
+        t.permalinkUrl?.takeIf { it.contains("/track/") || it.startsWith("spotify") }
+            ?.let { return com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(it).ifBlank { null } }
+
+        // Last resort: the synthetic user URN (spotify:artist:<id>).
+        t.user?.urn?.takeIf { it.startsWith("spotify") }
+            ?.let { return com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(it).ifBlank { null } }
+
+        return null
+    }
+
+    /** Resolves the primary Spotify artist id of a catalog track, if any. */
+    fun getSpotifyTrackArtistId(track: Track?): String? {
+        if (!isSpotifyTrack(track)) return null
+        track?.artists?.firstOrNull()?.id?.takeIf { it.isNotBlank() }?.let { return it }
+        return track?.user?.urn
+            ?.takeIf { it.startsWith("spotify:artist:") }
+            ?.removePrefix("spotify:artist:")
+            ?.ifBlank { null }
+            ?: track?.user?.permalink?.takeIf { it.isNotBlank() }
+    }
+
+    fun navigateToSpotifyArtist(artistId: String) {
+        if (artistId.isBlank()) return
+        showDetailsSheet = false
+        showMenuSheet = false
+        showCommentsSheet = false
+        isPlayerExpanded = false
+        navigateToPlaylistId = "spotify_artist:$artistId"
+    }
+
+    fun navigateToAlbum(albumId: String) {
+        val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(albumId)
+        if (cleanId.isBlank()) return
+        showDetailsSheet = false
+        showMenuSheet = false
+        showCommentsSheet = false
+        isPlayerExpanded = false
+        navigateToPlaylistId = "spotify:album:$cleanId"
+    }
+
+    // ---- Multi-artist selection (tracks credited to several Spotify artists) ----
+
+    var showSelectArtistDialog by mutableStateOf(false)
+        private set
+    var selectedArtistDialogTrack by mutableStateOf<Track?>(null)
+        private set
+
+    /**
+     * Artists the selection dialog offers. Held separately from the track so a
+     * caller without one — an album or radio header — can open the same dialog.
+     */
+    var selectArtistOptions by mutableStateOf<List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>>(emptyList())
+        private set
+
+    /**
+     * Entry point for any "open artist" action on a track: with a single
+     * catalog artist it navigates directly, with several ones it opens the
+     * selection dialog (same behavior as the Android player).
+     */
+    fun navigateToTrackArtist(track: Track?) {
+        if (track == null) return
+        val artists = navigableArtists(track.artists)
+        when {
+            artists.size > 1 -> openSelectArtistDialog(artists, track)
+            artists.size == 1 -> navigateToSpotifyArtist(artists.first().id)
+            isSpotifyTrack(track) -> {
+                val fallbackId = getSpotifyTrackArtistId(track)
+                if (!fallbackId.isNullOrBlank()) navigateToSpotifyArtist(fallbackId)
+                else track.user?.id?.takeIf { it > 0 }?.let { navigateToArtist(it) }
+            }
+            else -> track.user?.id?.takeIf { it > 0 }?.let { navigateToArtist(it) }
+        }
+    }
+
+    /**
+     * Same routing for a bare artist list (Spotify album / radio headers, where
+     * the credited artists don't hang off a single track): one artist opens the
+     * profile, several open the picker, none falls back to the SoundCloud user.
+     */
+    fun navigateToArtistChoice(
+        artists: List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>?,
+        fallbackUserId: Long? = null
+    ) {
+        val navigable = navigableArtists(artists)
+        when {
+            navigable.size > 1 -> openSelectArtistDialog(navigable, null)
+            navigable.size == 1 -> navigateToSpotifyArtist(navigable.first().id)
+            else -> fallbackUserId?.takeIf { it > 0 }?.let { navigateToArtist(it) }
+        }
+    }
+
+    private fun openSelectArtistDialog(
+        artists: List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>,
+        track: Track?
+    ) {
+        // The sheet the click came from is stale once the picker is up.
+        showMenuSheet = false
+        showDetailsSheet = false
+        showCommentsSheet = false
+        selectArtistOptions = artists
+        selectedArtistDialogTrack = track
+        showSelectArtistDialog = true
+    }
+
+    /** Artists we can actually open a profile for, without duplicates. */
+    private fun navigableArtists(
+        artists: List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>?
+    ): List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef> =
+        artists.orEmpty().filter { it.id.isNotBlank() }.distinctBy { it.id }
+
+    fun dismissSelectArtistDialog() {
+        showSelectArtistDialog = false
+        selectedArtistDialogTrack = null
+        selectArtistOptions = emptyList()
+    }
+
     fun navigateToEditTrack(trackId: Long) {
         if (trackId <= 0) return
         showDetailsSheet = false
@@ -1933,6 +2069,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun startRadioFromTrack(track: Track) {
         showMenuSheet = false
+        if (isSpotifyTrack(track)) {
+            // Spotify seeds have no SoundCloud station; use the catalog radio.
+            val spotifyId = getSpotifyTrackId(track)
+            if (!spotifyId.isNullOrBlank()) {
+                navigateToPlaylistId = "spotify_radio:$spotifyId"
+                return
+            }
+        }
         navigateToPlaylistId = "station:${track.id}"
     }
 
@@ -2056,6 +2200,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
+            } else if ((finalTrack.source == "spotify" || finalTrack.user?.urn?.startsWith("spotify") == true) && finalTrack.user != null) {
+                // Spotify catalog tracks: backfill the synthetic user with the
+                // primary artist's identity so the profile is clickable and
+                // correctly badged from the player.
+                val firstArtist = finalTrack.artists?.firstOrNull()
+                if (firstArtist != null && firstArtist.id.isNotBlank()) {
+                    val updatedUser = finalTrack.user!!.copy(
+                        verified = firstArtist.verified || finalTrack.user!!.verified,
+                        avatarUrl = firstArtist.avatarUrl ?: finalTrack.user!!.avatarUrl,
+                        urn = "spotify:artist:${firstArtist.id}",
+                        permalink = firstArtist.id
+                    )
+                    finalTrack = finalTrack.copy(user = updatedUser)
+                    val qIndex = _queue.indexOfFirst { it.id == trackToPlay.id }
+                    if (qIndex != -1) _queue[qIndex] = finalTrack
+                }
             }
             currentTrack = finalTrack
             MusicManager.currentTrack = finalTrack
@@ -2119,16 +2279,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 playTrackAtIndex(0, addToHistory = false, isCrossfade = isCrossfade)
             } else {
                 val autoPlayEnabled = playerPrefs.getAutoplayEnabled()
+                val isSpotify = isSpotifyTrack(currentTrack)
                 val isYoutube = currentTrack?.source == "youtube"
 
                 if (autoPlayEnabled || isYoutube) {
                     viewModelScope.launch {
                         val youtubeFallback = playerPrefs.getYouTubeFallbackEnabled()
 
-                        if (isYoutube || (currentTrack?.source == "soundcloud" && youtubeFallback)) {
-                            fetchAndPlayYoutubeRadio()
-                        } else {
-                            fetchAndQueueRadio()
+                        when {
+                            isSpotify -> fetchAndQueueSpotifyRadio()
+                            isYoutube || (currentTrack?.source == "soundcloud" && youtubeFallback) -> fetchAndPlayYoutubeRadio()
+                            else -> fetchAndQueueRadio()
                         }
 
                         val newNextIndex = currentQueueIndex + 1
@@ -2257,6 +2418,48 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
         } catch (_: Exception) {
+        } finally {
+            isAutoplayRadioLoading = false
+        }
+    }
+
+    /**
+     * End-of-queue autoplay for Spotify catalog tracks: resolve the Spotify
+     * radio playlist for the seed, append its tracks (skipping the seed) and
+     * register the station context so it lands in history like other radios.
+     */
+    private suspend fun fetchAndQueueSpotifyRadio() {
+        val lastTrack = currentTrack ?: return
+        isAutoplayRadioLoading = true
+        try {
+            val spotifyId = getSpotifyTrackId(lastTrack) ?: return
+
+            val radioPlaylist =
+                com.alananasss.kittytune.data.spotify.SpotifyRepository.getRadio(spotifyId, isArtist = false)
+            val rawTracks = radioPlaylist?.tracks
+                ?: com.alananasss.kittytune.data.spotify.SpotifyRepository.getRadioTracks(spotifyId)
+
+            val tracksToAdd = rawTracks.drop(1).map { it.toTrack() }
+                .filter { track -> _queue.none { it.id == track.id } }
+
+            if (tracksToAdd.isNotEmpty()) {
+                _queue.addAll(tracksToAdd)
+                _originalQueue.addAll(tracksToAdd)
+                updateQueueState()
+            }
+            if (currentContext == null) {
+                val ctx = PlaybackContext(
+                    displayText = str("context_station", lastTrack.title ?: ""),
+                    navigationId = "spotify_radio:$spotifyId",
+                    imageUrl = lastTrack.fullResArtwork,
+                    artistName = lastTrack.user?.username,
+                    isVerified = lastTrack.user?.verified == true
+                )
+                currentContext = ctx
+                MusicManager.updateContext(ctx)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         } finally {
             isAutoplayRadioLoading = false
         }

@@ -564,8 +564,13 @@ fun ChartPlaylistCard(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(Modifier.height(4.dp))
+                val subtitle = when {
+                    playlist.trackCount != null && playlist.trackCount > 0 -> str("playlist_num_tracks", playlist.trackCount)
+                    !playlist.user?.username.isNullOrBlank() -> playlist.user.username
+                    else -> str("lib_playlists")
+                }
                 Text(
-                    text = str("playlist_num_tracks", playlist.trackCount ?: 0),
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
