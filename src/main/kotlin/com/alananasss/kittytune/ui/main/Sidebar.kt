@@ -38,6 +38,8 @@ import androidx.compose.foundation.text.BasicTextField
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.ScrollableLazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -562,12 +564,14 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                     subtitle = listOfNotNull(
                         when {
                             isTrackStation || isArtistStation -> str("lib_stations")
-                            pl.isAlbum -> str("lib_albums")
+                            pl.isRealAlbum -> str("lib_albums")
                             else -> str("lib_playlists")
                         },
                         pl.user?.username,
                     ).joinToString(" • "),
-                    artworkUrl = pl.fullResArtwork,
+                    // Deliberately not fullResArtwork: EntryArtwork resolves the real
+                    // first-track cover instead of falling back to a stock image.
+                    artworkUrl = pl.usableArtwork,
                     destination = dest,
                     playlist = pl,
                     isPinned = showPin,
@@ -1189,49 +1193,70 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
         return
     }
 
-    when (libraryViewModel.viewMode) {
-        LibraryViewMode.COMPACT_LIST -> LazyColumn(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-            items(entries, key = { it.key }) { entry ->
-                CompactListRow(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
-            }
-        }
+    androidx.compose.runtime.key(
+        libraryViewModel.isSortDescending,
+        libraryViewModel.sortOption,
+        libraryViewModel.selectedFilter,
+        libraryViewModel.ownershipFilter,
+        libraryViewModel.currentFolderId
+    ) {
+        val compactListState = rememberLazyListState()
+        val listState = rememberLazyListState()
+        val compactGridState = rememberLazyGridState()
+        val gridState = rememberLazyGridState()
 
-        LibraryViewMode.LIST -> LazyColumn(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-            items(entries, key = { it.key }) { entry ->
-                LibraryRow(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
-            }
-        }
-
-        LibraryViewMode.COMPACT_GRID -> ScrollableLazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = if (fullScreen) 128.dp else 96.dp),
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(entries.size, key = { entries[it].key }) { index ->
-                val entry = entries[index]
-                Tip(entry.title) {
-                    EntryArtwork(
-                        entry = entry,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                        iconFraction = 0.4f,
-                        cornerRadius = 8.dp,
-                        onClick = { onOpen(entry) },
-                        onRightClick = onRightClick(entry),
-                    )
+        when (libraryViewModel.viewMode) {
+            LibraryViewMode.COMPACT_LIST -> LazyColumn(
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                state = compactListState
+            ) {
+                items(entries, key = { it.key }) { entry ->
+                    CompactListRow(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
                 }
             }
-        }
 
-        LibraryViewMode.GRID -> ScrollableLazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = if (fullScreen) 160.dp else 116.dp),
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-        ) {
-            items(entries.size, key = { entries[it].key }) { index ->
-                val entry = entries[index]
-                GridCell(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
+            LibraryViewMode.LIST -> LazyColumn(
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                state = listState
+            ) {
+                items(entries, key = { it.key }) { entry ->
+                    LibraryRow(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
+                }
+            }
+
+            LibraryViewMode.COMPACT_GRID -> ScrollableLazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = if (fullScreen) 128.dp else 96.dp),
+                modifier = Modifier.weight(1f),
+                state = compactGridState,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(entries.size, key = { entries[it].key }) { index ->
+                    val entry = entries[index]
+                    Tip(entry.title) {
+                        EntryArtwork(
+                            entry = entry,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                            iconFraction = 0.4f,
+                            cornerRadius = 8.dp,
+                            onClick = { onOpen(entry) },
+                            onRightClick = onRightClick(entry),
+                        )
+                    }
+                }
+            }
+
+            LibraryViewMode.GRID -> ScrollableLazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = if (fullScreen) 160.dp else 116.dp),
+                modifier = Modifier.weight(1f),
+                state = gridState,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            ) {
+                items(entries.size, key = { entries[it].key }) { index ->
+                    val entry = entries[index]
+                    GridCell(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
+                }
             }
         }
     }
@@ -1389,6 +1414,9 @@ private fun EntryArtwork(
     var boxModifier = modifier.clip(shape)
     if (onClick != null) boxModifier = boxModifier.libClicks(onClick, onRightClick)
 
+    val resolvedCover = com.alananasss.kittytune.ui.common.rememberPlaylistCover(entry.playlist)
+    val artwork = entry.artworkUrl ?: resolvedCover
+
     if (entry.gradient != null && entry.icon != null) {
         androidx.compose.foundation.layout.BoxWithConstraints(
             modifier = boxModifier.background(Brush.linearGradient(entry.gradient)),
@@ -1401,9 +1429,9 @@ private fun EntryArtwork(
                 modifier = Modifier.size(maxWidth * iconFraction),
             )
         }
-    } else if (!entry.artworkUrl.isNullOrBlank()) {
+    } else if (!artwork.isNullOrBlank()) {
         AsyncImage(
-            model = entry.artworkUrl,
+            model = artwork,
             contentDescription = entry.title,
             contentScale = ContentScale.Crop,
             modifier = boxModifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),

@@ -59,7 +59,9 @@ object AlbumResolver {
             states.getOrPut(track.id) { MutableStateFlow(AlbumUiState.Unknown) }
         }
 
-    private fun Track.isResolvable() = id > 0 && source != "youtube"
+    // Spotify catalog tracks carry their album id in publisherMetadata; they are
+    // resolved inline by the UI and must never hit the SoundCloud API.
+    private fun Track.isResolvable() = id > 0 && source != "youtube" && source != "spotify"
 
     fun requestResolve(track: Track) {
         if (!track.isResolvable()) return

@@ -2143,10 +2143,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             ) else null
             val safePermalink =
                 if (context.navigationId.startsWith("yt_radio:")) context.navigationId else null
+            val safeArtworkUrl = if (idLong == -1L || context.navigationId == "likes" || idLong == -2L || context.navigationId == "downloads") null else context.imageUrl
             val historyPlaylist = Playlist(
                 id = idLong,
                 title = cleanTitle,
-                artworkUrl = context.imageUrl,
+                artworkUrl = safeArtworkUrl,
                 calculatedArtworkUrl = null,
                 trackCount = tracks.size,
                 user = playlistCreator,

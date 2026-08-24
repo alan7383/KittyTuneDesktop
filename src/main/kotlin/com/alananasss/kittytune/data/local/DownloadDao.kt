@@ -259,6 +259,22 @@ class DownloadDao(private val db: AppDatabase) {
         a.id, a.username, a.avatarUrl, a.trackCount, a.savedAt,
     )
 
+    suspend fun insertArtists(artists: List<LocalArtist>) {
+        if (artists.isEmpty()) return
+        for (i in 0 until artists.size - 1) {
+            val a = artists[i]
+            db.execSilent(
+                "INSERT OR REPLACE INTO saved_artists(id,username,avatarUrl,trackCount,savedAt) VALUES(?,?,?,?,?)",
+                a.id, a.username, a.avatarUrl, a.trackCount, a.savedAt,
+            )
+        }
+        val last = artists.last()
+        db.exec(
+            "INSERT OR REPLACE INTO saved_artists(id,username,avatarUrl,trackCount,savedAt) VALUES(?,?,?,?,?)",
+            last.id, last.username, last.avatarUrl, last.trackCount, last.savedAt,
+        )
+    }
+
     suspend fun deleteArtist(artistId: Long) =
         db.exec("DELETE FROM saved_artists WHERE id = ?", artistId)
 
@@ -282,6 +298,9 @@ class DownloadDao(private val db: AppDatabase) {
     fun getHistory(): Flow<List<HistoryItem>> = db.observe {
         db.query("SELECT * FROM play_history ORDER BY timestamp DESC LIMIT 20", mapper = ::history)
     }
+
+    suspend fun getHistoryItemById(numericId: Long, id: String): HistoryItem? =
+        db.queryOne("SELECT * FROM play_history WHERE numericId = ? OR id = ? LIMIT 1", numericId, id, mapper = ::history)
 
     suspend fun deleteHistoryItem(itemId: String) =
         db.exec("DELETE FROM play_history WHERE id = ?", itemId)

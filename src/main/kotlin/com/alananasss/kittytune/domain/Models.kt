@@ -390,7 +390,10 @@
             @SerializedName("artist") val artist: String? = null,
             @SerializedName("album_title") val albumTitle: String? = null,
             @SerializedName("release_title") val releaseTitle: String? = null,
-            val publisher: String? = null
+            val publisher: String? = null,
+            val explicit: Boolean = false,
+            @SerializedName("album_id") val albumId: String? = null,
+            @SerializedName("writer_composer") val composer: String? = null
         )
 
         val displayArtist: String
@@ -449,11 +452,15 @@
             get() {
                 if (!artworkUrl.isNullOrEmpty()) return artworkUrl.replace("large", "t500x500")
                 if (!calculatedArtworkUrl.isNullOrEmpty()) return calculatedArtworkUrl.replace("large", "t500x500")
-                if (!tracks.isNullOrEmpty()) {
-                    val firstTrackArt = tracks[0].fullResArtwork
-                    if (!firstTrackArt.contains("picsum")) return firstTrackArt
-                }
-                return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
+                // First track that actually has a cover, not blindly tracks[0] — its artwork can
+                // itself be a placeholder or an avatar.
+                tracks?.firstOrNull { usablePlaylistCover(it.fullResArtwork) }
+                    ?.let { return it.fullResArtwork }
+                // Deliberately no owner-avatar fallback. A playlist cover is not a person, and
+                // that step is why an uncovered playlist showed the user's face in the library
+                // grid while opening it revealed the real first-track cover. Every code path that
+                // built a Playlist had to remember to blank the avatar to avoid it; now none has to.
+                return "https://picsum.photos/200"
             }
     }
     data class UpdateProfileRequest(val username: String?, val description: String?, val city: String?, @SerializedName("country_code") val countryCode: String?, @SerializedName("first_name") val firstName: String? = null, @SerializedName("last_name") val lastName: String? = null)
@@ -535,10 +542,22 @@
         @SerializedName("sharing") val sharing: String? = null,
         @SerializedName("secret_token") val secretToken: String? = null,
         @SerializedName("set_type") val setType: String? = null,
+        @SerializedName("playlist_type") val playlistType: String? = null,
         @SerializedName("release_date") val releaseDate: String? = null,
         @SerializedName("likes_count") val likesCount: Int? = 0,
         @SerializedName("kind") val kind: String? = null
     ) {
+        val isRealAlbum: Boolean
+            get() = isAlbum ||
+                    setType?.equals("album", ignoreCase = true) == true ||
+                    setType?.equals("ep", ignoreCase = true) == true ||
+                    setType?.equals("single", ignoreCase = true) == true ||
+                    setType?.equals("compilation", ignoreCase = true) == true ||
+                    playlistType?.equals("album", ignoreCase = true) == true ||
+                    playlistType?.equals("ep", ignoreCase = true) == true ||
+                    playlistType?.equals("single", ignoreCase = true) == true ||
+                    playlistType?.equals("compilation", ignoreCase = true) == true
+
         val numericId: Long
             get() {
                 val parts = (urn ?: permalinkUrl ?: id.toString()).split(":", "/")
@@ -546,15 +565,43 @@
             }
         val isArtistStation: Boolean get() = (urn ?: permalinkUrl ?: id.toString()).contains("artist-stations")
         val isTrackStation: Boolean get() = (urn ?: permalinkUrl ?: id.toString()).contains("track-stations")
+
+        /**
+         * The cover we actually have, or null when all we hold is a placeholder.
+         *
+         * Unlike [fullResArtwork] this never invents one: no random picsum image (which
+         * Coil caches per URL, so every coverless playlist ended up showing the very same
+         * photo), and every candidate goes through [usablePlaylistCover] — including
+         * artworkUrl and calculatedArtworkUrl, which SoundCloud happily fills with the
+         * owner's avatar. Callers that want a real cover for a playlist whose tracks
+         * aren't loaded yet should pair this with PlaylistCoverResolver.
+         */
+        val usableArtwork: String?
+            get() {
+                artworkUrl?.replace("large", "t500x500")
+                    ?.takeIf { usablePlaylistCover(it) }
+                    ?.let { return it }
+                calculatedArtworkUrl?.replace("large", "t500x500")
+                    ?.takeIf { usablePlaylistCover(it) }
+                    ?.let { return it }
+                tracks?.firstOrNull { usablePlaylistCover(it.fullResArtwork) }
+                    ?.let { return it.fullResArtwork }
+                return null
+            }
+
         val fullResArtwork: String
             get() {
                 if (!artworkUrl.isNullOrEmpty()) return artworkUrl.replace("large", "t500x500")
                 if (!calculatedArtworkUrl.isNullOrEmpty()) return calculatedArtworkUrl.replace("large", "t500x500")
-                if (!tracks.isNullOrEmpty()) {
-                    val firstTrackArt = tracks[0].fullResArtwork
-                    if (!firstTrackArt.contains("picsum")) return firstTrackArt
-                }
-                return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
+                // First track that actually has a cover, not blindly tracks[0] — its artwork can
+                // itself be a placeholder or an avatar.
+                tracks?.firstOrNull { usablePlaylistCover(it.fullResArtwork) }
+                    ?.let { return it.fullResArtwork }
+                // Deliberately no owner-avatar fallback. A playlist cover is not a person, and
+                // that step is why an uncovered playlist showed the user's face in the library
+                // grid while opening it revealed the real first-track cover. Every code path that
+                // built a Playlist had to remember to blank the avatar to avoid it; now none has to.
+                return "https://picsum.photos/200"
             }
     }
     
@@ -564,20 +611,29 @@
         val username: String?,
         @SerializedName("avatar_url", alternate = ["avatarUrl"]) val avatarUrl: String?,
         val city: String? = null,
+        val country: String? = null,
         @SerializedName("country_code", alternate = ["countryCode"]) val countryCode: String? = null,
+        @SerializedName("first_name", alternate = ["firstName"]) val firstName: String? = null,
+        @SerializedName("last_name", alternate = ["lastName"]) val lastName: String? = null,
         @SerializedName("followers_count", alternate = ["followersCount"]) val followersCount: Int = 0,
         @SerializedName("followings_count", alternate = ["followingsCount"]) val followingsCount: Int = 0,
-        @SerializedName("track_count", alternate = ["tracksCount"]) val trackCount: Int = 0,
+        @SerializedName("track_count", alternate = ["tracksCount", "trackCount"]) val trackCount: Int = 0,
+        @SerializedName("playlist_count", alternate = ["playlistCount", "public_playlists_count", "publicPlaylistsCount"]) val playlistCount: Int = 0,
         @SerializedName("description") val description: String? = null,
         @SerializedName("permalink_url", alternate = ["permalinkUrl"]) val permalinkUrl: String? = null,
         @SerializedName("permalink") val permalink: String? = null,
         val visuals: Visuals? = null,
         @SerializedName("verified") val verified: Boolean = false,
+        @SerializedName("is_pro", alternate = ["isPro"]) val isPro: Boolean = false,
+        @SerializedName("created_at", alternate = ["createdAt"]) val createdAt: String? = null,
         @SerializedName("public_favorites_count") private val _publicFavoritesCount: Int? = 0,
         @SerializedName("likes_count") private val _likesCount: Int? = 0,
         @SerializedName("favorites_count") private val _favoritesCount: Int? = 0,
         @SerializedName("urn") val urn: String? = null
     ) {
+        val isArtist: Boolean
+            get() = verified || trackCount > 0 || urn?.startsWith("spotify:artist:") == true
+
         val likesCount: Int
             get() = when {
                 (_publicFavoritesCount ?: 0) > 0 -> _publicFavoritesCount!!
@@ -592,6 +648,17 @@
             get() {
                 if (id != 0L) return id
                 return urn?.split(":")?.lastOrNull()?.toLongOrNull() ?: 0L
+            }
+
+        val profileNavId: String
+            get() = when {
+                urn?.startsWith("spotify:artist:") == true -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(urn)}"
+                urn?.contains("spotify") == true -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(urn)}"
+                permalinkUrl?.contains("spotify") == true -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(permalinkUrl)}"
+                !permalink.isNullOrBlank() && id == 0L -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(permalink)}"
+                id > 0L -> "profile:$id"
+                !permalink.isNullOrBlank() -> "profile:$permalink"
+                else -> "profile:$id"
             }
     }
     
@@ -638,3 +705,13 @@ fun String?.getHighResAvatarUrl(): String? {
     if (this == null || this.isDefaultAvatar()) return null
     return this.replace("large", "t500x500")
 }
+
+/**
+ * Whether a track's artwork is fit to stand in as a playlist cover: a real image, not a
+ * placeholder and not somebody's profile picture.
+ */
+internal fun usablePlaylistCover(url: String?): Boolean =
+    !url.isNullOrBlank() &&
+        !url.contains("picsum") &&
+        !url.contains("avatars") &&
+        !url.contains("default_avatar")
