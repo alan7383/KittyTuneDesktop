@@ -98,6 +98,13 @@ object MusicManager {
         val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
         _contextFlow.value = prefs.getLastContext()
 
+        // The saved level has to be applied here rather than from the ViewModel: AppBootstrap
+        // calls init() before any ViewModel exists, and plenty of code drives playback through
+        // MusicManager.player directly, so anything that waits for PlayerViewModel.player to be
+        // touched leaves the engine at its 1.0 default — a slider showing 35% over full-volume
+        // audio, which is what issue #27 reported.
+        player.volume = prefs.getSavedVolume()
+
         player.onCompletion = { onCompletion?.invoke() }
         player.onError = { it.printStackTrace() }
     }

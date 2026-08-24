@@ -39,6 +39,11 @@ import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.common.getSettingsShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.ui.res.painterResource
 
 @Composable
 fun AppearanceSettingsScreen(
@@ -246,7 +251,7 @@ fun AppearanceSettingsScreen(
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val totalVisibleItems = if (isPureBlackVisible) 4 else 3
+                        val totalVisibleItems = if (isPureBlackVisible) 6 else 5
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 0),
                             title = str("pref_language"),
@@ -304,7 +309,7 @@ fun AppearanceSettingsScreen(
                             exit = shrinkVertically() + fadeOut()
                         ) {
                             SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 3),
+                                shape = getSettingsShape(totalVisibleItems, 5),
                                 title = str("pref_pure_black"),
                                 hasSwitch = true,
                                 switchState = pureBlack,
