@@ -59,6 +59,31 @@ data class UnifiedLyricResult(
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val gson = Gson()
+    private val lyricsOverridesPrefs =
+        com.alananasss.kittytune.core.NamedPrefs("lyrics_overrides")
+
+    /**
+     * Manual lyrics persistence (issue #27): when the user picks a lyric result by
+     * hand, remember it per track so future plays reuse that exact choice.
+     */
+    private fun saveLyricsOverride(trackId: Long, result: UnifiedLyricResult) {
+        if (trackId <= 0L) return
+        try {
+            lyricsOverridesPrefs.putString("override_$trackId", gson.toJson(result))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun getLyricsOverride(trackId: Long): UnifiedLyricResult? {
+        if (trackId <= 0L) return null
+        return try {
+            val raw = lyricsOverridesPrefs.getString("override_$trackId", null)
+            raw?.takeIf { it.isNotBlank() }?.let { gson.fromJson(it, UnifiedLyricResult::class.java) }
+        } catch (e: Exception) {
+            null
+        }
+    }
     private val api = RetrofitClient.create()
     private val playerPrefs = PlayerPreferences()
     private val tokenManager = TokenManager
@@ -1095,6 +1120,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         manualSearchQuery = queries.firstOrNull() ?: ""
 
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
+            // A previously chosen manual search result wins over automatic matching.
+            val storedOverride = getLyricsOverride(track.id)
+            if (storedOverride != null) {
+                withContext(Dispatchers.Main) { selectUnifiedLyricResult(storedOverride) }
+                return@launch
+            }
+
             val preferLocal = playerPrefs.getLyricsPreferLocal()
             if (preferLocal) {
                 val localTrack = DownloadManager.getLocalTrack(track.id)
@@ -1443,6 +1475,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 lyricsMode = if (finalLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
                 isLyricsLoading = false
                 isSearchingLyrics = false
+            }
+
+            // Remember the manual pick for the current track (issue #27).
+            if (finalLines.isNotEmpty() || !finalPlain.isNullOrBlank()) {
+                currentTrack?.id?.let { saveLyricsOverride(it, result) }
             }
         }
     }
