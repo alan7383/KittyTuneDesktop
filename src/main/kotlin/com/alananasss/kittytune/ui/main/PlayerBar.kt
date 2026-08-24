@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -67,6 +68,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import java.awt.Cursor
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.data.MusicManager
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.alananasss.kittytune.utils.makeTimeString
@@ -77,6 +79,27 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.onClick
 import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.SliderState
+import androidx.compose.material3.VerticalSlider
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.onPointerEvent
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import kotlinx.coroutines.delay
 
 /**
  * Bottom full-width playback bar: track info left, transport + progress center,
@@ -140,12 +163,12 @@ fun PlayerBar(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
+                                ArtistLinkText(
+                                    track = track,
+                                    onArtistClick = { vm.navigateToTrackArtist(it) },
                                     text = track.user?.username ?: "",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
                                 if (track.user?.verified == true) {
                                     Spacer(Modifier.width(3.dp))
@@ -181,18 +204,15 @@ fun PlayerBar(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    IconButton(
-                        shapes = IconButtonDefaults.shapes(),
-                        onClick = { vm.toggleShuffle() }
-                    ) {
-                        Icon(
-                            Icons.Filled.Shuffle,
-                            contentDescription = "Shuffle",
-                            tint = if (vm.shuffleEnabled) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                    // Active pill background makes on/off state obvious at a glance.
+                    ExpressiveToggleButton(
+                        selected = vm.shuffleEnabled,
+                        icon = Icons.Filled.Shuffle,
+                        contentDescription = "Shuffle",
+                        onClick = { vm.toggleShuffle() },
+                    )
+
+                    Spacer(Modifier.width(6.dp))
 
                     val backInteractionSource = remember { MutableInteractionSource() }
                     val nextInteractionSource = remember { MutableInteractionSource() }
@@ -299,15 +319,15 @@ fun PlayerBar(
                         Icon(Icons.Filled.SkipNext, null, modifier = Modifier.size(22.dp))
                     }
 
-                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleRepeatMode() }) {
-                        Icon(
-                            if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                            contentDescription = null,
-                            tint = if (vm.repeatMode != RepeatMode.NONE) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                    Spacer(Modifier.width(6.dp))
+
+                    ExpressiveToggleButton(
+                        selected = vm.repeatMode != RepeatMode.NONE,
+                        icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
+                        else Icons.Filled.Repeat,
+                        contentDescription = "Repeat",
+                        onClick = { vm.toggleRepeatMode() },
+                    )
                 }
 
                 // Progress row
@@ -343,6 +363,8 @@ fun PlayerBar(
                     )
                 }
             }
+
+            val verticalVolumeSlider = rememberVerticalVolumeSlider()
 
             // --- right: lyrics / effects / queue / volume ------------------------------
             Row(
@@ -388,22 +410,300 @@ fun PlayerBar(
                 }
 
                 val volume = vm.volume
-                Icon(
-                    when {
-                        volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
-                        volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-                        else -> Icons.AutoMirrored.Filled.VolumeUp
-                    },
-                    contentDescription = "Mute",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp).clickable { vm.toggleMute() },
-                )
-                Slider(
-                    value = volume,
-                    onValueChange = { vm.updateVolume(it) },
-                    modifier = Modifier.width(110.dp).padding(start = 4.dp),
-                )
+                if (verticalVolumeSlider) {
+                    VolumeHoverControl(
+                        volume = volume,
+                        onVolumeChange = { vm.updateVolume(it) },
+                        onVolumeChangeFinished = { vm.persistVolume() },
+                        onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
+                        onToggleMute = { vm.toggleMute() },
+                    )
+                } else {
+                    Icon(
+                        when {
+                            volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
+                            volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                            else -> Icons.AutoMirrored.Filled.VolumeUp
+                        },
+                        contentDescription = "Mute",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() }
+                            .clickable { vm.toggleMute() },
+                    )
+                    Slider(
+                        value = volume,
+                        onValueChange = { vm.updateVolume(it) },
+                        onValueChangeFinished = { vm.persistVolume() },
+                        modifier = Modifier
+                            // Flexible rather than a fixed width: the three sections of the bar
+                            // each get exactly a third, and at the minimum window size a fixed
+                            // 140.dp made this row overflow — which clipped the thumb at the
+                            // left end of the track, the "slider disappears" report in #27.
+                            // weight(fill = false) lets it shrink instead, and grow up to 200.dp
+                            // on a wide window, which is also the "make it wider" ask.
+                            .weight(1f, fill = false)
+                            .widthIn(max = 200.dp)
+                            .padding(horizontal = 12.dp)
+                            .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
+                    )
+                }
             }
         }
+    }
+}
+
+
+/**
+ * Shuffle / repeat, in the same language as the transport pills next to them: 42 dp tall,
+ * springy, and morphing shape rather than a static circle glued to the end of the row.
+ *
+ * The shape carries the state as much as the colour does — round when off, noticeably squarer
+ * when on — which is the Material 3 Expressive selected-toggle treatment and reads even in a
+ * monochrome palette, where a container tint alone was too subtle to tell apart.
+ */
+@Composable
+private fun ExpressiveToggleButton(
+    selected: Boolean,
+    icon: ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val pressed by interaction.collectIsPressedAsState()
+
+    val corner by animateDpAsState(
+        targetValue = when {
+            pressed -> 12.dp
+            selected -> 14.dp
+            else -> 21.dp
+        },
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+        label = "toggleCorner",
+    )
+    val width by animateDpAsState(
+        targetValue = when {
+            pressed -> 40.dp
+            hovered -> 48.dp
+            else -> 42.dp
+        },
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = 600f),
+        label = "toggleWidth",
+    )
+
+    val container = when {
+        selected -> MaterialTheme.colorScheme.secondaryContainer
+        hovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        else -> Color.Transparent
+    }
+
+    Box(
+        modifier = Modifier
+            .size(width = width, height = 42.dp)
+            .clip(RoundedCornerShape(corner))
+            .background(container)
+            .hoverable(interaction)
+            .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+            .clickable(interactionSource = interaction, indication = ripple(), onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
+
+/**
+ * Scroll wheel over any volume control raises or lowers it, in 5% steps. Wheel deltas are
+ * positive downwards, so the sign is inverted to match the direction the user pushed.
+ *
+ * [currentVolume] and [onVolumeChange] are read through [rememberUpdatedState] because the
+ * `pointerInput` block is keyed on Unit and therefore never restarts: capturing them directly
+ * froze the level at whatever it was when the control first composed, so scrolling only ever
+ * moved one step either side of that stale value.
+ */
+@Composable
+private fun Modifier.volumeWheel(
+    currentVolume: () -> Float,
+    onVolumeChange: (Float) -> Unit,
+): Modifier {
+    val volume by androidx.compose.runtime.rememberUpdatedState(currentVolume)
+    val onChange by androidx.compose.runtime.rememberUpdatedState(onVolumeChange)
+    return this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type != PointerEventType.Scroll) continue
+                val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                if (delta == 0f) continue
+                onChange((volume() - delta * 0.05f).coerceIn(0f, 1f))
+                event.changes.forEach { it.consume() }
+            }
+        }
+    }
+}
+
+/**
+ * Reactive read of the "vertical volume slider" setting; recomposes when the pref changes.
+ */
+@Composable
+private fun rememberVerticalVolumeSlider(): Boolean {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) {
+        com.alananasss.kittytune.data.local.PlayerPreferences().getVerticalVolumeSlider()
+    }
+}
+
+/**
+ * Speaker button that reveals a vertical volume slider on hover, floating above the bar.
+ *
+ * Hover rather than click, because a click on the speaker already means mute and a control that
+ * needed two different clicks to do two things was the confusing part. The panel stays up while
+ * the pointer is over either the button or the panel itself, with a short grace period so the
+ * gap between them does not dismiss it mid-reach.
+ */
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+    ExperimentalComposeUiApi::class,
+)
+@Composable
+private fun VolumeHoverControl(
+    volume: Float,
+    onVolumeChange: (Float) -> Unit,
+    onVolumeChangeFinished: () -> Unit,
+    onVolumeScrolled: (Float) -> Unit,
+    onToggleMute: () -> Unit,
+) {
+    var overButton by remember { mutableStateOf(false) }
+    var overPanel by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(overButton, overPanel) {
+        if (overButton || overPanel) {
+            expanded = true
+        } else {
+            delay(250)
+            expanded = false
+        }
+    }
+
+    val levelIcon = when {
+        volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
+        volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+        else -> Icons.AutoMirrored.Filled.VolumeUp
+    }
+
+    Box {
+        val buttonShape by animateDpAsState(
+            targetValue = if (expanded) 14.dp else 20.dp,
+            animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+            label = "volumeButtonShape",
+        )
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(buttonShape))
+                .background(
+                    if (expanded) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    else Color.Transparent
+                )
+                .onPointerEvent(PointerEventType.Enter) { overButton = true }
+                .onPointerEvent(PointerEventType.Exit) { overButton = false }
+                .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                .volumeWheel({ volume }, onVolumeScrolled)
+                .clickable(indication = ripple(), interactionSource = remember { MutableInteractionSource() }) {
+                    onToggleMute()
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                levelIcon,
+                contentDescription = "Volume",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+
+        if (expanded) {
+            Popup(
+                popupPositionProvider = AboveAnchorCentered,
+                properties = PopupProperties(focusable = false),
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .padding(bottom = 6.dp)
+                        .onPointerEvent(PointerEventType.Enter) { overPanel = true }
+                        .onPointerEvent(PointerEventType.Exit) { overPanel = false }
+                        .volumeWheel({ volume }, onVolumeScrolled),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp),
+                    ) {
+                        Text(
+                            text = "${(volume * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        val state = remember {
+                            SliderState(volume, 0, { onVolumeChangeFinished() }, 0f..1f)
+                        }
+                        // Follow changes that did not come from this slider — the mute button,
+                        // the wheel, a keyboard shortcut — instead of only seeding once.
+                        LaunchedEffect(volume) {
+                            if (kotlin.math.abs(state.value - volume) > 0.001f) state.value = volume
+                        }
+                        LaunchedEffect(state) {
+                            snapshotFlow { state.value }.collect { onVolumeChange(it) }
+                        }
+                        VerticalSlider(
+                            state = state,
+                            // A volume slider fills from the bottom. The default direction puts
+                            // the origin at the top, which is what made it read upside down.
+                            reverseDirection = true,
+                            modifier = Modifier.height(150.dp),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Icon(
+                            levelIcon,
+                            contentDescription = "Mute",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                                .clickable { onToggleMute() },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Places a popup directly above its anchor, horizontally centred and clamped to the window. */
+private object AboveAnchorCentered : PopupPositionProvider {
+    override fun calculatePosition(
+        anchorBounds: IntRect,
+        windowSize: IntSize,
+        layoutDirection: LayoutDirection,
+        popupContentSize: IntSize,
+    ): IntOffset {
+        val x = anchorBounds.left + (anchorBounds.width - popupContentSize.width) / 2
+        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
+        return IntOffset(
+            x.coerceIn(0, maxX),
+            (anchorBounds.top - popupContentSize.height).coerceAtLeast(0),
+        )
     }
 }

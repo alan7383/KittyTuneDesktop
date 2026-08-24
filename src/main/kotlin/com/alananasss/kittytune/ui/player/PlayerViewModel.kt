@@ -89,6 +89,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (!playerInitialized) {
                 playerInitialized = true
                 MusicManager.init()
+                // Push whatever level the UI is already showing into the freshly built engine.
+                // Reading the pref again here would undo a change the user made before the
+                // first track started playing.
+                MusicManager.setVolume(volume)
                 MusicManager.player.addListener(playerListener)
                 MusicManager.applyEffects(effectsState)
             }
@@ -98,15 +102,40 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var effectsState by mutableStateOf(playerPrefs.getLastEffects())
     var isPreciseSpeedEnabled by mutableStateOf(playerPrefs.getPreciseSpeedEnabled())
 
-    var volume by mutableFloatStateOf(MusicManager.getVolume())
+    /**
+     * Seeded straight from preferences rather than from the engine: [player] is a lazy getter,
+     * and until something touches it the engine still reports its default of 1.0 — which is why
+     * the slider used to come up at maximum after every restart (issue #27).
+     */
+    var volume by mutableFloatStateOf(playerPrefs.getSavedVolume())
         private set
 
     private var volumeBeforeMute: Float = 1.0f
+    private var volumePersistJob: Job? = null
 
     fun updateVolume(v: Float) {
         val newVol = v.coerceIn(0f, 1f)
         volume = newVol
         MusicManager.setVolume(newVol)
+    }
+
+    /** Called when the user finishes a volume interaction; persists across restarts. */
+    fun persistVolume() {
+        volumePersistJob?.cancel()
+        volumePersistJob = null
+        playerPrefs.saveVolume(volume)
+    }
+
+    /**
+     * For continuous input like the scroll wheel. Every pref write re-serialises the whole
+     * file, so writing once per wheel notch would stutter the UI.
+     */
+    fun persistVolumeSoon() {
+        volumePersistJob?.cancel()
+        volumePersistJob = viewModelScope.launch {
+            delay(400)
+            playerPrefs.saveVolume(volume)
+        }
     }
 
     fun toggleMute() {
@@ -120,10 +149,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun volumeUp(delta: Float = 0.1f) {
         updateVolume(volume + delta)
+        persistVolume()
     }
 
     fun volumeDown(delta: Float = 0.1f) {
         updateVolume(volume - delta)
+        persistVolume()
     }
 
     fun changeOutputDevice(deviceName: String) {
@@ -369,7 +400,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var showSleepTimerDialog by mutableStateOf(false)
     val isSleepTimerActive: Boolean get() = sleepTimerRemainingMs > 0L || sleepTimerEndOfTrack
     private var sleepTimerJob: Job? = null
-    private var preFadeVolume: Float = 1f
+    /** Level to put back when a sleep-timer fade ends. Null means no fade is running. */
+    private var preFadeVolume: Float? = null
 
     private var pendingSeekPosition: Long? = null
     private var seekTargetPosition: Long = -1L
@@ -2873,7 +2905,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     player.volume = 0f
                     player.pause()
                     // Restore original volume (playback is paused = no sound)
-                    player.volume = preFadeVolume
+                    player.volume = preFadeVolume ?: volume
+                    preFadeVolume = null
                     sleepTimerRemainingMs = 0L
                     showSleepTimerIslandNotification(isStarted = false)
                     break
@@ -2884,7 +2917,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     val fraction = (remaining.toFloat() / fadeDurationMs).coerceIn(0f, 1f)
                     // Quadratic curve: perceived volume decreases naturally
                     val volumeFraction = fraction * fraction
-                    player.volume = (preFadeVolume * volumeFraction).coerceIn(0f, 1f)
+                    player.volume = ((preFadeVolume ?: volume) * volumeFraction).coerceIn(0f, 1f)
                 }
 
                 sleepTimerRemainingMs = remaining
@@ -2918,10 +2951,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun cancelSleepTimer() {
         sleepTimerJob?.cancel()
         sleepTimerJob = null
-        // Restore original volume if a fade was in progress
-        if (player.volume != preFadeVolume) {
-            player.volume = preFadeVolume
-        }
+        // Only if a fade actually lowered the volume. This used to compare against a field that
+        // defaulted to 1.0, so cancelling — or merely *arming* a timer, which calls this first —
+        // slammed the engine to full volume while the slider stayed where the user left it.
+        preFadeVolume?.let { player.volume = it }
+        preFadeVolume = null
         sleepTimerRemainingMs = 0L
         sleepTimerEndOfTrack = false
     }
