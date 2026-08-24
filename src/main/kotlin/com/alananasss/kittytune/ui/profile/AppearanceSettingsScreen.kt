@@ -50,6 +50,9 @@ fun AppearanceSettingsScreen(
 
     var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
     var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme()) }
+    var verticalVolumeSlider by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
+    var showIconDialog by remember { mutableStateOf(false) }
+    val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
     var appLanguage by remember { mutableStateOf(prefs.getAppLanguage()) }
@@ -123,6 +126,58 @@ fun AppearanceSettingsScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(str("btn_cancel")) } }
+        )
+    }
+
+    if (showIconDialog) {
+        AlertDialog(
+            onDismissRequest = { showIconDialog = false },
+            title = { Text(str("pref_app_icon")) },
+            text = {
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.heightIn(max = 420.dp)
+                ) {
+                    items(com.alananasss.kittytune.core.AppIconVariants.ALL.size) { index ->
+                        val variant = com.alananasss.kittytune.core.AppIconVariants.ALL[index]
+                        val selected = variant.key == appIconVariant
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.secondaryContainer
+                                    else androidx.compose.ui.graphics.Color.Transparent
+                                )
+                                .clickable {
+                                    prefs.setAppIconVariant(variant.key)
+                                    com.alananasss.kittytune.core.AppIconInstaller.apply(variant.key)
+                                    showIconDialog = false
+                                }
+                                .padding(8.dp)
+                        ) {
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(
+                                    com.alananasss.kittytune.core.AppIconVariants.resourcePath(variant.key)
+                                ),
+                                contentDescription = variant.label,
+                                modifier = Modifier.size(56.dp)
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = variant.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showIconDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -218,6 +273,25 @@ fun AppearanceSettingsScreen(
 
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 2),
+                            title = str("pref_vertical_volume_slider"),
+                            subtitle = str("pref_vertical_volume_slider_sub"),
+                            hasSwitch = true,
+                            switchState = verticalVolumeSlider,
+                            onSwitchChange = {
+                                verticalVolumeSlider = it
+                                prefs.setVerticalVolumeSlider(it)
+                            }
+                        )
+
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, 3),
+                            title = str("pref_app_icon"),
+                            subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.label ?: "Default",
+                            onClick = { showIconDialog = true }
+                        )
+
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, 4),
                             title = str("pref_colors"),
                             subtitle = str("pref_colors_subtitle"),
                             icon = Icons.Rounded.Palette,

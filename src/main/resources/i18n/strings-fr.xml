@@ -1029,6 +1029,9 @@
     <string name="pref_discord_title">Intégration Discord</string>
     <string name="pref_download_drm">Télécharger les flux DRM natifs</string>
     <string name="pref_download_drm_sub">Activez pour garder les DRM en cache interne. Désactivez pour forcer la conversion MP3 via YouTube (NewPipe).</string>
+    <string name="pref_app_icon">Icône de l'application</string>
+    <string name="pref_vertical_volume_slider">Curseur de volume vertical</string>
+    <string name="pref_vertical_volume_slider_sub">Affiche un curseur de volume vertical au-dessus de l'icône haut-parleur de la barre de lecture</string>
     <string name="pref_dynamic_theme">Thème dynamique</string>
     <string name="pref_font_custom_subtitle">Utiliser la police variable</string>
     <string name="pref_font_custom_title">Google Sans Flex</string>

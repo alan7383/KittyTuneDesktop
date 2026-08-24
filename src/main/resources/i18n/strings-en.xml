@@ -1029,6 +1029,9 @@
     <string name="pref_discord_title">Discord Integration</string>
     <string name="pref_download_drm">Download Native DRM</string>
     <string name="pref_download_drm_sub">Keep enabled to cache DRM natively for internal playback. Disable to force unencrypted MP3 downloads via YouTube fallback.</string>
+    <string name="pref_app_icon">App icon</string>
+    <string name="pref_vertical_volume_slider">Vertical volume slider</string>
+    <string name="pref_vertical_volume_slider_sub">Show a vertical volume popup above the speaker icon in the player bar</string>
     <string name="pref_dynamic_theme">Dynamic Theme</string>
     <string name="pref_font_custom_subtitle">Use custom variable font</string>
     <string name="pref_font_custom_title">Google Sans Flex</string>

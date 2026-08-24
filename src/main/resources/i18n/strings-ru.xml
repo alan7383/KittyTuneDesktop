@@ -1029,6 +1029,9 @@
     <string name="pref_discord_title">Интеграция с Discord</string>
     <string name="pref_download_drm">Скачать оригинальный DRM</string>
     <string name="pref_download_drm_sub">Оставьте включённым для сохранения оригинальных DRM-треков во внутренний кэш. Отключите для принудительного скачивания MP3-версий через YouTube.</string>
+    <string name="pref_app_icon">Значок приложения</string>
+    <string name="pref_vertical_volume_slider">Вертикальный ползунок громкости</string>
+    <string name="pref_vertical_volume_slider_sub">Показывать вертикальный ползунок громкости над значком динамика</string>
     <string name="pref_dynamic_theme">Динамическая тема</string>
     <string name="pref_font_custom_subtitle">Использовать свой переменный шрифт</string>
     <string name="pref_font_custom_title">Google Sans Flex</string>
