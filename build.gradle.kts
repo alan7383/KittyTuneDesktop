@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.0.35"
+version = "1.1.0"
 
 repositories {
     google()
@@ -131,7 +131,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.0.25"
+            packageVersion = "1.1.0"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 
