@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +30,66 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.domain.User
 import java.text.NumberFormat
 import java.util.Locale
+
+enum class UserFilterType {
+    ALL,
+    ARTISTS,
+    PROFILES
+}
+
+@Composable
+private fun UserFilterChips(
+    users: List<User>,
+    selectedFilter: UserFilterType,
+    onSelect: (UserFilterType) -> Unit,
+) {
+    val artistsCount = remember(users) { users.count { it.isArtist } }
+    val profilesCount = remember(users) { users.count { !it.isArtist } }
+
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            FilterChip(
+                selected = selectedFilter == UserFilterType.ALL,
+                onClick = { onSelect(UserFilterType.ALL) },
+                label = { Text("${str("filter_all")} (${users.size})") },
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+        item {
+            FilterChip(
+                selected = selectedFilter == UserFilterType.ARTISTS,
+                onClick = { onSelect(UserFilterType.ARTISTS) },
+                label = { Text("${str("filter_artists")} ($artistsCount)") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Rounded.MusicNote,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+        item {
+            FilterChip(
+                selected = selectedFilter == UserFilterType.PROFILES,
+                onClick = { onSelect(UserFilterType.PROFILES) },
+                label = { Text("${str("filter_profiles")} ($profilesCount)") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Rounded.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+    }
+}
 
 @Composable
 fun UserListDialog(
@@ -55,6 +117,15 @@ fun UserListDialog(
     }
 
     val title = if (type == "followers") str("profile_followers") else str("profile_followings")
+
+    var selectedFilter by remember { mutableStateOf(UserFilterType.ALL) }
+    val filteredUsers = remember(viewModel.users, selectedFilter) {
+        when (selectedFilter) {
+            UserFilterType.ALL -> viewModel.users
+            UserFilterType.ARTISTS -> viewModel.users.filter { it.isArtist }
+            UserFilterType.PROFILES -> viewModel.users.filter { !it.isArtist }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -103,12 +174,17 @@ fun UserListDialog(
                         )
                     }
                 } else {
+                    UserFilterChips(
+                        users = viewModel.users,
+                        selectedFilter = selectedFilter,
+                        onSelect = { selectedFilter = it }
+                    )
                     LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(bottom = 16.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(viewModel.users) { user ->
+                        items(filteredUsers) { user ->
                             UserRow(user = user, onClick = { onUserClick(user.numericId) })
                         }
 
@@ -153,6 +229,15 @@ fun UserListScreen(
 
     val title = if (type == "followers") str("profile_followers") else str("profile_followings")
 
+    var selectedFilter by remember { mutableStateOf(UserFilterType.ALL) }
+    val filteredUsers = remember(viewModel.users, selectedFilter) {
+        when (selectedFilter) {
+            UserFilterType.ALL -> viewModel.users
+            UserFilterType.ARTISTS -> viewModel.users.filter { it.isArtist }
+            UserFilterType.PROFILES -> viewModel.users.filter { !it.isArtist }
+        }
+    }
+
     Scaffold(
         topBar = {
             LargeTopAppBar(
@@ -171,6 +256,11 @@ fun UserListScreen(
                 CircularWavyProgressIndicator()
             }
         } else {
+            UserFilterChips(
+                users = viewModel.users,
+                selectedFilter = selectedFilter,
+                onSelect = { selectedFilter = it }
+            )
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(bottom = 120.dp),
@@ -178,7 +268,7 @@ fun UserListScreen(
                     .padding(innerPadding)
                     .fillMaxSize()
             ) {
-                items(viewModel.users) { user ->
+                items(filteredUsers) { user ->
                     UserRow(user = user, onClick = { onUserClick(user.numericId) })
                 }
 

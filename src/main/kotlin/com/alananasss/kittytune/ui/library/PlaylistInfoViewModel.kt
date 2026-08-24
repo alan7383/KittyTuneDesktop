@@ -36,21 +36,48 @@
         private var currentPlaylistIdStr: String = ""
     
         fun loadPlaylistDetails(playlistIdStr: String) {
+            val isSpotify = playlistIdStr.startsWith("spotify:playlist:") ||
+                    playlistIdStr.startsWith("spotify:album:") ||
+                    playlistIdStr.startsWith("spotify_playlist:") ||
+                    playlistIdStr.startsWith("spotify_album:")
+
             val isSystemPlaylist = playlistIdStr.startsWith("system_playlist:")
             val systemPlaylistUrn = playlistIdStr.removePrefix("system_playlist:")
             val playlistId = playlistIdStr.toLongOrNull() ?: 0L
-            
-            if (!isSystemPlaylist && playlistId <= 0) { isLoading = false; return }
+
+            if (!isSpotify && !isSystemPlaylist && playlistId <= 0) { isLoading = false; return }
             if (currentPlaylistIdStr == playlistIdStr && (likers.isNotEmpty() || reposters.isNotEmpty()) && playlistDetails != null) return
-    
+
             currentPlaylistIdStr = playlistIdStr
-    
+
             viewModelScope.launch {
                 isLoading = true
                 likers.clear(); likersNextUrl = null
                 reposters.clear(); repostersNextUrl = null
                 playlistDetails = null
-    
+
+                if (isSpotify) {
+                    try {
+                        val cleanId = playlistIdStr
+                            .removePrefix("spotify:playlist:")
+                            .removePrefix("spotify:album:")
+                            .removePrefix("spotify_playlist:")
+                            .removePrefix("spotify_album:")
+                        val isAlbum = playlistIdStr.contains("album")
+                        val p = if (isAlbum) {
+                            com.alananasss.kittytune.data.spotify.SpotifyRepository.getAlbum(cleanId)?.toPlaylist()
+                        } else {
+                            com.alananasss.kittytune.data.spotify.SpotifyRepository.getPlaylist(cleanId)?.toPlaylist()
+                        }
+                        playlistDetails = p
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        isLoading = false
+                    }
+                    return@launch
+                }
+
                 try {
                     coroutineScope {
                         // fetch full objects to get next_href AND playlist details

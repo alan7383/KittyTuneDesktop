@@ -19,11 +19,13 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Tag
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
@@ -93,22 +95,84 @@ fun PlaylistDetailsSheet(
                     overflow = TextOverflow.Ellipsis
                 )
                 if (playlist?.user != null) {
-                    Text(
-                        text = str("playlist_by_user", playlist.user.username ?: ""),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold,
+                    val creator = playlist.user
+                    val isArtist = creator.isArtist
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
                         modifier = Modifier
-                            .clickable {
-                                onDismiss()
-                                onNavigate("profile:${playlist.user.id}")
+                            .clip(RoundedCornerShape(12.dp))
+                            .then(
+                                if (isArtist) {
+                                    Modifier.clickable {
+                                        onDismiss()
+                                        // Same nav-target resolution as Android: spotify
+                                        // creators carry their urn through to the profile route.
+                                        val navTarget = when {
+                                            creator.urn?.startsWith("spotify:artist:") == true -> creator.urn!!
+                                            creator.permalink != null && creator.permalink.isNotBlank() -> creator.permalink
+                                            creator.numericId > 0L -> creator.numericId.toString()
+                                            else -> creator.id.toString()
+                                        }
+                                        onNavigate("profile:$navTarget")
+                                    }
+                                } else {
+                                    Modifier
+                                }
+                            )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                AsyncImage(
+                                    model = creator.avatarUrl,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                )
                             }
-                            .padding(vertical = 2.dp)
-                    )
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = creator.username ?: str("unknown_artist"),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = if (isArtist) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (creator.verified) {
+                                        Spacer(Modifier.width(4.dp))
+                                        Icon(
+                                            Icons.Rounded.Verified,
+                                            null,
+                                            tint = if (creator.urn?.startsWith("spotify") == true) Color(0xFF1DB954) else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = str("playlist_creator_badge"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
-                val metaParts = remember(playlist) {
+                val metaParts = remember(playlist, viewModel.likers.size) {
                     if (playlist == null) emptyList() else buildList {
-                        if (playlist.isAlbum) add(str("table_header_album"))
+                        if (playlist.isRealAlbum) add(str("table_header_album"))
+                        // Same saves resolution as Android: likes count, falling back
+                        // to the number of likers actually loaded.
+                        val saves = (playlist.likesCount ?: 0).takeIf { it > 0 } ?: viewModel.likers.size
+                        if (saves > 0) add(str("playlist_details_saves", String.format("%,d", saves)))
                         playlist.trackCount?.takeIf { it > 0 }?.let { add(str("playlist_num_tracks", it)) }
                         val totalMs = playlist.tracks.orEmpty().mapNotNull { it.durationMs }.sum()
                         if (totalMs > 0) add(formatTotalDuration(totalMs))

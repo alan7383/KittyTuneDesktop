@@ -26,6 +26,7 @@ import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.NetworkUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -195,7 +196,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                             item.playlist.title?.contains(searchQuery, ignoreCase = true) == true ||
                                     item.playlist.user?.username?.contains(searchQuery, ignoreCase = true) == true
                         }
-                        val isAlbum = item.playlist.isAlbum
+                        val isAlbum = item.playlist.isRealAlbum
                         val isStation = item.playlist.permalinkUrl?.let {
                             it.contains("artist-stations") || it.contains("track-stations")
                         } == true
@@ -228,7 +229,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
             val sorted = when (sortOption) {
                 LibrarySortOption.RECENTS -> {
-                    items.sortedByDescending { it.timestamp }
+                    if (isSortDescending) items.sortedByDescending { it.timestamp } else items.sortedBy { it.timestamp }
                 }
                 LibrarySortOption.DATE_ADDED -> {
                     if (isSortDescending) items.sortedByDescending { it.timestamp } else items.sortedBy { it.timestamp }
@@ -264,7 +265,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
 
     // --- state variables ---
-    var isLoading by mutableStateOf(true)
+    var isLoading by mutableStateOf(false)
     var isOfflineMode by mutableStateOf(false)
     var searchQuery by mutableStateOf("")
     var isGuestUser by mutableStateOf(false)
@@ -513,7 +514,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private var isHydratingLikes = false
-    private val isoParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+    private fun parseIsoDate(raw: String?): Long {
+        if (raw.isNullOrBlank()) return 0L
+        return runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
+            ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }.parse(raw)?.time }.getOrNull()
+            ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }.parse(raw)?.time }.getOrNull()
+            ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
+            ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(raw)?.time }.getOrNull()
+            ?: 0L
+    }
 
     private val api = RetrofitClient.create()
     private val db = AppDatabase.downloadDao
@@ -572,17 +581,21 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             SessionManager.isClientIdValid.collect { isReady ->
-                if (isReady) {
+                if (isReady && userProfile == null) {
                     loadData()
                 }
             }
         }
 
         viewModelScope.launch {
+            SessionManager.sessionReadyEvent.collect {
+                loadData(forceRefresh = true)
+            }
+        }
+
+        viewModelScope.launch {
             DownloadManager.libraryUpdated.collect {
-                if (SessionManager.isClientIdValid.value) {
-                    loadData(forceRefresh = true)
-                }
+                rebuildAllItems()
             }
         }
 
@@ -633,11 +646,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                 DownloadManager.deletedPlaylistIds
             ) { allLocalPlaylists, likedIds, deletedIds ->
                 allLocalPlaylists.filter { local ->
-                    !deletedIds.contains(local.id) && (local.id < 0 || local.isDownloaded || likedIds.contains(local.id))
+                    !deletedIds.contains(local.id) && (local.id < 0 || local.isDownloaded || likedIds.contains(local.id) || local.permalinkUrl?.contains("spotify") == true)
                 }
             }.collect { localPlaylists ->
                 val localIds = localPlaylists.map { it.id }.toSet()
-                DownloadManager.clearDeletedPlaylistIds(localIds)
+                if (DownloadManager.deletedPlaylistIds.value.any { localIds.contains(it) }) {
+                    DownloadManager.clearDeletedPlaylistIds(localIds)
+                }
                 localItemsCache = localPlaylists.map { local ->
                     val rawArt = if (!local.localCoverPath.isNullOrEmpty()) local.localCoverPath else local.artworkUrl
                     val validArt = if (rawArt?.contains("avatars") == true) {
@@ -686,6 +701,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             .map { it.playlist.id }
             .toSet()
 
+        val onlinePlaylistMap = onlineItemsCache
+            .filterIsInstance<LibraryItem.PlaylistItem>()
+            .associateBy { it.playlist.id }
+
         val updatedOnlineItems = onlineItemsCache.map { item ->
             if (item is LibraryItem.PlaylistItem) {
                 val meta = allItemMetasCache[item.key]
@@ -698,7 +717,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             if (item is LibraryItem.PlaylistItem) {
                 val meta = allItemMetasCache[item.key]
                 val isPinned = if (meta?.folderId == null) (meta?.isPinned == true) else false
-                item.copy(isPinned = isPinned)
+                val onlinePl = onlinePlaylistMap[item.playlist.id]?.playlist
+                val fixedPl = if (onlinePl != null && onlinePl.isRealAlbum && !item.playlist.isRealAlbum) {
+                    item.playlist.copy(
+                        isAlbum = true,
+                        setType = onlinePl.setType,
+                        playlistType = onlinePl.playlistType
+                    )
+                } else item.playlist
+                item.copy(playlist = fixedPl, isPinned = isPinned)
             } else item
         }
 
@@ -736,8 +763,11 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         _allItems.addAll(savedArtistsCache)
     }
 
+    private var loadJob: Job? = null
+
     fun loadData(forceRefresh: Boolean = false) {
-        if (isLoading && !forceRefresh && userProfile != null) return
+        if (!forceRefresh && userProfile != null) return
+        if (loadJob?.isActive == true && !forceRefresh) return
 
         val playerPrefs = PlayerPreferences()
         showLocalMedia = playerPrefs.getLocalMediaEnabled()
@@ -757,7 +787,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             isLoading = true
             if (NetworkUtils.isInternetAvailable()) {
                 try {
@@ -781,8 +812,34 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             DownloadManager.refreshFollowings()
             try {
                 coroutineScope {
-                    val likedPlaylistsDeferred = async { api.getUserPlaylistLikes(user.id) }
-                    val createdPlaylistsDeferred = async { api.getUserCreatedPlaylists(user.id) }
+                    val likedPlaylistsDeferred = async {
+                        val allLiked = mutableListOf<com.alananasss.kittytune.domain.PlaylistLikeItem>()
+                        try {
+                            var resp = api.getUserPlaylistLikes(user.id, limit = 200)
+                            allLiked.addAll(resp.collection)
+                            while (!resp.next_href.isNullOrEmpty()) {
+                                resp = api.getPlaylistLikesNextPage(resp.next_href!!)
+                                allLiked.addAll(resp.collection)
+                            }
+                        } catch (e: Exception) {
+                            Logger.e("LibraryVM", "Failed to fetch playlist likes", e)
+                        }
+                        allLiked
+                    }
+                    val createdPlaylistsDeferred = async {
+                        val allCreated = mutableListOf<Playlist>()
+                        try {
+                            var resp = api.getUserCreatedPlaylists(user.id, limit = 200)
+                            allCreated.addAll(resp.collection)
+                            while (!resp.next_href.isNullOrEmpty()) {
+                                resp = api.getSearchPlaylistsNextPage(resp.next_href!!)
+                                allCreated.addAll(resp.collection)
+                            }
+                        } catch (e: Exception) {
+                            Logger.e("LibraryVM", "Failed to fetch created playlists", e)
+                        }
+                        allCreated
+                    }
                     val repostedPlaylistsDeferred = async { api.getMyPlaylistPosts() }
                     val libraryAllDeferred = async { try { api.getMyLibraryAll(limit = 200) } catch (e: Exception) { null } }
                     val uploadedTracksDeferred = async {
@@ -819,13 +876,13 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     val addedPlaylistIds = mutableSetOf<Long>()
                     val trulyLikedIds = mutableSetOf<Long>()
 
-                    likedResponse.collection.forEach { item ->
+                    likedResponse.forEach { item ->
                         val pl = item.playlist
                         val sp = item.systemPlaylist
 
                         if (pl != null && addedPlaylistIds.add(pl.id)) {
                             trulyLikedIds.add(pl.id)
-                            val date = try { item.likedAt?.let { isoParser.parse(it)?.time } ?: 0L } catch (e: Exception) { 0L }
+                            val date = parseIsoDate(item.likedAt)
                             newOnlineItems.add(LibraryItem.PlaylistItem(pl, date))
                         } else if (sp != null) {
                             val numId = if (sp.numericId != 0L) sp.numericId else (sp.urn?.let { kotlin.math.abs(it.hashCode().toLong()) } ?: 0L)
@@ -843,18 +900,15 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                     permalinkUrl = stationPermalink,
                                     urn = sp.urn
                                 )
-                                val date = try { item.likedAt?.let { isoParser.parse(it)?.time } ?: 0L } catch (e: Exception) { 0L }
+                                val date = parseIsoDate(item.likedAt)
                                 newOnlineItems.add(LibraryItem.PlaylistItem(fakePlaylist, date))
                             }
                         }
                     }
 
-                    createdResponse.collection.forEach { playlist ->
+                    createdResponse.forEach { playlist ->
                         if (addedPlaylistIds.add(playlist.id)) {
-                            val date = try {
-                                val dateStr = playlist.lastModified ?: playlist.createdAt
-                                dateStr?.let { isoParser.parse(it)?.time } ?: 0L
-                            } catch (e: Exception) { 0L }
+                            val date = parseIsoDate(playlist.lastModified ?: playlist.createdAt)
 
                             val validCustomArt = playlist.artworkUrl?.takeIf { !it.contains("avatars") && !it.contains("default_avatar") }
                             val validCalcArt = playlist.calculatedArtworkUrl?.takeIf { !it.contains("avatars") && !it.contains("default_avatar") }
@@ -882,10 +936,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                     repostedResponse.collection.forEach { item ->
                         val playlist = item.playlist ?: return@forEach
                         if (addedPlaylistIds.add(playlist.id)) {
-                            val date = try {
-                                val dateStr = playlist.lastModified ?: playlist.createdAt
-                                dateStr?.let { isoParser.parse(it)?.time } ?: 0L
-                            } catch (e: Exception) { 0L }
+                            val date = parseIsoDate(playlist.lastModified ?: playlist.createdAt)
                             newOnlineItems.add(LibraryItem.PlaylistItem(playlist, date))
                         }
                     }
@@ -908,7 +959,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                 permalinkUrl = stationPermalink,
                                 urn = sp.urn
                             )
-                            val date = try { item.createdAt?.let { isoParser.parse(it)?.time } ?: 0L } catch (e: Exception) { 0L }
+                            val date = parseIsoDate(item.createdAt)
                             newOnlineItems.add(LibraryItem.PlaylistItem(fakePlaylist, date))
                         }
                     }
@@ -930,7 +981,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                 val firstPage = api.getUserTrackLikes(user.id, limit = 200)
 
                                 allCollectedLikes.addAll(firstPage.collection.map { item ->
-                                    val time = try { item.createdAt?.let { isoParser.parse(it)?.time } } catch (e: Exception) { 0L }
+                                    val time = parseIsoDate(item.createdAt).takeIf { it > 0 }
                                     item.track.copy(likedAt = time)
                                 })
 
@@ -940,7 +991,7 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                     val page = api.getTrackLikesNextPage(nextUrl!!)
 
                                     allCollectedLikes.addAll(page.collection.map { item ->
-                                        val time = try { item.createdAt?.let { isoParser.parse(it)?.time } } catch (e: Exception) { 0L }
+                                        val time = parseIsoDate(item.createdAt).takeIf { it > 0 }
                                         item.track.copy(likedAt = time)
                                     })
 

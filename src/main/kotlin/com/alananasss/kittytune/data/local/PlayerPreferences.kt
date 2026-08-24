@@ -520,6 +520,33 @@ class PlayerPreferences {
         if (id != null) Prefs.putString(KEY_SELECTED_PROXY_PROFILE_ID, id)
         else Prefs.remove(KEY_SELECTED_PROXY_PROFILE_ID)
     }
+
+    fun getLikedSpotifyArtists(): Set<String> = Prefs.getStringSet("liked_spotify_artists", emptySet())
+
+    fun isSpotifyArtistLiked(artistId: String): Boolean = getLikedSpotifyArtists().contains(artistId)
+
+    fun toggleLikeSpotifyArtist(artistId: String): Boolean {
+        val current = getLikedSpotifyArtists().toMutableSet()
+        val isNowLiked = if (current.contains(artistId)) {
+            current.remove(artistId)
+            false
+        } else {
+            current.add(artistId)
+            true
+        }
+        Prefs.putStringSet("liked_spotify_artists", current)
+        return isNowLiked
+    }
+
+    fun saveSpotifyArtistMapping(numericId: Long, spotifyId: String) {
+        Prefs.putString("spotify_artist_mapping_$numericId", spotifyId)
+    }
+
+    fun getSpotifyArtistIdForStableId(numericId: Long): String? = Prefs.getString("spotify_artist_mapping_$numericId", null)
+
+    fun removeSpotifyArtistMapping(numericId: Long) {
+        Prefs.remove("spotify_artist_mapping_$numericId")
+    }
 }
 
 const val RIGHT_PANEL_MIN_WIDTH = 280f
