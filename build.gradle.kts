@@ -95,19 +95,6 @@ dependencies {
     implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
     implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:5.2.0")
 
-    val javafxVersion = "21.0.3"
-    val javafxClassifier = when {
-        osName.contains("win") -> "win"
-        osName.contains("mac") -> "mac"
-        osName.contains("linux") -> "linux"
-        else -> null
-    }
-    if (javafxClassifier != null) {
-        listOf("javafx-base", "javafx-graphics", "javafx-controls", "javafx-swing", "javafx-media", "javafx-web").forEach { module ->
-            implementation("org.openjfx:$module:$javafxVersion:$javafxClassifier")
-        }
-    }
-
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
 }
@@ -115,6 +102,21 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "com.alananasss.kittytune.MainKt"
+
+        // Grants what the app already does, so the JDK stops warning about it on every launch:
+        // sqlite-jdbc loads its native library, and Gson writes final fields when it
+        // deserializes our data classes. Both are integrity-by-default warnings today and hard
+        // errors in a later JDK, so declaring them now is also what keeps the app running then.
+        // Gated on the build JDK because the packaged runtime is built from it, and an older
+        // one would refuse to start on an option it does not know.
+        val buildJdk = JavaVersion.current().majorVersion.toIntOrNull() ?: 0
+        if (buildJdk >= 24) jvmArgs += "--enable-native-access=ALL-UNNAMED"
+        if (buildJdk >= 25) jvmArgs += "--enable-final-field-mutation=ALL-UNNAMED"
+        // jffi, pulled in by the D-Bus transport, reaches into sun.misc.Unsafe for memory
+        // access. Nothing we can fix from here — the flag is the JDK's own way to say "known,
+        // stop printing it", and it also keeps that code working once the default flips to
+        // deny. The day Unsafe actually goes, jnr needs a release either way.
+        if (buildJdk >= 24) jvmArgs += "--sun-misc-unsafe-memory-access=allow"
 
         buildTypes.release.proguard {
             isEnabled.set(false)
@@ -145,10 +147,8 @@ compose.desktop {
                 "jdk.dynalink",
                 "jdk.httpserver",
                 "jdk.jfr",
-                "jdk.jsobject",
                 "jdk.unsupported",
                 "jdk.unsupported.desktop",
-                "jdk.xml.dom",
                 "jdk.security.auth"
             )
 
