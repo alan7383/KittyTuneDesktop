@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
@@ -30,7 +31,9 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.text.SimpleDateFormat
@@ -389,7 +392,8 @@ fun HistoryScreen(
                                         },
                                         onMoreClick = {
                                             playerViewModel.showTrackOptions(historyTrack.track)
-                                        }
+                                        },
+                                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                                     )
                                 }
                             }
@@ -491,7 +495,8 @@ fun HistoryTrackRow(
     item: HistoryTrackItem,
     isPlaying: Boolean,
     onClick: () -> Unit,
-    onMoreClick: () -> Unit
+    onMoreClick: () -> Unit,
+    onArtistClick: ((Track) -> Unit)? = null
 ) {
     val track = item.track
     val timeStr = remember(item.playedAt) {
@@ -570,12 +575,11 @@ fun HistoryTrackRow(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Text(
-                        text = track.user?.username ?: str("history_unknown_artist"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                    ArtistLinkText(
+                        track = track,
+                        onArtistClick = onArtistClick,
+                        text = track.user?.username?.takeIf { it.isNotBlank() }
+                            ?: str("history_unknown_artist"),
                         modifier = Modifier.weight(1f, fill = false)
                     )
 
@@ -647,6 +651,11 @@ fun HistoryContextRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            val isLikes = item.type == HistoryContextType.LIKES || item.id == "likes" || item.id == "pin_likes" ||
+                    item.title.equals("Titres Likés", ignoreCase = true) ||
+                    item.title.equals(str("lib_liked_tracks"), ignoreCase = true) ||
+                    item.title.equals(str("history_title_likes"), ignoreCase = true) ||
+                    item.title.equals("Liked Tracks", ignoreCase = true)
             val isCircle = item.type == HistoryContextType.ARTIST
             Box(
                 modifier = Modifier
@@ -655,7 +664,21 @@ fun HistoryContextRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 contentAlignment = Alignment.Center
             ) {
-                if (!item.imageUrl.isNullOrBlank()) {
+                if (isLikes) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Brush.linearGradient(listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)))),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Favorite,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+                } else if (!item.imageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = item.imageUrl,
                         contentDescription = item.title,

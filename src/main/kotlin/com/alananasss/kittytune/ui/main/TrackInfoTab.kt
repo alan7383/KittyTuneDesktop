@@ -128,54 +128,313 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                        displayTrack.user?.id?.let { vm.navigateToArtist(it) }
-                    }
-                ) {
-                    Text(
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // navigateToTrackArtist already routes both sources, and opens the
+                    // picker when the track credits several artists.
+                    com.alananasss.kittytune.ui.common.ArtistLinkText(
+                        track = displayTrack,
+                        onArtistClick = { vm.navigateToTrackArtist(it) },
                         text = displayTrack.user?.username ?: "",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium
+                        hoverColor = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     if (displayTrack.user?.verified == true) {
                         Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                    }
-                }
-                
-                // Stats Row
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    StatItem(Icons.Rounded.PlayArrow, displayTrack.playbackCount, onClick = null)
-                    StatItem(Icons.Rounded.Favorite, displayTrack.likesCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 0) })
-                    StatItem(Icons.Rounded.Repeat, displayTrack.repostsCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 1) })
-                    StatItem(Icons.Rounded.Comment, displayTrack.commentCount, onClick = null)
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-
-                        onClick = { vm.navigateToTrackDetails(displayTrack.id, 0) },
-                        modifier = Modifier.size(32.dp)
-                    ) {
                         Icon(
-                            Icons.Rounded.Info, 
-                            contentDescription = "Track Details",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            Icons.Rounded.Verified, null,
+                            tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
+                }
+
+                // Spotify catalog chip
+                if (isSpotifyTrack) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = SpotifyGreen.copy(alpha = 0.15f),
+                        modifier = Modifier.widthIn(max = 160.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = str("music_provider_spotify"),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = SpotifyGreen
+                            )
+                        }
+                    }
+                }
+
+                // Stats Row
+                if (isSpotifyTrack) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        (displayTrack.playCount ?: 0L).takeIf { it > 0 }?.let { streams ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    NumberFormat.getCompactNumberInstance(Locale.US, NumberFormat.Style.SHORT).format(streams) + " " + str("spotify_streams_formatted"),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (displayTrack.publisherMetadata?.explicit == true) {
+                            Text(
+                                text = "E",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(3.dp))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        StatItem(Icons.Rounded.PlayArrow, displayTrack.playbackCount, onClick = null)
+                        StatItem(Icons.Rounded.Favorite, displayTrack.likesCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 0) })
+                        StatItem(Icons.Rounded.Repeat, displayTrack.repostsCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 1) })
+                        StatItem(Icons.Rounded.Comment, displayTrack.commentCount, onClick = null)
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(
+
+                            onClick = { vm.navigateToTrackDetails(displayTrack.id, 0) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Info,
+                                contentDescription = "Track Details",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---- Spotify catalog: credits sheet, same structure as Android ----
+        if (isSpotifyTrack) {
+            // Streams counter card
+            val streamCount = displayTrack.playCount
+                ?: displayTrack.playbackCount.takeIf { it > 0 }?.toLong()
+            if (streamCount != null && streamCount > 0) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.PlayArrow, null,
+                                tint = SpotifyGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = NumberFormat.getNumberInstance(Locale.getDefault()).format(streamCount),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = str("spotify_streams_formatted"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Performers (credits role or fallback on the track's artist list)
+            val performersRole = spotifyCredits?.roles?.firstOrNull { role ->
+                role.roleTitle.equals("Performers", true) || role.roleTitle.equals("Artists", true) ||
+                    role.roleTitle.equals("Artist", true) || role.roleTitle.contains("Performer", true) ||
+                    role.roleTitle.contains("Artist", true)
+            }
+            val trackArtistRefs = displayTrack.artists.orEmpty()
+            val performerArtists = performersRole?.artists?.takeIf { it.isNotEmpty() }
+                ?: trackArtistRefs.map { ref ->
+                    com.alananasss.kittytune.data.spotify.SpotifyCreditArtist(
+                        id = ref.id,
+                        name = ref.name,
+                        uri = ref.uri,
+                        imageUri = ref.avatarUrl,
+                        subroles = if (trackArtistRefs.size > 1 && ref !== trackArtistRefs.first()) {
+                            listOf("Featured Artist")
+                        } else listOf("Main Artist")
+                    )
+                }
+
+            if (performerArtists.isNotEmpty()) {
+                item {
+                    Text(
+                        text = str("spotify_credits_performers"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = SpotifyGreen
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                itemsIndexed(performerArtists, key = { _, a -> "perf_${a.id}_${a.name}" }) { _, artist ->
+                    CreditArtistRow(artist, vm)
+                }
+                item { Spacer(Modifier.height(12.dp)) }
+            }
+
+            // Writers / composition
+            val writersRole = spotifyCredits?.roles?.firstOrNull { role ->
+                role.roleTitle.equals("Writers", true) || role.roleTitle.contains("Writer", true) ||
+                    role.roleTitle.contains("Lyric", true) || role.roleTitle.contains("Composition", true) ||
+                    role.roleTitle.contains("Composer", true)
+            }
+            val writerArtists = writersRole?.artists.orEmpty()
+            if (writerArtists.isNotEmpty()) {
+                item {
+                    Text(
+                        text = str("spotify_credits_writers"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = SpotifyGreen
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(writerArtists, key = { "writer_${it.id}_${it.name}" }) { writer ->
+                    Column(Modifier.padding(vertical = 4.dp)) {
+                        Text(text = writer.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                        val subrolesText = writer.subroles.joinToString(", ") { creditSubroleLabel(it) }
+                        if (subrolesText.isNotBlank()) {
+                            Text(
+                                text = subrolesText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(12.dp)) }
+            } else if (!displayTrack.publisherMetadata?.composer.isNullOrBlank()) {
+                item {
+                    Text(
+                        text = str("spotify_credits_composer"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = SpotifyGreen
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = displayTrack.publisherMetadata!!.composer!!,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+
+            // Producers
+            val producerArtists = spotifyCredits?.roles
+                ?.filter { it.roleTitle.contains("Producer", true) || it.roleTitle.contains("Production", true) }
+                ?.flatMap { it.artists }
+                .orEmpty()
+            if (producerArtists.isNotEmpty()) {
+                item {
+                    Text(
+                        text = str("spotify_credits_producers"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = SpotifyGreen
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+                items(producerArtists.distinctBy { it.name }, key = { "prod_${it.id}_${it.name}" }) { producer ->
+                    Text(
+                        text = producer.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+                item { Spacer(Modifier.height(12.dp)) }
+            }
+
+            // Sources
+            val sources = spotifyCredits?.sourceNames?.takeIf { it.isNotEmpty() }
+                ?: listOfNotNull(displayTrack.publisherMetadata?.publisher?.takeIf { it.isNotBlank() })
+            if (sources.isNotEmpty()) {
+                item {
+                    Text(
+                        text = str("spotify_credits_sources"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = SpotifyGreen
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = sources.joinToString("\n"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(16.dp))
+                }
+            }
+
+            // Album / release details
+            item {
+                val meta = displayTrack.publisherMetadata
+                // Playlist/search/artist payloads carry no release date, so fetch this one
+                // track's (one request, memoized). No date, no row — better than "Unknown".
+                val resolvedReleaseDate by produceState(displayTrack.releaseDate, displayTrack.id) {
+                    if (value.isNullOrBlank()) {
+                        val spotifyId = vm.getSpotifyTrackId(displayTrack)
+                        if (!spotifyId.isNullOrBlank()) {
+                            value = runCatching {
+                                com.alananasss.kittytune.data.spotify.SpotifyRepository
+                                    .getTrackReleaseDate(spotifyId)
+                            }.getOrNull()
+                        }
+                    }
+                }
+                if (!resolvedReleaseDate.isNullOrBlank()) {
+                    DetailInfoRow(str("detail_release_date"), formatReleaseDate(resolvedReleaseDate))
+                }
+                if (!meta?.albumTitle.isNullOrBlank()) {
+                    DetailInfoRow(str("profile_tab_albums"), meta!!.albumTitle!!)
+                }
+                DetailInfoRow(str("detail_duration"), makeTimeString(displayTrack.durationMs ?: 0L))
+                if (!meta?.publisher.isNullOrBlank()) {
+                    DetailInfoRow(str("spotify_credits_sources"), meta!!.publisher!!)
                 }
             }
         }
 
         // Social Liked Proof Banner (e.g. "Mandra and 1,400 others liked this track")
         val socialLiker = vm.socialLikerUser
-        if (socialLiker != null) {
+        if (!isSpotifyTrack && socialLiker != null) {
             item {
                 Surface(
                     onClick = { vm.navigateToArtist(socialLiker.id) },
@@ -799,5 +1058,120 @@ private fun formatReleaseDate(raw: String?): String {
 
     val displayFormat = java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.getDefault())
     return displayFormat.format(date)
+}
+
+// ---- Spotify catalog credits (parity with the Android credits sheet) ----
+
+private val SpotifyGreen = androidx.compose.ui.graphics.Color(0xFF1DB954)
+
+@Composable
+private fun DetailRow(icon: ImageVector, text: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(icon, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+private fun creditSubroleLabel(subrole: String): String = when (subrole.trim().lowercase()) {
+    "main artist", "main performer" -> str("spotify_credits_main_artist")
+    "featured artist" -> str("spotify_credits_featured_artist")
+    "composer" -> str("spotify_credits_composer")
+    "lyricist" -> str("spotify_credits_lyricist")
+    "producer" -> str("spotify_credits_producer")
+    else -> subrole
+}
+
+/** Label / value row used for release date, album, duration. */
+@Composable
+private fun DetailInfoRow(label: String, value: String) {
+    if (value.isBlank()) return
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/** Clickable credit artist row: avatar, name, localized subroles, chevron. */
+@Composable
+private fun CreditArtistRow(
+    artist: com.alananasss.kittytune.data.spotify.SpotifyCreditArtist,
+    vm: PlayerViewModel
+) {
+    // The credits payload only sometimes carries an image; fetch the missing ones so the
+    // section shows faces instead of a column of silhouettes.
+    val avatar by produceState(artist.imageUri, artist.id) {
+        if (value.isNullOrBlank() && artist.id.isNotBlank()) {
+            value = runCatching {
+                com.alananasss.kittytune.data.spotify.SpotifyRepository.getArtistAvatar(artist.id)
+            }.getOrNull()
+        }
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = artist.id.isNotBlank()) { vm.navigateToSpotifyArtist(artist.id) }
+            .padding(vertical = 8.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(44.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!avatar.isNullOrBlank()) {
+                AsyncImage(
+                    model = avatar,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(Icons.Rounded.Person, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = artist.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            val subrolesText = artist.subroles.joinToString(", ") { creditSubroleLabel(it) }
+            if (subrolesText.isNotBlank()) {
+                Text(
+                    text = subrolesText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            Icons.AutoMirrored.Rounded.ArrowForwardIos, null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp)
+        )
+    }
 }
 

@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 /**
@@ -198,12 +199,12 @@ private fun QueueList(vm: PlayerViewModel) {
                             overflow = TextOverflow.Ellipsis,
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
+                            ArtistLinkText(
+                                track = track,
+                                onArtistClick = { vm.navigateToTrackArtist(it) },
                                 text = track.user?.username ?: "",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             if (track.user?.verified == true) {
                                 Spacer(Modifier.width(3.dp))

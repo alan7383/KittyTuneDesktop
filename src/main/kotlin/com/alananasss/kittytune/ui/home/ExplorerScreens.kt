@@ -89,6 +89,7 @@ import com.alananasss.kittytune.core.Application
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.data.GenreData
 import com.alananasss.kittytune.data.OfficialPlaylistsData
 import com.alananasss.kittytune.data.SearchCategory
@@ -277,8 +278,8 @@ class GenreDetailViewModel(application: Application) : ViewModel() {
 
                     popularTracks.addAll(popularDef.await())
 
-                    val realPlaylists = communityDef.await().filter { !it.isAlbum }.distinctBy { it.id }.take(10)
-                    val realAlbums = albumsDef.await().filter { it.isAlbum }.distinctBy { it.id }.take(10)
+                    val realPlaylists = communityDef.await().filter { !it.isRealAlbum }.distinctBy { it.id }.take(10)
+                    val realAlbums = albumsDef.await().filter { it.isRealAlbum }.distinctBy { it.id }.take(10)
                     communityPlaylists.addAll(realPlaylists)
                     albums.addAll(realAlbums)
 
@@ -403,7 +404,8 @@ fun GenreDetailScreen(
                                             track = track,
                                             currentlyPlayingTrack = playerViewModel.currentTrack,
                                             onClick = { playerViewModel.playPlaylist(viewModel.popularTracks, absoluteIndex) },
-                                            onOptionClick = { playerViewModel.showTrackOptions(track) }
+                                            onOptionClick = { playerViewModel.showTrackOptions(track) },
+                                            onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                                         )
                                     }
                                 }
@@ -543,7 +545,8 @@ private fun PopularTrackListItem(
     track: Track,
     currentlyPlayingTrack: Track?,
     onClick: () -> Unit,
-    onOptionClick: () -> Unit
+    onOptionClick: () -> Unit,
+    onArtistClick: ((Track) -> Unit)? = null
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -590,13 +593,20 @@ private fun PopularTrackListItem(
                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                     color = titleColor
                 )
-                Text(
-                    text = "${track.user?.username ?: str("unknown_artist")} • ${formatPlayCount(track.playbackCount)} ${str("playback_count_formatted")}",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    ArtistLinkText(
+                        track = track,
+                        onArtistClick = onArtistClick,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Text(
+                        text = " • ${formatPlayCount(track.playbackCount)} ${str("playback_count_formatted")}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             IconButton(onClick = onOptionClick) {
                 Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -839,14 +849,16 @@ private fun CinematicPlaylistCard(playlist: Playlist, onClick: () -> Unit) {
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
-                    Text(
-                        text = str("playlist_num_tracks", playlist.trackCount ?: 0),
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+                if (playlist.trackCount != null && playlist.trackCount > 0) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp)) {
+                        Text(
+                            text = str("playlist_num_tracks", playlist.trackCount),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
         }

@@ -128,8 +128,9 @@ fun ProfileScreen(
     }
 
     LaunchedEffect(userId) {
-        val id = userId.toLongOrNull()
-        if (id != null) profileViewModel.loadProfile(id)
+        // String dispatcher routes SoundCloud ids as before and Spotify
+        // artists (base62 ids / spotify_artist: prefixes) to the catalog.
+        profileViewModel.loadProfile(userId)
     }
 
     LaunchedEffect(userId) {
@@ -146,9 +147,18 @@ fun ProfileScreen(
     val artistText = str("generic_artist")
     val artistPlaybackContext = remember(user, artistText) {
         user?.let {
+            // Route playback history back to the right catalog: Spotify
+            // artists must not be recorded as SoundCloud profiles.
+            val navId = if (it.urn?.startsWith("spotify:artist:") == true) {
+                "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(it.urn)}"
+            } else if (it.urn?.startsWith("spotify") == true || it.permalinkUrl?.contains("spotify") == true) {
+                "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(it.permalink ?: "")}"
+            } else {
+                "profile:${it.id}"
+            }
             PlaybackContext(
                 displayText = "$artistText • ${it.username}",
-                navigationId = "profile:${it.id}",
+                navigationId = navId,
                 imageUrl = it.avatarUrl,
                 artistName = it.username,
                 isVerified = it.verified
@@ -214,13 +224,74 @@ fun ProfileScreen(
                     }
                 }
 
+                if (profileViewModel.popularReleases.isNotEmpty()) {
+                    item {
+                        ProfileHorizontalCarouselRow(
+                            title = str("spotify_popular_releases"),
+                            items = profileViewModel.popularReleases
+                        ) { playlist ->
+                            ProfileSquareCard(playlist) { onNavigate(if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()) }
+                        }
+                    }
+                }
+
                 if (profileViewModel.albums.isNotEmpty()) {
                     item {
                         ProfileHorizontalCarouselRow(
                             title = str("profile_tab_albums"),
-                            items = profileViewModel.albums
+                            items = profileViewModel.albums,
+                            showMore = profileViewModel.isSpotifyProfile && profileViewModel.hasMoreDiscography(),
+                            onMoreClick = { profileViewModel.loadMoreDiscography() }
                         ) { playlist ->
-                            ProfileSquareCard(playlist) { onNavigate(playlist.id.toString()) }
+                            ProfileSquareCard(playlist) { onNavigate(if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()) }
+                        }
+                    }
+                }
+
+                if (profileViewModel.singles.isNotEmpty()) {
+                    item {
+                        ProfileHorizontalCarouselRow(
+                            title = str("spotify_singles_eps"),
+                            items = profileViewModel.singles,
+                            showMore = profileViewModel.isSpotifyProfile && profileViewModel.hasMoreDiscography(),
+                            onMoreClick = { profileViewModel.loadMoreDiscography() }
+                        ) { playlist ->
+                            ProfileSquareCard(playlist) { onNavigate(if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()) }
+                        }
+                    }
+                }
+
+                if (profileViewModel.compilations.isNotEmpty()) {
+                    item {
+                        ProfileHorizontalCarouselRow(
+                            title = str("spotify_compilations"),
+                            items = profileViewModel.compilations,
+                            showMore = profileViewModel.isSpotifyProfile && profileViewModel.hasMoreDiscography(),
+                            onMoreClick = { profileViewModel.loadMoreDiscography() }
+                        ) { playlist ->
+                            ProfileSquareCard(playlist) { onNavigate(if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()) }
+                        }
+                    }
+                }
+
+                if (profileViewModel.appearsOn.isNotEmpty()) {
+                    item {
+                        ProfileHorizontalCarouselRow(
+                            title = str("spotify_appears_on"),
+                            items = profileViewModel.appearsOn
+                        ) { playlist ->
+                            ProfileSquareCard(playlist) { onNavigate(if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()) }
+                        }
+                    }
+                }
+
+                if (profileViewModel.discoveredOn.isNotEmpty()) {
+                    item {
+                        ProfileHorizontalCarouselRow(
+                            title = str("spotify_discovered_on"),
+                            items = profileViewModel.discoveredOn
+                        ) { playlist ->
+                            ProfileSquareCard(playlist) { onNavigate(if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()) }
                         }
                     }
                 }
@@ -287,7 +358,7 @@ fun ProfileScreen(
                             title = str("profile_similar_artists"),
                             items = profileViewModel.similarArtists
                         ) { artist ->
-                            ArtistCircle(artist) { onNavigate("profile:${artist.id}") }
+                            ArtistCircle(artist) { onNavigate(artist.profileNavId) }
                         }
                     }
                 }
@@ -305,10 +376,10 @@ fun ProfileScreen(
                     AnimatedVisibility(visible = showBarBackground, enter = fadeIn(), exit = fadeOut()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(user.username ?: "", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-                            if (user.verified) {
-                                Spacer(Modifier.width(4.dp))
-                                Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                            }
+                             if (user.verified) {
+                                 Spacer(Modifier.width(4.dp))
+                                 Icon(Icons.Rounded.Verified, null, tint = if (profileViewModel.isSpotifyProfile) Color(0xFF1DB954) else MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                             }
                         }
                     }
                 },
@@ -329,7 +400,11 @@ fun ProfileScreen(
 
                     IconButton(onClick = {
                             val cleanUsername = user.username?.replace(" ", "")?.lowercase() ?: "user"
-                            val shareUrl = user.permalinkUrl ?: "https://soundcloud.com/$cleanUsername"
+                            val shareUrl = user.permalinkUrl ?: if (profileViewModel.isSpotifyProfile) {
+                                "https://open.spotify.com/artist/${user.permalink}"
+                            } else {
+                                "https://soundcloud.com/$cleanUsername"
+                            }
                             val selection = java.awt.datatransfer.StringSelection(shareUrl)
                             java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
                         },
@@ -483,7 +558,12 @@ fun ModernProfileHeader(
                 Text(text = user.username ?: str("unknown_artist"), style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onBackground)
                 if (user.verified) {
                     Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                    Icon(
+                        Icons.Rounded.Verified,
+                        null,
+                        tint = if (profileViewModel.isSpotifyProfile) Color(0xFF1DB954) else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
 
@@ -497,27 +577,88 @@ fun ModernProfileHeader(
             }
 
             Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                Text(
-                    text = "${NumberFormat.getNumberInstance(Locale.US).format(user.followersCount)} ${str("profile_followers")}",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onFollowersClick() }.padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-                Text(text = " • ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                Text(
-                    text = "${NumberFormat.getNumberInstance(Locale.US).format(user.followingsCount)} ${str("profile_followings")}",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onFollowingClick() }.padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-                Text(text = " • ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                Text(text = "${NumberFormat.getNumberInstance(Locale.US).format(user.trackCount)} ${str("profile_tracks")}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (profileViewModel.isSpotifyProfile) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    val count = user.followersCount
+                    if (count > 0) {
+                        Text(
+                            text = str(
+                                "spotify_monthly_listeners",
+                                NumberFormat.getNumberInstance(Locale.US).format(count)
+                            ),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    val rank = profileViewModel.spotifyArtist?.worldRank
+                    if (rank != null) {
+                        Text(text = " • ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                        Text(
+                            text = str("spotify_world_rank", rank),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    Text(
+                        text = "${NumberFormat.getNumberInstance(Locale.US).format(user.followersCount)} ${str("profile_followers")}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onFollowersClick() }.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                    Text(text = " • ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    Text(
+                        text = "${NumberFormat.getNumberInstance(Locale.US).format(user.followingsCount)} ${str("profile_followings")}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onFollowingClick() }.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                    Text(text = " • ", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    Text(text = "${NumberFormat.getNumberInstance(Locale.US).format(user.trackCount)} ${str("profile_tracks")}", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
 
             Spacer(Modifier.height(32.dp))
 
-            if (isCurrentUser) {
+            if (profileViewModel.isSpotifyProfile) {
+                // Catalog artist: shuffle the top tracks and open the Spotify radio.
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Button(
+                        onClick = {
+                            if (profileViewModel.popularTracks.isNotEmpty()) {
+                                playerViewModel.playPlaylist(
+                                    tracks = profileViewModel.popularTracks.toList().shuffled(),
+                                    startIndex = 0,
+                                    context = artistContext
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        shapes = ButtonDefaults.shapes(),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                    ) {
+                        Icon(Icons.Default.Shuffle, null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
+                        Text(str("btn_shuffle"), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    FilledTonalButton(
+                        onClick = {
+                            val spotifyId = user.permalink
+                                ?: user.urn?.removePrefix("spotify:artist:") ?: ""
+                            val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(spotifyId)
+                            if (cleanId.isNotBlank()) onNavigate("spotify_radio:$cleanId")
+                        },
+                        modifier = Modifier.weight(1f).height(56.dp),
+                        shapes = ButtonDefaults.shapes(),
+                        colors = ButtonDefaults.filledTonalButtonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)
+                    ) {
+                        Icon(Icons.Default.Radio, null, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
+                        Text(str("radio"), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            } else if (isCurrentUser) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -829,6 +970,15 @@ fun FullListScreen(
         }
     }
 
+    // Spotify artist payloads ship no per-track dates; those rows resolve their own as they
+    // scroll into view, so the column stays. Only lists that can never have one lose it.
+    val showTrackDates = remember(filteredTracks) {
+        filteredTracks.any {
+            it.likedAt != null || !it.releaseDate.isNullOrBlank() || !it.createdAt.isNullOrBlank() ||
+                it.source == "spotify"
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -902,7 +1052,7 @@ fun FullListScreen(
                     item(key = "table_header") {
                         com.alananasss.kittytune.ui.library.TrackTableHeaderRow(
                             showAlbum = false,
-                            showDate = true,
+                            showDate = showTrackDates,
                             releaseDateMode = false,
                             showPlays = showPlays
                         )
@@ -925,7 +1075,7 @@ fun FullListScreen(
                         downloadProgress = progress ?: 0,
                         showVerifiedBadge = true,
                         showAlbum = false,
-                        showDate = true,
+                        showDate = showTrackDates,
                         showPlays = showPlays,
                         onPlayCountClick = {
                             playerViewModel.navigateToTrackDetails(track.id)
@@ -934,7 +1084,8 @@ fun FullListScreen(
                             playerViewModel.playPlaylist(filteredTracks, startIndex = index, context = context)
                         },
                         onOptionClick = { playerViewModel.showTrackOptions(track) },
-                        onAlbumClick = { albumId -> playerViewModel.navigateToPlaylistId = albumId }
+                        onAlbumClick = { albumId -> playerViewModel.navigateToPlaylistId = albumId },
+                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                     )
                 }
             } else {
@@ -985,7 +1136,8 @@ fun ProfileTrackItem(
             playerViewModel.playPlaylist(contextList, startIndex = index, context = context)
         },
         onOptionClick = { playerViewModel.showTrackOptions(track) },
-        onAlbumClick = {}
+        onAlbumClick = {},
+        onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
     )
 }
 
@@ -1176,15 +1328,23 @@ fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             fontWeight = FontWeight.SemiBold
         )
-        val tracksText = str("playlist_num_tracks", playlist.trackCount ?: 0)
-        val likesText = if (playlist.likesCount != null && playlist.likesCount > 0) " • ${playlist.likesCount} likes" else ""
-        Text(
-            text = "$tracksText$likesText",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        // Spotify's artist page does not carry a track count for the "Appears on" /
+        // "Discovered on" cards, and printing "0 tracks" there was worse than printing
+        // nothing. Fall back to the owner, which is the useful line on those cards anyway.
+        val countText = playlist.trackCount?.takeIf { it > 0 }?.let { str("playlist_num_tracks", it) }
+        val likesText = playlist.likesCount?.takeIf { it > 0 }?.let { "$it likes" }
+        val subtitle = listOfNotNull(countText, likesText)
+            .ifEmpty { listOfNotNull(playlist.user?.username) }
+            .joinToString(" • ")
+        if (subtitle.isNotBlank()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

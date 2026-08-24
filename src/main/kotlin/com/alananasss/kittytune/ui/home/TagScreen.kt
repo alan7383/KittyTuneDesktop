@@ -155,7 +155,8 @@ fun TagScreen(
                                         onClick = {
                                             playerViewModel.playPlaylist(currentTracks.toList(), index, context = null)
                                         },
-                                        onOptionClick = { playerViewModel.showTrackOptions(track) }
+                                        onOptionClick = { playerViewModel.showTrackOptions(track) },
+                                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                                     )
                                 }
                             }

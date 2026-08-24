@@ -34,6 +34,7 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.StreamItem
 import com.alananasss.kittytune.domain.Track
@@ -266,14 +267,14 @@ private fun TrackFeedItem(
                 // Track info
                 Column(modifier = Modifier.weight(1f)) {
                     // Artist
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onArtistClick)) {
-                        Text(
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ArtistLinkText(
+                            track = track,
+                            onArtistClick = { onArtistClick() },
                             text = track.user?.username ?: "",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         if (track.user?.verified == true) {
                             Spacer(Modifier.width(3.dp))

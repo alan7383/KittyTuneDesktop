@@ -35,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
@@ -114,7 +115,11 @@ fun TrackDetailScreen(
                         Column {
                             Text(track.title ?: "", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(track.user?.username ?: "", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                ArtistLinkText(
+                                    track = track,
+                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+                                    text = track.user?.username ?: ""
+                                )
                                 if (track.user?.verified == true) {
                                     Spacer(Modifier.width(4.dp))
                                     Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
@@ -392,7 +397,8 @@ fun TrackList(
                     isDownloaded = isDownloaded,
                     downloadProgress = progress ?: 0,
                     onClick = { playerViewModel.playPlaylist(tracks, index) },
-                    onOptionClick = { playerViewModel.showTrackOptions(track) }
+                    onOptionClick = { playerViewModel.showTrackOptions(track) },
+                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                 )
             }
             if (isLoadingMore) {
