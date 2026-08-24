@@ -92,6 +92,9 @@ fun MainScreen() {
                 destinationId == "recognition_history" -> "recognition_history"
                 destinationId.startsWith("edit_track:") -> "edit_track/${destinationId.removePrefix("edit_track:")}"
                 destinationId.startsWith("profile:") -> "profile/${destinationId.removePrefix("profile:")}"
+                // Spotify artist profiles route to the profile screen; the string
+                // dispatcher in ProfileViewModel detects catalog artists.
+                destinationId.startsWith("spotify_artist:") -> "profile/${destinationId.removePrefix("spotify_artist:")}"
                 destinationId.startsWith("tag:") -> "tag/${destinationId.removePrefix("tag:")}"
                 destinationId.startsWith("track_detail:") -> "track_detail/${destinationId.removePrefix("track_detail:")}"
                 destinationId.startsWith("playlist_fans/") -> destinationId
@@ -376,7 +379,15 @@ fun MainScreen() {
                                         when {
                                             id == "history" -> navController.navigate("history")
                                             id == "recognition_history" -> navController.navigate("recognition_history")
-                                            id.startsWith("profile:") -> navController.navigate("profile/${id.removePrefix("profile:")}")
+                                            id.startsWith("profile:") -> {
+                                            val target = id.removePrefix("profile:")
+                                            if (target.startsWith("spotify:artist:") || target.startsWith("spotify_artist:")) {
+                                                navController.navigate("profile/${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(target)}")
+                                            } else {
+                                                navController.navigate("profile/$target")
+                                            }
+                                        }
+                                            id.startsWith("spotify_artist:") -> navController.navigate("profile/${id.removePrefix("spotify_artist:")}")
                                             id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                             id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
                                             id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
@@ -437,7 +448,15 @@ fun MainScreen() {
                                         dest == "history" -> navController.navigate("history")
                                         dest == "recognition_history" -> navController.navigate("recognition_history")
                                         dest.startsWith("tag:") -> navController.navigate("tag/${dest.removePrefix("tag:")}")
-                                        dest.startsWith("profile:") -> navController.navigate("profile/${dest.removePrefix("profile:")}")
+                                        dest.startsWith("profile:") -> {
+                                            val target = dest.removePrefix("profile:")
+                                            if (target.startsWith("spotify:artist:") || target.startsWith("spotify_artist:")) {
+                                                navController.navigate("profile/${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(target)}")
+                                            } else {
+                                                navController.navigate("profile/$target")
+                                            }
+                                        }
+                                        dest.startsWith("spotify_artist:") -> navController.navigate("profile/${dest.removePrefix("spotify_artist:")}")
                                         dest.startsWith("playlist_fans/") -> navController.navigate(dest)
                                         else -> navController.navigate("playlist_detail/${java.net.URLEncoder.encode(dest, "UTF-8")}")
                                     }
@@ -457,7 +476,15 @@ fun MainScreen() {
                                     when {
                                         id == "history" -> navController.navigate("history")
                                         id == "recognition_history" -> navController.navigate("recognition_history")
-                                        id.startsWith("profile:") -> navController.navigate("profile/${id.removePrefix("profile:")}")
+                                        id.startsWith("profile:") -> {
+                                            val target = id.removePrefix("profile:")
+                                            if (target.startsWith("spotify:artist:") || target.startsWith("spotify_artist:")) {
+                                                navController.navigate("profile/${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(target)}")
+                                            } else {
+                                                navController.navigate("profile/$target")
+                                            }
+                                        }
+                                        id.startsWith("spotify_artist:") -> navController.navigate("profile/${id.removePrefix("spotify_artist:")}")
                                         id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                         id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
                                         id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
