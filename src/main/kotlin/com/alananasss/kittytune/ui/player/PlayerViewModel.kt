@@ -4,6 +4,7 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.Application
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.alananasss.kittytune.core.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.alananasss.kittytune.media.MediaItem
@@ -3118,6 +3119,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun updatePlayerColors(track: Track) {
         viewModelScope.launch(Dispatchers.IO) {
+            val isDarkMode = playerPrefs.getThemeMode() != com.alananasss.kittytune.data.local.AppThemeMode.LIGHT
+
+            // Spotify catalog: use Spotify's own cover color extraction (one
+            // tiny request) instead of downloading and analyzing the artwork.
+            if (isSpotifyTrack(track)) {
+                val extracted = com.alananasss.kittytune.data.spotify.SpotifyRepository
+                    .getExtractedColors(track.artworkUrl)
+                if (extracted != null && !extracted.isFallback) {
+                    val chosen = if (isDarkMode) extracted.light else extracted.dark
+                    val color = parseHexColor(chosen)
+                    if (color != null) {
+                        backgroundColor = color
+                        com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = backgroundColor.toArgb()
+                        return@launch
+                    }
+                }
+            }
+
             val bitmap = loadBitmap(track.fullResArtwork)
             if (bitmap != null) {
                 try {
@@ -3130,12 +3149,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
 
                 // Desktop app is dark-first; pick a light vibrant color for contrast on dark bg.
-                val isDarkMode = playerPrefs.getThemeMode() != com.alananasss.kittytune.data.local.AppThemeMode.LIGHT
                 backgroundColor = ArtworkPalette.dominantColor(bitmap, preferLight = isDarkMode)
+                // Feed the dynamic theme (issue #27): the color scheme seeds from this.
+                com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = backgroundColor.toArgb()
             } else {
                 backgroundColor = Color(0xFF1E1E1E)
             }
         }
+    }
+
+    private fun parseHexColor(hex: String): Color? {
+        val clean = hex.removePrefix("#")
+        if (clean.length != 6) return null
+        return runCatching { Color(0xFF000000.toInt() or clean.toInt(16)) }.getOrNull()
     }
 
     private fun playRobustly(
