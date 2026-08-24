@@ -323,15 +323,31 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 emptyList()
             }
             val localMapped = localItems.map { historyItem ->
-                val type = when (historyItem.type) {
-                    "STATION" -> HistoryContextType.ARTIST_STATION
-                    "PROFILE" -> HistoryContextType.ARTIST
+                val isLikes = historyItem.id == "likes" || historyItem.numericId == -1L ||
+                        historyItem.title.equals("Titres Likés", ignoreCase = true) ||
+                        historyItem.title.equals(str("lib_liked_tracks"), ignoreCase = true) ||
+                        historyItem.title.equals(str("history_title_likes"), ignoreCase = true) ||
+                        historyItem.title.equals("Liked Tracks", ignoreCase = true)
+
+                val type = when {
+                    isLikes -> HistoryContextType.LIKES
+                    historyItem.type == "STATION" -> HistoryContextType.ARTIST_STATION
+                    historyItem.type == "PROFILE" -> HistoryContextType.ARTIST
                     else -> HistoryContextType.PLAYLIST
                 }
                 val targetNavId = when {
-                    historyItem.id == "likes" -> "likes"
+                    isLikes || historyItem.id == "likes" -> "likes"
                     historyItem.id == "downloads" -> "downloads"
                     historyItem.id.startsWith("yt_radio:") -> historyItem.id
+                    historyItem.id.startsWith("spotify_artist:") -> historyItem.id
+                    historyItem.id.startsWith("spotify_radio:") -> historyItem.id
+                    historyItem.id.startsWith("spotify:artist:") -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(historyItem.id)}"
+                    historyItem.id.startsWith("spotify:") || historyItem.id.startsWith("spotify_") -> historyItem.id
+                    historyItem.type == "PROFILE" && (historyItem.id.contains("spotify") || historyItem.numericId == 0L) -> {
+                        val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(historyItem.id)
+                        if (clean.isNotBlank()) "spotify_artist:$clean" else "profile:${historyItem.numericId}"
+                    }
+                    historyItem.type == "STATION" && historyItem.id.contains("spotify") -> "spotify_radio:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(historyItem.id)}"
                     historyItem.type == "STATION" -> "station:${historyItem.numericId}"
                     historyItem.type == "PROFILE" -> "profile:${historyItem.numericId}"
                     else -> historyItem.numericId.toString()
@@ -341,7 +357,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                     urn = historyItem.id,
                     title = historyItem.title,
                     subtitle = historyItem.subtitle,
-                    imageUrl = historyItem.imageUrl,
+                    imageUrl = if (isLikes) null else historyItem.imageUrl,
                     type = type,
                     playedAt = historyItem.timestamp,
                     targetNavId = targetNavId,
@@ -484,7 +500,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                         title = playlist?.title ?: str("history_type_playlist"),
                         subtitle = playlist?.user?.username ?: str("history_source_soundcloud"),
                         imageUrl = playlist?.fullResArtwork,
-                        type = if (playlist?.isAlbum == true) HistoryContextType.ALBUM else HistoryContextType.PLAYLIST,
+                        type = if (playlist?.isRealAlbum == true) HistoryContextType.ALBUM else HistoryContextType.PLAYLIST,
                         playedAt = playedAt,
                         targetNavId = id.toString(),
                         isVerified = playlist?.user?.verified == true
