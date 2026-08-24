@@ -58,6 +58,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
     import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
+    import com.alananasss.kittytune.core.openUrl
     import com.alananasss.kittytune.core.str
     import com.alananasss.kittytune.core.trackTextInput
     import androidx.compose.ui.text.AnnotatedString
@@ -81,6 +82,7 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.FormatAlignLeft
 import androidx.compose.material.icons.rounded.FormatAlignCenter
 import androidx.compose.material.icons.rounded.FormatAlignRight
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.BackHandler
 import androidx.compose.material.icons.rounded.Verified
@@ -155,12 +157,14 @@ import kotlin.math.roundToInt
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
+                                                ArtistLinkText(
+                                                    track = currentTrack,
+                                                    onArtistClick = { viewModel.navigateToTrackArtist(it) },
                                                     text = currentTrack.user?.username ?: "",
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = Color.White.copy(alpha = 0.7f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                    hoverColor = Color.White,
+                                                    modifier = Modifier.weight(1f, fill = false)
                                                 )
                                                 if (currentTrack.user?.verified == true) {
                                                     Spacer(Modifier.width(3.dp))
@@ -1485,11 +1489,7 @@ fun UploadYamlDialog(
                     color = MaterialTheme.colorScheme.primary,
                     textDecoration = TextDecoration.Underline,
                     modifier = Modifier.clickable {
-                        try {
-                            java.awt.Desktop.getDesktop().browse(java.net.URI("https://lrclib.net/lyricsfile"))
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                        }
+                        openUrl("https://lrclib.net/lyricsfile")
                     }
                 )
 

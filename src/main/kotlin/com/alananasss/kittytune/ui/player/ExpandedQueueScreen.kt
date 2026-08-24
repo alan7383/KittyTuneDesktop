@@ -47,6 +47,7 @@ import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -218,12 +219,10 @@ fun ExpandedQueueScreen(
                                     maxLines = 1
                                 )
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = track.user?.username
-                                            ?: str("unknown_artist"),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1
+                                    ArtistLinkText(
+                                        track = track,
+                                        onArtistClick = { viewModel.navigateToTrackArtist(it) },
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
                                     if (track.user?.verified == true) {
                                         Spacer(Modifier.width(3.dp))

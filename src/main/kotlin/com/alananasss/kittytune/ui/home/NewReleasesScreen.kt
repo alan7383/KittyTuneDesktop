@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.SquareCardShimmer
@@ -171,7 +172,8 @@ fun NewReleasesScreen(
                                             rank = absoluteIndex + 1,
                                             currentlyPlayingTrack = playerViewModel.currentTrack,
                                             onClick = { playerViewModel.playPlaylist(viewModel.popularTracks, absoluteIndex) },
-                                            onOptionClick = { playerViewModel.showTrackOptions(track) }
+                                            onOptionClick = { playerViewModel.showTrackOptions(track) },
+                                            onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                                         )
                                     }
                                 }
@@ -191,7 +193,8 @@ fun PopularTrackRow(
     rank: Int,
     currentlyPlayingTrack: Track?,
     onClick: () -> Unit,
-    onOptionClick: () -> Unit
+    onOptionClick: () -> Unit,
+    onArtistClick: ((Track) -> Unit)? = null
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -254,14 +257,21 @@ fun PopularTrackRow(
                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                 color = titleColor
             )
-            // artist and play count
-            Text(
-                text = "${track.user?.username ?: str("unknown_artist")} • ${formatNumber(track.playbackCount)} ${str("playback_count_formatted")}",
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // artist (a link on its own) and play count
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ArtistLinkText(
+                    track = track,
+                    onArtistClick = onArtistClick,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                Text(
+                    text = " • ${formatNumber(track.playbackCount)} ${str("playback_count_formatted")}",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         // kebab menu
@@ -303,8 +313,13 @@ fun NewReleasePlaylistCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                val subtitle = when {
+                    !playlist.user?.username.isNullOrBlank() -> playlist.user.username
+                    playlist.trackCount != null && playlist.trackCount > 0 -> str("playlist_num_tracks", playlist.trackCount)
+                    else -> str("lib_playlists")
+                }
                 Text(
-                    text = str("playlist_num_tracks", playlist.trackCount ?: 0),
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1

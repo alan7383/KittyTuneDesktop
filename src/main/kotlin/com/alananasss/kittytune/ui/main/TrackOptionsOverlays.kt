@@ -4,6 +4,11 @@ package com.alananasss.kittytune.ui.main
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +22,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -71,7 +78,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -82,6 +92,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.DownloadManager
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -102,6 +113,9 @@ private data class MenuOptionItem(
     val text: String,
     val onClick: () -> Unit,
 )
+
+/** Spotify brand green, used for catalog badges and verified marks. */
+private val SpotifyAccentGreen = androidx.compose.ui.graphics.Color(0xFF1DB954)
 
 /**
  * Desktop replacements for the Android modal bottom sheets: track options menu,
@@ -158,7 +172,134 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
             }
         }
     }
+    if (viewModel.showSelectArtistDialog) {
+        SelectArtistDialog(viewModel)
+    }
     SleepTimerDialog(viewModel)
+}
+
+/**
+ * Shown when the user opens an artist from a track credited to several
+ * Spotify artists (feat / duets): pick which artist profile to open.
+ */
+@Composable
+private fun SelectArtistDialog(viewModel: PlayerViewModel) {
+    // The artist list is authoritative: headers open the dialog without a track.
+    val track = viewModel.selectedArtistDialogTrack
+    val artistsList = viewModel.selectArtistOptions.takeIf { it.isNotEmpty() }
+        ?: track?.artists?.takeIf { it.isNotEmpty() }
+        ?: listOfNotNull(
+            track?.user?.let { u ->
+                com.alananasss.kittytune.data.spotify.SpotifyArtistRef(
+                    id = u.permalink ?: u.urn?.removePrefix("spotify:artist:") ?: "",
+                    name = u.username ?: str("unknown_artist"),
+                    avatarUrl = u.avatarUrl,
+                    verified = u.verified
+                )
+            }
+        )
+    if (artistsList.isEmpty()) return
+
+    EscapableAlertDialog(
+        onDismissRequest = { viewModel.dismissSelectArtistDialog() },
+        title = { Text(str("select_artist_title")) },
+        text = {
+            // A plain Column, not a lazy list: there are only ever a handful of credited
+            // artists, and ScrollableLazyColumn fills its constraints — which is what made
+            // this dialog claim 360dp of height and near-max width for two rows.
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .widthIn(min = 240.dp, max = 320.dp)
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                artistsList.forEach { artist ->
+                    ArtistPickerRow(artist = artist, viewModel = viewModel)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = { viewModel.dismissSelectArtistDialog() }, shapes = ButtonDefaults.shapes()) {
+                Text(str("btn_cancel"))
+            }
+        }
+    )
+}
+
+/**
+ * One row of the artist picker. The artist refs come from track/album payloads, which
+ * carry no images, so the avatar is fetched on demand (memoized in the repository) and
+ * the silhouette only stays if there is genuinely nothing to show.
+ */
+@Composable
+private fun ArtistPickerRow(
+    artist: com.alananasss.kittytune.data.spotify.SpotifyArtistRef,
+    viewModel: PlayerViewModel
+) {
+    val avatar by produceState(artist.avatarUrl, artist.id) {
+        if (value.isNullOrBlank() && artist.id.isNotBlank()) {
+            value = runCatching {
+                com.alananasss.kittytune.data.spotify.SpotifyRepository.getArtistAvatar(artist.id)
+            }.getOrNull()
+        }
+    }
+
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
+            .hoverable(interaction)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(interactionSource = interaction, indication = null) {
+                viewModel.dismissSelectArtistDialog()
+                val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(
+                    artist.id.ifBlank { artist.uri ?: "" }
+                )
+                if (cleanId.isNotBlank()) viewModel.navigateToSpotifyArtist(cleanId)
+            }
+            .padding(8.dp)
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            if (!avatar.isNullOrBlank()) {
+                AsyncImage(
+                    model = avatar,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = artist.name,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        if (artist.verified) {
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                Icons.Rounded.Verified,
+                contentDescription = null,
+                tint = SpotifyAccentGreen,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
 }
 
 @Composable
@@ -169,6 +310,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
     val likedTracks by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
     val isTrackLiked = remember(track.id, likedTracks) { com.alananasss.kittytune.data.LikeRepository.isTrackLiked(track.id) }
     val isLocalFile = track.id < 0 && track.source != "youtube"
+    val isSpotify = viewModel.isSpotifyTrack(track)
 
     val isReposted = viewModel.isTrackReposted(track.id) || track.userReposted
     if (track.userReposted) {
@@ -236,10 +378,9 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = track.user?.username ?: str("unknown_artist"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    com.alananasss.kittytune.ui.common.ArtistLinkText(
+                        track = track,
+                        onArtistClick = { viewModel.navigateToTrackArtist(it) }
                     )
                     if (track.user?.verified == true) {
                         Spacer(Modifier.width(4.dp))
@@ -268,7 +409,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem(Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.insertNext(listOf(track)); viewModel.showMenuSheet = false })
                 add(MenuOptionItem(Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
             }
-            if (track.source != "youtube" && !isLocalFile) {
+            if (track.source != "youtube" && !isSpotify && !isLocalFile) {
                 add(MenuOptionItem(Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) { viewModel.openComments(track) })
                 if (isReposted) {
                     add(MenuOptionItem(Icons.Rounded.Repeat, str("menu_reposted")) { showDeleteRepostConfirm = true })
@@ -276,13 +417,31 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     add(MenuOptionItem(Icons.Rounded.Repeat, str("menu_repost")) { showRepostDialog = true })
                 }
             }
-            if (track.source != "youtube") {
+            if (track.source != "youtube" && !isSpotify) {
                 add(MenuOptionItem(Icons.Rounded.Info, str("menu_details")) { viewModel.openTrackDetails(track) })
             }
             add(MenuOptionItem(Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track, forceSheet = true) })
             add(MenuOptionItem(Icons.Default.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
+
+            // Catalog tracks carry their album id: jump straight to it.
+            val albumId = track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() }
+            if (!isLocalFile && albumId != null && (isSpotify || albumId.length == 22)) {
+                add(MenuOptionItem(Icons.Rounded.Album, str("menu_go_album")) {
+                    viewModel.showMenuSheet = false
+                    viewModel.navigateToAlbum(albumId)
+                })
+            }
             if (track.source != "youtube" && !isLocalFile) {
-                add(MenuOptionItem(Icons.Default.Person, str("menu_go_artist")) { track.user?.id?.let { viewModel.navigateToArtist(it) } })
+                add(
+                    MenuOptionItem(Icons.Default.Person, str("menu_go_artist")) {
+                        if (isSpotify) {
+                            viewModel.navigateToTrackArtist(track)
+                            viewModel.showMenuSheet = false
+                        } else {
+                            track.user?.id?.let { viewModel.navigateToArtist(it) }
+                        }
+                    }
+                )
                 val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
                 if (isOwnTrack) {
                     add(MenuOptionItem(Icons.Default.Edit, str("menu_edit_track")) {
@@ -790,6 +949,20 @@ internal suspend fun loadPlaylistTracksForMenu(
 
     val api = com.alananasss.kittytune.data.network.RetrofitClient.create()
     val permalink = playlist.permalinkUrl ?: ""
+
+    // Spotify catalog playlists/albums resolve through the Pathfinder repository.
+    if (permalink.contains("spotify") || playlist.urn?.startsWith("spotify:") == true) {
+        val cleanId = playlist.permalink?.let { com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(it) }
+            ?: com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(playlist.urn ?: permalink)
+        if (cleanId.isBlank()) return emptyList()
+        val spotifyTracks = if (playlist.isAlbum) {
+            com.alananasss.kittytune.data.spotify.SpotifyRepository.getAlbum(cleanId)?.tracks
+        } else {
+            com.alananasss.kittytune.data.spotify.SpotifyRepository.getPlaylist(cleanId)?.tracks
+        }
+        return spotifyTracks?.map { it.toTrack() } ?: emptyList()
+    }
+
     val stationId = permalink.substringAfterLast(":").toLongOrNull()
     val playlistObj = when {
         permalink.contains("artist-stations") && stationId != null -> api.getArtistStation(stationId)
