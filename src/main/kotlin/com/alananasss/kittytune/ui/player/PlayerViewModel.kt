@@ -3298,6 +3298,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 e.printStackTrace()
             }
         }
+
+        // Second stage: warm the StreamResolver cache for the track AFTER next, so
+        // skipping forward never waits on stream resolution (issue #27). No media
+        // item is appended — only the resolved URL is cached.
+        val warmUpIndex = if (nextIndex + 1 >= _queue.size) {
+            if (repeatMode == RepeatMode.ALL && _queue.isNotEmpty()) 0 else return
+        } else nextIndex + 1
+        if (warmUpIndex !in _queue.indices) return
+        val warmUpTrack = _queue[warmUpIndex]
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+                val local = db.getTrack(warmUpTrack.id)
+                if (local != null && local.localAudioPath.isNotEmpty() &&
+                    !local.localAudioPath.startsWith("exo_cache://")
+                ) return@launch // local file — nothing to resolve
+
+                StreamResolver.resolveStreamWithDrm(warmUpTrack)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     private fun isColorDark(color: Int): Boolean {
