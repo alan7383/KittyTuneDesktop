@@ -20,6 +20,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.ArtistLinkText
+import com.alananasss.kittytune.ui.common.rememberReleaseDate
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.onClick
@@ -103,6 +105,17 @@ private val COLUMN_GAP = 16.dp
 /** Formats an API date ("2022-10-04T21:58:09Z" or "2022/10/04 21:58:09 +0000") as "dd MMM yyyy". */
 private fun formatApiDate(raw: String?): String {
     if (raw.isNullOrBlank()) return ""
+    // Catalog dates sometimes stop at the year or the month; those match none of the
+    // patterns below and used to render as an empty cell.
+    Regex("^(\\d{4})(?:-(\\d{2}))?$").find(raw.trim())?.let { m ->
+        val year = m.groupValues[1]
+        val month = m.groupValues[2]
+        if (month.isBlank()) return year
+        val monthDate = runCatching {
+            java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).parse("$year-$month")
+        }.getOrNull() ?: return year
+        return java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.getDefault()).format(monthDate)
+    }
     val millis = runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
         ?: runCatching {
             java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time
@@ -298,9 +311,14 @@ fun PlaylistDetailScreen(
     var playlistTagList by remember { mutableStateOf<String?>(null) }
     var playlistSetType by remember { mutableStateOf<String?>(null) }
     var playlistReleaseDate by remember { mutableStateOf<String?>(null) }
+    // Catalog extras: "2025 • Album" style subtitle shown under the title.
+    var playlistMetaSubtitle by remember { mutableStateOf<String?>(null) }
     var playlistPermalink by remember { mutableStateOf<String?>(null) }
 
     var playlistUser by remember { mutableStateOf<User?>(null) }
+    // Every artist credited on the header (a Spotify album can list several); the
+    // header line offers the picker instead of silently opening the first one.
+    var playlistArtists by remember { mutableStateOf<List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var defaultIcon by remember { mutableStateOf<ImageVector?>(null) }
 
@@ -363,8 +381,10 @@ fun PlaylistDetailScreen(
 
     val listState = rememberLazyListState()
 
+    val isSpecialPlaylist = playlistId == "likes" || playlistId == "downloads" || playlistId == "local_files" || playlistId.startsWith("liked_by:") || playlistId.startsWith("station") || playlistId.startsWith("system_playlist:")
+
     // Drag-to-reorder — only active for user-owned playlists with no active search/sort
-    val canReorder = isUserCreated && playlistSearchQuery.isEmpty() && playlistSortBy == TrackSortBy.FIRST_ADDED
+    val canReorder = !isSpecialPlaylist && isUserCreated && playlistSearchQuery.isEmpty() && playlistSortBy == TrackSortBy.FIRST_ADDED
     val reorderableState = rememberReorderableLazyListState(lazyListState = listState) { from, to ->
         if (canReorder) {
             val fromKey = from.key as? String
@@ -415,12 +435,18 @@ fun PlaylistDetailScreen(
         }
     }
 
-    // Date column always shown; uses added-at where available (likes, local
-    // playlists, downloads), falls back to release/upload date for remote playlists.
+    // Date column uses added-at where available (likes, local playlists, downloads) and
+    // falls back to release/upload date for remote playlists — but only when the rows can
+    // actually produce one. Spotify list payloads ship no dates, so those rows resolve
+    // theirs individually as they scroll into view (see rememberReleaseDate); lists that
+    // can never have a date, like YouTube mixes, drop the column instead of showing blanks.
     // Computed directly (no remember): tracksToDisplay can be a SnapshotStateList
     // whose identity never changes, and `any` short-circuits on the first element.
-    val showDateColumn = true
-    val useReleaseDate = tracksToDisplay.any { it.likedAt == null }
+    val showDateColumn = tracksToDisplay.any {
+        it.likedAt != null || !it.releaseDate.isNullOrBlank() || !it.createdAt.isNullOrBlank() ||
+            it.source == "spotify"
+    }
+    val useReleaseDate = !isSpecialPlaylist && tracksToDisplay.any { it.likedAt == null }
 
     val downloadedCount = remember(tracks.size, tracksToDisplay.size, downloadedIds) {
         if (tracksToDisplay.isEmpty()) 0
@@ -467,7 +493,12 @@ fun PlaylistDetailScreen(
         }
     }
 
-    LaunchedEffect(playlistInDb, currentIdLong, playlistUser, playerViewModel.currentUserId) {
+    LaunchedEffect(playlistInDb, currentIdLong, playlistUser, playerViewModel.currentUserId, playlistId) {
+        if (isSpecialPlaylist) {
+            isLocalPlaylist = false
+            isUserCreated = false
+            return@LaunchedEffect
+        }
         if (playlistInDb != null) {
             val isOwnedByCurrentAccount = (playlistUser?.id != null && playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
                 (playerViewModel.currentUser != null && (playlistInDb!!.artist == playerViewModel.currentUser?.username || playlistUser?.username == playerViewModel.currentUser?.username))
@@ -504,6 +535,7 @@ fun PlaylistDetailScreen(
 
         val newTracks = mutableListOf<Track>()
         val newDownloadedPlaylists = mutableListOf<Playlist>()
+        playlistArtists = emptyList()
 
         try {
             if (playerViewModel.currentUserId == 0L) {
@@ -513,6 +545,114 @@ fun PlaylistDetailScreen(
             val db = AppDatabase.downloadDao
 
             when {
+                playlistId.startsWith("spotify") || playlistId.startsWith("station_spotify:") -> {
+                    val isSpotifyAlbum = playlistId.startsWith("spotify:album:") || playlistId.startsWith("spotify_album:")
+                    val isSpotifyPlaylist = playlistId.startsWith("spotify:playlist:") || playlistId.startsWith("spotify_playlist:")
+                    val isSpotifyRadio = playlistId.startsWith("spotify_radio:") || playlistId.startsWith("station_spotify:")
+
+                    if (isSpotifyAlbum) {
+                        val album = com.alananasss.kittytune.data.spotify.SpotifyRepository.getAlbum(cleanIdStr)
+                        if (album != null) {
+                            isAlbum = true
+                            playlistTitle = album.name
+                            playlistCover = album.artworkUrl
+                            val firstArtist = album.artists.firstOrNull()
+                            playlistArtists = album.artists
+                            playlistUser = User(
+                                id = kotlin.math.abs(firstArtist?.id?.hashCode()?.toLong() ?: 0L),
+                                username = album.artistName,
+                                avatarUrl = firstArtist?.avatarUrl ?: album.artworkUrl,
+                                urn = firstArtist?.id?.let { "spotify:artist:$it" },
+                                permalink = firstArtist?.id,
+                                verified = firstArtist?.verified ?: false
+                            )
+                            playlistReleaseDate = album.releaseDate
+                            playlistMetaSubtitle = album.formattedSubtitle
+                            playlistPermalinkUrl = "https://open.spotify.com/album/${album.id}"
+                            playlistUrn = "spotify:album:${album.id}"
+                            newTracks.addAll(album.tracks.map { it.toTrack() })
+                        }
+                    } else if (isSpotifyPlaylist) {
+                        val pl = com.alananasss.kittytune.data.spotify.SpotifyRepository.getPlaylist(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = false
+                            playlistTitle = pl.name
+                            playlistCover = pl.artworkUrl
+                            playlistDescription = pl.description
+                            playlistMetaSubtitle = pl.followersCount?.takeIf { it > 0 }?.let {
+                                java.text.NumberFormat.getNumberInstance(java.util.Locale.getDefault()).format(it) + " " + str("profile_followers")
+                            }
+                            playlistUser = User(
+                                id = 0L,
+                                username = pl.ownerName ?: "Spotify",
+                                avatarUrl = pl.artworkUrl
+                            )
+                            playlistPermalinkUrl = "https://open.spotify.com/playlist/${pl.id}"
+                            playlistUrn = "spotify:playlist:${pl.id}"
+                            newTracks.addAll(pl.tracks.map { it.toTrack() })
+                        }
+                    } else if (isSpotifyRadio) {
+                        val isArtistStationSeed = playlistId.startsWith("station_artist:") || playlistId.startsWith("spotify:artist:") || playlistId.startsWith("spotify_artist:")
+                        var radioPlaylist = com.alananasss.kittytune.data.spotify.SpotifyRepository.getRadio(cleanIdStr, isArtist = isArtistStationSeed)
+                        if (radioPlaylist == null) {
+                            radioPlaylist = com.alananasss.kittytune.data.spotify.SpotifyRepository.getRadio(cleanIdStr, isArtist = !isArtistStationSeed)
+                        }
+                        if (radioPlaylist != null) {
+                            isAlbum = false
+                            playlistTitle = radioPlaylist.name
+                            playlistCover = radioPlaylist.artworkUrl
+                            defaultIcon = Icons.Rounded.Radio
+                            playlistUser = User(
+                                id = kotlin.math.abs("Spotify".hashCode().toLong()),
+                                username = radioPlaylist.ownerName ?: "Spotify",
+                                avatarUrl = radioPlaylist.artworkUrl
+                            )
+                            playlistPermalinkUrl = "https://open.spotify.com/playlist/${radioPlaylist.id}"
+                            playlistUrn = "spotify:playlist:${radioPlaylist.id}"
+                            newTracks.addAll(radioPlaylist.tracks.map { it.toTrack() })
+                        } else {
+                            val seedTrack = com.alananasss.kittytune.data.spotify.SpotifyRepository.getTrack(cleanIdStr)
+                            val radioTitle = if (seedTrack != null) str("spotify_radio_title", seedTrack.name) else "Spotify Radio"
+                            playlistTitle = radioTitle
+                            playlistCover = seedTrack?.artworkUrl
+                            defaultIcon = Icons.Rounded.Radio
+                            isAlbum = false
+                            if (seedTrack != null) {
+                                playlistArtists = seedTrack.artists
+                                playlistUser = User(
+                                    id = kotlin.math.abs(seedTrack.artists.firstOrNull()?.id?.hashCode()?.toLong() ?: 0L),
+                                    username = seedTrack.artistName,
+                                    avatarUrl = seedTrack.artists.firstOrNull()?.avatarUrl ?: seedTrack.artworkUrl,
+                                    urn = seedTrack.artists.firstOrNull()?.id?.let { "spotify:artist:$it" }
+                                )
+                                playlistPermalinkUrl = seedTrack.shareUrl
+                                val radioList = com.alananasss.kittytune.data.spotify.SpotifyRepository.getRadioTracks(cleanIdStr)
+                                newTracks.addAll(radioList.map { it.toTrack() })
+                            } else {
+                                val artist = com.alananasss.kittytune.data.spotify.SpotifyRepository.getArtist(cleanIdStr)
+                                if (artist != null) {
+                                    playlistTitle = "${artist.name} Radio"
+                                    playlistCover = artist.avatarUrl ?: artist.headerImageUrl
+                                    playlistArtists = listOf(
+                                        com.alananasss.kittytune.data.spotify.SpotifyArtistRef(
+                                            id = artist.id,
+                                            name = artist.name,
+                                            avatarUrl = artist.avatarUrl
+                                        )
+                                    )
+                                    playlistUser = User(
+                                        id = kotlin.math.abs(artist.id.hashCode().toLong()),
+                                        username = artist.name,
+                                        avatarUrl = artist.avatarUrl,
+                                        urn = "spotify:artist:${artist.id}"
+                                    )
+                                    newTracks.addAll(artist.topTracks.map { it.toTrack() })
+                                }
+                            }
+                        }
+                    }
+                }
+
                 playlistId == "likes" -> {
                     playlistTitle = str("lib_liked_tracks")
                     defaultIcon = Icons.Rounded.Favorite
@@ -692,7 +832,7 @@ fun PlaylistDetailScreen(
                                     throw e
                                 }
                             }
-                            isAlbum = playlistObj.isAlbum
+                            isAlbum = playlistObj.isRealAlbum
 
                             playlistTitle = playlistObj.title.takeIf { !it.isNullOrBlank() } ?: playlistTitle
                             playlistUser = playlistObj.user ?: playlistUser
@@ -862,8 +1002,12 @@ fun PlaylistDetailScreen(
                 modifier = Modifier.width(620.dp).heightIn(max = 680.dp)
             ) {
                 PlaylistDetailsSheet(
-                    // system_playlist: ids are urns, not numeric — pass them verbatim
-                    playlistId = if (playlistId.startsWith("system_playlist:")) playlistId else currentIdLong.toString(),
+                    // system_playlist: / spotify ids are urns, not numeric — pass them verbatim
+                    playlistId = when {
+                        playlistId.startsWith("system_playlist:") || playlistId.startsWith("spotify:") || playlistId.startsWith("spotify_") -> playlistId
+                        currentIdLong > 0L -> currentIdLong.toString()
+                        else -> playlistId
+                    },
                     onDismiss = { showDetailsSheet = false },
                     onViewAll = { tabIndex ->
                         showDetailsSheet = false
@@ -923,8 +1067,8 @@ fun PlaylistDetailScreen(
         val creatorName = playlistUser?.username
         val isVerified = playlistUser?.verified == true
         when {
-            playlistId == "likes" -> PlaybackContext(str("context_playlist", str("lib_liked_tracks")), "likes", playlistCover, artistName = null)
-            playlistId == "downloads" -> PlaybackContext(str("context_playlist", str("lib_downloads")), "downloads", playlistCover, artistName = null)
+            playlistId == "likes" -> PlaybackContext(str("context_playlist", str("lib_liked_tracks")), "likes", null, artistName = null)
+            playlistId == "downloads" -> PlaybackContext(str("context_playlist", str("lib_downloads")), "downloads", null, artistName = null)
             playlistId.startsWith("station") || playlistId.startsWith("yt_radio:") ->
                 PlaybackContext(str("context_station", playlistTitle), playlistId, playlistCover, artistName = null, isVerified = isVerified)
             isAlbum -> PlaybackContext(str("context_album", playlistTitle), playlistId, playlistCover, artistName = creatorName, isVerified = isVerified)
@@ -1005,14 +1149,35 @@ fun PlaylistDetailScreen(
                             }
                         }
                         if (playlistUser != null && playlistUser!!.id > 0) {
+                            val ownerInteraction = remember { MutableInteractionSource() }
+                            val ownerHovered by ownerInteraction.collectIsHoveredAsState()
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable { playerViewModel.navigateToArtist(playlistUser!!.id) }
+                                modifier = Modifier
+                                    .hoverable(ownerInteraction)
+                                    .pointerHoverIcon(PointerIcon.Hand)
+                                    .clickable(interactionSource = ownerInteraction, indication = null) {
+                                        val owner = playlistUser!!
+                                        val ownerUrn = owner.urn ?: ""
+                                        when {
+                                            // A record credited to several artists asks which one to open.
+                                            playlistArtists.count { it.id.isNotBlank() } > 1 ->
+                                                playerViewModel.navigateToArtistChoice(playlistArtists, owner.id)
+                                            ownerUrn.startsWith("spotify:artist:") ->
+                                                playerViewModel.navigateToSpotifyArtist(ownerUrn.removePrefix("spotify:artist:"))
+                                            else -> playerViewModel.navigateToArtist(owner.id)
+                                        }
+                                    }
                             ) {
-                                Text(str("playlist_by_user", playlistUser!!.username ?: ""), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                                Text(
+                                    str("playlist_by_user", playlistUser!!.username ?: ""),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = if (ownerHovered) TextDecoration.Underline else null
+                                )
                                 if (playlistUser?.verified == true) {
                                     Spacer(Modifier.width(4.dp))
-                                    Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Rounded.Verified, null, tint = if (playlistUser?.urn?.startsWith("spotify") == true) androidx.compose.ui.graphics.Color(0xFF1DB954) else MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                 }
                             }
                         } else if (playlistUser?.username != null) {
@@ -1023,6 +1188,17 @@ fun PlaylistDetailScreen(
                             )
                         }
                         Spacer(Modifier.height(4.dp))
+
+                        // Catalog subtitle ("2025 • Album" / follower count)
+                        if (!playlistMetaSubtitle.isNullOrBlank()) {
+                            Text(
+                                text = playlistMetaSubtitle!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                            Spacer(Modifier.height(2.dp))
+                        }
 
                         val trackCountText = when {
                             isYoutubeRadio -> str("radio") + " â€¢ YouTube"
@@ -1466,7 +1642,7 @@ fun PlaylistDetailScreen(
                                         playerViewModel.showTrackOptions(track, contextId)
                                     },
                                     onAlbumClick = { onNavigate(it) },
-                                    onArtistClick = { playerViewModel.navigateToArtist(it) },
+                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
                                     showAlbum = !isAlbum,
                                     showDate = showDateColumn,
                                     dragHandleModifier = dragHandleModifier,
@@ -1487,6 +1663,7 @@ fun PlaylistDetailScreen(
                                         playerViewModel.showTrackOptions(track, contextId)
                                     },
                                     onAlbumClick = { onNavigate(it) },
+                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
                                     showAlbum = !isAlbum,
                                     showDate = showDateColumn,
                                     useReleaseDate = useReleaseDate,
@@ -1550,7 +1727,8 @@ fun TrackListItem(
     modifier: Modifier = Modifier,
     showVerifiedBadge: Boolean = true,
     onClick: () -> Unit,
-    onOptionClick: () -> Unit
+    onOptionClick: () -> Unit,
+    onArtistClick: ((Track) -> Unit)? = null
 ) {
     val isCurrent = currentlyPlayingTrack?.id == track.id
     val titleColor = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
@@ -1615,12 +1793,10 @@ fun TrackListItem(
                         Icon(Icons.Rounded.DownloadDone, str("btn_downloaded"), modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(4.dp))
                     }
-                    Text(
-                        text = track.user?.username ?: str("unknown_artist"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                    ArtistLinkText(
+                        track = track,
+                        onArtistClick = onArtistClick,
+                        style = MaterialTheme.typography.bodySmall
                     )
                     if (showVerifiedBadge && track.user?.verified == true) {
                         Spacer(Modifier.width(4.dp))
@@ -1768,6 +1944,7 @@ fun TrackTableItem(
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
     onAlbumClick: (String) -> Unit,
+    onArtistClick: ((Track) -> Unit)? = null,
     showAlbum: Boolean = true,
     showDate: Boolean = true,
     useReleaseDate: Boolean = false,
@@ -1861,13 +2038,7 @@ fun TrackTableItem(
                             Icon(Icons.Rounded.DownloadDone, str("btn_downloaded"), modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(4.dp))
                         }
-                        Text(
-                            text = track.user?.username ?: str("unknown_artist"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        ArtistLinkText(track = track, onArtistClick = onArtistClick)
                         if (showVerifiedBadge && track.user?.verified == true) {
                             Spacer(Modifier.width(4.dp))
                             Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
@@ -1878,6 +2049,29 @@ fun TrackTableItem(
             if (showAlbum) {
                 Spacer(Modifier.width(COLUMN_GAP))
                 Box(modifier = Modifier.weight(TrackTableColumns.album).padding(end = 8.dp), contentAlignment = Alignment.CenterStart) {
+                // Catalog tracks know their album upfront: link it directly.
+                val spotifyAlbumId = if (track.source == "spotify") track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() } else null
+                val spotifyAlbumTitle = track.publisherMetadata?.albumTitle
+                when {
+                    spotifyAlbumId != null -> {
+                        val interaction = remember { MutableInteractionSource() }
+                        val hovered by interaction.collectIsHoveredAsState()
+                        Text(
+                            text = spotifyAlbumTitle ?: str("profile_tab_albums"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            textDecoration = if (hovered) TextDecoration.Underline else null,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .hoverable(interaction)
+                                .pointerHoverIcon(PointerIcon.Hand)
+                                .clickable(interactionSource = interaction, indication = null) {
+                                    onAlbumClick("spotify:album:$spotifyAlbumId")
+                                }
+                        )
+                    }
+                    else -> {
                 val resolved = albumState as? AlbumResolver.AlbumUiState.Resolved
                 if (resolved != null) {
                     val albumId = resolved.info.playlistId
@@ -1909,6 +2103,8 @@ fun TrackTableItem(
                     }
                 }
                 }
+                }
+                }
             }
             if (showDate || showPlays) {
                 Spacer(Modifier.width(COLUMN_GAP))
@@ -1935,10 +2131,12 @@ fun TrackTableItem(
                         overflow = TextOverflow.Ellipsis
                     )
                 } else if (showDate) {
-                    val dateStr = remember(track.likedAt, track.releaseDate, track.createdAt, useReleaseDate) {
+                    // Resolved per visible row: Spotify omits the date from list payloads.
+                    val releaseDate = rememberReleaseDate(track)
+                    val dateStr = remember(track.likedAt, releaseDate, track.createdAt, useReleaseDate) {
                         track.likedAt?.let {
                             java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(it))
-                        } ?: formatApiDate(if (useReleaseDate) (track.releaseDate ?: track.createdAt) else (track.createdAt ?: track.releaseDate))
+                        } ?: formatApiDate(if (useReleaseDate) (releaseDate ?: track.createdAt) else (track.createdAt ?: releaseDate))
                     }
                     Text(
                         text = dateStr,
@@ -2112,7 +2310,7 @@ fun TrackCompactItem(
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
     onAlbumClick: (String) -> Unit,
-    onArtistClick: ((Long) -> Unit)? = null,
+    onArtistClick: ((Track) -> Unit)? = null,
     showAlbum: Boolean = true,
     showDate: Boolean = true,
     dragHandleModifier: Modifier = Modifier,
@@ -2186,37 +2384,32 @@ fun TrackCompactItem(
                 }
                 Spacer(Modifier.width(COLUMN_GAP))
                 Box(modifier = Modifier.weight(TrackCompactColumns.artist), contentAlignment = Alignment.CenterStart) {
-                    val artistId = track.user?.id
-                    if (onArtistClick != null && artistId != null && artistId > 0) {
-                        val interaction = remember { MutableInteractionSource() }
-                        val hovered by interaction.collectIsHoveredAsState()
-                        Text(
-                            text = track.user?.username ?: str("unknown_artist"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                            textDecoration = if (hovered) TextDecoration.Underline else null,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .hoverable(interaction)
-                                .pointerHoverIcon(PointerIcon.Hand)
-                                .clickable(interactionSource = interaction, indication = null) {
-                                    onArtistClick(artistId)
-                                }
-                        )
-                    } else {
-                        Text(
-                            text = track.user?.username ?: str("unknown_artist"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    ArtistLinkText(track = track, onArtistClick = onArtistClick)
                 }
                 if (showAlbum) {
                     Spacer(Modifier.width(COLUMN_GAP))
                     Box(modifier = Modifier.weight(TrackCompactColumns.album).padding(end = 8.dp), contentAlignment = Alignment.CenterStart) {
+                        val spotifyAlbumId = if (track.source == "spotify") track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() } else null
+                        when {
+                            spotifyAlbumId != null -> {
+                                val interaction = remember { MutableInteractionSource() }
+                                val hovered by interaction.collectIsHoveredAsState()
+                                Text(
+                                    text = track.publisherMetadata?.albumTitle ?: str("profile_tab_albums"),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textDecoration = if (hovered) TextDecoration.Underline else null,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .hoverable(interaction)
+                                        .pointerHoverIcon(PointerIcon.Hand)
+                                        .clickable(interactionSource = interaction, indication = null) {
+                                            onAlbumClick("spotify:album:$spotifyAlbumId")
+                                        }
+                                )
+                            }
+                            else -> {
                         val resolved = albumState as? AlbumResolver.AlbumUiState.Resolved
                         if (resolved != null) {
                             val albumId = resolved.info.playlistId
@@ -2247,13 +2440,16 @@ fun TrackCompactItem(
                                 )
                             }
                         }
+                            }
+                        }
                     }
                 }
                 if (showDate) {
-                    val dateStr = remember(track.likedAt, track.releaseDate, track.createdAt) {
+                    val releaseDate = rememberReleaseDate(track)
+                    val dateStr = remember(track.likedAt, releaseDate, track.createdAt) {
                         track.likedAt?.let {
                             java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(it))
-                        } ?: formatApiDate(track.releaseDate ?: track.createdAt)
+                        } ?: formatApiDate(releaseDate ?: track.createdAt)
                     }
                     Spacer(Modifier.width(COLUMN_GAP))
                     Text(
