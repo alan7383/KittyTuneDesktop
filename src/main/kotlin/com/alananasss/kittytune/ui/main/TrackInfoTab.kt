@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,6 +53,7 @@ import java.net.URI
 import com.alananasss.kittytune.ui.profile.ExpandableDescription
 import com.alananasss.kittytune.ui.profile.getRelativeTime
 import com.alananasss.kittytune.ui.modifiers.squish
+import com.alananasss.kittytune.utils.makeTimeString
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -63,13 +65,27 @@ fun TrackInfoTab(vm: PlayerViewModel) {
     val currentTrack = vm.currentTrack ?: return
     val trackId = currentTrack.id
 
+    val isSpotifyTrack = remember(trackId) { vm.isSpotifyTrack(currentTrack) }
     var fullTrack by remember(trackId) { mutableStateOf<Track?>(null) }
-    var isLoading by remember(trackId) { mutableStateOf(true) }
+    var isLoading by remember(trackId) { mutableStateOf(!isSpotifyTrack) }
+    var spotifyCredits by remember(trackId) {
+        mutableStateOf<com.alananasss.kittytune.data.spotify.SpotifyCredits?>(null)
+    }
 
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(trackId) {
         if (trackId == 0L) return@LaunchedEffect
+        if (isSpotifyTrack) {
+            // Catalog tracks have no SoundCloud entity: fetch credits instead.
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val spotifyId = vm.getSpotifyTrackId(currentTrack)
+                spotifyCredits = spotifyId?.let {
+                    com.alananasss.kittytune.data.spotify.SpotifyRepository.getCredits(it)
+                }
+            }
+            return@LaunchedEffect
+        }
         isLoading = true
         scope.launch {
             try {
@@ -475,12 +491,12 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Tags & Details
-        item {
+        // Tags & Details (SoundCloud only)
+        if (!isSpotifyTrack) item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
                 val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
-                
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -627,8 +643,8 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Description
-        if (!displayTrack.description.isNullOrBlank()) {
+        // Description (SoundCloud only)
+        if (!isSpotifyTrack && !displayTrack.description.isNullOrBlank()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Surface(
@@ -652,8 +668,8 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Comments header & sort selector
-        item {
+        // Comments header & sort selector (SoundCloud only)
+        if (!isSpotifyTrack) item {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -716,7 +732,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         }
         
         // Add a new comment
-        item {
+        if (!isSpotifyTrack) item {
             var newCommentText by remember { mutableStateOf("") }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
@@ -741,7 +757,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        if (vm.isCommentsLoading && vm.commentsList.isEmpty()) {
+        if (!isSpotifyTrack && vm.isCommentsLoading && vm.commentsList.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier.fillMaxWidth().height(120.dp),
@@ -752,7 +768,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        itemsIndexed(organizedComments, key = { _, comment -> comment.id }) { index, comment ->
+        if (!isSpotifyTrack) itemsIndexed(organizedComments, key = { _, comment -> comment.id }) { index, comment ->
             if (index >= organizedComments.size - 3 && !vm.isCommentsLoading && vm.commentNextHref != null) {
                 LaunchedEffect(index) {
                     vm.loadComments(refresh = false)
@@ -761,7 +777,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             CommentItemUI(comment, vm)
         }
 
-        if (vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {
+        if (!isSpotifyTrack && vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {
             item {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
@@ -772,7 +788,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        if (!vm.isCommentsLoading && vm.commentsList.isEmpty()) {
+        if (!isSpotifyTrack && !vm.isCommentsLoading && vm.commentsList.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
@@ -1049,6 +1065,17 @@ private fun parseTags(tagListStr: String): List<String> {
 
 private fun formatReleaseDate(raw: String?): String {
     if (raw.isNullOrBlank()) return str("detail_unknown")
+    // Spotify sometimes gives precision that stops at the year or the month; those used to
+    // fall through every pattern below and come out as "Unknown".
+    Regex("^(\\d{4})(?:-(\\d{2}))?$").find(raw.trim())?.let { m ->
+        val year = m.groupValues[1]
+        val month = m.groupValues[2]
+        if (month.isBlank()) return year
+        val monthDate = runCatching {
+            java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).parse("$year-$month")
+        }.getOrNull() ?: return year
+        return java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(monthDate)
+    }
     val date = runCatching { java.time.Instant.parse(raw).let { java.util.Date.from(it) } }.getOrNull()
         ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).parse(raw) }.getOrNull()
         ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).parse(raw) }.getOrNull()
