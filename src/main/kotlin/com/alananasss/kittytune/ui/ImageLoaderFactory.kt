@@ -8,13 +8,15 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import com.alananasss.kittytune.core.AppDirs
-import okhttp3.OkHttpClient
+
 import okio.Path.Companion.toOkioPath
 
 object ImageLoaderFactory {
 
     fun create(): ImageLoader {
-        val okHttp = OkHttpClient.Builder().build()
+        // Route image requests through the proxy when one is configured
+        // (same as the Android app wiring Coil to ProxyManager's client).
+        val okHttp = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
         return ImageLoader.Builder(PlatformContext.INSTANCE)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { okHttp }))
