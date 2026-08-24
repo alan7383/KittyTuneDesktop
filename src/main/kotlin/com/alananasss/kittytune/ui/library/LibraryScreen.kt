@@ -35,6 +35,7 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.ArtistLinkText
 import coil3.compose.AsyncImage
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,7 +80,15 @@ fun LibraryScreen(
         }
     }
 
-    LaunchedEffect(libraryViewModel.selectedFilter) {
+    LaunchedEffect(
+        libraryViewModel.selectedFilter,
+        libraryViewModel.isSortDescending,
+        libraryViewModel.sortOption,
+        libraryViewModel.ownershipFilter,
+        libraryViewModel.currentFolderId,
+        libraryViewModel.isGridLayout,
+        libraryViewModel.searchQuery
+    ) {
         listState.scrollToItem(0)
     }
 
@@ -404,17 +413,35 @@ fun LibraryScreen(
                     } else if (libraryViewModel.currentFolderId != null && libraryViewModel.displayedItems.isEmpty()) {
                         EmptyFolderView()
                     } else {
-                        LibraryContentGrid(
-                            listState = listState,
-                            viewModel = libraryViewModel,
-                            playerViewModel = playerViewModel,
-                            onLikedTracksClick = onLikedTracksClick,
-                            onPlaylistClick = onPlaylistClick,
-                            onArtistClick = { artistId -> onPlaylistClick("profile:$artistId") },
-                            onFolderRightClick = { folderForMenu = it },
-                            onPlaylistRightClick = { playlistForMenu = it },
-                            isGuest = isGuest
-                        )
+                        androidx.compose.runtime.key(
+                            libraryViewModel.selectedFilter,
+                            libraryViewModel.isSortDescending,
+                            libraryViewModel.sortOption,
+                            libraryViewModel.ownershipFilter,
+                            libraryViewModel.currentFolderId,
+                            libraryViewModel.isGridLayout
+                        ) {
+                            val gridState = rememberLazyGridState()
+                            LibraryContentGrid(
+                                listState = gridState,
+                                viewModel = libraryViewModel,
+                                playerViewModel = playerViewModel,
+                                onLikedTracksClick = onLikedTracksClick,
+                                onPlaylistClick = onPlaylistClick,
+                                onArtistClick = { artistId ->
+                                    val spotifyId = com.alananasss.kittytune.data.local.PlayerPreferences().getSpotifyArtistIdForStableId(artistId)
+                                    if (!spotifyId.isNullOrBlank()) {
+                                        val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(spotifyId)
+                                        onPlaylistClick("spotify_artist:$clean")
+                                    } else {
+                                        onPlaylistClick("profile:$artistId")
+                                    }
+                                },
+                                onFolderRightClick = { folderForMenu = it },
+                                onPlaylistRightClick = { playlistForMenu = it },
+                                isGuest = isGuest
+                            )
+                        }
                     }
                 }
             }
@@ -497,7 +524,8 @@ fun LibraryScreen(
                                     },
                                     onOptionClick = {
                                         playerViewModel.showTrackOptions(track)
-                                    }
+                                    },
+                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                                 )
                             } else {
                                 UploadTrackListCard(
@@ -507,7 +535,8 @@ fun LibraryScreen(
                                     },
                                     onOptionClick = {
                                         playerViewModel.showTrackOptions(track)
-                                    }
+                                    },
+                                    onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                                 )
                             }
                         }
@@ -924,7 +953,9 @@ fun LibraryScreen(
         onClick: () -> Unit,
         onRightClick: (() -> Unit)? = null
     ) {
-        val art = playlist.fullResArtwork
+        // Resolves the first track's cover for playlists that ship none, rather than
+        // letting fullResArtwork hand every one of them the same stock photo.
+        val art = com.alananasss.kittytune.ui.common.rememberPlaylistCover(playlist)
         val isRadioShortcut = playlist.permalinkUrl?.startsWith("yt_radio:") == true
         val subtitleText = if (isRadioShortcut) {
             str("radio")
@@ -1204,7 +1235,8 @@ fun LibraryScreen(
     fun UploadTrackGridCard(
         track: Track,
         onClick: () -> Unit,
-        onOptionClick: () -> Unit
+        onOptionClick: () -> Unit,
+        onArtistClick: ((Track) -> Unit)? = null
     ) {
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
@@ -1265,12 +1297,11 @@ fun LibraryScreen(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
+                    ArtistLinkText(
+                        track = track,
+                        onArtistClick = onArtistClick,
                         text = track.displayArtist.ifBlank { str("unknown_artist") },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
                 IconButton(
@@ -1292,7 +1323,8 @@ fun LibraryScreen(
     fun UploadTrackListCard(
         track: Track,
         onClick: () -> Unit,
-        onOptionClick: () -> Unit
+        onOptionClick: () -> Unit,
+        onArtistClick: ((Track) -> Unit)? = null
     ) {
         val interaction = remember { MutableInteractionSource() }
         val hovered by interaction.collectIsHoveredAsState()
@@ -1345,12 +1377,9 @@ fun LibraryScreen(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = track.displayArtist.ifBlank { str("unknown_artist") },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                ArtistLinkText(
+                    track = track,
+                    onArtistClick = onArtistClick
                 )
             }
             IconButton(onClick = onOptionClick) {

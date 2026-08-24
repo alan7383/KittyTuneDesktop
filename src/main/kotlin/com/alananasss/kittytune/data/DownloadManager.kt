@@ -111,7 +111,7 @@ object DownloadManager {
     @OptIn(kotlinx.coroutines.FlowPreview::class)
     val debouncedStorageTrigger: Flow<Int> = _storageTrigger.asStateFlow().debounce(500L)
 
-    private val _libraryUpdated = MutableSharedFlow<Unit>(replay = 1)
+    private val _libraryUpdated = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 64)
     val libraryUpdated = _libraryUpdated.asSharedFlow()
 
     fun notifyLibraryUpdated() {
@@ -125,18 +125,43 @@ object DownloadManager {
     val trackRemovedFromPlaylist = _trackRemovedFromPlaylist.asSharedFlow()
 
     fun addDeletedPlaylistId(playlistId: Long) {
-        _deletedPlaylistIds.update { it + playlistId }
-        _libraryUpdated.tryEmit(Unit)
+        var changed = false
+        _deletedPlaylistIds.update { current ->
+            if (!current.contains(playlistId)) {
+                changed = true
+                current + playlistId
+            } else current
+        }
+        if (changed) {
+            _libraryUpdated.tryEmit(Unit)
+        }
     }
 
     fun clearDeletedPlaylistId(playlistId: Long) {
-        _deletedPlaylistIds.update { it - playlistId }
-        _libraryUpdated.tryEmit(Unit)
+        var changed = false
+        _deletedPlaylistIds.update { current ->
+            if (current.contains(playlistId)) {
+                changed = true
+                current - playlistId
+            } else current
+        }
+        if (changed) {
+            _libraryUpdated.tryEmit(Unit)
+        }
     }
 
     fun clearDeletedPlaylistIds(ids: Set<Long>) {
-        _deletedPlaylistIds.update { it - ids }
-        _libraryUpdated.tryEmit(Unit)
+        var changed = false
+        _deletedPlaylistIds.update { current ->
+            val next = current - ids
+            if (next.size != current.size) {
+                changed = true
+                next
+            } else current
+        }
+        if (changed) {
+            _libraryUpdated.tryEmit(Unit)
+        }
     }
 
     lateinit var downloadedIds: StateFlow<Set<Long>>
@@ -190,8 +215,11 @@ object DownloadManager {
                 }
 
                 val allPlaylists = dao.getAllPlaylists().first()
+                val currentLiked = LikeRepository.likedPlaylists.value
                 allPlaylists.forEach { localPlaylist ->
-                    if (!localPlaylist.isUserCreated && localPlaylist.id > 0) {
+                    val isSpotify = localPlaylist.permalinkUrl?.contains("spotify") == true
+                    val isLiked = currentLiked.contains(localPlaylist.id)
+                    if (!localPlaylist.isUserCreated && localPlaylist.id > 0 && !isSpotify && !isLiked) {
                         val tracks = dao.getTracksForPlaylistSync(localPlaylist.id)
                         val hasDownloadedTracks = tracks.any { it.localAudioPath.isNotEmpty() }
                         if (!hasDownloadedTracks) {
@@ -463,7 +491,7 @@ object DownloadManager {
         isDownloaded: Boolean? = null
     ) {
         scope.launch {
-            if (syncToCloud && playlist.id != 0L) {
+            if (playlist.id != 0L) {
                 LikeRepository.togglePlaylistLike(
                     playlistId = playlist.id,
                     isLiked = true,
@@ -496,7 +524,7 @@ object DownloadManager {
                 trackCount = tracks.size,
                 isUserCreated = isUserCreatedFinal,
                 permalinkUrl = playlist.permalinkUrl,
-                isAlbum = playlist.isAlbum,
+                isAlbum = playlist.isRealAlbum,
                 addedAt = existing?.addedAt ?: baseTime,
                 isDownloaded = isDownloadedFinal
             )
@@ -682,15 +710,37 @@ object DownloadManager {
     fun toggleSaveArtist(user: User) {
         scope.launch {
             val userId = user.numericId
+            val isSpotifyArtist = user.urn?.startsWith("spotify") == true || user.permalink?.length == 22
             val isSaved = dao.getArtist(userId) != null
             if (isSaved) dao.deleteArtist(userId)
             else dao.insertArtist(LocalArtist(userId, user.username ?: str("menu_go_artist"), user.avatarUrl ?: "", user.trackCount))
+
+            if (isSpotifyArtist) {
+                val spotifyId = user.permalink ?: user.urn?.removePrefix("spotify:artist:") ?: ""
+                if (spotifyId.isNotBlank()) {
+                    val playerPrefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+                    if (isSaved) {
+                        playerPrefs.removeSpotifyArtistMapping(userId)
+                        if (playerPrefs.isSpotifyArtistLiked(spotifyId)) {
+                            playerPrefs.toggleLikeSpotifyArtist(spotifyId)
+                        }
+                    } else {
+                        playerPrefs.saveSpotifyArtistMapping(userId, spotifyId)
+                        if (!playerPrefs.isSpotifyArtistLiked(spotifyId)) {
+                            playerPrefs.toggleLikeSpotifyArtist(spotifyId)
+                        }
+                    }
+                }
+                _libraryUpdated.tryEmit(Unit)
+                return@launch
+            }
 
             if (!tokenManager.isGuestMode()) {
                 try {
                     if (isSaved) api.unfollowUser(userId) else api.followUser(userId)
                 } catch (e: Exception) { e.printStackTrace() }
             }
+            _libraryUpdated.tryEmit(Unit)
         }
     }
 
@@ -731,9 +781,17 @@ object DownloadManager {
                     safetyCount++
                 }
 
-                allFollowings.forEach { user ->
-                    dao.insertArtist(LocalArtist(user.numericId, user.username ?: "", user.avatarUrl ?: "", user.trackCount))
+                val now = System.currentTimeMillis()
+                val artists = allFollowings.filter { it.numericId != 0L }.mapIndexed { index, user ->
+                    LocalArtist(
+                        id = user.numericId,
+                        username = user.username ?: "",
+                        avatarUrl = user.avatarUrl ?: "",
+                        trackCount = user.trackCount,
+                        savedAt = now - (index * 1000L)
+                    )
                 }
+                dao.insertArtists(artists)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

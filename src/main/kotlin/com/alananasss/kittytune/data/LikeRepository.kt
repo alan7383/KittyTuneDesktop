@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.lang.reflect.Type
@@ -104,6 +105,7 @@ object LikeRepository {
         scope.launch {
             saveToPrefs()
 
+            if (track.source == "spotify" || track.user?.urn?.startsWith("spotify") == true || (track.permalinkUrl != null && track.permalinkUrl!!.contains("spotify"))) return@launch
             if (!playerPrefs.getSyncLikesEnabled()) return@launch
             if (tokenManager.isGuestMode()) return@launch
             val token = tokenManager.getAccessToken()
@@ -124,12 +126,19 @@ object LikeRepository {
     }
 
     fun removeLike(trackId: Long) {
+        val targetTrack = _likedTracks.value.find { it.id == trackId }
+        val isSpotify = targetTrack?.source == "spotify" || targetTrack?.user?.urn?.startsWith("spotify") == true
+                || (targetTrack?.permalinkUrl != null && targetTrack.permalinkUrl!!.contains("spotify")) || trackId > 1000000000000000L
+
         addToBlacklist(trackId)
 
         _likedTracks.update { it.filterNot { t -> t.id == trackId } }
 
+        saveToPrefs()
+
+        if (isSpotify) return
+
         scope.launch {
-            saveToPrefs()
             if (!playerPrefs.getSyncLikesEnabled()) return@launch
             if (tokenManager.isGuestMode()) return@launch
             val token = tokenManager.getAccessToken()
@@ -154,7 +163,18 @@ object LikeRepository {
     fun isPlaylistLiked(playlistId: Long): Boolean = _likedPlaylists.value.contains(playlistId)
 
     fun setLikedPlaylists(ids: Set<Long>) {
-        _likedPlaylists.value = ids
+        val currentLiked = _likedPlaylists.value
+        val preservedLocalIds = try {
+            val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+            val allLocal = kotlinx.coroutines.runBlocking { dao.getAllPlaylists().first() }
+            allLocal.filter { local ->
+                currentLiked.contains(local.id) && (local.permalinkUrl?.contains("spotify") == true || local.id < 0 || local.isDownloaded)
+            }.map { it.id }.toSet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+
+        _likedPlaylists.value = ids + preservedLocalIds
         scope.launch { saveToPrefs() }
     }
 
@@ -186,11 +206,18 @@ object LikeRepository {
                 }
             }
 
+            val safePermalink = permalink ?: ""
+            val isSpotify = safePermalink.contains("spotify.com") || safePermalink.contains("spotify:")
+                    || urn?.startsWith("spotify:") == true || (urn != null && urn.contains("spotify"))
+                    || playlistId == 0L
+            if (isSpotify) {
+                return@launch
+            }
+
             if (tokenManager.isGuestMode()) return@launch
             val token = tokenManager.getAccessToken()
             if (!token.isNullOrEmpty()) {
                 try {
-                    val safePermalink = permalink ?: ""
                     val targetUrn = urn ?: when {
                         safePermalink.contains("artist-stations") -> "soundcloud:system-playlists:artist-stations:$playlistId"
                         safePermalink.contains("track-stations") -> "soundcloud:system-playlists:track-stations:$playlistId"
@@ -220,24 +247,30 @@ object LikeRepository {
             prefs.putLong("last_synced_user_id", currentUserId)
         }
 
+        val maxAllowedTime = System.currentTimeMillis() + 86_400_000L
+
         _likedTracks.update { currentLocalList ->
             val blacklist = getBlacklist()
 
             val serverList = serverTracks
                 .filter { !blacklist.contains(it.id) }
-                .map { it.copy(isLiked = true) }
+                .map { t ->
+                    val validLikedAt = t.likedAt?.takeIf { it in 1..maxAllowedTime }
+                    t.copy(isLiked = true, likedAt = validLikedAt)
+                }
+
+            val serverIds = serverList.map { it.id }.toSet()
 
             val localNonSoundcloud = currentLocalList.filter {
-                (it.source != "soundcloud" || it.id <= 0L) && !blacklist.contains(it.id)
+                (it.source != "soundcloud" || it.id <= 0L) && !blacklist.contains(it.id) && !serverIds.contains(it.id)
+            }.map { t ->
+                val validLikedAt = t.likedAt?.takeIf { it in 1..maxAllowedTime }
+                t.copy(likedAt = validLikedAt)
             }
 
             val combined = localNonSoundcloud + serverList
 
-            val mergedAndDeduplicated = combined
-                .groupBy { it.id }
-                .map { (_, tracks) -> tracks.maxByOrNull { it.likedAt ?: 0L }!! }
-
-            mergedAndDeduplicated.sortedByDescending { it.likedAt ?: System.currentTimeMillis() }
+            combined.sortedByDescending { it.likedAt ?: 0L }
         }
 
         scope.launch { saveToPrefs() }
@@ -273,11 +306,13 @@ object LikeRepository {
                 val loadedList: List<Track> = gson.fromJson(json, type) ?: emptyList()
 
                 val now = System.currentTimeMillis()
+                val maxAllowedTime = now + 86_400_000L
                 val migratedList = loadedList.mapIndexed { index, track ->
-                    if (track.likedAt == null || track.likedAt == 0L) {
+                    val validLikedAt = track.likedAt?.takeIf { it in 1..maxAllowedTime }
+                    if (validLikedAt == null) {
                         track.copy(likedAt = now - (index * 1000))
                     } else {
-                        track
+                        track.copy(likedAt = validLikedAt)
                     }
                 }
 
