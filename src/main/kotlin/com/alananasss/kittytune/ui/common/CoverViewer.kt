@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.common
 
 import androidx.compose.animation.*
@@ -8,7 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material3.*
@@ -29,9 +32,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.awt.FileDialog
 import java.awt.Frame
+import java.awt.Image
 import java.awt.Toolkit
+import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
-import java.net.URL
+import java.awt.datatransfer.Transferable
+import java.awt.datatransfer.UnsupportedFlavorException
+import java.awt.image.BufferedImage
+import java.io.File
+import java.net.URI
 import javax.imageio.ImageIO
 
 object CoverViewerState {
@@ -50,6 +59,44 @@ object CoverViewerState {
     }
 }
 
+private class ImageTransferable(private val image: Image) : Transferable {
+    override fun getTransferDataFlavors(): Array<DataFlavor> = arrayOf(DataFlavor.imageFlavor)
+    override fun isDataFlavorSupported(flavor: DataFlavor?): Boolean = flavor == DataFlavor.imageFlavor
+    override fun getTransferData(flavor: DataFlavor?): Any {
+        if (flavor == DataFlavor.imageFlavor) return image
+        throw UnsupportedFlavorException(flavor)
+    }
+}
+
+private fun loadImageFromUrl(urlStr: String): BufferedImage? {
+    return try {
+        if (urlStr.startsWith("http://", ignoreCase = true) || urlStr.startsWith("https://", ignoreCase = true)) {
+            val connection = URI(urlStr).toURL().openConnection()
+            connection.setRequestProperty(
+                "User-Agent",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            )
+            connection.connectTimeout = 10000
+            connection.readTimeout = 15000
+            connection.getInputStream().use { input ->
+                ImageIO.read(input)
+            }
+        } else if (urlStr.startsWith("file://", ignoreCase = true)) {
+            ImageIO.read(File(URI(urlStr)))
+        } else {
+            val file = File(urlStr)
+            if (file.exists()) {
+                ImageIO.read(file)
+            } else {
+                ImageIO.read(URI(urlStr).toURL())
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
 fun Modifier.viewableCover(url: String?): Modifier = this.clickable(
     interactionSource = MutableInteractionSource(),
     indication = null
@@ -62,6 +109,7 @@ fun CoverViewerOverlay() {
     val visible = CoverViewerState.visible
     val url = CoverViewerState.currentUrl
     val scope = rememberCoroutineScope()
+    var isCopyMenuExpanded by remember { mutableStateOf(false) }
 
     if (visible) {
         BackHandler {
@@ -95,44 +143,119 @@ fun CoverViewerOverlay() {
                         .fillMaxSize()
                         .padding(vertical = 64.dp, horizontal = 32.dp)
                 ) {
-                    
-                    // La magie est ici : ça s'adapte à la hauteur dispo (weight) et ça calcule la largeur en fonction
+                    // S'adapte à la hauteur dispo (weight) et calcule la largeur en fonction
                     Box(
                         modifier = Modifier
-                            .weight(1f) 
-                            .aspectRatio(1f, matchHeightConstraintsFirst = true) 
+                            .weight(1f)
+                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
                             .clip(RoundedCornerShape(16.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
                     ) {
                         AsyncImage(
-                            model = url, 
-                            contentDescription = null, 
-                            contentScale = ContentScale.Crop, 
+                            model = url,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(32.dp))
-                    
-                    // Boutons correctement placés en bas
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        FilledTonalButton(
-                            onClick = {
-                                url?.let {
-                                    val selection = StringSelection(it)
-                                    Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
-                                    Toaster.show(str("cover_copy_link"))
+
+                    // Boutons Expressive en bas
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // SplitButton Expressive pour copier l'image / copier le lien
+                        Box {
+                            val splitColors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            SplitButtonLayout(
+                                leadingButton = {
+                                    SplitButtonDefaults.LeadingButton(
+                                        onClick = {
+                                            url?.let { targetUrl ->
+                                                scope.launch(Dispatchers.IO) {
+                                                    try {
+                                                        val image = loadImageFromUrl(targetUrl)
+                                                        if (image != null) {
+                                                            Toolkit.getDefaultToolkit().systemClipboard.setContents(
+                                                                ImageTransferable(image),
+                                                                null
+                                                            )
+                                                            withContext(Dispatchers.Main) {
+                                                                Toaster.show(str("cover_image_copied"))
+                                                            }
+                                                        } else {
+                                                            withContext(Dispatchers.Main) {
+                                                                Toaster.show(str("cover_save_error"))
+                                                            }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        e.printStackTrace()
+                                                        withContext(Dispatchers.Main) {
+                                                            Toaster.show(str("cover_save_error"))
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        colors = splitColors
+                                    ) {
+                                        Icon(
+                                            Icons.Rounded.ContentCopy,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(str("cover_copy_image"))
+                                    }
+                                },
+                                trailingButton = {
+                                    SplitButtonDefaults.TrailingButton(
+                                        checked = isCopyMenuExpanded,
+                                        onCheckedChange = { isCopyMenuExpanded = it },
+                                        colors = splitColors
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ArrowDropDown,
+                                            contentDescription = str("cover_copy_link"),
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
                                 }
-                            },
-                            // L'effet de déformation Material 3 Expressive est ici :
-                            shapes = ButtonDefaults.shapes() 
-                        ) {
-                            Icon(Icons.Rounded.Link, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("cover_copy_link"))
+                            )
+
+                            DropdownMenu(
+                                expanded = isCopyMenuExpanded,
+                                onDismissRequest = { isCopyMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(str("cover_copy_link")) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Link,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    },
+                                    onClick = {
+                                        isCopyMenuExpanded = false
+                                        url?.let {
+                                            val selection = StringSelection(it)
+                                            Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
+                                            Toaster.show(str("cover_copy_link"))
+                                        }
+                                    }
+                                )
+                            }
                         }
-                        
+
+                        // Bouton Télécharger
                         Button(
                             onClick = {
                                 url?.let { targetUrl ->
@@ -143,9 +266,21 @@ fun CoverViewerOverlay() {
                                     if (file != null) {
                                         scope.launch(Dispatchers.IO) {
                                             try {
-                                                val image = ImageIO.read(URL(targetUrl))
-                                                ImageIO.write(image, "jpg", file)
-                                                withContext(Dispatchers.Main) { Toaster.show(str("cover_saved")) }
+                                                val image = loadImageFromUrl(targetUrl)
+                                                if (image != null) {
+                                                    val rgb = if (image.type == BufferedImage.TYPE_INT_RGB) image else {
+                                                        BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB).apply {
+                                                            createGraphics().apply {
+                                                                drawImage(image, 0, 0, java.awt.Color.WHITE, null)
+                                                                dispose()
+                                                            }
+                                                        }
+                                                    }
+                                                    ImageIO.write(rgb, "jpg", file)
+                                                    withContext(Dispatchers.Main) { Toaster.show(str("cover_saved")) }
+                                                } else {
+                                                    withContext(Dispatchers.Main) { Toaster.show(str("cover_save_error")) }
+                                                }
                                             } catch (e: Exception) {
                                                 e.printStackTrace()
                                                 withContext(Dispatchers.Main) { Toaster.show(str("cover_save_error")) }
@@ -154,7 +289,6 @@ fun CoverViewerOverlay() {
                                     }
                                 }
                             },
-                            // L'effet de déformation Material 3 Expressive est ici :
                             shapes = ButtonDefaults.shapes()
                         ) {
                             Icon(Icons.Rounded.Download, null)
@@ -164,7 +298,7 @@ fun CoverViewerOverlay() {
                     }
                 }
             }
-            
+
             // Bouton fermer toujours accessible en haut à droite
             IconButton(
                 onClick = { CoverViewerState.hide() },
