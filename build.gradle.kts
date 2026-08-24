@@ -82,6 +82,10 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.53.2.1")
     implementation("org.slf4j:slf4j-simple:2.0.18")
 
+    // QR rendering for the Discord remote-auth (scan-to-log-in) flow. Same artifact and
+    // version the Android app already uses for its VK QR login.
+    implementation("com.google.zxing:core:3.5.4")
+
     implementation("org.json:json:20260814")
     implementation("org.yaml:snakeyaml:2.6")
     implementation("com.github.pemistahl:lingua:1.2.2")
