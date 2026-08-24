@@ -168,6 +168,9 @@ compose.desktop {
             macOS {
                 bundleID = "com.alananasss.kittytune"
                 appCategory = "public.app-category.music"
+                // Without this jpackage bundles its own generic Java icon, and the variant
+                // switcher then has nothing recognisable to fall back to.
+                iconFile.set(project.file("src/main/resources/icons/kittytune.icns"))
             }
         }
     }

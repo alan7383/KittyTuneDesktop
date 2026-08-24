@@ -67,6 +67,9 @@ class PlayerPreferences {
         private const val KEY_SAVE_POSITION = "save_position_enabled"
         private const val KEY_START_DESTINATION = "start_destination_pref"
         private const val KEY_DYNAMIC_THEME = "dynamic_theme_enabled"
+        private const val KEY_PLAYER_VOLUME = "player_volume"
+        private const val KEY_VERTICAL_VOLUME_SLIDER = "vertical_volume_slider"
+        private const val KEY_APP_ICON_VARIANT = "app_icon_variant"
         private const val KEY_THEME_MODE = "app_theme_mode"
         private const val KEY_PURE_BLACK = "pure_black_enabled"
         private const val KEY_LOCAL_MEDIA_ENABLED = "local_media_enabled"
@@ -241,6 +244,19 @@ class PlayerPreferences {
     fun setStartDestination(dest: StartDestination) = Prefs.putString(KEY_START_DESTINATION, dest.name)
     fun getDynamicTheme(): Boolean = Prefs.getBoolean(KEY_DYNAMIC_THEME, true)
     fun setDynamicTheme(enabled: Boolean) = Prefs.putBoolean(KEY_DYNAMIC_THEME, enabled)
+
+    // Persisted volume so the app reopens at the level used when it was closed.
+    fun getSavedVolume(): Float = Prefs.getFloat(KEY_PLAYER_VOLUME, 1f)
+    fun saveVolume(value: Float) = Prefs.putFloat(KEY_PLAYER_VOLUME, value.coerceIn(0f, 1f))
+
+    fun getVerticalVolumeSlider(): Boolean = Prefs.getBoolean(KEY_VERTICAL_VOLUME_SLIDER, false)
+    fun setVerticalVolumeSlider(enabled: Boolean) = Prefs.putBoolean(KEY_VERTICAL_VOLUME_SLIDER, enabled)
+
+    // Alternate app icon switcher (mirrors the Android activity-alias feature).
+    fun getAppIconVariant(): String = Prefs.getString(KEY_APP_ICON_VARIANT, "default") ?: "default"
+    fun setAppIconVariant(key: String) = Prefs.putString(KEY_APP_ICON_VARIANT, key)
+    fun appIconVariantFlow(): Flow<String> =
+        Prefs.stringFlow(KEY_APP_ICON_VARIANT, "default").map { it ?: "default" }
     fun getThemeMode(): AppThemeMode { val n = Prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name); return try { AppThemeMode.valueOf(n!!) } catch (_: Exception) { AppThemeMode.SYSTEM } }
     fun setThemeMode(mode: AppThemeMode) = Prefs.putString(KEY_THEME_MODE, mode.name)
     fun getPureBlack(): Boolean = Prefs.getBoolean(KEY_PURE_BLACK, false)

@@ -1033,6 +1033,9 @@
     <string name="pref_discord_title">Discord integráció</string>
     <string name="pref_download_drm">Natív DRM letöltés</string>
     <string name="pref_download_drm_sub">Beolvassa a DRM tartalmat a belső lejátszáshoz. Tiltsd le az MP3 letöltés kényszerítéséhez YouTube-on keresztül.</string>
+    <string name="pref_app_icon">Alkalmazás ikon</string>
+    <string name="pref_vertical_volume_slider">Függőleges hangerőcsúszka</string>
+    <string name="pref_vertical_volume_slider_sub">Függőleges hangerőcsúszka megjelenítése a lejátszó sáv hangszóró ikonja fölött</string>
     <string name="pref_dynamic_theme">Dinamikus téma</string>
     <string name="pref_font_custom_subtitle">Egyedi variálható betűtípus használata</string>
     <string name="pref_font_custom_title">Google Sans Flex</string>

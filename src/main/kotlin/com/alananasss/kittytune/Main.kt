@@ -88,16 +88,21 @@ fun main() {
     AppBootstrap.init()
 
     application {
-        val appIcon = androidx.compose.runtime.remember {
+        val prefsForTray = remember { PlayerPreferences() }
+        val stopOnTaskClear by prefsForTray.stopOnTaskClearFlow().collectAsState(initial = prefsForTray.getStopOnTaskClear())
+
+        // Alternate icon switcher (issue #27): the selected variant drives both the
+        // window/taskbar icon and the tray icon, live.
+        val appIconVariant by prefsForTray.appIconVariantFlow().collectAsState(initial = prefsForTray.getAppIconVariant())
+        val appIcon = androidx.compose.runtime.remember(appIconVariant) {
             runCatching {
-                Thread.currentThread().contextClassLoader?.getResourceAsStream("icons/kittytune.png")?.use { stream ->
+                Thread.currentThread().contextClassLoader?.getResourceAsStream(
+                    com.alananasss.kittytune.core.AppIconVariants.resourcePath(appIconVariant)
+                )?.use { stream ->
                     androidx.compose.ui.graphics.painter.BitmapPainter(androidx.compose.ui.res.loadImageBitmap(stream))
                 }
             }.getOrNull()
         }
-
-        val prefsForTray = remember { PlayerPreferences() }
-        val stopOnTaskClear by prefsForTray.stopOnTaskClearFlow().collectAsState(initial = prefsForTray.getStopOnTaskClear())
         var isWindowVisible by remember { mutableStateOf(true) }
 
         if (!stopOnTaskClear && appIcon != null) {
@@ -199,6 +204,17 @@ fun main() {
             },
         ) {
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
+
+            // Enforce a minimum window size: below this the three-panel layout breaks
+            // down and the app can crash (issue #27).
+            window.minimumSize = java.awt.Dimension(960, 600)
+
+            // The macOS Dock image and the multi-size window icons are outside what
+            // Window(icon = …) can set, so they are applied here — from inside the window's
+            // own composition, where `window` is guaranteed to exist.
+            androidx.compose.runtime.LaunchedEffect(appIconVariant) {
+                com.alananasss.kittytune.core.AppIconRuntime.apply(appIconVariant, window)
+            }
 
             val prefs = remember { PlayerPreferences() }
             val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
