@@ -1497,7 +1497,9 @@ fun PlaylistDetailScreen(
                                 OutlinedTextField(
                                     value = playlistSearchQuery,
                                     onValueChange = { playlistSearchQuery = it },
-                                    placeholder = { Text(str("search_playlist_hint")) },
+                                    placeholder = {
+                                        Text(str("search_playlist_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    },
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     trailingIcon = {
                                         if (playlistSearchQuery.isNotEmpty()) {
@@ -1636,6 +1638,7 @@ fun PlaylistDetailScreen(
                                     isDownloading = isDownloading,
                                     isDownloaded = isDownloaded,
                                     downloadProgress = progress ?: 0,
+                                    showLikeIndicator = playlistId != "likes",
                                     onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList(), index, playbackContext) },
                                     onOptionClick = {
                                         val contextId = if (isUserCreated || isDownloadedView) currentIdLong else null
@@ -1657,6 +1660,7 @@ fun PlaylistDetailScreen(
                                     isDownloaded = isDownloaded,
                                     downloadProgress = progress ?: 0,
                                     showVerifiedBadge = false,
+                                    showLikeIndicator = playlistId != "likes",
                                     onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList(), index, playbackContext) },
                                     onOptionClick = {
                                         val contextId = if (isUserCreated || isDownloadedView) currentIdLong else null
@@ -1726,6 +1730,11 @@ fun TrackListItem(
     downloadProgress: Int,
     modifier: Modifier = Modifier,
     showVerifiedBadge: Boolean = true,
+    /**
+     * Off for the liked-tracks list, where every row is liked and the heart says nothing
+     * (issue #33).
+     */
+    showLikeIndicator: Boolean = true,
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
     onArtistClick: ((Track) -> Unit)? = null
@@ -1796,12 +1805,15 @@ fun TrackListItem(
                     ArtistLinkText(
                         track = track,
                         onArtistClick = onArtistClick,
+                        // Truncates rather than pushing the markers after it off the row.
+                        modifier = Modifier.weight(1f, fill = false),
                         style = MaterialTheme.typography.bodySmall
                     )
                     if (showVerifiedBadge && track.user?.verified == true) {
                         Spacer(Modifier.width(4.dp))
                         Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                     }
+                    com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track, showLikeIndicator)
                 }
             }
             IconButton(onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
@@ -1941,6 +1953,8 @@ fun TrackTableItem(
     downloadProgress: Int,
     modifier: Modifier = Modifier,
     showVerifiedBadge: Boolean = true,
+    /** Off for the liked-tracks list, where every row is liked (issue #33). */
+    showLikeIndicator: Boolean = true,
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
     onAlbumClick: (String) -> Unit,
@@ -2038,11 +2052,17 @@ fun TrackTableItem(
                             Icon(Icons.Rounded.DownloadDone, str("btn_downloaded"), modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(4.dp))
                         }
-                        ArtistLinkText(track = track, onArtistClick = onArtistClick)
+                        ArtistLinkText(
+                            track = track,
+                            onArtistClick = onArtistClick,
+                            // Truncates rather than pushing the markers after it off the row.
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
                         if (showVerifiedBadge && track.user?.verified == true) {
                             Spacer(Modifier.width(4.dp))
                             Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                         }
+                        com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track, showLikeIndicator)
                     }
                 }
             }
@@ -2307,6 +2327,8 @@ fun TrackCompactItem(
     isDownloaded: Boolean,
     downloadProgress: Int,
     modifier: Modifier = Modifier,
+    /** Off for the liked-tracks list, where every row is liked (issue #33). */
+    showLikeIndicator: Boolean = true,
     onClick: () -> Unit,
     onOptionClick: () -> Unit,
     onAlbumClick: (String) -> Unit,
@@ -2381,6 +2403,9 @@ fun TrackCompactItem(
                         Spacer(Modifier.width(6.dp))
                         Icon(Icons.Rounded.DownloadDone, str("btn_downloaded"), modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
                     }
+                    // In the compact table the artist has its own fixed column, so the markers ride
+                    // at the end of the title cell instead of after the artist name.
+                    com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track, showLikeIndicator)
                 }
                 Spacer(Modifier.width(COLUMN_GAP))
                 Box(modifier = Modifier.weight(TrackCompactColumns.artist), contentAlignment = Alignment.CenterStart) {

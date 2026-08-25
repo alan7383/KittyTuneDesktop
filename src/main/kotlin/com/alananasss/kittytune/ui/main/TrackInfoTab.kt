@@ -122,9 +122,12 @@ fun TrackInfoTab(vm: PlayerViewModel) {
     }
 
     LazyColumn(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        // The horizontal inset belongs to the content, not to the container: applied to the
+        // container it also pushed the scrollbar 16.dp inwards, which parked it against the text
+        // instead of at the panel edge (issue #33).
+        Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(24.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

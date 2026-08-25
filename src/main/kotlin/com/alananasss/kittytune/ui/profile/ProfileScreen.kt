@@ -1022,7 +1022,9 @@ fun FullListScreen(
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text(str("search_tracks_hint")) },
+                            placeholder = {
+                                Text(str("search_tracks_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
                             leadingIcon = { Icon(Icons.Default.Search, null) },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {

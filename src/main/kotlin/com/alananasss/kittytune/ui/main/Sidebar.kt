@@ -1207,7 +1207,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
 
         when (libraryViewModel.viewMode) {
             LibraryViewMode.COMPACT_LIST -> LazyColumn(
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp),
                 state = compactListState
             ) {
                 items(entries, key = { it.key }) { entry ->
@@ -1216,7 +1217,8 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
             }
 
             LibraryViewMode.LIST -> LazyColumn(
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 8.dp),
                 state = listState
             ) {
                 items(entries, key = { it.key }) { entry ->

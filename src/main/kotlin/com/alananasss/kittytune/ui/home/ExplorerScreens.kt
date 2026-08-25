@@ -606,6 +606,7 @@ private fun PopularTrackListItem(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track)
                 }
             }
             IconButton(onClick = onOptionClick) {
