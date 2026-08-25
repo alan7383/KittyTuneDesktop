@@ -167,9 +167,38 @@ class AudioEngine {
     @Volatile
     private var pausedTimestamp = 0L
 
+    /**
+     * Set while the decode loop is servicing a reconnect nobody is waiting for, which changes two
+     * things: recovery is bounded instead of retrying forever, and success resets the pause clock.
+     */
+    @Volatile
+    private var warmUpRequested = false
+
+    private var warmUpJob: kotlinx.coroutines.Job? = null
+
     private companion object {
         /** How long a pause has to last before resuming reconnects instead of trusting the socket. */
         const val RECONNECT_AFTER_PAUSE_MS = 30_000L
+
+        /** Just past the point where resuming would reconnect, so we get there first. */
+        const val WARM_UP_START_DELAY_MS = RECONNECT_AFTER_PAUSE_MS + 2_000L
+
+        /** Under the ~3 minute life of a SoundCloud signature, so the stream never goes stale. */
+        const val WARM_UP_INTERVAL_MS = 2 * 60 * 1000L
+
+        /**
+         * How many times a pause is worth refreshing. Roughly half an hour: past that, someone has
+         * walked away rather than paused, and reconnecting on a timer all night to save them two
+         * seconds is not a trade worth making.
+         */
+        const val WARM_UP_ROUNDS = 15
+
+        /**
+         * Recovery attempts allowed for a warm-up. Unbounded retries are right when a listener is
+         * waiting for the sound to come back; here nobody is, and an offline machine would
+         * otherwise reopen the stream every two seconds for as long as it stayed paused.
+         */
+        const val WARM_UP_RECOVERY_ATTEMPTS = 2
 
         /**
          * Re-resolve tries allowed while opening a track. Bounded so a genuinely unplayable
@@ -179,6 +208,8 @@ class AudioEngine {
     }
 
     fun play() {
+        warmUpJob?.cancel()
+        warmUpJob = null
         val pausedFor = if (paused && pausedTimestamp > 0L) System.currentTimeMillis() - pausedTimestamp else 0L
         paused = false
         pausedTimestamp = 0L
@@ -210,6 +241,49 @@ class AudioEngine {
         paused = true
         pausedTimestamp = System.currentTimeMillis()
         setPlaying(false)
+        scheduleWarmUp()
+    }
+
+    /**
+     * Keeps a paused network stream connected, so pressing play is instant.
+     *
+     * [play] reconnects whenever the pause outlasted [RECONNECT_AFTER_PAUSE_MS] — a signed
+     * SoundCloud URL dies in about three minutes and the CDN socket rarely survives even half of
+     * that — and that reconnect is the couple of seconds between pressing play and hearing
+     * anything (issue #33). It cannot be skipped, but it can be paid for while nobody is
+     * listening, which is what this does.
+     */
+    private fun scheduleWarmUp() {
+        warmUpJob?.cancel()
+        if (currentUrl?.startsWith("http") != true) return
+        warmUpJob = scope.launch {
+            kotlinx.coroutines.delay(WARM_UP_START_DELAY_MS)
+            var round = 0
+            while (round < WARM_UP_ROUNDS && paused) {
+                warmUpAfterPause()
+                round++
+                kotlinx.coroutines.delay(WARM_UP_INTERVAL_MS)
+            }
+        }
+    }
+
+    /**
+     * Asks the decode loop to reconnect at the current position while staying paused.
+     *
+     * The loop services a seek request before it checks the pause flag, so this reuses the seek
+     * path — which already re-signs an expired URL — rather than adding a second way to reopen a
+     * stream. The pause clock is reset by that path on success, not here, so a warm-up that failed
+     * still leaves [play] to reconnect the usual way.
+     */
+    @Synchronized
+    private fun warmUpAfterPause() {
+        if (!paused || pausedTimestamp <= 0L) return
+        if (currentUrl?.startsWith("http") != true) return
+        if (worker?.isAlive != true) return
+        if (seekRequestMs >= 0L) return
+        Logger.e("AudioEngine", "Warming up paused stream at $positionMs ms")
+        warmUpRequested = true
+        seekRequestMs = positionMs
     }
 
     fun seekTo(ms: Long) {
@@ -586,7 +660,13 @@ class AudioEngine {
                     }
 
                     if (!seekOk) {
-                        val recovered = recoverStream(grabber, activeUrl, headers, seek)
+                        val recovered = recoverStream(
+                            grabber,
+                            activeUrl,
+                            headers,
+                            seek,
+                            maxAttempts = if (warmUpRequested) WARM_UP_RECOVERY_ATTEMPTS else Int.MAX_VALUE,
+                        )
                         if (recovered.first != null) {
                             grabber = recovered.first
                             if (recovered.second != null) activeUrl = recovered.second!!
@@ -630,6 +710,15 @@ class AudioEngine {
                     limiter.flush()
                     chain.forEach { it.flush() }
                     localLine?.flush()
+
+                    if (warmUpRequested) {
+                        warmUpRequested = false
+                        // The pause clock measures how long it has been since the stream was known
+                        // good, which is what play() reads to decide whether to reconnect. A
+                        // successful warm-up makes that "just now"; a failed one leaves it alone so
+                        // resuming still reconnects.
+                        if (seekOk) pausedTimestamp = System.currentTimeMillis()
+                    }
                 }
 
                 if (paused) {
@@ -894,6 +983,9 @@ class AudioEngine {
 
     @Synchronized
     private fun stopInternal() {
+        warmUpJob?.cancel()
+        warmUpJob = null
+        warmUpRequested = false
         stopFlag = true
         activeWorkerId++
         paused = true
