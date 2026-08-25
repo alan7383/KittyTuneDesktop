@@ -61,6 +61,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ripple
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -99,7 +100,15 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.delay
+
+/**
+ * Narrowest space in which the horizontal volume slider is still worth showing: the speaker
+ * icon, its padding, and enough track left to aim at. Below this the bar switches to the
+ * vertical hover control instead of shrinking the slider into a sliver.
+ */
+private val HORIZONTAL_VOLUME_MIN_WIDTH = 168.dp
 
 /**
  * Bottom full-width playback bar: track info left, transport + progress center,
@@ -118,6 +127,8 @@ fun PlayerBar(
 ) {
     val vm = playerViewModel
     val track = vm.currentTrack
+    val visibleButtons = rememberPlayerBarButtons()
+    val showLyricsButton = rememberShowLyricsButton()
 
     Surface(
         modifier = modifier.height(88.dp),
@@ -138,6 +149,11 @@ fun PlayerBar(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
+                            // Yields width before the like button does. A Row measures its
+                            // unweighted children first, so without this the artwork and title
+                            // take what they want and the heart — last in the row — is the part
+                            // that gets clipped away as the UI scale goes up (issue #33).
+                            .weight(1f, fill = false)
                             .clip(RoundedCornerShape(8.dp))
                             .onClick(
                                 matcher = PointerMatcher.mouse(PointerButton.Secondary),
@@ -154,7 +170,7 @@ fun PlayerBar(
                                 .clip(RoundedCornerShape(8.dp)),
                         )
                         Spacer(Modifier.width(12.dp))
-                        Column(Modifier.widthIn(max = 220.dp)) {
+                        Column(Modifier.weight(1f, fill = false).widthIn(max = 220.dp)) {
                             Text(
                                 text = track.title ?: "",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -182,15 +198,17 @@ fun PlayerBar(
                             }
                         }
                     }
-                    Spacer(Modifier.width(8.dp))
-                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleLike() }) {
-                        Icon(
-                            if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = null,
-                            tint = if (vm.isLiked) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
+                    if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {
+                        Spacer(Modifier.width(8.dp))
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleLike() }) {
+                            Icon(
+                                if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (vm.isLiked) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
             }
@@ -372,82 +390,99 @@ fun PlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
-                IconButton(
-                    shapes = IconButtonDefaults.shapes(),
-                    onClick = onOpenLyrics,
-                ) {
-                    Icon(
-                        painter = androidx.compose.ui.res.painterResource("icons/lyrics.svg"),
-                        contentDescription = "Lyrics",
-                        tint = if (vm.hasLyrics) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
+                if (showLyricsButton) {
+                    IconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = onOpenLyrics,
+                    ) {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource("icons/lyrics.svg"),
+                            contentDescription = "Lyrics",
+                            tint = if (vm.hasLyrics) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
-                IconButton(
-                    shapes = IconButtonDefaults.shapes(),
-                    onClick = onToggleNowPlaying,
-
-                ) {
-                    Icon(
-                        Icons.Outlined.Tune,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
+                if (PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons) {
+                    IconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = onToggleNowPlaying,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
-                IconButton(
-                    shapes = IconButtonDefaults.shapes(),
-                    onClick = onOpenQueue,
-
-                ) {
-                    Icon(
-                        Icons.Outlined.QueueMusic,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
+                // The panel this opens also has a queue tab, so hiding this button costs the queue
+                // a click rather than access to it (issue #33).
+                if (PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons) {
+                    IconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = onOpenQueue,
+                    ) {
+                        Icon(
+                            Icons.Outlined.QueueMusic,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
 
                 val volume = vm.volume
-                if (verticalVolumeSlider) {
-                    VolumeHoverControl(
-                        volume = volume,
-                        onVolumeChange = { vm.updateVolume(it) },
-                        onVolumeChangeFinished = { vm.persistVolume() },
-                        onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
-                        onToggleMute = { vm.toggleMute() },
-                    )
-                } else {
-                    Icon(
-                        when {
-                            volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
-                            volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-                            else -> Icons.AutoMirrored.Filled.VolumeUp
-                        },
-                        contentDescription = "Mute",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() }
-                            .clickable { vm.toggleMute() },
-                    )
-                    Slider(
-                        value = volume,
-                        onValueChange = { vm.updateVolume(it) },
-                        onValueChangeFinished = { vm.persistVolume() },
-                        modifier = Modifier
-                            // Flexible rather than a fixed width: the three sections of the bar
-                            // each get exactly a third, and at the minimum window size a fixed
-                            // 140.dp made this row overflow — which clipped the thumb at the
-                            // left end of the track, the "slider disappears" report in #27.
-                            // weight(fill = false) lets it shrink instead, and grow up to 200.dp
-                            // on a wide window, which is also the "make it wider" ask.
-                            .weight(1f, fill = false)
-                            .widthIn(max = 200.dp)
-                            .padding(horizontal = 12.dp)
-                            .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
-                    )
+                // BoxWithConstraints is the last child of the row, so `maxWidth` here is exactly
+                // the width left over for the volume control. Below HORIZONTAL_VOLUME_MIN_WIDTH
+                // the horizontal slider is a sliver too short to aim at — the "disappears or
+                // shrinks until it is unusable" report in issue #33 — so the bar falls back to
+                // the vertical hover control, which needs no more room than its speaker button.
+                BoxWithConstraints(contentAlignment = Alignment.Center) {
+                    val tooNarrowForSlider = maxWidth < HORIZONTAL_VOLUME_MIN_WIDTH
+                    if (verticalVolumeSlider || tooNarrowForSlider) {
+                        VolumeHoverControl(
+                            volume = volume,
+                            onVolumeChange = { vm.updateVolume(it) },
+                            onVolumeChangeFinished = { vm.persistVolume() },
+                            onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
+                            onToggleMute = { vm.toggleMute() },
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                when {
+                                    volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
+                                    volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+                                    else -> Icons.AutoMirrored.Filled.VolumeUp
+                                },
+                                contentDescription = "Mute",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() }
+                                    .clickable { vm.toggleMute() },
+                            )
+                            Slider(
+                                value = volume,
+                                onValueChange = { vm.updateVolume(it) },
+                                onValueChangeFinished = { vm.persistVolume() },
+                                modifier = Modifier
+                                    // Flexible rather than a fixed width: the three sections of
+                                    // the bar each get exactly a third, and at the minimum window
+                                    // size a fixed 140.dp made this row overflow — which clipped
+                                    // the thumb at the left end of the track, the "slider
+                                    // disappears" report in #27. weight(fill = false) lets it
+                                    // shrink instead, and grow up to 200.dp on a wide window,
+                                    // which is also the "make it wider" ask.
+                                    .weight(1f, fill = false)
+                                    .widthIn(max = 200.dp)
+                                    .padding(horizontal = 12.dp)
+                                    .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -547,6 +582,22 @@ private fun Modifier.volumeWheel(
             }
         }
     }
+}
+
+/**
+ * Reactive read of which optional player-bar buttons the user keeps; recomposes on pref changes.
+ */
+@Composable
+private fun rememberPlayerBarButtons(): Set<String> {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { PlayerPreferences().getPlayerBarButtons() }
+}
+
+/** Reactive read of the lyrics button's own switch, which lives in the lyrics settings. */
+@Composable
+private fun rememberShowLyricsButton(): Boolean {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { PlayerPreferences().getShowLyricsButtonEnabled() }
 }
 
 /**

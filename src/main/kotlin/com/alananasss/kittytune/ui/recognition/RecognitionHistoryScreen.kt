@@ -136,7 +136,9 @@ fun RecognitionHistoryScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text(str("search_history_hint")) },
+                placeholder = {
+                    Text(str("search_history_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 modifier = Modifier
                     .fillMaxWidth()

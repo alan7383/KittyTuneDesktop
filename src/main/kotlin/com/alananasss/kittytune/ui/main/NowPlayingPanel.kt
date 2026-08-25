@@ -260,7 +260,12 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
             }
         }
 
-        LazyColumn(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        // Inset as content padding so the scrollbar stays at the panel edge rather than being
+        // pushed in against the lyrics (issue #33).
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+        ) {
             if (lines.isEmpty()) {
                 item {
                     Text(

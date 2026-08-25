@@ -1290,6 +1290,9 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel) {
                     Spacer(Modifier.width(3.dp))
                     Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                 }
+                // A search result is exactly where you cannot tell whether you already have the
+                // track, which is what the markers are for (issue #33).
+                com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track)
             }
         }
         if (durationText.isNotEmpty()) {

@@ -39,6 +39,7 @@ import androidx.savedstate.read
 import com.alananasss.kittytune.ui.modifiers.squish
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -160,7 +161,12 @@ fun MainTopBar(
                     }
                 }
             },
-            placeholder = { Text(str("search_hint")) },
+            // The hint is a full sentence and it is longer in some languages than in English,
+            // so it has to be allowed to truncate: left to wrap it makes the field two lines
+            // tall and bends the pill out of shape whenever the bar is tight (issue #33).
+            placeholder = {
+                Text(str("search_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
                 if (vm.searchQuery.isNotBlank()) {
@@ -181,7 +187,9 @@ fun MainTopBar(
                 focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
             ),
-            modifier = Modifier.widthIn(min = 320.dp, max = 480.dp).trackTextInput(),
+            // A low minimum: the field would rather be narrow than push the buttons around it
+            // off the bar when the window shrinks or the UI scale goes up.
+            modifier = Modifier.widthIn(min = 160.dp, max = 480.dp).trackTextInput(),
         )
 
         androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))

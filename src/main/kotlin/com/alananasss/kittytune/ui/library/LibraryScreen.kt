@@ -687,7 +687,9 @@ fun LibraryScreen(
                 .fillMaxWidth()
                 .trackTextInput()
                 .padding(horizontal = 16.dp),
-            placeholder = { Text(str("search_library_hint")) },
+            placeholder = {
+                Text(str("search_library_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = str("search_library_hint"))
             },
