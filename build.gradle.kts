@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.1.0"
+version = "1.1.1"
 
 repositories {
     google()
@@ -131,7 +131,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.1.0"
+            packageVersion = "1.1.1"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 
@@ -183,7 +183,13 @@ compose.desktop {
 tasks.withType<JavaExec>().configureEach {
     systemProperty("sun.java2d.wm.className", "kitty-tune")
 }
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     compilerOptions.freeCompilerArgs.addAll("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api", "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
 }
 
