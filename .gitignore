@@ -11,6 +11,10 @@ kotlin-js-store/
 *.log
 *.png
 !src/main/resources/icons/*.png
+# The alternate app icons are real product assets, not scratch images: without this
+# they are swallowed by the *.png rule above and the icon picker crashes on a build
+# made from a fresh clone (issue #33).
+!src/main/resources/icons/variants/*.png
 *.wav
 *.py
 *.ps1
