@@ -5,6 +5,7 @@ import com.alananasss.kittytune.data.network.CookieStore
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Config
+import com.alananasss.kittytune.utils.SignedUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Cookie
@@ -119,12 +120,45 @@ object StreamResolver {
 
     private val client: OkHttpClient
         get() = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(baseClient.newBuilder()).build()
-    private val streamCache = ConcurrentHashMap<Long, Pair<Long, ResolvedStream>>()
-    private const val CACHE_TTL_MS = 30 * 60 * 1000L // 30 minutes
+    private val streamCache = ConcurrentHashMap<Long, CachedStream>()
+
+    /** Local files never go stale; only the bookkeeping does. */
+    private const val LOCAL_CACHE_TTL_MS = 30 * 60 * 1000L
+
+    /**
+     * How long to trust a network URL that carries no readable deadline. SoundCloud's signed
+     * links last about three minutes, so nothing opaque is worth keeping past that either.
+     */
+    private const val OPAQUE_STREAM_TTL_MS = 3 * 60 * 1000L
+
+    /**
+     * A resolved stream plus the point it stops being playable.
+     *
+     * The cache used to hand out anything younger than 30 minutes, but a SoundCloud CDN
+     * signature dies after ~3, so sitting on one track long enough to outlive the queue's
+     * prefetch meant the next skip (or a seek on the current track) fed FFmpeg a URL the CDN
+     * answers 403 to, and playback only came back after its reconnect backoff gave up.
+     */
+    private class CachedStream(val stream: ResolvedStream) {
+        private val cachedAtMs = System.currentTimeMillis()
+        private val isNetwork = SignedUrl.isNetworkUrl(stream.url)
+        private val expiresAtMs = SignedUrl.expiryEpochMs(stream.url)
+
+        fun isUsable(marginMs: Long = SignedUrl.DEFAULT_MARGIN_MS): Boolean {
+            val now = System.currentTimeMillis()
+            if (!isNetwork) return now - cachedAtMs < LOCAL_CACHE_TTL_MS
+            val deadline = expiresAtMs ?: return now - cachedAtMs < OPAQUE_STREAM_TTL_MS
+            return now + marginMs < deadline
+        }
+    }
 
     fun evictStream(trackId: Long) {
         streamCache.remove(trackId)
     }
+
+    /** The cached URL for [trackId] while it is still playable, else null. */
+    fun cachedStreamUrl(trackId: Long): String? =
+        streamCache[trackId]?.takeIf { it.isUsable() }?.stream?.url
 
     fun init() {}
 
@@ -150,8 +184,9 @@ object StreamResolver {
     suspend fun resolveStreamWithDrm(track: Track, forDownload: Boolean = false): ResolvedStream? {
         if (!forDownload) {
             val cached = streamCache[track.id]
-            if (cached != null && (System.currentTimeMillis() - cached.first) < CACHE_TTL_MS) {
-                return cached.second
+            if (cached != null) {
+                if (cached.isUsable()) return cached.stream
+                streamCache.remove(track.id, cached)
             }
         }
         val result = withContext(Dispatchers.IO) {
@@ -204,7 +239,7 @@ object StreamResolver {
             return@withContext resolveFromSoundCloudWithDrm(track, forDownload)
         }
         if (result != null && !forDownload) {
-            streamCache[track.id] = System.currentTimeMillis() to result
+            streamCache[track.id] = CachedStream(result)
         }
         return result
     }
