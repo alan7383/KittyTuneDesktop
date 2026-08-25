@@ -32,7 +32,24 @@ object ArtworkPalette {
         null
     }
 
-    fun dominantColor(image: BufferedImage, preferLight: Boolean): Color {
+    /**
+     * The artwork's dominant colour, pushed light or dark so text stays legible on top of it.
+     * For a backdrop, where contrast is the whole point.
+     */
+    fun dominantColor(image: BufferedImage, preferLight: Boolean): Color =
+        dominant(image, clampValueTo = if (preferLight) 0.65f else null, clampDown = !preferLight)
+
+    /**
+     * The artwork's dominant colour exactly as it appears, with no brightness clamp.
+     *
+     * This is what the dynamic theme seeds from. The palette style the user picked — Vibrant,
+     * Expressive, Fidelity and the rest — decides tone and chroma from the seed, so handing it a
+     * pre-lightened colour meant the style was working from something that was no longer the
+     * cover's colour, and the styles that stay faithful to the seed suffered most (issue #33).
+     */
+    fun dominantSeed(image: BufferedImage): Color = dominant(image, clampValueTo = null, clampDown = false)
+
+    private fun dominant(image: BufferedImage, clampValueTo: Float?, clampDown: Boolean): Color {
         val w = min(image.width, 64)
         val h = min(image.height, 64)
         val scaled = BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
@@ -73,7 +90,10 @@ object ArtworkPalette {
 
         val hsv = FloatArray(3)
         java.awt.Color.RGBtoHSB(r, gg, b, hsv)
-        hsv[2] = if (preferLight) max(hsv[2], 0.65f) else min(hsv[2], 0.45f)
+        when {
+            clampValueTo != null -> hsv[2] = max(hsv[2], clampValueTo)
+            clampDown -> hsv[2] = min(hsv[2], 0.45f)
+        }
         val adjusted = java.awt.Color.HSBtoRGB(hsv[0], hsv[1], hsv[2])
         r = (adjusted shr 16) and 0xFF
         gg = (adjusted shr 8) and 0xFF

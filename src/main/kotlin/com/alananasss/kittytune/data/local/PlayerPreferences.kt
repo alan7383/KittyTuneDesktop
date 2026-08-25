@@ -74,6 +74,15 @@ class PlayerPreferences {
         private const val KEY_PURE_BLACK = "pure_black_enabled"
         private const val KEY_LOCAL_MEDIA_ENABLED = "local_media_enabled"
         private const val KEY_LOCAL_MEDIA_URIS_SET = "local_media_uris_set_v2"
+        private const val KEY_PLAYER_BAR_BUTTONS = "player_bar_buttons"
+
+        const val PLAYER_BAR_BUTTON_LIKE = "like"
+        const val PLAYER_BAR_BUTTON_PANEL = "panel"
+        const val PLAYER_BAR_BUTTON_QUEUE = "queue"
+
+        val PLAYER_BAR_BUTTONS_DEFAULT =
+            setOf(PLAYER_BAR_BUTTON_LIKE, PLAYER_BAR_BUTTON_PANEL, PLAYER_BAR_BUTTON_QUEUE)
+
         private const val KEY_LYRICS_PREFER_LOCAL = "lyrics_prefer_local"
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
@@ -341,6 +350,44 @@ class PlayerPreferences {
         return java.util.Locale.getDefault().language.take(2).lowercase()
     }
     fun setLyricsTranslationLang(lang: String) = Prefs.putString(KEY_LYRICS_TRANSLATION_LANG, lang)
+
+    /**
+     * Which optional buttons the player bar shows on the right, and the heart on the left.
+     *
+     * Rather than removing the queue button for everyone — the panel behind the settings button has
+     * a queue tab, so it is genuinely redundant for some people and one click for others — the row
+     * is configurable and ships as it was (issue #33). The lyrics button is not in here: it already
+     * had its own switch in the lyrics settings.
+     */
+    fun getPlayerBarButtons(): Set<String> {
+        val raw = Prefs.getString(KEY_PLAYER_BAR_BUTTONS, null) ?: return PLAYER_BAR_BUTTONS_DEFAULT
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setPlayerBarButtons(buttons: Set<String>) =
+        Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
+
+    /**
+     * Whether the Windows title bar is painted in the app's colours rather than left to the system.
+     * On by default — that was the point of the request — but reversible, because some people want
+     * the stock bar (issue #33). Has no effect off Windows.
+     */
+    fun getThemedTitleBar(): Boolean = Prefs.getBoolean("themed_title_bar", true)
+    fun setThemedTitleBar(enabled: Boolean) = Prefs.putBoolean("themed_title_bar", enabled)
+
+    /**
+     * Auto-scroll for lyrics with no timings, and how fast. Off by default: unsynced lyrics are
+     * the case where the reader sets their own pace, so scrolling has to be asked for (issue #33).
+     */
+    fun getLyricsPlainAutoScroll(): Boolean = Prefs.getBoolean("lyrics_plain_autoscroll", false)
+    fun setLyricsPlainAutoScroll(enabled: Boolean) = Prefs.putBoolean("lyrics_plain_autoscroll", enabled)
+
+    /** Multiplier on the base auto-scroll rate, clamped to the range the slider offers. */
+    fun getLyricsPlainAutoScrollSpeed(): Float =
+        Prefs.getFloat("lyrics_plain_autoscroll_speed", 1f).coerceIn(0.25f, 4f)
+
+    fun setLyricsPlainAutoScrollSpeed(speed: Float) =
+        Prefs.putFloat("lyrics_plain_autoscroll_speed", speed.coerceIn(0.25f, 4f))
 
     fun getLyricsRomanizationEnabled(): Boolean = Prefs.getBoolean("lyrics_romanization_enabled", false)
     fun setLyricsRomanizationEnabled(enabled: Boolean) = Prefs.putBoolean("lyrics_romanization_enabled", enabled)
