@@ -1885,4 +1885,20 @@
     <string name="user_type_artist">Artiste</string>
     <string name="user_type_profile">Profil</string>
     <string name="user_type_verified_artist">Artiste vérifié</string>
+    <string name="lyrics_badge_line_sync">Synchronisé à la ligne</string>
+    <string name="lyrics_badge_word_sync">Synchronisé au mot</string>
+    <string name="pref_dynamic_theme_sub">Colorer l'application d'après la pochette du morceau en cours</string>
+    <string name="pref_lyrics_autoscroll">Faire défiler les paroles non synchronisées</string>
+    <string name="pref_lyrics_autoscroll_sub">Les paroles sans horodatage défilent seules ; la molette reprend toujours la main</string>
+    <string name="pref_lyrics_autoscroll_speed">Vitesse de défilement</string>
+    <string name="pref_lyrics_autoscroll_speed_sub">À quelle vitesse les paroles non synchronisées défilent seules.</string>
+    <string name="pref_themed_title_bar">Barre de titre thématisée</string>
+    <string name="pref_themed_title_bar_sub">Colorer la barre de titre de la fenêtre aux couleurs de l'application au lieu de celles du système</string>
+    <string name="pref_player_bar_buttons">Boutons du lecteur</string>
+    <string name="pref_player_bar_buttons_sub">Choisir les boutons affichés dans la barre du lecteur</string>
+    <string name="pref_player_bar_buttons_desc">Le panneau ouvert par le bouton réglages contient aussi la file d'attente : masquer le bouton file la laisse donc à un clic.</string>
+    <string name="player_button_like">J'aime</string>
+    <string name="player_button_panel">Panneau de réglages</string>
+    <string name="player_button_queue">File d'attente</string>
+    <string name="track_already_liked">Déjà dans vos j'aime</string>
 </resources>

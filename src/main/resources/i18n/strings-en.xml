@@ -1883,4 +1883,20 @@
     <string name="user_type_artist">Artist</string>
     <string name="user_type_profile">Profile</string>
     <string name="user_type_verified_artist">Verified Artist</string>
+    <string name="lyrics_badge_line_sync">Line-by-line timings</string>
+    <string name="lyrics_badge_word_sync">Word-by-word timings</string>
+    <string name="pref_dynamic_theme_sub">Colour the app from the current track's artwork</string>
+    <string name="pref_lyrics_autoscroll">Scroll unsynced lyrics</string>
+    <string name="pref_lyrics_autoscroll_sub">Lyrics with no timings scroll on their own; your scroll wheel always takes over</string>
+    <string name="pref_lyrics_autoscroll_speed">Scrolling speed</string>
+    <string name="pref_lyrics_autoscroll_speed_sub">How fast unsynced lyrics scroll on their own.</string>
+    <string name="pref_themed_title_bar">Themed title bar</string>
+    <string name="pref_themed_title_bar_sub">Paint the window title bar in the app's colours instead of the system's</string>
+    <string name="pref_player_bar_buttons">Player bar buttons</string>
+    <string name="pref_player_bar_buttons_sub">Choose which buttons the player bar shows</string>
+    <string name="pref_player_bar_buttons_desc">The panel behind the settings button also holds the queue, so hiding the queue button still leaves it one click away.</string>
+    <string name="player_button_like">Like</string>
+    <string name="player_button_panel">Settings panel</string>
+    <string name="player_button_queue">Queue</string>
+    <string name="track_already_liked">Already in your likes</string>
 </resources>

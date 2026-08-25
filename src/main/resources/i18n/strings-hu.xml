@@ -1889,4 +1889,20 @@
     <string name="user_type_artist">Előadó</string>
     <string name="user_type_profile">Profil</string>
     <string name="user_type_verified_artist">Hitelesített előadó</string>
+    <string name="lyrics_badge_line_sync">Soronkénti időzítés</string>
+    <string name="lyrics_badge_word_sync">Szavankénti időzítés</string>
+    <string name="pref_dynamic_theme_sub">Az alkalmazás színei az aktuális szám borítójából</string>
+    <string name="pref_lyrics_autoscroll">Időzítés nélküli dalszöveg görgetése</string>
+    <string name="pref_lyrics_autoscroll_sub">Az időzítés nélküli dalszöveg magától görög; az egérgörgő mindig felülírja</string>
+    <string name="pref_lyrics_autoscroll_speed">Görgetési sebesség</string>
+    <string name="pref_lyrics_autoscroll_speed_sub">Milyen gyorsan görögjön magától az időzítés nélküli dalszöveg.</string>
+    <string name="pref_themed_title_bar">Témázott címsor</string>
+    <string name="pref_themed_title_bar_sub">A címsor az alkalmazás színeit kapja a rendszer színei helyett</string>
+    <string name="pref_player_bar_buttons">Lejátszósáv gombjai</string>
+    <string name="pref_player_bar_buttons_sub">Válaszd ki, mely gombok látszódjanak a lejátszósávon</string>
+    <string name="pref_player_bar_buttons_desc">A beállítások gomb mögötti panelen is ott van a várólista, így a gomb elrejtése után is egy kattintás.</string>
+    <string name="player_button_like">Kedvelés</string>
+    <string name="player_button_panel">Beállítások panel</string>
+    <string name="player_button_queue">Várólista</string>
+    <string name="track_already_liked">Már a kedveléseid között</string>
 </resources>

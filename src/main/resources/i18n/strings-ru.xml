@@ -1885,4 +1885,20 @@
     <string name="user_type_artist">Артист</string>
     <string name="user_type_profile">Профиль</string>
     <string name="user_type_verified_artist">Проверенный артист</string>
+    <string name="lyrics_badge_line_sync">Синхронизация по строкам</string>
+    <string name="lyrics_badge_word_sync">Синхронизация по словам</string>
+    <string name="pref_dynamic_theme_sub">Окрашивать приложение по обложке текущего трека</string>
+    <string name="pref_lyrics_autoscroll">Прокручивать несинхронизированный текст</string>
+    <string name="pref_lyrics_autoscroll_sub">Текст без временных меток прокручивается сам; колесо мыши всегда важнее</string>
+    <string name="pref_lyrics_autoscroll_speed">Скорость прокрутки</string>
+    <string name="pref_lyrics_autoscroll_speed_sub">Насколько быстро несинхронизированный текст прокручивается сам.</string>
+    <string name="pref_themed_title_bar">Заголовок окна в цветах приложения</string>
+    <string name="pref_themed_title_bar_sub">Окрашивать заголовок окна в цвета приложения вместо системных</string>
+    <string name="pref_player_bar_buttons">Кнопки плеера</string>
+    <string name="pref_player_bar_buttons_sub">Выберите, какие кнопки показывать на панели плеера</string>
+    <string name="pref_player_bar_buttons_desc">В панели за кнопкой настроек тоже есть очередь, поэтому скрытая кнопка очереди оставляет её в одном клике.</string>
+    <string name="player_button_like">Нравится</string>
+    <string name="player_button_panel">Панель настроек</string>
+    <string name="player_button_queue">Очередь</string>
+    <string name="track_already_liked">Уже в ваших лайках</string>
 </resources>
