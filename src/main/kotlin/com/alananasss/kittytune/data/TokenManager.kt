@@ -156,6 +156,8 @@ object TokenManager {
         save()
         LikeRepository.clear()
         RepostRepository.clear()
+        // Whose follows the social proof was about is gone with the session.
+        SocialProofRepository.clear()
         com.alananasss.kittytune.data.network.CookieStore.clear()
         logoutFlow.tryEmit(Unit)
 
