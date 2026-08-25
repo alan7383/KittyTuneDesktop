@@ -438,6 +438,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var queueChunkingJob: Job? = null
     private var trackInitJob: Job? = null
     private var playJob: Job? = null
+    private var prefetchWarmJob: Job? = null
     private var discordJob: Job? = null
     private var discordRpc: com.alananasss.kittytune.data.DiscordRPC? = null
     private var mprisService: com.alananasss.kittytune.data.MprisService? = null
@@ -447,6 +448,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     companion object {
         const val TRACK_PREFIX = "track:"
         const val CONTEXT_SEPARATOR = ":context:"
+
+        /**
+         * How often the queue's prefetched stream URLs are topped up. Well under the few
+         * minutes a SoundCloud CDN signature lasts, and a cache hit whenever one still holds.
+         */
+        private const val PREFETCH_REWARM_INTERVAL_MS = 45_000L
     }
 
     private val syncReceiver = Any()
@@ -3484,6 +3491,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun preloadNextTrack(nextIndex: Int) {
+        prefetchWarmJob?.cancel()
+
         val targetIndex = if (nextIndex >= _queue.size) {
             if (repeatMode == RepeatMode.ALL && _queue.isNotEmpty()) 0 else return
         } else nextIndex
@@ -3532,24 +3541,43 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // Second stage: warm the StreamResolver cache for the track AFTER next, so
         // skipping forward never waits on stream resolution (issue #27). No media
         // item is appended — only the resolved URL is cached.
-        val warmUpIndex = if (nextIndex + 1 >= _queue.size) {
-            if (repeatMode == RepeatMode.ALL && _queue.isNotEmpty()) 0 else return
-        } else nextIndex + 1
-        if (warmUpIndex !in _queue.indices) return
-        val warmUpTrack = _queue[warmUpIndex]
+        val warmUpIndex = when {
+            nextIndex + 1 < _queue.size -> nextIndex + 1
+            repeatMode == RepeatMode.ALL && _queue.isNotEmpty() -> 0
+            else -> null
+        }?.takeIf { it in _queue.indices }
+        val warmUpTrack = warmUpIndex?.let { _queue[it] }
 
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
-                val local = db.getTrack(warmUpTrack.id)
-                if (local != null && local.localAudioPath.isNotEmpty() &&
-                    !local.localAudioPath.startsWith("exo_cache://")
-                ) return@launch // local file — nothing to resolve
-
-                StreamResolver.resolveStreamWithDrm(warmUpTrack)
-            } catch (e: Exception) {
-                e.printStackTrace()
+        // Third stage: keep those URLs alive. They are CDN links signed for about three
+        // minutes, so staying on one track longer than that used to leave the whole prefetch
+        // holding dead links — and the skip that followed spent FFmpeg's reconnect backoff on
+        // a certain 403 before anything re-resolved. Topping them up costs a cache lookup
+        // until one actually lapses.
+        prefetchWarmJob = viewModelScope.launch(Dispatchers.IO) {
+            warmUpTrack?.let { warmStreamCache(it) }
+            while (isActive) {
+                delay(PREFETCH_REWARM_INTERVAL_MS)
+                if (!MusicManager.player.isPlaying) continue
+                // The playing track is on the list too: a seek is a fresh range request, so the
+                // engine needs a live URL for it as much as the queue needs one for the skip.
+                listOfNotNull(currentTrack, nextTrack, warmUpTrack)
+                    .distinctBy { it.id }
+                    .forEach { warmStreamCache(it) }
             }
+        }
+    }
+
+    /** Resolves [track] into the StreamResolver cache, unless it is already a local file. */
+    private suspend fun warmStreamCache(track: Track) {
+        try {
+            val local = com.alananasss.kittytune.data.local.AppDatabase.downloadDao.getTrack(track.id)
+            if (local != null && local.localAudioPath.isNotEmpty() &&
+                !local.localAudioPath.startsWith("exo_cache://")
+            ) return // local file — nothing to resolve
+
+            StreamResolver.resolveStreamWithDrm(track)
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

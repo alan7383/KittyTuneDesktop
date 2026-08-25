@@ -2,6 +2,7 @@ package com.alananasss.kittytune.audio
 
 import com.alananasss.kittytune.ui.player.AudioEffectsState
 import com.alananasss.kittytune.utils.Logger
+import com.alananasss.kittytune.utils.SignedUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -143,7 +144,7 @@ class AudioEngine {
         seekRequestMs = if (startPositionMs > 0) startPositionMs else -1L
         Logger.e("AudioEngine", "setMediaItem called with url: $url")
         try {
-            hlsAdapter = if (url.contains(".m3u8")) HlsStreamAdapter(url, headers) else null
+            hlsAdapter = if (url.contains(".m3u8")) HlsStreamAdapter(url, headers, ::reResolveUrl) else null
             Logger.e("AudioEngine", "hlsAdapter initialized: ${hlsAdapter != null}")
         } catch (e: Exception) {
             Logger.e("AudioEngine", "Failed to init HlsStreamAdapter: ${e.message}")
@@ -169,6 +170,12 @@ class AudioEngine {
     private companion object {
         /** How long a pause has to last before resuming reconnects instead of trusting the socket. */
         const val RECONNECT_AFTER_PAUSE_MS = 30_000L
+
+        /**
+         * Re-resolve tries allowed while opening a track. Bounded so a genuinely unplayable
+         * track still surfaces an error (and lets the queue move on) instead of spinning.
+         */
+        const val INITIAL_OPEN_ATTEMPTS = 3
     }
 
     fun play() {
@@ -353,14 +360,18 @@ class AudioEngine {
     }
 
 
-    var onReResolveUrl: (suspend () -> String?)? = null
+    /**
+     * Asked for a freshly signed URL for the loaded track; receives the URL that just failed (or
+     * expired) so the owner can tell a stale cache entry from one already refreshed elsewhere.
+     */
+    var onReResolveUrl: (suspend (failedUrl: String) -> String?)? = null
 
     private fun createGrabber(targetUrl: String, headers: Map<String, String>, startPositionMs: Long = 0L): FFmpegFrameGrabber {
         val isHls = targetUrl.contains(".m3u8")
         if (isHls) {
             var adapter = hlsAdapter
             if (adapter == null || adapter.playlistUrl != targetUrl) {
-                adapter = HlsStreamAdapter(targetUrl, headers)
+                adapter = HlsStreamAdapter(targetUrl, headers, ::reResolveUrl)
                 hlsAdapter = adapter
             }
             return FFmpegFrameGrabber(adapter.getInputStream(startPositionMs)).apply {
@@ -386,8 +397,11 @@ class AudioEngine {
                     setOption("reconnect", "1")
                     setOption("reconnect_streamed", "1")
                     setOption("reconnect_on_network_error", "1")
-                    setOption("reconnect_on_http_error", "4xx,5xx")
-                    setOption("reconnect_delay_max", "3")
+                    // Only codes worth waiting on. A 4xx from the CDN means the signed URL is
+                    // dead, not busy: retrying it burnt ~10s of backoff before the error even
+                    // reached us, and only a fresh URL can fix it.
+                    setOption("reconnect_on_http_error", "429,5xx")
+                    setOption("reconnect_delay_max", "2")
                     setOption("rw_timeout", "3000000") // 3s timeout
                     setOption("tcp_nodelay", "1")
                 }
@@ -398,11 +412,29 @@ class AudioEngine {
         }
     }
 
+    /**
+     * Asks the owner for a freshly signed URL for whatever is loaded. Blocking on purpose: the
+     * decode loop is a plain thread and has nothing to suspend into.
+     */
+    private fun reResolveUrl(failedUrl: String): String? {
+        val reResolver = onReResolveUrl ?: return null
+        var freshUrl: String? = null
+        kotlinx.coroutines.runBlocking {
+            try {
+                freshUrl = reResolver.invoke(failedUrl)
+            } catch (e: Exception) {
+                Logger.e("AudioEngine", "Re-resolve failed: ${e.message}")
+            }
+        }
+        return freshUrl?.takeIf { it.isNotEmpty() }
+    }
+
     private fun recoverStream(
         oldGrabber: FFmpegFrameGrabber?,
         url: String,
         headers: Map<String, String>,
-        resumePosMs: Long
+        resumePosMs: Long,
+        maxAttempts: Int = Int.MAX_VALUE
     ): Pair<FFmpegFrameGrabber?, String?> {
         try {
             oldGrabber?.stop()
@@ -413,24 +445,13 @@ class AudioEngine {
         var currentUrlToTry = url
         var attempt = 0
 
-        while (!stopFlag) {
+        while (!stopFlag && attempt < maxAttempts) {
             attempt++
             Logger.e("AudioEngine", "Network recovery attempt $attempt at $resumePosMs ms...")
 
             // Proactively re-resolve URL on network streams
-            val reResolver = onReResolveUrl
-            if (reResolver != null && (currentUrlToTry.startsWith("http://") || currentUrlToTry.startsWith("https://"))) {
-                var freshUrl: String? = null
-                kotlinx.coroutines.runBlocking {
-                    try {
-                        freshUrl = reResolver.invoke()
-                    } catch (e: Exception) {
-                        Logger.e("AudioEngine", "Re-resolve attempt $attempt failed: ${e.message}")
-                    }
-                }
-                if (!freshUrl.isNullOrEmpty()) {
-                    currentUrlToTry = freshUrl
-                }
+            if (SignedUrl.isNetworkUrl(currentUrlToTry)) {
+                reResolveUrl(currentUrlToTry)?.let { currentUrlToTry = it }
             }
 
             try {
@@ -471,13 +492,41 @@ class AudioEngine {
         var localLine: SourceDataLine? = null
         var activeUrl = url
         try {
-            grabber = createGrabber(activeUrl, headers, positionMs)
-            grabber.start()
+            // The URL may have been signed long before we got here — a queue prefetch that sat
+            // through a whole track, a restored session — and SoundCloud's signature only lasts
+            // minutes. Refresh it up front instead of paying for a 403 to find out.
+            if (SignedUrl.isExpired(activeUrl)) {
+                Logger.e("AudioEngine", "Stream URL expired before open; re-resolving")
+                reResolveUrl(activeUrl)?.let { activeUrl = it }
+            }
+
+            var opening: FFmpegFrameGrabber? = null
+            try {
+                // Both halves can fail on a dead URL: an HLS playlist 403s while the grabber is
+                // still being built, a progressive one only on start().
+                opening = createGrabber(activeUrl, headers, positionMs)
+                opening.start()
+                grabber = opening
+            } catch (e: Exception) {
+                // A dead URL that slipped past the check above (unsigned, or the CDN disagrees
+                // about the deadline). Re-resolve and retry a couple of times before handing the
+                // failure up: the owner's own error path is a full teardown and reload.
+                Logger.e("AudioEngine", "Initial open failed (${e.message}); recovering")
+                val recovered = recoverStream(opening, activeUrl, headers, positionMs, INITIAL_OPEN_ATTEMPTS)
+                grabber = recovered.first ?: throw e
+                recovered.second?.let { activeUrl = it }
+            }
 
             if (stopFlag || activeWorkerId != workerId) return
 
+            // Only trust the adapter's duration while it actually describes what we opened: a
+            // re-resolve can hand back a progressive URL where the playlist used to be.
             val adapter = hlsAdapter
-            durationMs = if (adapter != null) adapter.totalDurationMs else (grabber.lengthInTime / 1000L)
+            durationMs = if (adapter != null && adapter.playlistUrl == activeUrl) {
+                adapter.totalDurationMs
+            } else {
+                grabber.lengthInTime / 1000L
+            }
 
             localLine = openLine()
             line = localLine
@@ -504,9 +553,21 @@ class AudioEngine {
 
                     val isHls = activeUrl.contains(".m3u8")
 
+                    // Seeking is a fresh range request, so an expired signature turns it into a
+                    // guaranteed 403. Skip straight to the re-resolve — waiting for that 403 (and
+                    // FFmpeg's retries on it) is the stall behind "seek back after a long listen
+                    // and nothing plays for ten seconds".
+                    // On HLS the adapter does the fetching and can re-sign itself mid-track, so
+                    // ask what it is actually using rather than the URL we were handed.
+                    val effectiveUrl = hlsAdapter?.takeIf { it.playlistUrl == activeUrl }?.liveUrl ?: activeUrl
+                    val urlExpired = SignedUrl.isExpired(effectiveUrl)
+                    if (urlExpired) {
+                        Logger.e("AudioEngine", "Stream URL expired; re-resolving before seek to $seek ms")
+                    }
+
                     var seekOk = false
                     var seekFrame: Frame? = null
-                    try {
+                    if (!urlExpired) try {
                         if (isHls) {
                             grabber?.stop()
                             grabber?.release()

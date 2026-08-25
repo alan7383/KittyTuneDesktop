@@ -7,6 +7,7 @@ import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.utils.SignedUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -151,12 +152,18 @@ class Player {
             listeners.forEach { it.onPlayerError(err) } 
         }
         eng.onCompletion = { onCompletion?.invoke() }
-        eng.onReResolveUrl = {
+        eng.onReResolveUrl = { failedUrl ->
             val track = currentMediaItem?.track ?: com.alananasss.kittytune.data.MusicManager.currentTrack
             track?.let { t ->
-                com.alananasss.kittytune.data.StreamResolver.evictStream(t.id)
+                // Only throw the cache away when it is still holding the URL that just failed.
+                // Otherwise the queue's prefetch has already refreshed it and can answer without
+                // a round-trip — which is the difference between a seek resuming now and a seek
+                // waiting on two SoundCloud requests.
+                if (StreamResolver.cachedStreamUrl(t.id) == failedUrl) {
+                    StreamResolver.evictStream(t.id)
+                }
                 withContext(Dispatchers.IO) {
-                    com.alananasss.kittytune.data.StreamResolver.resolveStream(t)
+                    StreamResolver.resolveStream(t)
                 }
             }
         }
@@ -245,7 +252,11 @@ class Player {
         val item = currentMediaItem ?: return
         resolveJob?.cancel()
         resolveJob = scope.launch {
-            val url = item.uri?.takeIf { it.startsWith("http") || java.io.File(it).exists() }
+            // A prefetched item carries the URL it was resolved with; if its CDN signature has
+            // since lapsed, resolving again is far cheaper than handing FFmpeg a certain 403.
+            val url = item.uri?.takeIf {
+                if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it) else java.io.File(it).exists()
+            }
                 ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
             if (url == null) {
                 listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
