@@ -53,6 +53,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
+        var showAutoScrollSpeedDialog by remember { mutableStateOf(false) }
         var provider by remember { mutableStateOf(playerViewModel.lyricsProvider) }
         var showProviderDialog by remember { mutableStateOf(false) }
 
@@ -175,6 +176,60 @@ import androidx.compose.material3.ContainedLoadingIndicator
             }
         }
     
+        if (showAutoScrollSpeedDialog) {
+            BackHandler(onBack = { showAutoScrollSpeedDialog = false })
+            Dialog(onDismissRequest = { showAutoScrollSpeedDialog = false }) {
+                Card(
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text(str("pref_lyrics_autoscroll_speed"), style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            str("pref_lyrics_autoscroll_speed_sub"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                autoScrollSpeedLabel(playerViewModel.plainAutoScrollSpeed),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(60.dp)
+                            )
+                            IconButton(onClick = {
+                                playerViewModel.updatePlainAutoScrollSpeed(playerViewModel.plainAutoScrollSpeed - 0.25f)
+                            }) { Icon(Icons.Rounded.Remove, null) }
+                            Slider(
+                                value = playerViewModel.plainAutoScrollSpeed,
+                                onValueChange = { playerViewModel.updatePlainAutoScrollSpeed(it) },
+                                valueRange = 0.25f..4f,
+                                steps = 14,
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                            )
+                            IconButton(onClick = {
+                                playerViewModel.updatePlainAutoScrollSpeed(playerViewModel.plainAutoScrollSpeed + 0.25f)
+                            }) { Icon(Icons.Rounded.Add, null) }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            TextButton(onClick = { playerViewModel.updatePlainAutoScrollSpeed(1f) }) {
+                                Text(str("pref_lyrics_reset"))
+                            }
+                            TextButton(onClick = { showAutoScrollSpeedDialog = false }) { Text(str("btn_close")) }
+                        }
+                    }
+                }
+            }
+        }
+
         if (showAlignmentDialog) {
             EscapableAlertDialog(
                 onDismissRequest = { showAlignmentDialog = false },
@@ -286,7 +341,12 @@ import androidx.compose.material3.ContainedLoadingIndicator
     
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
     
-                            val totalVisibleItems = if (showLyricsButton) 5 else 4
+                            // The auto-scroll speed row only exists while auto-scroll is on, and
+                            // the inline row only while the lyrics button is shown, so the count
+                            // the shapes are derived from has to follow both.
+                            val autoScrollOn = playerViewModel.isPlainAutoScrollEnabled
+                            val totalVisibleItems =
+                                (if (showLyricsButton) 6 else 5) + (if (autoScrollOn) 1 else 0)
     
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 0),
@@ -337,13 +397,38 @@ import androidx.compose.material3.ContainedLoadingIndicator
                                 onClick = { showAlignmentDialog = true }
                             )
     
-                            val sizeIndex = if (showLyricsButton) 4 else 3
+                            val sizeIndex = alignIndex + 1
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, sizeIndex),
                                 title = str("pref_lyrics_size"),
                                 subtitle = "${fontSize.roundToInt()} sp",
                                 onClick = { showFontSizeDialog = true }
                             )
+
+                            // Only unsynced lyrics scroll on their own — synced ones already
+                            // follow the track (issue #33).
+                            val autoScrollIndex = sizeIndex + 1
+                            SettingsItem(
+                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, autoScrollIndex),
+                                title = str("pref_lyrics_autoscroll"),
+                                subtitle = str("pref_lyrics_autoscroll_sub"),
+                                hasSwitch = true,
+                                switchState = autoScrollOn,
+                                onSwitchChange = { playerViewModel.togglePlainAutoScroll(it) }
+                            )
+
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = autoScrollOn,
+                                enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                                exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                            ) {
+                                SettingsItem(
+                                    shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, autoScrollIndex + 1),
+                                    title = str("pref_lyrics_autoscroll_speed"),
+                                    subtitle = autoScrollSpeedLabel(playerViewModel.plainAutoScrollSpeed),
+                                    onClick = { showAutoScrollSpeedDialog = true }
+                                )
+                            }
                         }
                     }
                 }
@@ -361,3 +446,10 @@ import androidx.compose.material3.ContainedLoadingIndicator
     }
 
 
+
+/** "1.25×" — one decimal only when there is one, so the common speeds read as whole numbers. */
+private fun autoScrollSpeedLabel(speed: Float): String {
+    val rounded = kotlin.math.round(speed * 100f) / 100f
+    val text = if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()
+    return "$text×"
+}
