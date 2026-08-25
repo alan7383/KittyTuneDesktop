@@ -82,6 +82,24 @@ object AppIconVariants {
     fun byKey(key: String?): Variant? = ALL.firstOrNull { it.key == key }
 
     fun resourcePath(key: String): String =
-        if (key == null || key == DEFAULT_KEY) "icons/kittytune.png"
+        if (key == DEFAULT_KEY) "icons/kittytune.png"
         else "$RESOURCE_DIR/$key.png"
+
+    /**
+     * The variants this build can actually draw.
+     *
+     * [ALL] is a hand-maintained list, so it can name a bitmap the packaged jar does not carry
+     * — which is how a stale `.gitignore` rule once took the whole picker down with it
+     * (issue #33): `painterResource` throws for a missing path, and it throws from inside
+     * composition, where nothing catches it. Filtering here keeps a missing file to one absent
+     * tile instead of a crash, and the list is resolved once because the answer cannot change
+     * while the process runs.
+     */
+    val AVAILABLE: List<Variant> by lazy { ALL.filter { hasResource(it.key) } }
+
+    fun hasResource(key: String): Boolean =
+        loader()?.getResource(resourcePath(key)) != null
+
+    private fun loader(): ClassLoader? =
+        Thread.currentThread().contextClassLoader ?: AppIconVariants::class.java.classLoader
 }
