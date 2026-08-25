@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.window.Window
@@ -226,6 +227,10 @@ fun main() {
 
             CompositionLocalProvider(LocalDensity provides customDensity) {
                 KittyTuneTheme {
+                    // Inside the theme, so the title bar tracks the live palette — the
+                    // cover-seeded dynamic theme included — instead of a colour read once at
+                    // startup (issue #33).
+                    ThemedTitleBarEffect(window)
                     Surface { AppRouter() }
                 }
             }
@@ -234,3 +239,31 @@ fun main() {
 } // End main
 
 
+
+/**
+ * Keeps the Windows title bar in step with the app's palette, or hands it back to the system when
+ * the user turns the setting off. A no-op on every other platform — see [WindowsTitleBar].
+ */
+@Composable
+private fun ThemedTitleBarEffect(window: java.awt.Window) {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    val enabled = remember(prefsSnapshot) { PlayerPreferences().getThemedTitleBar() }
+
+    val scheme = androidx.compose.material3.MaterialTheme.colorScheme
+    val caption = scheme.surfaceContainerLow
+    val captionText = scheme.onSurface
+    val dark = caption.luminance() < 0.5f
+
+    androidx.compose.runtime.LaunchedEffect(enabled, caption, captionText, dark) {
+        // The window is realised by the time an effect runs, but a first launch can still race the
+        // native peer; one retry is enough and costs nothing when the first attempt worked.
+        repeat(2) { attempt ->
+            if (attempt > 0) kotlinx.coroutines.delay(400)
+            if (enabled) {
+                com.alananasss.kittytune.data.theme.WindowsTitleBar.apply(window, caption, captionText, dark)
+            } else {
+                com.alananasss.kittytune.data.theme.WindowsTitleBar.reset(window)
+            }
+        }
+    }
+}
