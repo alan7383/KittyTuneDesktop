@@ -93,6 +93,7 @@ import kotlin.math.roundToInt
     import com.alananasss.kittytune.ui.utils.fadingEdge
     import androidx.compose.ui.input.pointer.pointerInput
     import androidx.compose.foundation.gestures.detectTapGestures
+    import androidx.compose.foundation.gestures.scrollBy
     import kotlinx.coroutines.delay
     import kotlinx.coroutines.isActive
     import kotlinx.coroutines.launch
@@ -356,9 +357,15 @@ import kotlin.math.roundToInt
                 val startTime = System.currentTimeMillis()
                 val startPos = currentPosition.toFloat()
                 while (isActive) {
-                    withFrameMillis { 
-                        val elapsed = System.currentTimeMillis() - startTime
-                        // On calcule la position exacte à la milliseconde près (en tenant compte de la vitesse de lecture)
+                    withFrameMillis {
+                        // Interpolated to the millisecond between the player's 250 ms position
+                        // reports, but never further ahead than one report plus some slack: the
+                        // player stops reporting while buffering, seeking or scrubbing, and an
+                        // unbounded extrapolation then ran the word highlight off to the end of the
+                        // line and snapped it back once the real position arrived — the "one line
+                        // goes straight to the very end and jumps around" report in issue #33.
+                        val elapsed =
+                            (System.currentTimeMillis() - startTime).coerceAtMost(MAX_EXTRAPOLATION_MS)
                         smoothDrawPosition = startPos + (elapsed * speed)
                     }
                 }
@@ -378,9 +385,7 @@ import kotlin.math.roundToInt
         }
     
         val activeIndex = remember(adjustedPosition, lyrics) {
-            lyrics.indexOfFirst { adjustedPosition >= it.startTime && adjustedPosition < it.endTime }
-                .takeIf { it != -1 }
-                ?: lyrics.indexOfLast { adjustedPosition >= it.startTime }
+            LyricsUtils.activeLineIndex(lyrics, adjustedPosition)
         }
     
         LaunchedEffect(activeIndex) {
@@ -415,11 +420,11 @@ import kotlin.math.roundToInt
                     val lineInteractionSource = remember { MutableInteractionSource() }
                     val isHovered by lineInteractionSource.collectIsHoveredAsState()
     
-                    val textDecoration = if (isHovered) {
-                        TextDecoration.Underline
-                    } else {
-                        TextDecoration.None
-                    }
+                    // The hover rule is drawn by [lyricUnderline] rather than set as a
+                    // TextDecoration: Skia underlines each font run separately, so a line that
+                    // falls back out of the variable font (Cyrillic, Arabic, CJK…) came out as a
+                    // broken dashed rule at mismatched thicknesses (issue #33).
+                    var hoverLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     
                     val hzAlignment = when(alignment) {
                         TextAlign.Left -> Alignment.Start
@@ -460,19 +465,29 @@ import kotlin.math.roundToInt
                                 Box(modifier = Modifier.fillMaxWidth()) {
                                     Text(
                                         text = reconstructedText,
-                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp, textDecoration = textDecoration),
+                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                                         textAlign = alignment,
-                                        modifier = Modifier.fillMaxWidth(),
-                                        onTextLayout = { textLayoutResult = it }
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .lyricUnderline({ hoverLayout }, isHovered, fontSize, MaterialTheme.colorScheme.onSurface),
+                                        onTextLayout = { textLayoutResult = it; hoverLayout = it }
                                     )
                                     Text(
                                         text = reconstructedText,
-                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp, textDecoration = textDecoration),
+                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
                                         color = MaterialTheme.colorScheme.onSurface,
                                         textAlign = alignment,
                                         modifier = Modifier.fillMaxWidth().drawWithContent {
-                                            val currentPos = smoothDrawPosition + viewModel.lyricsOffset
+                                            // Clamped to this line's own end so it can only ever
+                                            // fill up, never overfill and then bounce.
+                                            val rawPos = smoothDrawPosition + viewModel.lyricsOffset
+                                            val currentPos =
+                                                if (line.endTime > line.startTime) {
+                                                    rawPos.coerceAtMost(line.endTime.toFloat())
+                                                } else {
+                                                    rawPos
+                                                }
                                             val layout = textLayoutResult ?: return@drawWithContent
                                             val path = androidx.compose.ui.graphics.Path()
                                             val safeTextLength = (reconstructedText.length - 1).coerceAtLeast(0)
@@ -510,19 +525,25 @@ import kotlin.math.roundToInt
                                 }
                                 Text(
                                     text = reconstructedText,
-                                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp, textDecoration = textDecoration),
+                                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
                                     textAlign = alignment,
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .lyricUnderline({ hoverLayout }, isHovered, fontSize, MaterialTheme.colorScheme.onSurface),
+                                    onTextLayout = { hoverLayout = it }
                                 )
                             }
                         } else {
                             val textColor = if (isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 1f)
                             Text(
                                 text = line.text,
-                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp, textDecoration = textDecoration),
+                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
                                 color = textColor,
                                 textAlign = alignment,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .lyricUnderline({ hoverLayout }, isHovered, fontSize, textColor),
+                                onTextLayout = { hoverLayout = it }
                             )
                         }
 
@@ -604,6 +625,7 @@ import kotlin.math.roundToInt
     fun PlainLyricsView(viewModel: PlayerViewModel) {
         val text = viewModel.rawPlainLyrics ?: str("lyrics_no_data")
         val clipboardManager = LocalClipboardManager.current
+        val density = androidx.compose.ui.platform.LocalDensity.current
     
         val fontSize = viewModel.lyricsFontSize
         val alignment = when(viewModel.lyricsAlignment) {
@@ -622,12 +644,49 @@ import kotlin.math.roundToInt
                 1f to Color.Transparent
             )
         }
-    
+
+        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        // Wheel and drag always win: the reader is following the words, and having the view creep
+        // out from under them would be worse than no auto-scroll at all. Any manual scroll parks
+        // the automatic one for a moment and it then picks up from wherever they left off.
+        var lastUserScrollMs by remember { mutableStateOf(0L) }
+
+        LaunchedEffect(viewModel.isPlainAutoScrollEnabled, viewModel.plainAutoScrollSpeed, text) {
+            if (!viewModel.isPlainAutoScrollEnabled) return@LaunchedEffect
+            var lastFrameNs = withFrameNanos { it }
+            while (isActive) {
+                val nowNs = withFrameNanos { it }
+                val elapsedSec = (nowNs - lastFrameNs) / 1_000_000_000f
+                lastFrameNs = nowNs
+                if (System.currentTimeMillis() - lastUserScrollMs < PLAIN_AUTOSCROLL_PAUSE_MS) continue
+                if (!listState.canScrollForward) continue
+                val step = PLAIN_AUTOSCROLL_BASE_DP_PER_SEC * viewModel.plainAutoScrollSpeed * elapsedSec
+                if (step > 0f) {
+                    listState.scrollBy(with(density) { step.dp.toPx() })
+                }
+            }
+        }
+
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .fadingEdge(fadeBrush),
+                    .fadingEdge(fadeBrush)
+                    // Observed on the Initial pass and never consumed, so the list still scrolls
+                    // exactly as it did before — this only notes that the reader took over.
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                                if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Scroll ||
+                                    event.type == androidx.compose.ui.input.pointer.PointerEventType.Press
+                                ) {
+                                    lastUserScrollMs = System.currentTimeMillis()
+                                }
+                            }
+                        }
+                    },
                 contentPadding = PaddingValues(top = 70.dp, bottom = 180.dp, start = 24.dp, end = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
@@ -724,27 +783,37 @@ import kotlin.math.roundToInt
     ) {
         val focusManager = LocalFocusManager.current
         var query by remember { mutableStateOf(viewModel.manualSearchQuery) }
-    
-        Column(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f))) {
+
+        // Themed rather than hard-coded black (issue #33): this view covers the whole player,
+        // so a flat black panel clashed with both the light theme and the cover-seeded palette.
+        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(16.dp)
             ) {
                 IconButton(onClick = onCloseSearch) {
-                    Icon(Icons.Rounded.Close, str("btn_close"), tint = Color.White)
+                    Icon(
+                        Icons.Rounded.Close,
+                        str("btn_close"),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.weight(1f).trackTextInput(),
-                    placeholder = { Text(str("lyrics_search_hint"), color = Color.White.copy(0.5f)) },
+                    placeholder = {
+                        Text(
+                            str("lyrics_search_hint"),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
                     singleLine = true,
+                    shape = CircleShape,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        cursorColor = Color.White,
-                        focusedBorderColor = Color.White,
-                        unfocusedBorderColor = Color.White.copy(0.5f)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
@@ -756,7 +825,11 @@ import kotlin.math.roundToInt
                     viewModel.searchLyricsManual(query, viewModel.manualSearchProvider)
                     focusManager.clearFocus()
                 }) {
-                    Icon(Icons.Rounded.Search, str("search_hint"), tint = Color.White)
+                    Icon(
+                        Icons.Rounded.Search,
+                        str("search_hint"),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
 
@@ -766,32 +839,44 @@ import kotlin.math.roundToInt
                 horizontalArrangement = Arrangement.Center
             ) {
                 Surface(
-                    color = Color.White.copy(alpha = 0.1f),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     shape = CircleShape,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(0.3f))
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant
+                    )
                 ) {
                     Row(modifier = Modifier.padding(4.dp)) {
-                        val p1 = "MUSIXMATCH"
-                        val p2 = "LRCLIB"
-                        
-                        Box(modifier = Modifier.clip(CircleShape).background(if(viewModel.manualSearchProvider == p1) Color.White else Color.Transparent).clickable { viewModel.searchLyricsManual(query, p1) }.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                            Text("Musixmatch", color = if(viewModel.manualSearchProvider == p1) Color.Black else Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                        Box(modifier = Modifier.clip(CircleShape).background(if(viewModel.manualSearchProvider == p2) Color.White else Color.Transparent).clickable { viewModel.searchLyricsManual(query, p2) }.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                            Text("LrcLib", color = if(viewModel.manualSearchProvider == p2) Color.Black else Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
+                        ProviderChip(
+                            label = "Musixmatch",
+                            selected = viewModel.manualSearchProvider == "MUSIXMATCH",
+                            onClick = { viewModel.searchLyricsManual(query, "MUSIXMATCH") }
+                        )
+                        ProviderChip(
+                            label = "LrcLib",
+                            selected = viewModel.manualSearchProvider == "LRCLIB",
+                            onClick = { viewModel.searchLyricsManual(query, "LRCLIB") }
+                        )
+                        ProviderChip(
+                            label = "Genius",
+                            selected = viewModel.manualSearchProvider == "GENIUS",
+                            onClick = { viewModel.searchLyricsManual(query, "GENIUS") }
+                        )
                     }
                 }
             }
 
             if (viewModel.isLyricsLoading) {
-                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Color.White)
+                LinearWavyProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             val searchResults = remember(viewModel.unifiedLyricSearchResults.toList()) {
                 viewModel.unifiedLyricSearchResults.toList()
             }
-    
+
             LazyColumn(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -799,7 +884,10 @@ import kotlin.math.roundToInt
                 items(items = searchResults, key = { it.id + it.provider }) { result ->
                     Card(
                         onClick = { viewModel.selectUnifiedLyricResult(result) },
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Row(
@@ -807,21 +895,37 @@ import kotlin.math.roundToInt
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(result.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(result.artistName, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(0.7f))
+                                Text(result.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(result.artistName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (!result.albumName.isNullOrEmpty()) {
-                                    Text(result.albumName, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(0.5f), maxLines = 1)
+                                    Text(result.albumName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                             Spacer(Modifier.width(8.dp))
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(makeTimeString((result.durationSec * 1000).toLong()), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(0.7f))
+                                if (result.durationSec > 0.0) {
+                                    Text(
+                                        makeTimeString((result.durationSec * 1000).toLong()),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                     if (result.hasLineSync) {
-                                        Icon(Icons.Rounded.Timer, null, tint = Color.Yellow, modifier = Modifier.size(16.dp))
+                                        Icon(
+                                            Icons.Rounded.Timer,
+                                            str("lyrics_badge_line_sync"),
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                     if (result.hasWordSync) {
-                                        Icon(Icons.Rounded.Verified, null, tint = Color.Green, modifier = Modifier.size(16.dp))
+                                        Icon(
+                                            Icons.Rounded.Verified,
+                                            str("lyrics_badge_word_sync"),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                     }
                                 }
                             }
@@ -831,6 +935,29 @@ import kotlin.math.roundToInt
             }
         }
     }
+
+    /** One provider pill in the manual-search selector. */
+    @Composable
+    private fun ProviderChip(label: String, selected: Boolean, onClick: () -> Unit) {
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(
+                    if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+                )
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            Text(
+                label,
+                color = if (selected) MaterialTheme.colorScheme.onPrimary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+        }
+    }
+
     @Composable
     fun LyricsOffsetControls(
         offset: Long,
@@ -1522,3 +1649,61 @@ fun UploadYamlDialog(
         }
     }
 }
+
+/**
+ * Draws the hover rule under a lyric line by hand.
+ *
+ * `TextDecoration.Underline` is drawn per font run, and a lyric line routinely spans several
+ * runs: the variable UI font has no Cyrillic, Arabic or CJK coverage, so those stretches fall
+ * back to a system face with its own underline thickness and position. The result was a rule
+ * that looked dashed and stepped — reported for Russian lyrics in issue #33. One rect per
+ * laid-out line, at one thickness, is the same rule whatever the script.
+ *
+ * @param layout the last layout of the text this sits on, read lazily so a relayout is picked
+ *   up without recreating the modifier.
+ * @param fontSizeSp the line's font size, which the thickness and the drop below the baseline
+ *   are both derived from, so the rule scales with the lyrics font-size setting.
+ */
+private fun Modifier.lyricUnderline(
+    layout: () -> androidx.compose.ui.text.TextLayoutResult?,
+    visible: Boolean,
+    fontSizeSp: Float,
+    color: Color,
+): Modifier = drawWithContent {
+    drawContent()
+    if (!visible) return@drawWithContent
+    val result = layout() ?: return@drawWithContent
+    val thickness = (fontSizeSp * 0.06f).sp.toPx().coerceAtLeast(1f)
+    val drop = (fontSizeSp * 0.14f).sp.toPx()
+    for (i in 0 until result.lineCount) {
+        val left = result.getLineLeft(i)
+        val right = result.getLineRight(i)
+        if (right - left <= 0f) continue
+        drawRect(
+            color = color,
+            topLeft = androidx.compose.ui.geometry.Offset(left, result.getLineBaseline(i) + drop),
+            size = androidx.compose.ui.geometry.Size(right - left, thickness),
+        )
+    }
+}
+
+/**
+ * Auto-scroll rate for lyrics with no timings, at speed 1×, in dp per second. Slow on purpose:
+ * the slider spans 0.25× to 4×, so the default has to sit where a comfortable reading pace is,
+ * not at the top of the range.
+ */
+private const val PLAIN_AUTOSCROLL_BASE_DP_PER_SEC = 18f
+
+/** How long a manual scroll holds the automatic one off. */
+private const val PLAIN_AUTOSCROLL_PAUSE_MS = 2_500L
+
+/**
+ * How far the word-sync highlight may run ahead of the player's last reported position.
+ *
+ * The player reports every 250 ms, so the highlight has to extrapolate to stay smooth between
+ * reports. It must not extrapolate indefinitely: reporting stops outright while buffering, seeking
+ * or scrubbing, and without a ceiling the highlight sprinted to the end of the line and jumped back
+ * when the real position returned (issue #33). One report plus slack keeps normal playback smooth
+ * and turns a stall into a pause rather than a bolt.
+ */
+private const val MAX_EXTRAPOLATION_MS = 400L

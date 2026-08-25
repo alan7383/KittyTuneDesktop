@@ -27,6 +27,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import java.net.URLEncoder
@@ -282,6 +283,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     var isRomanizationEnabled by mutableStateOf(playerPrefs.getLyricsRomanizationEnabled())
 
+    /** Auto-scroll for lyrics with no timings, and its rate. See [PlainLyricsView]. */
+    var isPlainAutoScrollEnabled by mutableStateOf(playerPrefs.getLyricsPlainAutoScroll())
+        private set
+    var plainAutoScrollSpeed by mutableFloatStateOf(playerPrefs.getLyricsPlainAutoScrollSpeed())
+        private set
+
+    fun togglePlainAutoScroll(enabled: Boolean) {
+        isPlainAutoScrollEnabled = enabled
+        playerPrefs.setLyricsPlainAutoScroll(enabled)
+    }
+
+    fun updatePlainAutoScrollSpeed(speed: Float) {
+        plainAutoScrollSpeed = speed.coerceIn(0.25f, 4f)
+        playerPrefs.setLyricsPlainAutoScrollSpeed(plainAutoScrollSpeed)
+    }
+
     fun toggleRomanization(enabled: Boolean) {
         isRomanizationEnabled = enabled
         playerPrefs.setLyricsRomanizationEnabled(enabled)
@@ -435,6 +452,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var saveQueueJob: Job? = null
     private var progressUpdateJob: Job? = null
     private var lyricsJob: Job? = null
+
+    /**
+     * Kept apart from [lyricsJob] so cancelling the current lookup — every track change does —
+     * does not throw away a prefetch that has already paid for its requests.
+     */
+    private var lyricsPrefetchJob: Job? = null
     private var queueChunkingJob: Job? = null
     private var trackInitJob: Job? = null
     private var playJob: Job? = null
@@ -448,6 +471,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     companion object {
         const val TRACK_PREFIX = "track:"
         const val CONTEXT_SEPARATOR = ":context:"
+
+        /**
+         * Weight given to the lyrics provider listed first in the settings, when two results are
+         * otherwise equally good. Far below the gap between sync tiers, and below any meaningful
+         * difference in match quality: a preference should settle a tie, not override a better
+         * match or a genuinely synced result from the other provider (issue #33).
+         */
+        private const val PROVIDER_PREFERENCE_BONUS = 0.05f
+
+        /** What [Track.fullResArtwork] falls back to when a track has no cover at all. */
+        private const val PLACEHOLDER_ARTWORK_PREFIX = "https://picsum.photos"
 
         /**
          * How often the queue's prefetched stream URLs are topped up. Well under the few
@@ -658,6 +692,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         MusicManager.applyEffects(effectsState)
         applyRepeatMode()
         fetchUserProfile()
+        observeArtworkColors()
 
 
         MusicManager.onNextClick = {
@@ -708,7 +743,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             currentTrack = finalTrack
             MusicManager.currentTrack = finalTrack
 
-            updatePlayerColors(finalTrack)
+            // Colours are not extracted from here any more: this callback only fires for direct
+            // URI launches, so hanging the dynamic theme off it meant normal playback never
+            // updated it at all (issue #33). [observeArtworkColors] watches currentTrack instead.
             updateDiscordPresence()
 
             viewModelScope.launch {
@@ -1112,6 +1149,61 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         return queries.filter { it.length > 2 }.toList()
     }
 
+    /**
+     * The settings a resolved lookup depends on. Two of them change the words themselves rather
+     * than how they are shown, so a cache entry is only reusable while all three still hold.
+     */
+    private data class LyricsVariant(
+        val providerPreference: String,
+        val translationLang: String?,
+        val romanized: Boolean,
+    )
+
+    private fun currentLyricsVariant() = LyricsVariant(
+        providerPreference = lyricsProvider.name,
+        translationLang =
+            if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null,
+        romanized = isRomanizationEnabled,
+    )
+
+    /** A resolved lookup, ready either to be shown or to be parked in the cache. */
+    private data class LyricsPayload(
+        val lines: List<LyricLine>,
+        val plain: String?,
+        val provider: String?,
+    ) {
+        val isEmpty: Boolean get() = lines.isEmpty() && plain.isNullOrBlank()
+    }
+
+    /**
+     * One provider result in the running, with its lyrics and its plain text kept together.
+     *
+     * They travel as a pair on purpose. The previous pass reused a single `finalPlain` across
+     * every generated query, so a query that only turned up plain text left it behind for a later
+     * query that found synced lines but no plain text — and the lyrics screen then showed the
+     * words of one song beside the timings of another (issue #33).
+     */
+    private data class LyricsCandidate(
+        val lines: List<LyricLine>,
+        val plain: String?,
+        val provider: String,
+        val matchScore: Float,
+        /**
+         * Small nudge for the provider named first in the settings, deliberately smaller than any
+         * meaningful difference in [matchScore]: it decides a genuine tie, it does not let the
+         * preferred provider win with lyrics that fit the track less well.
+         */
+        val providerBonus: Float = 0f,
+    ) {
+        /** Word sync beats line sync beats plain text; match quality settles ties within a tier. */
+        val rank: Float get() = syncTier * 10f + matchScore + providerBonus
+
+        /** See [LyricsMatcher.syncTier]: real timings first, provider second. */
+        val syncTier: Int get() = LyricsMatcher.syncTier(lines, plain)
+
+        val isUsable: Boolean get() = syncTier > LyricsMatcher.SYNC_TIER_NONE
+    }
+
     private fun loadLyrics(track: Track) {
         lyricsJob?.cancel()
         lyricsLines.clear()
@@ -1120,9 +1212,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         isLyricsLoading = true
         isSearchingLyrics = false
         rawPlainLyrics = null
-
-        val trackDurationMs = track.durationMs ?: 0L
-        val trackDurationSec = trackDurationMs / 1000.0
 
         val queries = generateSearchQueries(track.title ?: "", track.user?.username ?: "")
         manualSearchQuery = queries.firstOrNull() ?: ""
@@ -1135,215 +1224,324 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 return@launch
             }
 
-            val preferLocal = playerPrefs.getLyricsPreferLocal()
-            if (preferLocal) {
-                val localTrack = DownloadManager.getLocalTrack(track.id)
-                if (localTrack != null && localTrack.localAudioPath.isNotEmpty()) {
-                    val rawLyrics = LyricsUtils.extractLocalLyrics(localTrack.localAudioPath)
-                    if (!rawLyrics.isNullOrBlank()) {
-                        val parsed = LyricsUtils.parseLyricsContent(rawLyrics, trackDurationMs)
-                        withContext(Dispatchers.Main) {
-                            lyricsLines.addAll(parsed.ifEmpty { listOf(LyricLine(rawLyrics, 0, trackDurationMs)) })
-                            lyricsMode = LyricsMode.SYNCED
-                            isLyricsLoading = false
-                        }
-                        return@launch
-                    }
+            val variant = currentLyricsVariant()
+
+            // Cache first: a hit puts the lyrics on screen in this frame instead of after a
+            // dozen HTTP round trips, which is what made them arrive ten seconds into the song
+            // and flash "unavailable" until then (issue #33).
+            val cached = LyricsCache.get(
+                track.id,
+                variant.providerPreference,
+                variant.translationLang,
+                variant.romanized,
+            )
+            if (cached != null) {
+                withContext(Dispatchers.Main) {
+                    applyLyricsPayload(LyricsPayload(cached.lines, cached.plain, cached.provider))
                 }
+                prefetchQueueLyrics()
+                return@launch
             }
 
-            var bestMxmLineSync: Pair<List<LyricLine>, String?>? = null
-            var bestLrcLineSync: LrcLibResponse? = null
-
-            var finalLines = emptyList<LyricLine>()
-            var finalPlain: String? = null
-
-            val preferLrcLib = lyricsProvider == LyricsProvider.OPEN_SOURCE
-
-            for (query in queries) {
-                if (!isActive) return@launch
-
-                if (preferLrcLib) {
-                    val lrcAll = try {
-                        LrcLibClient.api.searchLyrics(query)
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                    val lrcFiltered = lrcAll.filter { kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
-                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered else lrcAll.take(10)
-                    val lrcMatch = topLrc.maxByOrNull { if (!it.syncedLyrics.isNullOrEmpty()) 1 else 0 }
-
-                    val lrcLines = lrcMatch?.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) }
-                        ?: emptyList()
-                    val lrcPlain = lrcMatch?.plainLyrics
-
-                    if (lrcLines.isNotEmpty()) {
-                        finalLines = lrcLines
-                        finalPlain = lrcPlain
-                        break
-                    }
-                    if (!lrcPlain.isNullOrBlank() && finalPlain == null) {
-                        finalPlain = lrcPlain
-                    }
-                } else {
-                    val (mxmAll, lrcAll) = kotlinx.coroutines.coroutineScope {
-                        val mxmDeferred = async {
-                            try {
-                                MusixmatchClient.search(query)
-                            } catch (e: Exception) {
-                                println("MXM search exception: ${e.message}")
-                                emptyList()
-                            }
-                        }
-                        val lrcDeferred = async {
-                            try {
-                                LrcLibClient.api.searchLyrics(query)
-                            } catch (e: Exception) {
-                                emptyList()
-                            }
-                        }
-                        Pair(mxmDeferred.await(), lrcDeferred.await())
-                    }
-
-                    println("LyricsFetch: MXM search results: ${mxmAll.size} | LRC search results: ${lrcAll.size}")
-
-                    val mxmFiltered =
-                        mxmAll.filter { it.trackLength == 0 || kotlin.math.abs(it.trackLength - trackDurationSec) < 15.0 }
-                    val topMxm = if (mxmFiltered.isNotEmpty()) mxmFiltered else mxmAll.take(10)
-                    val mxmMatch = topMxm.maxByOrNull { it.hasRichSync * 2 + it.hasSubtitles }
-
-                    println("LyricsFetch: MXM best match: ${mxmMatch?.trackName} | hasRichSync=${mxmMatch?.hasRichSync} | hasSubtitles=${mxmMatch?.hasSubtitles}")
-
-                    val targetLang =
-                        if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
-                    val mxmData = mxmMatch?.let {
-                        MusixmatchClient.getLyricsData(
-                            it.trackId,
-                            trackDurationMs,
-                            targetLang,
-                            isRomanizationEnabled
-                        )
-                    }
-
-                    val lrcFiltered =
-                        lrcAll.filter { it.duration == 0.0 || kotlin.math.abs(it.duration - trackDurationSec) < 15.0 }
-                    val topLrc = if (lrcFiltered.isNotEmpty()) lrcFiltered else lrcAll.take(10)
-                    val lrcMatch = topLrc.maxByOrNull { if (!it.syncedLyrics.isNullOrEmpty()) 1 else 0 }
-
-                    val lrcLines = lrcMatch?.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) }
-                        ?: emptyList()
-                    val lrcPlain = lrcMatch?.plainLyrics
-
-                    val mxmWordSync = mxmData != null && mxmData.first.any { it.words.isNotEmpty() }
-                    val lrcWordSync = lrcLines.any { it.words.isNotEmpty() }
-                    val mxmLineSync = mxmData != null && mxmData.first.size > 1
-                    val lrcLineSync = lrcLines.size > 1
-                    val hasMxmPlain = !mxmData?.second.isNullOrBlank()
-                    val hasLrcPlain = !lrcPlain.isNullOrBlank()
-
-                    println("LyricsFetch: MXM: wordSync=$mxmWordSync lineSync=$mxmLineSync plain=$hasMxmPlain linesCount=${mxmData?.first?.size}")
-                    println("LyricsFetch: LRC: wordSync=$lrcWordSync lineSync=$lrcLineSync plain=$hasLrcPlain linesCount=${lrcLines.size}")
-
-                    when {
-                        mxmWordSync -> {
-                            println("LyricsFetch: ✅ Picked: MXM word-sync")
-                            finalLines = mxmData!!.first
-                            finalPlain = mxmData.second
-                            break
-                        }
-
-                        lrcWordSync -> {
-                            println("LyricsFetch: ✅ Picked: LRC word-sync")
-                            finalLines = lrcLines
-                            finalPlain = lrcPlain
-                            break
-                        }
-
-                        mxmLineSync -> {
-                            println("LyricsFetch: ✅ Picked: MXM line-sync")
-                            bestMxmLineSync = mxmData
-                            if (hasMxmPlain) finalPlain = mxmData!!.second
-                            break
-                        }
-
-                        lrcLineSync -> {
-                            println("LyricsFetch: ✅ Picked: LRC line-sync (MXM had nothing)")
-                            bestLrcLineSync = lrcMatch
-                            if (hasLrcPlain) finalPlain = lrcPlain
-                            break
-                        }
-
-                        hasMxmPlain -> {
-                            if (finalPlain == null) finalPlain = mxmData!!.second
-                        }
-
-                        hasLrcPlain -> {
-                            if (finalPlain == null) finalPlain = lrcPlain
-                        }
-                    }
-                }
+            val local = loadEmbeddedLyrics(track)
+            if (local != null) {
+                withContext(Dispatchers.Main) { applyLyricsPayload(local) }
+                prefetchQueueLyrics()
+                return@launch
             }
 
-            if (finalLines.isEmpty()) {
-                if (bestMxmLineSync != null) {
-                    finalLines = bestMxmLineSync!!.first
-                    finalPlain = bestMxmLineSync!!.second
-                } else if (bestLrcLineSync != null) {
-                    finalLines =
-                        bestLrcLineSync!!.syncedLyrics?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) }
-                            ?: emptyList()
-                    finalPlain = bestLrcLineSync!!.plainLyrics
-                }
-            }
+            val payload = resolveLyrics(track, queries, variant)
+            if (!isActive) return@launch
 
-            if (finalLines.isEmpty() && finalPlain.isNullOrBlank()) {
-                for (query in queries) {
-                    if (!isActive) break
-                    val lrcPlain = try {
-                        LrcLibClient.api.searchLyrics(query)
-                            .firstOrNull { !it.plainLyrics.isNullOrBlank() }?.plainLyrics
-                    } catch (e: Exception) {
-                        null
-                    }
-                    if (lrcPlain != null) {
-                        finalPlain = lrcPlain; break
-                    }
-                }
-            }
-
-            if (finalLines.isNotEmpty() && (preferLrcLib || (finalLines.firstOrNull()?.translation == null && finalLines.firstOrNull()?.romanization == null))) {
-                val targetLang =
-                    if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
-                val wantsRomanization = isRomanizationEnabled
-
-                if (targetLang != null || wantsRomanization) {
-                    val originalTexts = finalLines.map { it.text }.filter { it.isNotBlank() }.distinct()
-                    val translations =
-                        if (targetLang != null) com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(
-                            originalTexts,
-                            targetLang
-                        ) else emptyMap()
-                    val romanizations =
-                        if (wantsRomanization) com.alananasss.kittytune.data.network.FreeTranslator.getRomanization(
-                            originalTexts
-                        ) else emptyMap()
-
-                    finalLines = finalLines.map { line ->
-                        line.copy(
-                            translation = line.translation ?: translations[line.text.trim()],
-                            romanization = line.romanization ?: romanizations[line.text.trim()]
-                        )
-                    }
-                }
-            }
+            LyricsCache.put(
+                track.id,
+                LyricsCache.Entry(
+                    found = payload != null && !payload.isEmpty,
+                    lines = payload?.lines.orEmpty(),
+                    plain = payload?.plain,
+                    provider = payload?.provider,
+                    providerPreference = variant.providerPreference,
+                    translationLang = variant.translationLang,
+                    romanized = variant.romanized,
+                ),
+            )
 
             withContext(Dispatchers.Main) {
-                lyricsLines.addAll(finalLines)
-                rawPlainLyrics = finalPlain
-                lyricsMode = if (finalLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
-                isLyricsLoading = false
-                if (finalLines.isNotEmpty() || !rawPlainLyrics.isNullOrBlank()) isSearchingLyrics = false
+                applyLyricsPayload(payload ?: LyricsPayload(emptyList(), null, null))
             }
+            prefetchQueueLyrics()
+        }
+    }
+
+    /** Publishes a resolved lookup to the screen. Main thread only. */
+    private fun applyLyricsPayload(payload: LyricsPayload) {
+        lyricsLines.clear()
+        lyricsLines.addAll(payload.lines)
+        rawPlainLyrics = payload.plain
+        lyricsMode = if (payload.lines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
+        isLyricsLoading = false
+        if (payload.lines.isNotEmpty() || !payload.plain.isNullOrBlank()) isSearchingLyrics = false
+    }
+
+    /** Lyrics tagged into the downloaded file, when the user asked for those to come first. */
+    private suspend fun loadEmbeddedLyrics(track: Track): LyricsPayload? {
+        if (!playerPrefs.getLyricsPreferLocal()) return null
+        val localTrack = DownloadManager.getLocalTrack(track.id) ?: return null
+        if (localTrack.localAudioPath.isEmpty()) return null
+        val raw = LyricsUtils.extractLocalLyrics(localTrack.localAudioPath)
+        if (raw.isNullOrBlank()) return null
+        val trackDurationMs = track.durationMs ?: 0L
+        val parsed = LyricsUtils.parseLyricsContent(raw, trackDurationMs)
+        return LyricsPayload(
+            lines = parsed.ifEmpty { listOf(LyricLine(raw, 0, trackDurationMs)) },
+            plain = raw.takeIf { parsed.isEmpty() },
+            provider = "LOCAL",
+        )
+    }
+
+    /**
+     * Warms the cache for the track queued after this one, so moving to it shows its lyrics
+     * immediately rather than starting the whole search over. Runs detached from [lyricsJob]:
+     * cancelling the current lookup should not throw away work already paid for.
+     */
+    private fun prefetchQueueLyrics() {
+        val next = _queue.getOrNull(currentQueueIndex + 1) ?: return
+        if (next.id == currentTrack?.id) return
+        val variant = currentLyricsVariant()
+        if (LyricsCache.get(next.id, variant.providerPreference, variant.translationLang, variant.romanized) != null) {
+            return
+        }
+        if (getLyricsOverride(next.id) != null) return
+
+        lyricsPrefetchJob?.cancel()
+        lyricsPrefetchJob = viewModelScope.launch(Dispatchers.IO) {
+            val queries = generateSearchQueries(next.title ?: "", next.user?.username ?: "")
+            val payload = runCatching { resolveLyrics(next, queries, variant) }.getOrNull()
+            if (!isActive) return@launch
+            LyricsCache.put(
+                next.id,
+                LyricsCache.Entry(
+                    found = payload != null && !payload.isEmpty,
+                    lines = payload?.lines.orEmpty(),
+                    plain = payload?.plain,
+                    provider = payload?.provider,
+                    providerPreference = variant.providerPreference,
+                    translationLang = variant.translationLang,
+                    romanized = variant.romanized,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Runs the whole provider search for [track] without touching any UI state, so the same code
+     * serves the track being played and the prefetch of the one after it.
+     *
+     * @return the best result found, or null when no provider had anything usable.
+     */
+    private suspend fun resolveLyrics(
+        track: Track,
+        queries: List<String>,
+        variant: LyricsVariant,
+    ): LyricsPayload? = coroutineScope {
+        val target = LyricsMatcher.Target(
+            title = track.title ?: "",
+            artist = track.user?.username ?: "",
+            durationMs = track.durationMs ?: 0L,
+        )
+        val trackDurationMs = track.durationMs ?: 0L
+        val preferLrcLib = lyricsProvider == LyricsProvider.OPEN_SOURCE
+        val preferredProvider = if (preferLrcLib) "LRCLIB" else "MUSIXMATCH"
+
+        var best: LyricsCandidate? = null
+
+        for (query in queries) {
+            if (!isActive) return@coroutineScope null
+
+            val found = if (preferLrcLib) {
+                searchLrcLibCandidates(query, target, trackDurationMs)
+            } else {
+                val mxm = async { searchMusixmatchCandidates(query, target, trackDurationMs, variant) }
+                val lrc = async { searchLrcLibCandidates(query, target, trackDurationMs) }
+                mxm.await() + lrc.await()
+            }
+            val candidates = found.map { candidate ->
+                if (candidate.provider == preferredProvider) {
+                    candidate.copy(providerBonus = PROVIDER_PREFERENCE_BONUS)
+                } else {
+                    candidate
+                }
+            }
+
+            val bestOfQuery = candidates.filter { it.isUsable }.maxByOrNull { it.rank }
+            if (bestOfQuery != null && bestOfQuery.rank > (best?.rank ?: Float.NEGATIVE_INFINITY)) {
+                best = bestOfQuery
+            }
+
+            // Word-level sync from a confident match is as good as this gets, so stop spending
+            // requests on the remaining, progressively looser, generated queries.
+            val current = best
+            if (current != null &&
+                current.syncTier >= LyricsMatcher.SYNC_TIER_WORD &&
+                current.matchScore >= 0.6f
+            ) break
+        }
+
+        // Genius only once everything else has come up empty: it never carries timings, so it is
+        // about having the words at all rather than about having them in sync (issue #33).
+        if (best == null) {
+            best = searchGeniusCandidate(queries, target)
+        }
+
+        val candidate = best ?: return@coroutineScope null
+        // Only real sync is published as sync. A single timed line is what a provider returns when
+        // it has the words but not the timings, and passing that through would put the lyrics view
+        // in synced mode with one line in it instead of showing the plain text it also sent.
+        val syncedLines =
+            if (candidate.syncTier >= LyricsMatcher.SYNC_TIER_LINE) candidate.lines else emptyList()
+        LyricsPayload(
+            lines = decorateLyrics(syncedLines, variant),
+            // Lines that turned out not to be synced are still the words: keep them as the plain
+            // text rather than dropping them along with their useless timings.
+            plain = candidate.plain
+                ?: candidate.lines.takeIf { it.isNotEmpty() }?.joinToString("\n") { it.text },
+            provider = candidate.provider,
+        )
+    }
+
+    /**
+     * LrcLib hits for one query. Every hit keeps its own plain text alongside its own timings, so
+     * the two can never be mixed between songs.
+     */
+    private suspend fun searchLrcLibCandidates(
+        query: String,
+        target: LyricsMatcher.Target,
+        trackDurationMs: Long,
+    ): List<LyricsCandidate> {
+        val results = try {
+            LrcLibClient.api.searchLyrics(query)
+        } catch (e: Exception) {
+            emptyList()
+        }
+        return results
+            .filter { LyricsMatcher.isAcceptable(it.name, it.artistName, target) }
+            .map { result ->
+                val synced = result.lyricsfile ?: result.syncedLyrics
+                val lines = synced
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) }
+                    ?: emptyList()
+                LyricsCandidate(
+                    lines = lines,
+                    plain = result.plainLyrics,
+                    provider = "LRCLIB",
+                    matchScore = LyricsMatcher.score(result.name, result.artistName, result.duration, target),
+                )
+            }
+    }
+
+    /**
+     * Musixmatch hits for one query.
+     *
+     * Search returns metadata only, so the actual lyrics cost a second round trip per track —
+     * which is why exactly one entry gets fetched: the one that both matches best and advertises
+     * the richest sync.
+     */
+    private suspend fun searchMusixmatchCandidates(
+        query: String,
+        target: LyricsMatcher.Target,
+        trackDurationMs: Long,
+        variant: LyricsVariant,
+    ): List<LyricsCandidate> {
+        val results = try {
+            MusixmatchClient.search(query)
+        } catch (e: Exception) {
+            emptyList()
+        }
+        val pick = results
+            .filter { LyricsMatcher.isAcceptable(it.trackName, it.artistName, target) }
+            .maxByOrNull { hit ->
+                val syncTier = hit.hasRichSync * 2 + hit.hasSubtitles
+                syncTier * 10f +
+                    LyricsMatcher.score(hit.trackName, hit.artistName, hit.trackLength.toDouble(), target)
+            } ?: return emptyList()
+
+        val data = try {
+            MusixmatchClient.getLyricsData(
+                pick.trackId,
+                trackDurationMs,
+                variant.translationLang,
+                variant.romanized,
+            )
+        } catch (e: Exception) {
+            return emptyList()
+        }
+        return listOf(
+            LyricsCandidate(
+                lines = data.first,
+                plain = data.second,
+                provider = "MUSIXMATCH",
+                matchScore = LyricsMatcher.score(
+                    pick.trackName,
+                    pick.artistName,
+                    pick.trackLength.toDouble(),
+                    target,
+                ),
+            )
+        )
+    }
+
+    /** The best Genius page for any of the generated queries, as plain text. */
+    private suspend fun searchGeniusCandidate(
+        queries: List<String>,
+        target: LyricsMatcher.Target,
+    ): LyricsCandidate? {
+        // The first few queries are the tightest; the looser tail is not worth another round trip
+        // against a provider that cannot give timings anyway.
+        for (query in queries.take(3)) {
+            if (!currentCoroutineContext().isActive) return null
+            val pick = com.alananasss.kittytune.data.network.GeniusClient.search(query)
+                .filter { LyricsMatcher.isAcceptable(it.title, it.artist, target) }
+                .maxByOrNull { LyricsMatcher.score(it.title, it.artist, 0.0, target) }
+                ?: continue
+            val plain = com.alananasss.kittytune.data.network.GeniusClient.lyrics(pick.id) ?: continue
+            return LyricsCandidate(
+                lines = emptyList(),
+                plain = plain,
+                provider = "GENIUS",
+                matchScore = LyricsMatcher.score(pick.title, pick.artist, 0.0, target),
+            )
+        }
+        return null
+    }
+
+    /** Adds the translation and romanisation the user asked for, when the provider did not. */
+    private suspend fun decorateLyrics(
+        lines: List<LyricLine>,
+        variant: LyricsVariant,
+    ): List<LyricLine> {
+        if (lines.isEmpty()) return lines
+        val wantsTranslation = variant.translationLang != null && lines.none { it.translation != null }
+        val wantsRomanization = variant.romanized && lines.none { it.romanization != null }
+        if (!wantsTranslation && !wantsRomanization) return lines
+
+        val texts = lines.map { it.text }.filter { it.isNotBlank() }.distinct()
+        val translations = if (wantsTranslation) {
+            com.alananasss.kittytune.data.network.FreeTranslator
+                .translateMissing(texts, variant.translationLang!!)
+        } else {
+            emptyMap()
+        }
+        val romanizations = if (wantsRomanization) {
+            com.alananasss.kittytune.data.network.FreeTranslator.getRomanization(texts)
+        } else {
+            emptyMap()
+        }
+        return lines.map { line ->
+            line.copy(
+                translation = line.translation ?: translations[line.text.trim()],
+                romanization = line.romanization ?: romanizations[line.text.trim()],
+            )
         }
     }
 
@@ -1412,24 +1610,35 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (provider == "LRCLIB") {
-                    val results = LrcLibClient.api.searchLyrics(query)
-                    val mapped = results.map {
+                val mapped = when (provider) {
+                    "LRCLIB" -> LrcLibClient.api.searchLyrics(query).map {
                         UnifiedLyricResult(
                             it.id.toString(),
                             it.name,
                             it.artistName,
                             it.albumName,
                             it.duration,
-                            !it.syncedLyrics.isNullOrEmpty(),
+                            !it.syncedLyrics.isNullOrEmpty() || !it.lyricsfile.isNullOrEmpty(),
                             false,
                             "LRCLIB"
                         )
                     }
-                    withContext(Dispatchers.Main) { unifiedLyricSearchResults.addAll(mapped) }
-                } else {
-                    val results = MusixmatchClient.search(query)
-                    val mapped = results.map {
+
+                    "GENIUS" -> com.alananasss.kittytune.data.network.GeniusClient.search(query).map {
+                        UnifiedLyricResult(
+                            it.id.toString(),
+                            it.title ?: "",
+                            it.artist,
+                            it.releaseDate,
+                            // Genius does not report a track length, and it never has timings.
+                            0.0,
+                            false,
+                            false,
+                            "GENIUS"
+                        )
+                    }
+
+                    else -> MusixmatchClient.search(query).map {
                         UnifiedLyricResult(
                             it.trackId.toString(),
                             it.trackName,
@@ -1441,8 +1650,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             "MUSIXMATCH"
                         )
                     }
-                    withContext(Dispatchers.Main) { unifiedLyricSearchResults.addAll(mapped) }
                 }
+                withContext(Dispatchers.Main) { unifiedLyricSearchResults.addAll(mapped) }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -1457,37 +1666,65 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             var finalLines = emptyList<LyricLine>()
             var finalPlain: String? = null
 
-            if (result.provider == "LRCLIB") {
-                try {
-                    val lrcData = LrcLibClient.api.searchLyrics(result.name + " " + result.artistName)
-                        .find { it.id.toString() == result.id }
-                    val lyricsText = lrcData?.lyricsfile ?: lrcData?.syncedLyrics
-                    if (!lyricsText.isNullOrEmpty()) finalLines = LyricsUtils.parseLyricsContent(lyricsText, duration)
-                    finalPlain = lrcData?.plainLyrics
-                } catch (e: Exception) {
+            when (result.provider) {
+                "LRCLIB" -> {
+                    try {
+                        val lrcData = LrcLibClient.api.getLyricsById(result.id.toLong())
+                        val lyricsText = lrcData.lyricsfile ?: lrcData.syncedLyrics
+                        if (!lyricsText.isNullOrEmpty()) {
+                            finalLines = LyricsUtils.parseLyricsContent(lyricsText, duration)
+                        }
+                        finalPlain = lrcData.plainLyrics
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-            } else {
-                val targetLang =
-                    if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
-                lastFetchedMxmTrackId = result.id.toLongOrNull()
-                val data =
-                    MusixmatchClient.getLyricsData(result.id.toLong(), duration, targetLang, isRomanizationEnabled)
-                finalLines = data.first
-                finalPlain = data.second
+
+                "GENIUS" -> {
+                    finalPlain = com.alananasss.kittytune.data.network.GeniusClient
+                        .lyrics(result.id.toLongOrNull() ?: 0L)
+                }
+
+                else -> {
+                    val targetLang =
+                        if (playerPrefs.getLyricsTranslationEnabled()) playerPrefs.getLyricsTranslationLang() else null
+                    lastFetchedMxmTrackId = result.id.toLongOrNull()
+                    val data =
+                        MusixmatchClient.getLyricsData(result.id.toLong(), duration, targetLang, isRomanizationEnabled)
+                    finalLines = data.first
+                    finalPlain = data.second
+                }
             }
 
             withContext(Dispatchers.Main) {
-                lyricsLines.clear()
-                lyricsLines.addAll(finalLines)
-                rawPlainLyrics = finalPlain
-                lyricsMode = if (finalLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
+                if (finalLines.isNotEmpty()) {
+                    lyricsLines.clear()
+                    lyricsLines.addAll(finalLines)
+                    rawPlainLyrics = finalPlain
+                    lyricsMode = LyricsMode.SYNCED
+                } else if (!finalPlain.isNullOrBlank()) {
+                    // A result with no timings must not cost the user the synced lyrics they
+                    // already had: synced outranks plain, so the plain text is added beside them
+                    // and the view stays where it is (issue #33). Only with nothing synced on
+                    // screen does picking plain text switch the view to it.
+                    rawPlainLyrics = finalPlain
+                    if (lyricsLines.isEmpty()) lyricsMode = LyricsMode.PLAIN
+                } else {
+                    lyricsLines.clear()
+                    rawPlainLyrics = null
+                    lyricsMode = LyricsMode.PLAIN
+                }
                 isLyricsLoading = false
                 isSearchingLyrics = false
             }
 
-            // Remember the manual pick for the current track (issue #27).
+            // Remember the manual pick for the current track (issue #27), and drop the cached
+            // automatic match so it cannot come back on the next play.
             if (finalLines.isNotEmpty() || !finalPlain.isNullOrBlank()) {
-                currentTrack?.id?.let { saveLyricsOverride(it, result) }
+                currentTrack?.id?.let {
+                    saveLyricsOverride(it, result)
+                    LyricsCache.invalidate(it)
+                }
             }
         }
     }
@@ -1839,11 +2076,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     ?.flatMap { it.relatedLikers?.users.orEmpty() }
                     ?.filter { it.urn != myUrn }
                     .orEmpty()
-                if (users.isNotEmpty()) {
-                    val u = users.first()
-                    val userId = u.urn?.substringAfterLast(':')?.toLongOrNull() ?: 0L
-                    if (userId > 0) {
-                        socialLikerUser = User(
+                    .mapNotNull { u ->
+                        val userId = u.urn?.substringAfterLast(':')?.toLongOrNull() ?: 0L
+                        if (userId <= 0) return@mapNotNull null
+                        User(
                             id = userId,
                             username = u.username,
                             avatarUrl = u.avatarUrl,
@@ -1851,9 +2087,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                             urn = u.urn
                         )
                     }
-                } else {
-                    socialLikerUser = null
-                }
+                socialLikerUser = users.firstOrNull()
+                // Hand the answer to the shared cache so the track's rows show the same faces
+                // without asking for them again (issue #33).
+                SocialProofRepository.putLikersForTrack(trackId, users)
             } catch (e: Exception) {
                 e.printStackTrace()
                 socialLikerUser = null
@@ -3328,9 +3565,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun loadBitmap(url: String): java.awt.image.BufferedImage? = ArtworkPalette.load(url)
 
+    /**
+     * Keeps the dynamic theme on the cover of whatever is playing.
+     *
+     * Watches [currentTrack] rather than a playback callback. The colours used to be extracted
+     * from `MusicManager.onTrackChange`, which only fires from `MusicManager.playTrack` — the
+     * direct-URI path — while normal playback goes through `playTrackAtIndex`/`playRobustly`.
+     * The dynamic theme therefore never updated during ordinary listening and the palette sat on
+     * its default seed forever (issue #33). One watcher on the state every one of those paths
+     * assigns covers them all, session restore and the metadata backfill included.
+     *
+     * Keyed on the artwork rather than the track, so the whole of an album costs one extraction
+     * and the backfill that swaps in fuller metadata does not pay for a second.
+     */
+    private fun observeArtworkColors() {
+        viewModelScope.launch {
+            snapshotFlow { currentTrack }
+                .distinctUntilChangedBy { it?.fullResArtwork }
+                .collect { track ->
+                    if (track == null) {
+                        com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = null
+                    } else {
+                        updatePlayerColors(track)
+                    }
+                }
+        }
+    }
+
     private fun updatePlayerColors(track: Track) {
         viewModelScope.launch(Dispatchers.IO) {
             val isDarkMode = playerPrefs.getThemeMode() != com.alananasss.kittytune.data.local.AppThemeMode.LIGHT
+
+            // No real cover: `fullResArtwork` invents a random picsum image for those, and seeding
+            // the whole palette from a stranger's photo is worse than falling back to the key
+            // colour the user picked.
+            if (track.fullResArtwork.startsWith(PLACEHOLDER_ARTWORK_PREFIX)) {
+                com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = null
+                return@launch
+            }
 
             // Spotify catalog: use Spotify's own cover color extraction (one
             // tiny request) instead of downloading and analyzing the artwork.
@@ -3361,8 +3633,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                 // Desktop app is dark-first; pick a light vibrant color for contrast on dark bg.
                 backgroundColor = ArtworkPalette.dominantColor(bitmap, preferLight = isDarkMode)
-                // Feed the dynamic theme (issue #27): the color scheme seeds from this.
-                com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = backgroundColor.toArgb()
+                // The theme seeds from the cover's own colour, not from the lightened backdrop:
+                // the palette style the user chose is what should decide tone from there.
+                com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor =
+                    ArtworkPalette.dominantSeed(bitmap).toArgb()
             } else {
                 backgroundColor = Color(0xFF1E1E1E)
             }
