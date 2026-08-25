@@ -158,7 +158,29 @@ object LikeRepository {
         }
     }
 
-    fun isTrackLiked(trackId: Long): Boolean = _likedTracks.value.any { it.id == trackId }
+    /**
+     * Ids of [likedTracks], rebuilt only when that list is replaced.
+     *
+     * The likes are held as whole tracks, so answering "is this one liked?" from them is a linear
+     * scan. That was fine while only the player bar asked; now every visible row does, and every
+     * like replaces the list and invalidates all of them at once — O(rows × likes) per like
+     * (issue #33). Memoising on the list's identity makes each row's question a set lookup, and
+     * keeps it synchronous, so a row is never briefly wrong the way a derived flow would be.
+     */
+    private var cachedIdsSource: List<Track>? = null
+    private var cachedIds: Set<Long> = emptySet()
+
+    @Synchronized
+    fun likedTrackIds(): Set<Long> {
+        val current = _likedTracks.value
+        if (cachedIdsSource !== current) {
+            cachedIdsSource = current
+            cachedIds = current.mapTo(HashSet(current.size)) { it.id }
+        }
+        return cachedIds
+    }
+
+    fun isTrackLiked(trackId: Long): Boolean = trackId in likedTrackIds()
 
     fun isPlaylistLiked(playlistId: Long): Boolean = _likedPlaylists.value.contains(playlistId)
 
