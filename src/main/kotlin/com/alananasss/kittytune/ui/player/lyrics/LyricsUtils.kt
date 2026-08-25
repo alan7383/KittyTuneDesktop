@@ -26,6 +26,20 @@ object LyricsUtils {
     
     private val ENHANCED_WORD_PATTERN = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>([^<]*)")
 
+    /**
+     * Which line is the current one at [positionMs]: the last one that has started.
+     *
+     * Deliberately not "the first line whose interval contains the position". Word-synced results
+     * carry each line's real start and end, so their intervals leave gaps over instrumental breaks
+     * and occasionally overlap each other; containment then picked an earlier line than the one
+     * actually being sung and the view jumped backwards (issue #33). Last-started is monotone in
+     * [positionMs] by construction, which is the property that matters here.
+     *
+     * @return the line index, or -1 before the first line starts.
+     */
+    fun activeLineIndex(lines: List<LyricLine>, positionMs: Long): Int =
+        lines.indexOfLast { positionMs >= it.startTime }
+
     fun parseLyricsContent(content: String, totalDurationMs: Long): List<LyricLine> {
         return if (content.trim().startsWith("version:")) {
             parseLyricsFile(content, totalDurationMs)

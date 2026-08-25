@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 data class LrcLibResponse(
@@ -29,6 +30,14 @@ interface LrcLibApiService {
     suspend fun searchLyrics(
         @Query("q") query: String
     ): List<LrcLibResponse>
+
+    /**
+     * One entry by id. Picking a manual search result used to re-run the search and hunt for the
+     * id in its results, which quietly found nothing whenever the second search ranked differently
+     * from the first (issue #33).
+     */
+    @GET("get/{id}")
+    suspend fun getLyricsById(@Path("id") id: Long): LrcLibResponse
 }
 
 object LrcLibClient {
