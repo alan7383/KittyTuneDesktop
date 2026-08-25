@@ -55,6 +55,9 @@ fun AppearanceSettingsScreen(
 
     var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
     var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme()) }
+    var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
+    var playerBarButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
+    var showPlayerButtonsDialog by remember { mutableStateOf(false) }
     var verticalVolumeSlider by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
     var showIconDialog by remember { mutableStateOf(false) }
     val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
@@ -134,6 +137,48 @@ fun AppearanceSettingsScreen(
         )
     }
 
+    if (showPlayerButtonsDialog) {
+        AlertDialog(
+            onDismissRequest = { showPlayerButtonsDialog = false },
+            title = { Text(str("pref_player_bar_buttons")) },
+            text = {
+                Column {
+                    Text(
+                        str("pref_player_bar_buttons_desc"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    listOf(
+                        PlayerPreferences.PLAYER_BAR_BUTTON_LIKE to str("player_button_like"),
+                        PlayerPreferences.PLAYER_BAR_BUTTON_PANEL to str("player_button_panel"),
+                        PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE to str("player_button_queue"),
+                    ).forEach { (key, label) ->
+                        val checked = key in playerBarButtons
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    playerBarButtons =
+                                        if (checked) playerBarButtons - key else playerBarButtons + key
+                                    prefs.setPlayerBarButtons(playerBarButtons)
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPlayerButtonsDialog = false }) { Text(str("btn_close")) }
+            }
+        )
+    }
+
     if (showIconDialog) {
         AlertDialog(
             onDismissRequest = { showIconDialog = false },
@@ -145,8 +190,9 @@ fun AppearanceSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.heightIn(max = 420.dp)
                 ) {
-                    items(com.alananasss.kittytune.core.AppIconVariants.ALL.size) { index ->
-                        val variant = com.alananasss.kittytune.core.AppIconVariants.ALL[index]
+                    val variants = com.alananasss.kittytune.core.AppIconVariants.AVAILABLE
+                    items(variants.size) { index ->
+                        val variant = variants[index]
                         val selected = variant.key == appIconVariant
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -163,13 +209,18 @@ fun AppearanceSettingsScreen(
                                 }
                                 .padding(8.dp)
                         ) {
-                            androidx.compose.foundation.Image(
-                                painter = androidx.compose.ui.res.painterResource(
-                                    com.alananasss.kittytune.core.AppIconVariants.resourcePath(variant.key)
-                                ),
-                                contentDescription = variant.label,
-                                modifier = Modifier.size(56.dp)
-                            )
+                            // Loaded by hand rather than with painterResource, which throws from
+                            // inside composition when the bitmap is missing (issue #33).
+                            val painter = remember(variant.key) { loadIconVariantPainter(variant.key) }
+                            if (painter != null) {
+                                androidx.compose.foundation.Image(
+                                    painter = painter,
+                                    contentDescription = variant.label,
+                                    modifier = Modifier.size(56.dp)
+                                )
+                            } else {
+                                Spacer(Modifier.size(56.dp))
+                            }
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 text = variant.label,
@@ -251,7 +302,14 @@ fun AppearanceSettingsScreen(
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val totalVisibleItems = if (isPureBlackVisible) 6 else 5
+                        // The themed title bar row only exists on Windows, where the window
+                        // manager lets us paint the caption at all (issue #33).
+                        val isTitleBarRowVisible = remember {
+                            System.getProperty("os.name").lowercase().contains("win")
+                        }
+                        val titleBarIndex = if (isPureBlackVisible) 6 else 5
+                        val playerButtonsIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
+                        val totalVisibleItems = playerButtonsIndex + 1
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 0),
                             title = str("pref_language"),
@@ -268,6 +326,7 @@ fun AppearanceSettingsScreen(
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 1),
                             title = str("pref_dynamic_theme"),
+                            subtitle = str("pref_dynamic_theme_sub"),
                             hasSwitch = true,
                             switchState = dynamicTheme,
                             onSwitchChange = {
@@ -319,6 +378,27 @@ fun AppearanceSettingsScreen(
                                 }
                             )
                         }
+
+                        if (isTitleBarRowVisible) {
+                            SettingsItem(
+                                shape = getSettingsShape(totalVisibleItems, titleBarIndex),
+                                title = str("pref_themed_title_bar"),
+                                subtitle = str("pref_themed_title_bar_sub"),
+                                hasSwitch = true,
+                                switchState = themedTitleBar,
+                                onSwitchChange = {
+                                    themedTitleBar = it
+                                    prefs.setThemedTitleBar(it)
+                                }
+                            )
+                        }
+
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, playerButtonsIndex),
+                            title = str("pref_player_bar_buttons"),
+                            subtitle = str("pref_player_bar_buttons_sub"),
+                            onClick = { showPlayerButtonsDialog = true }
+                        )
                     }
                 }
             }
@@ -535,3 +615,21 @@ fun LanguageRadioButton(text: String,
         Text(text)
     }
 }
+
+/**
+ * Decodes an app-icon variant into a painter, or returns null when the bitmap is not in this
+ * build. `painterResource` is the usual way to do this, but it throws for an unknown path and
+ * it throws from composition, which took the whole app down when the icons were missing from
+ * the packaged jar (issue #33). Here a missing file is just an empty tile.
+ */
+private fun loadIconVariantPainter(key: String): androidx.compose.ui.graphics.painter.Painter? =
+    runCatching {
+        val path = com.alananasss.kittytune.core.AppIconVariants.resourcePath(key)
+        val loader = Thread.currentThread().contextClassLoader
+            ?: com.alananasss.kittytune.core.AppIconVariants::class.java.classLoader
+        loader?.getResourceAsStream(path)?.use { stream ->
+            androidx.compose.ui.graphics.painter.BitmapPainter(
+                androidx.compose.ui.res.loadImageBitmap(stream)
+            )
+        }
+    }.getOrNull()
