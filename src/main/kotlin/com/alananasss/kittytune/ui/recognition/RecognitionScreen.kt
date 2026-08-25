@@ -162,21 +162,22 @@ private fun IdleView(viewModel: RecognitionViewModel, onTap: () -> Unit) {
     ) {
         Spacer(modifier = Modifier.weight(0.35f))
         
-        Box(
+        // A plain circle at rest, exactly as the Pixel listener is; tapping it squashes and blooms
+        // into the scalloped shape. See [NowPlayingListenButton].
+        NowPlayingListenButton(
+            active = false,
+            color = MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier
                 .size(180.dp)
                 .scale(btnScale)
-                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
-                .clip(CircleShape)
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = onTap
                 ),
-            contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Rounded.GraphicEq,
+                imageVector = NowPlayingNote,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onPrimaryContainer
@@ -310,28 +311,19 @@ private fun AudioDeviceSelector(
 
 @Composable
 private fun ListeningView() {
-    val infiniteTransition = rememberInfiniteTransition(label = "listening")
-    val pulseScale by infiniteTransition.animateFloat(
-        0.95f, 1.15f,
-        infiniteRepeatable(tween(1200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "pulse"
-    )
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxSize()
     ) {
         Spacer(modifier = Modifier.weight(0.417f))
-        
-        Box(
-            modifier = Modifier
-                .size(180.dp)
-                .scale(pulseScale)
-                .background(MaterialTheme.colorScheme.primary, CircleShape),
-            contentAlignment = Alignment.Center
+
+        NowPlayingListenButton(
+            active = true,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(180.dp),
         ) {
             Icon(
-                imageVector = Icons.Rounded.GraphicEq,
+                imageVector = NowPlayingNote,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onPrimary
