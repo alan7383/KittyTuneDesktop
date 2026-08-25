@@ -411,28 +411,33 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
 
             try {
                 val osName = System.getProperty("os.name").lowercase()
-                val (libPrefix, libSuffix) = when {
-                    osName.contains("win") -> "" to ".dll"
-                    osName.contains("mac") -> "lib" to ".dylib"
-                    else -> "lib" to ".so"
+                val candidateNames = when {
+                    osName.contains("win") -> listOf("libkittytune_audio_dsp.dll", "kittytune_audio_dsp.dll")
+                    osName.contains("mac") || osName.contains("darwin") -> listOf("libkittytune_audio_dsp.dylib", "kittytune_audio_dsp.dylib")
+                    else -> listOf("libkittytune_audio_dsp.so", "kittytune_audio_dsp.so")
                 }
-                val libName = "${libPrefix}kittytune_audio_dsp$libSuffix"
-                val resourcePath = "/native/$libName"
 
-                val inputStream = NormalizationAudioProcessor::class.java.getResourceAsStream(resourcePath)
-                    ?: NormalizationAudioProcessor::class.java.getResourceAsStream("/native/libkittytune_audio_dsp.so")
+                var inputStream: java.io.InputStream? = null
+                var loadedLibName: String? = null
 
-                if (inputStream != null) {
+                for (candidate in candidateNames) {
+                    val stream = NormalizationAudioProcessor::class.java.getResourceAsStream("/native/$candidate")
+                    if (stream != null) {
+                        inputStream = stream
+                        loadedLibName = candidate
+                        break
+                    }
+                }
+
+                if (inputStream != null && loadedLibName != null) {
                     val tempDir = java.io.File(System.getProperty("java.io.tmpdir"), "kittytune_native")
                     tempDir.mkdirs()
-                    val tempFile = java.io.File(tempDir, libName)
-                    if (!tempFile.exists() || tempFile.length() == 0L) {
+                    val tempFile = java.io.File(tempDir, loadedLibName)
+                    try {
                         tempFile.outputStream().use { out ->
                             inputStream.copyTo(out)
                         }
-                    } else {
-                        inputStream.close()
-                    }
+                    } catch (_: Throwable) {}
                     System.load(tempFile.absolutePath)
                     isLibraryLoaded = true
                 }
@@ -449,8 +454,10 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     fun setParameters(enabled: Boolean, level: com.alananasss.kittytune.ui.player.NormalizationLevel) {
         this.enabled = enabled
         this.level = level
-        if (nativeHandle != 0L) {
-            nativeSetTargetLevel(nativeHandle, getTargetLufs())
+        if (nativeHandle != 0L && isLibraryLoaded) {
+            try {
+                nativeSetTargetLevel(nativeHandle, getTargetLufs())
+            } catch (_: Throwable) {}
         }
     }
 
@@ -461,18 +468,26 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     }
 
     private fun ensureNativeHandle(channels: Int, sampleRate: Int) {
+        if (!isLibraryLoaded) return
         if (nativeHandle == 0L || channels != lastChannels || sampleRate != lastSampleRate) {
             destroyNative()
             lastChannels = channels
             lastSampleRate = sampleRate
-            nativeHandle = nativeInit(channels, sampleRate)
-            nativeSetTargetLevel(nativeHandle, getTargetLufs())
+            try {
+                nativeHandle = nativeInit(channels, sampleRate)
+                nativeSetTargetLevel(nativeHandle, getTargetLufs())
+            } catch (t: Throwable) {
+                System.err.println("Failed to initialize native DSP: ${t.message}")
+                nativeHandle = 0L
+            }
         }
     }
 
     private fun destroyNative() {
-        if (nativeHandle != 0L) {
-            nativeDestroy(nativeHandle)
+        if (nativeHandle != 0L && isLibraryLoaded) {
+            try {
+                nativeDestroy(nativeHandle)
+            } catch (_: Throwable) {}
             nativeHandle = 0
         }
     }
@@ -483,8 +498,10 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onFlush() {
-        if (nativeHandle != 0L) {
-            nativeResetLoudness(nativeHandle)
+        if (nativeHandle != 0L && isLibraryLoaded) {
+            try {
+                nativeResetLoudness(nativeHandle)
+            } catch (_: Throwable) {}
         }
     }
 
@@ -496,7 +513,7 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
-        if (!enabled || nativeHandle == 0L) {
+        if (!enabled || nativeHandle == 0L || !isLibraryLoaded) {
             val buffer = replaceOutputBuffer(remaining)
             buffer.put(inputBuffer)
             buffer.flip()
@@ -508,27 +525,39 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
         val numFrames = remaining / (inputAudioFormat.channelCount * 2)
 
         if (inputBuffer.isDirect && buffer.isDirect && numFrames > 0) {
-
-            val inOffset = inputBuffer.position()
-            nativeProcessShort(nativeHandle, inputBuffer, buffer, numFrames, inOffset)
-            inputBuffer.position(inputBuffer.limit())
-            buffer.position(remaining)
-            buffer.flip()
+            try {
+                val inOffset = inputBuffer.position()
+                nativeProcessShort(nativeHandle, inputBuffer, buffer, numFrames, inOffset)
+                inputBuffer.position(inputBuffer.limit())
+                buffer.position(remaining)
+                buffer.flip()
+            } catch (t: Throwable) {
+                val fallbackBuffer = replaceOutputBuffer(remaining)
+                fallbackBuffer.put(inputBuffer)
+                fallbackBuffer.flip()
+            }
         } else {
-
             buffer.put(inputBuffer)
             buffer.flip()
         }
     }
 
     fun getIntegratedLoudness(): Float {
-        if (nativeHandle == 0L) return -70f
-        return nativeGetIntegratedLoudness(nativeHandle)
+        if (nativeHandle == 0L || !isLibraryLoaded) return -70f
+        return try {
+            nativeGetIntegratedLoudness(nativeHandle)
+        } catch (_: Throwable) {
+            -70f
+        }
     }
 
     fun getMaxTruePeakDb(): Float {
-        if (nativeHandle == 0L) return -120f
-        return nativeGetTruePeakDb(nativeHandle)
+        if (nativeHandle == 0L || !isLibraryLoaded) return -120f
+        return try {
+            nativeGetTruePeakDb(nativeHandle)
+        } catch (_: Throwable) {
+            -120f
+        }
     }
 
     private external fun nativeInit(channels: Int, sampleRate: Int): Long
