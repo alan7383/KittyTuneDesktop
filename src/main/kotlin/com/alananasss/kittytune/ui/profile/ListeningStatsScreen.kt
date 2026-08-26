@@ -46,7 +46,16 @@ fun ListeningStatsScreen(
     onTrackClick: (TopTrackResult) -> Unit,
     onArtistClick: (TopArtistResult) -> Unit
 ) {
-    val viewModel = ListeningStatsViewModel()
+    // One instance for the screen's lifetime. It used to be constructed here on every recomposition, which
+    // restarted the load and reset the selected period — so pressing "this month" did work, and was then
+    // immediately undone by the next frame (issue #33).
+    //
+    // Built through an explicit initializer rather than bare `viewModel()`. The default factory route ends
+    // in `SavedStateViewModelFactory`, which on desktop has no `create(String, CreationExtras)` and throws
+    // `UnsupportedOperationException` from inside composition — the screen crashed the window on open. The
+    // initializer form supplies a factory that does implement it, and is also the honest description of
+    // what is wanted here: this view model takes no arguments and has no saved state to restore.
+    val viewModel: ListeningStatsViewModel = viewModel { ListeningStatsViewModel() }
     val stats = viewModel.stats
     val selectedPeriod = viewModel.selectedPeriod
     val isLoading = viewModel.isLoading
@@ -55,10 +64,6 @@ fun ListeningStatsScreen(
         val prefs = remember { PlayerPreferences() }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var isTrackingEnabled by remember { mutableStateOf(prefs.getListeningStatsEnabled()) }
-
-    LaunchedEffect(Unit) {
-        viewModel.refreshStats()
-    }
 
     if (showSettingsDialog) {
         EscapableAlertDialog(
@@ -189,7 +194,12 @@ fun ListeningStatsScreen(
                 )
             }
 
-            if (isLoading && selectedPeriod != StatsPeriod.ALL_TIME) {
+            // "All time" used to be a different screen rather than a longer one: it showed the month-by-month
+            // timeline and *nothing else* — no total, no play count, no top lists, no habits. So the period
+            // with the most to say showed the least, and a week of listening looked bigger than the whole
+            // history. It now shows everything the other periods show, with the timeline added underneath
+            // rather than in place of it (issue #33).
+            if (isLoading) {
                 item {
                     Box(
                         modifier = Modifier
@@ -200,40 +210,12 @@ fun ListeningStatsScreen(
                         CircularWavyProgressIndicator()
                     }
                 }
-            } else if (stats.totalEvents == 0 && selectedPeriod != StatsPeriod.ALL_TIME) {
+            } else if (stats.totalEvents == 0) {
                 // Empty state
                 item {
                     EmptyStatsCard()
                 }
-            } else if (selectedPeriod == StatsPeriod.ALL_TIME) {
-                // ─── ALL TIME TIMELINE VIEW ──────────────────────────
-                item {
-                    SectionTitle(str("listening_stats_period_all"))
-                }
-
-                items(viewModel.timelineChunks.value) { chunk ->
-                    TimelineChunkCard(
-                        chunk = chunk,
-                        onTrackClick = onTrackClick,
-                        onArtistClick = onArtistClick
-                    )
-                }
-
-                if (viewModel.isTimelineLoading) {
-                    item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            CircularWavyProgressIndicator()
-                        }
-                    }
-                } else if (viewModel.timelineHasMore) {
-                    item {
-                        LaunchedEffect(Unit) {
-                            viewModel.loadNextTimelineChunk()
-                        }
-                    }
-                }
             } else {
-                // ─── WEEK / MONTH VIEW ───────────────────────────────
                 
                 // Hero Stats Card
                 item {
@@ -250,7 +232,9 @@ fun ListeningStatsScreen(
                     item {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             SectionTitle(str("listening_stats_top_tracks"))
-                            LazyRow(
+                            // Arrows and the wheel: there is nothing to swipe with on a desktop, so the
+                            // cards past the window edge were simply unreachable (issue #33).
+                            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
@@ -267,7 +251,7 @@ fun ListeningStatsScreen(
                     item {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             SectionTitle(str("listening_stats_top_artists"))
-                            LazyRow(
+                            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
@@ -296,6 +280,39 @@ fun ListeningStatsScreen(
                         }
                     }
                 }
+
+                // The timeline, only where it means something: a month-by-month breakdown of "this week" is
+                // one row. Appended, so the totals above are what the tab opens on.
+                if (selectedPeriod == StatsPeriod.ALL_TIME) {
+                    item {
+                        SectionTitle(str("listening_stats_timeline"))
+                    }
+
+                    items(viewModel.timelineChunks) { chunk ->
+                        TimelineChunkCard(
+                            chunk = chunk,
+                            onTrackClick = onTrackClick,
+                            onArtistClick = onArtistClick
+                        )
+                    }
+
+                    if (viewModel.isTimelineLoading) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularWavyProgressIndicator()
+                            }
+                        }
+                    } else if (viewModel.timelineHasMore) {
+                        item {
+                            LaunchedEffect(Unit) {
+                                viewModel.loadNextTimelineChunk()
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -303,30 +320,45 @@ fun ListeningStatsScreen(
 
 // ─── Period Selector ─────────────────────────────────────────────
 
+/**
+ * The period switch, as the expressive connected group the rest of the app uses (issue #33).
+ *
+ * `SingleChoiceSegmentedButtonRow` is the older Material 3 control and looked like it came from a
+ * different app than the lyrics and effects panels, which already use the connected group.
+ */
 @Composable
 private fun PeriodSelector(
     selectedPeriod: StatsPeriod,
     onPeriodSelected: (StatsPeriod) -> Unit
 ) {
-    SingleChoiceSegmentedButtonRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        StatsPeriod.entries.forEachIndexed { index, period ->
+    com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+        options = StatsPeriod.entries,
+        selectedOption = selectedPeriod,
+        onOptionSelected = onPeriodSelected,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        iconProvider = { period ->
+            val icon = when (period) {
+                StatsPeriod.WEEK -> Icons.Rounded.CalendarViewWeek
+                StatsPeriod.MONTH -> Icons.Rounded.CalendarMonth
+                StatsPeriod.ALL_TIME -> Icons.Rounded.AllInclusive
+            }
+            Icon(icon, null, modifier = Modifier.size(16.dp))
+        },
+        labelProvider = { period ->
             val label = when (period) {
                 StatsPeriod.WEEK -> str("listening_stats_period_week")
                 StatsPeriod.MONTH -> str("listening_stats_period_month")
                 StatsPeriod.ALL_TIME -> str("listening_stats_period_all")
             }
-            SegmentedButton(selected = selectedPeriod == period,
-                onClick = { onPeriodSelected(period) },
-                shape = SegmentedButtonDefaults.itemShape(index, StatsPeriod.entries.size)
-            ) {
-                Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
+            Text(
+                label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false,
+            )
+        },
+    )
 }
 
 // ─── Empty State ──────────────────────────────────────────────────
