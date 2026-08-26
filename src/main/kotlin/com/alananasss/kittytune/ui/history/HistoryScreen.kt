@@ -819,9 +819,9 @@ private fun formatDateHeader(timestamp: Long): String {
         when (today - itemDay) {
             0 -> str("date_today")
             1 -> str("date_yesterday")
-            else -> SimpleDateFormat("dd MMMM", Locale.getDefault()).format(Date(millis))
+            else -> SimpleDateFormat("dd MMMM", com.alananasss.kittytune.core.Strings.locale()).format(Date(millis))
         }
     } else {
-        SimpleDateFormat("dd MMMM yyyy", Locale.getDefault()).format(Date(millis))
+        SimpleDateFormat("dd MMMM yyyy", com.alananasss.kittytune.core.Strings.locale()).format(Date(millis))
     }
 }

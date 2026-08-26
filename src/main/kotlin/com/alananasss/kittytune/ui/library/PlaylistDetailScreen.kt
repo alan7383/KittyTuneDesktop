@@ -114,7 +114,7 @@ private fun formatApiDate(raw: String?): String {
         val monthDate = runCatching {
             java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).parse("$year-$month")
         }.getOrNull() ?: return year
-        return java.text.SimpleDateFormat("MMM yyyy", java.util.Locale.getDefault()).format(monthDate)
+        return java.text.SimpleDateFormat("MMM yyyy", com.alananasss.kittytune.core.Strings.locale()).format(monthDate)
     }
     val millis = runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
         ?: runCatching {
@@ -124,7 +124,7 @@ private fun formatApiDate(raw: String?): String {
             java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(raw)?.time
         }.getOrNull()
         ?: return ""
-    return java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
+    return java.text.SimpleDateFormat("dd MMM yyyy", com.alananasss.kittytune.core.Strings.locale()).format(java.util.Date(millis))
 }
 
 /**
@@ -2155,7 +2155,7 @@ fun TrackTableItem(
                     val releaseDate = rememberReleaseDate(track)
                     val dateStr = remember(track.likedAt, releaseDate, track.createdAt, useReleaseDate) {
                         track.likedAt?.let {
-                            java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(it))
+                            java.text.SimpleDateFormat("dd MMM yyyy", com.alananasss.kittytune.core.Strings.locale()).format(java.util.Date(it))
                         } ?: formatApiDate(if (useReleaseDate) (releaseDate ?: track.createdAt) else (track.createdAt ?: releaseDate))
                     }
                     Text(
@@ -2473,7 +2473,7 @@ fun TrackCompactItem(
                     val releaseDate = rememberReleaseDate(track)
                     val dateStr = remember(track.likedAt, releaseDate, track.createdAt) {
                         track.likedAt?.let {
-                            java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(it))
+                            java.text.SimpleDateFormat("dd MMM yyyy", com.alananasss.kittytune.core.Strings.locale()).format(java.util.Date(it))
                         } ?: formatApiDate(releaseDate ?: track.createdAt)
                     }
                     Spacer(Modifier.width(COLUMN_GAP))

@@ -975,27 +975,42 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
                         launch(Dispatchers.IO) {
                             try {
+                                // Every page of a whole library ends up in one list that is then
+                                // held for the session, so each track is shrunk as it arrives rather
+                                // than after: the peak matters as much as what is kept (issue #33).
+                                val slimmer = com.alananasss.kittytune.data.LibraryTrackSlimmer()
                                 val allCollectedLikes = mutableListOf<Track>()
                                 var nextUrl: String? = null
+                                var pages = 0
 
                                 val firstPage = api.getUserTrackLikes(user.id, limit = 200)
 
                                 allCollectedLikes.addAll(firstPage.collection.map { item ->
                                     val time = parseIsoDate(item.createdAt).takeIf { it > 0 }
-                                    item.track.copy(likedAt = time)
+                                    slimmer.slim(item.track.copy(likedAt = time))
                                 })
 
                                 nextUrl = firstPage.next_href
+                                pages++
 
-                                while (nextUrl != null) {
+                                while (nextUrl != null && pages < MAX_LIKES_PAGES) {
                                     val page = api.getTrackLikesNextPage(nextUrl!!)
 
                                     allCollectedLikes.addAll(page.collection.map { item ->
                                         val time = parseIsoDate(item.createdAt).takeIf { it > 0 }
-                                        item.track.copy(likedAt = time)
+                                        slimmer.slim(item.track.copy(likedAt = time))
                                     })
 
                                     nextUrl = page.next_href
+                                    pages++
+                                }
+
+                                if (nextUrl != null) {
+                                    com.alananasss.kittytune.utils.Logger.e(
+                                        "LibraryViewModel",
+                                        "Stopped hydrating likes at $MAX_LIKES_PAGES pages " +
+                                            "(${allCollectedLikes.size} tracks); more remain on the server."
+                                    )
                                 }
 
                                 LikeRepository.replaceAllLikes(allCollectedLikes, currentUserId = user.id)
@@ -1059,3 +1074,15 @@ const val SIDEBAR_MAX_WIDTH = 480f
 const val SIDEBAR_DEFAULT_WIDTH = 300f
 const val SIDEBAR_COLLAPSED_WIDTH = 80f
 const val SIDEBAR_SNAP_THRESHOLD = 176f
+
+/**
+ * A ceiling on the walk through `track_likes`, in pages of 200 (issue #33).
+ *
+ * A safety net, not a feature: 40 000 liked tracks is far past any real library, and the loop that
+ * collects them had no bound at all — it kept every page in one list until the server ran out, which
+ * is a design that cannot be reasoned about and did in fact run a machine out of heap.
+ *
+ * Reaching it means some likes are missing from the list, which is why it is logged rather than
+ * silent. If anyone ever hits it, the fix is to page the library instead of raising this.
+ */
+private const val MAX_LIKES_PAGES = 200
