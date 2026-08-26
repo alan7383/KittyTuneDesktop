@@ -179,11 +179,25 @@ object StreamResolver {
         }
     }
 
+    /**
+     * Whether SoundCloud will refuse to stream this track to us, so the YouTube fallback is the only
+     * way to hear it.
+     *
+     * Judged on the policy fields alone. An absent media block used to count too, and that was wrong in
+     * a way that broke ordinary playback: a `Track` with no transcodings is one nobody has asked the API
+     * about yet, not one the API refuses. Liked tracks are deliberately slimmed for memory — the signed
+     * stream URLs in them expire within minutes of launch and are dead weight — so once that landed,
+     * *every liked track* looked restricted and went to YouTube. Reported as a three-minute song playing
+     * for twenty seconds (issue #33).
+     *
+     * Nothing is lost by dropping the clause: [resolveFromSoundCloudWithDrm] re-fetches a track whose
+     * transcodings are missing and decides from the fresh data, which is the right place for that
+     * decision. And if the fresh data really has no usable candidate, the fallback still runs from there.
+     */
     fun isRestricted(track: Track): Boolean {
         return track.policy == "SNIP" ||
             track.policy == "BLOCK" ||
-            track.monetizationModel == "SUB_HIGH_TIER" ||
-            track.media?.transcodings.isNullOrEmpty()
+            track.monetizationModel == "SUB_HIGH_TIER"
     }
 
     suspend fun resolveStream(track: Track, forDownload: Boolean = false): String? {
@@ -255,6 +269,14 @@ object StreamResolver {
         return result
     }
 
+    /**
+     * How far a YouTube candidate's length may be from the track's before it is rejected.
+     *
+     * Wide enough for the usual differences — a fade, a bit of silence, an intro on the upload — and far
+     * too narrow for a snippet or a teaser to slip through.
+     */
+    private const val DURATION_TOLERANCE_SEC = 12L
+
     private fun resolveViaNewPipe(track: Track): String? {
         return try {
             val cleanTitle = track.title?.replace(Regex("(?i)(\\[.*?\\]|\\(.*?\\))"), "")?.trim() ?: ""
@@ -267,7 +289,28 @@ object StreamResolver {
 
             if (videoResults.isEmpty()) return null
 
-            val firstResultUrl = videoResults.first().url
+            // The first hit was taken blindly, and that is how a twenty-second clip came to stand in for a
+            // three-minute song: YouTube's top result for a track name is frequently a snippet, a teaser or
+            // a "sped up" edit. A substitute has to be the same length as the thing it replaces, so results
+            // whose duration is nowhere near the track's are dropped, and among what is left the closest
+            // wins (issue #33).
+            val wantedSec = (track.durationMs ?: 0L) / 1000
+            val firstResultUrl = if (wantedSec <= 0) {
+                // No duration to check against — nothing better than the top hit, but nothing worse either.
+                videoResults.first().url
+            } else {
+                val matched = videoResults
+                    .filter { it.duration > 0 && kotlin.math.abs(it.duration - wantedSec) <= DURATION_TOLERANCE_SEC }
+                    .minByOrNull { kotlin.math.abs(it.duration - wantedSec) }
+                if (matched == null) {
+                    println(
+                        "StreamResolver: no YouTube result within ${DURATION_TOLERANCE_SEC}s of " +
+                            "${wantedSec}s for '${track.title}' — refusing to substitute a different song"
+                    )
+                    return null
+                }
+                matched.url
+            }
             val extractor = youtubeService.getStreamExtractor(firstResultUrl)
             extractor.fetchPage()
 
