@@ -1245,21 +1245,29 @@ import com.alananasss.kittytune.utils.Logger
                         val playlists = parsedItems.filterIsInstance<Playlist>()
                         val users = parsedItems.filterIsInstance<User>()
                         
+                        // Our own name for the selection where we have one: their titles come back
+                        // English whatever Accept-Language says (issue #33).
+                        val selectionUrn = selection.urn ?: selection.id
+                        val label = com.alananasss.kittytune.data.SoundCloudSelectionLabels
+                            .title(selectionUrn, selection.title) ?: "Selection"
+                        val labelSub = com.alananasss.kittytune.data.SoundCloudSelectionLabels
+                            .subtitle(selectionUrn, selection.description)
+
                         val isLatest = selection.title?.contains("follow", ignoreCase = true) == true || 
                                        selection.id?.contains("follow", ignoreCase = true) == true ||
                                        selection.urn?.contains("follow", ignoreCase = true) == true
 
                         if (tracks.isNotEmpty() && playlists.isEmpty() && users.isEmpty()) {
-                            sections.add(HomeSection(selection.title ?: "Selection", selection.description, tracks, if (isLatest) SectionType.HIGHLIGHT_ROW else SectionType.TRACKS_ROW))
+                            sections.add(HomeSection(label, labelSub, tracks, if (isLatest) SectionType.HIGHLIGHT_ROW else SectionType.TRACKS_ROW))
                         } else if (playlists.isNotEmpty() && tracks.isEmpty() && users.isEmpty()) {
-                            sections.add(HomeSection(selection.title ?: "Selection", selection.description, playlists, SectionType.STATIONS_ROW))
+                            sections.add(HomeSection(label, labelSub, playlists, SectionType.STATIONS_ROW))
                         } else if (users.isNotEmpty() && tracks.isEmpty() && playlists.isEmpty()) {
-                            sections.add(HomeSection(selection.title ?: "Selection", selection.description, users, SectionType.ARTISTS_ROW))
+                            sections.add(HomeSection(label, labelSub, users, SectionType.ARTISTS_ROW))
                         } else {
                             if (tracks.isNotEmpty()) {
-                                sections.add(HomeSection(selection.title ?: "Selection", selection.description, tracks, if (isLatest) SectionType.HIGHLIGHT_ROW else SectionType.TRACKS_ROW))
+                                sections.add(HomeSection(label, labelSub, tracks, if (isLatest) SectionType.HIGHLIGHT_ROW else SectionType.TRACKS_ROW))
                             } else if (playlists.isNotEmpty()) {
-                                sections.add(HomeSection(selection.title ?: "Selection", selection.description, playlists, SectionType.STATIONS_ROW))
+                                sections.add(HomeSection(label, labelSub, playlists, SectionType.STATIONS_ROW))
                             }
                         }
                     }
