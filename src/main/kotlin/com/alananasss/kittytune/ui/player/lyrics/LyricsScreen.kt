@@ -605,7 +605,13 @@ import kotlin.math.roundToInt
                 lastFrameNs = nowNs
                 if (System.currentTimeMillis() - lastUserScrollMs < LyricsScrolling.PLAIN_PAUSE_MS) continue
                 if (!listState.canScrollForward) continue
-                val step = LyricsScrolling.PLAIN_BASE_DP_PER_SEC * viewModel.plainAutoScrollSpeed * elapsedSec
+                // Paced by this view's own line height, so the same speed setting reads the same here as
+                // it does in the side panel (issue #33).
+                val step = LyricsScrolling.plainScrollStepDp(
+                    lineHeightDp = fontSize * 1.4f,
+                    speed = viewModel.plainAutoScrollSpeed,
+                    elapsedSec = elapsedSec,
+                )
                 if (step > 0f) {
                     listState.scrollBy(with(density) { step.dp.toPx() })
                 }

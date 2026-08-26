@@ -1,6 +1,7 @@
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.data.local.LyricsDisplayStyle
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineStyling
+import com.alananasss.kittytune.ui.player.lyrics.LyricsScrolling
 import org.junit.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -99,5 +100,53 @@ class LyricLineStylingTest {
             assertTrue(upcoming > past, "style $style: upcoming $upcoming should beat past $past")
             assertTrue(past > 0f)
         }
+    }
+}
+
+/**
+ * The pace of the untimed-lyrics auto-scroll (issue #33).
+ *
+ * The unit is the whole point. It was dp per second, and dp is wrong for reading: the full screen draws plain
+ * text at the size the reader chose while the side panel draws it small, so the same figure moved a third of a
+ * line per second in one and nearly a whole line in the other. "1.5×" meant two different speeds depending on
+ * where you were reading.
+ */
+class PlainScrollPaceTest {
+
+    private val oneSecond = 1f
+
+    @Test
+    fun `a line takes the same time to pass whatever the type size`() {
+        val fullScreenLine = 42f * 1.4f   // the reader's own lyrics size
+        val panelLine = 20f              // bodyMedium in the side panel
+
+        val fullScreenLinesPerSec =
+            LyricsScrolling.plainScrollStepDp(fullScreenLine, speed = 1f, elapsedSec = oneSecond) / fullScreenLine
+        val panelLinesPerSec =
+            LyricsScrolling.plainScrollStepDp(panelLine, speed = 1f, elapsedSec = oneSecond) / panelLine
+
+        assertEquals(fullScreenLinesPerSec, panelLinesPerSec, 0.0001f)
+    }
+
+    /** Smaller text means fewer dp per second, which is what stops the panel racing. */
+    @Test
+    fun `smaller text scrolls fewer dp per second`() {
+        val big = LyricsScrolling.plainScrollStepDp(59f, speed = 1f, elapsedSec = oneSecond)
+        val small = LyricsScrolling.plainScrollStepDp(20f, speed = 1f, elapsedSec = oneSecond)
+        assertTrue(small < big, "20 dp lines should move slower than 59 dp lines, got $small vs $big")
+    }
+
+    @Test
+    fun `the speed setting scales the pace`() {
+        val single = LyricsScrolling.plainScrollStepDp(59f, speed = 1f, elapsedSec = oneSecond)
+        val onePointFive = LyricsScrolling.plainScrollStepDp(59f, speed = 1.5f, elapsedSec = oneSecond)
+        assertEquals(single * 1.5f, onePointFive, 0.0001f)
+    }
+
+    /** The pace the full screen already had at a 42 sp setting, which is what is being compared against. */
+    @Test
+    fun `the reference pace is unchanged`() {
+        val step = LyricsScrolling.plainScrollStepDp(42f * 1.4f, speed = 1f, elapsedSec = oneSecond)
+        assertTrue(step in 17f..18.5f, "expected about 18 dp/s at a 42 sp setting, got $step")
     }
 }
