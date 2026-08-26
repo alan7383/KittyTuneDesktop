@@ -26,6 +26,15 @@ object Strings {
     private val tables = ConcurrentHashMap<String, Map<String, String>>()
     private val cache = ConcurrentHashMap<String, String>()
 
+    /**
+     * The locale to format dates and numbers with.
+     *
+     * The app's own language setting, not [Locale.getDefault]. Formatting followed the JVM default,
+     * so a French app on an English system printed "25 Aug 2026" under a "Date d'ajout" header
+     * (issue #33).
+     */
+    fun locale(): Locale = Locale.forLanguageTag(effectiveLang())
+
     /** The concrete language in use after resolving "system": "en", "fr", "hu" or "ru". */
     val resolvedLanguage: String
         get() = effectiveLang()
