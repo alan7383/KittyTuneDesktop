@@ -18,32 +18,33 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Used for the standalone Android pref namespaces: achievements_prefs, soundtune_likes_v3,
  * update_cache, etc. — keeps the same file/key names for backup compatibility.
+ *
+ * ## Two instances of the same name are the same store
+ *
+ * Every write rewrites the whole file from the instance's own map, so two instances for one name used to
+ * silently delete each other's keys: whichever saved last wrote a file missing everything the other had
+ * added since it loaded. Three separate objects in the sync layer each held a `NamedPrefs("sync_state")`,
+ * which meant remembering a paired device could erase the pairing secret, or the sync marks — and losing
+ * marks makes a peer resend history that has already been counted (issue #33).
+ *
+ * So the map is shared per file rather than per instance, loaded once. `NamedPrefs("x")` is now a handle
+ * onto one store, not a copy of it, and callers need not coordinate.
  */
 class NamedPrefs(name: String) {
 
     private val file = File(AppDirs.dataDir, "$name.json")
-    private val json = Json { prettyPrint = true }
-    private val values = ConcurrentHashMap<String, JsonElement>()
+    private val values = shared(file)
 
-    init {
-        load()
-    }
-
-    private fun load() {
-        try {
-            if (file.exists()) {
-                json.parseToJsonElement(file.readText()).jsonObject.forEach { (k, v) -> values[k] = v }
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    @Synchronized
     private fun save() {
-        try {
-            val obj = buildJsonObject { values.forEach { (k, v) -> put(k, v) } }
-            file.writeText(json.encodeToString(JsonElement.serializer(), obj))
-        } catch (_: Exception) {
+        // Locked on the shared map, so two threads writing different keys of the same file cannot
+        // interleave a read of the map with a write of the file.
+        synchronized(values) {
+            try {
+                val obj = buildJsonObject { values.forEach { (k, v) -> put(k, v) } }
+                file.parentFile?.mkdirs()
+                file.writeText(json.encodeToString(JsonElement.serializer(), obj))
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -71,5 +72,27 @@ class NamedPrefs(name: String) {
         values.clear()
         values.putAll(entries)
         save()
+    }
+
+    private companion object {
+        private val json = Json { prettyPrint = true }
+
+        /** One map per file, for the lifetime of the process. */
+        private val stores = ConcurrentHashMap<String, ConcurrentHashMap<String, JsonElement>>()
+
+        fun shared(file: File): ConcurrentHashMap<String, JsonElement> =
+            stores.getOrPut(file.absolutePath) { load(file) }
+
+        private fun load(file: File): ConcurrentHashMap<String, JsonElement> {
+            val values = ConcurrentHashMap<String, JsonElement>()
+            try {
+                if (file.exists()) {
+                    json.parseToJsonElement(file.readText()).jsonObject
+                        .forEach { (k, v) -> values[k] = v }
+                }
+            } catch (_: Exception) {
+            }
+            return values
+        }
     }
 }
