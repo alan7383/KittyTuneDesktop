@@ -1929,6 +1929,47 @@ private fun NormalizationDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                // The per-track trim lives here on purpose: this is the dialog you are in when you
+                // decide normalisation is not what you wanted (issue #33). It needs no measuring, so
+                // it is right from the first sample rather than a few seconds in.
+                Spacer(Modifier.height(20.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    str("track_gain_title"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    str("track_gain_sub"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    IconButton(
+                        onClick = { viewModel.adjustTrackGain(-1) },
+                        enabled = viewModel.trackGainDb > com.alananasss.kittytune.audio.TrackGain.MIN_DB
+                    ) { Icon(Icons.Rounded.Remove, contentDescription = null) }
+                    Text(
+                        com.alananasss.kittytune.audio.TrackGain.label(viewModel.trackGainDb),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    IconButton(
+                        onClick = { viewModel.adjustTrackGain(1) },
+                        enabled = viewModel.trackGainDb < com.alananasss.kittytune.audio.TrackGain.MAX_DB
+                    ) { Icon(Icons.Rounded.Add, contentDescription = null) }
+                }
+                if (viewModel.trackGainDb != com.alananasss.kittytune.audio.TrackGain.NONE) {
+                    TextButton(onClick = { viewModel.resetTrackGain() }) { Text(str("btn_reset")) }
+                }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
