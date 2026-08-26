@@ -38,7 +38,8 @@ object MusicManager {
     var currentTrack: Track? = null
 
     // --- DRM token cache (kept for API compatibility; playback via CEF is a later TODO) ---
-    private val drmTokenCache = ConcurrentHashMap<Long, String>()
+    /** One short token per track, bounded so it does not accumulate for a whole session (issue #33). */
+    private val drmTokenCache = com.alananasss.kittytune.core.BoundedCache<Long, String>(200)
     fun putDrmToken(trackId: Long, token: String) { drmTokenCache[trackId] = token }
     fun getDrmToken(trackId: Long): String? = drmTokenCache[trackId]
 
@@ -155,6 +156,9 @@ object MusicManager {
     fun pause() = player.pause()
     fun seekTo(ms: Long) = player.seekTo(ms)
     fun setVolume(v: Float) { player.volume = v }
+
+    /** The current track's own trim, in dB. See [com.alananasss.kittytune.audio.TRACK_GAIN_MIN_DB]. */
+    fun setTrackGainDb(db: Float) { player.trackGainDb = db }
     fun getVolume(): Float = player.volume
     fun stop() = player.stop()
 
