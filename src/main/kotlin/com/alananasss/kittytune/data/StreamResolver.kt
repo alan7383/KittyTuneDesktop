@@ -120,7 +120,16 @@ object StreamResolver {
 
     private val client: OkHttpClient
         get() = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(baseClient.newBuilder()).build()
-    private val streamCache = ConcurrentHashMap<Long, CachedStream>()
+    /**
+     * Resolved stream URLs, bounded (issue #33). Entries go stale within minutes — see
+     * [OPAQUE_STREAM_TTL_MS] — but an expired one was only dropped when that same track came round
+     * again, so the map still grew by one per track played or previewed for the whole session.
+     */
+    private val streamCache =
+        com.alananasss.kittytune.core.BoundedCache<Long, CachedStream>(MAX_CACHED_STREAMS)
+
+    /** Comfortably more than a queue, since a stale entry costs one re-resolve and nothing else. */
+    private const val MAX_CACHED_STREAMS = 200
 
     /** Local files never go stale; only the bookkeeping does. */
     private const val LOCAL_CACHE_TTL_MS = 30 * 60 * 1000L
@@ -186,7 +195,9 @@ object StreamResolver {
             val cached = streamCache[track.id]
             if (cached != null) {
                 if (cached.isUsable()) return cached.stream
-                streamCache.remove(track.id, cached)
+                streamCache.remove(track.id)
+                // One expiry is a good moment to drop the others: they all age on the same clock.
+                streamCache.retainWhere { it.isUsable() }
             }
         }
         val result = withContext(Dispatchers.IO) {
