@@ -49,6 +49,24 @@ object AppBootstrap {
         DownloadManager.init()
         AlbumResolver.init()
 
+        // The sync listener. It opens a port on the local network, so it stays off until there is a
+        // reason for it — which is a device having been paired. Pairing turns it on; an install that
+        // has never paired never opens anything (issue #33).
+        if (com.alananasss.kittytune.data.sync.SyncService.isListenerEnabled) {
+            com.alananasss.kittytune.data.sync.SyncService.start()
+        }
+
+        // Paired once, in step from then on. Costs nothing until something is paired.
+        if (!com.alananasss.kittytune.data.sync.SyncPeers.isEmpty()) {
+            com.alananasss.kittytune.data.sync.SyncScheduler.start()
+            // Anything the log holds that the statistics table is missing goes back in. The marks advance
+            // when events are merged, not when their rows land, so a failed or cancelled insert used to lose
+            // listens the peer would never send again (issue #33).
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                com.alananasss.kittytune.data.sync.SyncApply.reconcile()
+            }
+        }
+
         // 4. Player + session keep-alive.
         MusicManager.init()
         SessionManager.start()
