@@ -327,6 +327,13 @@ fun MainScreen() {
                 }
             }
 
+            // The lyrics screen and the whole NavHost are the two branches of one `if`, so opening
+            // the lyrics takes every destination out of the composition. `rememberSaveable` state
+            // inside them — every list's scroll position included — was registered in a holder that
+            // went away with the branch, so coming back rebuilt each screen from scratch and every
+            // tab reopened at the top (issue #33). Holding the branch state here, above the `if`,
+            // is what lets it survive the swap.
+            val branchStateHolder = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
             Surface(
                 modifier = Modifier.weight(1f),
                 shape = PanelShape,
@@ -337,7 +344,7 @@ fun MainScreen() {
                         viewModel = playerViewModel,
                         onClose = { playerViewModel.showLyricsSheet = false }
                     )
-                } else {
+                } else branchStateHolder.SaveableStateProvider("main_content") {
                     Column(Modifier.fillMaxSize()) {
                         MainTopBar(
                             navController = navController,
@@ -429,6 +436,28 @@ fun MainScreen() {
                                 onBackClick = { navController.popBackStack() },
                                 playerViewModel = playerViewModel
                             )
+                        }
+                        // The listening statistics screen existed but nothing navigated to it, so
+                        // the events being recorded had nowhere to be seen (issue #33).
+                        composable("listening_stats") {
+                            com.alananasss.kittytune.ui.profile.ListeningStatsScreen(
+                                onBackClick = { navController.popBackStack() },
+                                onTrackClick = { top -> playerViewModel.navigateToTrackDetails(top.trackId) },
+                                onArtistClick = { top ->
+                                    // The stats table keeps the name always and the id only
+                                    // sometimes, so resolving by name is the path that always works.
+                                    playerViewModel.resolveAndNavigateToArtist(
+                                        top.artistName,
+                                        top.artistId,
+                                    )
+                                },
+                            )
+                        }
+                        composable("sync_settings") {
+                            // No back arrow: sync is a sidebar destination now, and the app already has its
+                            // own navigation. The scaffold's arrow was a second one pointing at the same
+                            // place (issue #33).
+                            com.alananasss.kittytune.ui.profile.SyncSettingsScreen(onBackClick = null)
                         }
                         composable("proxy_settings") {
                             com.alananasss.kittytune.ui.profile.ProxySettingsScreen(

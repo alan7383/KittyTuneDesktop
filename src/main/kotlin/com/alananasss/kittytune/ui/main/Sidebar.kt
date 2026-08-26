@@ -87,6 +87,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.ui.library.*
 import com.alananasss.kittytune.ui.library.LibraryViewModel
@@ -99,6 +100,11 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.alananasss.kittytune.ui.modifiers.squish
 
 import com.alananasss.kittytune.ui.home.HomeViewModel
+import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.CloudUpload
+import androidx.compose.material.icons.rounded.Album
 
 /**
  * Left panel: primary navigation on top, then "Your Library" — search, create,
@@ -117,6 +123,11 @@ fun Sidebar(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val collapsed = libraryViewModel.isSidebarCollapsed
+
+    // Whole sections of the app somebody may never open; Home always stays (issue #33).
+    val navPrefs = remember { PlayerPreferences() }
+    val hiddenNav by navPrefs.hiddenSidebarNavFlow()
+        .collectAsState(initial = navPrefs.getHiddenSidebarNav())
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(PANEL_GUTTER.dp)) {
 
@@ -140,7 +151,7 @@ fun Sidebar(
                         playerViewModel.showLyricsSheet = false
                     }
                 }
-                SidebarNavItem(
+                if (PlayerPreferences.SIDEBAR_NAV_FEED !in hiddenNav) SidebarNavItem(
                     label = str("nav_feed"),
                     selected = currentRoute == "feed",
                     iconSelected = Icons.Rounded.DynamicFeed,
@@ -153,7 +164,7 @@ fun Sidebar(
                         playerViewModel.showLyricsSheet = false
                     }
                 }
-                SidebarNavItem(
+                if (PlayerPreferences.SIDEBAR_NAV_EXPLORE !in hiddenNav) SidebarNavItem(
                     label = str("explorer_title"),
                     selected = currentRoute == "genres",
                     iconSelected = Icons.Filled.Explore,
@@ -166,7 +177,7 @@ fun Sidebar(
                         playerViewModel.showLyricsSheet = false
                     }
                 }
-                SidebarNavItem(
+                if (PlayerPreferences.SIDEBAR_NAV_RECOGNITION !in hiddenNav) SidebarNavItem(
                     label = str("pref_bottom_menu_fab_recognition"),
                     selected = currentRoute == "recognition",
                     iconSelected = Icons.Rounded.GraphicEq,
@@ -175,6 +186,21 @@ fun Sidebar(
                 ) {
                     if (currentRoute != "recognition") {
                         navController.navigate("recognition") { launchSingleTop = true }
+                    } else {
+                        playerViewModel.showLyricsSheet = false
+                    }
+                }
+                // One click, from anywhere. Sync lived at the bottom of the settings page, which for a
+                // feature whose first problem is being discovered at all was the same as hiding it.
+                if (PlayerPreferences.SIDEBAR_NAV_SYNC !in hiddenNav) SidebarNavItem(
+                    label = str("sync_title"),
+                    selected = currentRoute == "sync_settings",
+                    iconSelected = Icons.Rounded.Devices,
+                    iconUnselected = Icons.Rounded.Devices,
+                    compact = collapsed,
+                ) {
+                    if (currentRoute != "sync_settings") {
+                        navController.navigate("sync_settings") { launchSingleTop = true }
                     } else {
                         playerViewModel.showLyricsSheet = false
                     }
@@ -216,7 +242,18 @@ private data class LibEntry(
     val subtitle: String,
     val artworkUrl: String? = null,
     val icon: ImageVector? = null,
+    /** An imported image standing in for [icon]. See [LibraryTileIcons]. */
+    val iconPath: String? = null,
     val gradient: List<Color>? = null,
+    /**
+     * A single tonal fill, used instead of [gradient] when set.
+     *
+     * Material 3 tiles are flat tonal surfaces; a two-stop gradient between a role and its container
+     * is what made these look cheap next to the rest of the app (issue #33).
+     */
+    val flatColor: Color? = null,
+    /** Colour of [icon] over the fill. White when the fill is one of the fixed gradients. */
+    val iconTint: Color = Color.White,
     val round: Boolean = false,
     val destination: String,
     val playlist: com.alananasss.kittytune.domain.Playlist? = null,
@@ -451,6 +488,90 @@ fun LibraryPanel(
     }
 }
 
+/**
+ * The three fixed library tiles — Liked, Downloads, Local files — as the settings want them
+ * (issue #33).
+ *
+ * Hidden ones are dropped, and one with an imported icon carries its path instead of a vector.
+ *
+ * With the dynamic theme on, each tile is a flat container role — primary, secondary, tertiary —
+ * with its matching `on` colour for the icon. Flat and tonal is what Material 3 does; the earlier
+ * gradient from a role to its own container read as cheap next to everything around it, and with
+ * three roles drawn from one seed the three tiles came out nearly the same colour. The containers
+ * sit further apart in hue and much closer to the surface, so they read as a set (issue #33).
+ *
+ * With it off they keep the exact purple, green and blue gradients they have always had.
+ */
+@Composable
+private fun rememberFixedLibraryTiles(): List<LibEntry> {
+    val prefs = remember { PlayerPreferences() }
+    val hidden by prefs.hiddenLibraryTilesFlow()
+        .collectAsState(initial = prefs.getHiddenLibraryTiles())
+    // Tied to the dynamic theme rather than a switch of its own, which is how it was asked for:
+    // the tiles follow the cover while it is on, and fall back to their fixed colours when it is
+    // off (issue #33).
+    val themed by prefs.dynamicThemeFlow().collectAsState(initial = prefs.getDynamicTheme())
+
+    val likesIcon by prefs.libraryTileIconFlow(PlayerPreferences.LIBRARY_TILE_LIKES)
+        .collectAsState(initial = prefs.getLibraryTileIcon(PlayerPreferences.LIBRARY_TILE_LIKES))
+    val downloadsIcon by prefs.libraryTileIconFlow(PlayerPreferences.LIBRARY_TILE_DOWNLOADS)
+        .collectAsState(initial = prefs.getLibraryTileIcon(PlayerPreferences.LIBRARY_TILE_DOWNLOADS))
+    val localIcon by prefs.libraryTileIconFlow(PlayerPreferences.LIBRARY_TILE_LOCAL)
+        .collectAsState(initial = prefs.getLibraryTileIcon(PlayerPreferences.LIBRARY_TILE_LOCAL))
+
+    val scheme = MaterialTheme.colorScheme
+    return buildList {
+        if (PlayerPreferences.LIBRARY_TILE_LIKES !in hidden) {
+            add(
+                LibEntry(
+                    key = "pin_likes",
+                    title = str("lib_liked_tracks"),
+                    subtitle = str("lib_liked_subtitle"),
+                    icon = Icons.Filled.Favorite,
+                    iconPath = likesIcon,
+                    gradient = if (themed) null else listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)),
+                    flatColor = if (themed) scheme.primaryContainer else null,
+                    iconTint = if (themed) scheme.onPrimaryContainer else Color.White,
+                    destination = "likes",
+                    isPinned = true,
+                )
+            )
+        }
+        if (PlayerPreferences.LIBRARY_TILE_DOWNLOADS !in hidden) {
+            add(
+                LibEntry(
+                    key = "pin_downloads",
+                    title = str("lib_downloads"),
+                    subtitle = str("lib_liked_subtitle_local"),
+                    icon = Icons.Outlined.DownloadForOffline,
+                    iconPath = downloadsIcon,
+                    gradient = if (themed) null else listOf(Color(0xFF00C853), Color(0xFF69F0AE)),
+                    flatColor = if (themed) scheme.secondaryContainer else null,
+                    iconTint = if (themed) scheme.onSecondaryContainer else Color.White,
+                    destination = "downloads",
+                    isPinned = true,
+                )
+            )
+        }
+        if (PlayerPreferences.LIBRARY_TILE_LOCAL !in hidden) {
+            add(
+                LibEntry(
+                    key = "pin_local",
+                    title = str("lib_local_media"),
+                    subtitle = str("lib_local_media_subtitle"),
+                    icon = Icons.Outlined.FolderOpen,
+                    iconPath = localIcon,
+                    gradient = if (themed) null else listOf(Color(0xFF0091EA), Color(0xFF40C4FF)),
+                    flatColor = if (themed) scheme.tertiaryContainer else null,
+                    iconTint = if (themed) scheme.onTertiaryContainer else Color.White,
+                    destination = "local_files",
+                    isPinned = true,
+                )
+            )
+        }
+    }
+}
+
 @Composable
 private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEntry> {
     val query = libraryViewModel.searchQuery
@@ -492,35 +613,8 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
     }
 
     val pinned = if (libraryViewModel.selectedFilter == null && !isInsideFolder) {
-        listOf(
-            LibEntry(
-                key = "pin_likes",
-                title = str("lib_liked_tracks"),
-                subtitle = str("lib_liked_subtitle"),
-                icon = Icons.Filled.Favorite,
-                gradient = listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)),
-                destination = "likes",
-                isPinned = true,
-            ),
-            LibEntry(
-                key = "pin_downloads",
-                title = str("lib_downloads"),
-                subtitle = str("lib_liked_subtitle_local"),
-                icon = Icons.Outlined.DownloadForOffline,
-                gradient = listOf(Color(0xFF00C853), Color(0xFF69F0AE)),
-                destination = "downloads",
-                isPinned = true,
-            ),
-            LibEntry(
-                key = "pin_local",
-                title = str("lib_local_media"),
-                subtitle = str("lib_local_media_subtitle"),
-                icon = Icons.Outlined.FolderOpen,
-                gradient = listOf(Color(0xFF0091EA), Color(0xFF40C4FF)),
-                destination = "local_files",
-                isPinned = true,
-            ),
-        ).filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
+        rememberFixedLibraryTiles()
+            .filter { query.isBlank() || it.title.contains(query, ignoreCase = true) }
     } else emptyList()
 
     val items = libraryViewModel.displayedItems.map { item ->
@@ -612,6 +706,10 @@ private fun LibraryHeader(
 ) {
     var showCreateMenu by remember { mutableStateOf(false) }
 
+    val headerPrefs = remember { PlayerPreferences() }
+    val hiddenButtons by headerPrefs.hiddenLibraryButtonsFlow()
+        .collectAsState(initial = headerPrefs.getHiddenLibraryButtons())
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -687,27 +785,35 @@ private fun LibraryHeader(
             Spacer(Modifier.weight(1f))
         }
 
-        // Extended "+ Créer" with dropdown menu
+        // Extended "+ Créer" with dropdown menu. Outlined rather than filled tonal: next to a row
+        // of plain icon buttons the tonal fill made it the loudest thing in the header, which is
+        // not what a secondary action should be (issue #33).
         val extendedCreate = fullScreen || libraryViewModel.sidebarWidth >= 340f
+        val showCreate = PlayerPreferences.LIBRARY_BUTTON_CREATE !in hiddenButtons
         Box {
-            Tip(str("lib_create_playlist_tooltip")) {
+            if (showCreate) Tip(str("lib_create_playlist_tooltip")) {
                 if (extendedCreate) {
-                    FilledTonalButton(
+                    OutlinedButton(
                         onClick = { showCreateMenu = true },
                         shapes = ButtonDefaults.shapes(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     ) {
                         Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(str("lib_create"))
                     }
                 } else {
-                    FilledTonalIconButton(
+                    IconButton(
                         onClick = { showCreateMenu = true },
                         shapes = IconButtonDefaults.shapes(),
                         modifier = Modifier.size(32.dp),
                     ) {
-                        Icon(Icons.Rounded.Add, contentDescription = str("lib_create_playlist_tooltip"), modifier = Modifier.size(18.dp))
+                        Icon(
+                            Icons.Rounded.Add,
+                            contentDescription = str("lib_create_playlist_tooltip"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
                     }
                 }
             }
@@ -742,19 +848,23 @@ private fun LibraryHeader(
                 )
             }
         }
-        Spacer(Modifier.width(4.dp))
-        Tip(str("history_title")) {
-            IconButton(
-                shapes = IconButtonDefaults.shapes(),
-                onClick = onHistory,
-                modifier = Modifier.size(32.dp),
-            ) {
-                Icon(
-                    Icons.Rounded.History,
-                    contentDescription = str("history_title"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+        if (PlayerPreferences.LIBRARY_BUTTON_HISTORY !in hiddenButtons) {
+            Spacer(Modifier.width(4.dp))
+            Tip(str("history_title")) {
+                IconButton(
+                    shapes = IconButtonDefaults.shapes(),
+                    onClick = onHistory,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    // A plain clock rather than the clock-with-arrow: the arrow read as an undo or a
+                    // refresh next to the other header icons (issue #33).
+                    Icon(
+                        Icons.Rounded.Schedule,
+                        contentDescription = str("history_title"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
         Spacer(Modifier.width(4.dp))
@@ -798,22 +908,18 @@ private fun LibraryHeader(
 
 @Composable
 private fun LibraryFilterChips(libraryViewModel: LibraryViewModel) {
+    // Each filter carries its icon: narrowed all the way down the labels truncate to a couple of
+    // letters, and in a language with long words there was nothing left to recognise them by
+    // (issue #33). The main navigation rail already pairs icon and label the same way.
     val filters = remember(libraryViewModel.uploadedTracks.size) {
-        if (libraryViewModel.uploadedTracks.isNotEmpty()) {
-            listOf(
-                str("lib_playlists"),
-                str("lib_albums"),
-                str("lib_artists"),
-                str("lib_stations"),
-                str("lib_your_uploads"),
-            )
-        } else {
-            listOf(
-                str("lib_playlists"),
-                str("lib_albums"),
-                str("lib_artists"),
-                str("lib_stations"),
-            )
+        buildList {
+            add(str("lib_playlists") to Icons.Rounded.QueueMusic)
+            add(str("lib_albums") to Icons.Rounded.Album)
+            add(str("lib_artists") to Icons.Rounded.Person)
+            add(str("lib_stations") to Icons.Rounded.Radio)
+            if (libraryViewModel.uploadedTracks.isNotEmpty()) {
+                add(str("lib_your_uploads") to Icons.Rounded.CloudUpload)
+            }
         }
     }
     val scrollState = rememberScrollState()
@@ -840,20 +946,22 @@ private fun LibraryFilterChips(libraryViewModel: LibraryViewModel) {
                 .padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            filters.forEach { filter ->
-                val selected = libraryViewModel.selectedFilter == filter
+            filters.forEach { (label, icon) ->
+                val selected = libraryViewModel.selectedFilter == label
                 Button(
                     onClick = {
-                        libraryViewModel.selectedFilter = if (selected) null else filter
+                        libraryViewModel.selectedFilter = if (selected) null else label
                     },
                     shapes = ButtonDefaults.shapes(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                     ),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Text(filter)
+                    Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -1419,17 +1527,36 @@ private fun EntryArtwork(
     val resolvedCover = com.alananasss.kittytune.ui.common.rememberPlaylistCover(entry.playlist)
     val artwork = entry.artworkUrl ?: resolvedCover
 
-    if (entry.gradient != null && entry.icon != null) {
+    val tileFill: Modifier? = when {
+        entry.flatColor != null -> Modifier.background(entry.flatColor)
+        entry.gradient != null -> Modifier.background(Brush.linearGradient(entry.gradient))
+        else -> null
+    }
+
+    if (tileFill != null && entry.icon != null) {
         androidx.compose.foundation.layout.BoxWithConstraints(
-            modifier = boxModifier.background(Brush.linearGradient(entry.gradient)),
+            modifier = boxModifier.then(tileFill),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                entry.icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(maxWidth * iconFraction),
-            )
+            // An imported icon is drawn as an image, not tinted: someone who picked their own
+            // artwork picked its colours too. It also fills the tile rather than sitting at
+            // iconFraction, which is sized for a line-art vector (issue #33).
+            val imported = entry.iconPath?.let { path -> remember(path) { java.io.File(path) } }
+            if (imported != null && imported.isFile) {
+                AsyncImage(
+                    model = imported,
+                    contentDescription = entry.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                )
+            } else {
+                Icon(
+                    entry.icon,
+                    contentDescription = null,
+                    tint = entry.iconTint,
+                    modifier = Modifier.size(maxWidth * iconFraction),
+                )
+            }
         }
     } else if (!artwork.isNullOrBlank()) {
         AsyncImage(
@@ -1482,29 +1609,44 @@ private fun CollapsedLibraryRail(
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
-        Tip(str("lib_create_playlist_tooltip")) {
-            FilledTonalIconButton(
-                onClick = onCreate,
-                shapes = IconButtonDefaults.shapes(),
-                modifier = Modifier.size(36.dp),
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = str("lib_create_playlist_tooltip"), modifier = Modifier.size(20.dp))
+        // Same treatment as the expanded header: no tonal fill, a plain clock, and both hideable
+        // (issue #33).
+        val railPrefs = remember { PlayerPreferences() }
+        val hiddenButtons by railPrefs.hiddenLibraryButtonsFlow()
+            .collectAsState(initial = railPrefs.getHiddenLibraryButtons())
+
+        if (PlayerPreferences.LIBRARY_BUTTON_CREATE !in hiddenButtons) {
+            Spacer(Modifier.height(4.dp))
+            Tip(str("lib_create_playlist_tooltip")) {
+                IconButton(
+                    onClick = onCreate,
+                    shapes = IconButtonDefaults.shapes(),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Add,
+                        contentDescription = str("lib_create_playlist_tooltip"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(4.dp))
-        Tip(str("history_title")) {
-            IconButton(
-                onClick = onHistory,
-                shapes = IconButtonDefaults.shapes(),
-                modifier = Modifier.size(36.dp),
-            ) {
-                Icon(
-                    Icons.Rounded.History,
-                    contentDescription = str("history_title"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp)
-                )
+        if (PlayerPreferences.LIBRARY_BUTTON_HISTORY !in hiddenButtons) {
+            Spacer(Modifier.height(4.dp))
+            Tip(str("history_title")) {
+                IconButton(
+                    onClick = onHistory,
+                    shapes = IconButtonDefaults.shapes(),
+                    modifier = Modifier.size(36.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Schedule,
+                        contentDescription = str("history_title"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -1542,11 +1684,40 @@ private fun CollapsedLibraryRail(
 @Composable
 private fun Tip(text: String, content: @Composable () -> Unit) {
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        positionProvider = rememberEdgeSafeTooltipPositionProvider(),
         tooltip = { PlainTooltip { Text(text) } },
         state = rememberTooltipState(),
         content = content,
     )
+}
+
+/**
+ * The plain tooltip position, kept inside the window.
+ *
+ * Material centres a tooltip on its anchor and does not clamp it. The library panel's icons sit
+ * against the left edge, so a label wider than its icon — every label, once the panel is collapsed —
+ * started at a negative x and was cut off by the window, which is the unreadable
+ * "usic Recognition" in issue #33.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun rememberEdgeSafeTooltipPositionProvider(): androidx.compose.ui.window.PopupPositionProvider {
+    val delegate = TooltipDefaults.rememberPlainTooltipPositionProvider()
+    return remember(delegate) {
+        object : androidx.compose.ui.window.PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: androidx.compose.ui.unit.IntRect,
+                windowSize: androidx.compose.ui.unit.IntSize,
+                layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+                popupContentSize: androidx.compose.ui.unit.IntSize,
+            ): androidx.compose.ui.unit.IntOffset {
+                val wanted =
+                    delegate.calculatePosition(anchorBounds, windowSize, layoutDirection, popupContentSize)
+                val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
+                return androidx.compose.ui.unit.IntOffset(wanted.x.coerceIn(0, maxX), wanted.y)
+            }
+        }
+    }
 }
 
 @Composable

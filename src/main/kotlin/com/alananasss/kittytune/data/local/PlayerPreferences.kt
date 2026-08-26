@@ -18,6 +18,15 @@ enum class AppThemeMode { SYSTEM, LIGHT, DARK }
 enum class StartDestination { HOME, LIBRARY }
 enum class LyricsAlignment { LEFT, CENTER, RIGHT }
 
+/**
+ * How much the lyrics views set the line being sung apart from the rest (issue #33).
+ *
+ * [STANDARD] is what the app has always done: the current line is brighter. [SCALE] also grows
+ * it, and [FOCUS] pushes the rest well back instead — the two treatments asked for, each useful
+ * on a different kind of lyric sheet.
+ */
+enum class LyricsDisplayStyle { STANDARD, SCALE, FOCUS }
+
 enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
 
 enum class AppLanguage(val code: String) {
@@ -83,8 +92,45 @@ class PlayerPreferences {
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(PLAYER_BAR_BUTTON_LIKE, PLAYER_BAR_BUTTON_PANEL, PLAYER_BAR_BUTTON_QUEUE)
 
+        private const val KEY_LIBRARY_TILES_HIDDEN = "library_tiles_hidden"
+
+        const val LIBRARY_TILE_LIKES = "likes"
+        const val LIBRARY_TILE_DOWNLOADS = "downloads"
+        const val LIBRARY_TILE_LOCAL = "local"
+
+        /** In the order they appear in the library, which is the order the settings list them in. */
+        val LIBRARY_TILES =
+            listOf(LIBRARY_TILE_LIKES, LIBRARY_TILE_DOWNLOADS, LIBRARY_TILE_LOCAL)
+
+        private const val KEY_SIDEBAR_NAV_HIDDEN = "sidebar_nav_hidden"
+
+        const val SIDEBAR_NAV_FEED = "feed"
+        const val SIDEBAR_NAV_EXPLORE = "explore"
+        const val SIDEBAR_NAV_RECOGNITION = "recognition"
+
+        /**
+         * Device sync, in the sidebar rather than only at the bottom of the settings page.
+         *
+         * Shown by default — a new key is absent from the hidden set — because the thing sync needs most is
+         * to be found once. It can be switched off like the others for anyone who has paired and is done
+         * thinking about it.
+         */
+        const val SIDEBAR_NAV_SYNC = "sync"
+
+        /** Home is deliberately absent: see [getHiddenSidebarNav]. */
+        val SIDEBAR_NAV_ITEMS =
+            listOf(SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC)
+
+        private const val KEY_LIBRARY_BUTTONS_HIDDEN = "library_buttons_hidden"
+
+        const val LIBRARY_BUTTON_CREATE = "create"
+        const val LIBRARY_BUTTON_HISTORY = "history"
+
+        val LIBRARY_BUTTONS = listOf(LIBRARY_BUTTON_CREATE, LIBRARY_BUTTON_HISTORY)
+
         private const val KEY_LYRICS_PREFER_LOCAL = "lyrics_prefer_local"
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
+        private const val KEY_LYRICS_DISPLAY_STYLE = "lyrics_display_style"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
@@ -240,6 +286,14 @@ class PlayerPreferences {
     }
     fun setLyricsAlignment(align: LyricsAlignment) = Prefs.putString(KEY_LYRICS_ALIGNMENT, align.name)
 
+    fun getLyricsDisplayStyle(): LyricsDisplayStyle {
+        val name = Prefs.getString(KEY_LYRICS_DISPLAY_STYLE, LyricsDisplayStyle.STANDARD.name)
+        return LyricsDisplayStyle.entries.find { it.name == name } ?: LyricsDisplayStyle.STANDARD
+    }
+
+    fun setLyricsDisplayStyle(style: LyricsDisplayStyle) =
+        Prefs.putString(KEY_LYRICS_DISPLAY_STYLE, style.name)
+
 
 
     fun getLyricsFontSize(): Float = Prefs.getFloat(KEY_LYRICS_FONT_SIZE, 42f)
@@ -253,6 +307,9 @@ class PlayerPreferences {
     fun setStartDestination(dest: StartDestination) = Prefs.putString(KEY_START_DESTINATION, dest.name)
     fun getDynamicTheme(): Boolean = Prefs.getBoolean(KEY_DYNAMIC_THEME, true)
     fun setDynamicTheme(enabled: Boolean) = Prefs.putBoolean(KEY_DYNAMIC_THEME, enabled)
+
+    /** Also decides whether the fixed library tiles follow the palette. See [LIBRARY_TILES]. */
+    fun dynamicThemeFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_DYNAMIC_THEME, true)
 
     // Persisted volume so the app reopens at the level used when it was closed.
     fun getSavedVolume(): Float = Prefs.getFloat(KEY_PLAYER_VOLUME, 1f)
@@ -368,6 +425,82 @@ class PlayerPreferences {
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
 
     /**
+     * The three fixed tiles at the top of the library — Liked, Downloads, Local files.
+     *
+     * They were the one part of the library nobody could touch: always present, always their own
+     * purple, green and blue, always the icon we picked. Someone who never downloads anything had a
+     * tile they could not remove, and the three of them were the only thing on the page that
+     * ignored the app's own colours (issue #33).
+     *
+     * Hidden ones are stored rather than visible ones, so a tile added later shows up by default
+     * instead of silently staying hidden for everyone who had already saved a selection.
+     */
+    fun getHiddenLibraryTiles(): Set<String> {
+        val raw = Prefs.getString(KEY_LIBRARY_TILES_HIDDEN, null) ?: return emptySet()
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setHiddenLibraryTiles(tiles: Set<String>) =
+        Prefs.putString(KEY_LIBRARY_TILES_HIDDEN, tiles.joinToString(","))
+
+    fun hiddenLibraryTilesFlow(): Flow<Set<String>> =
+        Prefs.stringFlow(KEY_LIBRARY_TILES_HIDDEN, null).map { raw ->
+            raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+        }
+
+    /** Path to the image standing in for a tile's built-in icon, or null for the built-in one. */
+    fun getLibraryTileIcon(tile: String): String? =
+        Prefs.getString(keyLibraryTileIcon(tile), null)?.takeIf { it.isNotBlank() }
+
+    fun setLibraryTileIcon(tile: String, path: String?) =
+        Prefs.putString(keyLibraryTileIcon(tile), path)
+
+    fun libraryTileIconFlow(tile: String): Flow<String?> =
+        Prefs.stringFlow(keyLibraryTileIcon(tile), null).map { it?.takeIf { p -> p.isNotBlank() } }
+
+    private fun keyLibraryTileIcon(tile: String) = "library_tile_icon_$tile"
+
+    /**
+     * Which of the sidebar's navigation rows are hidden.
+     *
+     * Home is not in here and cannot be hidden: it is where the app starts and where every "go
+     * back to the beginning" ends up, so a sidebar without it has no anchor. The other three are
+     * whole sections of the app somebody may simply never open (issue #33).
+     */
+    fun getHiddenSidebarNav(): Set<String> {
+        val raw = Prefs.getString(KEY_SIDEBAR_NAV_HIDDEN, null) ?: return emptySet()
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setHiddenSidebarNav(items: Set<String>) =
+        Prefs.putString(KEY_SIDEBAR_NAV_HIDDEN, items.joinToString(","))
+
+    fun hiddenSidebarNavFlow(): Flow<Set<String>> =
+        Prefs.stringFlow(KEY_SIDEBAR_NAV_HIDDEN, null).map { raw ->
+            raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+        }
+
+    /**
+     * Which of the library header's own buttons are hidden — creating, and the listening history.
+     *
+     * Both were permanent fixtures next to a search field, and neither is something everybody uses
+     * (issue #33). The import button stays: it is the only way into that screen.
+     */
+    fun getHiddenLibraryButtons(): Set<String> {
+        val raw = Prefs.getString(KEY_LIBRARY_BUTTONS_HIDDEN, null) ?: return emptySet()
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setHiddenLibraryButtons(buttons: Set<String>) =
+        Prefs.putString(KEY_LIBRARY_BUTTONS_HIDDEN, buttons.joinToString(","))
+
+    fun hiddenLibraryButtonsFlow(): Flow<Set<String>> =
+        Prefs.stringFlow(KEY_LIBRARY_BUTTONS_HIDDEN, null).map { raw ->
+            raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+        }
+
+
+    /**
      * Whether the Windows title bar is painted in the app's colours rather than left to the system.
      * On by default — that was the point of the request — but reversible, because some people want
      * the stock bar (issue #33). Has no effect off Windows.
@@ -384,7 +517,7 @@ class PlayerPreferences {
 
     /** Multiplier on the base auto-scroll rate, clamped to the range the slider offers. */
     fun getLyricsPlainAutoScrollSpeed(): Float =
-        Prefs.getFloat("lyrics_plain_autoscroll_speed", 1f).coerceIn(0.25f, 4f)
+        Prefs.getFloat("lyrics_plain_autoscroll_speed", 1.5f).coerceIn(0.25f, 4f)
 
     fun setLyricsPlainAutoScrollSpeed(speed: Float) =
         Prefs.putFloat("lyrics_plain_autoscroll_speed", speed.coerceIn(0.25f, 4f))
