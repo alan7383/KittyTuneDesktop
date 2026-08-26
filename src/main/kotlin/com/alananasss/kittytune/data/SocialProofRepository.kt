@@ -28,13 +28,32 @@ object SocialProofRepository {
     private const val BATCH_DEBOUNCE_MS = 60L
     private const val MAX_BATCH_SIZE = 50
 
+    /**
+     * How many tracks' likers to keep (issue #33).
+     *
+     * One entry is a handful of users, so this is small in bytes — but it was keyed by track and
+     * never emptied, which over a long session with a lot of scrolling is one entry per track ever
+     * seen. Well past what any screen shows at once, and the ones evicted are the ones nobody has
+     * looked at in the longest time.
+     */
+    private const val MAX_CACHED_TRACKS = 600
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    /**
+     * The likers themselves, bounded. The flow still publishes a plain map so nothing downstream has
+     * to know about the eviction; it is republished from the cache after every change.
+     */
+    private val likers = com.alananasss.kittytune.core.BoundedCache<Long, List<User>>(MAX_CACHED_TRACKS)
 
     private val _socialLikersMap = MutableStateFlow<Map<Long, List<User>>>(emptyMap())
     val socialLikersMap: StateFlow<Map<Long, List<User>>> = _socialLikersMap.asStateFlow()
 
-    /** Asked about already, answered or not: the guard against re-requesting on every scroll. */
-    private val requestedTrackIds = ConcurrentHashMap.newKeySet<Long>()
+    /**
+     * Asked about already, answered or not: the guard against re-requesting on every scroll. Bounded
+     * to the same size as the answers, so forgetting a key and forgetting its answer coincide.
+     */
+    private val requestedTrackIds = com.alananasss.kittytune.core.BoundedSet<Long>(MAX_CACHED_TRACKS)
     private val pendingBatchIds = ConcurrentHashMap.newKeySet<Long>()
     private var batchJob: Job? = null
 
@@ -45,19 +64,26 @@ object SocialProofRepository {
 
     fun clear() {
         myUrn = null
+        likers.clear()
         _socialLikersMap.value = emptyMap()
         requestedTrackIds.clear()
         pendingBatchIds.clear()
         batchJob?.cancel()
     }
 
-    fun getLikersForTrack(trackId: Long): List<User>? = _socialLikersMap.value[trackId]
+    fun getLikersForTrack(trackId: Long): List<User>? = likers[trackId]
 
     /** Records likers resolved elsewhere (the player sheet), so a row does not ask again. */
     fun putLikersForTrack(trackId: Long, users: List<User>) {
         if (trackId <= 0) return
         requestedTrackIds.add(trackId)
-        _socialLikersMap.value = _socialLikersMap.value + (trackId to users)
+        likers[trackId] = users
+        publish()
+    }
+
+    /** Mirrors the cache into the flow the rows collect. */
+    private fun publish() {
+        _socialLikersMap.value = likers.snapshot()
     }
 
     fun requestSocialProof(trackId: Long) {
@@ -131,7 +157,8 @@ object SocialProofRepository {
             // Tracks the response said nothing about have no likers among your follows; recording
             // that keeps them out of the next batch.
             idsToFetch.forEach { resolved.putIfAbsent(it, emptyList()) }
-            _socialLikersMap.value = _socialLikersMap.value + resolved
+            resolved.forEach { (id, users) -> likers[id] = users }
+            publish()
         } catch (e: Exception) {
             idsToFetch.forEach { requestedTrackIds.remove(it) }
         }
