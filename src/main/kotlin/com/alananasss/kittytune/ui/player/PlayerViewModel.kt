@@ -15,6 +15,7 @@ import com.alananasss.kittytune.R
 import com.alananasss.kittytune.data.*
 import com.alananasss.kittytune.data.local.LocalPlaylist
 import com.alananasss.kittytune.data.local.LyricsAlignment
+import com.alananasss.kittytune.data.local.LyricsDisplayStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.LrcLibClient
 import com.alananasss.kittytune.data.ListeningStatsRepository
@@ -27,6 +28,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
@@ -410,6 +412,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
     var lyricsAlignment by mutableStateOf(playerPrefs.getLyricsAlignment())
 
+    /** How the line being sung is set apart. See [LyricsDisplayStyle]. */
+    var lyricsDisplayStyle by mutableStateOf(playerPrefs.getLyricsDisplayStyle())
+
     var lyricsMode by mutableStateOf(LyricsMode.SYNCED)
     var rawPlainLyrics by mutableStateOf<String?>(null)
     var showInlineLyrics by mutableStateOf(false)
@@ -435,7 +440,239 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setRightPanelWidth(rightPanelWidth)
     }
 
-    var currentSessionListenMs = 0L
+    /**
+     * The listen in progress, and the track it belongs to (issue #33).
+     *
+     * Replaces a bare counter that was incremented by 250 ms per progress tick and then written only
+     * when the track ended in one of three specific ways. Anything else — closing the app, stopping,
+     * loading something else — discarded it, which is why whole listening sessions went unrecorded.
+     * Every ending now goes through [flushListenSession].
+     */
+    private var listenSession: com.alananasss.kittytune.data.stats.ListenSessionAccumulator? = null
+    private var listenSessionTrack: Track? = null
+
+    /** Media milliseconds heard in the current listen. Exposed for the player's own displays. */
+    val currentSessionListenMs: Long get() = listenSession?.listenedMs ?: 0L
+
+    /**
+     * Makes sure the track that is playing has a session, whichever code path started it.
+     *
+     * Auto-advance inside the player does not always go through [playTrackAtIndex], so relying on the
+     * explicit calls alone left some transitions unrecorded. Called from the progress loop, where
+     * "something is playing" is known to be true.
+     */
+    private fun ensureListenSession() {
+        val track = currentTrack ?: return
+        if (listenSession != null && listenSessionTrack?.id == track.id) return
+        beginListenSession(track, currentPosition)
+        listenSession?.onPlaying(currentPosition)
+    }
+
+    /**
+     * Starts accounting for [track] from [startPositionMs], writing out whatever was in progress first.
+     */
+    private fun beginListenSession(track: Track?, startPositionMs: Long = 0L) {
+        flushListenSession("TRACK_CHANGE")
+        listenSessionTrack = track
+        listenSession = track?.let {
+            com.alananasss.kittytune.data.stats.ListenSessionAccumulator(startPositionMs)
+        }
+    }
+
+    /**
+     * Writes the listen in progress, if enough of it was heard, and clears it.
+     *
+     * Safe to call repeatedly and from anywhere: the session is cleared first, so two callers racing to
+     * end the same listen cannot record it twice.
+     *
+     * @param reason how the listen ended, kept for detail only — no aggregate depends on it any more.
+     */
+    fun flushListenSession(reason: String, blocking: Boolean = false) {
+        val session = listenSession ?: return
+        val track = listenSessionTrack
+        listenSession = null
+        listenSessionTrack = null
+        if (track == null || !playerPrefs.getListeningStatsEnabled()) return
+
+        // Nothing heard at all is not a listen and not a skip — it is a track that was loaded. Recording
+        // it would put a row in the table that every aggregate then has to exclude, and would make the
+        // skip rate a measure of how often the next button was pressed while something loaded.
+        if (session.listenedMs <= 0L) return
+
+        ListeningStatsRepository.recordEvent(
+            track = track,
+            eventType = reason,
+            listenDurationMs = session.listenedMs,
+            furthestPositionMs = session.furthestPositionMs,
+            blocking = blocking,
+        )
+    }
+
+    // --- trim / smart skip -----------------------------------------------------------------------
+
+    /**
+     * The current track's trim, if it has one (issue #33).
+     *
+     * SoundCloud is full of re-uploads that exist only because someone wanted a song without its guest verse
+     * or without a long intro. This is that, done in the player: a few remembered timestamps, skipped over on
+     * the fly. The audio file is never touched, so clearing the trim gives the original back.
+     */
+    var currentTrim by mutableStateOf(com.alananasss.kittytune.audio.TrackTrim.none())
+        private set
+
+    /** Whether the trim editor is open. */
+    var showTrimDialog by mutableStateOf(false)
+
+    private var trimJob: Job? = null
+    private var trimWatchJob: Job? = null
+
+    /** Set while a trim jump is fading, so the watcher does not fire again mid-jump. */
+    @Volatile
+    private var trimJumpInProgress = false
+
+    /** Loads the trim for [trackId], or clears it. Cheap enough to call on every track change. */
+    private fun loadTrimFor(trackId: Long?) {
+        trimJob?.cancel()
+        if (trackId == null) {
+            currentTrim = com.alananasss.kittytune.audio.TrackTrim.none()
+            return
+        }
+        trimJob = viewModelScope.launch {
+            currentTrim = com.alananasss.kittytune.data.TrackTrimRepository.get(trackId)
+        }
+    }
+
+    /** Replaces the trim for the track playing now, and applies it immediately. */
+    fun saveCurrentTrim(trim: com.alananasss.kittytune.audio.TrackTrim) {
+        val trackId = currentTrack?.id ?: return
+        currentTrim = trim
+        viewModelScope.launch {
+            com.alananasss.kittytune.data.TrackTrimRepository.put(trackId, trim)
+            // Applied at once rather than at the next track: editing a trim while listening to the part you
+            // are removing and having it keep playing is a confusing way to find out it worked.
+            applyTrimNow()
+        }
+    }
+
+    fun clearCurrentTrim() {
+        val trackId = currentTrack?.id ?: return
+        currentTrim = com.alananasss.kittytune.audio.TrackTrim.none()
+        viewModelScope.launch { com.alananasss.kittytune.data.TrackTrimRepository.remove(trackId) }
+    }
+
+    /**
+     * Watches the clock for the moment a trim applies.
+     *
+     * Its own loop rather than a hook in the progress updater, which reports four times a second: a quarter of
+     * a second of the verse you asked to remove is exactly the thing that would make this feel unfinished. The
+     * tick reads one volatile long, so running it twenty times faster costs nothing measurable.
+     */
+    private fun startTrimWatcher() {
+        if (trimWatchJob != null) return
+        trimWatchJob = viewModelScope.launch {
+            while (isActive) {
+                delay(TRIM_TICK_MS)
+                if (!isPlaying || trimJumpInProgress || currentTrim.isEmpty) continue
+                applyTrimNow()
+            }
+        }
+    }
+
+    private suspend fun applyTrimNow() {
+        val trim = currentTrim
+        if (trim.isEmpty) return
+        when (val action = trim.actionFor(player.currentPosition, player.duration)) {
+            is com.alananasss.kittytune.audio.TrimAction.Continue -> Unit
+
+            is com.alananasss.kittytune.audio.TrimAction.JumpTo -> jumpWithFade(action.positionMs)
+
+            is com.alananasss.kittytune.audio.TrimAction.Finished -> {
+                // Treated as the track running out, so repeat, the queue and the listening statistics all see
+                // what they would have seen if the file itself had ended here.
+                trimJumpInProgress = true
+                try {
+                    fadeVolumeTo(0f)
+                    flushListenSession("PLAY_COMPLETE")
+                    playNext(manual = false)
+                } finally {
+                    player.volume = volume
+                    trimJumpInProgress = false
+                }
+            }
+        }
+    }
+
+    /**
+     * Seeks to [positionMs] with a short fade either side.
+     *
+     * The fade is the whole reason this sounds like an edit rather than a fault: a bare seek cuts the waveform
+     * mid-cycle and clicks.
+     *
+     * Measured on a real jump, the transition is about 316 ms end to end — 136 ms of true silence while the
+     * seek drains and re-primes the decoder, then the ramp back. Most of that is the seek's cost, not the
+     * fade's, and none of it is a hard edge. The earlier claim in this comment was ninety milliseconds, which
+     * was the ramp's own duration and not what anyone hears (issue #33).
+     */
+    private suspend fun jumpWithFade(positionMs: Long) {
+        trimJumpInProgress = true
+        try {
+            // A sleep-timer fade is already driving the volume; taking it over would leave the timer's own
+            // restore fighting ours. The jump still happens, just without the ramp.
+            val canFade = preFadeVolume == null
+
+            // Fading *out* of something nobody has heard yet is a stutter, not a transition. A trim that
+            // moves the start of the track fires within twenty milliseconds of playback beginning, and
+            // ramping down from there would make every play of the track open with a wobble. Fading back
+            // in still happens, which is what keeps the seek itself silent.
+            val fromTheTop = player.currentPosition < TRIM_SILENT_SEEK_MS
+            if (canFade && !fromTheTop) fadeVolumeTo(0f) else if (canFade) player.volume = 0f
+            player.seekTo(positionMs)
+            currentPosition = positionMs
+            listenSession?.onSeek(positionMs)
+
+            // Waited for, not assumed. Measuring this on a real jump is what caught the bug: the seek
+            // drains and re-primes the decoder, so no audio comes out for roughly 120 ms — and a ramp on
+            // the wall clock finished during that silence. The volume was already back at full when the
+            // first sample returned, so the fade-in existed in the code and nowhere in the sound: the
+            // audio resumed at full level in a single frame, which is precisely the edge the fade was
+            // added to remove.
+            if (canFade) {
+                awaitPlaybackResumed(positionMs)
+                fadeVolumeTo(volume)
+            }
+        } finally {
+            if (preFadeVolume == null) player.volume = volume
+            trimJumpInProgress = false
+        }
+    }
+
+    /**
+     * Waits until the engine is actually producing audio again after a seek to [seekedToMs].
+     *
+     * "Producing audio" is read as the reported position having moved past where we seeked to. Bounded,
+     * because a seek that never completes — a dead stream URL, a stall — must not leave the track muted:
+     * past the deadline the fade runs anyway and the worst case is the hard edge we had before.
+     */
+    private suspend fun awaitPlaybackResumed(seekedToMs: Long) {
+        val deadline = System.currentTimeMillis() + TRIM_RESUME_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            if (!isPlaying) return
+            if (player.currentPosition > seekedToMs) return
+            delay(TRIM_TICK_MS)
+        }
+    }
+
+    private suspend fun fadeVolumeTo(target: Float) {
+        val from = player.volume
+        val steps = TRIM_FADE_STEPS
+        for (step in 1..steps) {
+            val fraction = step.toFloat() / steps
+            player.volume = (from + (target - from) * fraction).coerceIn(0f, 1f)
+            delay(TRIM_FADE_MS / steps)
+        }
+        player.volume = target.coerceIn(0f, 1f)
+    }
+
     private var hasPushedRecentlyPlayed = false
 
     var sleepTimerRemainingMs by mutableLongStateOf(0L)
@@ -488,6 +725,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
          * minutes a SoundCloud CDN signature lasts, and a cache hit whenever one still holds.
          */
         private const val PREFETCH_REWARM_INTERVAL_MS = 45_000L
+
+        /**
+         * How often the trim watcher looks at the clock (issue #33).
+         *
+         * Twenty milliseconds, not the progress loop's 250: a quarter of a second of the verse you asked to
+         * remove is precisely what would make this feel half-finished. The tick reads one volatile long, so
+         * running it twelve times more often costs nothing worth measuring.
+         */
+        private const val TRIM_TICK_MS = 20L
+
+        /**
+         * How long each ramp takes.
+         *
+         * Ninety milliseconds of ramp reaches full level in about 56 ms of audible signal once the device
+         * buffer is accounted for — measured, not assumed. Long enough to leave no transient, short enough
+         * that the ramp itself is not the thing you notice about the transition.
+         */
+        private const val TRIM_FADE_MS = 90L
+
+        /** Steps in that fade. Enough to be smooth at 90 ms, few enough to cost nothing. */
+        private const val TRIM_FADE_STEPS = 9
+
+        /**
+         * Below this, a jump is treated as "playback had not really started" and the fade-out is skipped.
+         *
+         * Covers the case that would otherwise be the most noticeable of all: a kept range that begins at
+         * 00:30 fires on the first tick, and a ramp-down from an intro nobody heard is just a wobble at the
+         * top of every play.
+         */
+        private const val TRIM_SILENT_SEEK_MS = 600L
+
+        /**
+         * How long to wait for audio to come back after a trim seek before fading in regardless.
+         *
+         * Measured at about 120 ms on a healthy stream; this leaves generous room for a slow one without
+         * letting a stalled seek mute the track indefinitely.
+         */
+        private const val TRIM_RESUME_TIMEOUT_MS = 1_500L
     }
 
     private val syncReceiver = Any()
@@ -510,6 +785,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onIsPlayingChanged(isPlayingState: Boolean) {
             isPlaying = isPlayingState
             saveStateAsync(saveQueue = false)
+            // The gap while paused is not listening, and the position after a resume is the new
+            // baseline rather than a jump (issue #33).
+            if (isPlayingState) listenSession?.onPlaying(currentPosition) else listenSession?.onPaused()
             if (isPlayingState) {
                 startProgressUpdate()
                 SoundCloudTelemetryTracker.onTrackResumed(currentPosition)
@@ -532,17 +810,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 SoundCloudTelemetryTracker.onTrackCompleted()
                 if (com.alananasss.kittytune.core.AppInstance.isShuttingDown) return
 
-                currentTrack?.let { track ->
-                    if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
-                        if (repeatMode == RepeatMode.ONE) {
-                            ListeningStatsRepository.recordEvent(track, "REPEAT_ONE_LOOP", currentSessionListenMs)
-                        } else {
-                            ListeningStatsRepository.recordEvent(track, "PLAY_COMPLETE", currentSessionListenMs)
-                        }
-                    }
-                }
-
-                currentSessionListenMs = 0L
+                flushListenSession(
+                    if (repeatMode == RepeatMode.ONE) "REPEAT_ONE_LOOP" else "PLAY_COMPLETE"
+                )
 
                 if (sleepTimerEndOfTrack) {
                     cancelSleepTimer()
@@ -656,7 +926,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             if (currentTrack?.id != trackId) {
-                currentSessionListenMs = 0L
+                // Was a silent reset: whatever had been listened to went missing here.
+flushListenSession("TRACK_CHANGE")
+                loadTrimFor(MusicManager.currentTrack?.id)
                 hasPushedRecentlyPlayed = false
             }
 
@@ -693,6 +965,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         applyRepeatMode()
         fetchUserProfile()
         observeArtworkColors()
+        observeTrackGain()
+        startTrimWatcher()
+
+        // The listen in progress when the app exits used to be lost outright — the single most common
+        // way for a track to end, and the one nobody was recording (issue #33). The hook runs on a
+        // normal exit and on a termination signal; it writes synchronously because the process is on
+        // its way out. A hard kill still loses the current track and nothing else.
+        runCatching {
+            Runtime.getRuntime().addShutdownHook(
+                Thread { runCatching { flushListenSession("APP_EXIT", blocking = true) } }
+            )
+        }
 
 
         MusicManager.onNextClick = {
@@ -1094,6 +1378,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateLyricsAlignment(alignment: LyricsAlignment) {
         lyricsAlignment = alignment
         playerPrefs.setLyricsAlignment(alignment)
+    }
+
+    fun updateLyricsDisplayStyle(style: LyricsDisplayStyle) {
+        lyricsDisplayStyle = style
+        playerPrefs.setLyricsDisplayStyle(style)
     }
 
 
@@ -1602,13 +1891,31 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * Searches a provider for lyrics to pick by hand.
+     *
+     * Only one search runs at a time, and the results replace rather than accumulate. Both halves of that
+     * were needed: pressing the button twice used to start two searches that each cleared the list and then
+     * appended to it, so the second one's results landed on top of the first one's — and since both searched
+     * the same thing, every row appeared twice. `LazyColumn` keys rows by id, two rows with one id is a
+     * duplicate key, and a duplicate key takes the window down: `Key "205071906MUSIXMATCH" was already used`
+     * (issue #33).
+     *
+     * The de-duplication is a second, independent guard. A provider is entitled to return the same track
+     * twice, and when it does, the list must not be able to crash the app.
+     */
+    private var manualLyricSearchJob: Job? = null
+
     fun searchLyricsManual(query: String, provider: String = manualSearchProvider) {
         if (query.isBlank()) return
+        // Cancelled, not merely ignored: the older search would otherwise finish later and append its rows
+        // to the newer search's list, which is both wrong and a crash.
+        manualLyricSearchJob?.cancel()
         isLyricsLoading = true
         unifiedLyricSearchResults.clear()
         manualSearchProvider = provider
 
-        viewModelScope.launch(Dispatchers.IO) {
+        manualLyricSearchJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val mapped = when (provider) {
                     "LRCLIB" -> LrcLibClient.api.searchLyrics(query).map {
@@ -1651,7 +1958,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         )
                     }
                 }
-                withContext(Dispatchers.Main) { unifiedLyricSearchResults.addAll(mapped) }
+                // Replaced in one go, and distinct by the identity the list is keyed on.
+                val distinct = mapped.distinctBy { it.id + it.provider }
+                withContext(Dispatchers.Main) {
+                    unifiedLyricSearchResults.clear()
+                    unifiedLyricSearchResults.addAll(distinct)
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -1661,6 +1973,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectUnifiedLyricResult(result: UnifiedLyricResult) {
+        // The automatic search has to be cut dead here. It was left running, so a slow resolution —
+        // and it is slow once Genius is in the chain — finished after the manual pick and overwrote
+        // it with whatever it had found, which is the "after some time it adds synchronised text
+        // that does not match this song" report in issue #33.
+        lyricsJob?.cancel()
+        lyricsPrefetchJob?.cancel()
         viewModelScope.launch(Dispatchers.IO) {
             isLyricsLoading = true
             var finalLines = emptyList<LyricLine>()
@@ -2425,7 +2743,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         isLoading = true; duration = trackToPlay.durationMs ?: 0L; currentPosition = 0L
-        currentSessionListenMs = 0L
+        beginListenSession(trackToPlay)
+        // Loaded before the stream is handed to the engine, so a trim that moves the starting point can be
+        // applied as a start position rather than as a jump the listener hears (issue #33).
+        loadTrimFor(trackToPlay.id)
         hasPushedRecentlyPlayed = false
         currentTrack = trackToPlay; MusicManager.currentTrack = trackToPlay
 
@@ -2490,19 +2811,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         if (manual) {
             currentTrack?.let { track ->
-                if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
-                    ListeningStatsRepository.recordEvent(track, "SKIP_NEXT", currentSessionListenMs)
-                }
+                flushListenSession("SKIP_NEXT")
             }
         }
 
         if (!manual && !ignoreRepeatOne && repeatMode == RepeatMode.ONE) {
-            currentTrack?.let { track ->
-                if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
-                    ListeningStatsRepository.recordEvent(track, "REPEAT_ONE_LOOP", currentSessionListenMs)
-                }
-            }
-            currentSessionListenMs = 0L
+            flushListenSession("REPEAT_ONE_LOOP")
             playTrackAtIndex(currentQueueIndex, addToHistory = false, isCrossfade = isCrossfade)
             return
         }
@@ -2712,19 +3026,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun smartPrevious(isCrossfade: Boolean = false) {
         if (player.currentPosition > 3000) {
-            currentTrack?.let { track ->
-                if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
-                    ListeningStatsRepository.recordEvent(track, "MANUAL_REPLAY", currentSessionListenMs)
-                }
-            }
-            currentSessionListenMs = 0L
+            flushListenSession("MANUAL_REPLAY")
+            // The same track from the top is a new listen, not a continuation of the old one.
+            beginListenSession(currentTrack)
             currentPosition = 0L
             player.seekTo(0)
         } else {
             currentTrack?.let { track ->
-                if (playerPrefs.getListeningStatsEnabled() && currentSessionListenMs > 0) {
-                    ListeningStatsRepository.recordEvent(track, "SKIP_PREVIOUS", currentSessionListenMs)
-                }
+                flushListenSession("SKIP_PREVIOUS")
             }
             val prev = currentQueueIndex - 1
             if (prev >= 0) {
@@ -2920,6 +3229,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         seekTargetPosition = target
         lastSeekTimestamp = System.currentTimeMillis()
         currentPosition = target
+        // Crossing the track deliberately is not listening to what was crossed (issue #33).
+        listenSession?.onSeek(target)
         player.seekTo(target)
         SoundCloudTelemetryTracker.onTrackSeeked(target)
         saveStateAsync(savePositionOnly = true)
@@ -3332,7 +3643,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         } else {
                             currentPosition = enginePos
                         }
-                        currentSessionListenMs += 250L
+                        ensureListenSession()
+                        listenSession?.onPosition(currentPosition)
 
                         // Dispatch progress to SoundCloud Telemetry Tracker (handles 5s threshold and 30s checkpoints)
                         SoundCloudTelemetryTracker.onProgressUpdate(currentPosition)
@@ -3578,6 +3890,55 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * Keyed on the artwork rather than the track, so the whole of an album costs one extraction
      * and the backfill that swaps in fuller metadata does not pay for a second.
      */
+    /**
+     * The current track's own volume trim (issue #33).
+     *
+     * Stored per track and applied the moment the track becomes current, which is the whole point:
+     * normalisation was rejected because it measures as it plays and only reaches the right level a
+     * few seconds in. Kept in its own file rather than the main preferences, which is rewritten
+     * whole on every change and would grow a key per track.
+     */
+    private val trackGainPrefs = com.alananasss.kittytune.core.NamedPrefs("track_gain")
+
+    var trackGainDb by mutableIntStateOf(com.alananasss.kittytune.audio.TrackGain.NONE)
+        private set
+
+    private fun trackGainKey(trackId: Long) = "gain_$trackId"
+
+    private fun observeTrackGain() {
+        viewModelScope.launch {
+            snapshotFlow { currentTrack?.id }
+                .distinctUntilChanged()
+                .collect { id ->
+                    val stored = if (id == null || id == 0L) {
+                        com.alananasss.kittytune.audio.TrackGain.NONE
+                    } else {
+                        trackGainPrefs.getInt(trackGainKey(id), com.alananasss.kittytune.audio.TrackGain.NONE)
+                    }
+                    trackGainDb = com.alananasss.kittytune.audio.TrackGain.clamp(stored)
+                    MusicManager.setTrackGainDb(trackGainDb.toFloat())
+                }
+        }
+    }
+
+    /** Moves the current track's trim by [delta] steps and remembers it. */
+    fun adjustTrackGain(delta: Int) {
+        val track = currentTrack ?: return
+        val next = com.alananasss.kittytune.audio.TrackGain.adjust(trackGainDb, delta)
+        if (next == trackGainDb) return
+        trackGainDb = next
+        MusicManager.setTrackGainDb(next.toFloat())
+        // Nothing stored means no trim, so the common case leaves no key behind.
+        if (next == com.alananasss.kittytune.audio.TrackGain.NONE) {
+            trackGainPrefs.remove(trackGainKey(track.id))
+        } else {
+            trackGainPrefs.putInt(trackGainKey(track.id), next)
+        }
+    }
+
+    /** Back to no trim for the current track. */
+    fun resetTrackGain() = adjustTrackGain(-trackGainDb)
+
     private fun observeArtworkColors() {
         viewModelScope.launch {
             snapshotFlow { currentTrack }

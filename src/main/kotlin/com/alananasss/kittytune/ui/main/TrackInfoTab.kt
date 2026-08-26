@@ -26,6 +26,14 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.ui.graphics.Color
+import com.alananasss.kittytune.core.Strings
+import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -120,6 +128,17 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         }
         list
     }
+
+    /**
+     * Which half the panel shows below the track details (issue #33). Deliberately not keyed on the
+     * track: someone who opened the panel for the lyrics wants the lyrics on the next track too.
+     * Saveable, so it also survives closing and reopening the panel.
+     *
+     * Spotify catalog tracks have no comments at all, so there is nothing to toggle between: the
+     * lyrics are the only half they have.
+     */
+    var showLyricsHalf by rememberSaveable { mutableStateOf(false) }
+    val lyricsHalf = isSpotifyTrack || showLyricsHalf
 
     LazyColumn(
         // The horizontal inset belongs to the content, not to the container: applied to the
@@ -451,50 +470,9 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Social Liked Proof Banner (e.g. "Mandra and 1,400 others liked this track")
-        val socialLiker = vm.socialLikerUser
-        if (!isSpotifyTrack && socialLiker != null) {
-            item {
-                Surface(
-                    onClick = { vm.navigateToArtist(socialLiker.id) },
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        AsyncImage(
-                            model = socialLiker.avatarUrl?.replace("large", "t500x500"),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentScale = ContentScale.Crop
-                        )
-                        val totalLikes = displayTrack.likesCount ?: 1
-                        val otherCount = (totalLikes - 1).coerceAtLeast(0)
-                        val text = if (otherCount > 0) {
-                            val formattedOthers = NumberFormat.getNumberInstance(Locale.getDefault()).format(otherCount)
-                            str("social_proof_liked_multiple", socialLiker.username ?: str("comment_anonymous"), formattedOthers)
-                        } else {
-                            str("social_proof_liked_single", socialLiker.username ?: str("comment_anonymous"))
-                        }
-                        Text(
-                            text = text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        }
-
-        // Tags & Details (SoundCloud only)
+        // Tags & details (SoundCloud only). Ahead of the social proof and the description so
+        // that the release date sits with the rest of the track's own facts, right under the
+        // play/like/repost counts, instead of below a banner about other listeners (issue #33).
         if (!isSpotifyTrack) item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
@@ -646,6 +624,49 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
+        // Social Liked Proof Banner (e.g. "Mandra and 1,400 others liked this track")
+        val socialLiker = vm.socialLikerUser
+        if (!isSpotifyTrack && socialLiker != null) {
+            item {
+                Surface(
+                    onClick = { vm.navigateToArtist(socialLiker.id) },
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        AsyncImage(
+                            model = socialLiker.avatarUrl?.replace("large", "t500x500"),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentScale = ContentScale.Crop
+                        )
+                        val totalLikes = displayTrack.likesCount ?: 1
+                        val otherCount = (totalLikes - 1).coerceAtLeast(0)
+                        val text = if (otherCount > 0) {
+                            val formattedOthers = NumberFormat.getNumberInstance(Locale.getDefault()).format(otherCount)
+                            str("social_proof_liked_multiple", socialLiker.username ?: str("comment_anonymous"), formattedOthers)
+                        } else {
+                            str("social_proof_liked_single", socialLiker.username ?: str("comment_anonymous"))
+                        }
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+
         // Description (SoundCloud only)
         if (!isSpotifyTrack && !displayTrack.description.isNullOrBlank()) {
             item {
@@ -671,78 +692,90 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Comments header & sort selector (SoundCloud only)
+        // The switch between the two halves. Only for SoundCloud tracks: a catalog track has no
+        // comments, so there would be only one side to switch to (issue #33).
         if (!isSpotifyTrack) item {
+            InfoHalfToggle(
+                lyricsSelected = lyricsHalf,
+                commentCount = displayTrack.commentCount ?: organizedComments.size,
+                onSelect = { showLyricsHalf = it },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            )
+        }
+
+        // Comments sort selector (SoundCloud only). No title above it: the selected half of the
+        // toggle already names the section and carries the count.
+        if (!isSpotifyTrack && !lyricsHalf) item {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                var isSortMenuExpanded by remember { mutableStateOf(false) }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = str("menu_comments") + " (${displayTrack.commentCount ?: organizedComments.size})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box {
+                        OutlinedButton(
+                            onClick = { isSortMenuExpanded = true },
+                            shapes = ButtonDefaults.shapes(),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = str("sorted_by", str(vm.commentSort.labelResId)),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+
+                        DropdownMenu(
+                            expanded = isSortMenuExpanded,
+                            onDismissRequest = { isSortMenuExpanded = false }
+                        ) {
+                            CommentSort.values().forEach { sortOption ->
+                                DropdownMenuItem(
+                                    text = { Text(str(sortOption.labelResId)) },
+                                    onClick = {
+                                        vm.onCommentSortChanged(sortOption)
+                                        isSortMenuExpanded = false
+                                    },
+                                    trailingIcon = {
+                                        if (sortOption == vm.commentSort) {
+                                            Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
                     if (vm.isCommentsLoading) {
                         CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
                     }
                 }
-
-                var isSortMenuExpanded by remember { mutableStateOf(false) }
-                Box {
-                    OutlinedButton(
-                        onClick = { isSortMenuExpanded = true },
-                        shapes = ButtonDefaults.shapes(),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = str("sorted_by", str(vm.commentSort.labelResId)),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
-                    }
-
-                    DropdownMenu(
-                        expanded = isSortMenuExpanded,
-                        onDismissRequest = { isSortMenuExpanded = false }
-                    ) {
-                        CommentSort.values().forEach { sortOption ->
-                            DropdownMenuItem(
-                                text = { Text(str(sortOption.labelResId)) },
-                                onClick = {
-                                    vm.onCommentSortChanged(sortOption)
-                                    isSortMenuExpanded = false
-                                },
-                                trailingIcon = {
-                                    if (sortOption == vm.commentSort) {
-                                        Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
             }
         }
-        
+
         // Add a new comment
-        if (!isSpotifyTrack) item {
+        if (!isSpotifyTrack && !lyricsHalf) item {
             var newCommentText by remember { mutableStateOf("") }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
                     value = newCommentText,
                     onValueChange = { newCommentText = it },
                     modifier = Modifier.weight(1f).trackTextInput(),
-                    placeholder = { Text(str("add_comment_hint")) },
+                    // The panel is narrow and the send button takes its share, so the hint has to
+                    // survive being given less room than it wants: one line, ellipsized, and a step
+                    // down from bodyLarge so it usually fits whole (issue #33).
+                    placeholder = {
+                        Text(str("add_comment_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    textStyle = MaterialTheme.typography.bodyMedium,
                     singleLine = true,
                     shape = RoundedCornerShape(24.dp)
                 )
@@ -760,7 +793,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        if (!isSpotifyTrack && vm.isCommentsLoading && vm.commentsList.isEmpty()) {
+        if (!isSpotifyTrack && !lyricsHalf && vm.isCommentsLoading && vm.commentsList.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier.fillMaxWidth().height(120.dp),
@@ -771,7 +804,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        if (!isSpotifyTrack) itemsIndexed(organizedComments, key = { _, comment -> comment.id }) { index, comment ->
+        if (!isSpotifyTrack && !lyricsHalf) itemsIndexed(organizedComments, key = { _, comment -> comment.id }) { index, comment ->
             if (index >= organizedComments.size - 3 && !vm.isCommentsLoading && vm.commentNextHref != null) {
                 LaunchedEffect(index) {
                     vm.loadComments(refresh = false)
@@ -780,7 +813,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             CommentItemUI(comment, vm)
         }
 
-        if (!isSpotifyTrack && vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {
+        if (!isSpotifyTrack && !lyricsHalf && vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {
             item {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
@@ -791,7 +824,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        if (!isSpotifyTrack && !vm.isCommentsLoading && vm.commentsList.isEmpty()) {
+        if (!isSpotifyTrack && !lyricsHalf && !vm.isCommentsLoading && vm.commentsList.isEmpty()) {
             item {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
@@ -801,8 +834,155 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                 }
             }
         }
+
+        if (lyricsHalf) trackLyricsHalf(vm, showHeader = isSpotifyTrack)
     }
 }
+
+/**
+ * The Comments / Lyrics switch in the middle of the info panel (issue #33).
+ *
+ * The same pill as the lyrics screen's own mode switch, so the two read as one control rather than
+ * two conventions. Both halves take the same width and ellipsize: "Commentaires" is a third longer
+ * than "Comments" and the panel can be dragged narrow.
+ */
+@Composable
+private fun InfoHalfToggle(
+    lyricsSelected: Boolean,
+    commentCount: Int,
+    onSelect: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val count = remember(commentCount) {
+        NumberFormat.getCompactNumberInstance(Strings.locale(), NumberFormat.Style.SHORT)
+            .format(commentCount)
+    }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = CircleShape,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier.height(38.dp)
+    ) {
+        Row(Modifier.padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            InfoHalfChip(
+                text = "${str("menu_comments")} ($count)",
+                isSelected = !lyricsSelected,
+                onClick = { onSelect(false) },
+                modifier = Modifier.weight(1f)
+            )
+            InfoHalfChip(
+                text = str("player_lyrics"),
+                isSelected = lyricsSelected,
+                onClick = { onSelect(true) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoHalfChip(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val background by animateColorAsState(
+        targetValue = if (isSelected) scheme.primary else Color.Transparent,
+        animationSpec = tween(300),
+        label = "infoHalfBackground"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) scheme.onPrimary else scheme.onSurfaceVariant,
+        animationSpec = tween(300),
+        label = "infoHalfText"
+    )
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clip(CircleShape)
+            .background(background)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+    }
+}
+
+/**
+ * The lyrics half of the info panel (issue #33).
+ *
+ * The same pane the panel's own Lyrics tab uses, so it follows the song and scrolls itself rather
+ * than being a second, stiller copy of the lyrics. It gets a bounded height instead of filling the
+ * panel: the cover and the track's details above it are the point of this tab, and a lyrics view
+ * that pushed them off the top would have replaced the tab rather than shared it.
+ *
+ * @param showHeader whether to name the section. Only needed where no toggle names it, which is
+ *   Spotify catalog tracks: they have no comments to switch between.
+ */
+private fun LazyListScope.trackLyricsHalf(vm: PlayerViewModel, showHeader: Boolean) {
+    item {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (showHeader) {
+                Text(
+                    text = str("player_lyrics"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Still searching, and nothing to show yet. A result already on screen stays there: the
+            // search also runs while a better match is being looked for.
+            if (vm.isLyricsLoading && !vm.hasLyrics) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ContainedLoadingIndicator()
+                }
+            } else {
+                PanelLyrics(vm, Modifier.fillMaxWidth().height(LYRICS_HALF_HEIGHT))
+            }
+
+            if (vm.hasLyrics) {
+                OutlinedButton(
+                    onClick = { vm.openLyrics(forceSheet = true) },
+                    shapes = ButtonDefaults.shapes(),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Rounded.Lyrics, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = str("info_open_lyrics_view"),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Height of the lyrics pane inside the info tab. Tall enough for the current line to sit a third of
+ * the way down with lines either side of it, short enough to leave the cover and the details above
+ * it on screen.
+ */
+private val LYRICS_HALF_HEIGHT = 320.dp
 
 @Composable
 fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = false) {
@@ -1077,7 +1257,7 @@ private fun formatReleaseDate(raw: String?): String {
         val monthDate = runCatching {
             java.text.SimpleDateFormat("yyyy-MM", java.util.Locale.US).parse("$year-$month")
         }.getOrNull() ?: return year
-        return java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(monthDate)
+        return java.text.SimpleDateFormat("MMMM yyyy", com.alananasss.kittytune.core.Strings.locale()).format(monthDate)
     }
     val date = runCatching { java.time.Instant.parse(raw).let { java.util.Date.from(it) } }.getOrNull()
         ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).parse(raw) }.getOrNull()
@@ -1086,7 +1266,7 @@ private fun formatReleaseDate(raw: String?): String {
         ?: runCatching { java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).parse(raw) }.getOrNull()
         ?: return str("detail_unknown")
 
-    val displayFormat = java.text.SimpleDateFormat("d MMMM yyyy", java.util.Locale.getDefault())
+    val displayFormat = java.text.SimpleDateFormat("d MMMM yyyy", com.alananasss.kittytune.core.Strings.locale())
     return displayFormat.format(date)
 }
 
