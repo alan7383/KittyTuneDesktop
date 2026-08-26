@@ -30,6 +30,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
     import androidx.compose.ui.unit.dp
     import androidx.compose.ui.window.Dialog
         import com.alananasss.kittytune.data.local.LyricsAlignment
+    import com.alananasss.kittytune.data.local.LyricsDisplayStyle
     import com.alananasss.kittytune.data.local.PlayerPreferences
     import com.alananasss.kittytune.ui.common.SettingsGroup
     import com.alananasss.kittytune.ui.common.SettingsItem
@@ -52,6 +53,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
         var inlineLyrics by remember { mutableStateOf(prefs.getInlineLyricsEnabled()) }
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
+        var showDisplayStyleDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
         var showAutoScrollSpeedDialog by remember { mutableStateOf(false) }
         var provider by remember { mutableStateOf(playerViewModel.lyricsProvider) }
@@ -220,7 +222,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updatePlainAutoScrollSpeed(1f) }) {
+                            TextButton(onClick = { playerViewModel.updatePlainAutoScrollSpeed(1.5f) }) {
                                 Text(str("pref_lyrics_reset"))
                             }
                             TextButton(onClick = { showAutoScrollSpeedDialog = false }) { Text(str("btn_close")) }
@@ -245,6 +247,46 @@ import androidx.compose.material3.ContainedLoadingIndicator
             )
         }
     
+        if (showDisplayStyleDialog) {
+            EscapableAlertDialog(
+                onDismissRequest = { showDisplayStyleDialog = false },
+                title = { Text(str("pref_lyrics_display_style")) },
+                text = {
+                    Column {
+                        LyricsDisplayStyle.entries.forEach { option ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        playerViewModel.updateLyricsDisplayStyle(option)
+                                        showDisplayStyleDialog = false
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = option == playerViewModel.lyricsDisplayStyle,
+                                    onClick = null
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(str(displayStyleLabel(option)))
+                                    Text(
+                                        str(displayStyleDescription(option)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showDisplayStyleDialog = false }) { Text(str("btn_cancel")) }
+                }
+            )
+        }
+
         // --- MAIN SCREEN ---
     
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -346,7 +388,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
                             // the shapes are derived from has to follow both.
                             val autoScrollOn = playerViewModel.isPlainAutoScrollEnabled
                             val totalVisibleItems =
-                                (if (showLyricsButton) 6 else 5) + (if (autoScrollOn) 1 else 0)
+                                (if (showLyricsButton) 7 else 6) + (if (autoScrollOn) 1 else 0)
     
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 0),
@@ -397,7 +439,15 @@ import androidx.compose.material3.ContainedLoadingIndicator
                                 onClick = { showAlignmentDialog = true }
                             )
     
-                            val sizeIndex = alignIndex + 1
+                            val styleIndex = alignIndex + 1
+                            SettingsItem(
+                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, styleIndex),
+                                title = str("pref_lyrics_display_style"),
+                                subtitle = str(displayStyleLabel(playerViewModel.lyricsDisplayStyle)),
+                                onClick = { showDisplayStyleDialog = true }
+                            )
+
+                            val sizeIndex = styleIndex + 1
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, sizeIndex),
                                 title = str("pref_lyrics_size"),
@@ -452,4 +502,18 @@ private fun autoScrollSpeedLabel(speed: Float): String {
     val rounded = kotlin.math.round(speed * 100f) / 100f
     val text = if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()
     return "$text×"
+}
+
+/** Settings label for one lyrics display style. */
+private fun displayStyleLabel(style: LyricsDisplayStyle): String = when (style) {
+    LyricsDisplayStyle.STANDARD -> "lyrics_style_standard"
+    LyricsDisplayStyle.SCALE -> "lyrics_style_scale"
+    LyricsDisplayStyle.FOCUS -> "lyrics_style_focus"
+}
+
+/** One line on what each style actually does to the lines. */
+private fun displayStyleDescription(style: LyricsDisplayStyle): String = when (style) {
+    LyricsDisplayStyle.STANDARD -> "lyrics_style_standard_sub"
+    LyricsDisplayStyle.SCALE -> "lyrics_style_scale_sub"
+    LyricsDisplayStyle.FOCUS -> "lyrics_style_focus_sub"
 }

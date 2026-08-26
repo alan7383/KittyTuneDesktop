@@ -229,7 +229,6 @@ private fun QueueList(vm: PlayerViewModel) {
 
 @Composable
 private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
-    val lines = vm.lyricsLines
     Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -260,37 +259,7 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
             }
         }
 
-        // Inset as content padding so the scrollbar stays at the panel edge rather than being
-        // pushed in against the lyrics (issue #33).
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-        ) {
-            if (lines.isEmpty()) {
-                item {
-                    Text(
-                        text = vm.rawPlainLyrics ?: str("lyrics_no_data"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            } else {
-                itemsIndexed(lines) { _, line ->
-                    val active = vm.currentPosition + vm.lyricsOffset >= line.startTime
-                    Text(
-                        text = line.text,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (active) MaterialTheme.colorScheme.onSurface
-                        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { vm.seekTo(line.startTime) }
-                            .padding(vertical = 6.dp),
-                    )
-                }
-            }
-        }
+        PanelLyrics(vm, Modifier.fillMaxSize())
     }
 }
 

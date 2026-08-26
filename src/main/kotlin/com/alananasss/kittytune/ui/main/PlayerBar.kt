@@ -103,12 +103,17 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.delay
 
+/** The speaker icon and the slider's own horizontal padding, which the track does not get. */
+private val VOLUME_ROW_OVERHEAD = 44.dp
+
 /**
- * Narrowest space in which the horizontal volume slider is still worth showing: the speaker
- * icon, its padding, and enough track left to aim at. Below this the bar switches to the
- * vertical hover control instead of shrinking the slider into a sliver.
+ * Shortest track worth aiming at. With less room than this the bar switches to the vertical hover
+ * control rather than showing a sliver.
  */
-private val HORIZONTAL_VOLUME_MIN_WIDTH = 168.dp
+private val MIN_VOLUME_SLIDER_WIDTH = 120.dp
+
+/** And the widest it grows to on a roomy window. */
+private val MAX_VOLUME_SLIDER_WIDTH = 200.dp
 
 /**
  * Bottom full-width playback bar: track info left, transport + progress center,
@@ -434,13 +439,18 @@ fun PlayerBar(
                 }
 
                 val volume = vm.volume
-                // BoxWithConstraints is the last child of the row, so `maxWidth` here is exactly
-                // the width left over for the volume control. Below HORIZONTAL_VOLUME_MIN_WIDTH
-                // the horizontal slider is a sliver too short to aim at — the "disappears or
-                // shrinks until it is unusable" report in issue #33 — so the bar falls back to
-                // the vertical hover control, which needs no more room than its speaker button.
+                // BoxWithConstraints is the last child of the row, so `maxWidth` here is the width
+                // left over for the volume control.
+                //
+                // The slider's width is then derived from it rather than left to `weight`. Asking
+                // for a weighted, wrap-content width inside a row that is itself wrap-content let
+                // the row report more than it had been given: the excess was clamped away and the
+                // track came out cut off with space still visible beside it, which is why the first
+                // attempt at this did not fix the report (issue #33). Computed this way the row is
+                // exactly icon + padding + slider wide, so there is nothing left to clip.
                 BoxWithConstraints(contentAlignment = Alignment.Center) {
-                    val tooNarrowForSlider = maxWidth < HORIZONTAL_VOLUME_MIN_WIDTH
+                    val roomForSlider = maxWidth - VOLUME_ROW_OVERHEAD
+                    val tooNarrowForSlider = roomForSlider < MIN_VOLUME_SLIDER_WIDTH
                     if (verticalVolumeSlider || tooNarrowForSlider) {
                         VolumeHoverControl(
                             volume = volume,
@@ -469,15 +479,10 @@ fun PlayerBar(
                                 onValueChange = { vm.updateVolume(it) },
                                 onValueChangeFinished = { vm.persistVolume() },
                                 modifier = Modifier
-                                    // Flexible rather than a fixed width: the three sections of
-                                    // the bar each get exactly a third, and at the minimum window
-                                    // size a fixed 140.dp made this row overflow — which clipped
-                                    // the thumb at the left end of the track, the "slider
-                                    // disappears" report in #27. weight(fill = false) lets it
-                                    // shrink instead, and grow up to 200.dp on a wide window,
-                                    // which is also the "make it wider" ask.
-                                    .weight(1f, fill = false)
-                                    .widthIn(max = 200.dp)
+                                    // Exactly the room there is, between what is worth showing and
+                                    // what is worth using. Still grows on a wide window, which was
+                                    // the "make it wider" ask in #27, but never past its box.
+                                    .width(roomForSlider.coerceAtMost(MAX_VOLUME_SLIDER_WIDTH))
                                     .padding(horizontal = 12.dp)
                                     .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
                             )

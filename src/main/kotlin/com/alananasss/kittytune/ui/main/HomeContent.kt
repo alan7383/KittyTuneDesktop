@@ -44,6 +44,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.AnimatedVisibility
@@ -303,6 +309,10 @@ fun HomeContent(
                 }
             }
         }
+
+        // Listening statistics, as a card on the home page rather than an entry in a menu: it was
+        // asked for as something you come across, not something you go looking for (issue #33).
+        item { ListeningStatsCard(navController) }
 
         // Section carousels
         items(vm.homeSections, key = { it.title }) { section ->
@@ -1450,4 +1460,161 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
         }
     }
     }
+}
+
+/**
+ * The week's listening, on the home page (issue #33).
+ *
+ * Statistics were already being recorded and there was a screen for them, but nothing navigated to
+ * it, so they were invisible. A card is the form that was asked for: the three numbers worth
+ * knowing at a glance, the artist behind them, and a way through to everything else.
+ *
+ * Absent entirely until there is something to show. A card reading zero minutes on a fresh install
+ * is noise, and it is the state every new listener starts in.
+ */
+@Composable
+private fun ListeningStatsCard(navController: NavController) {
+    val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
+    val summary by produceState<HomeStatsSummary?>(initialValue = null, key1 = weekAgo) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                val repo = com.alananasss.kittytune.data.ListeningStatsRepository
+                HomeStatsSummary(
+                    listenedMs = repo.getTotalListenTime(weekAgo),
+                    uniqueTracks = repo.getUniqueTracks(weekAgo),
+                    uniqueArtists = repo.getUniqueArtists(weekAgo),
+                    topArtist = repo.getTopArtists(weekAgo, limit = 1).firstOrNull(),
+                )
+            }.getOrNull()
+        }
+    }
+
+    val stats = summary ?: return
+    if (stats.listenedMs <= 0L) return
+
+    Surface(
+        onClick = { navController.navigate("listening_stats") },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Rounded.BarChart,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = str("listening_stats_title"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = str("listening_stats_period_week"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Icon(
+                    Icons.AutoMirrored.Rounded.ArrowForwardIos,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                StatFigure(
+                    value = listenedLabel(stats.listenedMs),
+                    label = str("listening_stats_time_listened"),
+                    modifier = Modifier.weight(1f),
+                )
+                StatFigure(
+                    value = stats.uniqueTracks.toString(),
+                    label = str("listening_stats_unique_tracks"),
+                    modifier = Modifier.weight(1f),
+                )
+                StatFigure(
+                    value = stats.uniqueArtists.toString(),
+                    label = str("listening_stats_unique_artists"),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            stats.topArtist?.let { artist ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AsyncImage(
+                        model = artist.artworkUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = str("listening_stats_top_artists"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = artist.artistName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** What the card needs, fetched in one pass so the card appears whole rather than in pieces. */
+private data class HomeStatsSummary(
+    val listenedMs: Long,
+    val uniqueTracks: Int,
+    val uniqueArtists: Int,
+    val topArtist: com.alananasss.kittytune.data.local.TopArtistResult?,
+)
+
+@Composable
+private fun StatFigure(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * Listening time at a glance: hours once there are hours, minutes below that.
+ *
+ * Never seconds. A card is read in passing and "4 h 12" tells you what you wanted; the exact figure
+ * is on the screen behind it.
+ */
+private fun listenedLabel(ms: Long): String {
+    val totalMinutes = ms / 60_000
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return if (hours > 0) "${hours} h ${minutes}" else "$totalMinutes min"
 }
