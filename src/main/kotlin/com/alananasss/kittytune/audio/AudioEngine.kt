@@ -21,6 +21,16 @@ import javax.sound.sampled.SourceDataLine
 import kotlin.concurrent.thread
 import javax.sound.sampled.AudioFormat as JavaAudioFormat
 
+/**
+ * How far a per-track trim may go, in dB (issue #33).
+ *
+ * Cut goes further than boost because that is the safe direction and the common case: a track that
+ * is too loud can always be brought down, while a boost is capped by what the output line's own gain
+ * control will accept — usually +6 dB, and asking for more just clamps.
+ */
+const val TRACK_GAIN_MIN_DB = -12f
+const val TRACK_GAIN_MAX_DB = 6f
+
 class AudioEngine {
 
     enum class State { IDLE, BUFFERING, READY, ENDED }
@@ -103,6 +113,16 @@ class AudioEngine {
     @Volatile
     private var volume: Float = 1f
 
+    /**
+     * Per-track trim in dB, added on top of [volume] (issue #33).
+     *
+     * Kept apart from [volume] so the slider keeps meaning what it says: the trim belongs to the
+     * track and follows it, the slider belongs to the session. Applied at the output line's gain
+     * control rather than to the samples, which is why a boost cannot clip anything of ours — the
+     * mixer is doing it, downstream of our float pipeline and its limiter.
+     */
+    private var trackGainDb: Float = 0f
+
     @Volatile
     private var seekRequestMs: Long = -1L
 
@@ -154,12 +174,59 @@ class AudioEngine {
         setState(State.BUFFERING)
     }
 
+    /**
+     * Decode threads that were superseded and have not exited yet.
+     *
+     * A worker only notices it has been replaced between reads, so one stuck in a slow read outlives
+     * the track change that replaced it. Each holds an [FFmpegFrameGrabber], which is the largest
+     * thing this class allocates, so they have to be waited for rather than forgotten — skipping
+     * from track to track otherwise stacks up grabbers until the heap runs out (issue #33).
+     */
+    private val windingDown = java.util.concurrent.CopyOnWriteArrayList<Thread>()
+
+    private fun reapFinishedWorkers() {
+        windingDown.removeAll(windingDown.filter { !it.isAlive })
+    }
+
+    /**
+     * Blocks until the workers this one replaced have finished, or until [PREDECESSOR_WAIT_MS] runs
+     * out between them.
+     *
+     * Runs on the new decode thread rather than in [prepare], so a caller changing tracks is never
+     * made to wait. The budget is generous next to the 3 s read timeout the grabber is opened with
+     * and short next to how long a listener will tolerate silence.
+     */
+    private fun awaitPredecessors(workerId: Long) {
+        val deadline = System.currentTimeMillis() + PREDECESSOR_WAIT_MS
+        for (thread in windingDown) {
+            if (activeWorkerId != workerId) return
+            val remaining = deadline - System.currentTimeMillis()
+            if (remaining <= 0) break
+            try {
+                thread.join(remaining)
+            } catch (_: InterruptedException) {
+                return
+            }
+        }
+        reapFinishedWorkers()
+        if (windingDown.isNotEmpty()) {
+            Logger.e(
+                "AudioEngine",
+                "${windingDown.size} decode worker(s) still winding down after ${PREDECESSOR_WAIT_MS}ms"
+            )
+        }
+    }
+
     @Synchronized
     fun prepare() {
         val url = currentUrl ?: return
         stopFlag = false
         val newWorkerId = ++activeWorkerId
         worker = thread(name = "kittytune-audio-$newWorkerId", isDaemon = true) {
+            // One grabber open at a time: the predecessors are holding theirs until they notice
+            // they have been replaced.
+            awaitPredecessors(newWorkerId)
+            if (stopFlag || activeWorkerId != newWorkerId) return@thread
             runDecodeLoop(newWorkerId, url, currentHeaders)
         }
     }
@@ -177,6 +244,14 @@ class AudioEngine {
     private var warmUpJob: kotlinx.coroutines.Job? = null
 
     private companion object {
+        /**
+         * How long a new decode worker waits for the ones it replaced, in total.
+         *
+         * Longer than the grabber's 3 s read timeout, so a worker blocked on a stalled CDN has
+         * time to come back and release; short enough that a track change never appears stuck.
+         */
+        private const val PREDECESSOR_WAIT_MS = 4_000L
+
         /** How long a pause has to last before resuming reconnects instead of trusting the socket. */
         const val RECONNECT_AFTER_PAUSE_MS = 30_000L
 
@@ -294,6 +369,12 @@ class AudioEngine {
 
     fun setVolume(v: Float) {
         volume = v.coerceIn(0f, 1f)
+        applyLineVolume()
+    }
+
+    /** @param db the current track's trim, clamped to [TRACK_GAIN_MIN_DB]..[TRACK_GAIN_MAX_DB]. */
+    fun setTrackGainDb(db: Float) {
+        trackGainDb = db.coerceIn(TRACK_GAIN_MIN_DB, TRACK_GAIN_MAX_DB)
         applyLineVolume()
     }
 
@@ -961,8 +1042,11 @@ class AudioEngine {
         try {
             if (l.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                 val ctrl = l.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
+                // Silent stays silent whatever the track's trim says, so muting is never
+                // undone by a track that happens to carry a boost.
                 val db = if (volume <= 0.0001f) ctrl.minimum
-                else (20.0 * Math.log10(volume.toDouble())).toFloat().coerceIn(ctrl.minimum, ctrl.maximum)
+                else ((20.0 * Math.log10(volume.toDouble())).toFloat() + trackGainDb)
+                    .coerceIn(ctrl.minimum, ctrl.maximum)
                 ctrl.value = db
             }
         } catch (_: Exception) {
@@ -995,8 +1079,14 @@ class AudioEngine {
                 currentWorker.join(50)
             } catch (_: InterruptedException) {
             }
+            // 50 ms is not long enough for a worker blocked in a network read, and dropping the
+            // reference here is what let them pile up: each one keeps its FFmpeg grabber and every
+            // buffer behind it alive, invisible and unwaitable. Remembered instead, so the next
+            // decode loop can wait for its predecessors before opening another (issue #33).
+            if (currentWorker.isAlive) windingDown.add(currentWorker)
         }
         worker = null
+        reapFinishedWorkers()
         closeLineInstance(line, drain = false)
         stretcher.flush()
         limiter.flush()

@@ -128,6 +128,16 @@ class Player {
             activeEngine.setVolume(value)
         }
 
+    /**
+     * The current track's own trim, in dB. Re-applied whenever playback moves to an engine, since
+     * crossfade swaps between two of them and only one carries the trim at a time (issue #33).
+     */
+    var trackGainDb: Float = 0f
+        set(value) {
+            field = value
+            activeEngine.setTrackGainDb(value)
+        }
+
     val mediaItemCount: Int get() = items.size
     val currentMediaItem: MediaItem? get() = items.getOrNull(currentIndex)
     val currentMediaItemIndex: Int get() = currentIndex
@@ -271,6 +281,7 @@ class Player {
                 
                 val targetVolume = volume
                 activeEngine.setVolume(0f)
+                activeEngine.setTrackGainDb(trackGainDb)
                 
                 if (playWhenReady) activeEngine.play()
                 
@@ -317,6 +328,7 @@ class Player {
                 fadingEngine = null
                 
                 activeEngine.setVolume(volume)
+                activeEngine.setTrackGainDb(trackGainDb)
                 activeEngine.setMediaItem(url, headers, startPositionMs)
                 activeEngine.prepare()
                 if (playWhenReady) activeEngine.play()
