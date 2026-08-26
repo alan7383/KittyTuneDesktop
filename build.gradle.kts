@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.2.0"
+version = "1.3.0"
 
 repositories {
     google()
@@ -118,6 +118,30 @@ compose.desktop {
         // deny. The day Unsafe actually goes, jnr needs a release either way.
         if (buildJdk >= 24) jvmArgs += "--sun-misc-unsafe-memory-access=allow"
 
+        // Memory, and why an audio app cares about the collector it gets (issue #33).
+        //
+        // Reported as "500 MB at launch, 1000 MB later, sometimes 4000 MB, and the song freezes for
+        // an instant and then stops". Without -Xmx the JVM sets the ceiling to a quarter of physical
+        // RAM, so on a 16 GB machine it will happily grow to 4 GB before collecting in earnest —
+        // which is exactly the number reported. Nothing needs that: the image cache is capped at
+        // 128 MB and everything else is small.
+        //
+        // The freeze and the stop are one event. A stop-the-world collection of a multi-gigabyte
+        // heap takes long enough to starve the decode loop, the output line runs dry, and playback
+        // stops. G1 is named explicitly rather than left to ergonomics because a machine the JVM
+        // judges "client class" gets SerialGC, whose full collections are the longest of the lot,
+        // and a pause target tells it to work in short increments instead of one long sweep.
+        // 2 GB, not the quarter of physical RAM the JVM defaults to. The ceiling exists to stop the
+        // 4 GB balloon that was reported, not to squeeze the app: a library of tens of thousands of
+        // liked tracks genuinely needs several hundred megabytes while it hydrates, and a tighter
+        // cap turns a stutter into an OutOfMemoryError in the middle of playback.
+        jvmArgs += "-Xmx2g"
+        jvmArgs += "-XX:+UseG1GC"
+        jvmArgs += "-XX:MaxGCPauseMillis=50"
+        // Thousands of tracks repeat the same artist names, genres and CDN prefixes. Deduplicating
+        // those strings costs a background pass and gives back real memory here.
+        jvmArgs += "-XX:+UseStringDeduplication"
+
         buildTypes.release.proguard {
             isEnabled.set(false)
         }
@@ -131,7 +155,7 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.2.0"
+            packageVersion = "1.3.0"
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 
