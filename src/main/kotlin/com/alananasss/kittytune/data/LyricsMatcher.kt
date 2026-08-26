@@ -144,7 +144,12 @@ object LyricsMatcher {
      */
     fun normalize(raw: String): String {
         var text = raw.lowercase()
-        text = text.replace(Regex("\\[.*?]|\\(.*?\\)|\\{.*?}"), " ")
+        // Every bracket escaped, including the closing ones. The JVM treats a bare `]` or `}` outside a
+        // character class as a literal; Android's ICU engine rejects it outright —
+        // `PatternSyntaxException: Syntax error in regexp pattern near index 21`, which crashed the app on
+        // the first lyrics lookup. Escaping is valid on both, so the file stays identical between them
+        // (issue #33).
+        text = text.replace(Regex("\\[.*?\\]|\\(.*?\\)|\\{.*?\\}"), " ")
         text = text.replace(Regex("(?i)\\b(feat|ft|featuring|prod|w)\\.?\\s.*$"), " ")
         text = Normalizer.normalize(text, Normalizer.Form.NFD)
             .replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")

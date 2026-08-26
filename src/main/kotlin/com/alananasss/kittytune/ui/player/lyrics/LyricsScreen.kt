@@ -28,6 +28,9 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.foundation.verticalScroll
     import androidx.compose.material.icons.Icons
     import androidx.compose.material.icons.rounded.Close
+    import androidx.compose.material.icons.rounded.Notes
+    import androidx.compose.material.icons.rounded.FormatSize
+    import androidx.compose.material.icons.rounded.CenterFocusStrong
     import androidx.compose.material.icons.rounded.Add
     import androidx.compose.material.icons.rounded.ArrowDropDown
     import androidx.compose.material.icons.rounded.ContentCopy
@@ -74,6 +77,7 @@ import coil3.compose.AsyncImage
     import androidx.compose.ui.unit.sp
     import androidx.compose.ui.zIndex
     import com.alananasss.kittytune.data.local.LyricsAlignment
+    import com.alananasss.kittytune.data.local.LyricsDisplayStyle
 
     import com.alananasss.kittytune.data.network.LrcLibResponse
     import androidx.compose.ui.window.DialogProperties
@@ -153,7 +157,11 @@ import kotlin.math.roundToInt
                                                 text = currentTrack.title ?: "",
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color.White,
+                                                // The whole top line was pure white on a themed surface, so it
+                                                // ignored the palette entirely — and in a light theme it was
+                                                // white on near-white. It takes the surface's own on-colour
+                                                // now, which is what makes it follow the cover (issue #33).
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -163,13 +171,13 @@ import kotlin.math.roundToInt
                                                     onArtistClick = { viewModel.navigateToTrackArtist(it) },
                                                     text = currentTrack.user?.username ?: "",
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = Color.White.copy(alpha = 0.7f),
-                                                    hoverColor = Color.White,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    hoverColor = MaterialTheme.colorScheme.onSurface,
                                                     modifier = Modifier.weight(1f, fill = false)
                                                 )
                                                 if (currentTrack.user?.verified == true) {
                                                     Spacer(Modifier.width(3.dp))
-                                                    Icon(Icons.Rounded.Verified, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(12.dp))
+                                                    Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(12.dp))
                                                 }
                                             }
                                         }
@@ -178,26 +186,27 @@ import kotlin.math.roundToInt
                                     Text(
                                         str("player_lyrics"),
                                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             },
                             navigationIcon = {
                                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = onClose) {
-                                    Icon(Icons.Rounded.Close, str("btn_close"), tint = Color.White)
+                                    Icon(Icons.Rounded.Close, str("btn_close"), tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             },
                             actions = {
                                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showUploadYamlDialog = true }) {
-                                    Icon(Icons.Rounded.Add, str("btn_upload_yaml"), tint = Color.White)
+                                    Icon(Icons.Rounded.Add, str("btn_upload_yaml"), tint = MaterialTheme.colorScheme.onSurface)
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showQuickSettingsDialog = true }) {
-                                    val tint = if (viewModel.lyricsOffset != 0L) MaterialTheme.colorScheme.primary else Color.White
+                                    val tint = if (viewModel.lyricsOffset != 0L) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface
                                     Icon(Icons.Rounded.Settings, str("pref_lyrics_title"), tint = tint)
                                 }
                                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.isSearchingLyrics = true }) {
-                                    Icon(Icons.Rounded.Search, str("lyrics_manual_search"), tint = Color.White)
+                                    Icon(Icons.Rounded.Search, str("lyrics_manual_search"), tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -267,11 +276,14 @@ import kotlin.math.roundToInt
         hasPlain: Boolean,
         modifier: Modifier = Modifier
     ) {
+        // Themed rather than hard-coded black and white: the hover effect came from Material and so
+        // already followed the palette, which is exactly why the buttons under it looked wrong
+        // (issue #33).
         Surface(
-            color = Color.Black.copy(alpha = 0.6f),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shape = CircleShape,
             modifier = modifier.height(38.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Row(
                 modifier = Modifier.padding(3.dp),
@@ -304,13 +316,18 @@ import kotlin.math.roundToInt
         onClick: () -> Unit,
         enabled: Boolean = true
     ) {
+        val scheme = MaterialTheme.colorScheme
         val backgroundColor by animateColorAsState(
-            targetValue = if (isSelected) Color.White else Color.Transparent,
+            targetValue = if (isSelected) scheme.primary else Color.Transparent,
             animationSpec = tween(300),
             label = "bgColor"
         )
         val textColor by animateColorAsState(
-            targetValue = if (isSelected) Color.Black else Color.White.copy(alpha = if (enabled) 0.7f else 0.3f),
+            targetValue = when {
+                isSelected -> scheme.onPrimary
+                enabled -> scheme.onSurfaceVariant
+                else -> scheme.onSurfaceVariant.copy(alpha = 0.38f)
+            },
             animationSpec = tween(300),
             label = "textColor"
         )
@@ -345,35 +362,14 @@ import kotlin.math.roundToInt
             LyricsAlignment.RIGHT -> TextAlign.Right
         }
 
-        // --- NOUVEAU : Moteur d'interpolation 144Hz / 244Hz ---
-        val isPlaying = viewModel.isPlaying
-        val speed = viewModel.effectsState.speed
-        
-        // Cette variable n'est lue QUE par la carte graphique (drawWithContent)
-        var smoothDrawPosition by remember { mutableFloatStateOf(currentPosition.toFloat()) }
-        
-        LaunchedEffect(currentPosition, isPlaying, speed) {
-            if (isPlaying) {
-                val startTime = System.currentTimeMillis()
-                val startPos = currentPosition.toFloat()
-                while (isActive) {
-                    withFrameMillis {
-                        // Interpolated to the millisecond between the player's 250 ms position
-                        // reports, but never further ahead than one report plus some slack: the
-                        // player stops reporting while buffering, seeking or scrubbing, and an
-                        // unbounded extrapolation then ran the word highlight off to the end of the
-                        // line and snapped it back once the real position arrived — the "one line
-                        // goes straight to the very end and jumps around" report in issue #33.
-                        val elapsed =
-                            (System.currentTimeMillis() - startTime).coerceAtMost(MAX_EXTRAPOLATION_MS)
-                        smoothDrawPosition = startPos + (elapsed * speed)
-                    }
-                }
-            } else {
-                smoothDrawPosition = currentPosition.toFloat()
-            }
-        }
-        // ------------------------------------------------------
+        // Interpolated between the player's four-per-second reports so the word fill moves per frame.
+        // Shared with the panel, which needs exactly the same thing for exactly the same reason
+        // (issue #33) — see [rememberSmoothPosition] for why the estimate is bounded.
+        val smoothDrawPosition = rememberSmoothPosition(
+            positionMs = currentPosition,
+            isPlaying = viewModel.isPlaying,
+            speed = viewModel.effectsState.speed,
+        )
     
         val fadeBrush = remember {
             Brush.verticalGradient(
@@ -388,11 +384,9 @@ import kotlin.math.roundToInt
             LyricsUtils.activeLineIndex(lyrics, adjustedPosition)
         }
     
-        LaunchedEffect(activeIndex) {
-            if (activeIndex >= 0 && !listState.isScrollInProgress) {
-                listState.animateScrollToItem(index = activeIndex)
-            }
-        }
+        // Reading along by hand wins for a while; the panel's copy of the lyrics follows the same
+        // rule, which is why this lives in one place (issue #33).
+        FollowActiveLine(listState, activeIndex)
     
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val screenHeight = maxHeight
@@ -410,12 +404,23 @@ import kotlin.math.roundToInt
                 itemsIndexed(lyrics) { index, line ->
                     val isActive = index == activeIndex
     
-                    val targetScale = 1.0f
-                    val targetAlpha = if (isActive) 1.0f else (if (index < activeIndex) 0.45f else 0.70f)
-                    val targetBlur = 0.dp
-    
-                    val scale by animateFloatAsState(targetScale, tween(400), label = "scale")
-                    val alpha by animateFloatAsState(targetAlpha, tween(400), label = "alpha")
+                    // Three ways to set the current line apart, asked for with screenshots of another
+                    // player (issue #33). The decision is shared with the panel now — see
+                    // [LyricLineStyling] — because it was made twice and the two copies disagreed about
+                    // what the same setting does. Scale falls away with distance rather than in one step,
+                    // which is what the request's sketch of "lower / more lower" actually describes.
+                    val treatment = LyricLineStyling.treatmentFor(
+                        style = viewModel.lyricsDisplayStyle,
+                        // Zero for every line until the song reaches the words: with no current line there
+                        // is nothing to measure distance from, and shrinking everything would be wrong.
+                        distance = if (activeIndex < 0) 0 else index - activeIndex,
+                    )
+
+                    val scale by animateFloatAsState(treatment.scale, tween(400), label = "scale")
+                    val alpha by animateFloatAsState(treatment.alpha, tween(400), label = "alpha")
+                    val blurRadius by androidx.compose.animation.core.animateDpAsState(
+                        treatment.blur, tween(400), label = "blur"
+                    )
     
                     val lineInteractionSource = remember { MutableInteractionSource() }
                     val isHovered by lineInteractionSource.collectIsHoveredAsState()
@@ -442,110 +447,50 @@ import kotlin.math.roundToInt
                             .padding(horizontal = 24.dp)
                             .scale(scale)
                             .alpha(alpha)
+                            // Only when there is something to blur: the modifier forces the line
+                            // into its own layer, which is not worth paying for at 0.dp.
+                            .then(
+                                if (blurRadius > 0.dp) {
+                                    Modifier.blur(blurRadius)
+                                } else Modifier
+                            )
                             .clickable(interactionSource = lineInteractionSource, indication = null) { viewModel.seekTo(line.startTime) }
                     ) {
-                        val isWordSyncEnabled = viewModel.isWordSyncEnabled
-                        val isAppleEffect = viewModel.isAppleMusicEffectEnabled
-                        val displayWords = if (isWordSyncEnabled) line.words else emptyList()
+                        // One renderer for both views. This block existed twice — here and in the
+                        // panel — and only this copy ever drew the words, so "highlight word by word"
+                        // did nothing at all for anyone reading in the panel (issue #33).
+                        val lineFont = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = fontSize.sp,
+                            lineHeight = (fontSize * 1.4).sp,
+                        )
+                        val ruleColor =
+                            if (isActive) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurfaceVariant
 
-                        if (isActive && displayWords.isNotEmpty()) {
-                            if (isAppleEffect) {
-                                var textLayoutResult by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
-                                val reconstructedText = remember(displayWords) { displayWords.joinToString("") { it.text } }
-                                val wordRanges = remember(displayWords) {
-                                    val ranges = mutableListOf<Pair<Int, Int>>()
-                                    var currentLen = 0
-                                    for (w in displayWords) {
-                                        ranges.add(currentLen to currentLen + w.text.length)
-                                        currentLen += w.text.length
-                                    }
-                                    ranges
-                                }
-
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    Text(
-                                        text = reconstructedText,
-                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                                        textAlign = alignment,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .lyricUnderline({ hoverLayout }, isHovered, fontSize, MaterialTheme.colorScheme.onSurface),
-                                        onTextLayout = { textLayoutResult = it; hoverLayout = it }
-                                    )
-                                    Text(
-                                        text = reconstructedText,
-                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        textAlign = alignment,
-                                        modifier = Modifier.fillMaxWidth().drawWithContent {
-                                            // Clamped to this line's own end so it can only ever
-                                            // fill up, never overfill and then bounce.
-                                            val rawPos = smoothDrawPosition + viewModel.lyricsOffset
-                                            val currentPos =
-                                                if (line.endTime > line.startTime) {
-                                                    rawPos.coerceAtMost(line.endTime.toFloat())
-                                                } else {
-                                                    rawPos
-                                                }
-                                            val layout = textLayoutResult ?: return@drawWithContent
-                                            val path = androidx.compose.ui.graphics.Path()
-                                            val safeTextLength = (reconstructedText.length - 1).coerceAtLeast(0)
-                                            for (i in displayWords.indices) {
-                                                val w = displayWords[i]
-                                                val range = wordRanges[i]
-                                                if (range.first >= range.second) continue
-                                                if (currentPos >= w.endTime) {
-                                                    for (c in range.first until range.second) path.addRect(layout.getBoundingBox(c.coerceIn(0, safeTextLength)))
-                                                } else if (currentPos >= w.startTime) {
-                                                    val progress = ((currentPos - w.startTime).toFloat() / (w.endTime - w.startTime).coerceAtLeast(1L)).coerceIn(0f, 1f)
-                                                    val exactProgressChars = progress * (range.second - range.first)
-                                                    val fullySungChars = exactProgressChars.toInt()
-                                                    val charFraction = exactProgressChars - fullySungChars
-                                                    for (c in range.first until range.first + fullySungChars) path.addRect(layout.getBoundingBox(c.coerceIn(0, safeTextLength)))
-                                                    val partialCharIdx = range.first + fullySungChars
-                                                    if (partialCharIdx < range.second) {
-                                                        val cBbox = layout.getBoundingBox(partialCharIdx.coerceIn(0, safeTextLength))
-                                                        val cX = cBbox.left + (cBbox.right - cBbox.left) * charFraction
-                                                        path.addRect(androidx.compose.ui.geometry.Rect(cBbox.left, cBbox.top, cX, cBbox.bottom))
-                                                    }
-                                                }
-                                            }
-                                            clipPath(path) { this@drawWithContent.drawContent() }
-                                        }
-                                    )
-                                }
-                            } else {
-                                val reconstructedText = buildAnnotatedString {
-                                    displayWords.forEach { word ->
-                                        val isWordActive = (viewModel.currentPosition + viewModel.lyricsOffset) >= word.startTime
-                                        val wordColor = if (isWordActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                                        withStyle(SpanStyle(color = wordColor)) { append(word.text) }
-                                    }
-                                }
-                                Text(
-                                    text = reconstructedText,
-                                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.ExtraBold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
-                                    textAlign = alignment,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .lyricUnderline({ hoverLayout }, isHovered, fontSize, MaterialTheme.colorScheme.onSurface),
-                                    onTextLayout = { hoverLayout = it }
-                                )
-                            }
-                        } else {
-                            val textColor = if (isActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 1f)
-                            Text(
-                                text = line.text,
-                                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Bold, fontSize = fontSize.sp, lineHeight = (fontSize * 1.4).sp),
-                                color = textColor,
-                                textAlign = alignment,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .lyricUnderline({ hoverLayout }, isHovered, fontSize, textColor),
-                                onTextLayout = { hoverLayout = it }
-                            )
-                        }
+                        LyricLineText(
+                            line = line,
+                            isActive = isActive,
+                            // Interpolated, so the fill moves per frame rather than per report.
+                            positionMs = smoothDrawPosition + viewModel.lyricsOffset,
+                            wordSync = viewModel.isWordSyncEnabled,
+                            fillEffect = viewModel.isAppleMusicEffectEnabled,
+                            activeStyle = lineFont.copy(fontWeight = FontWeight.ExtraBold),
+                            inactiveStyle = lineFont.copy(fontWeight = FontWeight.Bold),
+                            activeColor = MaterialTheme.colorScheme.onSurface,
+                            inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unsungColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            textAlign = alignment,
+                            // The hover rule is drawn rather than set as a TextDecoration: Skia underlines
+                            // each font run separately, so a line that falls back out of the variable font
+                            // (Cyrillic, Arabic, CJK…) came out as a broken dashed rule.
+                            textModifier = Modifier.lyricUnderline(
+                                { hoverLayout },
+                                isHovered,
+                                fontSize,
+                                ruleColor,
+                            ),
+                            onTextLayout = { hoverLayout = it },
+                        )
 
                         AnimatedVisibility(
                             visible = viewModel.isRomanizationEnabled && !line.romanization.isNullOrBlank(),
@@ -658,9 +603,9 @@ import kotlin.math.roundToInt
                 val nowNs = withFrameNanos { it }
                 val elapsedSec = (nowNs - lastFrameNs) / 1_000_000_000f
                 lastFrameNs = nowNs
-                if (System.currentTimeMillis() - lastUserScrollMs < PLAIN_AUTOSCROLL_PAUSE_MS) continue
+                if (System.currentTimeMillis() - lastUserScrollMs < LyricsScrolling.PLAIN_PAUSE_MS) continue
                 if (!listState.canScrollForward) continue
-                val step = PLAIN_AUTOSCROLL_BASE_DP_PER_SEC * viewModel.plainAutoScrollSpeed * elapsedSec
+                val step = LyricsScrolling.PLAIN_BASE_DP_PER_SEC * viewModel.plainAutoScrollSpeed * elapsedSec
                 if (step > 0f) {
                     listState.scrollBy(with(density) { step.dp.toPx() })
                 }
@@ -698,7 +643,9 @@ import kotlin.math.roundToInt
                             fontSize = fontSize.sp,
                             lineHeight = (fontSize * 1.4).sp
                         ),
-                        color = Color.White.copy(alpha = 0.9f),
+                        // The synced view draws its lines in onSurface, which picks up the cover's
+                        // tint; this was pure white, so the two modes did not match (issue #33).
+                        color = MaterialTheme.colorScheme.onSurface,
                         textAlign = alignment,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -708,8 +655,8 @@ import kotlin.math.roundToInt
             FloatingActionButton(onClick = {
                     clipboardManager.setText(AnnotatedString(text))
                 },
-                containerColor = Color.White.copy(alpha = 0.2f),
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(24.dp)
@@ -729,17 +676,17 @@ import kotlin.math.roundToInt
         ) {
             Text(
                 str("lyrics_no_data"),
-                color = Color.White.copy(0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.titleMedium
             )
             Spacer(Modifier.height(24.dp))
     
             Button(onClick = onManualSearch,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White.copy(alpha = 0.1f),
-                    contentColor = Color.White
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
             ) {
                 Icon(
@@ -763,8 +710,8 @@ import kotlin.math.roundToInt
             Surface(
                 onClick = onClick,
                 shape = CircleShape,
-                color = Color.Black.copy(alpha = 0.4f),
-                contentColor = Color.White.copy(alpha = 0.8f)
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             ) {
                 Text(
                     str("lyrics_wrong"),
@@ -969,8 +916,10 @@ import kotlin.math.roundToInt
         Surface(
             modifier = modifier.fillMaxWidth(), // Padding is managed by the parent
             shape = RoundedCornerShape(24.dp),
-            color = Color.Black.copy(alpha = 0.8f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+            // Themed like the rest of the screen. This panel floats over the lyrics, so it uses a raised
+            // container rather than a black scrim that ignored the palette (issue #33).
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -984,14 +933,15 @@ import kotlin.math.roundToInt
                     Text(
                         text = str("lyrics_sync"),
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
     
                     // Proper formatting: +0.1s, -0.5s, 0.0s
                     val seconds = offset / 1000.0
                     val sign = if (offset > 0) "+" else ""
-                    val color = if (offset == 0L) Color.White.copy(0.7f) else MaterialTheme.colorScheme.primary
+                    val color = if (offset == 0L) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.primary
     
                     Text(
                         text = String.format(java.util.Locale.US, "%s%.1fs", sign, seconds),
@@ -1012,18 +962,22 @@ import kotlin.math.roundToInt
                     // MINUS BUTTON (Active repetition)
                     RepeatingIconButton(onClick = { onAdjust(-100L) }, // -0.1s
                         icon = Icons.Rounded.Remove,
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
     
                     // RESET BUTTON (Simple click is enough)
                     TextButton(onClick = onReset) {
-                        Text("RESET", color = Color.White.copy(alpha = 0.7f), fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "RESET",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
     
                     // PLUS BUTTON (Active repetition)
                     RepeatingIconButton(onClick = { onAdjust(100L) }, // +0.1s
                         icon = Icons.Rounded.Add,
-                        tint = Color.White
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -1042,7 +996,7 @@ import kotlin.math.roundToInt
         // We use Surface instead of FilledIconButton to have total control over touch events
         Surface(
             shape = CircleShape, // Round shape like an IconButton
-            color = Color.White.copy(0.1f), // Background color (translucent gray)
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
             modifier = modifier
                 .size(48.dp) // Standard button size
                 .clip(CircleShape) // Important for visual effect and touch
@@ -1347,6 +1301,56 @@ fun QuickLyricsSettingsDialog(
                             }
                         }
 
+                        // 2b. VITESSE DE DÉFILEMENT (texte non synchronisé)
+                        // Here as well as in the full settings: this is the screen you are on when
+                        // you notice the speed is wrong (issue #33).
+                        if (viewModel.isPlainAutoScrollEnabled) {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = str("pref_lyrics_autoscroll_speed"),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = autoScrollSpeedLabel(viewModel.plainAutoScrollSpeed),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                                            viewModel.updatePlainAutoScrollSpeed(viewModel.plainAutoScrollSpeed - 0.25f)
+                                        }) { Icon(Icons.Rounded.Remove, null) }
+                                        Slider(
+                                            value = viewModel.plainAutoScrollSpeed,
+                                            onValueChange = { viewModel.updatePlainAutoScrollSpeed(it) },
+                                            valueRange = 0.25f..4f,
+                                            steps = 14,
+                                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                        )
+                                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                                            viewModel.updatePlainAutoScrollSpeed(viewModel.plainAutoScrollSpeed + 0.25f)
+                                        }) { Icon(Icons.Rounded.Add, null) }
+                                    }
+                                }
+                            }
+                        }
+
                         // 3. ALIGNEMENT
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -1377,6 +1381,43 @@ fun QuickLyricsSettingsDialog(
                                             LyricsAlignment.LEFT -> str("align_left")
                                             LyricsAlignment.CENTER -> str("align_center_simple")
                                             LyricsAlignment.RIGHT -> str("align_right")
+                                        }
+                                        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                                    }
+                                )
+                            }
+                        }
+
+                        // 3b. STYLE D'AFFICHAGE DE LA LIGNE COURANTE
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = str("pref_lyrics_display_style"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                ExpressiveConnectedButtonGroup(
+                                    options = LyricsDisplayStyle.entries,
+                                    selectedOption = viewModel.lyricsDisplayStyle,
+                                    onOptionSelected = { viewModel.updateLyricsDisplayStyle(it) },
+                                    iconProvider = { style ->
+                                        val icon = when (style) {
+                                            LyricsDisplayStyle.STANDARD -> Icons.Rounded.Notes
+                                            LyricsDisplayStyle.SCALE -> Icons.Rounded.FormatSize
+                                            LyricsDisplayStyle.FOCUS -> Icons.Rounded.CenterFocusStrong
+                                        }
+                                        Icon(icon, null, modifier = Modifier.size(16.dp))
+                                    },
+                                    labelProvider = { style ->
+                                        val text = when (style) {
+                                            LyricsDisplayStyle.STANDARD -> str("lyrics_style_standard")
+                                            LyricsDisplayStyle.SCALE -> str("lyrics_style_scale")
+                                            LyricsDisplayStyle.FOCUS -> str("lyrics_style_focus")
                                         }
                                         Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                                     }
@@ -1687,23 +1728,12 @@ private fun Modifier.lyricUnderline(
     }
 }
 
-/**
- * Auto-scroll rate for lyrics with no timings, at speed 1×, in dp per second. Slow on purpose:
- * the slider spans 0.25× to 4×, so the default has to sit where a comfortable reading pace is,
- * not at the top of the range.
- */
-private const val PLAIN_AUTOSCROLL_BASE_DP_PER_SEC = 18f
 
-/** How long a manual scroll holds the automatic one off. */
-private const val PLAIN_AUTOSCROLL_PAUSE_MS = 2_500L
 
-/**
- * How far the word-sync highlight may run ahead of the player's last reported position.
- *
- * The player reports every 250 ms, so the highlight has to extrapolate to stay smooth between
- * reports. It must not extrapolate indefinitely: reporting stops outright while buffering, seeking
- * or scrubbing, and without a ceiling the highlight sprinted to the end of the line and jumped back
- * when the real position returned (issue #33). One report plus slack keeps normal playback smooth
- * and turns a stall into a pause rather than a bolt.
- */
-private const val MAX_EXTRAPOLATION_MS = 400L
+/** "1.5×" — one decimal only when there is one, matching the label in the full settings. */
+private fun autoScrollSpeedLabel(speed: Float): String {
+    val rounded = kotlin.math.round(speed * 100f) / 100f
+    val text = if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()
+    return "$text×"
+}
+
