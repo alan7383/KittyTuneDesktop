@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Comment
+import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.Sort
@@ -176,6 +177,7 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
         SelectArtistDialog(viewModel)
     }
     SleepTimerDialog(viewModel)
+    TrackTrimDialog(viewModel)
 }
 
 /**
@@ -461,6 +463,12 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             }
             if (viewModel.isMenuContextFromPlayer) {
                 add(MenuOptionItem(Icons.Rounded.Bedtime, str("sleep_timer_title")) { viewModel.showSleepTimerDialog = true })
+                // Only for the track that is playing: the editor's whole method is "listen, mark here", so
+                // it needs a playhead to mark from (issue #33).
+                add(MenuOptionItem(Icons.Rounded.ContentCut, str("trim_title")) {
+                    viewModel.showMenuSheet = false
+                    viewModel.showTrimDialog = true
+                })
             }
         }
 

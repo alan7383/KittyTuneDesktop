@@ -72,6 +72,32 @@ fun SettingsScreen(
             LyricsSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
             Spacer(Modifier.height(32.dp))
             
+            // Mid-page: it was at the very bottom, which for a feature nobody knows exists yet is the same
+            // as not shipping it, and it is also not the first thing anyone opens settings for. The row says
+            // what is actually happening rather than naming the listener switch, so the state is legible
+            // without opening it. The sidebar entry is what makes it reachable in one click.
+            MainCategoryTitle(str("sync_title"), Icons.Rounded.Sync)
+            SettingsGroup(
+                title = str("sync_title"),
+                items = listOf(
+                    { shape ->
+                        val devices = com.alananasss.kittytune.data.sync.SyncPeers.all()
+                        SettingsItem(
+                            shape = shape,
+                            title = str("sync_title"),
+                            subtitle = if (devices.isEmpty()) {
+                                str("sync_state_not_paired_sub")
+                            } else {
+                                str("sync_state_in_step")
+                            },
+                            icon = Icons.Rounded.Devices,
+                            onClick = { navController.navigate("sync_settings") }
+                        )
+                    }
+                )
+            )
+            Spacer(Modifier.height(32.dp))
+
             MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum)
             DiscordSettingsScreen(onBackClick = null, onNavigateToLogin = { navController.navigate("discord_login") }, playerViewModel = playerViewModel)
             Spacer(Modifier.height(32.dp))

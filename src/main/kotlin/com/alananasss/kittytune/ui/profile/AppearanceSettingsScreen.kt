@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.outlined.Image
 
 @Composable
 fun AppearanceSettingsScreen(
@@ -56,8 +58,7 @@ fun AppearanceSettingsScreen(
     var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
     var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme()) }
     var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
-    var playerBarButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
-    var showPlayerButtonsDialog by remember { mutableStateOf(false) }
+    var showCustomizeDialog by remember { mutableStateOf(false) }
     var verticalVolumeSlider by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
     var showIconDialog by remember { mutableStateOf(false) }
     val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
@@ -137,46 +138,8 @@ fun AppearanceSettingsScreen(
         )
     }
 
-    if (showPlayerButtonsDialog) {
-        AlertDialog(
-            onDismissRequest = { showPlayerButtonsDialog = false },
-            title = { Text(str("pref_player_bar_buttons")) },
-            text = {
-                Column {
-                    Text(
-                        str("pref_player_bar_buttons_desc"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    listOf(
-                        PlayerPreferences.PLAYER_BAR_BUTTON_LIKE to str("player_button_like"),
-                        PlayerPreferences.PLAYER_BAR_BUTTON_PANEL to str("player_button_panel"),
-                        PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE to str("player_button_queue"),
-                    ).forEach { (key, label) ->
-                        val checked = key in playerBarButtons
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    playerBarButtons =
-                                        if (checked) playerBarButtons - key else playerBarButtons + key
-                                    prefs.setPlayerBarButtons(playerBarButtons)
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(label)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showPlayerButtonsDialog = false }) { Text(str("btn_close")) }
-            }
-        )
+    if (showCustomizeDialog) {
+        CustomizeButtonsDialog(prefs = prefs, onDismiss = { showCustomizeDialog = false })
     }
 
     if (showIconDialog) {
@@ -308,8 +271,8 @@ fun AppearanceSettingsScreen(
                             System.getProperty("os.name").lowercase().contains("win")
                         }
                         val titleBarIndex = if (isPureBlackVisible) 6 else 5
-                        val playerButtonsIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
-                        val totalVisibleItems = playerButtonsIndex + 1
+                        val customizeIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
+                        val totalVisibleItems = customizeIndex + 1
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 0),
                             title = str("pref_language"),
@@ -394,10 +357,11 @@ fun AppearanceSettingsScreen(
                         }
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, playerButtonsIndex),
-                            title = str("pref_player_bar_buttons"),
-                            subtitle = str("pref_player_bar_buttons_sub"),
-                            onClick = { showPlayerButtonsDialog = true }
+                            shape = getSettingsShape(totalVisibleItems, customizeIndex),
+                            title = str("pref_customize_buttons"),
+                            subtitle = str("pref_customize_buttons_sub"),
+                            icon = Icons.Rounded.Tune,
+                            onClick = { showCustomizeDialog = true }
                         )
                     }
                 }
@@ -633,3 +597,285 @@ private fun loadIconVariantPainter(key: String): androidx.compose.ui.graphics.pa
             )
         }
     }.getOrNull()
+
+/**
+ * One place to customise every optional button and tile in the app (issue #33).
+ *
+ * Three separate dialogs would have been three places to go looking. The sections are the three
+ * surfaces that carry optional controls: the sidebar's navigation rows, the player bar's right-hand
+ * buttons, and the fixed library tiles.
+ *
+ * The library rows preview each tile the way the library will actually draw it, so the effect of the
+ * colour switch and of an imported icon is visible without leaving the dialog.
+ */
+@Composable
+private fun CustomizeButtonsDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
+    var hiddenNav by remember { mutableStateOf(prefs.getHiddenSidebarNav()) }
+    var hiddenLibraryButtons by remember { mutableStateOf(prefs.getHiddenLibraryButtons()) }
+    var playerBarButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
+    var hidden by remember { mutableStateOf(prefs.getHiddenLibraryTiles()) }
+    // Not a setting of its own: the tiles follow the palette exactly while the dynamic theme is
+    // on, which is how it was asked for. Read here only so the previews match the library.
+    val themed = prefs.getDynamicTheme()
+    var icons by remember {
+        mutableStateOf(PlayerPreferences.LIBRARY_TILES.associateWith { prefs.getLibraryTileIcon(it) })
+    }
+    /** Set when a picked file turned out not to be an image; cleared by the next attempt. */
+    var rejectedFile by remember { mutableStateOf(false) }
+
+    val scheme = MaterialTheme.colorScheme
+    val labels = mapOf(
+        PlayerPreferences.LIBRARY_TILE_LIKES to str("lib_liked_tracks"),
+        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to str("lib_downloads"),
+        PlayerPreferences.LIBRARY_TILE_LOCAL to str("lib_local_media"),
+    )
+    val builtInIcons = mapOf(
+        PlayerPreferences.LIBRARY_TILE_LIKES to Icons.Rounded.Favorite,
+        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to Icons.Rounded.DownloadForOffline,
+        PlayerPreferences.LIBRARY_TILE_LOCAL to Icons.Rounded.FolderOpen,
+    )
+    // Mirrors the library exactly: flat container roles while the dynamic theme is on, the original
+    // gradients when it is off. See rememberFixedLibraryTiles.
+    val gradients = mapOf(
+        PlayerPreferences.LIBRARY_TILE_LIKES to
+            if (themed) null else listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)),
+        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to
+            if (themed) null else listOf(Color(0xFF00C853), Color(0xFF69F0AE)),
+        PlayerPreferences.LIBRARY_TILE_LOCAL to
+            if (themed) null else listOf(Color(0xFF0091EA), Color(0xFF40C4FF)),
+    )
+    val flats = mapOf(
+        PlayerPreferences.LIBRARY_TILE_LIKES to scheme.primaryContainer.takeIf { themed },
+        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to scheme.secondaryContainer.takeIf { themed },
+        PlayerPreferences.LIBRARY_TILE_LOCAL to scheme.tertiaryContainer.takeIf { themed },
+    )
+    val tints = mapOf(
+        PlayerPreferences.LIBRARY_TILE_LIKES to
+            if (themed) scheme.onPrimaryContainer else Color.White,
+        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to
+            if (themed) scheme.onSecondaryContainer else Color.White,
+        PlayerPreferences.LIBRARY_TILE_LOCAL to
+            if (themed) scheme.onTertiaryContainer else Color.White,
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("pref_customize_buttons")) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                CustomizeSectionTitle(str("customize_section_sidebar"))
+                Text(
+                    str("customize_section_sidebar_desc"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant
+                )
+                listOf(
+                    PlayerPreferences.SIDEBAR_NAV_FEED to str("nav_feed"),
+                    PlayerPreferences.SIDEBAR_NAV_EXPLORE to str("explorer_title"),
+                    PlayerPreferences.SIDEBAR_NAV_RECOGNITION to str("pref_bottom_menu_fab_recognition"),
+                    PlayerPreferences.SIDEBAR_NAV_SYNC to str("sync_title"),
+                ).forEach { (key, label) ->
+                    val shown = key !in hiddenNav
+                    CustomizeCheckRow(label = label, checked = shown) {
+                        hiddenNav = if (shown) hiddenNav + key else hiddenNav - key
+                        prefs.setHiddenSidebarNav(hiddenNav)
+                    }
+                }
+
+                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+
+                CustomizeSectionTitle(str("pref_player_bar_buttons"))
+                Text(
+                    str("pref_player_bar_buttons_desc"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant
+                )
+                listOf(
+                    PlayerPreferences.PLAYER_BAR_BUTTON_LIKE to str("player_button_like"),
+                    PlayerPreferences.PLAYER_BAR_BUTTON_PANEL to str("player_button_panel"),
+                    PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE to str("player_button_queue"),
+                ).forEach { (key, label) ->
+                    val checked = key in playerBarButtons
+                    CustomizeCheckRow(label = label, checked = checked) {
+                        playerBarButtons =
+                            if (checked) playerBarButtons - key else playerBarButtons + key
+                        prefs.setPlayerBarButtons(playerBarButtons)
+                    }
+                }
+
+                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+
+                CustomizeSectionTitle(str("customize_section_library"))
+                listOf(
+                    PlayerPreferences.LIBRARY_BUTTON_CREATE to str("lib_create"),
+                    PlayerPreferences.LIBRARY_BUTTON_HISTORY to str("history_title"),
+                ).forEach { (key, label) ->
+                    val shown = key !in hiddenLibraryButtons
+                    CustomizeCheckRow(label = label, checked = shown) {
+                        hiddenLibraryButtons =
+                            if (shown) hiddenLibraryButtons + key else hiddenLibraryButtons - key
+                        prefs.setHiddenLibraryButtons(hiddenLibraryButtons)
+                    }
+                }
+
+                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+
+                CustomizeSectionTitle(str("pref_library_tiles"))
+                Text(
+                    str("pref_library_tiles_desc"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant
+                )
+                PlayerPreferences.LIBRARY_TILES.forEach { tile ->
+                    val shown = tile !in hidden
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = shown,
+                            onCheckedChange = {
+                                hidden = if (shown) hidden + tile else hidden - tile
+                                prefs.setHiddenLibraryTiles(hidden)
+                            }
+                        )
+                        LibraryTilePreview(
+                            iconPath = icons[tile],
+                            icon = builtInIcons.getValue(tile),
+                            gradient = gradients.getValue(tile),
+                            flatColor = flats.getValue(tile),
+                            tint = tints.getValue(tile),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            labels[tile].orEmpty(),
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        IconButton(onClick = {
+                            val picked = pickImageFile(str("lib_tile_choose_icon"))
+                            if (picked != null) {
+                                val stored = com.alananasss.kittytune.data.local.LibraryTileIcons
+                                    .import(tile, picked)
+                                rejectedFile = stored == null
+                                if (stored != null) {
+                                    prefs.setLibraryTileIcon(tile, stored)
+                                    icons = icons + (tile to stored)
+                                }
+                            }
+                        }) {
+                            Icon(
+                                Icons.Outlined.Image,
+                                contentDescription = str("lib_tile_choose_icon"),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        if (icons[tile] != null) {
+                            IconButton(onClick = {
+                                com.alananasss.kittytune.data.local.LibraryTileIcons.clear(tile)
+                                prefs.setLibraryTileIcon(tile, null)
+                                icons = icons + (tile to null)
+                                rejectedFile = false
+                            }) {
+                                Icon(
+                                    Icons.Rounded.Refresh,
+                                    contentDescription = str("lib_tile_reset_icon"),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (rejectedFile) {
+                    Text(
+                        str("lib_tile_icon_rejected"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } }
+    )
+}
+
+@Composable
+private fun CustomizeSectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 8.dp)
+    )
+}
+
+/** A checkbox whose whole row is the target, the way the settings list behaves. */
+@Composable
+private fun CustomizeCheckRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = null)
+        Spacer(Modifier.width(8.dp))
+        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** One tile drawn the way the library draws it: the icon, or the imported image, over the gradient. */
+@Composable
+private fun LibraryTilePreview(
+    iconPath: String?,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    gradient: List<Color>?,
+    flatColor: Color?,
+    tint: Color,
+) {
+    val file = iconPath?.let { path -> remember(path) { java.io.File(path) } }
+    val fill = when {
+        flatColor != null -> Modifier.background(flatColor)
+        gradient != null -> Modifier.background(androidx.compose.ui.graphics.Brush.linearGradient(gradient))
+        else -> Modifier
+    }
+    Box(
+        modifier = Modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .then(fill),
+        contentAlignment = Alignment.Center
+    ) {
+        if (file != null && file.isFile) {
+            coil3.compose.AsyncImage(
+                model = file,
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
+            )
+        } else {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/**
+ * Asks for an image file, or null when the dialog is dismissed.
+ *
+ * The filter is a hint the platform is free to ignore, so the file still has to be validated
+ * afterwards — see [com.alananasss.kittytune.data.local.LibraryTileIcons.import].
+ */
+private fun pickImageFile(title: String): java.io.File? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
+    dialog.setFilenameFilter { _, name ->
+        listOf(".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp").any { name.endsWith(it, true) }
+    }
+    dialog.isVisible = true
+    return dialog.files.firstOrNull()
+}
