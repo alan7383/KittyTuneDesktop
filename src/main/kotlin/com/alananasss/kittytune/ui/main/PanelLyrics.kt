@@ -238,7 +238,15 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier) {
     // from under them would be worse than no auto-scroll at all.
     var lastUserScrollMs by remember { mutableStateOf(0L) }
 
-    LaunchedEffect(vm.isPlainAutoScrollEnabled, vm.plainAutoScrollSpeed, text) {
+    // The panel draws plain text far smaller than the full screen does, so pacing in dp made the same
+    // speed setting mean something different here. Measured once and handed to the shared rate.
+    val bodyStyle = MaterialTheme.typography.bodyMedium
+    val lineHeightDp = with(density) {
+        val line = bodyStyle.lineHeight
+        if (line.isSpecified) line.toDp().value else (bodyStyle.fontSize.toDp().value * 1.4f)
+    }
+
+    LaunchedEffect(vm.isPlainAutoScrollEnabled, vm.plainAutoScrollSpeed, text, lineHeightDp) {
         if (!vm.isPlainAutoScrollEnabled) return@LaunchedEffect
         var lastFrameNs = withFrameNanos { it }
         while (isActive) {
@@ -247,7 +255,11 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier) {
             lastFrameNs = nowNs
             if (System.currentTimeMillis() - lastUserScrollMs < LyricsScrolling.PLAIN_PAUSE_MS) continue
             if (!listState.canScrollForward) continue
-            val step = LyricsScrolling.PLAIN_BASE_DP_PER_SEC * vm.plainAutoScrollSpeed * elapsedSec
+            val step = LyricsScrolling.plainScrollStepDp(
+                lineHeightDp = lineHeightDp,
+                speed = vm.plainAutoScrollSpeed,
+                elapsedSec = elapsedSec,
+            )
             if (step > 0f) listState.scrollBy(with(density) { step.dp.toPx() })
         }
     }

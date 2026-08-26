@@ -21,11 +21,27 @@ import kotlinx.coroutines.delay
 internal object LyricsScrolling {
 
     /**
-     * Auto-scroll rate for lyrics with no timings, at speed 1×, in dp per second. Slow on purpose:
-     * the slider spans 0.25× to 4×, so the default has to sit where a comfortable reading pace is,
-     * not at the top of the range.
+     * Auto-scroll rate for lyrics with no timings, at speed 1×, in **lines** per second.
+     *
+     * Lines, not dp. It was 18 dp per second, and dp is the wrong unit for reading: the full screen draws
+     * plain text at the size the reader chose — 42 sp is not unusual, so a line is about 59 dp — while the
+     * side panel draws it at `bodyMedium`, about 20 dp. The same 18 dp/s therefore moved a third of a line
+     * per second in one view and nearly a whole line in the other, so "1.5×" meant two different speeds
+     * depending on where you were reading. Reported as the panel's text moving too fast (issue #33).
+     *
+     * Expressed per line, a line takes the same time to pass in both, whatever either one's typography.
+     * The value is what the full screen already did at a 42 sp setting, since that is the pace being
+     * compared against.
      */
-    const val PLAIN_BASE_DP_PER_SEC = 18f
+    const val PLAIN_BASE_LINES_PER_SEC = 0.3f
+
+    /**
+     * @param lineHeightDp the height of one line in the view asking, which is what makes the pace
+     *   comparable between views rather than merely equal in dp.
+     * @return how far to scroll, in dp, for [elapsedSec] at [speed].
+     */
+    fun plainScrollStepDp(lineHeightDp: Float, speed: Float, elapsedSec: Float): Float =
+        lineHeightDp * PLAIN_BASE_LINES_PER_SEC * speed * elapsedSec
 
     /** How long a manual scroll holds the automatic one off. */
     const val PLAIN_PAUSE_MS = 2_500L
