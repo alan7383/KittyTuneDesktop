@@ -1129,6 +1129,8 @@
     <string name="pref_sc_sync_title">Синхронизация истории SoundCloud</string>
     <string name="pref_seed_palette_title">Палитра</string>
     <string name="pref_start_screen">Начальный экран</string>
+    <string name="pref_info_half">Вкладка «Инфо» открывается на</string>
+    <string name="pref_info_half_remember">Последний выбор</string>
     <string name="pref_stop_on_task_clear">Остановить музыку при закрытии приложения</string>
     <string name="pref_storage_cache">Кэш</string>
     <string name="pref_storage_cache_clear">Очистить кэш</string>

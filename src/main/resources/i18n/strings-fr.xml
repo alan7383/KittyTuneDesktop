@@ -1129,6 +1129,8 @@
     <string name="pref_sc_sync_title">Synchronisation de l\'historique SoundCloud</string>
     <string name="pref_seed_palette_title">Palette de seeds</string>
     <string name="pref_start_screen">Écran de démarrage</string>
+    <string name="pref_info_half">L'onglet Info s'ouvre sur</string>
+    <string name="pref_info_half_remember">Dernier choix</string>
     <string name="pref_stop_on_task_clear">Arrêter la musique à la fermeture</string>
     <string name="pref_storage_cache">Cache</string>
     <string name="pref_storage_cache_clear">Effacer le cache</string>

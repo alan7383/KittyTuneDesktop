@@ -26,7 +26,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -130,14 +129,22 @@ fun TrackInfoTab(vm: PlayerViewModel) {
     }
 
     /**
-     * Which half the panel shows below the track details (issue #33). Deliberately not keyed on the
-     * track: someone who opened the panel for the lyrics wants the lyrics on the next track too.
-     * Saveable, so it also survives closing and reopening the panel.
+     * Which half the panel shows below the track details (issue #33).
+     *
+     * It was a `rememberSaveable`, which sounds like it survives the panel closing and does not: the
+     * saved-state registry belongs to the composition the panel is part of, so choosing the lyrics
+     * and closing the panel gave the comments back on the next open. Reported as "the comments
+     * button and the text don't remember my choice".
+     *
+     * It reads a preference now, which also answers the request for a default: Comments, Lyrics, or
+     * whichever was last picked. Never keyed on the track — someone who opened the panel for the
+     * lyrics wants the lyrics on the next track too.
      *
      * Spotify catalog tracks have no comments at all, so there is nothing to toggle between: the
      * lyrics are the only half they have.
      */
-    var showLyricsHalf by rememberSaveable { mutableStateOf(false) }
+    val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    var showLyricsHalf by remember { mutableStateOf(playerPrefs.infoPanelOpensOnLyrics()) }
     val lyricsHalf = isSpotifyTrack || showLyricsHalf
 
     LazyColumn(
@@ -470,50 +477,67 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Tags & details (SoundCloud only). Ahead of the social proof and the description so
-        // that the release date sits with the rest of the track's own facts, right under the
-        // play/like/repost counts, instead of below a banner about other listeners (issue #33).
+        // Tags & details (SoundCloud only).
+        //
+        // One line for the release date and the genre, not two rows twelve dp apart (issue #33).
+        // "I think it is necessary to remove the release date and genre below the text, because the
+        // text is more important than them" — the text is, so they give up the height rather than
+        // the place: moved under the lyrics they would mean scrolling past a whole song to find a
+        // year, and they belong with the track's own numbers, which are right above. The labels go
+        // because a calendar before a date and a note before a genre say the same thing in no
+        // horizontal space at all.
         if (!isSpotifyTrack) item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
                 val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
+                val genre = displayTrack.genre
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Icon(
                         Icons.Rounded.CalendarToday,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        contentDescription = str("detail_release_date"),
+                        modifier = Modifier.size(14.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${str("detail_release_date")}: $releaseDateStr",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = releaseDateStr,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
-                }
 
-                if (!displayTrack.genre.isNullOrBlank()) {
-                    Row(
-                        modifier = Modifier
-                            .clickable { vm.navigateToTag(displayTrack.genre) }
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically, 
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.MusicNote,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    if (!genre.isNullOrBlank()) {
                         Text(
-                            text = "${str("detail_genre")}: ${displayTrack.genre}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "·",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
                         )
+                        Row(
+                            modifier = Modifier
+                                .clickable { vm.navigateToTag(genre) }
+                                .weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.MusicNote,
+                                contentDescription = str("detail_genre"),
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            // Ellipsized rather than wrapping: a long genre string must not be what
+                            // turns this one line back into two.
+                            Text(
+                                text = genre,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
                 
@@ -698,7 +722,12 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             InfoHalfToggle(
                 lyricsSelected = lyricsHalf,
                 commentCount = displayTrack.commentCount ?: organizedComments.size,
-                onSelect = { showLyricsHalf = it },
+                onSelect = {
+                    showLyricsHalf = it
+                    // Written whatever the setting says. Someone who switches the setting to
+                    // "last choice" later should find the choice they had already been making.
+                    playerPrefs.setInfoPanelLastLyrics(it)
+                },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             )
         }

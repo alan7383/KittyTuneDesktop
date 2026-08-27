@@ -71,6 +71,8 @@ fun AppearanceSettingsScreen(
     var customFontEnabled by remember { mutableStateOf(prefs.getCustomFontEnabled()) }
 
     var showStartDestDialog by remember { mutableStateOf(false) }
+    var showInfoHalfDialog by remember { mutableStateOf(false) }
+    var infoPanelHalf by remember { mutableStateOf(prefs.getInfoPanelHalf()) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showFontConfigDialog by remember { mutableStateOf(false) }
 
@@ -95,6 +97,39 @@ fun AppearanceSettingsScreen(
                 }
             },
             confirmButton = { TextButton(onClick = { showStartDestDialog = false }) { Text(str("btn_cancel")) } }
+        )
+    }
+
+    if (showInfoHalfDialog) {
+        AlertDialog(
+            onDismissRequest = { showInfoHalfDialog = false },
+            title = { Text(str("pref_info_half")) },
+            text = {
+                Column {
+                    listOf(
+                        InfoPanelHalf.REMEMBER to str("pref_info_half_remember"),
+                        InfoPanelHalf.COMMENTS to str("menu_comments"),
+                        InfoPanelHalf.LYRICS to str("player_lyrics"),
+                    ).forEach { (value, label) ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    infoPanelHalf = value
+                                    prefs.setInfoPanelHalf(value)
+                                    showInfoHalfDialog = false
+                                }
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected = infoPanelHalf == value, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showInfoHalfDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -424,6 +459,18 @@ fun AppearanceSettingsScreen(
                                     StartDestination.LIBRARY -> str("nav_library")
                                 },
                                 onClick = { showStartDestDialog = true }
+                            )
+                        },
+                        { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_info_half"),
+                                subtitle = when (infoPanelHalf) {
+                                    InfoPanelHalf.REMEMBER -> str("pref_info_half_remember")
+                                    InfoPanelHalf.COMMENTS -> str("menu_comments")
+                                    InfoPanelHalf.LYRICS -> str("player_lyrics")
+                                },
+                                onClick = { showInfoHalfDialog = true }
                             )
                         },
                         { shape ->
