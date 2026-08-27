@@ -32,7 +32,24 @@ import kotlin.concurrent.thread
 object MemoryDiagnostics {
 
     private const val ENABLE_PROPERTY = "kittytune.memlog"
-    private val INTERVAL_MS = 60_000L
+
+    /**
+     * How often the cheap numbers are read, and how often the full account is written.
+     *
+     * Two rates because of what was reported: "I just listened to a song, and then it suddenly froze
+     * 1 sec and used 3000-4000 MB". A minute between samples would have every chance of falling
+     * either side of an event that lasts a second, so the heap and the process size are read every
+     * few seconds, peaks are carried forward, and a jump writes the full account immediately rather
+     * than waiting for the next minute.
+     */
+    private const val POLL_MS = 5_000L
+    private const val FULL_REPORT_MS = 60_000L
+
+    /** A jump this big since the last full account is treated as the event we are hunting. */
+    private const val SPIKE_MB = 256L
+
+    /** A collection longer than this is the freeze somebody feels, so each one is written down. */
+    private const val SLOW_GC_MS = 200L
 
     /** Kept next to the settings rather than in a cache, so clearing the cache cannot delete it. */
     val logFile: File get() = File(AppDirs.dataDir, "memory.log")
@@ -48,9 +65,23 @@ object MemoryDiagnostics {
         // exactly when a coroutine on a shared dispatcher might not get a turn.
         thread(isDaemon = true, name = "memory-diagnostics") {
             append(header())
+            var lastFullMs = 0L
+            var baselineMb = 0L
             while (true) {
-                runCatching { append(report("periodic")) }
-                Thread.sleep(INTERVAL_MS)
+                runCatching {
+                    val nowMb = maxOf(heapCommittedMb(), processMb())
+                    trackPeaks()
+                    noteSlowCollections()
+
+                    val jumped = baselineMb > 0 && nowMb - baselineMb >= SPIKE_MB
+                    val due = System.currentTimeMillis() - lastFullMs >= FULL_REPORT_MS
+                    if (jumped || due) {
+                        append(report(if (jumped) "jumped ${nowMb - baselineMb} MB" else "periodic"))
+                        lastFullMs = System.currentTimeMillis()
+                        baselineMb = nowMb
+                    }
+                }
+                Thread.sleep(POLL_MS)
             }
         }
 
@@ -86,6 +117,9 @@ object MemoryDiagnostics {
 
         // The Java half. If this stays small while the total does not, the problem is below.
         appendLine("heap used ${mb(rt.totalMemory() - rt.freeMemory())} MB / committed ${mb(rt.totalMemory())} MB / max ${mb(rt.maxMemory())} MB")
+        // What was seen between reports, which is where a one-second event lives.
+        appendLine("peak since last report: heap used ${peakHeapUsedMb} MB, heap committed ${peakHeapCommittedMb} MB, process ${peakProcessMb} MB")
+        resetPeaks()
         val nonHeap = ManagementFactory.getMemoryMXBean().nonHeapMemoryUsage
         appendLine("non-heap used ${mb(nonHeap.used)} MB / committed ${mb(nonHeap.committed)} MB")
         appendLine("threads ${ManagementFactory.getThreadMXBean().threadCount}")
@@ -140,6 +174,68 @@ object MemoryDiagnostics {
     private fun vmOptions(): String = runCatching {
         ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" ")
     }.getOrDefault("unknown")
+
+
+    // ---- the cheap numbers, read far more often than they are written ------------------------
+
+    private var peakHeapUsedMb = 0L
+    private var peakHeapCommittedMb = 0L
+    private var peakProcessMb = 0L
+
+    private fun heapCommittedMb(): Long = mb(Runtime.getRuntime().totalMemory())
+
+    private fun heapUsedMb(): Long {
+        val rt = Runtime.getRuntime()
+        return mb(rt.totalMemory() - rt.freeMemory())
+    }
+
+    /** Resident size on Linux, committed virtual elsewhere. Both are cheap enough to read often. */
+    private fun processMb(): Long = runCatching {
+        val status = File("/proc/self/status")
+        if (status.exists()) {
+            val rss = status.readLines().firstOrNull { it.startsWith("VmRSS:") }
+            if (rss != null) return@runCatching rss.filter { it.isDigit() }.toLong() / 1024
+        }
+        val os = ManagementFactory.getOperatingSystemMXBean() as com.sun.management.OperatingSystemMXBean
+        mb(os.committedVirtualMemorySize)
+    }.getOrDefault(0L)
+
+    private fun trackPeaks() {
+        peakHeapUsedMb = maxOf(peakHeapUsedMb, heapUsedMb())
+        peakHeapCommittedMb = maxOf(peakHeapCommittedMb, heapCommittedMb())
+        peakProcessMb = maxOf(peakProcessMb, processMb())
+    }
+
+    private fun resetPeaks() {
+        peakHeapUsedMb = 0
+        peakHeapCommittedMb = 0
+        peakProcessMb = 0
+    }
+
+    /**
+     * Writes down every collection long enough to be heard as a gap.
+     *
+     * "It suddenly froze 1 sec" is a pause, and a pause has a length, a cause and a heap size either
+     * side of it. The platform keeps the last one per collector, so this checks by id and writes each
+     * one once. Nothing here needs a log file or a flag.
+     */
+    private val lastSeenGcId = HashMap<String, Long>()
+
+    private fun noteSlowCollections() {
+        for (bean in ManagementFactory.getGarbageCollectorMXBeans()) {
+            val sun = bean as? com.sun.management.GarbageCollectorMXBean ?: continue
+            val info = runCatching { sun.lastGcInfo }.getOrNull() ?: continue
+            if (lastSeenGcId[bean.name] == info.id) continue
+            lastSeenGcId[bean.name] = info.id
+            if (info.duration < SLOW_GC_MS) continue
+            val before = runCatching { info.memoryUsageBeforeGc.values.sumOf { it.used } }.getOrDefault(0L)
+            val after = runCatching { info.memoryUsageAfterGc.values.sumOf { it.used } }.getOrDefault(0L)
+            append(
+                "\n!! ${stamp.format(Date())}  ${bean.name} paused ${info.duration} ms" +
+                    " (heap ${mb(before)} MB before, ${mb(after)} MB after)\n"
+            )
+        }
+    }
 
     private fun mb(bytes: Long): Long = bytes / (1024 * 1024)
 
