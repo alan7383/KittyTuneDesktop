@@ -1268,6 +1268,13 @@
     <string name="quality_high_sub">Лучшее качество (128 kbps+)</string>
     <string name="quality_low">Эко (экономия данных)</string>
     <string name="quality_low_sub">Сохраняет данные в мобильной сети</string>
+    <string name="menu_tile_hide">Скрыть эту кнопку</string>
+    <string name="menu_tiles_reorder_hint">Удерживайте, чтобы переместить</string>
+    <string name="menu_tiles_title">Кнопки меню</string>
+    <string name="menu_tiles_desc">Удерживайте кнопку в меню трека или плейлиста, чтобы переместить её, правый клик — чтобы скрыть. Скрытые можно вернуть здесь.</string>
+    <string name="menu_tiles_reset">Сбросить порядок</string>
+    <string name="menu_tiles_track">Меню трека</string>
+    <string name="menu_tiles_playlist">Меню плейлиста</string>
     <string name="panel_tabs_title">Показываемые вкладки</string>
     <string name="panel_tabs_desc">Скройте те, которые никогда не открываете. Хотя бы одна останется.</string>
     <string name="queue_up_next">Далее</string>

@@ -1268,6 +1268,13 @@
     <string name="quality_high_sub">Meilleure qualité (128kbps+)</string>
     <string name="quality_low">Éco (Données mobiles)</string>
     <string name="quality_low_sub">Idéal pour économiser la data</string>
+    <string name="menu_tile_hide">Masquer ce bouton</string>
+    <string name="menu_tiles_reorder_hint">Maintenir pour déplacer</string>
+    <string name="menu_tiles_title">Boutons des menus</string>
+    <string name="menu_tiles_desc">Maintenez un bouton du menu d'un morceau ou d'une playlist pour le déplacer, clic droit pour le masquer. Les boutons masqués se réactivent ici.</string>
+    <string name="menu_tiles_reset">Réinitialiser l'ordre</string>
+    <string name="menu_tiles_track">Menu du morceau</string>
+    <string name="menu_tiles_playlist">Menu de la playlist</string>
     <string name="panel_tabs_title">Onglets affichés</string>
     <string name="panel_tabs_desc">Masquez ceux que vous n'ouvrez jamais. Il en reste au moins un.</string>
     <string name="queue_up_next">À suivre</string>
