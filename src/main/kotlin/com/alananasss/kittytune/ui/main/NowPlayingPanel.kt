@@ -190,6 +190,15 @@ private fun QueueList(vm: PlayerViewModel) {
     val currentIndex = vm.currentQueueIndex
     val keys = remember(queue) { com.alananasss.kittytune.ui.player.queueItemKeys(queue) }
 
+    // Compacted for having been heard, not for sitting at a lower index. Jumping ahead to the sixth
+    // track used to draw the five skipped ones as "already played", and jumping back drew the ones
+    // really heard as still to come (issue #33). The track just played keeps its full row either way,
+    // since that is the one worth recognising.
+    val played = vm.playedTrackIds
+    val firstPast = remember(queue, currentIndex, played) {
+        queue.indices.firstOrNull { it < currentIndex - 1 && queue[it].id in played }
+    }
+
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState,
         // Resolved through the keys rather than the raw lazy-list indices. The two agree today, and
@@ -218,15 +227,12 @@ private fun QueueList(vm: PlayerViewModel) {
                 key = keys[index]
             ) { isDragging ->
                 val isCurrent = index == currentIndex
-                // The track just played keeps its full row. Only what is further back gets compacted,
-                // which is exactly the line drawn in the report: the previous one, the current one,
-                // and everything ahead.
-                val isPast = currentIndex > 0 && index < currentIndex - 1
+                val isPast = index < currentIndex - 1 && track.id in played
 
                 Column {
                     // Named where the treatment changes, so the compact rows read as a section rather
                     // than as rows that failed to load properly.
-                    if (index == 0 && currentIndex >= 2) QueueSectionRule(str("queue_played"))
+                    if (firstPast != null && index == firstPast) QueueSectionRule(str("queue_played"))
                     if (currentIndex >= 0 && index == currentIndex + 1) QueueSectionRule(str("queue_up_next"))
 
                     QueueRow(
