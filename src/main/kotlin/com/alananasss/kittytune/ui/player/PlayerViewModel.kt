@@ -265,6 +265,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val _originalQueue = mutableListOf<Track>()
     private val _queue = mutableListOf<Track>()
     val queue: List<Track> get() = _queue
+    /**
+     * Which tracks in this queue have actually started playing (issue #33).
+     *
+     * Position in the queue is not the same thing as having been listened to, and the queue view had
+     * been treating them as one: jump forward to the sixth track and the five you skipped were drawn
+     * as "already played", jump back and the ones you had really heard were drawn as still to come.
+     * Reported as the queue counting tracks it had no business counting.
+     *
+     * Filled where a listen session begins, so it says exactly what the statistics say, and cleared
+     * with the queue it describes.
+     */
+    var playedTrackIds by mutableStateOf<Set<Long>>(emptySet())
+        private set
+
     var queueState by mutableStateOf<List<Track>>(emptyList())
         private set
     var currentQueueIndex by mutableIntStateOf(-1)
@@ -2716,6 +2730,7 @@ flushListenSession("TRACK_CHANGE")
             isPlayerExpanded = false
         }
         SoundCloudTelemetryTracker.onQueueReset()
+        playedTrackIds = emptySet()
         _originalQueue.clear(); _originalQueue.addAll(tracks)
         _queue.clear()
         this.currentContext = context
@@ -2800,6 +2815,9 @@ flushListenSession("TRACK_CHANGE")
 
         isLoading = true; duration = trackToPlay.durationMs ?: 0L; currentPosition = 0L
         beginListenSession(trackToPlay)
+        // Alongside the session rather than anywhere else, so "played" means the same to the queue as
+        // it does to the statistics.
+        playedTrackIds = playedTrackIds + trackToPlay.id
         // Loaded before the stream is handed to the engine, so a trim that moves the starting point can be
         // applied as a start position rather than as a jump the listener hears (issue #33).
         loadTrimFor(trackToPlay.id)
