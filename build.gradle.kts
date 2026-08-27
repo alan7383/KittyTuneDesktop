@@ -138,9 +138,27 @@ compose.desktop {
         jvmArgs += "-Xmx2g"
         jvmArgs += "-XX:+UseG1GC"
         jvmArgs += "-XX:MaxGCPauseMillis=50"
+        // Give the pages back (issue #33).
+        //
+        // Measured on a real session: the heap held 266 MB committed for 80 MB of live objects. G1's
+        // defaults are MinHeapFreeRatio=40/MaxHeapFreeRatio=70, which is a policy for a server that would
+        // rather keep memory than ask for it again — on a desktop it reads as a leak, because the number in
+        // the system monitor never comes down after the library finishes loading.
+        //
+        // A periodic cycle is what actually triggers the uncommit: a player sitting idle never allocates
+        // hard enough to collect on its own, so without this the slack is simply held for ever. It is
+        // pinned to a *concurrent* cycle on purpose — the default for this flag is a full collection, and a
+        // stop-the-world pause on a multi-hundred-megabyte heap is what starved the decode loop and stopped
+        // playback in the first place. Concurrent gives back less, and giving back less is the right trade
+        // against an audible gap.
+        jvmArgs += "-XX:MinHeapFreeRatio=10"
+        jvmArgs += "-XX:MaxHeapFreeRatio=30"
+        jvmArgs += "-XX:G1PeriodicGCInterval=60000"
+        jvmArgs += "-XX:+G1PeriodicGCInvokesConcurrent"
         // Thousands of tracks repeat the same artist names, genres and CDN prefixes. Deduplicating
         // those strings costs a background pass and gives back real memory here.
         jvmArgs += "-XX:+UseStringDeduplication"
+
 
         buildTypes.release.proguard {
             isEnabled.set(false)
