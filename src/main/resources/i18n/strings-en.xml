@@ -1264,6 +1264,9 @@
     <string name="quality_high_sub">Best quality (128kbps+)</string>
     <string name="quality_low">Eco (Data Saver)</string>
     <string name="quality_low_sub">Saves data on mobile networks</string>
+    <string name="queue_up_next">Up next</string>
+    <string name="queue_remove">Remove from queue</string>
+    <string name="queue_played">Already played</string>
     <string name="queue_repeat">Repeat</string>
     <string name="queue_shuffle">Shuffle</string>
     <string name="radio">Radio</string>
@@ -1954,6 +1957,8 @@
     <string name="trim_plays_for">Plays %1$s of %2$s</string>
     <string name="trim_clear">Remove trim</string>
     <string name="listening_stats_timeline">Month by month</string>
+    <string name="trim_field_start">Start</string>
+    <string name="trim_field_end">End</string>
     <string name="sync_title">Device sync</string>
     <string name="sync_intro">Your devices exchange listening history directly over your local network. Nothing is uploaded anywhere, and there is no account.</string>
     <string name="sync_this_device">This device</string>
