@@ -902,7 +902,18 @@ fun MainScreen() {
     }
 }
 
-enum class NowPlayingTab { TRACK, QUEUE, LYRICS, EFFECTS }
+/**
+ * The tabs the Now Playing panel can show.
+ *
+ * [prefKey] is what [com.alananasss.kittytune.data.local.PlayerPreferences.getHiddenPanelTabs]
+ * stores, so a tab can be taken out of the row without the panel having to know why (issue #33).
+ */
+enum class NowPlayingTab(val prefKey: String) {
+    TRACK(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_TRACK),
+    QUEUE(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_QUEUE),
+    LYRICS(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_LYRICS),
+    EFFECTS(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_EFFECTS),
+}
 
 @Composable
 fun PlaceholderScreen(name: String) {

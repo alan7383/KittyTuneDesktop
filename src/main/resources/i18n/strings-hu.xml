@@ -1270,6 +1270,8 @@
     <string name="quality_high_sub">Legjobb minőség (128kbps+)</string>
     <string name="quality_low">Eco (Mobilnet)</string>
     <string name="quality_low_sub">Adatspórolós mód</string>
+    <string name="panel_tabs_title">Megjelenő fülek</string>
+    <string name="panel_tabs_desc">Rejtsd el azokat, amiket sosem nyitsz meg. Legalább egy megmarad.</string>
     <string name="queue_up_next">Következik</string>
     <string name="queue_remove">Eltávolítás a várólistáról</string>
     <string name="queue_played">Már lejátszva</string>

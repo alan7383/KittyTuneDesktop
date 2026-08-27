@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import com.alananasss.kittytune.data.local.AppThemeMode
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.SettingsScaffold
+import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.theme.MaterialKolorColorSpecOptions
 import com.alananasss.kittytune.ui.theme.normalizedMaterialKolorColorSpecName
 import com.alananasss.kittytune.ui.theme.parseMaterialKolorPaletteStyle

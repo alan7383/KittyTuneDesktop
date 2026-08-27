@@ -89,6 +89,7 @@ import androidx.compose.material.icons.rounded.FormatAlignRight
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.ui.common.Slider
 import androidx.compose.material.icons.rounded.Verified
 import kotlin.math.roundToInt
     import com.alananasss.kittytune.ui.player.LyricsMode

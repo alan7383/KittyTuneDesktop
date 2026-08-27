@@ -1266,6 +1266,8 @@
     <string name="quality_high_sub">Meilleure qualité (128kbps+)</string>
     <string name="quality_low">Éco (Données mobiles)</string>
     <string name="quality_low_sub">Idéal pour économiser la data</string>
+    <string name="panel_tabs_title">Onglets affichés</string>
+    <string name="panel_tabs_desc">Masquez ceux que vous n'ouvrez jamais. Il en reste au moins un.</string>
     <string name="queue_up_next">À suivre</string>
     <string name="queue_remove">Retirer de la file</string>
     <string name="queue_played">Déjà joué</string>

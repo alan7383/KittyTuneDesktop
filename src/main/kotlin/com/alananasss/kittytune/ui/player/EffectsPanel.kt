@@ -52,6 +52,7 @@ import kotlin.math.roundToInt
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.ui.common.Slider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

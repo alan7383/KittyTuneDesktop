@@ -27,6 +27,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,7 @@ import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsScaffold
+import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.getSettingsShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
@@ -613,6 +615,7 @@ private fun CustomizeButtonsDialog(prefs: PlayerPreferences, onDismiss: () -> Un
     var hiddenNav by remember { mutableStateOf(prefs.getHiddenSidebarNav()) }
     var hiddenLibraryButtons by remember { mutableStateOf(prefs.getHiddenLibraryButtons()) }
     var playerBarButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
+    var hiddenPanelTabs by remember { mutableStateOf(prefs.getHiddenPanelTabs()) }
     var hidden by remember { mutableStateOf(prefs.getHiddenLibraryTiles()) }
     // Not a setting of its own: the tiles follow the palette exactly while the dynamic theme is
     // on, which is how it was asked for. Read here only so the previews match the library.
@@ -703,6 +706,31 @@ private fun CustomizeButtonsDialog(prefs: PlayerPreferences, onDismiss: () -> Un
                         playerBarButtons =
                             if (checked) playerBarButtons - key else playerBarButtons + key
                         prefs.setPlayerBarButtons(playerBarButtons)
+                    }
+                }
+
+                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+
+                // The same switches the panel's own gear offers. Both, because the panel is where the
+                // effect is visible and this dialog is where someone goes looking for a setting.
+                CustomizeSectionTitle(str("panel_tabs_title"))
+                Text(
+                    str("panel_tabs_desc"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant
+                )
+                listOf(
+                    PlayerPreferences.PANEL_TAB_TRACK to str("detail_track_title"),
+                    PlayerPreferences.PANEL_TAB_QUEUE to str("player_queue"),
+                    PlayerPreferences.PANEL_TAB_LYRICS to str("player_lyrics"),
+                    PlayerPreferences.PANEL_TAB_EFFECTS to str("player_effects"),
+                ).forEach { (key, label) ->
+                    val shown = key !in hiddenPanelTabs
+                    // Never the last one: a panel with no tabs has nothing to show and no way back.
+                    val isLastShown = shown && hiddenPanelTabs.size == 3
+                    CustomizeCheckRow(label = label, checked = shown, enabled = !isLastShown) {
+                        hiddenPanelTabs = if (shown) hiddenPanelTabs + key else hiddenPanelTabs - key
+                        prefs.setHiddenPanelTabs(hiddenPanelTabs)
                     }
                 }
 
@@ -816,15 +844,22 @@ private fun CustomizeSectionTitle(text: String) {
 
 /** A checkbox whose whole row is the target, the way the settings list behaves. */
 @Composable
-private fun CustomizeCheckRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+private fun CustomizeCheckRow(
+    label: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onToggle: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onToggle)
-            .padding(vertical = 10.dp),
+            .clickable(enabled = enabled, onClick = onToggle)
+            .padding(vertical = 10.dp)
+            // Says why it will not budge, rather than simply not budging.
+            .alpha(if (enabled) 1f else 0.5f),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = null)
+        androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
         Spacer(Modifier.width(8.dp))
         Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

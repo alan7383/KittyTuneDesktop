@@ -122,6 +122,16 @@ fun TrackTrimDialog(viewModel: PlayerViewModel) {
                                 it[index] = segment.copy(endMs = position)
                             }
                         },
+                        onStart = { ms ->
+                            segments = segments.toMutableList().also {
+                                it[index] = segment.copy(startMs = ms)
+                            }
+                        },
+                        onEnd = { ms ->
+                            segments = segments.toMutableList().also {
+                                it[index] = segment.copy(endMs = ms)
+                            }
+                        },
                         onRemove = {
                             segments = segments.toMutableList().also { it.removeAt(index) }
                         },
@@ -179,6 +189,8 @@ private fun TrimSegmentRow(
     position: Long,
     onStartHere: () -> Unit,
     onEndHere: () -> Unit,
+    onStart: (Long) -> Unit,
+    onEnd: (Long) -> Unit,
     onRemove: () -> Unit,
 ) {
     Surface(
@@ -209,6 +221,27 @@ private fun TrimSegmentRow(
                     )
                 }
             }
+            // Two ways to set a mark, because they suit different jobs. Marking from the playhead is how you
+            // find a boundary you have to *hear* — a guest verse does not look like anything. Typing it is how
+            // you enter one you already know, or nudge one you got slightly wrong by two seconds. Only having
+            // the first was the "I can't specify the timestamps numerically" report (issue #33).
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TimeField(
+                    label = str("trim_field_start"),
+                    valueMs = segment.startMs,
+                    onValueMs = onStart,
+                    modifier = Modifier.weight(1f),
+                )
+                TimeField(
+                    label = str("trim_field_end"),
+                    valueMs = segment.endMs,
+                    onValueMs = onEnd,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = onStartHere) { Text(str("trim_set_start", formatMs(position))) }
                 TextButton(onClick = onEndHere) { Text(str("trim_set_end", formatMs(position))) }
@@ -221,4 +254,61 @@ private fun TrimSegmentRow(
 private fun formatMs(ms: Long): String {
     val total = (ms / 1000).coerceAtLeast(0)
     return "%d:%02d".format(total / 60, total % 60)
+}
+
+/**
+ * One timestamp, typed (issue #33).
+ *
+ * Accepts what a person actually writes for a time in a song: `1:07`, `67`, `1:07.5`, `0:07`. Anything
+ * unparseable is left in the field and simply not committed, so a half-typed `1:` does not become a
+ * mark at zero and then fight the next keystroke — the text is local state and only the parsed value
+ * travels outward.
+ *
+ * Re-seeded from [valueMs] whenever it changes from outside, which is what keeps it in step with the
+ * "mark from the playhead" buttons sitting right below it.
+ */
+@Composable
+private fun TimeField(
+    label: String,
+    valueMs: Long,
+    onValueMs: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var text by remember(valueMs) { mutableStateOf(formatMs(valueMs)) }
+    val parsed = remember(text) { parseTime(text) }
+
+    OutlinedTextField(
+        value = text,
+        onValueChange = { typed ->
+            text = typed
+            parseTime(typed)?.let(onValueMs)
+        },
+        label = { Text(label) },
+        singleLine = true,
+        isError = text.isNotBlank() && parsed == null,
+        modifier = modifier,
+    )
+}
+
+/**
+ * @return the time [raw] names, in milliseconds, or null when it is not a time yet.
+ *
+ * `m:ss` and `m:ss.t` are the forms the app shows, so they are the forms it has to read back. A bare
+ * number is read as seconds, because that is what someone types when the mark is inside the first
+ * minute.
+ */
+private fun parseTime(raw: String): Long? {
+    val text = raw.trim()
+    if (text.isEmpty()) return null
+
+    val parts = text.split(':')
+    if (parts.size > 2) return null
+
+    return if (parts.size == 1) {
+        parts[0].toDoubleOrNull()?.takeIf { it >= 0 }?.let { (it * 1000).toLong() }
+    } else {
+        val minutes = parts[0].toLongOrNull()?.takeIf { it >= 0 } ?: return null
+        val seconds = parts[1].toDoubleOrNull()?.takeIf { it >= 0 && it < 60 } ?: return null
+        minutes * 60_000 + (seconds * 1000).toLong()
+    }
 }
