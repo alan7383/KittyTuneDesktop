@@ -30,6 +30,10 @@ object AppBootstrap {
         if (done) return
         done = true
 
+        // 0. Memory diagnostics, before anything has had a chance to allocate. Does nothing at all
+        //    unless the launcher asked for it, which only the diagnostic build does (issue #33).
+        com.alananasss.kittytune.utils.MemoryDiagnostics.start()
+
         // 1. Core config + persistence.
         Config.init()
         AppDatabase.init()

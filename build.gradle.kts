@@ -159,6 +159,23 @@ compose.desktop {
         // those strings costs a background pass and gives back real memory here.
         jvmArgs += "-XX:+UseStringDeduplication"
 
+        /**
+         * Where the memory actually goes, on demand: `./gradlew packageReleaseMsi -PmemDiag`.
+         *
+         * The heap is capped at 2 GB above, so the 4 GB that was reported has at least half of itself
+         * somewhere the heap cannot account for, and no figure a task manager shows can say where.
+         * Native memory tracking can, but the JVM only collects it when asked at startup, so it takes
+         * a build of its own. `MemoryDiagnostics` reads the result from inside the process and writes
+         * it to a file, so nobody has to install a JDK or open a terminal to send it back.
+         *
+         * Deliberately not on by default: tracking costs a few percent and a little memory of its
+         * own, which is a poor trade for everyone who is not currently being asked about it.
+         */
+        if (project.hasProperty("memDiag")) {
+            jvmArgs += "-XX:NativeMemoryTracking=summary"
+            jvmArgs += "-Dkittytune.memlog=true"
+        }
+
 
         buildTypes.release.proguard {
             isEnabled.set(false)
@@ -187,6 +204,10 @@ compose.desktop {
                 "java.scripting",
                 "java.prefs",
                 "jdk.dynalink",
+                // The diagnostic command MBean and the OS memory bean live here. Included in every
+                // build so the diagnostic one differs from a release by launcher flags alone, which
+                // is what makes what it measures worth anything (issue #33).
+                "jdk.management",
                 "jdk.httpserver",
                 "jdk.jfr",
                 "jdk.unsupported",
