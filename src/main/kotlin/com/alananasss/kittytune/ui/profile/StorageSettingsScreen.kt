@@ -28,25 +28,6 @@ fun StorageSettingsScreen() {
     var cacheSizeMB by remember { mutableStateOf(0L) }
     var downloadLocation by remember { mutableStateOf(prefs.getDownloadLocation() ?: AppDirs.defaultDownloadDir.absolutePath) }
 
-    // Heap, not resident size. Resident size is what a task manager shows and most of the gap between
-    // the two is exactly what the note below explains, so showing the honest pair is the point
-    // (issue #33).
-    var usedMB by remember { mutableStateOf(0L) }
-    var heldMB by remember { mutableStateOf(0L) }
-
-    fun readMemory() {
-        val rt = Runtime.getRuntime()
-        heldMB = rt.totalMemory() / (1024 * 1024)
-        usedMB = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024)
-    }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            readMemory()
-            kotlinx.coroutines.delay(2_000)
-        }
-    }
-
     fun refreshSizes() {
         scope.launch {
             val dSize = withContext(Dispatchers.IO) { AppDirs.sizeOf(File(downloadLocation)) / (1024 * 1024) }
@@ -178,37 +159,5 @@ fun StorageSettingsScreen() {
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${str("pref_memory")} : $usedMB / $heldMB MB",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = str("pref_memory_desc"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            OutlinedButton(
-                onClick = {
-                    // A hint, not a command, but with the heap-free ratios this build sets G1 does
-                    // uncommit on it. The point is to let someone watch the second number fall
-                    // instead of being told it will.
-                    System.gc()
-                    readMemory()
-                },
-                shapes = ButtonDefaults.shapes()
-            ) {
-                Text(str("pref_memory_release"))
-            }
-        }
     }
 }

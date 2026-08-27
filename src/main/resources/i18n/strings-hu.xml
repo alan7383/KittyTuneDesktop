@@ -1165,9 +1165,6 @@
     <string name="pref_info_half">Az Infó fül ezzel nyílik</string>
     <string name="pref_info_half_remember">Utolsó választás</string>
     <string name="pref_stop_on_task_clear">Zene leállítása bezáráskor</string>
-    <string name="pref_memory">Memória</string>
-    <string name="pref_memory_desc">Az első szám az, amit a KittyTune valóban használ. A második az, amit a Java lefoglal és csak később ad vissza, ezért látszik rosszabbnak a feladatkezelőben. A gombbal most adja vissza. Ha a zene valóban ugrik, indítsd újra, és írd meg GitHubon, mennyi ideje volt nyitva az app.</string>
-    <string name="pref_memory_release">Visszaadás most</string>
     <string name="pref_storage_cache">Gyorsítótár</string>
     <string name="pref_storage_cache_clear">Gyorsítótár törlése</string>
     <string name="pref_storage_cache_desc">Az alkalmazás által tárolt ideiglenes fájlok a gyorsabb élmény érdekében</string>
