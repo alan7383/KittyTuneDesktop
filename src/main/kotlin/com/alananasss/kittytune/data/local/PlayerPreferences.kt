@@ -16,6 +16,16 @@ import java.io.FileReader
 
 enum class AppThemeMode { SYSTEM, LIGHT, DARK }
 enum class StartDestination { HOME, LIBRARY }
+
+/**
+ * Which half the info panel opens on: the comments, the lyrics, or whichever was last chosen
+ * (issue #33).
+ *
+ * Asked for by analogy with the start-screen setting, and it also settles a bug: the choice used to
+ * live in a `rememberSaveable`, whose registry goes away with the panel, so picking the lyrics and
+ * closing the panel got you the comments back on the next open.
+ */
+enum class InfoPanelHalf { COMMENTS, LYRICS, REMEMBER }
 enum class LyricsAlignment { LEFT, CENTER, RIGHT }
 
 /**
@@ -91,6 +101,9 @@ class PlayerPreferences {
 
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(PLAYER_BAR_BUTTON_LIKE, PLAYER_BAR_BUTTON_PANEL, PLAYER_BAR_BUTTON_QUEUE)
+
+        private const val KEY_INFO_PANEL_HALF = "info_panel_half"
+        private const val KEY_INFO_PANEL_LAST_LYRICS = "info_panel_last_lyrics"
 
         private const val KEY_PANEL_TABS_HIDDEN = "now_playing_tabs_hidden"
 
@@ -312,6 +325,30 @@ class PlayerPreferences {
     fun removeLocalMediaUri(uri: String) { val c = getLocalMediaUris().toMutableSet(); c.remove(uri); Prefs.putStringSet(KEY_LOCAL_MEDIA_URIS_SET, c) }
     fun getStartDestination(): StartDestination { val n = Prefs.getString(KEY_START_DESTINATION, StartDestination.HOME.name); return try { StartDestination.valueOf(n!!) } catch (_: Exception) { StartDestination.HOME } }
     fun setStartDestination(dest: StartDestination) = Prefs.putString(KEY_START_DESTINATION, dest.name)
+
+    fun getInfoPanelHalf(): InfoPanelHalf {
+        val name = Prefs.getString(KEY_INFO_PANEL_HALF, InfoPanelHalf.REMEMBER.name)
+        return try { InfoPanelHalf.valueOf(name!!) } catch (_: Exception) { InfoPanelHalf.REMEMBER }
+    }
+
+    fun setInfoPanelHalf(half: InfoPanelHalf) = Prefs.putString(KEY_INFO_PANEL_HALF, half.name)
+
+    /**
+     * The last half picked by hand, for [InfoPanelHalf.REMEMBER].
+     *
+     * Deliberately not keyed on the track: someone who opened the panel for the lyrics wants the
+     * lyrics on the next track too.
+     */
+    fun getInfoPanelLastLyrics(): Boolean = Prefs.getBoolean(KEY_INFO_PANEL_LAST_LYRICS, false)
+
+    fun setInfoPanelLastLyrics(lyrics: Boolean) = Prefs.putBoolean(KEY_INFO_PANEL_LAST_LYRICS, lyrics)
+
+    /** Resolves the setting and the remembered choice into the half to open on. */
+    fun infoPanelOpensOnLyrics(): Boolean = when (getInfoPanelHalf()) {
+        InfoPanelHalf.COMMENTS -> false
+        InfoPanelHalf.LYRICS -> true
+        InfoPanelHalf.REMEMBER -> getInfoPanelLastLyrics()
+    }
     fun getDynamicTheme(): Boolean = Prefs.getBoolean(KEY_DYNAMIC_THEME, true)
     fun setDynamicTheme(enabled: Boolean) = Prefs.putBoolean(KEY_DYNAMIC_THEME, enabled)
 
