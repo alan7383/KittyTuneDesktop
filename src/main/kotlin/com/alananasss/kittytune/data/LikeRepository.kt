@@ -11,6 +11,8 @@ import com.alananasss.kittytune.domain.Track
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -119,6 +121,18 @@ object LikeRepository {
     fun init() {
         pruneBlacklist()
         loadFromPrefs()
+
+        // Closes the coalescing window. Prefs has a hook of its own, but the order between shutdown
+        // hooks is undefined, so this forces the flush rather than hoping ours ran first.
+        Runtime.getRuntime().addShutdownHook(
+            Thread {
+                if (pendingSave?.isActive == true) {
+                    pendingSave?.cancel()
+                    saveToPrefs()
+                    com.alananasss.kittytune.core.Prefs.flush(force = true)
+                }
+            }
+        )
     }
 
     private suspend fun getUserId(): Long? {
@@ -149,9 +163,9 @@ object LikeRepository {
             }
         }
 
-        scope.launch {
-            saveToPrefs()
+        scheduleSave()
 
+        scope.launch {
             if (track.source == "spotify" || track.user?.urn?.startsWith("spotify") == true || (track.permalinkUrl != null && track.permalinkUrl!!.contains("spotify"))) return@launch
             if (!playerPrefs.getSyncLikesEnabled()) return@launch
             if (tokenManager.isGuestMode()) return@launch
@@ -181,7 +195,9 @@ object LikeRepository {
 
         _likedTracks.update { it.filterNot { t -> t.id == trackId } }
 
-        saveToPrefs()
+        // Was a synchronous whole-library serialisation on whichever thread unliked — the UI one,
+        // when it came from a row in a list.
+        scheduleSave()
 
         if (isSpotify) return
 
@@ -248,7 +264,7 @@ object LikeRepository {
         }
 
         _likedPlaylists.value = ids + preservedLocalIds
-        scope.launch { saveToPrefs() }
+        scheduleSave()
     }
 
     fun togglePlaylistLike(playlistId: Long, isLiked: Boolean, permalink: String? = null, urn: String? = null) {
@@ -262,9 +278,9 @@ object LikeRepository {
         }
         _likedPlaylists.value = current
         DownloadManager.notifyLibraryUpdated()
-        scope.launch {
-            saveToPrefs()
+        scheduleSave()
 
+        scope.launch {
             if (!isLiked && playlistId > 0) {
                 try {
                     val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
@@ -362,7 +378,7 @@ object LikeRepository {
             combined.sortedByDescending { it.likedAt ?: 0L }
         }
 
-        scope.launch { saveToPrefs() }
+        scheduleSave()
         _isSyncing.value = false
     }
 
@@ -381,11 +397,43 @@ object LikeRepository {
         _isSyncing.value = isSync
     }
 
+    /**
+     * Writes the liked list to disk, at most once per burst (issue #33).
+     *
+     * ## Why this is coalesced
+     *
+     * [saveToPrefs] serialises the entire list. For a library of several thousand tracks that is
+     * megabytes of JSON built from nothing, handed to [com.alananasss.kittytune.core.Prefs] as one
+     * string, which then re-encodes the whole preference object around it and writes the file. Every
+     * like paid for all of that, and [removeLike] paid for it on the caller's thread — so unliking
+     * from a list did a multi-megabyte serialisation on the UI thread.
+     *
+     * Liking half a dozen tracks in a row therefore allocated the same library over and over in a few
+     * seconds. That is the shape of churn that turns into a collection pause, and a pause in the wrong
+     * place is the audio drop-out that was reported alongside the memory figures. Coalescing collapses
+     * a burst into one write of the final state, which is the only state anyone wanted written.
+     *
+     * The window is short and the shutdown hook closes it, so nothing is lost by waiting; a like is
+     * also already on its way to the server, which is where the next launch reads it from anyway.
+     */
+    private var pendingSave: Job? = null
+
+    private fun scheduleSave() {
+        pendingSave?.cancel()
+        pendingSave = scope.launch {
+            delay(SAVE_COALESCE_MS)
+            saveToPrefs()
+        }
+    }
+
     private fun saveToPrefs() {
         val json = gson.toJson(_likedTracks.value)
         prefs.putString(KEY_LIKED_TRACKS, json)
         putStringSet(KEY_LIKED_PLAYLISTS, _likedPlaylists.value.map { it.toString() }.toSet())
     }
+
+    /** Long enough to swallow a run of likes, short enough that nobody could close the app inside it. */
+    private const val SAVE_COALESCE_MS = 1_000L
 
     private fun loadFromPrefs() {
         val json = prefs.getString(KEY_LIKED_TRACKS, null)
