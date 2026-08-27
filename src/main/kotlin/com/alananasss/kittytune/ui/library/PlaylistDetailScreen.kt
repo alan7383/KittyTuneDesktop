@@ -506,7 +506,7 @@ fun PlaylistDetailScreen(
             isLocalPlaylist = isDownloadedView || currentIdLong < 0
             isUserCreated = isLocalUser
             val dbTitle = playlistInDb!!.title
-            if (!dbTitle.isNullOrBlank() && dbTitle != str("untitled_track") && dbTitle != "Untitled Track") {
+            if (!dbTitle.isNullOrBlank() && dbTitle != str("untitled_track") && dbTitle != str("track_untitled")) {
                 playlistTitle = dbTitle
             }
             val dbCover = playlistInDb!!.localCoverPath ?: playlistInDb!!.artworkUrl

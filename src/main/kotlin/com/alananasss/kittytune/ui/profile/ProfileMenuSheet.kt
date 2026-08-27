@@ -178,7 +178,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
 
                     MenuRowItem(
                         icon = Icons.Rounded.Info,
-                        label = "À propos / Support",
+                        label = str("nav_about_support"),
                         onClick = { onDismiss(); onViewAbout?.invoke() }
                     )
 

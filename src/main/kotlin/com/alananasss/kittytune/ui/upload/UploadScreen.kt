@@ -521,7 +521,7 @@ private fun HeroFilePickerSection(
                 Spacer(Modifier.height(32.dp))
 
                 Text(
-                    text = if (isDraggingOver) "Déposez votre fichier ici" else str("upload_picker_hero_title"),
+                    text = if (isDraggingOver) str("upload_drop_file") else str("upload_picker_hero_title"),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -915,7 +915,7 @@ private fun BasicInfoTabContent(
             value = viewModel.title,
             onValueChange = { viewModel.onTitleChanged(it) },
             label = { Text(str("upload_field_title")) },
-            placeholder = { Text("Track title") },
+            placeholder = { Text(str("upload_field_track_title")) },
             singleLine = true,
             isError = !viewModel.isTitleValid && viewModel.title.isNotEmpty(),
             modifier = Modifier.fillMaxWidth(),
@@ -927,7 +927,7 @@ private fun BasicInfoTabContent(
             value = viewModel.artist,
             onValueChange = { viewModel.artist = it },
             label = { Text(str("upload_field_artist")) },
-            placeholder = { Text("Artist name") },
+            placeholder = { Text(str("upload_field_artist_name")) },
             supportingText = { Text(str("upload_field_hint_artist")) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
@@ -1024,7 +1024,7 @@ private fun BasicInfoTabContent(
                 value = viewModel.tagInput,
                 onValueChange = { viewModel.tagInput = it },
                 label = { Text(str("upload_field_tags")) },
-                placeholder = { Text("Add tag and press Enter") },
+                placeholder = { Text(str("upload_add_tag_hint")) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1356,7 +1356,7 @@ private fun ScheduleSection(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Heure de publication",
+                        text = str("upload_publish_time"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -3724,13 +3724,13 @@ private fun ScheduleReleaseDialog(
                                 onClick = { selectedEpochMs += 86400000L },
                                 shapes = ButtonDefaults.shapes()
                             ) {
-                                Text("+1 Day")
+                                Text(str("upload_schedule_plus_day"))
                             }
                             OutlinedButton(
                                 onClick = { selectedEpochMs += 86400000L * 7 },
                                 shapes = ButtonDefaults.shapes()
                             ) {
-                                Text("+1 Week")
+                                Text(str("upload_schedule_plus_week"))
                             }
                         }
                     }
@@ -3873,7 +3873,7 @@ private fun DiscardChangesDialog(
                         shapes = ButtonDefaults.shapes(),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                     ) {
-                        Text("Discard")
+                        Text(str("btn_discard"))
                     }
                 }
             }
@@ -4237,7 +4237,7 @@ private fun SwitchRow(
 // ---------------- FILE CHOOSER HELPERS ----------------
 private fun openNativeAudioFileChooser(onFileSelected: (File) -> Unit) {
     try {
-        val fileDialog = FileDialog(null as Frame?, "Choose Audio File", FileDialog.LOAD)
+        val fileDialog = FileDialog(null as Frame?, str("upload_choose_audio"), FileDialog.LOAD)
         fileDialog.setFilenameFilter { _, name ->
             val ext = name.substringAfterLast(".", "").lowercase()
             ext in listOf("mp3", "wav", "flac", "aac", "ogg", "m4a", "aiff")
@@ -4250,7 +4250,7 @@ private fun openNativeAudioFileChooser(onFileSelected: (File) -> Unit) {
         }
     } catch (e: Exception) {
         val chooser = JFileChooser()
-        chooser.dialogTitle = "Choose Audio File"
+        chooser.dialogTitle = str("upload_choose_audio")
         chooser.fileFilter = FileNameExtensionFilter("Audio Files (*.mp3, *.wav, *.flac, *.aac, *.ogg, *.m4a, *.aiff)", "mp3", "wav", "flac", "aac", "ogg", "m4a", "aiff")
         val result = chooser.showOpenDialog(null)
         if (result == JFileChooser.APPROVE_OPTION && chooser.selectedFile != null) {
@@ -4261,7 +4261,7 @@ private fun openNativeAudioFileChooser(onFileSelected: (File) -> Unit) {
 
 private fun openNativeImageFileChooser(onFileSelected: (File) -> Unit) {
     try {
-        val fileDialog = FileDialog(null as Frame?, "Choose Artwork Image", FileDialog.LOAD)
+        val fileDialog = FileDialog(null as Frame?, str("upload_choose_artwork"), FileDialog.LOAD)
         fileDialog.setFilenameFilter { _, name ->
             val ext = name.substringAfterLast(".", "").lowercase()
             ext in listOf("jpg", "jpeg", "png", "webp")
@@ -4274,7 +4274,7 @@ private fun openNativeImageFileChooser(onFileSelected: (File) -> Unit) {
         }
     } catch (e: Exception) {
         val chooser = JFileChooser()
-        chooser.dialogTitle = "Choose Artwork Image"
+        chooser.dialogTitle = str("upload_choose_artwork")
         chooser.fileFilter = FileNameExtensionFilter("Image Files (*.jpg, *.jpeg, *.png, *.webp)", "jpg", "jpeg", "png", "webp")
         val result = chooser.showOpenDialog(null)
         if (result == JFileChooser.APPROVE_OPTION && chooser.selectedFile != null) {

@@ -105,10 +105,10 @@ fun EditPlaylistScreen(
             Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("Edit Playlist") },
+                    title = { Text(str("edit_playlist_title")) },
                     navigationIcon = {
                         IconButton(onClick = onDismissRequest) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Close")
+                            Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
                         }
                     },
                     actions = {
@@ -145,7 +145,7 @@ fun EditPlaylistScreen(
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("Title *") },
+                        label = { Text(str("upload_field_title")) },
                         modifier = Modifier.fillMaxWidth().trackTextInput(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
@@ -157,7 +157,7 @@ fun EditPlaylistScreen(
                     OutlinedTextField(
                         value = permalink,
                         onValueChange = { permalink = it },
-                        label = { Text("Permalink *") },
+                        label = { Text(str("edit_playlist_permalink")) },
                         modifier = Modifier.fillMaxWidth().trackTextInput(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -165,7 +165,7 @@ fun EditPlaylistScreen(
                         prefix = { Text("soundcloud.com/${playlistUser?.permalink ?: "user"}/sets/") },
                         supportingText = {
                             if (!isValidPermalink) {
-                                Text("Use only numbers,lowercase letters,underscores,or hyphens.")
+                                Text(str("edit_playlist_permalink_hint"))
                             }
                         }
                     )
@@ -175,42 +175,42 @@ fun EditPlaylistScreen(
                     OutlinedTextField(
                         value = description,
                         onValueChange = { description = it },
-                        label = { Text("Description") },
+                        label = { Text(str("upload_field_description")) },
                         modifier = Modifier.fillMaxWidth().height(120.dp).trackTextInput(),
                         maxLines = 5
                     )
                 }
 
                 item {
-                    Text("Privacy",style = MaterialTheme.typography.titleMedium)
+                    Text(str("edit_playlist_privacy"),style = MaterialTheme.typography.titleMedium)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = sharing == "public",
                             onClick = { sharing = "public" }
                         )
-                        Text("Public",modifier = Modifier.clickable { sharing = "public" })
+                        Text(str("lib_playlist_public"),modifier = Modifier.clickable { sharing = "public" })
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = sharing == "private",
                             onClick = { sharing = "private" }
                         )
-                        Text("Private",modifier = Modifier.clickable { sharing = "private" })
+                        Text(str("edit_playlist_private"),modifier = Modifier.clickable { sharing = "private" })
                     }
                 }
 
                 item {
-                    Text("Playlist Type",style = MaterialTheme.typography.titleMedium)
+                    Text(str("edit_playlist_type"),style = MaterialTheme.typography.titleMedium)
                     ExposedDropdownMenuBox(
                         expanded = showSetTypeDropdown,
                         onExpandedChange = { showSetTypeDropdown = it }
                     ) {
                         OutlinedTextField(
                             value = when(setType) {
-                                "" -> "Playlist"
-                                "album" -> "Album"
+                                "" -> str("edit_playlist_type_playlist")
+                                "album" -> str("edit_playlist_type_album")
                                 "ep" -> "EP"
-                                "single" -> "Single"
-                                "compilation" -> "Compilation"
-                                else -> "Playlist"
+                                "single" -> str("edit_playlist_type_single")
+                                "compilation" -> str("edit_playlist_type_compilation")
+                                else -> str("edit_playlist_type_playlist")
                             },
                             onValueChange = {},
                             readOnly = true,
@@ -221,7 +221,14 @@ fun EditPlaylistScreen(
                             expanded = showSetTypeDropdown,
                             onDismissRequest = { showSetTypeDropdown = false }
                         ) {
-                            listOf("" to "Playlist","album" to "Album","ep" to "EP","single" to "Single","compilation" to "Compilation").forEach { (value,label) ->
+                            // The left side is what SoundCloud stores and must stay in English; only the label is shown.
+                            listOf(
+                                "" to str("edit_playlist_type_playlist"),
+                                "album" to str("edit_playlist_type_album"),
+                                "ep" to "EP",
+                                "single" to str("edit_playlist_type_single"),
+                                "compilation" to str("edit_playlist_type_compilation"),
+                            ).forEach { (value,label) ->
                                 DropdownMenuItem(
                                     text = { Text(label) },
                                     onClick = { 
@@ -239,13 +246,13 @@ fun EditPlaylistScreen(
                         OutlinedTextField(
                             value = releaseDate,
                             onValueChange = { releaseDate = it },
-                            label = { Text("Release Date (YYYY-MM-DD) *") },
+                            label = { Text(str("upload_field_release_date")) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             trailingIcon = {
                                 TextButton(onClick = { showDatePicker = true }) {
-                                    Text("Pick")
+                                    Text(str("btn_pick"))
                                 }
                             }
                         )
@@ -253,16 +260,27 @@ fun EditPlaylistScreen(
                 }
 
                 item {
-                    Text("Genre",style = MaterialTheme.typography.titleMedium)
+                    Text(str("detail_genre"),style = MaterialTheme.typography.titleMedium)
                     val predefinedGenres = listOf("None","Custom","Alternative Rock","Ambient","Classical","Country","Dance & EDM","Dancehall","Deep House","Disco","Drum & Bass","Dubstep","Electronic","Folk & Singer-Songwriter","Hip-hop & Rap","House","Indie","Jazz & Blues","Latin","Metal","Piano","Pop","R&B & Soul","Reggae","Reggaeton","Rock","Soundtrack","Techno","Trance","Trap","Triphop","World","Audiobooks","Business","Comedy","Entertainment","Learning","News & Politics","Religion & Spirituality","Science","Sports","Storytelling","Technology")
                     var selectedGenreCategory by remember { mutableStateOf(if (genre in predefinedGenres || genre == "") genre else "Custom") }
+
+                    // Genre names stay as SoundCloud spells them, because that is what gets sent and
+                    // what the rest of the app already shows. Only the two entries that are not genres
+                    // are translated.
+                    val genreLabel: (String) -> String = { value ->
+                        when (value) {
+                            "None", "" -> str("edit_playlist_genre_none")
+                            "Custom" -> str("edit_playlist_genre_custom")
+                            else -> value
+                        }
+                    }
                     
                     ExposedDropdownMenuBox(
                         expanded = showGenreDropdown,
                         onExpandedChange = { showGenreDropdown = it }
                     ) {
                         OutlinedTextField(
-                            value = if (selectedGenreCategory == "") "None" else selectedGenreCategory,
+                            value = genreLabel(selectedGenreCategory),
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showGenreDropdown) },
@@ -274,7 +292,7 @@ fun EditPlaylistScreen(
                         ) {
                             predefinedGenres.forEach { label ->
                                 DropdownMenuItem(
-                                    text = { Text(label) },
+                                    text = { Text(genreLabel(label)) },
                                     onClick = { 
                                         val value = if (label == "None") "" else label
                                         selectedGenreCategory = value
@@ -290,7 +308,7 @@ fun EditPlaylistScreen(
                         OutlinedTextField(
                             value = genre,
                             onValueChange = { genre = it },
-                            label = { Text("Custom Genre") },
+                            label = { Text(str("edit_playlist_custom_genre")) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -298,11 +316,11 @@ fun EditPlaylistScreen(
                 }
 
                 item {
-                    Text("Tags",style = MaterialTheme.typography.titleMedium)
+                    Text(str("detail_tags"),style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(
                         value = tagInput,
                         onValueChange = { tagInput = it },
-                        label = { Text("Add tags") },
+                        label = { Text(str("edit_playlist_add_tags")) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -314,7 +332,7 @@ fun EditPlaylistScreen(
                                     }
                                     tagInput = "" 
                                 }) {
-                                    Icon(Icons.Rounded.Close,contentDescription = "Add tag")
+                                    Icon(Icons.Rounded.Close,contentDescription = str("edit_playlist_add_tags"))
                                 }
                             }
                         }
@@ -366,7 +384,7 @@ fun EditPlaylistScreen(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Text(tag)
-                                        Icon(Icons.Rounded.Close, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+                                        Icon(Icons.Rounded.Close, contentDescription = str("menu_remove"), modifier = Modifier.size(18.dp))
                                     }
                                 }
                             }
@@ -398,7 +416,7 @@ fun EditPlaylistScreen(
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showDatePicker = false }) { Text(str("btn_cancel")) }
             }
         ) {
             DatePicker(state = datePickerState)

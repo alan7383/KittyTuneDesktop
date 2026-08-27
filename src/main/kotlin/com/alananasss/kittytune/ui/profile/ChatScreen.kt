@@ -327,7 +327,7 @@ import androidx.compose.material3.ButtonDefaults
                 data.avatarUrl?.replace("large", "t500x500"),
                 Icons.Rounded.Person
             )
-            else -> Quadruple("SoundCloud Link", "", null, Icons.Rounded.GraphicEq)
+            else -> Quadruple(str("chat_soundcloud_link"), "", null, Icons.Rounded.GraphicEq)
         }
     
         Card(

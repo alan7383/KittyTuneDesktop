@@ -281,7 +281,7 @@ fun MainTopBar(
                     }
                 )
                 androidx.compose.material3.DropdownMenuItem(
-                    text = { Text("À propos / Support") },
+                    text = { Text(str("nav_about_support")) },
                     onClick = {
                         showProfileMenu = false
                         showAboutDialog = true

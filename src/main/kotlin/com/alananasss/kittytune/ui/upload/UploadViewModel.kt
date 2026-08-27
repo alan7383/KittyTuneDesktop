@@ -657,14 +657,14 @@ class UploadViewModel {
                     val policy = repo.fetchUploadPolicy(newFile.name, newFile.length()).getOrElse { e ->
                         withContext(Dispatchers.Main) {
                             isSavingEdit = false
-                            Toaster.show(e.message ?: "Failed to fetch replacement upload policy")
+                            Toaster.show(e.message ?: str("error_generic"))
                         }
                         return@launch
                     }
                     repo.uploadFileToS3(newFile, policy) { }.getOrElse { e ->
                         withContext(Dispatchers.Main) {
                             isSavingEdit = false
-                            Toaster.show(e.message ?: "Failed to upload replacement audio")
+                            Toaster.show(e.message ?: str("error_generic"))
                         }
                         return@launch
                     }
@@ -689,7 +689,7 @@ class UploadViewModel {
                         ) {
                             str("upload_error_schedule_next_pro")
                         } else {
-                            errorMsg ?: "Failed to edit track"
+                            errorMsg ?: str("error_generic")
                         }
                         Toaster.show(localizedMsg)
                     }
@@ -736,7 +736,7 @@ class UploadViewModel {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     isSavingEdit = false
-                    Toaster.show(e.message ?: "Error saving edits")
+                    Toaster.show(e.message ?: str("error_generic"))
                 }
             }
         }
@@ -855,7 +855,7 @@ class UploadViewModel {
                     Toaster.show(str("edit_track_deleted_success"))
                     onSuccess()
                 } else {
-                    val err = result.exceptionOrNull()?.message ?: "Failed to delete track"
+                    val err = result.exceptionOrNull()?.message ?: str("error_generic")
                     Toaster.show(err)
                 }
             }

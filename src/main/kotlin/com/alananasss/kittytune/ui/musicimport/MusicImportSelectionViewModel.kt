@@ -1,4 +1,5 @@
 package com.alananasss.kittytune.ui.musicimport
+import com.alananasss.kittytune.core.str
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +73,7 @@ class MusicImportSelectionViewModel(application: Application) : AndroidViewModel
                         if (collected.size >= pageInfo?.totalItems ?: Int.MAX_VALUE) next = null
                     }
                     is MusicImportResult.Error -> {
-                        error = result.message ?: "Unknown error"
+                        error = result.message ?: str("error_generic")
                         retryAfter = result.retryAfterSeconds
                         fetchFailed = true
                     }
@@ -98,7 +99,7 @@ class MusicImportSelectionViewModel(application: Application) : AndroidViewModel
                         ?: result.data.tracks?.size ?: 0
                 }
                 is MusicImportResult.Error -> {
-                    error = result.message ?: "Unknown error"
+                    error = result.message ?: str("error_generic")
                     retryAfter = result.retryAfterSeconds
                     likedTracksCount = 0
                 }
