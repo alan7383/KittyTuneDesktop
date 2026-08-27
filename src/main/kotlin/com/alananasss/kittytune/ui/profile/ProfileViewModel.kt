@@ -464,23 +464,27 @@
                             try {
                                 var nextUrl: String? = null
                                 val firstPage = api.getUserTrackLikes(userId, limit = 50)
-                                allLikes.addAll(firstPage.collection.map { item ->
+                                // mapNotNull: an entry can arrive with no track when the like points
+                                // at something deleted, private or blocked.
+                                allLikes.addAll(firstPage.collection.mapNotNull { item ->
+                                    val track = item.track ?: return@mapNotNull null
                                     val millis = item.createdAt?.let { raw ->
                                         runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
                                             ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
                                     }
-                                    item.track.copy(likedAt = millis ?: item.track.likedAt, createdAt = item.createdAt ?: item.track.createdAt)
+                                    track.copy(likedAt = millis ?: track.likedAt, createdAt = item.createdAt ?: track.createdAt)
                                 })
                                 nextUrl = firstPage.next_href
                                 var safetyCount = 0
                                 while (nextUrl != null && safetyCount < 10) {
                                     val page = api.getTrackLikesNextPage(nextUrl!!)
-                                    allLikes.addAll(page.collection.map { item ->
+                                    allLikes.addAll(page.collection.mapNotNull { item ->
+                                        val track = item.track ?: return@mapNotNull null
                                         val millis = item.createdAt?.let { raw ->
                                             runCatching { java.time.Instant.parse(raw).toEpochMilli() }.getOrNull()
                                                 ?: runCatching { java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss Z", java.util.Locale.US).parse(raw)?.time }.getOrNull()
                                         }
-                                        item.track.copy(likedAt = millis ?: item.track.likedAt, createdAt = item.createdAt ?: item.track.createdAt)
+                                        track.copy(likedAt = millis ?: track.likedAt, createdAt = item.createdAt ?: track.createdAt)
                                     })
                                     nextUrl = page.next_href
                                     safetyCount++

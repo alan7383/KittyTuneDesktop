@@ -982,38 +982,73 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                                 val allCollectedLikes = mutableListOf<Track>()
                                 var nextUrl: String? = null
                                 var pages = 0
+                                var skippedEmpty = 0
+                                var failedAt: String? = null
 
+                                /**
+                                 * One page's tracks, minus the entries with nothing in them.
+                                 *
+                                 * A like whose track was deleted, made private or blocked arrives
+                                 * with no track at all. Mapping it used to dereference that null,
+                                 * and since the only `catch` sat outside the whole loop, one such
+                                 * entry ended the entire hydration: [LikeRepository.replaceAllLikes]
+                                 * was never reached and the liked list quietly stayed at whatever
+                                 * had been cached, missing everything liked since. Skipped and
+                                 * counted instead (issue #33).
+                                 */
+                                fun collect(items: List<com.alananasss.kittytune.domain.TrackLikeItem>) {
+                                    for (item in items) {
+                                        val track = item.track
+                                        if (track == null) {
+                                            skippedEmpty++
+                                            continue
+                                        }
+                                        val time = parseIsoDate(item.createdAt).takeIf { it > 0 }
+                                        allCollectedLikes.add(slimmer.slim(track.copy(likedAt = time)))
+                                    }
+                                }
+
+                                // The first page is the one failure that has to abort: with nothing
+                                // collected there is no list worth writing.
                                 val firstPage = api.getUserTrackLikes(user.id, limit = 200)
-
-                                allCollectedLikes.addAll(firstPage.collection.map { item ->
-                                    val time = parseIsoDate(item.createdAt).takeIf { it > 0 }
-                                    slimmer.slim(item.track.copy(likedAt = time))
-                                })
-
+                                collect(firstPage.collection)
                                 nextUrl = firstPage.next_href
                                 pages++
 
+                                // Every later page is isolated. A page that fails stops the walk
+                                // and keeps what came before it, rather than throwing away a
+                                // library's worth of likes because request 37 timed out.
                                 while (nextUrl != null && pages < MAX_LIKES_PAGES) {
-                                    val page = api.getTrackLikesNextPage(nextUrl!!)
-
-                                    allCollectedLikes.addAll(page.collection.map { item ->
-                                        val time = parseIsoDate(item.createdAt).takeIf { it > 0 }
-                                        slimmer.slim(item.track.copy(likedAt = time))
-                                    })
-
+                                    val page = try {
+                                        api.getTrackLikesNextPage(nextUrl!!)
+                                    } catch (e: Exception) {
+                                        failedAt = e.toString()
+                                        break
+                                    }
+                                    collect(page.collection)
                                     nextUrl = page.next_href
                                     pages++
                                 }
 
-                                if (nextUrl != null) {
-                                    com.alananasss.kittytune.utils.Logger.e(
-                                        "LibraryViewModel",
-                                        "Stopped hydrating likes at $MAX_LIKES_PAGES pages " +
-                                            "(${allCollectedLikes.size} tracks); more remain on the server."
-                                    )
-                                }
+                                val complete = nextUrl == null && failedAt == null
 
-                                LikeRepository.replaceAllLikes(allCollectedLikes, currentUserId = user.id)
+                                com.alananasss.kittytune.utils.Logger.e(
+                                    "LibraryViewModel",
+                                    "Hydrated ${allCollectedLikes.size} likes over $pages page(s), " +
+                                        "${slimmer.internedArtistCount} distinct artists, " +
+                                        "$skippedEmpty entry(ies) with no track" +
+                                        when {
+                                            failedAt != null -> "; stopped early on $failedAt"
+                                            nextUrl != null -> "; stopped at the $MAX_LIKES_PAGES-page ceiling, more remain"
+                                            else -> "; complete"
+                                        }
+                                )
+
+                                LikeRepository.replaceAllLikes(
+                                    allCollectedLikes,
+                                    currentUserId = user.id,
+                                    serverListComplete = complete,
+                                )
 
                             } catch (e: Exception) {
                                 e.printStackTrace()

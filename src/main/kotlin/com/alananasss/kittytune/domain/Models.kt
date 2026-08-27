@@ -411,7 +411,16 @@
     // misc responses
     data class TrackLikesResponse(val collection: List<TrackLikeItem>, val next_href: String?)
     data class TrackLikeItem(
-        val track: Track,
+        /**
+         * Nullable whatever the endpoint implies (issue #33).
+         *
+         * A like whose track has since been deleted, gone private or been blocked comes back as an
+         * entry with no track. Gson fills a non-null Kotlin field with null anyway, so declaring it
+         * non-null bought nothing and cost everything: the first such entry threw an NPE inside the
+         * page mapping, the whole hydration aborted, and the liked list silently stayed at whatever
+         * had been cached before. That is likes going missing with nothing on screen to say so.
+         */
+        val track: Track?,
         @SerializedName("created_at") val createdAt: String?
     )
     data class PlaylistLikesResponse(val collection: List<PlaylistLikeItem>, val next_href: String?)
