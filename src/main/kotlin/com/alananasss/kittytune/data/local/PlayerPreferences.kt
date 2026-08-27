@@ -92,6 +92,13 @@ class PlayerPreferences {
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(PLAYER_BAR_BUTTON_LIKE, PLAYER_BAR_BUTTON_PANEL, PLAYER_BAR_BUTTON_QUEUE)
 
+        private const val KEY_PANEL_TABS_HIDDEN = "now_playing_tabs_hidden"
+
+        const val PANEL_TAB_TRACK = "track"
+        const val PANEL_TAB_QUEUE = "queue"
+        const val PANEL_TAB_LYRICS = "lyrics"
+        const val PANEL_TAB_EFFECTS = "effects"
+
         private const val KEY_LIBRARY_TILES_HIDDEN = "library_tiles_hidden"
 
         const val LIBRARY_TILE_LIKES = "likes"
@@ -423,6 +430,32 @@ class PlayerPreferences {
 
     fun setPlayerBarButtons(buttons: Set<String>) =
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
+
+    /**
+     * Which tabs the Now Playing panel offers (issue #33).
+     *
+     * The panel had four and no way to drop one, so four labels fought over the width of a side
+     * panel and all four came out truncated — which is also why nobody could tell what they were.
+     * Someone who never touches the effects can take that tab out and give the room back to the
+     * three they use.
+     *
+     * Hidden ones are stored rather than visible ones, so a tab added later shows up by default
+     * instead of staying silently hidden for everyone who had already saved a selection. The Track
+     * tab can be hidden too — the panel simply falls back to the first one still standing, and it
+     * refuses to hide the last.
+     */
+    fun getHiddenPanelTabs(): Set<String> {
+        val raw = Prefs.getString(KEY_PANEL_TABS_HIDDEN, null) ?: return emptySet()
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setHiddenPanelTabs(tabs: Set<String>) =
+        Prefs.putString(KEY_PANEL_TABS_HIDDEN, tabs.joinToString(","))
+
+    fun hiddenPanelTabsFlow(): Flow<Set<String>> =
+        Prefs.stringFlow(KEY_PANEL_TABS_HIDDEN, null).map { raw ->
+            raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+        }
 
     /**
      * The three fixed tiles at the top of the library — Liked, Downloads, Local files.

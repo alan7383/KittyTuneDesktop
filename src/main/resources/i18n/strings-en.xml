@@ -1264,6 +1264,8 @@
     <string name="quality_high_sub">Best quality (128kbps+)</string>
     <string name="quality_low">Eco (Data Saver)</string>
     <string name="quality_low_sub">Saves data on mobile networks</string>
+    <string name="panel_tabs_title">Tabs shown</string>
+    <string name="panel_tabs_desc">Hide the ones you never open. At least one stays.</string>
     <string name="queue_up_next">Up next</string>
     <string name="queue_remove">Remove from queue</string>
     <string name="queue_played">Already played</string>

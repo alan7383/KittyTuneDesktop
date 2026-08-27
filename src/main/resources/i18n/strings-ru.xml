@@ -1266,6 +1266,8 @@
     <string name="quality_high_sub">Лучшее качество (128 kbps+)</string>
     <string name="quality_low">Эко (экономия данных)</string>
     <string name="quality_low_sub">Сохраняет данные в мобильной сети</string>
+    <string name="panel_tabs_title">Показываемые вкладки</string>
+    <string name="panel_tabs_desc">Скройте те, которые никогда не открываете. Хотя бы одна останется.</string>
     <string name="queue_up_next">Далее</string>
     <string name="queue_remove">Убрать из очереди</string>
     <string name="queue_played">Уже прослушано</string>

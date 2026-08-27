@@ -19,6 +19,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.material.icons.rounded.SdStorage
     import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
+import com.alananasss.kittytune.ui.common.Slider
     import androidx.compose.runtime.*
     import androidx.compose.ui.Alignment
     import androidx.compose.ui.Modifier

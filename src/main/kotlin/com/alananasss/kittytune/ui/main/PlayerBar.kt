@@ -38,7 +38,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,6 +69,7 @@ import java.awt.Cursor
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.ui.common.ArtistLinkText
+import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.alananasss.kittytune.utils.makeTimeString
@@ -103,8 +103,18 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.delay
 
-/** The speaker icon and the slider's own horizontal padding, which the track does not get. */
-private val VOLUME_ROW_OVERHEAD = 44.dp
+/**
+ * What the row spends before the track: the speaker icon and the gap after it.
+ *
+ * Counted once. It used to include the slider's own inner padding as well, which the slider then also
+ * applied inside its fixed width — so the track was short by that padding twice over (issue #33).
+ */
+private val VOLUME_ICON_SIZE = 20.dp
+
+/** Between the speaker and the track. Enough to separate them, not enough to eat the track. */
+private val VOLUME_ICON_GAP = 10.dp
+
+private val VOLUME_ROW_OVERHEAD = VOLUME_ICON_SIZE + VOLUME_ICON_GAP
 
 /**
  * Shortest track worth aiming at. With less room than this the bar switches to the vertical hover
@@ -470,10 +480,11 @@ fun PlayerBar(
                                 contentDescription = "Mute",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(VOLUME_ICON_SIZE)
                                     .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() }
                                     .clickable { vm.toggleMute() },
                             )
+                            Spacer(Modifier.width(VOLUME_ICON_GAP))
                             Slider(
                                 value = volume,
                                 onValueChange = { vm.updateVolume(it) },
@@ -482,8 +493,15 @@ fun PlayerBar(
                                     // Exactly the room there is, between what is worth showing and
                                     // what is worth using. Still grows on a wide window, which was
                                     // the "make it wider" ask in #27, but never past its box.
+                                    //
+                                    // No inner padding here. It used to carry `padding(horizontal = 12.dp)`
+                                    // *inside* a fixed width, so the track was the width minus 24 dp — while
+                                    // [VOLUME_ROW_OVERHEAD] had already subtracted that same 24 dp from the
+                                    // room available. The padding was charged twice and the track lost 24 dp
+                                    // it had been budgeted, which is the truncated slider in the report. The
+                                    // gap to the icon is a Spacer now, so it is paid for exactly once
+                                    // (issue #33).
                                     .width(roomForSlider.coerceAtMost(MAX_VOLUME_SLIDER_WIDTH))
-                                    .padding(horizontal = 12.dp)
                                     .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
                             )
                         }

@@ -87,6 +87,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.ui.library.*
@@ -1678,47 +1679,6 @@ private fun CollapsedLibraryRail(
 // ---------------------------------------------------------------------------
 // Shared bits
 // ---------------------------------------------------------------------------
-
-/** Plain M3 tooltip wrapper used across the library panel. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun Tip(text: String, content: @Composable () -> Unit) {
-    TooltipBox(
-        positionProvider = rememberEdgeSafeTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text(text) } },
-        state = rememberTooltipState(),
-        content = content,
-    )
-}
-
-/**
- * The plain tooltip position, kept inside the window.
- *
- * Material centres a tooltip on its anchor and does not clamp it. The library panel's icons sit
- * against the left edge, so a label wider than its icon — every label, once the panel is collapsed —
- * started at a negative x and was cut off by the window, which is the unreadable
- * "usic Recognition" in issue #33.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun rememberEdgeSafeTooltipPositionProvider(): androidx.compose.ui.window.PopupPositionProvider {
-    val delegate = TooltipDefaults.rememberPlainTooltipPositionProvider()
-    return remember(delegate) {
-        object : androidx.compose.ui.window.PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: androidx.compose.ui.unit.IntRect,
-                windowSize: androidx.compose.ui.unit.IntSize,
-                layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-                popupContentSize: androidx.compose.ui.unit.IntSize,
-            ): androidx.compose.ui.unit.IntOffset {
-                val wanted =
-                    delegate.calculatePosition(anchorBounds, windowSize, layoutDirection, popupContentSize)
-                val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-                return androidx.compose.ui.unit.IntOffset(wanted.x.coerceIn(0, maxX), wanted.y)
-            }
-        }
-    }
-}
 
 @Composable
 private fun SidebarNavItem(
