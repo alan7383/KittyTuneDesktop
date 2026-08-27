@@ -55,22 +55,69 @@ object LikeRepository {
     private fun putStringSet(key: String, value: Set<String>) =
         prefs.putString(key, value.joinToString(SET_SEP))
 
+    /**
+     * How long an id unliked here keeps overriding what the server says (issue #33).
+     *
+     * The blacklist covers one narrow window: between unliking on this machine and the server
+     * agreeing. It used to have no end, so an entry written once suppressed that track for good —
+     * and a track unliked here and then liked again from the phone was filtered out of every sync
+     * from then on. Dozens of likes can disappear that way over months with nothing looking broken,
+     * which is the report. Entries carry the time they were written now and stop counting after
+     * this; a confirmed unlike drops its entry immediately, since from then on the server does not
+     * report the track as liked at all and there is nothing left to suppress.
+     */
+    private const val UNLIKE_BLACKLIST_TTL_MS = 7L * 24 * 60 * 60 * 1000
+
+    private data class UnlikeMark(val trackId: Long, val atMs: Long)
+
+    private fun readUnlikeMarks(): List<UnlikeMark> =
+        getStringSet(KEY_LOCALLY_UNLIKED_IDS).mapNotNull { raw ->
+            val id = raw.substringBefore(':').toLongOrNull() ?: return@mapNotNull null
+            // Entries written before there was an expiry carry no timestamp. Dropping them is the
+            // repair rather than a side effect: they are exactly the ones that may be hiding a
+            // track the server still calls liked, and an unlike done while online is already
+            // reflected server-side, so nothing comes back that should not.
+            val at = raw.substringAfter(':', "").toLongOrNull() ?: return@mapNotNull null
+            UnlikeMark(id, at)
+        }
+
+    private fun writeUnlikeMarks(marks: Collection<UnlikeMark>) =
+        putStringSet(KEY_LOCALLY_UNLIKED_IDS, marks.map { "${it.trackId}:${it.atMs}" }.toSet())
+
     private fun addToBlacklist(trackId: Long) {
-        val current = getBlacklist().toMutableSet()
-        current.add(trackId)
-        putStringSet(KEY_LOCALLY_UNLIKED_IDS, current.map { it.toString() }.toSet())
+        val kept = readUnlikeMarks().filterNot { it.trackId == trackId }
+        writeUnlikeMarks(kept + UnlikeMark(trackId, System.currentTimeMillis()))
     }
 
     private fun removeFromBlacklist(trackId: Long) {
-        val current = getBlacklist().toMutableSet()
-        current.remove(trackId)
-        putStringSet(KEY_LOCALLY_UNLIKED_IDS, current.map { it.toString() }.toSet())
+        writeUnlikeMarks(readUnlikeMarks().filterNot { it.trackId == trackId })
     }
 
-    private fun getBlacklist(): Set<Long> =
-        getStringSet(KEY_LOCALLY_UNLIKED_IDS).mapNotNull { it.toLongOrNull() }.toSet()
+    private fun getBlacklist(): Set<Long> {
+        val cutoff = System.currentTimeMillis() - UNLIKE_BLACKLIST_TTL_MS
+        return readUnlikeMarks().filter { it.atMs >= cutoff }.map { it.trackId }.toSet()
+    }
+
+    /**
+     * Drops the entries that no longer suppress anything — expired ones and the untimestamped
+     * legacy ones — so the stored set cannot grow without bound and cannot keep hiding a like.
+     */
+    private fun pruneBlacklist() {
+        val stored = getStringSet(KEY_LOCALLY_UNLIKED_IDS)
+        if (stored.isEmpty()) return
+        val cutoff = System.currentTimeMillis() - UNLIKE_BLACKLIST_TTL_MS
+        val kept = readUnlikeMarks().filter { it.atMs >= cutoff }
+        if (kept.size != stored.size) {
+            com.alananasss.kittytune.utils.Logger.e(
+                "LikeRepository",
+                "Pruned ${stored.size - kept.size} stale locally-unliked ids (${kept.size} left)."
+            )
+            writeUnlikeMarks(kept)
+        }
+    }
 
     fun init() {
+        pruneBlacklist()
         loadFromPrefs()
     }
 
@@ -151,6 +198,10 @@ object LikeRepository {
                     if (response.code() == 401) {
                         SessionManager.requestSessionRefresh(force = true)
                     }
+                    // Once the server has taken the unlike, it stops reporting the track as liked
+                    // and the local override has nothing left to do. Kept on failure so an unlike
+                    // made offline still holds until the next attempt gets through.
+                    if (response.isSuccessful) removeFromBlacklist(trackId)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
@@ -260,7 +311,17 @@ object LikeRepository {
         }
     }
 
-    fun replaceAllLikes(serverTracks: List<Track>, currentUserId: Long? = null) {
+    /**
+     * @param serverListComplete whether [serverTracks] is the whole of what the server holds.
+     *   A complete list is authoritative and anything absent from it is genuinely no longer liked.
+     *   A truncated one is not: a page that failed to load must not be read as "those likes are
+     *   gone", which would drop them here and, on the next save, from disk too (issue #33).
+     */
+    fun replaceAllLikes(
+        serverTracks: List<Track>,
+        currentUserId: Long? = null,
+        serverListComplete: Boolean = true,
+    ) {
         if (currentUserId != null) {
             val lastUserId = prefs.getLong("last_synced_user_id", -1L)
             if (lastUserId != -1L && lastUserId != currentUserId) {
@@ -283,14 +344,20 @@ object LikeRepository {
 
             val serverIds = serverList.map { it.id }.toSet()
 
-            val localNonSoundcloud = currentLocalList.filter {
-                (it.source != "soundcloud" || it.id <= 0L) && !blacklist.contains(it.id) && !serverIds.contains(it.id)
+            val keptLocal = currentLocalList.filter {
+                // What SoundCloud never knew about in the first place — local files, Spotify —
+                // always survives a replace. Its own tracks only survive one the server could not
+                // finish, where their absence means "not seen yet" rather than "not liked".
+                val foreignToServer = it.source != "soundcloud" || it.id <= 0L
+                (foreignToServer || !serverListComplete) &&
+                    !blacklist.contains(it.id) &&
+                    !serverIds.contains(it.id)
             }.map { t ->
                 val validLikedAt = t.likedAt?.takeIf { it in 1..maxAllowedTime }
                 t.copy(likedAt = validLikedAt)
             }
 
-            val combined = localNonSoundcloud + serverList
+            val combined = keptLocal + serverList
 
             combined.sortedByDescending { it.likedAt ?: 0L }
         }

@@ -1051,7 +1051,7 @@ import com.alananasss.kittytune.utils.Logger
     
                     val localLikes = LikeRepository.likedTracks.value
                     val sourceLikes = if (localLikes.size > 20) localLikes else {
-                        try { api.getUserTrackLikes(me.id, limit = 50).collection.map { it.track } } catch(e:Exception) { emptyList() }
+                        try { api.getUserTrackLikes(me.id, limit = 50).collection.mapNotNull { it.track } } catch(e:Exception) { emptyList() }
                     }
     
                     generatePersonalizedCategories()
