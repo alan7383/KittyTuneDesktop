@@ -84,7 +84,7 @@ fun MusicImportSelectionScreen(
                                 onClick = { viewModel.loadExternalContent() },
                                 shapes = ButtonDefaults.shapes()
                             ) {
-                                Text("Retry")
+                                Text(stringResource(R.string.btn_retry))
                             }
                         }
                     }

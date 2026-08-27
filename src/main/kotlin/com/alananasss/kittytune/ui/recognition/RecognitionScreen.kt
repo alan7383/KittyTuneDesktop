@@ -223,7 +223,7 @@ private fun AudioDeviceSelector(
                 onClick = { expanded = true },
                 label = {
                     Text(
-                        text = cleanName(selectedDevice?.name ?: "Source audio"),
+                        text = cleanName(selectedDevice?.name ?: str("recognition_default_source")),
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
