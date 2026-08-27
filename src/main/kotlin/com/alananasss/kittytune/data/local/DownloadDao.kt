@@ -107,6 +107,12 @@ class DownloadDao(private val db: AppDatabase) {
         updatedAt = rs.getLong("updatedAt"),
     )
 
+    private fun lyricsScrollSpeed(rs: ResultSet) = LyricsScrollSpeedRow(
+        trackId = rs.getLong("trackId"),
+        speed = rs.getFloat("speed"),
+        updatedAt = rs.getLong("updatedAt"),
+    )
+
     private fun statsSnapshot(rs: ResultSet) = StatsSnapshot(
         totalListenMs = rs.getLong("totalListenMs"),
         rows = rs.getInt("rowCount"),
@@ -504,6 +510,18 @@ class DownloadDao(private val db: AppDatabase) {
 
     suspend fun deleteTrackTrim(trackId: Long) =
         db.exec("DELETE FROM track_trim WHERE trackId = ?", trackId)
+
+    suspend fun getLyricsScrollSpeed(trackId: Long): LyricsScrollSpeedRow? = db.queryOne(
+        "SELECT * FROM lyrics_scroll_speed WHERE trackId = ?", trackId, mapper = ::lyricsScrollSpeed,
+    )
+
+    suspend fun putLyricsScrollSpeed(row: LyricsScrollSpeedRow) = db.exec(
+        "INSERT OR REPLACE INTO lyrics_scroll_speed(trackId,speed,updatedAt) VALUES(?,?,?)",
+        row.trackId, row.speed, row.updatedAt,
+    )
+
+    suspend fun deleteLyricsScrollSpeed(trackId: Long) =
+        db.exec("DELETE FROM lyrics_scroll_speed WHERE trackId = ?", trackId)
 
     private companion object {
         const val INSERT_STATS_EVENT =

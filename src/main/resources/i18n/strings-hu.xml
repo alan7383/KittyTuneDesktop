@@ -1903,6 +1903,11 @@
     <string name="pref_lyrics_autoscroll_sub">Az időzítés nélküli dalszöveg magától görög; az egérgörgő mindig felülírja</string>
     <string name="pref_lyrics_autoscroll_speed">Görgetési sebesség</string>
     <string name="pref_lyrics_autoscroll_speed_sub">Milyen gyorsan görögjön magától az időzítés nélküli dalszöveg.</string>
+    <string name="pref_lyrics_speed_this_track">Csak ehhez a számhoz</string>
+    <string name="pref_lyrics_speed_this_track_sub">Külön sebesség ehhez a számhoz, az általánostól függetlenül.</string>
+    <string name="pref_lyrics_wheel_step">Görgő léptetése</string>
+    <string name="pref_lyrics_wheel_step_sub">Egy görgőkattanás mennyit léptet a szövegen.</string>
+    <string name="pref_lyrics_wheel_step_value">%1$s sor</string>
     <string name="pref_themed_title_bar">Témázott címsor</string>
     <string name="pref_themed_title_bar_sub">A címsor az alkalmazás színeit kapja a rendszer színei helyett</string>
     <string name="pref_player_bar_buttons">Lejátszósáv gombjai</string>

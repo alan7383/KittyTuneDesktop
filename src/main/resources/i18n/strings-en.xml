@@ -1897,6 +1897,11 @@
     <string name="pref_lyrics_autoscroll_sub">Lyrics with no timings scroll on their own; your scroll wheel always takes over</string>
     <string name="pref_lyrics_autoscroll_speed">Scrolling speed</string>
     <string name="pref_lyrics_autoscroll_speed_sub">How fast unsynced lyrics scroll on their own.</string>
+    <string name="pref_lyrics_speed_this_track">This track only</string>
+    <string name="pref_lyrics_speed_this_track_sub">Keep a speed for this song, whatever the general one is.</string>
+    <string name="pref_lyrics_wheel_step">Mouse wheel step</string>
+    <string name="pref_lyrics_wheel_step_sub">How far one notch of the wheel moves the lyrics.</string>
+    <string name="pref_lyrics_wheel_step_value">%1$s lines</string>
     <string name="pref_themed_title_bar">Themed title bar</string>
     <string name="pref_themed_title_bar_sub">Paint the window title bar in the app's colours instead of the system's</string>
     <string name="pref_player_bar_buttons">Player bar buttons</string>

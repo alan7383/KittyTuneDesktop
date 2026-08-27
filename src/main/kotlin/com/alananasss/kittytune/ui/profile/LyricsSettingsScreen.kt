@@ -57,6 +57,7 @@ import com.alananasss.kittytune.ui.common.Slider
         var showDisplayStyleDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
         var showAutoScrollSpeedDialog by remember { mutableStateOf(false) }
+        var showWheelStepDialog by remember { mutableStateOf(false) }
         var provider by remember { mutableStateOf(playerViewModel.lyricsProvider) }
         var showProviderDialog by remember { mutableStateOf(false) }
 
@@ -233,6 +234,60 @@ import com.alananasss.kittytune.ui.common.Slider
             }
         }
 
+        if (showWheelStepDialog) {
+            BackHandler(onBack = { showWheelStepDialog = false })
+            Dialog(onDismissRequest = { showWheelStepDialog = false }) {
+                Card(
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text(str("pref_lyrics_wheel_step"), style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            str("pref_lyrics_wheel_step_sub"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                str("pref_lyrics_wheel_step_value", wheelLinesLabel(playerViewModel.lyricsWheelLines)),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(70.dp)
+                            )
+                            IconButton(onClick = {
+                                playerViewModel.updateLyricsWheelLines(playerViewModel.lyricsWheelLines - 0.5f)
+                            }) { Icon(Icons.Rounded.Remove, null) }
+                            Slider(
+                                value = playerViewModel.lyricsWheelLines,
+                                onValueChange = { playerViewModel.updateLyricsWheelLines(it) },
+                                valueRange = PlayerPreferences.LYRICS_WHEEL_LINES_MIN..PlayerPreferences.LYRICS_WHEEL_LINES_MAX,
+                                steps = 21,
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                            )
+                            IconButton(onClick = {
+                                playerViewModel.updateLyricsWheelLines(playerViewModel.lyricsWheelLines + 0.5f)
+                            }) { Icon(Icons.Rounded.Add, null) }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            TextButton(onClick = { playerViewModel.updateLyricsWheelLines(3f) }) {
+                                Text(str("pref_lyrics_reset"))
+                            }
+                            TextButton(onClick = { showWheelStepDialog = false }) { Text(str("btn_close")) }
+                        }
+                    }
+                }
+            }
+        }
+
         if (showAlignmentDialog) {
             EscapableAlertDialog(
                 onDismissRequest = { showAlignmentDialog = false },
@@ -389,7 +444,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             // the shapes are derived from has to follow both.
                             val autoScrollOn = playerViewModel.isPlainAutoScrollEnabled
                             val totalVisibleItems =
-                                (if (showLyricsButton) 7 else 6) + (if (autoScrollOn) 1 else 0)
+                                (if (showLyricsButton) 8 else 7) + (if (autoScrollOn) 1 else 0)
     
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 0),
@@ -480,12 +535,28 @@ import com.alananasss.kittytune.ui.common.Slider
                                     onClick = { showAutoScrollSpeedDialog = true }
                                 )
                             }
+
+                            // Applies to every lyrics view, synced or not, which is why it sits
+                            // outside the auto-scroll block (issue #33).
+                            val wheelIndex = autoScrollIndex + (if (autoScrollOn) 2 else 1)
+                            SettingsItem(
+                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, wheelIndex),
+                                title = str("pref_lyrics_wheel_step"),
+                                subtitle = str("pref_lyrics_wheel_step_value", wheelLinesLabel(playerViewModel.lyricsWheelLines)),
+                                onClick = { showWheelStepDialog = true }
+                            )
                         }
                     }
                 }
             }
         }
     
+
+    /** "3" rather than "3.0", and "2.5" when it is not whole. */
+    private fun wheelLinesLabel(lines: Float): String {
+        val rounded = kotlin.math.round(lines * 2f) / 2f
+        return if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()
+    }
 
     @Composable
     fun AlignRadioButton(text: String, mode: LyricsAlignment, selected: LyricsAlignment, onSelect: (LyricsAlignment) -> Unit) {

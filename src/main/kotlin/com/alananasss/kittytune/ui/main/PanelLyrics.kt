@@ -22,6 +22,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -47,7 +48,8 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineStyling
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
 import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
-import com.alananasss.kittytune.ui.player.lyrics.LyricsScrolling
+import com.alananasss.kittytune.ui.player.lyrics.FollowPlainLyrics
+import com.alananasss.kittytune.ui.player.lyrics.lyricsWheel
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import kotlinx.coroutines.isActive
 
@@ -224,61 +226,43 @@ private fun PanelLyricLine(
 }
 
 /**
- * Text with no timings. There is nothing to follow, so it creeps forward at the reader's chosen
- * speed — the same setting the full screen uses — and stops the moment they take over.
+ * Text with no timings.
+ *
+ * There is nothing to follow, so where it sits is worked out from the playback position instead — see
+ * [FollowPlainLyrics], which is also what the full screen uses, so the two cannot disagree about what
+ * a given speed means.
  */
 @Composable
 private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier) {
     val text = vm.rawPlainLyrics.orEmpty()
     val lines = remember(text) { text.split("\n") }
     val listState = rememberLazyListState()
-    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
 
     // Wheel and drag always win: the reader is following the words, and having the view creep out
     // from under them would be worse than no auto-scroll at all.
     var lastUserScrollMs by remember { mutableStateOf(0L) }
 
-    // The panel draws plain text far smaller than the full screen does, so pacing in dp made the same
-    // speed setting mean something different here. Measured once and handed to the shared rate.
-    val bodyStyle = MaterialTheme.typography.bodyMedium
-    val lineHeightDp = with(density) {
-        val line = bodyStyle.lineHeight
-        if (line.isSpecified) line.toDp().value else (bodyStyle.fontSize.toDp().value * 1.4f)
-    }
-
-    LaunchedEffect(vm.isPlainAutoScrollEnabled, vm.plainAutoScrollSpeed, text, lineHeightDp) {
-        if (!vm.isPlainAutoScrollEnabled) return@LaunchedEffect
-        var lastFrameNs = withFrameNanos { it }
-        while (isActive) {
-            val nowNs = withFrameNanos { it }
-            val elapsedSec = (nowNs - lastFrameNs) / 1_000_000_000f
-            lastFrameNs = nowNs
-            if (System.currentTimeMillis() - lastUserScrollMs < LyricsScrolling.PLAIN_PAUSE_MS) continue
-            if (!listState.canScrollForward) continue
-            val step = LyricsScrolling.plainScrollStepDp(
-                lineHeightDp = lineHeightDp,
-                speed = vm.plainAutoScrollSpeed,
-                elapsedSec = elapsedSec,
-            )
-            if (step > 0f) listState.scrollBy(with(density) { step.dp.toPx() })
-        }
-    }
+    FollowPlainLyrics(
+        listState = listState,
+        enabled = vm.isPlainAutoScrollEnabled,
+        speed = vm.effectivePlainAutoScrollSpeed,
+        lineCount = lines.size,
+        positionMs = { vm.currentPosition },
+        isPlaying = { vm.isPlaying },
+        playbackSpeed = { vm.effectsState.speed },
+        lastManualScrollMs = { lastUserScrollMs },
+    )
 
     LazyColumn(
         modifier
             .fillMaxSize()
-            // Observed on the Initial pass and never consumed, so the list still scrolls exactly as
-            // it did before — this only notes that the reader took over.
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        if (event.type == PointerEventType.Scroll || event.type == PointerEventType.Press) {
-                            lastUserScrollMs = System.currentTimeMillis()
-                        }
-                    }
-                }
-            },
+            .lyricsWheel(
+                listState = listState,
+                scope = scope,
+                lines = { vm.lyricsWheelLines },
+                onManualScroll = { lastUserScrollMs = System.currentTimeMillis() },
+            ),
         state = listState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
     ) {
