@@ -110,43 +110,44 @@ class LyricLineStylingTest {
  * text at the size the reader chose while the side panel draws it small, so the same figure moved a third of a
  * line per second in one and nearly a whole line in the other. "1.5×" meant two different speeds depending on
  * where you were reading.
+ *
+ * It is now lines per second outright — the scroll target is a line index and a fraction of one, with no type
+ * size anywhere in it — so the two views cannot disagree at all rather than merely agreeing today. What is
+ * left to pin down is that the pace itself did not change while the unit did.
+ *
+ * @see PlainLyricsScrollTest for the target function's own behaviour.
  */
 class PlainScrollPaceTest {
 
-    private val oneSecond = 1f
-
-    @Test
-    fun `a line takes the same time to pass whatever the type size`() {
-        val fullScreenLine = 42f * 1.4f   // the reader's own lyrics size
-        val panelLine = 20f              // bodyMedium in the side panel
-
-        val fullScreenLinesPerSec =
-            LyricsScrolling.plainScrollStepDp(fullScreenLine, speed = 1f, elapsedSec = oneSecond) / fullScreenLine
-        val panelLinesPerSec =
-            LyricsScrolling.plainScrollStepDp(panelLine, speed = 1f, elapsedSec = oneSecond) / panelLine
-
-        assertEquals(fullScreenLinesPerSec, panelLinesPerSec, 0.0001f)
-    }
-
-    /** Smaller text means fewer dp per second, which is what stops the panel racing. */
-    @Test
-    fun `smaller text scrolls fewer dp per second`() {
-        val big = LyricsScrolling.plainScrollStepDp(59f, speed = 1f, elapsedSec = oneSecond)
-        val small = LyricsScrolling.plainScrollStepDp(20f, speed = 1f, elapsedSec = oneSecond)
-        assertTrue(small < big, "20 dp lines should move slower than 59 dp lines, got $small vs $big")
+    /** How far the text gets in one second at 1x, in lines. */
+    private fun linesPerSecond(speed: Float = 1f): Float {
+        val after = LyricsScrolling.plainScrollTarget(1_000f, speed, lineCount = 1_000)
+        return after.index + after.fraction
     }
 
     @Test
     fun `the speed setting scales the pace`() {
-        val single = LyricsScrolling.plainScrollStepDp(59f, speed = 1f, elapsedSec = oneSecond)
-        val onePointFive = LyricsScrolling.plainScrollStepDp(59f, speed = 1.5f, elapsedSec = oneSecond)
-        assertEquals(single * 1.5f, onePointFive, 0.0001f)
+        assertEquals(linesPerSecond() * 1.5f, linesPerSecond(1.5f), 0.0001f)
+        assertEquals(linesPerSecond() * 0.5f, linesPerSecond(0.5f), 0.0001f)
     }
 
-    /** The pace the full screen already had at a 42 sp setting, which is what is being compared against. */
+    /**
+     * The pace the full screen already had at a 42 sp setting, which is what the report was comparing
+     * against: about 18 dp per second, which at a 59 dp line is 0.3 lines per second.
+     */
     @Test
     fun `the reference pace is unchanged`() {
-        val step = LyricsScrolling.plainScrollStepDp(42f * 1.4f, speed = 1f, elapsedSec = oneSecond)
-        assertTrue(step in 17f..18.5f, "expected about 18 dp/s at a 42 sp setting, got $step")
+        val fullScreenLineDp = 42f * 1.4f
+        val dpPerSecond = linesPerSecond() * fullScreenLineDp
+        assertTrue(dpPerSecond in 17f..18.5f, "expected about 18 dp/s at a 42 sp setting, got $dpPerSecond")
+    }
+
+    /**
+     * No type size takes part, so a line takes the same time to pass in a side panel as on a full
+     * screen by construction rather than by arithmetic that happens to line up.
+     */
+    @Test
+    fun `the pace does not depend on the view`() {
+        assertEquals(LyricsScrolling.PLAIN_BASE_LINES_PER_SEC, linesPerSecond(), 0.0001f)
     }
 }

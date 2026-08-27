@@ -1899,6 +1899,11 @@
     <string name="pref_lyrics_autoscroll_sub">Текст без временных меток прокручивается сам; колесо мыши всегда важнее</string>
     <string name="pref_lyrics_autoscroll_speed">Скорость прокрутки</string>
     <string name="pref_lyrics_autoscroll_speed_sub">Насколько быстро несинхронизированный текст прокручивается сам.</string>
+    <string name="pref_lyrics_speed_this_track">Только для этого трека</string>
+    <string name="pref_lyrics_speed_this_track_sub">Своя скорость для этого трека, независимо от общей.</string>
+    <string name="pref_lyrics_wheel_step">Шаг колёсика мыши</string>
+    <string name="pref_lyrics_wheel_step_sub">На сколько один щелчок колёсика продвигает текст.</string>
+    <string name="pref_lyrics_wheel_step_value">%1$s строк</string>
     <string name="pref_themed_title_bar">Заголовок окна в цветах приложения</string>
     <string name="pref_themed_title_bar_sub">Окрашивать заголовок окна в цвета приложения вместо системных</string>
     <string name="pref_player_bar_buttons">Кнопки плеера</string>

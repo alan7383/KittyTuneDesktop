@@ -592,32 +592,25 @@ import kotlin.math.roundToInt
         }
 
         val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
         // Wheel and drag always win: the reader is following the words, and having the view creep
         // out from under them would be worse than no auto-scroll at all. Any manual scroll parks
-        // the automatic one for a moment and it then picks up from wherever they left off.
+        // the automatic one for five seconds, and the way back is animated rather than a snap.
         var lastUserScrollMs by remember { mutableStateOf(0L) }
 
-        LaunchedEffect(viewModel.isPlainAutoScrollEnabled, viewModel.plainAutoScrollSpeed, text) {
-            if (!viewModel.isPlainAutoScrollEnabled) return@LaunchedEffect
-            var lastFrameNs = withFrameNanos { it }
-            while (isActive) {
-                val nowNs = withFrameNanos { it }
-                val elapsedSec = (nowNs - lastFrameNs) / 1_000_000_000f
-                lastFrameNs = nowNs
-                if (System.currentTimeMillis() - lastUserScrollMs < LyricsScrolling.PLAIN_PAUSE_MS) continue
-                if (!listState.canScrollForward) continue
-                // Paced by this view's own line height, so the same speed setting reads the same here as
-                // it does in the side panel (issue #33).
-                val step = LyricsScrolling.plainScrollStepDp(
-                    lineHeightDp = fontSize * 1.4f,
-                    speed = viewModel.plainAutoScrollSpeed,
-                    elapsedSec = elapsedSec,
-                )
-                if (step > 0f) {
-                    listState.scrollBy(with(density) { step.dp.toPx() })
-                }
-            }
-        }
+        // Where the text sits is a function of the playback position, not a running total — so it
+        // resumes where it was after a restart, keeps its place while nobody is looking, and is
+        // already correct on the first frame after this screen opens (issue #33).
+        FollowPlainLyrics(
+            listState = listState,
+            enabled = viewModel.isPlainAutoScrollEnabled,
+            speed = viewModel.effectivePlainAutoScrollSpeed,
+            lineCount = lines.size,
+            positionMs = { viewModel.currentPosition },
+            isPlaying = { viewModel.isPlaying },
+            playbackSpeed = { viewModel.effectsState.speed },
+            lastManualScrollMs = { lastUserScrollMs },
+        )
 
         Box(modifier = Modifier.fillMaxSize()) {
             LazyColumn(
@@ -625,20 +618,12 @@ import kotlin.math.roundToInt
                 modifier = Modifier
                     .fillMaxSize()
                     .fadingEdge(fadeBrush)
-                    // Observed on the Initial pass and never consumed, so the list still scrolls
-                    // exactly as it did before — this only notes that the reader took over.
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                                if (event.type == androidx.compose.ui.input.pointer.PointerEventType.Scroll ||
-                                    event.type == androidx.compose.ui.input.pointer.PointerEventType.Press
-                                ) {
-                                    lastUserScrollMs = System.currentTimeMillis()
-                                }
-                            }
-                        }
-                    },
+                    .lyricsWheel(
+                        listState = listState,
+                        scope = scrollScope,
+                        lines = { viewModel.lyricsWheelLines },
+                        onManualScroll = { lastUserScrollMs = System.currentTimeMillis() },
+                    ),
                 contentPadding = PaddingValues(top = 70.dp, bottom = 180.dp, start = 24.dp, end = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
@@ -1329,31 +1314,122 @@ fun QuickLyricsSettingsDialog(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = autoScrollSpeedLabel(viewModel.plainAutoScrollSpeed),
+                                            text = autoScrollSpeedLabel(viewModel.effectivePlainAutoScrollSpeed),
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                     Spacer(Modifier.height(6.dp))
+
+                                    // One slider for both, because they are one question asked of
+                                    // different scopes: the switch below decides whether the number
+                                    // being dragged belongs to this song or to every song (issue #33).
+                                    val perTrack = viewModel.trackAutoScrollSpeed != null
+                                    val speed = viewModel.effectivePlainAutoScrollSpeed
+                                    val setSpeed: (Float) -> Unit = { value ->
+                                        if (perTrack) viewModel.setTrackAutoScrollSpeed(value)
+                                        else viewModel.updatePlainAutoScrollSpeed(value)
+                                    }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
-                                            viewModel.updatePlainAutoScrollSpeed(viewModel.plainAutoScrollSpeed - 0.25f)
+                                            setSpeed(speed - 0.25f)
                                         }) { Icon(Icons.Rounded.Remove, null) }
                                         Slider(
-                                            value = viewModel.plainAutoScrollSpeed,
-                                            onValueChange = { viewModel.updatePlainAutoScrollSpeed(it) },
+                                            value = speed,
+                                            onValueChange = setSpeed,
                                             valueRange = 0.25f..4f,
                                             steps = 14,
                                             modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                                         )
                                         IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
-                                            viewModel.updatePlainAutoScrollSpeed(viewModel.plainAutoScrollSpeed + 0.25f)
+                                            setSpeed(speed + 0.25f)
                                         }) { Icon(Icons.Rounded.Add, null) }
                                     }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                text = str("pref_lyrics_speed_this_track"),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                            Text(
+                                                text = str("pref_lyrics_speed_this_track_sub"),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                        Switch(
+                                            checked = perTrack,
+                                            onCheckedChange = { on ->
+                                                // Turning it on starts from whatever is on screen, so
+                                                // the number does not jump when the scope changes.
+                                                if (on) viewModel.setTrackAutoScrollSpeed(speed)
+                                                else viewModel.clearTrackAutoScrollSpeed()
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2c. PAS DE LA MOLETTE
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = str("pref_lyrics_wheel_step"),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = str(
+                                            "pref_lyrics_wheel_step_value",
+                                            wheelLinesLabel(viewModel.lyricsWheelLines),
+                                        ),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Text(
+                                    text = str("pref_lyrics_wheel_step_sub"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                                        viewModel.updateLyricsWheelLines(viewModel.lyricsWheelLines - 0.5f)
+                                    }) { Icon(Icons.Rounded.Remove, null) }
+                                    Slider(
+                                        value = viewModel.lyricsWheelLines,
+                                        onValueChange = { viewModel.updateLyricsWheelLines(it) },
+                                        valueRange = PlayerPreferences.LYRICS_WHEEL_LINES_MIN..PlayerPreferences.LYRICS_WHEEL_LINES_MAX,
+                                        steps = 21,
+                                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                    )
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                                        viewModel.updateLyricsWheelLines(viewModel.lyricsWheelLines + 0.5f)
+                                    }) { Icon(Icons.Rounded.Add, null) }
                                 }
                             }
                         }
@@ -1738,6 +1814,12 @@ private fun Modifier.lyricUnderline(
 
 
 /** "1.5×" — one decimal only when there is one, matching the label in the full settings. */
+/** "3" rather than "3.0", and "2.5" when it is not whole. */
+private fun wheelLinesLabel(lines: Float): String {
+    val rounded = kotlin.math.round(lines * 2f) / 2f
+    return if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()
+}
+
 private fun autoScrollSpeedLabel(speed: Float): String {
     val rounded = kotlin.math.round(speed * 100f) / 100f
     val text = if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()

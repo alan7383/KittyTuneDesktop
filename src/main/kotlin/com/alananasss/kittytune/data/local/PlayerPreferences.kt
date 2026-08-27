@@ -102,6 +102,9 @@ class PlayerPreferences {
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(PLAYER_BAR_BUTTON_LIKE, PLAYER_BAR_BUTTON_PANEL, PLAYER_BAR_BUTTON_QUEUE)
 
+        const val LYRICS_WHEEL_LINES_MIN = 1f
+        const val LYRICS_WHEEL_LINES_MAX = 12f
+
         private const val KEY_INFO_PANEL_HALF = "info_panel_half"
         private const val KEY_INFO_PANEL_LAST_LYRICS = "info_panel_last_lyrics"
 
@@ -591,6 +594,24 @@ class PlayerPreferences {
 
     fun setLyricsPlainAutoScrollSpeed(speed: Float) =
         Prefs.putFloat("lyrics_plain_autoscroll_speed", speed.coerceIn(0.25f, 4f))
+
+    /**
+     * How far one notch of the mouse wheel moves the lyrics, in lines (issue #33).
+     *
+     * "I would also add an adjustment for how much the mouse wheel scrolling adds." Expressed in
+     * lines rather than pixels so it means the same thing at a 42 sp full screen and in a side panel
+     * drawing the same text a third of the size — the unit the auto-scroll rate already uses.
+     *
+     * Three is roughly what a desktop wheel notch does elsewhere in the app, so the default changes
+     * nothing for anyone who does not go looking for it.
+     */
+    fun getLyricsWheelLines(): Float =
+        Prefs.getFloat("lyrics_wheel_lines", 3f).coerceIn(LYRICS_WHEEL_LINES_MIN, LYRICS_WHEEL_LINES_MAX)
+
+    fun setLyricsWheelLines(lines: Float) = Prefs.putFloat(
+        "lyrics_wheel_lines",
+        lines.coerceIn(LYRICS_WHEEL_LINES_MIN, LYRICS_WHEEL_LINES_MAX),
+    )
 
     fun getLyricsRomanizationEnabled(): Boolean = Prefs.getBoolean("lyrics_romanization_enabled", false)
     fun setLyricsRomanizationEnabled(enabled: Boolean) = Prefs.putBoolean("lyrics_romanization_enabled", enabled)

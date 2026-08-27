@@ -1899,6 +1899,11 @@
     <string name="pref_lyrics_autoscroll_sub">Les paroles sans horodatage défilent seules ; la molette reprend toujours la main</string>
     <string name="pref_lyrics_autoscroll_speed">Vitesse de défilement</string>
     <string name="pref_lyrics_autoscroll_speed_sub">À quelle vitesse les paroles non synchronisées défilent seules.</string>
+    <string name="pref_lyrics_speed_this_track">Ce morceau uniquement</string>
+    <string name="pref_lyrics_speed_this_track_sub">Garder une vitesse pour ce morceau, quelle que soit la vitesse générale.</string>
+    <string name="pref_lyrics_wheel_step">Pas de la molette</string>
+    <string name="pref_lyrics_wheel_step_sub">De combien un cran de molette fait avancer les paroles.</string>
+    <string name="pref_lyrics_wheel_step_value">%1$s lignes</string>
     <string name="pref_themed_title_bar">Barre de titre thématisée</string>
     <string name="pref_themed_title_bar_sub">Colorer la barre de titre de la fenêtre aux couleurs de l'application au lieu de celles du système</string>
     <string name="pref_player_bar_buttons">Boutons du lecteur</string>

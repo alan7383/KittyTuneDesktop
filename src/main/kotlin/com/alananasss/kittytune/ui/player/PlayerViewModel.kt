@@ -301,6 +301,52 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setLyricsPlainAutoScrollSpeed(plainAutoScrollSpeed)
     }
 
+    /**
+     * This track's own auto-scroll speed, or null when it follows the global one (issue #33).
+     *
+     * Loaded on every track change from [com.alananasss.kittytune.data.LyricsScrollSpeedRepository],
+     * which caches misses as well as hits — almost no track has one.
+     */
+    var trackAutoScrollSpeed by mutableStateOf<Float?>(null)
+        private set
+
+    /** What the untimed views actually scroll at: the track's own speed if it has one. */
+    val effectivePlainAutoScrollSpeed: Float
+        get() = trackAutoScrollSpeed ?: plainAutoScrollSpeed
+
+    fun setTrackAutoScrollSpeed(speed: Float) {
+        val track = currentTrack ?: return
+        val clamped = speed.coerceIn(
+            com.alananasss.kittytune.data.LyricsScrollSpeedRepository.MIN_SPEED,
+            com.alananasss.kittytune.data.LyricsScrollSpeedRepository.MAX_SPEED,
+        )
+        trackAutoScrollSpeed = clamped
+        viewModelScope.launch(Dispatchers.IO) {
+            com.alananasss.kittytune.data.LyricsScrollSpeedRepository.put(track.id, clamped)
+        }
+    }
+
+    /** Hands this track back to the global speed. */
+    fun clearTrackAutoScrollSpeed() {
+        val track = currentTrack ?: return
+        trackAutoScrollSpeed = null
+        viewModelScope.launch(Dispatchers.IO) {
+            com.alananasss.kittytune.data.LyricsScrollSpeedRepository.remove(track.id)
+        }
+    }
+
+    /** How far one wheel notch moves the lyrics, in lines. */
+    var lyricsWheelLines by mutableFloatStateOf(playerPrefs.getLyricsWheelLines())
+        private set
+
+    fun updateLyricsWheelLines(lines: Float) {
+        lyricsWheelLines = lines.coerceIn(
+            PlayerPreferences.LYRICS_WHEEL_LINES_MIN,
+            PlayerPreferences.LYRICS_WHEEL_LINES_MAX,
+        )
+        playerPrefs.setLyricsWheelLines(lyricsWheelLines)
+    }
+
     fun toggleRomanization(enabled: Boolean) {
         isRomanizationEnabled = enabled
         playerPrefs.setLyricsRomanizationEnabled(enabled)
@@ -1497,6 +1543,16 @@ flushListenSession("TRACK_CHANGE")
         lyricsJob?.cancel()
         lyricsLines.clear()
         lyricsOffset = 0L
+        // Cleared before it is read, so a track with no speed of its own cannot inherit the last
+        // track's for the moment it takes to answer.
+        trackAutoScrollSpeed = null
+        viewModelScope.launch(Dispatchers.IO) {
+            val speed = com.alananasss.kittytune.data.LyricsScrollSpeedRepository.get(track.id)
+            withContext(Dispatchers.Main) {
+                // Only if we are still on the track that asked.
+                if (currentTrack?.id == track.id) trackAutoScrollSpeed = speed
+            }
+        }
         showLyricsOffsetControls = false
         isLyricsLoading = true
         isSearchingLyrics = false

@@ -184,6 +184,13 @@ data class TrackTrimRow(
     val updatedAt: Long,
 )
 
+// table: lyrics_scroll_speed
+data class LyricsScrollSpeedRow(
+    val trackId: Long,
+    val speed: Float,
+    val updatedAt: Long,
+)
+
 // table: library_folders
 data class LibraryFolder(
     val id: Long = 0,

@@ -84,6 +84,11 @@ object AppDatabase {
             """CREATE TABLE IF NOT EXISTS track_trim (
                 trackId INTEGER PRIMARY KEY NOT NULL, mode TEXT NOT NULL, segments TEXT NOT NULL,
                 updatedAt INTEGER NOT NULL)""",
+            // One row per track whose untimed-lyrics scroll speed was set by hand. Absent means
+            // "use the global speed", which is almost every track, so nothing is written by default
+            // (issue #33).
+            """CREATE TABLE IF NOT EXISTS lyrics_scroll_speed (
+                trackId INTEGER PRIMARY KEY NOT NULL, speed REAL NOT NULL, updatedAt INTEGER NOT NULL)""",
             """CREATE TABLE IF NOT EXISTS library_item_meta (
                 itemKey TEXT PRIMARY KEY NOT NULL, folderId INTEGER, isPinned INTEGER NOT NULL DEFAULT 0,
                 addedAt INTEGER NOT NULL)""",
