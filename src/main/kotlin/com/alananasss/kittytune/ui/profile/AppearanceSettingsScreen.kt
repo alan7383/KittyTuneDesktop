@@ -663,6 +663,8 @@ private fun CustomizeButtonsDialog(prefs: PlayerPreferences, onDismiss: () -> Un
     var hiddenLibraryButtons by remember { mutableStateOf(prefs.getHiddenLibraryButtons()) }
     var playerBarButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
     var hiddenPanelTabs by remember { mutableStateOf(prefs.getHiddenPanelTabs()) }
+    var hiddenTrackTiles by remember { mutableStateOf(prefs.getHiddenMenuTiles(PlayerPreferences.MENU_TRACK)) }
+    var hiddenPlaylistTiles by remember { mutableStateOf(prefs.getHiddenMenuTiles(PlayerPreferences.MENU_PLAYLIST)) }
     var hidden by remember { mutableStateOf(prefs.getHiddenLibraryTiles()) }
     // Not a setting of its own: the tiles follow the palette exactly while the dynamic theme is
     // on, which is how it was asked for. Read here only so the previews match the library.
@@ -779,6 +781,53 @@ private fun CustomizeButtonsDialog(prefs: PlayerPreferences, onDismiss: () -> Un
                         hiddenPanelTabs = if (shown) hiddenPanelTabs + key else hiddenPanelTabs - key
                         prefs.setHiddenPanelTabs(hiddenPanelTabs)
                     }
+                }
+
+                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
+
+                // Visibility only. The order is set by dragging the tiles themselves, which is what
+                // was asked for and also the only place it can be judged — a list of labels in a
+                // dialog says nothing about how a 3-across grid will read (issue #33).
+                CustomizeSectionTitle(str("menu_tiles_title"))
+                Text(
+                    str("menu_tiles_desc"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant
+                )
+                listOf(
+                    Triple(
+                        str("menu_tiles_track"),
+                        PlayerPreferences.MENU_TRACK,
+                        com.alananasss.kittytune.ui.main.MenuTiles.TRACK,
+                    ),
+                    Triple(
+                        str("menu_tiles_playlist"),
+                        PlayerPreferences.MENU_PLAYLIST,
+                        com.alananasss.kittytune.ui.main.MenuTiles.PLAYLIST,
+                    ),
+                ).forEach { (label, menu, catalogue) ->
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = scheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    val hiddenHere = if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles else hiddenPlaylistTiles
+                    catalogue.forEach { tile ->
+                        val shown = tile.id !in hiddenHere
+                        CustomizeCheckRow(label = str(tile.labelKey), checked = shown) {
+                            val next = if (shown) hiddenHere + tile.id else hiddenHere - tile.id
+                            prefs.setHiddenMenuTiles(menu, next)
+                            if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles = next
+                            else hiddenPlaylistTiles = next
+                        }
+                    }
+                    TextButton(onClick = {
+                        prefs.resetMenuTiles(menu)
+                        if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles = emptySet()
+                        else hiddenPlaylistTiles = emptySet()
+                    }) { Text(str("menu_tiles_reset")) }
                 }
 
                 HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))

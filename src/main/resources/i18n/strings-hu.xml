@@ -1272,6 +1272,13 @@
     <string name="quality_high_sub">Legjobb minőség (128kbps+)</string>
     <string name="quality_low">Eco (Mobilnet)</string>
     <string name="quality_low_sub">Adatspórolós mód</string>
+    <string name="menu_tile_hide">Gomb elrejtése</string>
+    <string name="menu_tiles_reorder_hint">Tartsd lenyomva a mozgatáshoz</string>
+    <string name="menu_tiles_title">Menügombok</string>
+    <string name="menu_tiles_desc">Tartsd lenyomva a szám vagy lejátszási lista menüjének egy gombját a mozgatáshoz, jobb klikk az elrejtéshez. Az elrejtetteket itt hozhatod vissza.</string>
+    <string name="menu_tiles_reset">Sorrend visszaállítása</string>
+    <string name="menu_tiles_track">Szám menüje</string>
+    <string name="menu_tiles_playlist">Lejátszási lista menüje</string>
     <string name="panel_tabs_title">Megjelenő fülek</string>
     <string name="panel_tabs_desc">Rejtsd el azokat, amiket sosem nyitsz meg. Legalább egy megmarad.</string>
     <string name="queue_up_next">Következik</string>

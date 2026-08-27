@@ -28,7 +28,14 @@ import com.alananasss.kittytune.ui.common.Slider
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.alananasss.kittytune.core.trackTextInput
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.foundation.PointerMatcher
+import androidx.compose.foundation.onClick
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -98,6 +105,7 @@ import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Send
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -107,11 +115,30 @@ import androidx.compose.runtime.LaunchedEffect
 import com.alananasss.kittytune.domain.Comment
 import com.alananasss.kittytune.ui.player.CommentSort
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.RepeatMode
+import sh.calvin.reorderable.ReorderableCollectionItemScope
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 
+/**
+ * One tile of an options menu.
+ *
+ * [id] is the tile's identity for the arrangement stored in the preferences, so it is never shown and
+ * never translated. It also replaced what the grid used to do, which was to recognise the tiles
+ * needing a highlight by comparing their *labels* — a test against translated text, in a menu whose
+ * labels change with state ("Repeat" becoming "Repeat one"). See [MenuTiles].
+ *
+ * @param tint overrides the default, for the tiles that are on rather than merely available.
+ * @param iconContent drawn instead of [icon] where a tile needs more than one, which is the download
+ *   tile and its progress ring.
+ */
 private data class MenuOptionItem(
+    val id: String,
     val icon: ImageVector,
     val text: String,
+    val tint: androidx.compose.ui.graphics.Color? = null,
+    val iconContent: (@Composable (androidx.compose.ui.graphics.Color) -> Unit)? = null,
     val onClick: () -> Unit,
 )
 
@@ -392,50 +419,77 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             }
         }
 
+        val activeColor = MaterialTheme.colorScheme.primary
+
         val gridItems = mutableListOf<MenuOptionItem>().apply {
             if (!isLocalFile && !viewModel.isMenuContextFromPlayer) {
                 add(
                     MenuOptionItem(
-                        if (isTrackLiked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
-                        if (isTrackLiked) str("action_unlike") else str("player_like_action")
+                        id = "like",
+                        icon = if (isTrackLiked) Icons.Rounded.Favorite else Icons.Outlined.FavoriteBorder,
+                        text = if (isTrackLiked) str("action_unlike") else str("player_like_action"),
+                        tint = activeColor.takeIf { isTrackLiked },
                     ) {
                         viewModel.toggleTrackLike(track)
                     }
                 )
             }
             if (viewModel.isMenuContextFromPlayer) {
-                add(MenuOptionItem(Icons.Rounded.Shuffle, str("menu_shuffle")) { viewModel.toggleShuffle() })
-                add(MenuOptionItem(Icons.Rounded.Repeat, str("menu_repeat")) { viewModel.toggleRepeatMode() })
+                add(
+                    MenuOptionItem(
+                        id = "shuffle",
+                        icon = Icons.Rounded.Shuffle,
+                        text = str("menu_shuffle"),
+                        tint = activeColor.takeIf { viewModel.shuffleEnabled },
+                    ) { viewModel.toggleShuffle() }
+                )
+                add(
+                    MenuOptionItem(
+                        id = "repeat",
+                        icon = if (viewModel.repeatMode == RepeatMode.ONE) Icons.Rounded.RepeatOne
+                        else Icons.Rounded.Repeat,
+                        text = when (viewModel.repeatMode) {
+                            RepeatMode.ALL -> str("menu_repeat_all")
+                            RepeatMode.ONE -> str("menu_repeat_one")
+                            else -> str("menu_repeat")
+                        },
+                        tint = activeColor.takeIf { viewModel.repeatMode != RepeatMode.NONE },
+                    ) { viewModel.toggleRepeatMode() }
+                )
             }
             if (!viewModel.isMenuContextFromPlayer) {
-                add(MenuOptionItem(Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.insertNext(listOf(track)); viewModel.showMenuSheet = false })
-                add(MenuOptionItem(Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
+                add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.insertNext(listOf(track)); viewModel.showMenuSheet = false })
+                add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
             }
             if (track.source != "youtube" && !isSpotify && !isLocalFile) {
-                add(MenuOptionItem(Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) { viewModel.openComments(track) })
+                add(MenuOptionItem("comments", Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) { viewModel.openComments(track) })
                 if (isReposted) {
-                    add(MenuOptionItem(Icons.Rounded.Repeat, str("menu_reposted")) { showDeleteRepostConfirm = true })
+                    add(
+                        MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_reposted"), tint = activeColor) {
+                            showDeleteRepostConfirm = true
+                        }
+                    )
                 } else {
-                    add(MenuOptionItem(Icons.Rounded.Repeat, str("menu_repost")) { showRepostDialog = true })
+                    add(MenuOptionItem("repost", Icons.Rounded.Repeat, str("menu_repost")) { showRepostDialog = true })
                 }
             }
             if (track.source != "youtube" && !isSpotify) {
-                add(MenuOptionItem(Icons.Rounded.Info, str("menu_details")) { viewModel.openTrackDetails(track) })
+                add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_details")) { viewModel.openTrackDetails(track) })
             }
-            add(MenuOptionItem(Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track, forceSheet = true) })
-            add(MenuOptionItem(Icons.Default.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
+            add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track, forceSheet = true) })
+            add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
 
             // Catalog tracks carry their album id: jump straight to it.
             val albumId = track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() }
             if (!isLocalFile && albumId != null && (isSpotify || albumId.length == 22)) {
-                add(MenuOptionItem(Icons.Rounded.Album, str("menu_go_album")) {
+                add(MenuOptionItem("go_album", Icons.Rounded.Album, str("menu_go_album")) {
                     viewModel.showMenuSheet = false
                     viewModel.navigateToAlbum(albumId)
                 })
             }
             if (track.source != "youtube" && !isLocalFile) {
                 add(
-                    MenuOptionItem(Icons.Default.Person, str("menu_go_artist")) {
+                    MenuOptionItem("go_artist", Icons.Default.Person, str("menu_go_artist")) {
                         if (isSpotify) {
                             viewModel.navigateToTrackArtist(track)
                             viewModel.showMenuSheet = false
@@ -446,100 +500,84 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 )
                 val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
                 if (isOwnTrack) {
-                    add(MenuOptionItem(Icons.Default.Edit, str("menu_edit_track")) {
+                    add(MenuOptionItem("edit_track", Icons.Default.Edit, str("menu_edit_track")) {
                         viewModel.showMenuSheet = false
                         viewModel.navigateToEditTrack(track.id)
                     })
                 }
             }
             if (!isLocalFile) {
-                add(MenuOptionItem(Icons.Rounded.Radio, str("menu_track_radio")) {
+                add(MenuOptionItem("track_radio", Icons.Rounded.Radio, str("menu_track_radio")) {
                     if (track.source == "youtube") viewModel.startYoutubeRadio(track) else viewModel.startRadioFromTrack(track)
                 })
-                add(MenuOptionItem(Icons.Outlined.Share, str("btn_share")) { viewModel.shareTrack(track) })
+                add(MenuOptionItem("share", Icons.Outlined.Share, str("btn_share")) { viewModel.shareTrack(track) })
             }
             if (viewModel.menuContextPlaylistId != null && (viewModel.menuContextPlaylistId!! < 0 || viewModel.menuContextPlaylistId == -2L)) {
-                add(MenuOptionItem(Icons.Outlined.Delete, str("menu_remove")) { viewModel.removeFromContextPlaylist(viewModel.menuContextPlaylistId!!, track) })
+                add(MenuOptionItem("remove_from_playlist", Icons.Outlined.Delete, str("menu_remove")) { viewModel.removeFromContextPlaylist(viewModel.menuContextPlaylistId!!, track) })
             }
             if (viewModel.isMenuContextFromPlayer) {
-                add(MenuOptionItem(Icons.Rounded.Bedtime, str("sleep_timer_title")) { viewModel.showSleepTimerDialog = true })
+                add(
+                    MenuOptionItem(
+                        id = "sleep_timer",
+                        icon = Icons.Rounded.Bedtime,
+                        text = if (viewModel.isSleepTimerActive) viewModel.formatSleepTimerRemaining()
+                        else str("sleep_timer_title"),
+                        tint = activeColor.takeIf { viewModel.isSleepTimerActive },
+                    ) { viewModel.showSleepTimerDialog = true }
+                )
                 // Only for the track that is playing: the editor's whole method is "listen, mark here", so
                 // it needs a playhead to mark from (issue #33).
-                add(MenuOptionItem(Icons.Rounded.ContentCut, str("trim_title")) {
+                add(MenuOptionItem("trim", Icons.Rounded.ContentCut, str("trim_title")) {
                     viewModel.showMenuSheet = false
                     viewModel.showTrimDialog = true
                 })
             }
-        }
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.heightIn(max = 420.dp)
-        ) {
-            items(gridItems) { item ->
-                val activeColor = MaterialTheme.colorScheme.primary
-                val inactiveColor = MaterialTheme.colorScheme.onSurface
-                var tint = inactiveColor
-                var text = item.text
-
-                if (item.text == str("action_unlike")) tint = activeColor
-                if (item.text == str("menu_shuffle") && viewModel.shuffleEnabled) tint = activeColor
-                if (item.text == str("menu_reposted")) tint = activeColor
-                if (item.text == str("menu_repeat")) {
-                    if (viewModel.repeatMode != RepeatMode.NONE) tint = activeColor
-                    text = when (viewModel.repeatMode) {
-                        RepeatMode.ALL -> str("menu_repeat_all")
-                        RepeatMode.ONE -> str("menu_repeat_one")
-                        else -> str("menu_repeat")
-                    }
-                }
-                if (item.text == str("sleep_timer_title") && viewModel.isSleepTimerActive) {
-                    tint = activeColor
-                    text = viewModel.formatSleepTimerRemaining()
-                }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { item.onClick() }.padding(vertical = 6.dp)
-                ) {
-                    Icon(item.icon, null, modifier = Modifier.size(30.dp), tint = tint)
-                    Spacer(Modifier.height(8.dp))
-                    Text(text = text, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, color = tint, maxLines = 2)
-                }
-            }
             if (!isLocalFile) {
-                item {
-                    val trackId = track.id
-                    val isDownloading = DownloadManager.isTrackDownloading(trackId)
-                    val downloadProgressVal = downloadProgress[trackId]
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable {
-                            if (isDownloaded) showDeleteDialog = true
-                            else if (isDownloading) DownloadManager.cancelDownload(trackId)
-                            else viewModel.downloadTrack(track)
-                        }.padding(vertical = 6.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(30.dp)) {
-                            if (isDownloading) {
-                                val animatedProgress by animateFloatAsState(targetValue = (downloadProgressVal ?: 0) / 100f, label = "progress")
-                                CircularWavyProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxSize())
-                                Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(18.dp))
-                            } else {
-                                val icon = if (isDownloaded) Icons.Default.Delete else Icons.Rounded.Download
-                                val dlTint = if (isDownloaded) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                                Icon(icon, null, modifier = Modifier.fillMaxSize(), tint = dlTint)
+                val trackId = track.id
+                val isDownloading = DownloadManager.isTrackDownloading(trackId)
+                val downloadProgressVal = downloadProgress[trackId]
+                add(
+                    MenuOptionItem(
+                        id = "download",
+                        icon = if (isDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                        text = when {
+                            isDownloaded -> str("btn_delete")
+                            isDownloading -> "${downloadProgressVal ?: 0}%"
+                            else -> str("btn_download")
+                        },
+                        tint = MaterialTheme.colorScheme.error.takeIf { isDownloaded },
+                        iconContent = { tint ->
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(30.dp)) {
+                                if (isDownloading) {
+                                    val animatedProgress by animateFloatAsState(
+                                        targetValue = (downloadProgressVal ?: 0) / 100f,
+                                        label = "progress",
+                                    )
+                                    CircularWavyProgressIndicator(
+                                        progress = { animatedProgress },
+                                        modifier = Modifier.fillMaxSize(),
+                                    )
+                                    Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(18.dp))
+                                } else {
+                                    Icon(
+                                        if (isDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                                        null,
+                                        modifier = Modifier.size(30.dp),
+                                        tint = tint,
+                                    )
+                                }
                             }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        val textLabel = if (isDownloaded) str("btn_delete") else if (isDownloading) str("btn_cancel") else str("btn_download")
-                        val textColor = if (isDownloaded) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                        Text(textLabel, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, color = textColor)
+                        },
+                    ) {
+                        if (isDownloaded) showDeleteDialog = true
+                        else if (isDownloading) DownloadManager.cancelDownload(trackId)
+                        else viewModel.downloadTrack(track)
                     }
-                }
+                )
             }
         }
+
+        MenuTileGrid(menu = PlayerPreferences.MENU_TRACK, items = gridItems)
     }
 }
 
@@ -854,80 +892,59 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
 
         val gridItems = mutableListOf<MenuOptionItem>().apply {
             if (tracks.isNotEmpty()) {
-                add(MenuOptionItem(Icons.Rounded.PlayArrow, str("btn_play")) {
+                add(MenuOptionItem("play", Icons.Rounded.PlayArrow, str("btn_play")) {
                     viewModel.playPlaylist(tracks, 0); viewModel.showPlaylistMenuSheet = false
                 })
-                add(MenuOptionItem(Icons.Rounded.Shuffle, str("btn_shuffle")) {
+                add(MenuOptionItem("shuffle", Icons.Rounded.Shuffle, str("btn_shuffle")) {
                     viewModel.playPlaylist(tracks.shuffled(), 0); viewModel.showPlaylistMenuSheet = false
                 })
-                add(MenuOptionItem(Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
+                add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
                     viewModel.insertNext(tracks); viewModel.showPlaylistMenuSheet = false
                 })
-                add(MenuOptionItem(Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
+                add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
                     viewModel.addToQueue(tracks); viewModel.showPlaylistMenuSheet = false
                 })
-                add(MenuOptionItem(Icons.Default.Add, str("menu_add_playlist")) {
+                add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) {
                     viewModel.showPlaylistMenuSheet = false
                     viewModel.prepareBulkAdd(tracks)
                 })
             }
             if (!isLocal && playlist.id > 0 && !isStation) {
-                add(MenuOptionItem(Icons.Rounded.Info, str("menu_playlist_details")) { showDetailsSheet = true })
+                add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_playlist_details")) { showDetailsSheet = true })
             }
             playlist.user?.id?.takeIf { it > 0 }?.let { ownerId ->
-                add(MenuOptionItem(Icons.Default.Person, str("menu_go_artist")) {
+                add(MenuOptionItem("go_artist", Icons.Default.Person, str("menu_go_artist")) {
                     viewModel.showPlaylistMenuSheet = false
                     viewModel.navigateToPlaylistId = "profile:$ownerId"
                 })
             }
             if (shareUrl.isNotEmpty()) {
-                add(MenuOptionItem(Icons.Outlined.Share, str("btn_share")) { viewModel.sharePlaylist(playlist) })
-            }
-        }
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.heightIn(max = 420.dp)
-        ) {
-            items(gridItems) { item ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { item.onClick() }.padding(vertical = 6.dp)
-                ) {
-                    Icon(item.icon, null, modifier = Modifier.size(30.dp), tint = MaterialTheme.colorScheme.onSurface)
-                    Spacer(Modifier.height(8.dp))
-                    Text(item.text, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface, maxLines = 2)
-                }
+                add(MenuOptionItem("share", Icons.Outlined.Share, str("btn_share")) { viewModel.sharePlaylist(playlist) })
             }
             if (!isLocal && tracks.isNotEmpty() && !isStation) {
-                item {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable {
-                            if (isFullyDownloaded) {
-                                showRemoveDownloadDialog = true
-                            } else if (!isPlaylistDownloading) {
-                                DownloadManager.downloadPlaylist(playlist, tracks)
-                                viewModel.showPlaylistMenuSheet = false
-                            }
-                        }.padding(vertical = 6.dp)
-                    ) {
-                        val icon = if (isFullyDownloaded) Icons.Default.Delete else Icons.Rounded.Download
-                        val tint = if (isFullyDownloaded) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-                        val label = when {
+                add(
+                    MenuOptionItem(
+                        id = "download",
+                        icon = if (isFullyDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                        text = when {
                             isFullyDownloaded -> str("btn_delete")
                             isPlaylistDownloading -> str("btn_cancel")
                             else -> str("btn_download")
+                        },
+                        tint = MaterialTheme.colorScheme.error.takeIf { isFullyDownloaded },
+                    ) {
+                        if (isFullyDownloaded) {
+                            showRemoveDownloadDialog = true
+                        } else if (!isPlaylistDownloading) {
+                            DownloadManager.downloadPlaylist(playlist, tracks)
+                            viewModel.showPlaylistMenuSheet = false
                         }
-                        Icon(icon, null, modifier = Modifier.size(30.dp), tint = tint)
-                        Spacer(Modifier.height(8.dp))
-                        Text(label, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center, color = tint)
                     }
-                }
+                )
             }
         }
+
+        MenuTileGrid(menu = PlayerPreferences.MENU_PLAYLIST, items = gridItems)
     }
 }
 
@@ -1234,6 +1251,125 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                     )
                 }
             }
+        }
+    }
+}
+
+
+/**
+ * The tile grid an options menu is made of, arranged the way the reader arranged it (issue #33).
+ *
+ * "As in gboard, that you can move the tiles: if you need one thing in the first place, then just
+ * move it." A long press picks a tile up — the one gesture that adds reordering without taking the
+ * tile's normal click away — and a right-click offers to hide it. Both menus use this, so neither can
+ * grow the feature without the other.
+ *
+ * The arrangement is stored over the whole catalogue rather than over the tiles on screen: a menu
+ * shows a subset that depends on the track, and writing that subset back would be read later as
+ * "these come first and everything else after", quietly reordering tiles nobody touched. See
+ * [MenuTiles].
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun MenuTileGrid(menu: String, items: List<MenuOptionItem>) {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    val prefs = remember { PlayerPreferences() }
+    val order = remember(prefsSnapshot, menu) { prefs.getMenuTileOrder(menu) }
+    val hidden = remember(prefsSnapshot, menu) { prefs.getHiddenMenuTiles(menu) }
+    val arranged = remember(items, order, hidden) {
+        MenuTiles.arrange(items, order, hidden) { it.id }
+    }
+
+    val gridState = rememberLazyGridState()
+    val reorderableState = rememberReorderableLazyGridState(
+        lazyGridState = gridState,
+        // Read fresh rather than closed over: a second drag before this composition has caught up
+        // would otherwise splice into the arrangement as it was two moves ago.
+        onMove = { from, to ->
+            val fromId = from.key as? String
+            val toId = to.key as? String
+            if (fromId != null && toId != null) {
+                prefs.setMenuTileOrder(menu, MenuTiles.moved(menu, prefs.getMenuTileOrder(menu), fromId, toId))
+            }
+        },
+    )
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        state = gridState,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.heightIn(max = 420.dp)
+    ) {
+        items(arranged, key = { it.id }) { item ->
+            ReorderableItem(state = reorderableState, key = item.id) { isDragging ->
+                MenuTile(
+                    item = item,
+                    isDragging = isDragging,
+                    onHide = { prefs.setHiddenMenuTiles(menu, prefs.getHiddenMenuTiles(menu) + item.id) },
+                )
+            }
+        }
+    }
+}
+
+/** One tile: its normal click, a long press to move it, and a right-click to take it out. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ReorderableCollectionItemScope.MenuTile(
+    item: MenuOptionItem,
+    isDragging: Boolean,
+    onHide: () -> Unit,
+) {
+    var contextMenuOpen by remember { mutableStateOf(false) }
+    val tint = item.tint ?: MaterialTheme.colorScheme.onSurface
+    // Lifted rather than shadowed: the tile has no container of its own to cast one.
+    val scale by animateFloatAsState(if (isDragging) 1.12f else 1f, label = "menuTileScale")
+
+    Box {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .clip(RoundedCornerShape(12.dp))
+                .longPressDraggableHandle()
+                .onClick(
+                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                    onClick = { contextMenuOpen = true },
+                )
+                .clickable { item.onClick() }
+                .padding(vertical = 6.dp)
+        ) {
+            val icon = item.iconContent
+            if (icon != null) {
+                icon(tint)
+            } else {
+                Icon(item.icon, null, modifier = Modifier.size(30.dp), tint = tint)
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = item.text,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                color = tint,
+                maxLines = 2,
+            )
+        }
+
+        DropdownMenu(expanded = contextMenuOpen, onDismissRequest = { contextMenuOpen = false }) {
+            DropdownMenuItem(
+                text = { Text(str("menu_tile_hide")) },
+                leadingIcon = { Icon(Icons.Outlined.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
+                onClick = {
+                    onHide()
+                    contextMenuOpen = false
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(str("menu_tiles_reorder_hint")) },
+                enabled = false,
+                onClick = {},
+            )
         }
     }
 }

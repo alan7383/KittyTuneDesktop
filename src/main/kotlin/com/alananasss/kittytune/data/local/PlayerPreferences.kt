@@ -105,6 +105,9 @@ class PlayerPreferences {
         const val LYRICS_WHEEL_LINES_MIN = 1f
         const val LYRICS_WHEEL_LINES_MAX = 12f
 
+        const val MENU_TRACK = "track"
+        const val MENU_PLAYLIST = "playlist"
+
         private const val KEY_INFO_PANEL_HALF = "info_panel_half"
         private const val KEY_INFO_PANEL_LAST_LYRICS = "info_panel_last_lyrics"
 
@@ -470,6 +473,45 @@ class PlayerPreferences {
 
     fun setPlayerBarButtons(buttons: Set<String>) =
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
+
+    /**
+     * The order of the tiles in an options menu, and which of them are hidden (issue #33).
+     *
+     * "As in gboard, that you can move the tiles: if you need one thing in the first place, then just
+     * move it. You can also add hiding unnecessary buttons."
+     *
+     * Only the tiles actually moved are stored, in order; anything absent keeps its place in the
+     * built-in sequence, after the ones that were arranged. That is what lets a tile added in a later
+     * version appear at all instead of falling off the end of a saved list — and it means the stored
+     * value stays empty for everyone who never touches this.
+     *
+     * @param menu [MENU_TRACK] or [MENU_PLAYLIST]. The two menus keep separate arrangements: they
+     *   share several tiles but not the reasons anyone would reach for them.
+     */
+    fun getMenuTileOrder(menu: String): List<String> {
+        val raw = Prefs.getString(keyMenuTileOrder(menu), null) ?: return emptyList()
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    fun setMenuTileOrder(menu: String, order: List<String>) =
+        Prefs.putString(keyMenuTileOrder(menu), order.joinToString(","))
+
+    fun getHiddenMenuTiles(menu: String): Set<String> {
+        val raw = Prefs.getString(keyHiddenMenuTiles(menu), null) ?: return emptySet()
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setHiddenMenuTiles(menu: String, tiles: Set<String>) =
+        Prefs.putString(keyHiddenMenuTiles(menu), tiles.joinToString(","))
+
+    /** Back to the built-in order and nothing hidden. */
+    fun resetMenuTiles(menu: String) {
+        Prefs.putString(keyMenuTileOrder(menu), null)
+        Prefs.putString(keyHiddenMenuTiles(menu), null)
+    }
+
+    private fun keyMenuTileOrder(menu: String) = "menu_tile_order_$menu"
+    private fun keyHiddenMenuTiles(menu: String) = "menu_tiles_hidden_$menu"
 
     /**
      * Which tabs the Now Playing panel offers (issue #33).
