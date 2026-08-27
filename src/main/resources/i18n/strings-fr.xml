@@ -1266,6 +1266,9 @@
     <string name="quality_high_sub">Meilleure qualité (128kbps+)</string>
     <string name="quality_low">Éco (Données mobiles)</string>
     <string name="quality_low_sub">Idéal pour économiser la data</string>
+    <string name="queue_up_next">À suivre</string>
+    <string name="queue_remove">Retirer de la file</string>
+    <string name="queue_played">Déjà joué</string>
     <string name="queue_repeat">Répéter</string>
     <string name="queue_shuffle">Aléatoire</string>
     <string name="radio">Radio</string>
@@ -1956,6 +1959,8 @@
     <string name="trim_plays_for">Joue %1$s sur %2$s</string>
     <string name="trim_clear">Retirer le découpage</string>
     <string name="listening_stats_timeline">Mois par mois</string>
+    <string name="trim_field_start">Début</string>
+    <string name="trim_field_end">Fin</string>
     <string name="sync_title">Synchro entre appareils</string>
     <string name="sync_intro">Tes appareils échangent l'historique d'écoute directement sur ton réseau local. Rien n'est envoyé ailleurs, et il n'y a pas de compte.</string>
     <string name="sync_this_device">Cet appareil</string>
