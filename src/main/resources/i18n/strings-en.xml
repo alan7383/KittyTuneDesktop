@@ -1159,9 +1159,6 @@
     <string name="pref_info_half">Info tab opens on</string>
     <string name="pref_info_half_remember">Last choice</string>
     <string name="pref_stop_on_task_clear">Stop music on app close</string>
-    <string name="pref_memory">Memory</string>
-    <string name="pref_memory_desc">The first number is what KittyTune really uses. The second is what Java holds and hands back later, so your task manager looks worse than it is. The button hands it back now. If the music actually skips, restart and tell me on GitHub how long the app had been open.</string>
-    <string name="pref_memory_release">Hand it back</string>
     <string name="pref_storage_cache">Cache</string>
     <string name="pref_storage_cache_clear">Clear cache</string>
     <string name="pref_storage_cache_desc">Temporary files stored by the application for a faster experience</string>

@@ -1161,9 +1161,6 @@
     <string name="pref_info_half">Вкладка «Инфо» открывается на</string>
     <string name="pref_info_half_remember">Последний выбор</string>
     <string name="pref_stop_on_task_clear">Остановить музыку при закрытии приложения</string>
-    <string name="pref_memory">Память</string>
-    <string name="pref_memory_desc">Первое число это то, что KittyTune действительно использует. Второе это то, что Java держит и отдаёт позже, поэтому в диспетчере задач всё выглядит хуже, чем есть. Кнопка отдаёт это сразу. Если музыка правда прерывается, перезапустите приложение и напишите на GitHub, сколько времени оно было открыто.</string>
-    <string name="pref_memory_release">Отдать сейчас</string>
     <string name="pref_storage_cache">Кэш</string>
     <string name="pref_storage_cache_clear">Очистить кэш</string>
     <string name="pref_storage_cache_desc">Временные файлы приложения для быстрой загрузки</string>

@@ -1161,9 +1161,6 @@
     <string name="pref_info_half">L'onglet Info s'ouvre sur</string>
     <string name="pref_info_half_remember">Dernier choix</string>
     <string name="pref_stop_on_task_clear">Arrêter la musique à la fermeture</string>
-    <string name="pref_memory">Mémoire</string>
-    <string name="pref_memory_desc">Le premier chiffre est ce que KittyTune utilise vraiment. Le second est ce que Java garde et rend plus tard, donc le gestionnaire de tâches a l'air pire que la réalité. Le bouton le rend tout de suite. Si la musique saute vraiment, redémarre et dis-moi sur GitHub depuis combien de temps l'app était ouverte.</string>
-    <string name="pref_memory_release">Rendre maintenant</string>
     <string name="pref_storage_cache">Cache</string>
     <string name="pref_storage_cache_clear">Effacer le cache</string>
     <string name="pref_storage_cache_desc">Fichiers temporaires stockés par l\'application pour une expérience plus rapide</string>
