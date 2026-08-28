@@ -42,6 +42,7 @@ import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.main.loadPlaylistTracksForMenu
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun CreatePlaylistDialog(
@@ -598,8 +599,20 @@ fun LibraryPlaylistOptionsDialog(
     val isStation = playlist.isTrackStation || playlist.isArtistStation ||
             playlist.permalinkUrl?.contains("station") == true || playlist.urn?.contains("station") == true
 
-    val loadedTracks by produceState<List<com.alananasss.kittytune.domain.Track>?>(initialValue = null, playlist.id) {
-        value = try {
+    // The library's own copy of the menu, and it waited to draw exactly as the other one did
+    // (issue #33). The tiles that act on the track list were gated on having the list, so a playlist
+    // whose tracks are not already in hand showed a short menu and a spinner, then reflowed.
+    //
+    // Same treatment: draw now, wait on the click. Kept as two implementations rather than merged,
+    // because the library menu offers pinning, folders and liking that the other one does not, and a
+    // shared version would be mostly branches. But the waiting has to behave the same in both, so if
+    // one of them changes again, so does the other.
+    val menuScope = rememberCoroutineScope()
+    val tracksReady = remember(playlist.id) {
+        kotlinx.coroutines.CompletableDeferred<List<com.alananasss.kittytune.domain.Track>>()
+    }
+    LaunchedEffect(playlist.id) {
+        val fetched = try {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 com.alananasss.kittytune.ui.main.loadPlaylistTracksForMenu(playlist)
             }
@@ -607,9 +620,29 @@ fun LibraryPlaylistOptionsDialog(
             e.printStackTrace()
             emptyList()
         }
+        tracksReady.complete(fetched)
+    }
+    val loadedTracks by produceState<List<com.alananasss.kittytune.domain.Track>?>(initialValue = null, playlist.id) {
+        value = tracksReady.await()
     }
     val tracks = loadedTracks ?: emptyList()
     val isLoadingTracks = loadedTracks == null
+
+    /** True while the answer is unknown, because it is almost always yes. See the note above. */
+    val offerTrackActions = isLoadingTracks || tracks.isNotEmpty()
+
+    /** Runs [action] once the list is in, so a tile can be pressed before the fetch has landed. */
+    val withTracks: ((List<com.alananasss.kittytune.domain.Track>) -> Unit) -> Unit = { action ->
+        val already = loadedTracks
+        if (already != null) {
+            if (already.isNotEmpty()) action(already)
+        } else {
+            menuScope.launch {
+                val fetched = tracksReady.await()
+                if (fetched.isNotEmpty()) action(fetched)
+            }
+        }
+    }
 
     val isFullyDownloaded = remember(tracks, downloadedIds, storageTrigger) {
         tracks.isNotEmpty() && tracks.all { it.id < 0 || downloadedIds.contains(it.id) }
@@ -645,26 +678,21 @@ fun LibraryPlaylistOptionsDialog(
     val errorColor = MaterialTheme.colorScheme.error
     val gridItems = remember(playlist, tracks, isItemPinned, isInsideFolder, primaryColor, errorColor, isPlaylistLiked, isFullyDownloaded, isPlaylistDownloading) {
         mutableListOf<LibraryPlaylistActionItem>().apply {
-            if (tracks.isNotEmpty()) {
+            if (offerTrackActions) {
                 add(LibraryPlaylistActionItem(Icons.Rounded.PlayArrow, str("btn_play")) {
-                    playerViewModel.playPlaylist(tracks, 0)
-                    onDismiss()
+                    withTracks { playerViewModel.playPlaylist(it, 0); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.Rounded.Shuffle, str("btn_shuffle")) {
-                    playerViewModel.playPlaylist(tracks.shuffled(), 0)
-                    onDismiss()
+                    withTracks { playerViewModel.playPlaylist(it.shuffled(), 0); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
-                    playerViewModel.insertNext(tracks)
-                    onDismiss()
+                    withTracks { playerViewModel.insertNext(it); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
-                    playerViewModel.addToQueue(tracks)
-                    onDismiss()
+                    withTracks { playerViewModel.addToQueue(it); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.Default.Add, str("menu_add_playlist")) {
-                    onDismiss()
-                    playerViewModel.prepareBulkAdd(tracks)
+                    withTracks { onDismiss(); playerViewModel.prepareBulkAdd(it) }
                 })
             }
             if (playlist.id > 0 || playlist.urn?.startsWith("soundcloud:system-playlists:") == true) {
@@ -721,7 +749,7 @@ fun LibraryPlaylistOptionsDialog(
                     onDismiss()
                 })
             }
-            if (!isLocal && tracks.isNotEmpty() && !isStation) {
+            if (!isLocal && offerTrackActions && !isStation) {
                 val icon = if (isFullyDownloaded) Icons.Default.Delete else Icons.Rounded.Download
                 val tint = if (isFullyDownloaded) errorColor else null
                 val label = when {
@@ -733,8 +761,10 @@ fun LibraryPlaylistOptionsDialog(
                     if (isFullyDownloaded) {
                         showRemoveDownloadDialog = true
                     } else if (!isPlaylistDownloading) {
-                        com.alananasss.kittytune.data.DownloadManager.downloadPlaylist(playlist, tracks)
-                        onDismiss()
+                        withTracks {
+                            com.alananasss.kittytune.data.DownloadManager.downloadPlaylist(playlist, it)
+                            onDismiss()
+                        }
                     }
                 })
             }
@@ -785,14 +815,13 @@ fun LibraryPlaylistOptionsDialog(
                     }
                 }
 
-                if (isLoadingTracks) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
-                    }
+                // Keeps its height either way, so appearing and disappearing cannot move the grid.
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(28.dp).padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (isLoadingTracks) CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
                 }
 
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
