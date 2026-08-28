@@ -237,9 +237,13 @@ fun MainScreen() {
 
     val density = androidx.compose.ui.platform.LocalDensity.current
 
+    // The mouse's side buttons, on the root so they work wherever the pointer happens to be.
+    val historyNavigator = rememberHistoryNavigator(navController)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .mouseHistoryButtons(historyNavigator)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .padding(PANEL_GUTTER.dp)
     ) {
