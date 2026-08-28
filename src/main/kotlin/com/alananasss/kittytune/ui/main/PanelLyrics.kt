@@ -141,7 +141,14 @@ private fun PanelSyncedLyrics(vm: PlayerViewModel, lines: List<LyricLine>, modif
                     positionMs = smoothPosition,
                     // The offset shifts the lyrics against the audio, so the position that makes
                     // this line current is its start minus that offset.
-                    onClick = { vm.seekTo((line.startTime - vm.lyricsOffset).coerceAtLeast(0L)) },
+                    // Clamped to the track, not merely to zero. A lyric sheet matched from a longer
+                    // song carries timestamps past this track's end, and a seek past the end used to
+                    // land back at the start (issue #33).
+                    onClick = {
+                        val target = line.startTime - vm.lyricsOffset
+                        val last = (vm.duration - 1).coerceAtLeast(0L)
+                        vm.seekTo(target.coerceIn(0L, last))
+                    },
                 )
             }
         }

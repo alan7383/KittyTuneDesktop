@@ -182,8 +182,29 @@ class HlsStreamAdapter(
     private fun initUrl(): String? = initSegmentUrl
 
     @Synchronized
-    private fun startIndexFor(positionMs: Long): Int =
-        segments.indexOfFirst { it.startTimeMs + it.durationMs > positionMs }.coerceAtLeast(0)
+    /**
+     * The fragment a seek to [positionMs] should start reading from.
+     *
+     * ## The restart this had
+     *
+     * It was `indexOfFirst { ... }.coerceAtLeast(0)`, and `indexOfFirst` answers -1 when nothing
+     * matches. Coercing that to 0 turned "past the end of the track" into "the first fragment", so a
+     * seek beyond the last fragment silently started the song again from the beginning (issue #33).
+     *
+     * That is reachable from the lyrics: clicking a line seeks to its timestamp, and a lyric sheet
+     * matched from a longer song carries timestamps past this track's end. Which is what the report
+     * described, "when you click on the text, playback starts from the very beginning".
+     *
+     * Past the end now means what it says: no fragment, so the decoder sees EOF and the track ends,
+     * exactly as if it had played out. A position inside the track that matches nothing can only be
+     * rounding at the boundary, and takes the last fragment.
+     */
+    private fun startIndexFor(positionMs: Long): Int {
+        if (segments.isEmpty()) return 0
+        if (totalDurationMs > 0 && positionMs >= totalDurationMs) return segments.size
+        val match = segments.indexOfFirst { it.startTimeMs + it.durationMs > positionMs }
+        return if (match >= 0) match else segments.lastIndex
+    }
 
     private fun resolveUrl(base: String, rel: String): String {
         return URL(URL(base), rel).toString()
