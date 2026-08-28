@@ -455,7 +455,12 @@ import kotlin.math.roundToInt
                                     Modifier.blur(blurRadius)
                                 } else Modifier
                             )
-                            .clickable(interactionSource = lineInteractionSource, indication = null) { viewModel.seekTo(line.startTime) }
+                            .clickable(interactionSource = lineInteractionSource, indication = null) {
+                                // Clamped to the track: a sheet matched from a longer song carries
+                                // timestamps past its end, and seeking past the end used to restart it.
+                                val last = (viewModel.duration - 1).coerceAtLeast(0L)
+                                viewModel.seekTo(line.startTime.coerceIn(0L, last))
+                            }
                     ) {
                         // One renderer for both views. This block existed twice — here and in the
                         // panel — and only this copy ever drew the words, so "highlight word by word"

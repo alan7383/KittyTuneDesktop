@@ -214,4 +214,43 @@ class HlsStreamAdapterRefreshTest {
 
     private fun assertArrayEquals(expected: ByteArray, actual: ByteArray) =
         org.junit.Assert.assertArrayEquals(expected, actual)
+    // --- seeking (issue #33) ------------------------------------------------------------------
+    //
+    // "When you click on the text, playback does not start from the very beginning." Clicking a
+    // lyric line seeks to its timestamp, and a sheet matched from a longer song carries timestamps
+    // past this track's end. The start-fragment lookup used to answer "the first one" for anything
+    // it could not place, so seeking past the end restarted the song.
+
+    /** What the decoder reads from a seek to [positionMs]: one byte per fragment, in order. */
+    private fun fragmentsFrom(adapter: HlsStreamAdapter, positionMs: Long): List<Int> =
+        adapter.getInputStream(positionMs).use { it.readBytes() }
+            .toList()
+            .chunked(fragmentBytes)
+            .map { it.first().toInt() }
+
+    @Test
+    fun `seeking into the middle starts at the fragment holding that moment`() {
+        val adapter = HlsStreamAdapter(playlistUrl(600), emptyMap())
+        // Fragments are ten seconds each, so 15 s is inside the second one.
+        assertEquals(listOf(1, 2), fragmentsFrom(adapter, 15_000L))
+        assertEquals(listOf(0, 1, 2), fragmentsFrom(adapter, 0L))
+        assertEquals(listOf(2), fragmentsFrom(adapter, 25_000L))
+    }
+
+    @Test
+    fun `seeking past the end ends the track instead of restarting it`() {
+        val adapter = HlsStreamAdapter(playlistUrl(600), emptyMap())
+        // Thirty seconds of audio in total. Past that there is nothing left to read, and reading
+        // fragment zero again is what made the song start over.
+        assertEquals(emptyList<Int>(), fragmentsFrom(adapter, 30_000L))
+        assertEquals(emptyList<Int>(), fragmentsFrom(adapter, 600_000L))
+    }
+
+    @Test
+    fun `a position on a fragment boundary takes the fragment that contains it`() {
+        val adapter = HlsStreamAdapter(playlistUrl(600), emptyMap())
+        assertEquals(listOf(1, 2), fragmentsFrom(adapter, 10_000L))
+        assertEquals(listOf(2), fragmentsFrom(adapter, 20_000L))
+    }
+
 }
