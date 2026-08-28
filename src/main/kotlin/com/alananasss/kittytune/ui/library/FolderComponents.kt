@@ -631,14 +631,26 @@ fun LibraryPlaylistOptionsDialog(
     /** True while the answer is unknown, because it is almost always yes. See the note above. */
     val offerTrackActions = isLoadingTracks || tracks.isNotEmpty()
 
+    /**
+     * Set only while a click is genuinely waiting for the track list.
+     *
+     * The menu used to spin the whole time the fetch was in flight, which made sense when the fetch
+     * was the reason there was nothing to look at. Now that the tiles are drawn immediately, an
+     * indicator for work nobody is waiting on is just something moving in the corner of the eye
+     * (issue #33). It appears only in the case it was ever for: a tile pressed before the list landed.
+     */
+    var waitingOnClick by remember(playlist.id) { mutableStateOf(false) }
+
     /** Runs [action] once the list is in, so a tile can be pressed before the fetch has landed. */
     val withTracks: ((List<com.alananasss.kittytune.domain.Track>) -> Unit) -> Unit = { action ->
         val already = loadedTracks
         if (already != null) {
             if (already.isNotEmpty()) action(already)
         } else {
+            waitingOnClick = true
             menuScope.launch {
                 val fetched = tracksReady.await()
+                waitingOnClick = false
                 if (fetched.isNotEmpty()) action(fetched)
             }
         }
@@ -813,15 +825,11 @@ fun LibraryPlaylistOptionsDialog(
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
-                }
-
-                // Keeps its height either way, so appearing and disappearing cannot move the grid.
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(28.dp).padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (isLoadingTracks) CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
+                    // In the header, where it cannot move the grid, and only while a click waits.
+                    if (waitingOnClick) {
+                        Spacer(Modifier.width(12.dp))
+                        CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
+                    }
                 }
 
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(

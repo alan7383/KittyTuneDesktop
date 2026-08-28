@@ -400,7 +400,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 contentScale = ContentScale.Crop
             )
             Spacer(Modifier.width(16.dp))
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(
                     text = track.title ?: str("untitled_track"),
                     style = MaterialTheme.typography.titleLarge,
@@ -827,6 +827,16 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
      */
     val offerTrackActions = isLoadingTracks || tracks.isNotEmpty()
 
+    /**
+     * Set only while a click is genuinely waiting for the track list.
+     *
+     * The menu used to spin the whole time the fetch was in flight, which made sense when the fetch
+     * was the reason there was nothing to look at. Now that the tiles are drawn immediately, an
+     * indicator for work nobody is waiting on is just something moving in the corner of the eye
+     * (issue #33). It appears only in the case it was ever for: a tile pressed before the list landed.
+     */
+    var waitingOnClick by remember(playlist.id) { mutableStateOf(false) }
+
     /** Runs [action] once the list is in, so a tile can be pressed before the fetch has landed. */
     fun withTracks(action: (List<com.alananasss.kittytune.domain.Track>) -> Unit) {
         val already = loadedTracks
@@ -834,8 +844,10 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
             if (already.isNotEmpty()) action(already)
             return
         }
+        waitingOnClick = true
         scope.launch {
             val fetched = tracksReady.await()
+            waitingOnClick = false
             if (fetched.isNotEmpty()) action(fetched)
         }
     }
@@ -902,7 +914,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 contentScale = ContentScale.Crop
             )
             Spacer(Modifier.width(16.dp))
-            Column {
+            Column(Modifier.weight(1f)) {
                 Text(
                     text = playlist.title ?: str("generic_title"),
                     style = MaterialTheme.typography.titleLarge,
@@ -922,16 +934,11 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                     overflow = TextOverflow.Ellipsis
                 )
             }
-        }
-
-        // The row keeps its height either way. Appearing and disappearing, it moved the whole grid
-        // down and back up again, which is the reflow this change exists to remove.
-        Row(
-            modifier = Modifier.fillMaxWidth().height(28.dp).padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (isLoadingTracks) CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
+            // In the header, where it cannot move the grid, and only while a click is waiting.
+            if (waitingOnClick) {
+                Spacer(Modifier.width(12.dp))
+                CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
+            }
         }
 
         val gridItems = mutableListOf<MenuOptionItem>().apply {
