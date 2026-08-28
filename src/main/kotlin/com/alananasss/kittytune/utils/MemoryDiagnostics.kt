@@ -134,7 +134,41 @@ object MemoryDiagnostics {
         // The payload: the JVM's own account of every native allocation, by subsystem.
         appendLine()
         appendLine(diagnosticCommand("vmNativeMemory", "summary") ?: "native memory tracking is off")
+
+        // And, on a jump, what is actually holding the heap.
+        if (reason.startsWith("jumped")) {
+            appendLine()
+            appendLine(classHistogram() ?: "class histogram unavailable")
+        }
     }
+
+    /**
+     * The classes holding the heap, largest first — the question the second log left open.
+     *
+     * That log settled what this is not. Over 81 minutes javacpp held 0 MB across 42 allocations, so
+     * the audio decoder is not involved; then at minute 33 the *Java* heap jumped by a gigabyte and
+     * stayed there, with thirteen full collections over the next hour each pausing 200 to 411 ms and
+     * each leaving 1.2 GB behind. Objects that survive thirteen full collections are reachable. So
+     * something is retaining them, and a summary by subsystem cannot say what: only a count by class
+     * can (issue #33).
+     *
+     * Trimmed to the head of the list, because the tail is every class in the JVM and the answer is
+     * always in the first few lines. Emitted only on a jump: it forces a full collection of its own,
+     * which is not something to do to somebody every minute.
+     */
+    private fun classHistogram(): String? {
+        val raw = diagnosticCommand("gcClassHistogram") ?: return null
+        val lines = raw.lines()
+        return buildString {
+            appendLine("Heap by class, largest first:")
+            lines.take(HISTOGRAM_LINES).forEach { appendLine(it) }
+            val remaining = lines.size - HISTOGRAM_LINES
+            if (remaining > 0) appendLine("... and $remaining more classes")
+        }
+    }
+
+    /** Enough to name the culprit and its container, not enough to bury them. */
+    private const val HISTOGRAM_LINES = 45
 
     /**
      * Runs one of the commands `jcmd` would run, in-process.
