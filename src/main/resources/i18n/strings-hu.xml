@@ -1162,6 +1162,9 @@
     <string name="pref_sc_sync_title">SoundCloud előzmények szinkronizálása</string>
     <string name="pref_seed_palette_title">Seed paletta</string>
     <string name="pref_start_screen">Kezdőképernyő</string>
+    <string name="pref_seek_wheel_step">Görgő a folyamatjelzőn</string>
+    <string name="pref_seek_wheel_step_sub">Egy görgőkattanás mennyit mozdít a lejátszási ponton.</string>
+    <string name="pref_seek_wheel_step_value">%1$s s</string>
     <string name="pref_info_half">Az Infó fül ezzel nyílik</string>
     <string name="pref_info_half_remember">Utolsó választás</string>
     <string name="pref_stop_on_task_clear">Zene leállítása bezáráskor</string>

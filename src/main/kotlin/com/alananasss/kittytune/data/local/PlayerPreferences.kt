@@ -102,6 +102,9 @@ class PlayerPreferences {
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(PLAYER_BAR_BUTTON_LIKE, PLAYER_BAR_BUTTON_PANEL, PLAYER_BAR_BUTTON_QUEUE)
 
+        const val SEEK_WHEEL_SECONDS_MIN = 1f
+        const val SEEK_WHEEL_SECONDS_MAX = 60f
+
         const val LYRICS_WHEEL_LINES_MIN = 1f
         const val LYRICS_WHEEL_LINES_MAX = 12f
 
@@ -647,6 +650,21 @@ class PlayerPreferences {
      * Three is roughly what a desktop wheel notch does elsewhere in the app, so the default changes
      * nothing for anyone who does not go looking for it.
      */
+    /**
+     * How far one notch of the wheel moves the playhead, in seconds (issue #33).
+     *
+     * "If you hover over the slider showing how long the track is, you can use the mouse wheel to
+     * rewind and fast-forward the track." Five seconds is the step every player uses for its skip
+     * buttons, so it is the one that will feel like nothing new.
+     */
+    fun getSeekWheelSeconds(): Float =
+        Prefs.getFloat("seek_wheel_seconds", 5f).coerceIn(SEEK_WHEEL_SECONDS_MIN, SEEK_WHEEL_SECONDS_MAX)
+
+    fun setSeekWheelSeconds(seconds: Float) = Prefs.putFloat(
+        "seek_wheel_seconds",
+        seconds.coerceIn(SEEK_WHEEL_SECONDS_MIN, SEEK_WHEEL_SECONDS_MAX),
+    )
+
     fun getLyricsWheelLines(): Float =
         Prefs.getFloat("lyrics_wheel_lines", 3f).coerceIn(LYRICS_WHEEL_LINES_MIN, LYRICS_WHEEL_LINES_MAX)
 

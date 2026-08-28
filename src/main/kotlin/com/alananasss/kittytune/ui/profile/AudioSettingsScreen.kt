@@ -54,6 +54,8 @@ fun AudioSettingsScreen(
 
     var showQualityDialog by remember { mutableStateOf(false) }
     var showFadeDurationDialog by remember { mutableStateOf(false) }
+    var showSeekWheelDialog by remember { mutableStateOf(false) }
+    var seekWheelSeconds by remember { mutableStateOf(prefs.getSeekWheelSeconds()) }
 
     var showDeviceDialog by remember { mutableStateOf(false) }
     var currentDevice by remember { mutableStateOf(prefs.getAudioDevice()) }
@@ -231,6 +233,40 @@ fun AudioSettingsScreen(
         )
     }
 
+    if (showSeekWheelDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showSeekWheelDialog = false },
+            title = { Text(str("pref_seek_wheel_step")) },
+            text = {
+                Column {
+                    Text(
+                        str("pref_seek_wheel_step_sub"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        str("pref_seek_wheel_step_value", seekWheelSeconds.toInt().toString()),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Slider(
+                        value = seekWheelSeconds,
+                        onValueChange = {
+                            seekWheelSeconds = kotlin.math.round(it)
+                            prefs.setSeekWheelSeconds(seekWheelSeconds)
+                        },
+                        valueRange = PlayerPreferences.SEEK_WHEEL_SECONDS_MIN..PlayerPreferences.SEEK_WHEEL_SECONDS_MAX,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSeekWheelDialog = false }) { Text(str("btn_ok")) }
+            }
+        )
+    }
+
     if (showFadeDurationDialog) {
         EscapableAlertDialog(
             onDismissRequest = { showFadeDurationDialog = false },
@@ -388,7 +424,7 @@ fun AudioSettingsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         val isNormEnabled = playerViewModel.effectsState.isNormalizationEnabled
                         val isGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
-                        val totalVisibleItems = if (!isGuest) 9 else 8
+                        val totalVisibleItems = if (!isGuest) 10 else 9
 
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) })
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) })
@@ -421,6 +457,21 @@ fun AudioSettingsScreen(
                                 }
                             )
                         }
+
+                        // Last, because the wheel over the progress bar works out of the box and this
+                        // only changes how far a notch goes (issue #33).
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, if (!isGuest) 9 else 8),
+                            title = str("pref_seek_wheel_step"),
+                            subtitle = str(
+                                "pref_seek_wheel_step_value",
+                                seekWheelSeconds.let { s ->
+                                    val rounded = kotlin.math.round(s)
+                                    if (rounded == s) rounded.toInt().toString() else s.toString()
+                                },
+                            ),
+                            onClick = { showSeekWheelDialog = true }
+                        )
                     }
                 }
             }
