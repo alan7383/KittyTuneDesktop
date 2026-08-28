@@ -129,6 +129,7 @@ object MemoryDiagnostics {
 
         // What the operating system charges the process, which is the number in a task manager.
         processMemory()?.let { appendLine(it) }
+        appendLine(nativeLibraryMemory())
 
         // The payload: the JVM's own account of every native allocation, by subsystem.
         appendLine()
@@ -176,6 +177,31 @@ object MemoryDiagnostics {
     }.getOrDefault("unknown")
 
 
+    /**
+     * The half of the process that native memory tracking cannot see.
+     *
+     * The first log from a real session settled the easy question and raised the real one: the heap
+     * never passed 217 MB, everything the JVM accounts for actually *shrank* by 28 MB, and the process
+     * still grew by 692 MB. At the high point, 733 MB of it was memory the JVM had no record of.
+     *
+     * That is expected rather than mysterious. Tracking covers allocations the JVM makes; it says
+     * nothing about what a library allocates for itself, and this app links two that allocate
+     * heavily: Skia for drawing and FFmpeg for decoding. So the numbers below come from javacpp, which
+     * is the layer every FFmpeg buffer in this app is allocated through and keeps its own account.
+     *
+     * `physicalBytes` is the whole process footprint as the operating system sees it, which is finally
+     * the same number a task manager shows. `totalBytes` is what javacpp itself holds: if that climbs
+     * with track changes and never comes back down, the decoder is not being released, and the search
+     * is over.
+     */
+    private fun nativeLibraryMemory(): String = runCatching {
+        val physical = org.bytedeco.javacpp.Pointer.physicalBytes()
+        val tracked = org.bytedeco.javacpp.Pointer.totalBytes()
+        val count = org.bytedeco.javacpp.Pointer.totalCount()
+        "native libraries: process physical ${mb(physical)} MB, javacpp holds ${mb(tracked)} MB " +
+            "across $count allocations"
+    }.getOrElse { "native libraries: unavailable (${it::class.simpleName})" }
+
     // ---- the cheap numbers, read far more often than they are written ------------------------
 
     private var peakHeapUsedMb = 0L
@@ -189,8 +215,16 @@ object MemoryDiagnostics {
         return mb(rt.totalMemory() - rt.freeMemory())
     }
 
-    /** Resident size on Linux, committed virtual elsewhere. Both are cheap enough to read often. */
+    /**
+     * The process footprint, by whichever route gives the truest figure.
+     *
+     * javacpp asks the operating system the same question a task manager does, on every platform, so
+     * it goes first. The first log came out reporting committed virtual memory instead, which on
+     * Windows is a larger and less comparable number than the one anybody reads off the screen.
+     */
     private fun processMb(): Long = runCatching {
+        val physical = org.bytedeco.javacpp.Pointer.physicalBytes()
+        if (physical > 0) return@runCatching mb(physical)
         val status = File("/proc/self/status")
         if (status.exists()) {
             val rss = status.readLines().firstOrNull { it.startsWith("VmRSS:") }
