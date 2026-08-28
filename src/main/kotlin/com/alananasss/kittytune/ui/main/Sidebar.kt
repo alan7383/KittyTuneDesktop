@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -133,8 +135,23 @@ fun Sidebar(
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(PANEL_GUTTER.dp)) {
 
         // --- top card: Home / Explore ------------------------------------------------
-        Surface(shape = PanelShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Surface(
+            shape = PanelShape,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            // Pinned to the width these rows were laid out for, and clipped by the card, for the same
+            // reason the library card below is (issue #33). Left to the panel's animating width, a
+            // label being faded out is re-wrapped narrower on every frame — "Explorer" ends up one
+            // letter per line — which looks less like a transition than like a broken layout.
+            Column(
+                Modifier
+                    .requiredWidth(
+                        if (collapsed) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH.dp
+                        else libraryViewModel.sidebarWidth.dp
+                    )
+                    .padding(vertical = 8.dp)
+            ) {
                 SidebarNavItem(
                     label = str("nav_home"),
                     selected = currentRoute == "home",
@@ -320,36 +337,69 @@ fun LibraryPanel(
     val entries = buildLibraryEntries(libraryViewModel)
 
     Surface(shape = PanelShape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = modifier) {
-        if (libraryViewModel.isSidebarCollapsed && !fullScreen) {
-            CollapsedLibraryRail(
-                entries = entries,
-                onExpand = { libraryViewModel.toggleSidebarCollapsed() },
-                onCreate = { showCreatePlaylistDialog = true },
-                onHistory = onHistory,
-                onOpen = openEntry,
-                onRightClick = rightClickEntry,
-            )
-        } else {
-            Column(Modifier.fillMaxSize()) {
-                LibraryHeader(
-                    libraryViewModel = libraryViewModel,
-                    playerViewModel = playerViewModel,
-                    fullScreen = fullScreen,
-                    onCreatePlaylist = { showCreatePlaylistDialog = true },
-                    onCreateFolder = { showCreateFolderDialog = true },
-                    onImport = onImport,
-                    onHistory = onHistory,
-                    onUpload = onUpload,
+        // Faded rather than swapped (issue #33).
+        //
+        // "When I minimize and then open the library, all the lines shift down, and the opening
+        // doesn't look smooth, it looks abrupt."
+        //
+        // The panel's *width* was already animated, on a spring, in MainScreen. Its *contents* were
+        // not: this was a plain `if`, so the rail and the full column replaced each other in a single
+        // frame while the width was still travelling. Every frame of the resize therefore showed one
+        // layout at a width belonging to the other, and the swap itself was a cut. Crossfading them
+        // costs nothing and gives the eye something continuous to follow while the panel moves.
+        //
+        // Timed to outlast the width spring rather than to a round number, so the fade is not already
+        // over while the edge is still moving, which is the half of "abrupt" that a fade alone would
+        // leave behind.
+        androidx.compose.animation.Crossfade(
+            targetState = libraryViewModel.isSidebarCollapsed && !fullScreen,
+            animationSpec = androidx.compose.animation.core.tween(LIBRARY_SWAP_MS),
+            label = "libraryCollapse",
+        ) { showRail ->
+            // Each layout keeps the width it was designed for while the panel travels, and the panel
+            // clips whatever no longer fits. Left to the incoming constraint, the outgoing layout is
+            // squeezed narrower every frame instead — the header and the filter chips visibly crush
+            // together — which is its own kind of lurch on top of the one being fixed. Not applied in
+            // full screen, where the panel is deliberately wider than the stored sidebar width.
+            val fixedWidth =
+                if (fullScreen) Modifier
+                else Modifier.requiredWidth(
+                    if (showRail) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH.dp
+                    else libraryViewModel.sidebarWidth.dp
                 )
-                LibraryFilterChips(libraryViewModel)
-                LibrarySearchRow(libraryViewModel)
-                LibraryContent(
-                    libraryViewModel = libraryViewModel,
+            if (showRail) {
+                androidx.compose.foundation.layout.Box(fixedWidth) {
+                CollapsedLibraryRail(
                     entries = entries,
-                    fullScreen = fullScreen,
+                    onExpand = { libraryViewModel.toggleSidebarCollapsed() },
+                    onCreate = { showCreatePlaylistDialog = true },
+                    onHistory = onHistory,
                     onOpen = openEntry,
                     onRightClick = rightClickEntry,
                 )
+                }
+            } else {
+                Column(fixedWidth.fillMaxHeight()) {
+                    LibraryHeader(
+                        libraryViewModel = libraryViewModel,
+                        playerViewModel = playerViewModel,
+                        fullScreen = fullScreen,
+                        onCreatePlaylist = { showCreatePlaylistDialog = true },
+                        onCreateFolder = { showCreateFolderDialog = true },
+                        onImport = onImport,
+                        onHistory = onHistory,
+                        onUpload = onUpload,
+                    )
+                    LibraryFilterChips(libraryViewModel)
+                    LibrarySearchRow(libraryViewModel)
+                    LibraryContent(
+                        libraryViewModel = libraryViewModel,
+                        entries = entries,
+                        fullScreen = fullScreen,
+                        onOpen = openEntry,
+                        onRightClick = rightClickEntry,
+                    )
+                }
             }
         }
     }
@@ -1726,3 +1776,13 @@ private fun SidebarNavItem(
         )
     }
 }
+
+/**
+ * How long the library takes to fade between its rail and its full contents.
+ *
+ * Longer than it feels it should be, on purpose: the panel's width is on a medium-low spring, which
+ * takes appreciably more than a typical 200 ms fade to settle. A shorter fade finishes while the edge
+ * of the panel is still moving, and the leftover movement reads as the same lurch the fade was added
+ * to remove.
+ */
+private const val LIBRARY_SWAP_MS = 320
