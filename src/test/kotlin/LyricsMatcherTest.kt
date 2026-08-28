@@ -117,6 +117,77 @@ class LyricsMatcherTest {
         assertFalse(LyricsMatcher.isAcceptable("", "", target))
         assertFalse(LyricsMatcher.isAcceptable(null, null, target))
     }
+
+    // --- the wrong song on screen (issue #33) -------------------------------------------------
+    //
+    // "When I play a song, it shows the lyrics for a completely different song, although if I do a
+    // manual search, it will immediately show the correct song." The automatic lookup works through
+    // progressively looser queries and takes the best usable candidate, so the only thing standing
+    // between it and an unrelated lyric sheet is this comparison. It used to be a plain substring
+    // test on the whole string, and a short title is a substring of almost anything.
+
+    private val messy = LyricsMatcher.Target("fortuna 812 go with me", "xxxqs0", 180_000L)
+
+    @Test
+    fun `a short word inside a long title is not a match`() {
+        // "go" sits inside the target, and used to score 0.9 for it.
+        assertTrue(LyricsMatcher.similarity("Go", messy.title) < 0.35f)
+        assertFalse(LyricsMatcher.isAcceptable("Go", "Someone Else", messy))
+    }
+
+    @Test
+    fun `a short shared word out of several is not a match`() {
+        assertFalse(LyricsMatcher.isAcceptable("Me", "Another Artist", messy))
+        assertTrue(LyricsMatcher.similarity("Me", messy.title) < 0.35f)
+    }
+
+    /**
+     * The deliberate middle tier. A provider holding this track as plain "Fortuna" is very likely
+     * right, since an uploader's title is the song plus whatever else they felt like typing. It is
+     * accepted, but it does not get to claim the confidence of a full match.
+     */
+    @Test
+    fun `one distinctive word of a messy title is accepted but ranked below an exact match`() {
+        val partial = LyricsMatcher.similarity("Fortuna", messy.title)
+        val whole = LyricsMatcher.similarity("fortuna 812 go with me", messy.title)
+        assertTrue(LyricsMatcher.isAcceptable("Fortuna", "Another Artist", messy))
+        assertTrue("partial=$partial whole=$whole", partial < whole)
+    }
+
+    @Test
+    fun `a substring that is not a word is not a match`() {
+        // "man" inside "mango": the old rule read the strings, not the words.
+        val mango = LyricsMatcher.Target("Mango Season", "Someone", 200_000L)
+        assertTrue(LyricsMatcher.similarity("Man", mango.title) < 0.35f)
+    }
+
+    @Test
+    fun `the real title still matches through the packaging`() {
+        val packaged = LyricsMatcher.Target("Song Name (Official Video) [FREE]", "Uploader", 200_000L)
+        assertTrue(LyricsMatcher.similarity("Song Name", packaged.title) >= 0.85f)
+        assertTrue(LyricsMatcher.isAcceptable("Song Name", "The Actual Artist", packaged))
+    }
+
+    @Test
+    fun `a remix of the right song still matches`() {
+        val plain = LyricsMatcher.Target("Song Name", "Artist", 200_000L)
+        assertTrue(LyricsMatcher.isAcceptable("Song Name Remix", "Artist", plain))
+    }
+
+    @Test
+    fun `a distinctive single word still carries`() {
+        // One word, but a word rather than a syllable, so it may identify a song on its own.
+        val queen = LyricsMatcher.Target("Bohemian Rhapsody", "Queen", 355_000L)
+        assertTrue(LyricsMatcher.similarity("Bohemian", queen.title) >= 0.7f)
+    }
+
+    @Test
+    fun `non latin titles compare on their own words`() {
+        val cyrillic = LyricsMatcher.Target("Заправка", "Артист", 200_000L)
+        assertTrue(LyricsMatcher.isAcceptable("Заправка", "Артист", cyrillic))
+        assertFalse(LyricsMatcher.isAcceptable("Другая песня", "Кто-то", cyrillic))
+    }
+
 }
 
 /**

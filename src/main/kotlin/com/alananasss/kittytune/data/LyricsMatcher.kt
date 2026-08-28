@@ -112,14 +112,49 @@ object LyricsMatcher {
         val normB = normalize(b)
         if (normA.isEmpty() || normB.isEmpty()) return 0f
         if (normA == normB) return 1f
-        if (normA.contains(normB) || normB.contains(normA)) return 0.9f
 
         val tokensA = tokens(normA)
         val tokensB = tokens(normB)
         if (tokensA.isEmpty() || tokensB.isEmpty()) return 0f
+
+        // The same words in a different order are the same credit, not a near miss: artist credits
+        // and title fragments get reordered constantly.
+        if (tokensA == tokensB) return 1f
+
         val shared = tokensA.count { it in tokensB }
-        return shared.toFloat() / minOf(tokensA.size, tokensB.size)
+        val fewer = minOf(tokensA.size, tokensB.size)
+        val more = maxOf(tokensA.size, tokensB.size)
+
+        // Containment is still the common shape: one title is the other plus packaging, and the
+        // packaging is mostly gone by now. But it has to be containment of *words*, and of enough of
+        // them to identify a song.
+        //
+        // It used to be a plain substring test on the whole string, which is how a wrong song got on
+        // screen (issue #33). A short title is a substring of almost anything: "go" sits inside
+        // "mango", so a track called "fortuna 812 go with me" would accept a lyric sheet titled "Go"
+        // at 0.9 and publish it as a confident match.
+        if (shared == fewer) {
+            if (fewer >= 2) return 0.9f
+            // A single word can still identify a song when it is a word rather than a syllable, but
+            // never with the confidence of two.
+            val onlyToken = tokensA.intersect(tokensB).first()
+            if (onlyToken.length >= DISTINCTIVE_TOKEN_LENGTH) return 0.75f
+        }
+
+        // Divided by the longer side, not the shorter one. Dividing by the shorter side scored a
+        // one-word candidate that appears anywhere in a long title as a perfect match, which is the
+        // same bug from the other direction: one word out of eight is a coincidence, however short
+        // the sheet's own title happens to be.
+        return shared.toFloat() / more
     }
+
+    /**
+     * How long a lone shared word has to be before it identifies a song on its own.
+     *
+     * Six characters is past the length of the short English words that turn up inside other words
+     * and inside every second track title.
+     */
+    private const val DISTINCTIVE_TOKEN_LENGTH = 6
 
     /** Words worth comparing: everything else is packaging, not identity. */
     private val NOISE = setOf(
