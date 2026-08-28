@@ -1330,6 +1330,16 @@ private fun ReorderableCollectionItemScope.MenuTile(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
+                // Fills its cell, which it used to get for free.
+                //
+                // A grid cell hands its item an exact width, so the tile filled it and its icon sat in
+                // the middle. [ReorderableItem] wraps what it is given in a Box, and a Box does not
+                // pass a minimum width down, so the tile started measuring itself against its own
+                // label instead: short labels ended up hugging the left of their cell and long ones
+                // reaching the middle, and no two icons in a column lined up. Asking for the width
+                // back restores it, and gives the click and its ripple the whole tile while it is
+                // there (issue #33).
+                .fillMaxWidth()
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(RoundedCornerShape(12.dp))
                 .longPressDraggableHandle()
