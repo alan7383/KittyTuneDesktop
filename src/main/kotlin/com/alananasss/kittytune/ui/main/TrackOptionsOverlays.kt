@@ -111,6 +111,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import com.alananasss.kittytune.domain.Comment
 import com.alananasss.kittytune.ui.player.CommentSort
@@ -784,17 +786,59 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
     val downloadedIds by DownloadManager.downloadedIds.collectAsState()
     val storageTrigger by DownloadManager.storageTrigger.collectAsState()
 
-    // Cards usually carry stub tracks (or none): fetch the full list once.
-    val loadedTracks by produceState<List<com.alananasss.kittytune.domain.Track>?>(initialValue = null, playlist.id) {
-        value = try {
+    // Cards usually carry stub tracks (or none), so the full list has to be fetched. What changed is
+    // when that fetch is allowed to hold anything up (issue #33).
+    //
+    // "If I right-click on the mixes in the main channel, it takes a couple of seconds to load, and
+    // this doesn't happen anywhere except the main channel." Only there because only there do the
+    // cards carry stubs: a library playlist comes from SQLite or is already hydrated, so its menu
+    // opens instantly. Every tile that needs the list was gated on having it, so for those two
+    // seconds the menu was three tiles and a spinner, and then it reflowed into nine.
+    //
+    // The tiles are drawn immediately now and a click waits instead, which is the right place for the
+    // wait: by the time anybody has read the menu and aimed at a tile, the fetch has almost always
+    // landed, and when it has not, waiting after a deliberate click is what every other button in the
+    // app already does.
+    val scope = rememberCoroutineScope()
+    val tracksReady = remember(playlist.id) {
+        kotlinx.coroutines.CompletableDeferred<List<com.alananasss.kittytune.domain.Track>>()
+    }
+    LaunchedEffect(playlist.id) {
+        val fetched = try {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { loadPlaylistTracksForMenu(playlist) }
         } catch (e: Exception) {
             e.printStackTrace()
             emptyList()
         }
+        tracksReady.complete(fetched)
+    }
+    val loadedTracks by produceState<List<com.alananasss.kittytune.domain.Track>?>(initialValue = null, playlist.id) {
+        value = tracksReady.await()
     }
     val tracks = loadedTracks ?: emptyList()
     val isLoadingTracks = loadedTracks == null
+
+    /**
+     * Whether to offer the tiles that act on the track list.
+     *
+     * True while the answer is unknown, because it is almost always yes and guessing wrong costs a
+     * click that does nothing rather than two seconds of everyone's time. A playlist that turns out to
+     * be genuinely empty takes them away, which is a reflow — in the one case where it is deserved.
+     */
+    val offerTrackActions = isLoadingTracks || tracks.isNotEmpty()
+
+    /** Runs [action] once the list is in, so a tile can be pressed before the fetch has landed. */
+    fun withTracks(action: (List<com.alananasss.kittytune.domain.Track>) -> Unit) {
+        val already = loadedTracks
+        if (already != null) {
+            if (already.isNotEmpty()) action(already)
+            return
+        }
+        scope.launch {
+            val fetched = tracksReady.await()
+            if (fetched.isNotEmpty()) action(fetched)
+        }
+    }
 
     val isFullyDownloaded = remember(tracks, downloadedIds, storageTrigger) {
         tracks.isNotEmpty() && tracks.all { it.id < 0 || downloadedIds.contains(it.id) }
@@ -880,33 +924,35 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
             }
         }
 
-        if (isLoadingTracks) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularWavyProgressIndicator(modifier = Modifier.size(20.dp), )
-            }
+        // The row keeps its height either way. Appearing and disappearing, it moved the whole grid
+        // down and back up again, which is the reflow this change exists to remove.
+        Row(
+            modifier = Modifier.fillMaxWidth().height(28.dp).padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isLoadingTracks) CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
         }
 
         val gridItems = mutableListOf<MenuOptionItem>().apply {
-            if (tracks.isNotEmpty()) {
+            if (offerTrackActions) {
                 add(MenuOptionItem("play", Icons.Rounded.PlayArrow, str("btn_play")) {
-                    viewModel.playPlaylist(tracks, 0); viewModel.showPlaylistMenuSheet = false
+                    withTracks { viewModel.playPlaylist(it, 0); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("shuffle", Icons.Rounded.Shuffle, str("btn_shuffle")) {
-                    viewModel.playPlaylist(tracks.shuffled(), 0); viewModel.showPlaylistMenuSheet = false
+                    withTracks { viewModel.playPlaylist(it.shuffled(), 0); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
-                    viewModel.insertNext(tracks); viewModel.showPlaylistMenuSheet = false
+                    withTracks { viewModel.insertNext(it); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
-                    viewModel.addToQueue(tracks); viewModel.showPlaylistMenuSheet = false
+                    withTracks { viewModel.addToQueue(it); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) {
-                    viewModel.showPlaylistMenuSheet = false
-                    viewModel.prepareBulkAdd(tracks)
+                    withTracks {
+                        viewModel.showPlaylistMenuSheet = false
+                        viewModel.prepareBulkAdd(it)
+                    }
                 })
             }
             if (!isLocal && playlist.id > 0 && !isStation) {
@@ -921,7 +967,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
             if (shareUrl.isNotEmpty()) {
                 add(MenuOptionItem("share", Icons.Outlined.Share, str("btn_share")) { viewModel.sharePlaylist(playlist) })
             }
-            if (!isLocal && tracks.isNotEmpty() && !isStation) {
+            if (!isLocal && offerTrackActions && !isStation) {
                 add(
                     MenuOptionItem(
                         id = "download",
@@ -936,8 +982,10 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                         if (isFullyDownloaded) {
                             showRemoveDownloadDialog = true
                         } else if (!isPlaylistDownloading) {
-                            DownloadManager.downloadPlaylist(playlist, tracks)
-                            viewModel.showPlaylistMenuSheet = false
+                            withTracks {
+                                DownloadManager.downloadPlaylist(playlist, it)
+                                viewModel.showPlaylistMenuSheet = false
+                            }
                         }
                     }
                 )
