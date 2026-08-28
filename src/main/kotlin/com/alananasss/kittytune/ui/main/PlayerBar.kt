@@ -364,6 +364,7 @@ fun PlayerBar(
                 }
 
                 // Progress row
+                val seekWheelSeconds = rememberSeekWheelSeconds()
                 var scrubbing by remember { mutableStateOf(false) }
                 var scrubPosition by remember { mutableFloatStateOf(0f) }
                 val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition
@@ -387,7 +388,20 @@ fun PlayerBar(
                             scrubbing = false
                         },
                         valueRange = 0f..duration.toFloat(),
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp)
+                            .seekWheel(
+                                positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
+                                durationMs = { vm.duration },
+                                stepSeconds = { seekWheelSeconds },
+                                onSeek = { target ->
+                                    // Straight to the player rather than through the scrub state: a
+                                    // wheel notch is a decision, not a drag in progress.
+                                    scrubbing = false
+                                    vm.seekTo(target)
+                                },
+                            ),
                     )
                     Text(
                         text = makeTimeString(duration),
@@ -608,12 +622,58 @@ private fun Modifier.volumeWheel(
 }
 
 /**
+ * The wheel over the progress bar, moving the playhead (issue #33).
+ *
+ * "If you hover over the slider showing how long the track is, you can use the mouse wheel to rewind
+ * and fast-forward the track."
+ *
+ * Consumed, so the wheel does not also scroll whatever the player bar happens to be sitting on. Up
+ * goes forward, matching the volume control right next to it, where up is louder. The step is a
+ * setting because five seconds is right for checking a lyric and useless for finding your way around
+ * a two-hour set.
+ */
+@Composable
+private fun Modifier.seekWheel(
+    positionMs: () -> Long,
+    durationMs: () -> Long,
+    stepSeconds: () -> Float,
+    onSeek: (Long) -> Unit,
+): Modifier {
+    val position by androidx.compose.runtime.rememberUpdatedState(positionMs)
+    val duration by androidx.compose.runtime.rememberUpdatedState(durationMs)
+    val step by androidx.compose.runtime.rememberUpdatedState(stepSeconds)
+    val seek by androidx.compose.runtime.rememberUpdatedState(onSeek)
+    return this.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                if (event.type != PointerEventType.Scroll) continue
+                val notches = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                if (notches == 0f) continue
+                val total = duration()
+                if (total <= 0L) continue
+                val moved = position() - (notches * step() * 1000f).toLong()
+                seek(moved.coerceIn(0L, total))
+                event.changes.forEach { it.consume() }
+            }
+        }
+    }
+}
+
+/**
  * Reactive read of which optional player-bar buttons the user keeps; recomposes on pref changes.
  */
 @Composable
 private fun rememberPlayerBarButtons(): Set<String> {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) { PlayerPreferences().getPlayerBarButtons() }
+}
+
+/** Reactive read of how far a wheel notch over the progress bar moves the playhead. */
+@Composable
+private fun rememberSeekWheelSeconds(): Float {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { PlayerPreferences().getSeekWheelSeconds() }
 }
 
 /** Reactive read of the lyrics button's own switch, which lives in the lyrics settings. */

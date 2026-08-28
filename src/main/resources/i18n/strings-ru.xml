@@ -1158,6 +1158,9 @@
     <string name="pref_sc_sync_title">Синхронизация истории SoundCloud</string>
     <string name="pref_seed_palette_title">Палитра</string>
     <string name="pref_start_screen">Начальный экран</string>
+    <string name="pref_seek_wheel_step">Колёсико над полосой воспроизведения</string>
+    <string name="pref_seek_wheel_step_sub">На сколько один щелчок колёсика сдвигает позицию.</string>
+    <string name="pref_seek_wheel_step_value">%1$s с</string>
     <string name="pref_info_half">Вкладка «Инфо» открывается на</string>
     <string name="pref_info_half_remember">Последний выбор</string>
     <string name="pref_stop_on_task_clear">Остановить музыку при закрытии приложения</string>

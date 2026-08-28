@@ -1158,6 +1158,9 @@
     <string name="pref_sc_sync_title">Synchronisation de l\'historique SoundCloud</string>
     <string name="pref_seed_palette_title">Palette de seeds</string>
     <string name="pref_start_screen">Écran de démarrage</string>
+    <string name="pref_seek_wheel_step">Molette sur la barre de progression</string>
+    <string name="pref_seek_wheel_step_sub">De combien un cran de molette déplace la tête de lecture.</string>
+    <string name="pref_seek_wheel_step_value">%1$s s</string>
     <string name="pref_info_half">L'onglet Info s'ouvre sur</string>
     <string name="pref_info_half_remember">Dernier choix</string>
     <string name="pref_stop_on_task_clear">Arrêter la musique à la fermeture</string>
