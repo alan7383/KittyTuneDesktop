@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.profile
 
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -139,7 +140,7 @@ fun ProxySettingsScreen(
                         placeholder = { Text(str("proxy_profile_name_hint")) },
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().trackTextInput()
                     )
                 }
             },
@@ -568,7 +569,7 @@ fun ProxySettingsScreen(
                                         }
                                     },
                                     shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth().trackTextInput()
                                 )
 
                                 OutlinedTextField(
@@ -589,7 +590,7 @@ fun ProxySettingsScreen(
                                         Icon(Icons.Rounded.Numbers, contentDescription = null)
                                     },
                                     shape = RoundedCornerShape(16.dp),
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth().trackTextInput()
                                 )
 
                                 // Quick Presets
@@ -710,7 +711,7 @@ fun ProxySettingsScreen(
                                             Icon(Icons.Rounded.Person, contentDescription = null)
                                         },
                                         shape = RoundedCornerShape(16.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier.fillMaxWidth().trackTextInput()
                                     )
 
                                     OutlinedTextField(
@@ -737,7 +738,7 @@ fun ProxySettingsScreen(
                                             }
                                         },
                                         shape = RoundedCornerShape(16.dp),
-                                        modifier = Modifier.fillMaxWidth()
+                                        modifier = Modifier.fillMaxWidth().trackTextInput()
                                     )
                                 }
                             }

@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.profile
 
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -267,7 +268,7 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
                             )
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
                 )
 
                 Spacer(Modifier.height(8.dp))

@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.upload
 
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -137,7 +138,7 @@ fun GenrePickerDialog(
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 12.dp),
+                        .padding(bottom = 12.dp).trackTextInput(),
                     shape = RoundedCornerShape(12.dp)
                 )
 

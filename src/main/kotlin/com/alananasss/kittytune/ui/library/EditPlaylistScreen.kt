@@ -215,7 +215,7 @@ fun EditPlaylistScreen(
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showSetTypeDropdown) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                            modifier = Modifier.fillMaxWidth().menuAnchor().trackTextInput()
                         )
                         ExposedDropdownMenu(
                             expanded = showSetTypeDropdown,
@@ -247,7 +247,7 @@ fun EditPlaylistScreen(
                             value = releaseDate,
                             onValueChange = { releaseDate = it },
                             label = { Text(str("upload_field_release_date")) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().trackTextInput(),
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             trailingIcon = {
@@ -284,7 +284,7 @@ fun EditPlaylistScreen(
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showGenreDropdown) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                            modifier = Modifier.fillMaxWidth().menuAnchor().trackTextInput()
                         )
                         ExposedDropdownMenu(
                             expanded = showGenreDropdown,
@@ -309,7 +309,7 @@ fun EditPlaylistScreen(
                             value = genre,
                             onValueChange = { genre = it },
                             label = { Text(str("edit_playlist_custom_genre")) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().trackTextInput(),
                             singleLine = true
                         )
                     }
@@ -321,7 +321,7 @@ fun EditPlaylistScreen(
                         value = tagInput,
                         onValueChange = { tagInput = it },
                         label = { Text(str("edit_playlist_add_tags")) },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         trailingIcon = {
