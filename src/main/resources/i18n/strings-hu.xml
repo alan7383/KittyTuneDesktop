@@ -1012,12 +1012,6 @@
     <string name="player_effects">Effektek</string>
     <string name="player_like_action">Tetszik</string>
     <string name="player_lyrics">Dalszöveg</string>
-    <string name="player_shuffle">Véletlenszerű</string>
-    <string name="player_previous">Előző szám</string>
-    <string name="player_play_pause">Lejátszás / pillanatállj</string>
-    <string name="player_next">Következő szám</string>
-    <string name="player_repeat">Ismétlés</string>
-    <string name="player_like">Kedvelés</string>
     <string name="player_pitch">Hangmagasság</string>
     <string name="player_playing_now">MOST SZÓL</string>
     <string name="player_queue">Várólista</string>
