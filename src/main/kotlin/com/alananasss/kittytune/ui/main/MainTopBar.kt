@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.main
 
+import com.alananasss.kittytune.ui.common.escapeDismisses
 import androidx.compose.material3.ButtonDefaults
 
 import androidx.compose.foundation.layout.Row
@@ -149,6 +150,7 @@ fun MainTopBar(
 
         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
 
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
         OutlinedTextField(
             value = vm.searchQuery,
             onValueChange = {
@@ -189,7 +191,19 @@ fun MainTopBar(
             ),
             // A low minimum: the field would rather be narrow than push the buttons around it
             // off the bar when the window shrinks or the UI scale goes up.
-            modifier = Modifier.widthIn(min = 160.dp, max = 480.dp).trackTextInput(),
+            modifier = Modifier
+                .widthIn(min = 160.dp, max = 480.dp)
+                .trackTextInput()
+                // Escape only. This field is always on the bar, so it has no closed state to return to
+                // — and a click that took the query with it would clear the search every time somebody
+                // clicked one of its own results. Escape is the gesture that means "and I am done":
+                // it empties the field and leaves the results, which is the exit he could not find
+                // ("you will be able to close it only after returning from the tabs", issue #33).
+                .escapeDismisses {
+                    vm.clearSearch()
+                    vm.isSearching = false
+                    focusManager.clearFocus()
+                },
         )
 
         androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))

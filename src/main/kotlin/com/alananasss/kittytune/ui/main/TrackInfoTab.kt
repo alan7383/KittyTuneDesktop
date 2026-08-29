@@ -477,176 +477,10 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Tags & details (SoundCloud only).
-        //
-        // One line for the release date and the genre, not two rows twelve dp apart (issue #33).
-        // "I think it is necessary to remove the release date and genre below the text, because the
-        // text is more important than them" — the text is, so they give up the height rather than
-        // the place: moved under the lyrics they would mean scrolling past a whole song to find a
-        // year, and they belong with the track's own numbers, which are right above. The labels go
-        // because a calendar before a date and a note before a genre say the same thing in no
-        // horizontal space at all.
-        if (!isSpotifyTrack) item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
-                val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
-                val genre = displayTrack.genre
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
-                ) {
-                    Icon(
-                        Icons.Rounded.CalendarToday,
-                        contentDescription = str("detail_release_date"),
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = releaseDateStr,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-
-                    if (!genre.isNullOrBlank()) {
-                        Text(
-                            text = "·",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                        Row(
-                            modifier = Modifier
-                                .clickable { vm.navigateToTag(genre) }
-                                .weight(1f, fill = false),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Icon(
-                                Icons.Rounded.MusicNote,
-                                contentDescription = str("detail_genre"),
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            // Ellipsized rather than wrapping: a long genre string must not be what
-                            // turns this one line back into two.
-                            Text(
-                                text = genre,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-                
-                if (!displayTrack.tagList.isNullOrBlank()) {
-                    val tags = parseTags(displayTrack.tagList)
-                    if (tags.isNotEmpty()) {
-                        val scrollState = rememberScrollState()
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .pointerInput(Unit) {
-                                        awaitPointerEventScope {
-                                            while (true) {
-                                                val event = awaitPointerEvent()
-                                                if (event.type == PointerEventType.Scroll) {
-                                                    val delta = event.changes.first().scrollDelta.y
-                                                    scope.launch {
-                                                        scrollState.scrollBy(delta * 50f)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    .horizontalScroll(scrollState),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                tags.forEach { tag ->
-                                    SuggestionChip(
-                                        onClick = { vm.navigateToTag(tag) },
-                                        label = { Text(tag) }
-                                    )
-                                }
-                            }
-
-                            // Left shadow & arrow
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = scrollState.value > 0,
-                                enter = fadeIn(),
-                                exit = fadeOut(),
-                                modifier = Modifier.align(Alignment.CenterStart)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(40.dp)
-                                        .height(32.dp)
-                                        .background(
-                                            androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                listOf(
-                                                    MaterialTheme.colorScheme.surface,
-                                                    androidx.compose.ui.graphics.Color.Transparent
-                                                )
-                                            )
-                                        ),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(start = 4.dp)
-                                            .size(22.dp)
-                                            .background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.CircleShape)
-                                            .clip(androidx.compose.foundation.shape.CircleShape)
-                                            .clickable { scope.launch { scrollState.animateScrollBy(-200f) } },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Rounded.ChevronLeft, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                                    }
-                                }
-                            }
-
-                            // Right shadow & arrow
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = scrollState.value < scrollState.maxValue,
-                                enter = fadeIn(),
-                                exit = fadeOut(),
-                                modifier = Modifier.align(Alignment.CenterEnd)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(40.dp)
-                                        .height(32.dp)
-                                        .background(
-                                            androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                                listOf(
-                                                    androidx.compose.ui.graphics.Color.Transparent,
-                                                    MaterialTheme.colorScheme.surface
-                                                )
-                                            )
-                                        ),
-                                    contentAlignment = Alignment.CenterEnd
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(end = 4.dp)
-                                            .size(22.dp)
-                                            .background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.CircleShape)
-                                            .clip(androidx.compose.foundation.shape.CircleShape)
-                                            .clickable { scope.launch { scrollState.animateScrollBy(200f) } },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // Above the comments, below the lyrics — see [trackTagsAndDetails]. With comments showing there
+        // is nothing to be "under": that list has no end, and a year at the bottom of it is a year
+        // nobody will find.
+        if (!isSpotifyTrack && !lyricsHalf) trackTagsAndDetails(vm, displayTrack, scope)
 
         // Social Liked Proof Banner (e.g. "Mandra and 1,400 others liked this track")
         val socialLiker = vm.socialLikerUser
@@ -865,6 +699,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         }
 
         if (lyricsHalf) trackLyricsHalf(vm, showHeader = isSpotifyTrack)
+        if (!isSpotifyTrack && lyricsHalf) trackTagsAndDetails(vm, displayTrack, scope)
     }
 }
 
@@ -1011,7 +846,13 @@ private fun LazyListScope.trackLyricsHalf(vm: PlayerViewModel, showHeader: Boole
  * the way down with lines either side of it, short enough to leave the cover and the details above
  * it on screen.
  */
-private val LYRICS_HALF_HEIGHT = 320.dp
+/**
+ * How tall the lyrics are inside the info tab.
+ *
+ * "Make the text higher." It was 320 dp, chosen when the release date, the genre and the tag chips sat
+ * above it and took the difference; they are below it now, so the words get the height back (issue #33).
+ */
+private val LYRICS_HALF_HEIGHT = 440.dp
 
 @Composable
 fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = false) {
@@ -1414,3 +1255,187 @@ private fun CreditArtistRow(
     }
 }
 
+
+
+/**
+ * The release date, the genre and the tags — below the words rather than above them (issue #33).
+ *
+ * "I also think that it is necessary to change the action of the button […] I consider it necessary to
+ * move the date of the track under the text, to the right menu, and make the text higher."
+ *
+ * Asked twice, so it goes below, and the height it was taking goes to the lyrics. The reservation this
+ * block used to carry in a comment still stands — a year under a whole song takes scrolling to find —
+ * which is why it goes below the *lyrics* and not below the comments: a comment list has no end, and
+ * "under the text" only means anything where there is text. With comments showing it stays where it
+ * was, above them.
+ *
+ * One line for the date and the genre, not two rows twelve dp apart, and no labels: a calendar before a
+ * date and a note before a genre say the same thing in no horizontal space at all.
+ */
+private fun LazyListScope.trackTagsAndDetails(
+    vm: PlayerViewModel,
+    displayTrack: com.alananasss.kittytune.domain.Track,
+    scope: kotlinx.coroutines.CoroutineScope,
+) {
+    item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
+                val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
+                val genre = displayTrack.genre
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        Icons.Rounded.CalendarToday,
+                        contentDescription = str("detail_release_date"),
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = releaseDateStr,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+
+                    if (!genre.isNullOrBlank()) {
+                        Text(
+                            text = "·",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .clickable { vm.navigateToTag(genre) }
+                                .weight(1f, fill = false),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.MusicNote,
+                                contentDescription = str("detail_genre"),
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            // Ellipsized rather than wrapping: a long genre string must not be what
+                            // turns this one line back into two.
+                            Text(
+                                text = genre,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                
+                if (!displayTrack.tagList.isNullOrBlank()) {
+                    val tags = parseTags(displayTrack.tagList)
+                    if (tags.isNotEmpty()) {
+                        val scrollState = rememberScrollState()
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .pointerInput(Unit) {
+                                        awaitPointerEventScope {
+                                            while (true) {
+                                                val event = awaitPointerEvent()
+                                                if (event.type == PointerEventType.Scroll) {
+                                                    val delta = event.changes.first().scrollDelta.y
+                                                    scope.launch {
+                                                        scrollState.scrollBy(delta * 50f)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .horizontalScroll(scrollState),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                tags.forEach { tag ->
+                                    SuggestionChip(
+                                        onClick = { vm.navigateToTag(tag) },
+                                        label = { Text(tag) }
+                                    )
+                                }
+                            }
+
+                            // Left shadow & arrow
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = scrollState.value > 0,
+                                enter = fadeIn(),
+                                exit = fadeOut(),
+                                modifier = Modifier.align(Alignment.CenterStart)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(40.dp)
+                                        .height(32.dp)
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                listOf(
+                                                    MaterialTheme.colorScheme.surface,
+                                                    androidx.compose.ui.graphics.Color.Transparent
+                                                )
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(start = 4.dp)
+                                            .size(22.dp)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.CircleShape)
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .clickable { scope.launch { scrollState.animateScrollBy(-200f) } },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Rounded.ChevronLeft, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+
+                            // Right shadow & arrow
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = scrollState.value < scrollState.maxValue,
+                                enter = fadeIn(),
+                                exit = fadeOut(),
+                                modifier = Modifier.align(Alignment.CenterEnd)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(40.dp)
+                                        .height(32.dp)
+                                        .background(
+                                            androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                listOf(
+                                                    androidx.compose.ui.graphics.Color.Transparent,
+                                                    MaterialTheme.colorScheme.surface
+                                                )
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(end = 4.dp)
+                                            .size(22.dp)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.CircleShape)
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .clickable { scope.launch { scrollState.animateScrollBy(200f) } },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+    }
+}
