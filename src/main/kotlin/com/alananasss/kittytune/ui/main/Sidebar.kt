@@ -85,6 +85,8 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.Tip
+import com.alananasss.kittytune.ui.common.escapeDismisses
+import com.alananasss.kittytune.ui.common.focusLossDismisses
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.ui.library.*
@@ -992,6 +994,11 @@ private fun LibraryHeader(
 @Composable
 private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
     var searchActive by remember { mutableStateOf(libraryViewModel.searchQuery.isNotBlank()) }
+    // One way out, whichever gesture asked for it: the cross, Escape, or a click anywhere else.
+    val dismiss = {
+        libraryViewModel.searchQuery = ""
+        searchActive = false
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(36.dp),
@@ -1035,22 +1042,15 @@ private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
                                 .fillMaxWidth()
                                 .trackTextInput()
                                 .focusRequester(focusRequester)
-                                .onPreviewKeyEvent { event ->
-                                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                                        libraryViewModel.searchQuery = ""
-                                        searchActive = false
-                                        true
-                                    } else false
-                                },
+                                // This field is an icon until it is pressed, so both gestures close it
+                                // outright — see [escapeDismisses] for why they are separate modifiers.
+                                .escapeDismisses(dismiss)
+                                .focusLossDismisses(dismiss),
                         )
                     }
                     IconButton(
                         shapes = IconButtonDefaults.shapes(),
-                        onClick = {
-                            libraryViewModel.searchQuery = ""
-                            searchActive = false
-                        },
-
+                        onClick = dismiss,
                         modifier = Modifier.size(20.dp),
                     ) {
                         Icon(
