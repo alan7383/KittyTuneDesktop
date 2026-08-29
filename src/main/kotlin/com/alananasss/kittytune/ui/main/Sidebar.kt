@@ -80,6 +80,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.alananasss.kittytune.domain.getHighResAvatarUrl
+import com.alananasss.kittytune.domain.isDefaultAvatar
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
@@ -243,9 +245,161 @@ fun Sidebar(
             onUpload = { navController.navigate("upload") },
             modifier = Modifier.weight(1f),
         )
+
+        SidebarProfileRow(
+            playerViewModel = playerViewModel,
+            navController = navController,
+            collapse = collapse,
+        )
     }
     }
 }
+
+/**
+ * The account, at the bottom of the panel where it is always in the same place (issue #33).
+ *
+ * "You can have an avatar with all the buttons (profile, upload, settings, support, etc.), move it to the
+ * bottom of the left panel so that it is already in place, because now it is not always easy to get to
+ * it, but it is always there — a visible and convenient location."
+ *
+ * It lived at the right end of the top bar, which is the part of that bar the search field pushes around:
+ * at a narrow window or a large UI scale it was the thing that moved. The bottom of the sidebar does not
+ * move, and it is where every other desktop player keeps the account.
+ *
+ * Same geometry as everything else in this panel — the avatar is 24 dp at [SidebarMorph.ICON_INSET], so
+ * its centre is on the line the navigation icons and every entry's artwork stand on, and the name beside
+ * it leaves through [pushedBack] like any other label.
+ */
+@Composable
+private fun SidebarProfileRow(
+    playerViewModel: PlayerViewModel,
+    navController: NavController,
+    collapse: Float,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
+
+    if (showAboutDialog) {
+        com.alananasss.kittytune.ui.profile.AboutDialog(onDismiss = { showAboutDialog = false })
+    }
+
+    LaunchedEffect(Unit) {
+        if (playerViewModel.currentUser == null) playerViewModel.fetchUserProfile()
+    }
+
+    val rawAvatar = playerViewModel.currentUser?.avatarUrl
+    val avatarUrl = rawAvatar.getHighResAvatarUrl()
+    val name = playerViewModel.currentUser?.username ?: str("profile_menu_login")
+
+    Surface(
+        shape = PanelShape,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box {
+            Tip(name, enabled = collapse > SidebarMorph.FADE_DONE_AT) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { showMenu = true }
+                        .padding(start = SidebarMorph.ICON_INSET, end = 8.dp)
+                        .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (!avatarUrl.isNullOrEmpty() && !rawAvatar.isDefaultAvatar()) {
+                        AsyncImage(
+                            model = avatarUrl,
+                            contentDescription = null,
+                            error = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
+                            fallback = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(SidebarMorph.ICON_SIZE).clip(CircleShape),
+                        )
+                    } else {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(SidebarMorph.ICON_SIZE).clip(CircleShape),
+                        )
+                    }
+                    Box(Modifier.pushedBack(collapse).padding(start = SidebarMorph.LABEL_GAP)) {
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            softWrap = false,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+
+            ProfileMenu(
+                expanded = showMenu,
+                onDismiss = { showMenu = false },
+                playerViewModel = playerViewModel,
+                navController = navController,
+                onAbout = { showAboutDialog = true },
+            )
+        }
+    }
+}
+
+/** The same four destinations the top bar's avatar offered, plus signing in or out. */
+@Composable
+private fun ProfileMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    playerViewModel: PlayerViewModel,
+    navController: NavController,
+    onAbout: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(str("nav_profile")) },
+            onClick = {
+                onDismiss()
+                playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(str("nav_upload")) },
+            onClick = {
+                onDismiss()
+                navController.navigate("upload")
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(str("profile_menu_settings")) },
+            onClick = {
+                onDismiss()
+                navController.navigate("settings")
+            },
+        )
+        DropdownMenuItem(
+            text = { Text(str("nav_about_support")) },
+            onClick = {
+                onDismiss()
+                onAbout()
+            },
+        )
+        androidx.compose.material3.HorizontalDivider()
+        val isGuest = playerViewModel.currentUserId == 0L
+        DropdownMenuItem(
+            text = { Text(if (isGuest) str("profile_menu_login") else str("profile_menu_logout")) },
+            onClick = {
+                onDismiss()
+                com.alananasss.kittytune.data.TokenManager.logout()
+            },
+        )
+    }
+}
+
+private const val DEFAULT_AVATAR = "drawable/ic_default_user_artwork_placeholder_round.xml"
 
 /** Left/right click handling shared by all library entry composables. */
 @OptIn(ExperimentalFoundationApi::class)

@@ -44,11 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
-import com.alananasss.kittytune.domain.getHighResAvatarUrl
-import com.alananasss.kittytune.domain.isDefaultAvatar
 import com.alananasss.kittytune.ui.home.HomeViewModel
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
@@ -226,93 +223,10 @@ fun MainTopBar(
             )
         }
 
+        // Still here with nothing after it, so the search stays in the middle of the bar rather than
+        // sliding to the right edge now that the avatar has moved to the bottom of the sidebar
+        // (issue #33).
         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-
-        // Avatar -> profile dropdown
-        androidx.compose.foundation.layout.Box {
-            var showProfileMenu by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-            var showAboutDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-
-            if (showAboutDialog) {
-                com.alananasss.kittytune.ui.profile.AboutDialog(onDismiss = { showAboutDialog = false })
-            }
-
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                if (playerViewModel.currentUser == null) {
-                    playerViewModel.fetchUserProfile()
-                }
-            }
-
-            val rawAvatar = playerViewModel.currentUser?.avatarUrl
-            val avatarUrl = rawAvatar.getHighResAvatarUrl()
-
-            IconButton(
-                shapes = IconButtonDefaults.shapes(),
-                onClick = { showProfileMenu = true }
-            ) {
-                if (!avatarUrl.isNullOrEmpty() && !rawAvatar.isDefaultAvatar()) {
-                    AsyncImage(
-                        model = avatarUrl,
-                        contentDescription = null,
-                        error = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
-                        fallback = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
-                        modifier = Modifier.size(32.dp).clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(32.dp).clip(CircleShape),
-                    )
-                }
-            }
-
-            androidx.compose.material3.DropdownMenu(
-                expanded = showProfileMenu,
-                onDismissRequest = { showProfileMenu = false }
-            ) {
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(str("nav_profile")) },
-                    onClick = {
-                        showProfileMenu = false
-                        playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
-                    }
-                )
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(str("nav_upload")) },
-                    onClick = {
-                        showProfileMenu = false
-                        navController.navigate("upload")
-                    }
-                )
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(str("profile_menu_settings")) },
-                    onClick = {
-                        showProfileMenu = false
-                        navController.navigate("settings")
-                    }
-                )
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(str("nav_about_support")) },
-                    onClick = {
-                        showProfileMenu = false
-                        showAboutDialog = true
-                    }
-                )
-                androidx.compose.material3.HorizontalDivider()
-                
-                val isGuest = playerViewModel.currentUserId == 0L
-                androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(if (isGuest) str("profile_menu_login") else str("profile_menu_logout")) },
-                    onClick = {
-                        showProfileMenu = false
-                        com.alananasss.kittytune.data.TokenManager.logout()
-                    }
-                )
-            }
-        }
     }
 }
 
