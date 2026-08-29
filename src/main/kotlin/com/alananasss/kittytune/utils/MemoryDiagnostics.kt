@@ -51,6 +51,18 @@ object MemoryDiagnostics {
     /** A collection longer than this is the freeze somebody feels, so each one is written down. */
     private const val SLOW_GC_MS = 200L
 
+    /**
+     * Names of the collectors whose every collection is written down, however short.
+     *
+     * G1 does its old-generation work concurrently; a *full* collection is the fallback for when that
+     * could not keep up, and it stops the world. So the count matters even when the duration does not.
+     * Two logs went by with this hidden behind [SLOW_GC_MS]: the pauses were 25 to 66 ms at the heap
+     * sizes those sessions reached, so nothing was written, and the fact that the app was doing two full
+     * collections a minute from startup — which is the thing that was wrong — only showed up as a
+     * cumulative counter nobody had a reason to read closely (issue #33).
+     */
+    private val ALWAYS_LOGGED_COLLECTORS = setOf("G1 Old Generation", "PS MarkSweep", "MarkSweepCompact")
+
     /** Kept next to the settings rather than in a cache, so clearing the cache cannot delete it. */
     val logFile: File get() = File(AppDirs.dataDir, "memory.log")
 
@@ -164,11 +176,30 @@ object MemoryDiagnostics {
             lines.take(HISTOGRAM_LINES).forEach { appendLine(it) }
             val remaining = lines.size - HISTOGRAM_LINES
             if (remaining > 0) appendLine("... and $remaining more classes")
+
+            // And the same list with everything but this app's own types removed.
+            //
+            // The first histogram we got back was 2.8 million strings in 2.5 million byte arrays inside
+            // 36,000 object arrays, and exactly one line of the top forty-five belonged to KittyTune. That
+            // is a true answer to "what is on the heap" and no answer at all to "who put it there": the
+            // strings are held by containers the JDK supplies and this app fills. Whichever of our own
+            // classes is unexpectedly numerous names the subsystem, and it is never in the top forty-five
+            // because our objects are large and few where theirs are small and many (issue #33).
+            val ours = lines.filter { it.contains(APP_PACKAGE) }
+            appendLine()
+            appendLine("Of those, KittyTune's own classes:")
+            if (ours.isEmpty()) appendLine(" (none in the histogram)")
+            else ours.take(APP_HISTOGRAM_LINES).forEach { appendLine(it) }
         }
     }
 
     /** Enough to name the culprit and its container, not enough to bury them. */
     private const val HISTOGRAM_LINES = 45
+
+    /** The app's own types are the short list, so it can afford to be longer. */
+    private const val APP_HISTOGRAM_LINES = 25
+
+    private const val APP_PACKAGE = "com.alananasss.kittytune"
 
     /**
      * Runs one of the commands `jcmd` would run, in-process.
@@ -295,7 +326,7 @@ object MemoryDiagnostics {
             val info = runCatching { sun.lastGcInfo }.getOrNull() ?: continue
             if (lastSeenGcId[bean.name] == info.id) continue
             lastSeenGcId[bean.name] = info.id
-            if (info.duration < SLOW_GC_MS) continue
+            if (info.duration < SLOW_GC_MS && bean.name !in ALWAYS_LOGGED_COLLECTORS) continue
             val before = runCatching { info.memoryUsageBeforeGc.values.sumOf { it.used } }.getOrDefault(0L)
             val after = runCatching { info.memoryUsageAfterGc.values.sumOf { it.used } }.getOrDefault(0L)
             append(
