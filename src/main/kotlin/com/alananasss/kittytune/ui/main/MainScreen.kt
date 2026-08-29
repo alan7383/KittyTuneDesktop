@@ -379,7 +379,10 @@ fun MainScreen() {
                     label = "lyricsSheet",
                 ) { showLyrics ->
                 if (showLyrics) {
-                    com.alananasss.kittytune.ui.player.lyrics.LyricsScreen(
+                    // The words on the record's own colour, with the sleeve and the transport beside them —
+                    // built from the Apple Music screenshot he sent after the first attempt was described
+                    // rather than shown. See [FullPlayerScreen] (issue #33).
+                    com.alananasss.kittytune.ui.player.FullPlayerScreen(
                         viewModel = playerViewModel,
                         onClose = { playerViewModel.showLyricsSheet = false }
                     )
@@ -937,10 +940,7 @@ fun MainScreen() {
             onOpenLyrics = {
                 playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
             },
-            onOpenTrackInfo = {
-                showNowPlayingPanel = true
-                nowPlayingTab = NowPlayingTab.TRACK
-            },
+            onOpenFullPlayer = { playerViewModel.showLyricsSheet = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = PANEL_GUTTER.dp)
