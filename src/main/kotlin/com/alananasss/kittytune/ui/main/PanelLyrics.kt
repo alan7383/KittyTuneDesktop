@@ -160,7 +160,7 @@ private fun PanelSyncedLyrics(
                 PanelLyricLine(
                     vm = vm,
                     line = line,
-                    lineSpacing = style.lineSpacing,
+                    style = style,
                     // Negative for lines already sung. Before the first line starts there is no current
                     // line, and treating every line as "far away" would shrink the whole panel — so the
                     // distance is zero for all of them until the song reaches the words.
@@ -195,20 +195,21 @@ private fun PanelSyncedLyrics(
 private fun PanelLyricLine(
     vm: PlayerViewModel,
     line: LyricLine,
-    lineSpacing: Dp,
+    style: PanelLyricsStyle,
     distance: Int,
     positionMs: Float,
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val isActive = distance == 0
+    val displayStyle = if (style.isFullScreen) vm.lyricsFullScreenDisplayStyle else vm.lyricsDisplayStyle
 
     val treatment = LyricLineStyling.treatmentFor(
-        style = vm.lyricsDisplayStyle,
+        style = displayStyle,
         distance = distance,
         // Softer than the full screen's: this text is a third of the size, and the radius that reads as
         // depth behind a headline turns a panel line into a smudge.
-        focusBlur = 1.dp,
+        focusBlur = if (style.isFullScreen) 3.dp else 1.dp,
     )
 
     val scale by animateFloatAsState(treatment.scale, tween(260), label = "panelLyricScale")
@@ -226,7 +227,7 @@ private fun PanelLyricLine(
     // The reader's own alignment, which this view used to ignore: "ça doit prendre en compte les paramètres
     // lyrics, si on met centré ça met centré" (issue #33). The full screen honoured it and the panel did not,
     // which is the same class of bug as every other one where these two disagreed.
-    val textAlign = alignmentOf(vm)
+    val textAlign = alignmentOf(vm, style)
     val columnAlign = when (textAlign) {
         TextAlign.Center -> Alignment.CenterHorizontally
         TextAlign.End -> Alignment.End
@@ -246,7 +247,7 @@ private fun PanelLyricLine(
             // the "gros truc en surbrillance moche" — the lyrics screen has always drawn a rule under the
             // hovered line instead, and that is the affordance these lines should have too (issue #33).
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(vertical = lineSpacing)
+            .padding(vertical = style.lineSpacing)
             .graphicsLayer {
                 // Scaled about whichever edge the text is aligned to, so a shrinking line does not drift away
                 // from its own margin. Centred text scales about its centre, which is what the lyrics screen
@@ -384,7 +385,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = alignmentOf(vm),
+                        textAlign = alignmentOf(vm, style),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = style.lineSpacing),
@@ -397,10 +398,13 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
 
 /** The reader's chosen alignment, in the one place both halves of this file read it from. */
 @Composable
-private fun alignmentOf(vm: PlayerViewModel): TextAlign = when (vm.lyricsAlignment) {
-    com.alananasss.kittytune.data.local.LyricsAlignment.LEFT -> TextAlign.Start
-    com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> TextAlign.Center
-    com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT -> TextAlign.End
+private fun alignmentOf(vm: PlayerViewModel, style: PanelLyricsStyle): TextAlign {
+    val align = if (style.isFullScreen) vm.lyricsFullScreenAlignment else vm.lyricsAlignment
+    return when (align) {
+        com.alananasss.kittytune.data.local.LyricsAlignment.LEFT -> TextAlign.Start
+        com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> TextAlign.Center
+        com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT -> TextAlign.End
+    }
 }
 
 /** Long enough to read as the line growing a second half, short enough not to lag behind the switch. */
@@ -429,6 +433,7 @@ private const val SECONDARY_FADE_MS = 220
  *   the inset to matter (issue #33).
  * @param lineSpacing air between one line and the next. Part of the preset rather than a setting: it is a
  *   consequence of how big the type is, and the type is what the reader actually adjusts.
+ * @param isFullScreen whether this is rendered in full-window lyrics mode.
  */
 data class PanelLyricsStyle(
     val startPadding: Dp,
@@ -437,6 +442,7 @@ data class PanelLyricsStyle(
     val tailFraction: Float,
     val anchorFraction: Float,
     val lineSpacing: Dp,
+    val isFullScreen: Boolean = false,
 ) {
     companion object {
         /**
@@ -452,6 +458,7 @@ data class PanelLyricsStyle(
             tailFraction = 0.35f,
             anchorFraction = 0.32f,
             lineSpacing = 6.dp,
+            isFullScreen = false,
         )
 
         /** A full screen, where the same air is the point of the thing. */
@@ -464,6 +471,7 @@ data class PanelLyricsStyle(
             anchorFraction = 0.34f,
             // Overwritten by the caller, which scales it to whatever size the reader has chosen.
             lineSpacing = 14.dp,
+            isFullScreen = true,
         )
     }
 }

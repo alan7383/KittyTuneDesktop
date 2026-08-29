@@ -870,6 +870,16 @@
     <string name="listening_stats_subtitle">Vos habitudes musicales</string>
     <string name="listening_stats_time_listened">Temps écouté</string>
     <string name="listening_stats_title">Stats d\'écoute</string>
+    <string name="mix_title">Ton mix</string>
+    <string name="mix_subtitle">Construit à partir de ce que tu écoutes vraiment, pas de ce que tu as déjà aimé.</string>
+    <string name="mix_start">Lancer le mix</string>
+    <string name="mix_building">Construction du mix…</string>
+    <string name="mix_customise">Personnaliser le mix</string>
+    <string name="mix_needs_history">Écoute quelques titres d’abord — le mix se construit sur tes écoutes.</string>
+    <string name="mix_nothing_found">Rien n’est revenu. Vérifie ta connexion et réessaie.</string>
+    <string name="mix_in_the_style_of">Dans le style d’un artiste</string>
+    <string name="mix_artist_hint">Yeat, Fred again.., …</string>
+    <string name="mix_by_genre">Ou un genre</string>
     <string name="listening_stats_top_artist_label">Top Artiste</string>
     <string name="listening_stats_top_artists">Top Artistes</string>
     <string name="listening_stats_top_track_label">Top Morceau</string>
@@ -1107,6 +1117,7 @@
     <string name="pref_local_subtitle">Gérer la musique sur l\'appareil</string>
     <string name="pref_local_title">Fichiers Locaux</string>
     <string name="pref_lyrics_align">Alignement</string>
+    <string name="pref_lyrics_fullscreen_align">Alignement (plein écran)</string>
     <string name="pref_lyrics_apple_effect">Effet de remplissage fluide</string>
     <string name="pref_lyrics_apple_effect_sub">Remplit les lettres de façon fluide au lieu de sauter d\'un mot à l\'autre.</string>
     <string name="pref_lyrics_inline">Paroles intégrées</string>
@@ -1987,6 +1998,7 @@
     <string name="customize_section_sidebar">Barre latérale</string>
     <string name="customize_section_sidebar_desc">L'accueil reste toujours : c'est là que l'appli démarre et là où le retour arrive.</string>
     <string name="pref_lyrics_display_style">Ligne en cours</string>
+    <string name="pref_lyrics_fullscreen_display_style">Ligne en cours (plein écran)</string>
     <string name="lyrics_style_standard">Standard</string>
     <string name="lyrics_style_standard_sub">La ligne chantée est plus claire que les autres.</string>
     <string name="lyrics_style_scale">Échelle</string>

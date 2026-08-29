@@ -69,6 +69,10 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.foundation.layout.widthIn
+import com.alananasss.kittytune.ui.common.Tip
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import com.alananasss.kittytune.data.local.HistoryItem
@@ -312,6 +316,11 @@ fun HomeContent(
                 }
             }
         }
+
+        // "Add your own mix, on the main screen, above your time" — above the listening statistics, which is
+        // literally where he put it, and it is the right place: the stats are what you *did*, and this is what
+        // to do next (issue #33).
+        item { StartMixingCard(playerViewModel) }
 
         // Listening statistics, as a card on the home page rather than an entry in a menu: it was
         // asked for as something you come across, not something you go looking for (issue #33).
@@ -1669,6 +1678,208 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
  * Absent entirely until there is something to show. A card reading zero minutes on a fresh install
  * is noise, and it is the state every new listener starts in.
  */
+/**
+ * "Start mixing" — the button, and what happens when it is not that simple (issue #33).
+ *
+ * "Just click the start mixing button, which, according to your interests, gives out songs that you like (these
+ * are not your favorite songs), you can also customize your mix, select a genre or artist's songs, for example,
+ * in the Yeat style."
+ *
+ * Two controls, because there are two things somebody wants from this. The big one is *press and go* — no
+ * choices, no dialog, it reads your listening and plays. The small one beside it opens the customisation, for
+ * when you already know what you are in the mood for.
+ *
+ * Three states worth showing plainly rather than as a spinner and a silence:
+ *
+ *  - **Building.** It is five or six requests deep and takes a couple of seconds, so it says so.
+ *  - **Nothing to go on.** A fresh install has no listening to profile. "Play something first" is the honest
+ *    answer and it is better than an empty mix that looks like a bug.
+ *  - **Found nothing.** Seeds existed and every expansion came back empty, which in practice means the network.
+ */
+@Composable
+private fun StartMixingCard(playerViewModel: PlayerViewModel) {
+    val scope = rememberCoroutineScope()
+    var state by remember { mutableStateOf<MixState>(MixState.Idle) }
+    var showOptions by remember { mutableStateOf(false) }
+
+    fun start(recipe: com.alananasss.kittytune.data.mix.MixEngine.Recipe) {
+        if (state is MixState.Building) return
+        state = MixState.Building
+        scope.launch {
+            val result = com.alananasss.kittytune.data.mix.MixEngine.mix(recipe)
+            state = when (result) {
+                is com.alananasss.kittytune.data.mix.MixEngine.Result.Mixed -> {
+                    playerViewModel.playPlaylist(result.tracks, 0)
+                    MixState.Idle
+                }
+                com.alananasss.kittytune.data.mix.MixEngine.Result.NotEnoughHistory ->
+                    MixState.Empty(str("mix_needs_history"))
+                com.alananasss.kittytune.data.mix.MixEngine.Result.NothingFound ->
+                    MixState.Empty(str("mix_nothing_found"))
+            }
+        }
+    }
+
+    if (showOptions) {
+        MixOptionsDialog(
+            onDismiss = { showOptions = false },
+            onPick = { recipe ->
+                showOptions = false
+                start(recipe)
+            },
+        )
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+    ) {
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = str("mix_title"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = when (val current = state) {
+                        is MixState.Empty -> current.message
+                        MixState.Building -> str("mix_building")
+                        MixState.Idle -> str("mix_subtitle")
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+            Tip(str("mix_customise")) {
+                IconButton(
+                    onClick = { showOptions = true },
+                    shapes = IconButtonDefaults.shapes(),
+                ) {
+                    Icon(Icons.Rounded.Tune, contentDescription = str("mix_customise"))
+                }
+            }
+            Spacer(Modifier.width(4.dp))
+            Button(
+                onClick = { start(com.alananasss.kittytune.data.mix.MixEngine.Recipe.MyTaste) },
+                shapes = ButtonDefaults.shapes(),
+                enabled = state !is MixState.Building,
+            ) {
+                if (state is MixState.Building) {
+                    CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
+                } else {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("mix_start"))
+                }
+            }
+        }
+    }
+}
+
+/** What the card is doing. Not an enum, because one of the three carries a reason. */
+private sealed interface MixState {
+    data object Idle : MixState
+    data object Building : MixState
+    data class Empty(val message: String) : MixState
+}
+
+/**
+ * Choosing a genre or an artist to build around.
+ *
+ * The artist field is free text rather than a picker on purpose: "in the Yeat style" is something you type, and
+ * the name you have in mind is very often not somebody in your own history — which is the whole point of asking.
+ * It is resolved by search when the mix is built.
+ *
+ * The genres offered are the ones the listener actually plays, most-played first, because a list of every genre
+ * SoundCloud has is a list nobody reads. Their own top genres are three taps from useful.
+ */
+@Composable
+private fun MixOptionsDialog(
+    onDismiss: () -> Unit,
+    onPick: (com.alananasss.kittytune.data.mix.MixEngine.Recipe) -> Unit,
+) {
+    var artist by remember { mutableStateOf("") }
+    val genres = remember { com.alananasss.kittytune.data.GenreData.getGenres().take(12) }
+
+    com.alananasss.kittytune.core.BackHandler(onBack = onDismiss)
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.padding(24.dp).widthIn(max = 460.dp)) {
+                Text(str("mix_customise"), style = MaterialTheme.typography.headlineSmall)
+
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    str("mix_in_the_style_of"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.OutlinedTextField(
+                        value = artist,
+                        onValueChange = { artist = it },
+                        singleLine = true,
+                        placeholder = { Text(str("mix_artist_hint")) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            onPick(
+                                com.alananasss.kittytune.data.mix.MixEngine.Recipe.LikeArtist(
+                                    artistId = null,
+                                    artistName = artist.trim(),
+                                )
+                            )
+                        },
+                        shapes = ButtonDefaults.shapes(),
+                        enabled = artist.isNotBlank(),
+                    ) { Text(str("mix_start")) }
+                }
+
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    str("mix_by_genre"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    genres.forEach { genre ->
+                        AssistChip(
+                            onClick = {
+                                onPick(
+                                    com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre(genre.query)
+                                )
+                            },
+                            label = { Text(genre.title) },
+                            leadingIcon = {
+                                Icon(genre.icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                            },
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text(str("btn_cancel")) }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ListeningStatsCard(navController: NavController) {
     val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }

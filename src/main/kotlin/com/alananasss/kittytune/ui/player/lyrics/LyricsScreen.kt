@@ -1058,7 +1058,16 @@ fun QuickLyricsSettingsDialog(
         if (isFullScreen) viewModel.updateLyricsFullScreenFontSize(it)
         else viewModel.updateLyricsFontSize(it)
     }
-    val alignment = viewModel.lyricsAlignment
+    val alignment = if (isFullScreen) viewModel.lyricsFullScreenAlignment else viewModel.lyricsAlignment
+    val updateAlignment: (LyricsAlignment) -> Unit = {
+        if (isFullScreen) viewModel.updateLyricsFullScreenAlignment(it)
+        else viewModel.updateLyricsAlignment(it)
+    }
+    val displayStyle = if (isFullScreen) viewModel.lyricsFullScreenDisplayStyle else viewModel.lyricsDisplayStyle
+    val updateDisplayStyle: (LyricsDisplayStyle) -> Unit = {
+        if (isFullScreen) viewModel.updateLyricsFullScreenDisplayStyle(it)
+        else viewModel.updateLyricsDisplayStyle(it)
+    }
     var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
     val currentOffsetMs = viewModel.lyricsOffset
     val currentOffsetSec = currentOffsetMs / 1000f
@@ -1478,7 +1487,7 @@ fun QuickLyricsSettingsDialog(
                                 ExpressiveConnectedButtonGroup(
                                     options = listOf(LyricsAlignment.LEFT, LyricsAlignment.CENTER, LyricsAlignment.RIGHT),
                                     selectedOption = alignment,
-                                    onOptionSelected = { viewModel.updateLyricsAlignment(it) },
+                                    onOptionSelected = { updateAlignment(it) },
                                     iconProvider = { align ->
                                         val icon = when (align) {
                                             LyricsAlignment.LEFT -> Icons.Rounded.FormatAlignLeft
@@ -1514,8 +1523,8 @@ fun QuickLyricsSettingsDialog(
                                 Spacer(Modifier.height(10.dp))
                                 ExpressiveConnectedButtonGroup(
                                     options = LyricsDisplayStyle.entries,
-                                    selectedOption = viewModel.lyricsDisplayStyle,
-                                    onOptionSelected = { viewModel.updateLyricsDisplayStyle(it) },
+                                    selectedOption = displayStyle,
+                                    onOptionSelected = { updateDisplayStyle(it) },
                                     iconProvider = { style ->
                                         val icon = when (style) {
                                             LyricsDisplayStyle.STANDARD -> Icons.Rounded.Notes

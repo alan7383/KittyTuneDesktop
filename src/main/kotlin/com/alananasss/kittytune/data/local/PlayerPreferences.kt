@@ -160,7 +160,9 @@ class PlayerPreferences {
 
         private const val KEY_LYRICS_PREFER_LOCAL = "lyrics_prefer_local"
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
+        private const val KEY_LYRICS_FULLSCREEN_ALIGNMENT = "lyrics_fullscreen_alignment"
         private const val KEY_LYRICS_DISPLAY_STYLE = "lyrics_display_style"
+        private const val KEY_LYRICS_FULLSCREEN_DISPLAY_STYLE = "lyrics_fullscreen_display_style"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
         private const val KEY_LYRICS_FULLSCREEN_FONT_SIZE = "lyrics_fullscreen_font_size"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
@@ -317,6 +319,12 @@ class PlayerPreferences {
     }
     fun setLyricsAlignment(align: LyricsAlignment) = Prefs.putString(KEY_LYRICS_ALIGNMENT, align.name)
 
+    fun getLyricsFullScreenAlignment(): LyricsAlignment {
+        val name = Prefs.getString(KEY_LYRICS_FULLSCREEN_ALIGNMENT, LyricsAlignment.LEFT.name)
+        return try { LyricsAlignment.valueOf(name!!) } catch (_: Exception) { LyricsAlignment.LEFT }
+    }
+    fun setLyricsFullScreenAlignment(align: LyricsAlignment) = Prefs.putString(KEY_LYRICS_FULLSCREEN_ALIGNMENT, align.name)
+
     fun getLyricsDisplayStyle(): LyricsDisplayStyle {
         val name = Prefs.getString(KEY_LYRICS_DISPLAY_STYLE, LyricsDisplayStyle.STANDARD.name)
         return LyricsDisplayStyle.entries.find { it.name == name } ?: LyricsDisplayStyle.STANDARD
@@ -324,6 +332,14 @@ class PlayerPreferences {
 
     fun setLyricsDisplayStyle(style: LyricsDisplayStyle) =
         Prefs.putString(KEY_LYRICS_DISPLAY_STYLE, style.name)
+
+    fun getLyricsFullScreenDisplayStyle(): LyricsDisplayStyle {
+        val name = Prefs.getString(KEY_LYRICS_FULLSCREEN_DISPLAY_STYLE, LyricsDisplayStyle.STANDARD.name)
+        return LyricsDisplayStyle.entries.find { it.name == name } ?: LyricsDisplayStyle.STANDARD
+    }
+
+    fun setLyricsFullScreenDisplayStyle(style: LyricsDisplayStyle) =
+        Prefs.putString(KEY_LYRICS_FULLSCREEN_DISPLAY_STYLE, style.name)
 
 
 

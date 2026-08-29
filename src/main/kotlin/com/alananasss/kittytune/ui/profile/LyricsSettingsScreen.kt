@@ -50,12 +50,15 @@ import com.alananasss.kittytune.ui.common.Slider
         val fontSize = playerViewModel.lyricsFontSize
         val fullScreenFontSize = playerViewModel.lyricsFullScreenFontSize
         val alignment = playerViewModel.lyricsAlignment
+        val fullScreenAlignment = playerViewModel.lyricsFullScreenAlignment
         var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
         var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
         var inlineLyrics by remember { mutableStateOf(prefs.getInlineLyricsEnabled()) }
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
+        var showFullScreenAlignmentDialog by remember { mutableStateOf(false) }
         var showDisplayStyleDialog by remember { mutableStateOf(false) }
+        var showFullScreenDisplayStyleDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
         var showFullScreenFontSizeDialog by remember { mutableStateOf(false) }
         var showAutoScrollSpeedDialog by remember { mutableStateOf(false) }
@@ -341,6 +344,21 @@ import com.alananasss.kittytune.ui.common.Slider
                 confirmButton = { TextButton(onClick = { showAlignmentDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
+
+        if (showFullScreenAlignmentDialog) {
+            EscapableAlertDialog(
+                onDismissRequest = { showFullScreenAlignmentDialog = false },
+                title = { Text(str("pref_lyrics_fullscreen_align")) },
+                text = {
+                    Column {
+                        AlignRadioButton(str("align_left"), LyricsAlignment.LEFT, fullScreenAlignment) { playerViewModel.updateLyricsFullScreenAlignment(it); showFullScreenAlignmentDialog = false }
+                        AlignRadioButton(str("align_center"), LyricsAlignment.CENTER, fullScreenAlignment) { playerViewModel.updateLyricsFullScreenAlignment(it); showFullScreenAlignmentDialog = false }
+                        AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, fullScreenAlignment) { playerViewModel.updateLyricsFullScreenAlignment(it); showFullScreenAlignmentDialog = false }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showFullScreenAlignmentDialog = false }) { Text(str("btn_cancel")) } }
+            )
+        }
     
         if (showDisplayStyleDialog) {
             EscapableAlertDialog(
@@ -378,6 +396,46 @@ import com.alananasss.kittytune.ui.common.Slider
                 },
                 confirmButton = {
                     TextButton(onClick = { showDisplayStyleDialog = false }) { Text(str("btn_cancel")) }
+                }
+            )
+        }
+
+        if (showFullScreenDisplayStyleDialog) {
+            EscapableAlertDialog(
+                onDismissRequest = { showFullScreenDisplayStyleDialog = false },
+                title = { Text(str("pref_lyrics_fullscreen_display_style")) },
+                text = {
+                    Column {
+                        LyricsDisplayStyle.entries.forEach { option ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        playerViewModel.updateLyricsFullScreenDisplayStyle(option)
+                                        showFullScreenDisplayStyleDialog = false
+                                    }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = option == playerViewModel.lyricsFullScreenDisplayStyle,
+                                    onClick = null
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(str(displayStyleLabel(option)))
+                                    Text(
+                                        str(displayStyleDescription(option)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showFullScreenDisplayStyleDialog = false }) { Text(str("btn_cancel")) }
                 }
             )
         }
@@ -483,7 +541,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             // the shapes are derived from has to follow both.
                             val autoScrollOn = playerViewModel.isPlainAutoScrollEnabled
                             val totalVisibleItems =
-                                (if (showLyricsButton) 9 else 8) + (if (autoScrollOn) 1 else 0)
+                                (if (showLyricsButton) 11 else 10) + (if (autoScrollOn) 1 else 0)
     
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 0),
@@ -533,8 +591,20 @@ import com.alananasss.kittytune.ui.common.Slider
                                 },
                                 onClick = { showAlignmentDialog = true }
                             )
+
+                            val fullScreenAlignIndex = alignIndex + 1
+                            SettingsItem(
+                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, fullScreenAlignIndex),
+                                title = str("pref_lyrics_fullscreen_align"),
+                                subtitle = when(fullScreenAlignment) {
+                                    LyricsAlignment.LEFT -> str("align_left")
+                                    LyricsAlignment.CENTER -> str("align_center_simple")
+                                    LyricsAlignment.RIGHT -> str("align_right")
+                                },
+                                onClick = { showFullScreenAlignmentDialog = true }
+                            )
     
-                            val styleIndex = alignIndex + 1
+                            val styleIndex = fullScreenAlignIndex + 1
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, styleIndex),
                                 title = str("pref_lyrics_display_style"),
@@ -542,7 +612,15 @@ import com.alananasss.kittytune.ui.common.Slider
                                 onClick = { showDisplayStyleDialog = true }
                             )
 
-                            val sizeIndex = styleIndex + 1
+                            val fullScreenStyleIndex = styleIndex + 1
+                            SettingsItem(
+                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, fullScreenStyleIndex),
+                                title = str("pref_lyrics_fullscreen_display_style"),
+                                subtitle = str(displayStyleLabel(playerViewModel.lyricsFullScreenDisplayStyle)),
+                                onClick = { showFullScreenDisplayStyleDialog = true }
+                            )
+
+                            val sizeIndex = fullScreenStyleIndex + 1
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, sizeIndex),
                                 title = str("pref_lyrics_size"),

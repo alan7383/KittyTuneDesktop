@@ -874,6 +874,16 @@
     <string name="listening_stats_subtitle">A zenehallgatási szokásaid</string>
     <string name="listening_stats_time_listened">Hallgatási idő</string>
     <string name="listening_stats_title">Hallgatási statisztikák</string>
+    <string name="mix_title">A te mixed</string>
+    <string name="mix_subtitle">Abból épül, amit valóban hallgatsz, nem abból, amit már kedveltél.</string>
+    <string name="mix_start">Mixelés indítása</string>
+    <string name="mix_building">Mix készítése…</string>
+    <string name="mix_customise">Mix testreszabása</string>
+    <string name="mix_needs_history">Hallgass meg pár számot — a mix a hallgatásaidból épül.</string>
+    <string name="mix_nothing_found">Semmi nem jött vissza. Ellenőrizd a kapcsolatot.</string>
+    <string name="mix_in_the_style_of">Egy előadó stílusában</string>
+    <string name="mix_artist_hint">Yeat, Fred again.., …</string>
+    <string name="mix_by_genre">Vagy egy műfaj</string>
     <string name="listening_stats_top_artist_label">Top Előadó</string>
     <string name="listening_stats_top_artists">Top előadók</string>
     <string name="listening_stats_top_track_label">Top Dal</string>
@@ -1111,6 +1121,7 @@
     <string name="pref_local_subtitle">Zenék az eszközön</string>
     <string name="pref_local_title">Helyi Fájlok</string>
     <string name="pref_lyrics_align">Igazítás</string>
+    <string name="pref_lyrics_fullscreen_align">Igazítás (teljes képernyő)</string>
     <string name="pref_lyrics_apple_effect">Fokozatos kitöltés effektus</string>
     <string name="pref_lyrics_apple_effect_sub">Sima betűkitöltés a szavak közötti ugrálás helyett.</string>
     <string name="pref_lyrics_inline">Beágyazott dalszöveg</string>
@@ -1991,6 +2002,7 @@
     <string name="customize_section_sidebar">Oldalsáv</string>
     <string name="customize_section_sidebar_desc">A Főoldal mindig megmarad: itt indul az alkalmazás, és ide vezet vissza a visszalépés.</string>
     <string name="pref_lyrics_display_style">Aktuális sor</string>
+    <string name="pref_lyrics_fullscreen_display_style">Aktuális sor (teljes képernyő)</string>
     <string name="lyrics_style_standard">Alap</string>
     <string name="lyrics_style_standard_sub">Az éppen énekelt sor világosabb a többinél.</string>
     <string name="lyrics_style_scale">Méret</string>
