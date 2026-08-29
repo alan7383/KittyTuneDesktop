@@ -45,9 +45,8 @@ import kotlin.math.roundToInt
  * The progress driving all of it is read from the panel's real width ([progressFor]) rather than from a
  * timer of its own. The width is on a spring in `MainScreen`; anything animated to its own schedule is
  * either finished while the edge is still moving or still going after it has stopped, which is the
- * "abrupt" half of the same report. Measured against the width instead, the two cannot disagree at any
- * point along the way — including the one place a timer could never have followed, which is the handover
- * from the full layout to the rail ([RAIL_SWAP_AT]).
+ * "abrupt" half of the same report. Measured against the width instead, nothing can disagree at any
+ * point along the way, because there is only one thing being measured.
  */
 internal object SidebarMorph {
 
@@ -71,21 +70,6 @@ internal object SidebarMorph {
     val LABEL_GAP: Dp = 12.dp
 
     /**
-     * Stand-in for the height of the library's header, chip row and search row together, used only until
-     * the real one has been measured.
-     *
-     * The rail matches the block it replaces by measuring it, which is the only way to be right at every
-     * font size and density. That measurement needs the full layout to have existed at least once, and it
-     * has not when the app is launched with the panel already collapsed — so these two are what the first
-     * frame after such a launch uses, and nothing else. Deliberately a little generous: too tall leaves a
-     * few dp of space above the entries for one frame, too short would clip the actions inside.
-     */
-    val FALLBACK_LEADING_BLOCK: Dp = 146.dp
-
-    /** Stand-in for the header row alone. See [FALLBACK_LEADING_BLOCK]. */
-    val FALLBACK_HEADER: Dp = 54.dp
-
-    /**
      * How far into a collapse the panel is, from its width alone.
      *
      * @param expanded the width the panel returns to, i.e. the stored sidebar width.
@@ -99,30 +83,24 @@ internal object SidebarMorph {
     }
 
     /**
-     * How far into the travel the library card hands over from the full layout to the rail.
+     * How visible something that only belongs to the rail should be, at a given [progress].
      *
-     * There is one thing the rail holds that no amount of receding can produce from the full layout:
-     * the create and history buttons, which live in a header row when the panel is open and in a column
-     * of their own once it is not. So one swap survives — but it happens at the *end* of the travel
-     * rather than at the start of it, which is the whole difference.
+     * The mirror of [FADE_DONE_AT], and deliberately the same boundary: what arrives starts arriving
+     * exactly where what leaves has finished leaving, so the two are never both legible and the row they
+     * share never looks like it holds two things.
      *
-     * It used to key off [LibraryViewModel.isSidebarCollapsed], and that flag flips the instant the
-     * button is pressed: the rail began fading in over a panel still at full width with all of its text
-     * still on screen, and the two pictures were nothing like each other. Keyed off the width instead,
-     * the handover happens when the panel is nine tenths shut — by which point the labels have finished
-     * receding and both layouts are the same column of icons in the same places, so there is nothing
-     * left for a fade to give away.
+     * There is one thing a narrowing panel cannot produce by receding — the create and history buttons,
+     * which live in a header when there is room for a header. This is how they come forward, and it is
+     * all that is left of what used to be a cross-fade between two whole layouts.
      */
-    const val RAIL_SWAP_AT = 0.9f
-
-    /** Long enough to carry the rail's own buttons in, short enough to finish with the width. */
-    const val RAIL_SWAP_MS = 180
+    fun arrivalOf(progress: Float): Float =
+        ((progress - FADE_DONE_AT) / (1f - FADE_DONE_AT)).coerceIn(0f, 1f)
 
     /**
      * Where the fade of a receding element finishes, as a fraction of the travel.
      *
-     * Before the handover at [RAIL_SWAP_AT], with room to spare. Anything still visible when the
-     * layouts change hands is something the eye can catch being cut.
+     * Also where [arrivalOf] starts, so what leaves and what arrives never overlap: at any moment the
+     * shared row holds one legible thing or none.
      */
     const val FADE_DONE_AT = 0.6f
 }
@@ -150,14 +128,8 @@ internal object SidebarMorph {
  * narrow panel cannot wrap it either.
  *
  * @param progress 0 leaves the label exactly as it was; 1 is fully away.
- * @param unbounded whether to ignore the width the parent offers while measuring. True for a label whose
- *   parent is itself narrowing — a navigation row follows the panel's edge, and measured against that
- *   edge the label truncates a letter at a time on the way out. False where the parent's width is fixed
- *   for the whole travel, as a library row's is: there the offered width is already the right one, and
- *   asking for an unbounded measurement instead would let a long title report a width wider than the row
- *   it sits in.
  */
-fun Modifier.pushedBack(progress: Float, unbounded: Boolean = true): Modifier {
+fun Modifier.pushedBack(progress: Float): Modifier {
     if (progress <= 0f) return this
     return this
         .layout { measurable, constraints ->
@@ -168,8 +140,7 @@ fun Modifier.pushedBack(progress: Float, unbounded: Boolean = true): Modifier {
             // Only while it is actually leaving: at rest the row is laid out normally, so a label too
             // long for a narrow sidebar still ellipsises the way it always did.
             val placeable = measurable.measure(
-                if (unbounded) constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
-                else constraints.copy(minWidth = 0)
+                constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
             )
             val width = (placeable.width * (1f - progress)).roundToInt().coerceAtLeast(0)
             layout(width, placeable.height) { placeable.placeRelative(0, 0) }

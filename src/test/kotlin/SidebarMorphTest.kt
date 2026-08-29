@@ -56,11 +56,14 @@ class SidebarMorphTest {
     }
 
     /**
-     * The order these two happen in is the point. Anything still visible when the layouts change hands
-     * is something the eye can catch being cut, which is what a cross-dissolve looked like.
+     * What leaves and what arrives must not overlap: the search field and the two rail actions share one
+     * row, and a moment where both are legible is a moment where the row holds two things.
      */
     @Test
-    fun `everything has finished fading before the layouts swap`() {
-        assertTrue(SidebarMorph.FADE_DONE_AT < SidebarMorph.RAIL_SWAP_AT)
+    fun `the rail's own actions start arriving only once everything else has gone`() {
+        assertEquals(0f, SidebarMorph.arrivalOf(SidebarMorph.FADE_DONE_AT))
+        assertEquals(1f, SidebarMorph.arrivalOf(1f))
+        assertEquals(0f, SidebarMorph.arrivalOf(0f))
+        assertTrue(SidebarMorph.arrivalOf(0.8f) in 0f..1f)
     }
 }
