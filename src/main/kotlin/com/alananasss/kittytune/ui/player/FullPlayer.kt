@@ -1,15 +1,11 @@
 package com.alananasss.kittytune.ui.player
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -137,11 +134,39 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     val palette = rememberFullPlayerPalette()
     val drift = rememberMeshDrift()
 
+    // How much of the row the words have, animated rather than switched.
+    //
+    // `weight` reserves its share whatever the child is doing, so an AnimatedVisibility that shrank its
+    // content still held 1.3 shares of the row until it was removed — and then the cover jumped to the middle
+    // in one frame: "quand on enlève les lyrics la cover elle va au milieu sans animations". Animating the
+    // weight itself is what makes the two halves trade width instead (issue #33).
+    val lyricsShare by animateFloatAsState(
+        targetValue = if (showText) LYRICS_SHARE else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "lyricsShare",
+    )
+
     Box(
         Modifier
             .fillMaxSize()
             .background(palette.base)
             .drawBehind { drawMesh(palette, drift) }
+            // Nothing behind this is reachable while it is up. "Quand on survole la souris en plein écran, les
+            // trucs sont sélectionnables derrière le pop up, donc le truc de volume on peut y accéder" — the
+            // player bar and the panels are still laid out underneath, and a Box hit-tests every child it
+            // covers rather than stopping at the top one.
+            //
+            // Consumed on the Final pass, which is the only place this works: Initial runs parent-before-child
+            // and would swallow this screen's own controls, while by Final anything of ours has had its turn
+            // and everything left is on its way to something underneath.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Final)
+                            .changes.forEach { it.consume() }
+                    }
+                }
+            }
     ) {
         Row(
             // No padding on this Row, and the two halves inset themselves. The lyrics half has to reach the
@@ -160,26 +185,28 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 CoverColumn(
                     viewModel = viewModel,
                     palette = palette,
+                    // How much room the cover has to itself, which is what decides how large it gets: the
+                    // sleeve grows into the space the words leave rather than sliding across it.
+                    roomToItself = 1f - (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f),
                     showText = showText,
                     onToggleText = { showText = !showText },
                 )
             }
 
-            AnimatedVisibility(
-                visible = showText,
-                enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-                    expandHorizontally(
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        expandFrom = Alignment.Start,
-                    ),
-                exit = fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) +
-                    shrinkHorizontally(
-                        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                        shrinkTowards = Alignment.Start,
-                    ),
-                modifier = Modifier.weight(LYRICS_SHARE).fillMaxHeight().padding(vertical = 24.dp),
-            ) {
-                LyricsOnCoverColour(viewModel, palette)
+            // Kept out of the row entirely once it has no width, since `weight` refuses zero — and there is
+            // nothing left to draw at that point anyway.
+            if (lyricsShare > 0.01f) {
+                Box(
+                    Modifier
+                        .weight(lyricsShare)
+                        .fillMaxHeight()
+                        .padding(vertical = 24.dp)
+                        // Fades on the way out as well as narrowing, or the last few pixels of a line hang
+                        // against the edge at full strength.
+                        .graphicsLayer { alpha = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f) },
+                ) {
+                    LyricsOnCoverColour(viewModel, palette)
+                }
             }
 
         }
@@ -467,13 +494,18 @@ private const val SPACING_PER_SP = 0.34f
 private fun CoverColumn(
     viewModel: PlayerViewModel,
     palette: FullPlayerPalette,
+    /** 0 while the words have their full share of the row, 1 once the cover has it to itself. */
+    roomToItself: Float,
     showText: Boolean,
     onToggleText: () -> Unit,
 ) {
     val track = viewModel.currentTrack ?: return
 
     BoxWithConstraints {
-        val side = min(min(maxWidth, maxHeight * 0.56f), COVER_MAX)
+        // The cap rises as the words leave, so the sleeve grows into the space instead of being re-centred in
+        // it. Re-centring alone is what read as a jump even once the widths were animating (issue #33).
+        val cap = COVER_MAX + (COVER_MAX_ALONE - COVER_MAX) * roomToItself
+        val side = min(min(maxWidth, maxHeight * 0.56f), cap)
 
         Column(horizontalAlignment = Alignment.Start) {
             AsyncImage(
@@ -510,6 +542,13 @@ private fun CoverColumn(
  * Wide enough to be the subject on a laptop, small enough that a 4K window does not turn it into a poster.
  */
 private val COVER_MAX = 420.dp
+
+/**
+ * And what it may reach once it is the only thing on screen.
+ *
+ * Not the whole window: a sleeve at 640 dp on a 4K display is a poster, and the screen is still a player.
+ */
+private val COVER_MAX_ALONE = 560.dp
 
 /**
  * What is playing, and the two things you do to it from here (issue #33).

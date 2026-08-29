@@ -257,12 +257,32 @@ private fun PanelLyricLine(
             unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.5f),
             textAlign = textAlign,
         )
-        val secondary = line.translation ?: line.romanization
-        if (!secondary.isNullOrBlank()) {
+        // Gated on the switches, which it was not: a fetched translation stayed in the line, so turning the
+        // setting *off* left it on screen until the track changed. "Quand on active la traduction,
+        // romanization il faut que ça se fasse direct en updatant l'écran avec anim" — direct in both
+        // directions, and animated in both (issue #33).
+        val secondary = when {
+            vm.isLyricsTranslationEnabled -> line.translation ?: line.romanization
+            vm.isRomanizationEnabled -> line.romanization
+            else -> null
+        }
+        // Held past its own disappearance, so the line does not lose its words a frame before it loses the
+        // height they were sitting in.
+        var lastShown by remember { mutableStateOf("") }
+        if (!secondary.isNullOrBlank()) lastShown = secondary
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !secondary.isNullOrBlank(),
+            enter = androidx.compose.animation.fadeIn(tween(SECONDARY_FADE_MS)) +
+                androidx.compose.animation.expandVertically(tween(SECONDARY_FADE_MS)),
+            exit = androidx.compose.animation.fadeOut(tween(SECONDARY_FADE_MS)) +
+                androidx.compose.animation.shrinkVertically(tween(SECONDARY_FADE_MS)),
+        ) {
             Text(
-                text = secondary,
+                text = lastShown,
                 style = MaterialTheme.typography.bodySmall,
                 color = scheme.onSurfaceVariant,
+                textAlign = textAlign,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -348,6 +368,9 @@ private fun alignmentOf(vm: PlayerViewModel): TextAlign = when (vm.lyricsAlignme
     com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> TextAlign.Center
     com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT -> TextAlign.End
 }
+
+/** Long enough to read as the line growing a second half, short enough not to lag behind the switch. */
+private const val SECONDARY_FADE_MS = 220
 
 /**
  * The room the words get around themselves, which is the whole of what differs between reading them in a
