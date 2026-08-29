@@ -186,7 +186,7 @@ fun ProxySettingsScreen(
         )
     }
 
-    val scrollState = rememberScrollState()
+    val scrollState = com.alananasss.kittytune.ui.common.rememberRestorableScrollState()
     SettingsScaffold(
         title = str("proxy_settings_title"),
         onBackClick = onBackClick,
