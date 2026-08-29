@@ -139,15 +139,15 @@ private fun PanelSyncedLyrics(vm: PlayerViewModel, lines: List<LyricLine>, modif
                     // distance is zero for all of them until the song reaches the words.
                     distance = if (activeIndex < 0) 0 else index - activeIndex,
                     positionMs = smoothPosition,
-                    // The offset shifts the lyrics against the audio, so the position that makes
-                    // this line current is its start minus that offset.
-                    // Clamped to the track, not merely to zero. A lyric sheet matched from a longer
-                    // song carries timestamps past this track's end, and a seek past the end used to
-                    // land back at the start (issue #33).
+                    // Shared with the full screen, which had its own copy of this and got it
+                    // differently wrong — see [LyricsUtils.seekTargetFor] for what the clamp does
+                    // with a duration that is not known yet and with a line past the end.
                     onClick = {
-                        val target = line.startTime - vm.lyricsOffset
-                        val last = (vm.duration - 1).coerceAtLeast(0L)
-                        vm.seekTo(target.coerceIn(0L, last))
+                        LyricsUtils.seekTargetFor(
+                            line = line,
+                            lyricsOffsetMs = vm.lyricsOffset,
+                            durationMs = vm.duration,
+                        )?.let(vm::seekTo)
                     },
                 )
             }

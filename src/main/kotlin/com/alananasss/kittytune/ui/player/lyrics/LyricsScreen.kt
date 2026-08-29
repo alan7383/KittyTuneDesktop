@@ -456,10 +456,14 @@ import kotlin.math.roundToInt
                                 } else Modifier
                             )
                             .clickable(interactionSource = lineInteractionSource, indication = null) {
-                                // Clamped to the track: a sheet matched from a longer song carries
-                                // timestamps past its end, and seeking past the end used to restart it.
-                                val last = (viewModel.duration - 1).coerceAtLeast(0L)
-                                viewModel.seekTo(line.startTime.coerceIn(0L, last))
+                                // Same sum as the panel's, in one place, and allowed to answer
+                                // "nowhere" — see [LyricsUtils.seekTargetFor]. This copy also used to
+                                // forget the offset that its own highlight applies.
+                                LyricsUtils.seekTargetFor(
+                                    line = line,
+                                    lyricsOffsetMs = viewModel.lyricsOffset,
+                                    durationMs = viewModel.duration,
+                                )?.let(viewModel::seekTo)
                             }
                     ) {
                         // One renderer for both views. This block existed twice — here and in the
