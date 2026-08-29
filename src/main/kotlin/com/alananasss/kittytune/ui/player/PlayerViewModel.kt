@@ -1544,8 +1544,11 @@ flushListenSession("TRACK_CHANGE")
          */
         val providerBonus: Float = 0f,
     ) {
-        /** Word sync beats line sync beats plain text; match quality settles ties within a tier. */
-        val rank: Float get() = syncTier * 10f + matchScore + providerBonus
+        /**
+         * Identity first, then sync, then match quality — see [LyricsMatcher.rank] for why that order
+         * had to change.
+         */
+        val rank: Float get() = LyricsMatcher.rank(syncTier, matchScore, providerBonus)
 
         /** See [LyricsMatcher.syncTier]: real timings first, provider second. */
         val syncTier: Int get() = LyricsMatcher.syncTier(lines, plain)
@@ -1817,12 +1820,20 @@ flushListenSession("TRACK_CHANGE")
         } catch (e: Exception) {
             emptyList()
         }
+        // Exactly one hit is fetched, so this choice is final: whatever loses here never gets a second
+        // chance from this provider. It used to be ranked tier-first, which meant that when the response
+        // held both the right song and a better-synchronised wrong one, the wrong one was the only entry
+        // the app ever downloaded — and no amount of ranking further down could recover from that
+        // (issue #33). Same order as everywhere else now.
         val pick = results
             .filter { LyricsMatcher.isAcceptable(it.trackName, it.artistName, target) }
             .maxByOrNull { hit ->
-                val syncTier = hit.hasRichSync * 2 + hit.hasSubtitles
-                syncTier * 10f +
-                    LyricsMatcher.score(hit.trackName, hit.artistName, hit.trackLength.toDouble(), target)
+                LyricsMatcher.rank(
+                    syncTier = hit.hasRichSync * 2 + hit.hasSubtitles,
+                    matchScore = LyricsMatcher.score(
+                        hit.trackName, hit.artistName, hit.trackLength.toDouble(), target
+                    ),
+                )
             } ?: return emptyList()
 
         val data = try {
