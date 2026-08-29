@@ -1008,6 +1008,8 @@
     <string name="player_effects">Effets</string>
     <string name="player_like_action">Like</string>
     <string name="player_lyrics">Paroles</string>
+    <string name="lyrics_fullscreen">Plein écran</string>
+    <string name="lyrics_exit_fullscreen">Quitter le plein écran</string>
     <string name="player_previous">Piste précédente</string>
     <string name="player_play_pause">Lecture / pause</string>
     <string name="player_next">Piste suivante</string>

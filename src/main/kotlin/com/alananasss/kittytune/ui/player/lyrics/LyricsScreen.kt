@@ -36,6 +36,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.material.icons.rounded.ContentCopy
     import androidx.compose.material.icons.rounded.Remove
     import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.OpenInFull
     import androidx.compose.material.icons.rounded.Settings
     import androidx.compose.material.icons.rounded.Timer
     import androidx.compose.material.icons.rounded.Tune
@@ -208,6 +209,19 @@ import kotlin.math.roundToInt
                                 }
                                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.isSearchingLyrics = true }) {
                                     Icon(Icons.Rounded.Search, str("lyrics_manual_search"), tint = MaterialTheme.colorScheme.onSurface)
+                                }
+                                // Raises the player over the whole window. This screen is one of three
+                                // columns, so the big view cannot live in it — it is an overlay, and this is
+                                // the way in (issue #33).
+                                IconButton(
+                                    shapes = IconButtonDefaults.shapes(),
+                                    onClick = { viewModel.isLyricsFullScreen = true },
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.OpenInFull,
+                                        str("lyrics_fullscreen"),
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                    )
                                 }
                             },
                             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
