@@ -73,6 +73,15 @@ const val PANEL_GUTTER = 8
  */
 private const val SHEET_SWAP_MS = 220
 
+/**
+ * How long the full player takes to arrive and to leave.
+ *
+ * Slower in than out, which is the usual asymmetry and the right one here: arriving is the thing worth
+ * watching, and leaving is something you asked for and want over with.
+ */
+private const val FULLSCREEN_ENTER_MS = 320
+private const val FULLSCREEN_EXIT_MS = 220
+
 @Composable
 fun MainScreen() {
     val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(AppInstance.application) }
@@ -379,10 +388,7 @@ fun MainScreen() {
                     label = "lyricsSheet",
                 ) { showLyrics ->
                 if (showLyrics) {
-                    // The words on the record's own colour, with the sleeve and the transport beside them —
-                    // built from the Apple Music screenshot he sent after the first attempt was described
-                    // rather than shown. See [FullPlayerScreen] (issue #33).
-                    com.alananasss.kittytune.ui.player.FullPlayerScreen(
+                    com.alananasss.kittytune.ui.player.lyrics.LyricsScreen(
                         viewModel = playerViewModel,
                         onClose = { playerViewModel.showLyricsSheet = false }
                     )
@@ -940,7 +946,10 @@ fun MainScreen() {
             onOpenLyrics = {
                 playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
             },
-            onOpenFullPlayer = { playerViewModel.showLyricsSheet = true },
+            // Straight to the big one, which is what he asked for: "I think you can do this when you click
+            // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
+            // lyrics, which has its own way up here (issue #33).
+            onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = PANEL_GUTTER.dp)
@@ -950,6 +959,38 @@ fun MainScreen() {
     TrackOptionsOverlays(playerViewModel)
 
     CoverViewerOverlay()
+
+    // The whole window, above everything — the sidebar, the player bar, the lot (issue #33).
+    //
+    // "Quand on ouvre les lyrics, ça remet comme avant mais tu mets un bouton plein écran […] et elle prend
+    // TOUT l'écran avec animations."
+    //
+    // Which is why it lives out here rather than inside the centre panel: the panel is one of three columns,
+    // so a full player rendered in it can only ever be a third of the window. Placed alongside the other two
+    // overlays it covers the window, and the lyrics screen goes back to being what it was — with a button
+    // that brings this up.
+    androidx.compose.animation.AnimatedVisibility(
+        visible = playerViewModel.isLyricsFullScreen,
+        enter = androidx.compose.animation.fadeIn(
+            androidx.compose.animation.core.tween(FULLSCREEN_ENTER_MS)
+        ) + androidx.compose.animation.scaleIn(
+            androidx.compose.animation.core.tween(FULLSCREEN_ENTER_MS),
+            // Grows a little into place rather than appearing at size: the screen it comes from stays
+            // visible underneath for those few frames, so this reads as rising out of it.
+            initialScale = 0.94f,
+        ),
+        exit = androidx.compose.animation.fadeOut(
+            androidx.compose.animation.core.tween(FULLSCREEN_EXIT_MS)
+        ) + androidx.compose.animation.scaleOut(
+            androidx.compose.animation.core.tween(FULLSCREEN_EXIT_MS),
+            targetScale = 0.94f,
+        ),
+    ) {
+        com.alananasss.kittytune.ui.player.FullPlayerScreen(
+            viewModel = playerViewModel,
+            onExitFullScreen = { playerViewModel.isLyricsFullScreen = false },
+        )
+    }
 
     if (showShortcutsDialog) {
         KeyboardShortcutsDialog(onDismiss = { showShortcutsDialog = false })

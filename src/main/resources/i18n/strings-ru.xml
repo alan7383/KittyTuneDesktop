@@ -1008,6 +1008,8 @@
     <string name="player_effects">Эффекты</string>
     <string name="player_like_action">Нравится</string>
     <string name="player_lyrics">Текст песни</string>
+    <string name="lyrics_fullscreen">Во весь экран</string>
+    <string name="lyrics_exit_fullscreen">Выйти из полноэкранного режима</string>
     <string name="player_previous">Предыдущий трек</string>
     <string name="player_play_pause">Воспроизведение / пауза</string>
     <string name="player_next">Следующий трек</string>

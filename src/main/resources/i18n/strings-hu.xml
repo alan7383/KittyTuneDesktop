@@ -1012,6 +1012,8 @@
     <string name="player_effects">Effektek</string>
     <string name="player_like_action">Tetszik</string>
     <string name="player_lyrics">Dalszöveg</string>
+    <string name="lyrics_fullscreen">Teljes képernyő</string>
+    <string name="lyrics_exit_fullscreen">Kilépés a teljes képernyőből</string>
     <string name="player_previous">Előző szám</string>
     <string name="player_play_pause">Lejátszás / pillanatállj</string>
     <string name="player_next">Következő szám</string>

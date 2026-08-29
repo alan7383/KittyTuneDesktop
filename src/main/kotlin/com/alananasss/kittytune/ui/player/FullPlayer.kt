@@ -28,7 +28,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CloseFullscreen
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Pause
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,15 +94,33 @@ import com.alananasss.kittytune.ui.main.PanelLyrics
  * that says what it should look like.
  */
 @Composable
-fun FullPlayerScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
+fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     val track = viewModel.currentTrack
     var showText by remember { mutableStateOf(true) }
+    var showQuickSettings by remember { mutableStateOf(false) }
 
-    // Nothing to build a screen around, so this stays the lyrics view it replaced.
+    // Nothing to build a screen around. Leaving rather than drawing an empty sleeve on a grey wall: the
+    // lyrics screen underneath is still there and is the better thing to be looking at.
     if (track == null) {
-        com.alananasss.kittytune.ui.player.lyrics.LyricsScreen(viewModel = viewModel, onClose = onClose)
+        LaunchedEffect(Unit) { onExitFullScreen() }
         return
     }
+
+    if (showQuickSettings) {
+        // The same dialog the lyrics screen's own gear opens. Asked for explicitly — "pouvoir aussi avoir
+        // les paramètres rapides du lyrics screen" — and it would be needed anyway: the offset controls are
+        // the one thing you reach for *while* reading along, which is exactly what this screen is for.
+        com.alananasss.kittytune.ui.player.lyrics.QuickLyricsSettingsDialog(
+            viewModel = viewModel,
+            onDismiss = { showQuickSettings = false },
+        )
+    }
+
+    // Escape and the mouse's back button leave, through the app's own back stack so this takes precedence
+    // over whatever registered before it and gives way to a dialog opened on top. A full-window view whose
+    // only exit is a dim glyph in a corner is a trap, and being trapped in a view is the complaint that
+    // produced the search-field fix a few commits ago (issue #33).
+    com.alananasss.kittytune.core.BackHandler(onBack = onExitFullScreen)
 
     val palette = rememberFullPlayerPalette()
 
@@ -151,16 +171,25 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onClose: () -> Unit) {
             }
         }
 
-        // Small, low-contrast, out of the way: the reference has no chrome at all, and a cross that
-        // announces itself would be the loudest thing on a screen built for reading.
-        androidx.compose.material3.IconButton(
-            onClick = onClose,
-            modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+        // The two things this screen needs of its own, in the corner and dim: the way out, and the lyrics
+        // settings. The reference has no chrome at all, and controls that announce themselves would be the
+        // loudest thing on a screen built for reading — but a full-window view with no visible exit is a
+        // trap, which is the complaint that produced the search-field fix.
+        Row(
+            modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            androidx.compose.material3.Icon(
-                Icons.Rounded.Close,
-                contentDescription = str("btn_close"),
+            QuietButton(
+                icon = Icons.Rounded.Tune,
+                label = str("pref_lyrics_title"),
+                tint = if (viewModel.lyricsOffset != 0L) palette.bright else palette.dim,
+                onClick = { showQuickSettings = true },
+            )
+            QuietButton(
+                icon = Icons.Rounded.CloseFullscreen,
+                label = str("lyrics_exit_fullscreen"),
                 tint = palette.dim,
+                onClick = onExitFullScreen,
             )
         }
     }

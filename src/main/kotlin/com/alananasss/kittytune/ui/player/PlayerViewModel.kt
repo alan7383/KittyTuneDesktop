@@ -105,6 +105,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var isScrubbing by mutableStateOf(false)
     var isPlayerExpanded by mutableStateOf(false)
     var isLiked by mutableStateOf(false)
+
+    /**
+     * Whether the player is filling the window.
+     *
+     * Separate from [showLyricsSheet] on purpose. The sheet is the lyrics inside the centre panel, which is
+     * one of three columns; this is an overlay over the whole window, raised from that sheet by a button on
+     * it. Two flags because they are two places, and because closing the big one should put you back on the
+     * lyrics rather than back on the library (issue #33).
+     */
+    var isLyricsFullScreen by mutableStateOf(false)
     var backgroundColor by mutableStateOf(Color(0xFF1E1E1E))
     val hasLyrics by derivedStateOf { lyricsLines.isNotEmpty() || !rawPlainLyrics.isNullOrBlank() }
     var commentSort by mutableStateOf(CommentSort.NEWEST)
