@@ -39,6 +39,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.filled.MoreVert
@@ -90,7 +94,13 @@ import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.ArtistLinkText
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.getValue
 import com.alananasss.kittytune.data.GenreData
+import com.alananasss.kittytune.data.sections.SduiItem
+import com.alananasss.kittytune.data.sections.SduiSection
+import com.alananasss.kittytune.data.sections.SectionsParser
+import com.alananasss.kittytune.data.sections.SectionsRepository
 import com.alananasss.kittytune.data.OfficialPlaylistsData
 import com.alananasss.kittytune.data.SearchCategory
 import com.alananasss.kittytune.data.network.RetrofitClient
@@ -111,12 +121,69 @@ import java.util.Locale
 /* Explorer (genres/moods grid)                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The browse screen: SoundCloud's own categories when they can be had, this app's list when they cannot.
+ *
+ * "Pouvoir mettre ça pour toutes les catégories qu'a l'app Android — ici je t'ai pas montré toutes mais mets-les
+ * toutes […] tu mets tout exactement comme Android mais adapté desktop."
+ *
+ * "Toutes" is the part a hardcoded list cannot honour. The set he screenshotted is not a constant — SoundCloud
+ * serves it, per country and per language, and changes it — so the only way to have all of them and keep having
+ * all of them is to ask. That is [SectionsRepository.browse], the same request their Android client makes.
+ *
+ * The local list stays as the fallback rather than being deleted. That request needs a signed-in token and
+ * answers 401 without one, so a guest would otherwise get an empty browse screen where they used to get a usable
+ * one. Twelve moods and thirty genres that are ours beat nothing that is theirs (issue #33).
+ */
 @Composable
 fun GenresScreen(
     onNavigate: (String) -> Unit,
+    /** Needed only so a track tile in one of their shelves can be played from where it sits. */
+    playerViewModel: com.alananasss.kittytune.ui.player.PlayerViewModel? = null,
 ) {
     val moods = remember { GenreData.getMoods() }
     val genres = remember { GenreData.getGenres() }
+
+    // Their categories, or null while asking and if asking failed. Not a loading spinner over the whole screen:
+    // the fallback is already good enough to look at, so it is shown immediately and replaced if theirs arrive.
+    val live by produceState<SectionsParser.Screen?>(initialValue = null) {
+        value = runCatching { SectionsRepository.browse() }.getOrNull()?.takeIf { !it.isEmpty }
+    }
+
+    val theirs = live
+    if (theirs != null) {
+        SduiScreen(
+            title = str("explorer_title"),
+            screen = theirs,
+            onOpenCategory = { item ->
+                val query = item.query ?: item.title
+                onNavigate(
+                    "sdui_category/${URLEncoder.encode(item.title, "UTF-8")}/${URLEncoder.encode(query, "UTF-8")}"
+                )
+            },
+            onNavigate = onNavigate,
+            playerViewModel = playerViewModel,
+            header = {
+                // The two shortcuts are ours and have no equivalent in their layout, so they stay above whatever
+                // it sends.
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ExplorerShortcutCard(
+                        title = str("explorer_new_releases"),
+                        icon = Icons.Rounded.NewReleases,
+                        baseColor = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.weight(1f)
+                    ) { onNavigate("new_releases") }
+                    ExplorerShortcutCard(
+                        title = str("explorer_charts"),
+                        icon = Icons.Rounded.TrendingUp,
+                        baseColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    ) { onNavigate("charts") }
+                }
+            },
+        )
+        return
+    }
 
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 200.dp),
@@ -920,3 +987,218 @@ private fun ExplorerShortcutCard(
     }
 }
 
+
+/**
+ * Renders whatever SoundCloud's sections API sent, as a desktop grid (issue #33).
+ *
+ * ## "Exactly like Android but adapted for desktop"
+ *
+ * The adaptation is the whole job, and it is mostly one decision: their shelves are horizontal strips because a
+ * phone is 400 dp wide and a strip is the only way to fit four tiles on it. A desktop window is 1400 dp, so the
+ * same four tiles fit *and* the next four, and a horizontal scroll on a mouse is worse than a wrap. Every shelf
+ * becomes a wrapping row here, which is the same content and the same order in the shape this screen has room
+ * for.
+ *
+ * What is kept exactly: the sections, their order, their titles, and what each tile does. Those are theirs and
+ * there is no reason for them to differ.
+ */
+@Composable
+private fun SduiScreen(
+    title: String,
+    screen: SectionsParser.Screen,
+    onOpenCategory: (SduiItem) -> Unit,
+    onNavigate: (String) -> Unit,
+    playerViewModel: com.alananasss.kittytune.ui.player.PlayerViewModel?,
+    header: (@Composable () -> Unit)? = null,
+) {
+
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 200.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(20.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        if (header != null) item(span = { GridItemSpan(maxLineSpan) }) { header() }
+
+        // Flattened here rather than in the parser: a group's title is worth showing, and its shelves are worth
+        // showing under it, but a desktop grid has no third level to nest them into.
+        screen.sections.forEach { section ->
+            when (section) {
+                is SduiSection.Group -> {
+                    section.title?.let { groupTitle ->
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = groupTitle,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+                            )
+                        }
+                    }
+                    section.sections.filterIsInstance<SduiSection.Shelf>().forEach { shelf ->
+                        sduiShelf(shelf, onOpenCategory, onNavigate, playerViewModel)
+                    }
+                }
+                is SduiSection.Shelf -> sduiShelf(section, onOpenCategory, onNavigate, playerViewModel)
+            }
+        }
+    }
+}
+
+/** One shelf: its title spanning the grid, then its tiles as ordinary grid cells. */
+private fun androidx.compose.foundation.lazy.grid.LazyGridScope.sduiShelf(
+    shelf: SduiSection.Shelf,
+    onOpenCategory: (SduiItem) -> Unit,
+    onNavigate: (String) -> Unit,
+    playerViewModel: com.alananasss.kittytune.ui.player.PlayerViewModel?,
+) {
+    shelf.title?.let { shelfTitle ->
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Text(
+                text = shelfTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+            )
+        }
+    }
+    items(shelf.items, key = { it.key }) { item ->
+        SduiTile(item) {
+            when (item.kind) {
+                SduiItem.Kind.CATEGORY -> onOpenCategory(item)
+                SduiItem.Kind.PLAYLIST -> item.urn?.let { onNavigate("playlist_detail/${URLEncoder.encode(it, "UTF-8")}") }
+                SduiItem.Kind.USER -> item.urn?.numericId()?.let { onNavigate("profile/$it") }
+                // Their payload carries a track's metadata but no stream, so a tile opens the track rather than
+                // playing blind — the detail route resolves it the way every other entry point does.
+                SduiItem.Kind.TRACK -> item.urn?.numericId()?.let { id ->
+                    playerViewModel?.navigateToPlaylistId = "track_detail:$id"
+                }
+            }
+        }
+    }
+}
+
+/** `soundcloud:users:12345` → `12345`, which is what every route in this app takes. */
+private fun String.numericId(): Long? = substringAfterLast(':').toLongOrNull()
+
+/**
+ * One tile from their layout.
+ *
+ * Square artwork with the title under it, which is what every other tile in this app looks like — the point of
+ * adapting rather than copying is that their shelves arrive looking like the rest of the desktop, not like a
+ * phone embedded in it. A tile with no artwork falls back to the same treatment [SearchCategoryCard] uses, since
+ * their category tiles sometimes send no image at all.
+ */
+@Composable
+private fun SduiTile(item: SduiItem, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (item.artworkUrl != null) {
+                coil3.compose.AsyncImage(
+                    model = item.artworkUrl,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Icon(
+                    when (item.kind) {
+                        SduiItem.Kind.USER -> Icons.Rounded.Person
+                        SduiItem.Kind.TRACK -> Icons.Rounded.MusicNote
+                        SduiItem.Kind.PLAYLIST -> Icons.Rounded.QueueMusic
+                        SduiItem.Kind.CATEGORY -> Icons.Rounded.Category
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxSize(0.35f),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = item.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+        if (item.subtitle != null) {
+            Text(
+                text = item.subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * One category's own page — their trending / playlists / albums / profiles shelves, in their order.
+ *
+ * The same renderer as the browse screen, because it is the same payload from the same endpoint with a different
+ * layout name. That is the part worth having taken from their client rather than reimplemented: two screens, one
+ * parser, and whatever they add to either arrives without a change here (issue #33).
+ */
+@Composable
+fun SduiCategoryScreen(
+    title: String,
+    query: String,
+    onNavigate: (String) -> Unit,
+    playerViewModel: com.alananasss.kittytune.ui.player.PlayerViewModel? = null,
+) {
+    val screen by produceState<SectionsParser.Screen?>(initialValue = null, key1 = query) {
+        value = runCatching { SectionsRepository.category(query) }.getOrNull()
+    }
+
+    val loaded = screen
+    when {
+        loaded == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.CircularProgressIndicator()
+        }
+        loaded.isEmpty -> Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = str("sdui_category_unavailable"),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+        }
+        else -> SduiScreen(
+            title = title,
+            screen = loaded,
+            // A category page can contain further categories — their "related genres" shelf — so drilling in
+            // keeps working rather than dead-ending.
+            onOpenCategory = { item ->
+                val next = item.query ?: item.title
+                onNavigate(
+                    "sdui_category/${URLEncoder.encode(item.title, "UTF-8")}/${URLEncoder.encode(next, "UTF-8")}"
+                )
+            },
+            onNavigate = onNavigate,
+            playerViewModel = playerViewModel,
+        )
+    }
+}

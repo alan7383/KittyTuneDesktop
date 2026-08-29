@@ -547,6 +547,7 @@
     <string name="explorer_moods_genres">Moods\n&amp; Genres</string>
     <string name="explorer_new_releases">New</string>
     <string name="explorer_title">Explorer</string>
+    <string name="sdui_category_unavailable">This category is not available. Sign in to browse SoundCloud’s own categories.</string>
     <string name="fab_settings_hint">Tip: only playlists added to your library appear here. Feel free to like playlists so you can use them as shortcuts!</string>
     <string name="fab_settings_no_playlists">No playlist found in your library.</string>
     <string name="fab_settings_radio">Radio • YouTube</string>

@@ -416,7 +416,31 @@ fun MainScreen() {
                         }
                         composable("genres") {
                             com.alananasss.kittytune.ui.home.GenresScreen(
-                                onNavigate = { dest -> navController.navigate(dest) }
+                                onNavigate = { dest -> navController.navigate(dest) },
+                                playerViewModel = playerViewModel,
+                            )
+                        }
+                        // One category, rendered from SoundCloud's own sections API — the same request their
+                        // Android client makes, so the shelves are theirs and in their order (issue #33).
+                        composable("sdui_category/{title}/{query}") { entry ->
+                            val args = entry.arguments
+                            val title = runCatching {
+                                java.net.URLDecoder.decode(
+                                    args?.read { getString("title") } ?: "",
+                                    "UTF-8",
+                                )
+                            }.getOrDefault("")
+                            val query = runCatching {
+                                java.net.URLDecoder.decode(
+                                    args?.read { getString("query") } ?: "",
+                                    "UTF-8",
+                                )
+                            }.getOrDefault("")
+                            com.alananasss.kittytune.ui.home.SduiCategoryScreen(
+                                title = title,
+                                query = query,
+                                onNavigate = { dest -> navController.navigate(dest) },
+                                playerViewModel = playerViewModel,
                             )
                         }
                         composable("feed") {
