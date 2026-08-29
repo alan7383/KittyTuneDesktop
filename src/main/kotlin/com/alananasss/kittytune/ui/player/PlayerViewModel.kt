@@ -485,9 +485,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
     var lyricsFullScreenFontSize by mutableFloatStateOf(playerPrefs.getLyricsFullScreenFontSize())
     var lyricsAlignment by mutableStateOf(playerPrefs.getLyricsAlignment())
+    var lyricsFullScreenAlignment by mutableStateOf(playerPrefs.getLyricsFullScreenAlignment())
 
     /** How the line being sung is set apart. See [LyricsDisplayStyle]. */
     var lyricsDisplayStyle by mutableStateOf(playerPrefs.getLyricsDisplayStyle())
+    var lyricsFullScreenDisplayStyle by mutableStateOf(playerPrefs.getLyricsFullScreenDisplayStyle())
 
     var lyricsMode by mutableStateOf(LyricsMode.SYNCED)
     var rawPlainLyrics by mutableStateOf<String?>(null)
@@ -1459,9 +1461,19 @@ flushListenSession("TRACK_CHANGE")
         playerPrefs.setLyricsAlignment(alignment)
     }
 
+    fun updateLyricsFullScreenAlignment(alignment: LyricsAlignment) {
+        lyricsFullScreenAlignment = alignment
+        playerPrefs.setLyricsFullScreenAlignment(alignment)
+    }
+
     fun updateLyricsDisplayStyle(style: LyricsDisplayStyle) {
         lyricsDisplayStyle = style
         playerPrefs.setLyricsDisplayStyle(style)
+    }
+
+    fun updateLyricsFullScreenDisplayStyle(style: LyricsDisplayStyle) {
+        lyricsFullScreenDisplayStyle = style
+        playerPrefs.setLyricsFullScreenDisplayStyle(style)
     }
 
 

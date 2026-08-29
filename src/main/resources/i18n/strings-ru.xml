@@ -870,6 +870,16 @@
     <string name="listening_stats_subtitle">Ваши привычки прослушивания</string>
     <string name="listening_stats_time_listened">Время прослушивания</string>
     <string name="listening_stats_title">Статистика прослушиваний</string>
+    <string name="mix_title">Твой микс</string>
+    <string name="mix_subtitle">Собран из того, что ты действительно слушаешь, а не из того, что уже лайкнул.</string>
+    <string name="mix_start">Запустить микс</string>
+    <string name="mix_building">Собираем микс…</string>
+    <string name="mix_customise">Настроить микс</string>
+    <string name="mix_needs_history">Послушай сначала несколько треков — микс строится по твоим прослушиваниям.</string>
+    <string name="mix_nothing_found">Ничего не вернулось. Проверь соединение и попробуй снова.</string>
+    <string name="mix_in_the_style_of">В стиле исполнителя</string>
+    <string name="mix_artist_hint">Yeat, Fred again.., …</string>
+    <string name="mix_by_genre">Или жанр</string>
     <string name="listening_stats_top_artist_label">Топ-исполнитель</string>
     <string name="listening_stats_top_artists">Лучшие исполнители</string>
     <string name="listening_stats_top_track_label">Топ-трек</string>
@@ -1107,6 +1117,7 @@
     <string name="pref_local_subtitle">Музыка на этом устройстве</string>
     <string name="pref_local_title">Локальные файлы</string>
     <string name="pref_lyrics_align">Выравнивание</string>
+    <string name="pref_lyrics_fullscreen_align">Выравнивание (полный экран)</string>
     <string name="pref_lyrics_apple_effect">Эффект плавного заполнения</string>
     <string name="pref_lyrics_apple_effect_sub">Плавная анимация текста вместо резкого переключения между словами</string>
     <string name="pref_lyrics_inline">Встроенные тексты</string>
@@ -1987,6 +1998,7 @@
     <string name="customize_section_sidebar">Боковая панель</string>
     <string name="customize_section_sidebar_desc">«Главная» остаётся всегда: с неё приложение начинается и к ней ведёт возврат.</string>
     <string name="pref_lyrics_display_style">Текущая строка</string>
+    <string name="pref_lyrics_fullscreen_display_style">Текущая строка (полный экран)</string>
     <string name="lyrics_style_standard">Обычный</string>
     <string name="lyrics_style_standard_sub">Строка, которая звучит сейчас, светлее остальных.</string>
     <string name="lyrics_style_scale">Масштаб</string>

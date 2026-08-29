@@ -870,6 +870,16 @@
     <string name="listening_stats_subtitle">Your listening habits</string>
     <string name="listening_stats_time_listened">Time Listened</string>
     <string name="listening_stats_title">Listening Stats</string>
+    <string name="mix_title">Your mix</string>
+    <string name="mix_subtitle">Built from what you actually play, not what you already liked.</string>
+    <string name="mix_start">Start mixing</string>
+    <string name="mix_building">Building your mix…</string>
+    <string name="mix_customise">Customise the mix</string>
+    <string name="mix_needs_history">Play a few tracks first — the mix is built from your listening.</string>
+    <string name="mix_nothing_found">Nothing came back. Check your connection and try again.</string>
+    <string name="mix_in_the_style_of">In the style of an artist</string>
+    <string name="mix_artist_hint">Yeat, Fred again.., …</string>
+    <string name="mix_by_genre">Or a genre</string>
     <string name="listening_stats_top_artist_label">Top Artist</string>
     <string name="listening_stats_top_artists">Top Artists</string>
     <string name="listening_stats_top_track_label">Top Track</string>
@@ -1107,6 +1117,7 @@
     <string name="pref_local_subtitle">Music on this device</string>
     <string name="pref_local_title">Local Files</string>
     <string name="pref_lyrics_align">Alignment</string>
+    <string name="pref_lyrics_fullscreen_align">Alignment (full screen)</string>
     <string name="pref_lyrics_apple_effect">Smooth fill effect</string>
     <string name="pref_lyrics_apple_effect_sub">Fills letters smoothly instead of jumping from word to word.</string>
     <string name="pref_lyrics_inline">Inline Lyrics</string>
@@ -1985,6 +1996,7 @@
     <string name="customize_section_sidebar">Sidebar</string>
     <string name="customize_section_sidebar_desc">Home always stays: it is where the app starts and where going back ends up.</string>
     <string name="pref_lyrics_display_style">Current line</string>
+    <string name="pref_lyrics_fullscreen_display_style">Current line (full screen)</string>
     <string name="lyrics_style_standard">Standard</string>
     <string name="lyrics_style_standard_sub">The line being sung is brighter than the rest.</string>
     <string name="lyrics_style_scale">Scale</string>
