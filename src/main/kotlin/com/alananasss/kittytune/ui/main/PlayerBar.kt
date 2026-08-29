@@ -137,7 +137,12 @@ fun PlayerBar(
     onToggleNowPlaying: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenLyrics: () -> Unit,
-    onOpenTrackInfo: () -> Unit = {},
+    /**
+     * The cover and the credit at the bottom left. It opened the side panel on its Info tab; it opens the
+     * whole player now, which is what he asked for — "I think you can do this when you click on it, the
+     * player opens in full" (issue #33). The Info tab is still one press away on the panel's own tab row.
+     */
+    onOpenFullPlayer: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val vm = playerViewModel
@@ -174,7 +179,7 @@ fun PlayerBar(
                                 matcher = PointerMatcher.mouse(PointerButton.Secondary),
                                 onClick = { vm.showTrackOptions(track, fromPlayer = true) }
                             )
-                            .clickable { onOpenTrackInfo() }
+                            .clickable { onOpenFullPlayer() }
                             .padding(4.dp),
                     ) {
                         AsyncImage(

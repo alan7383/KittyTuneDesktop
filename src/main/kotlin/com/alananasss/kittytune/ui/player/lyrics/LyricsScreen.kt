@@ -107,7 +107,14 @@ import kotlin.math.roundToInt
     @Composable
     fun LyricsScreen(
         viewModel: PlayerViewModel,
-        onClose: () -> Unit
+        onClose: () -> Unit,
+        /**
+         * Whether to draw the cross in this screen's own top bar.
+         *
+         * False when the full player has it beside: there is one way out of one place, and two crosses in
+         * one rectangle is two answers to the same question (issue #33).
+         */
+        showCloseButton: Boolean = true,
     ) {
         val isSearching = viewModel.isSearchingLyrics
         val currentTrack = viewModel.currentTrack
@@ -192,8 +199,10 @@ import kotlin.math.roundToInt
                                 }
                             },
                             navigationIcon = {
-                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = onClose) {
-                                    Icon(Icons.Rounded.Close, str("btn_close"), tint = MaterialTheme.colorScheme.onSurface)
+                                if (showCloseButton) {
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onClose) {
+                                        Icon(Icons.Rounded.Close, str("btn_close"), tint = MaterialTheme.colorScheme.onSurface)
+                                    }
                                 }
                             },
                             actions = {
