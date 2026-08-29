@@ -70,8 +70,39 @@ object MemoryDiagnostics {
 
     private val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
 
+    /**
+     * The recording behind [retentionStacks], held for the life of the process.
+     *
+     * One event and nothing else, so this is a sampling queue rather than a profiler: JFR's own overhead
+     * here is a few objects per collection, and it replaces the heap dump that would otherwise be the
+     * only way to answer the question.
+     */
+    private var recording: jdk.jfr.Recording? = null
+
+    private fun startOldObjectSampling() {
+        recording = runCatching {
+            jdk.jfr.Recording().apply {
+                name = "kittytune-retention"
+                // `cutoff` of zero means every sample the collector kept, rather than only objects past
+                // some age: the retention being hunted is acquired in one thirty-second window, and an
+                // age filter is exactly the wrong instrument for that.
+                enable("jdk.OldObjectSample").withStackTrace().with("cutoff", "0 ns")
+                // Never write a chunk on its own. The only thing that ever reads this is a dump taken at
+                // the moment a jump is noticed, so an unbounded file on somebody else's disk would be
+                // pure cost.
+                setToDisk(false)
+                maxSize = RECORDING_MAX_BYTES
+                start()
+            }
+        }.getOrNull()
+    }
+
+    /** Enough for the sampling queue and its stacks, small enough to be invisible. */
+    private const val RECORDING_MAX_BYTES = 16L * 1024 * 1024
+
     fun start() {
         if (!isEnabled) return
+        startOldObjectSampling()
 
         // A plain daemon thread. This has to keep reporting while the app is busy or wedged, which is
         // exactly when a coroutine on a shared dispatcher might not get a turn.
@@ -147,12 +178,91 @@ object MemoryDiagnostics {
         appendLine()
         appendLine(diagnosticCommand("vmNativeMemory", "summary") ?: "native memory tracking is off")
 
-        // And, on a jump, what is actually holding the heap.
+        // And, on a jump, what is actually holding the heap, and the code that put it there.
         if (reason.startsWith("jumped")) {
             appendLine()
             appendLine(classHistogram() ?: "class histogram unavailable")
+            appendLine()
+            appendLine(retentionStacks() ?: "old object sampling unavailable")
         }
     }
+
+    /**
+     * The code that allocated the objects still alive — the question a histogram cannot answer.
+     *
+     * Two logs now have said the same thing about the same heap: 2.7 million live strings inside 27,000
+     * object arrays, and every KittyTune class in the process adding up to about 700 KB. Our own data is
+     * innocent and the strings sit in containers the JDK supplies and our code fills, so naming the
+     * container names nothing. What is needed is the stack that allocated them.
+     *
+     * That is exactly what JFR's old-object sample is: the collector keeps a bounded queue of sampled
+     * objects that have survived, each with the stack trace of its allocation, and dumping the recording
+     * asks for the ones still reachable at that moment. It is the standard answer to "what is leaking",
+     * it costs a sampling queue rather than a heap dump, and `jdk.jfr` is already in the packaged
+     * runtime.
+     *
+     * Summarised here rather than left as a file to send, because a stack trace read by the person who
+     * can fix it on the same day beats a 3 MB attachment. The raw recording is kept beside the log all
+     * the same, in case the summary points somewhere ambiguous and the frames underneath it matter.
+     *
+     * Verified against a deliberate leak of 1800 retained string arrays: 228 samples, and the method that
+     * built them named on the second line. The first line was `StringConcatHelper.newArray`, which is why
+     * [originOf] pulls our own frames to the front — the frame that did the allocating is a library one
+     * every time, and it is never the frame to change.
+     */
+    private fun retentionStacks(): String? {
+        val active = recording ?: return null
+        return runCatching {
+            val dump = File(AppDirs.dataDir, "retention.jfr")
+            active.dump(dump.toPath())
+
+            // Keyed on the allocated type plus the frames of ours that led to it. Two allocations of the
+            // same type from the same place in our code are one finding, however deep the library
+            // machinery between them goes.
+            val byOrigin = HashMap<String, Int>()
+            var sampled = 0
+            jdk.jfr.consumer.RecordingFile(dump.toPath()).use { file ->
+                while (file.hasMoreEvents()) {
+                    val event = runCatching { file.readEvent() }.getOrNull() ?: break
+                    if (event.eventType.name != "jdk.OldObjectSample") continue
+                    sampled++
+                    byOrigin.merge(originOf(event), 1, Int::plus)
+                }
+            }
+
+            if (sampled == 0) {
+                "Surviving objects by allocation site: nothing sampled yet (the queue fills as the heap grows)"
+            } else buildString {
+                appendLine("Surviving objects by allocation site ($sampled sampled), most first:")
+                byOrigin.entries
+                    .sortedByDescending { it.value }
+                    .take(RETENTION_LINES)
+                    .forEach { (origin, count) -> appendLine("  ${count.toString().padStart(5)}  $origin") }
+                appendLine("  (full recording: ${dump.name}, beside this log)")
+            }
+        }.getOrNull()
+    }
+
+    /** One line naming what was allocated and the frames of ours that asked for it. */
+    private fun originOf(event: jdk.jfr.consumer.RecordedEvent): String {
+        val type = runCatching { event.getClass("object.type")?.name }.getOrNull() ?: "?"
+        val frames = runCatching { event.stackTrace?.frames.orEmpty() }.getOrElse { emptyList() }
+        val described = frames.mapNotNull { frame ->
+            runCatching { "${frame.method.type.name}.${frame.method.name}" }.getOrNull()
+        }
+        // Ours first, because the library frame that did the allocating is never the one to change.
+        // Falling back to the top of the stack when none of it is ours, since "not our code at all" is
+        // itself the answer in that case.
+        val ours = described.filter { it.startsWith(APP_PACKAGE) }
+        val shown = (if (ours.isNotEmpty()) ours else described).take(RETENTION_FRAMES)
+        return if (shown.isEmpty()) type else "$type  <-  " + shown.joinToString("  <-  ")
+    }
+
+    /** Enough distinct sites to see a pattern, not enough to bury the first one. */
+    private const val RETENTION_LINES = 15
+
+    /** Three frames is normally the call, its caller and the reason. */
+    private const val RETENTION_FRAMES = 3
 
     /**
      * The classes holding the heap, largest first — the question the second log left open.
