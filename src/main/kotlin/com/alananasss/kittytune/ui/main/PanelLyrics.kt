@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -69,21 +71,13 @@ import kotlinx.coroutines.isActive
 fun PanelLyrics(
     vm: PlayerViewModel,
     modifier: Modifier = Modifier,
-    /**
-     * Air between one line and the next.
-     *
-     * A parameter because the two callers are reading at completely different sizes. In a side panel a line
-     * is about twenty dp tall and six dp of gap is plenty; on the full player it is three times that, and the
-     * same six dp packs the lines into a block — "il faut qu'il prenne beaucoup plus de saut de ligne car là
-     * il met tout ligne par ligne" (issue #33). Spacing that does not follow the type is spacing that is
-     * wrong at one of the two sizes.
-     */
-    lineSpacing: Dp = 6.dp,
+    /** How much room the words get around themselves. See [PanelLyricsStyle]. */
+    style: PanelLyricsStyle = PanelLyricsStyle.Panel,
 ) {
     val lines = vm.lyricsLines
     when {
-        lines.isNotEmpty() -> PanelSyncedLyrics(vm, lines, modifier, lineSpacing)
-        !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier)
+        lines.isNotEmpty() -> PanelSyncedLyrics(vm, lines, modifier, style)
+        !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier, style)
         else -> Box(modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
             Text(
                 text = str("lyrics_no_data"),
@@ -99,7 +93,7 @@ private fun PanelSyncedLyrics(
     vm: PlayerViewModel,
     lines: List<LyricLine>,
     modifier: Modifier,
-    lineSpacing: Dp,
+    style: PanelLyricsStyle,
 ) {
     val listState = rememberLazyListState()
     // Derived rather than read straight from the position, so the lines recompose when the line
@@ -123,7 +117,7 @@ private fun PanelSyncedLyrics(
         // opened on a large empty rectangle with the lyrics below it, and ended on the same rectangle upside
         // down. Anchoring with a scroll offset costs nothing when there is content above the line, and when
         // there is not, the first line simply sits at the top where it belongs (issue #33).
-        val anchorPx = (viewportPx * ANCHOR_FRACTION).toInt()
+        val anchorPx = (viewportPx * style.anchorFraction).toInt()
 
         FollowActiveLine(listState, activeIndex, anchorPx)
 
@@ -139,13 +133,19 @@ private fun PanelSyncedLyrics(
             Modifier.fillMaxSize(),
             state = listState,
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 8.dp,
+                start = style.startPadding,
+                end = style.endPadding,
+                // Before the first line there is nothing to scroll to, so the list sits where it starts —
+                // and a list starts at its top inset. On a full screen that is the difference between the
+                // words beginning in the middle of the page and beginning jammed against the ceiling:
+                // "quand on est au début, il faut que le lyrics soit au milieu ou un peu vers le haut et pas
+                // tout en haut car ça fait vraiment pas beau" (issue #33). Once the song reaches the words
+                // the anchored scroll takes over and this costs nothing.
+                top = viewportHeight * style.topInsetFraction,
                 // Enough for the closing lines to rise clear of the bottom edge, and no more. This was half
                 // the panel, which left the same empty rectangle at the end of a song that the top inset
                 // left at the start.
-                bottom = viewportHeight * TAIL_FRACTION,
+                bottom = viewportHeight * style.tailFraction,
             ),
         ) {
             items(lines.size) { index ->
@@ -153,7 +153,7 @@ private fun PanelSyncedLyrics(
                 PanelLyricLine(
                     vm = vm,
                     line = line,
-                    lineSpacing = lineSpacing,
+                    lineSpacing = vm.lyricsLineSpacing.dp,
                     // Negative for lines already sung. Before the first line starts there is no current
                     // line, and treating every line as "far away" would shrink the whole panel — so the
                     // distance is zero for all of them until the song reaches the words.
@@ -215,11 +215,7 @@ private fun PanelLyricLine(
     // The reader's own alignment, which this view used to ignore: "ça doit prendre en compte les paramètres
     // lyrics, si on met centré ça met centré" (issue #33). The full screen honoured it and the panel did not,
     // which is the same class of bug as every other one where these two disagreed.
-    val textAlign = when (vm.lyricsAlignment) {
-        com.alananasss.kittytune.data.local.LyricsAlignment.LEFT -> TextAlign.Start
-        com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> TextAlign.Center
-        com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT -> TextAlign.End
-    }
+    val textAlign = alignmentOf(vm)
     val columnAlign = when (textAlign) {
         TextAlign.Center -> Alignment.CenterHorizontally
         TextAlign.End -> Alignment.End
@@ -276,7 +272,7 @@ private fun PanelLyricLine(
  * a given speed means.
  */
 @Composable
-private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier) {
+private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: PanelLyricsStyle) {
     val text = vm.rawPlainLyrics.orEmpty()
     val lines = remember(text) { text.split("\n") }
     val listState = rememberLazyListState()
@@ -307,26 +303,95 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier) {
                 onManualScroll = { lastUserScrollMs = System.currentTimeMillis() },
             ),
         state = listState,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        contentPadding = PaddingValues(
+            start = style.startPadding,
+            end = style.endPadding,
+            top = 12.dp,
+            bottom = 24.dp,
+        ),
     ) {
         items(lines) { line ->
-            Text(
-                text = line,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
-            )
+            // The same type and the same alignment a sung line gets, because "les lyrics qui sont juste en
+            // texte tout seul, c'est vraiment moche" was about exactly this: untimed words were set in
+            // `bodyMedium` and left-aligned whatever the reader had chosen, so a song without timings looked
+            // like a different app from the same song with them. There is no current line to light up — that
+            // is what untimed means — but everything else about how they are set can match (issue #33).
+            //
+            // A blank line in the source stays a blank line: the verse breaks are most of what makes a sheet
+            // readable, and they were the one thing the old version did keep.
+            if (line.isBlank()) {
+                Spacer(Modifier.height(vm.lyricsLineSpacing.dp * 2))
+            } else {
+                Text(
+                    text = line,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = alignmentOf(vm),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = vm.lyricsLineSpacing.dp / 2),
+                )
+            }
         }
     }
 }
 
-/**
- * How far down the panel the current line settles, as a fraction of its height.
- *
- * Low enough that several lines still to come stay visible — which is the half worth reading — and high
- * enough that the line just sung is still on screen for context.
- */
-private const val ANCHOR_FRACTION = 0.32f
+/** The reader's chosen alignment, in the one place both halves of this file read it from. */
+@Composable
+private fun alignmentOf(vm: PlayerViewModel): TextAlign = when (vm.lyricsAlignment) {
+    com.alananasss.kittytune.data.local.LyricsAlignment.LEFT -> TextAlign.Start
+    com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> TextAlign.Center
+    com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT -> TextAlign.End
+}
 
-/** How much room the last lines get to rise into, as a fraction of the panel's height. */
-private const val TAIL_FRACTION = 0.35f
+/**
+ * The room the words get around themselves, which is the whole of what differs between reading them in a
+ * side panel and reading them on a full screen (issue #33).
+ *
+ * A bundle rather than four parameters, because they only ever change together: every one of them is a
+ * consequence of how big the type is, and a caller that got three of the four right would look worse than one
+ * that took the wrong preset entirely.
+ *
+ * @param startPadding inset for the text's leading edge.
+ * @param endPadding inset for its trailing edge. Deliberately larger than [startPadding] on the full screen:
+ *   the list runs to the window edge so the scrollbar can sit against it — "met la barre de slide tout à
+ *   droite" — which means the text needs room not to run underneath it.
+ * @param topInsetFraction where the first line sits before the song has reached the words, as a fraction of
+ *   the viewport. A list with nothing to scroll to sits at its top inset, so this is what puts the opening
+ *   line in the middle of the page rather than against the ceiling.
+ * @param tailFraction how much room the closing lines get to rise into.
+ * @param anchorFraction how far down the current line settles once the song is following.
+ */
+data class PanelLyricsStyle(
+    val startPadding: Dp,
+    val endPadding: Dp,
+    val topInsetFraction: Float,
+    val tailFraction: Float,
+    val anchorFraction: Float,
+) {
+    companion object {
+        /**
+         * A side panel, where the height is what is in shortest supply.
+         *
+         * A third of a panel of air above the first line reads as most of the panel being empty, which is why
+         * the inset here is a token one and the anchoring does the work instead.
+         */
+        val Panel = PanelLyricsStyle(
+            startPadding = 16.dp,
+            endPadding = 16.dp,
+            topInsetFraction = 0.03f,
+            tailFraction = 0.35f,
+            anchorFraction = 0.32f,
+        )
+
+        /** A full screen, where the same air is the point of the thing. */
+        val FullScreen = PanelLyricsStyle(
+            startPadding = 24.dp,
+            endPadding = 48.dp,
+            topInsetFraction = 0.36f,
+            tailFraction = 0.55f,
+            anchorFraction = 0.30f,
+        )
+    }
+}

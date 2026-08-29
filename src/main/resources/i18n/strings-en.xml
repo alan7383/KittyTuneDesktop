@@ -1124,6 +1124,7 @@
     <string name="pref_lyrics_show_button">Show lyrics button</string>
     <string name="pref_lyrics_show_button_sub">Show a quick access button on the player</string>
     <string name="pref_lyrics_size">Size</string>
+    <string name="pref_lyrics_line_spacing">Line spacing</string>
     <string name="pref_lyrics_subtitle">Display &amp; Source</string>
     <string name="pref_lyrics_title">Lyrics</string>
     <string name="pref_lyrics_translation_lang">Translation language</string>

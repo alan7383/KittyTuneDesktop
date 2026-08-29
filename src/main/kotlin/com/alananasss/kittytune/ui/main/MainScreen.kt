@@ -988,7 +988,15 @@ fun MainScreen() {
     ) {
         com.alananasss.kittytune.ui.player.FullPlayerScreen(
             viewModel = playerViewModel,
-            onExitFullScreen = { playerViewModel.isLyricsFullScreen = false },
+            onExitFullScreen = {
+                playerViewModel.isLyricsFullScreen = false
+                // Said here as well as on disposal. Disposal happens at the *end* of the exit animation, so
+                // relying on it alone left the window full screen for a fifth of a second after the view had
+                // gone — and if the window manager missed that one change, for good: "quand on quitte le mode
+                // fullscreen il faut qu'il arrête le mode fullscreen" (issue #33). Asking twice is harmless
+                // and the effect that applies it is idempotent.
+                com.alananasss.kittytune.core.AppWindowState.fullScreen = false
+            },
         )
     }
 
