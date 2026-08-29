@@ -824,6 +824,7 @@
     <string name="lib_restore_tooltip">Restore Your Library</string>
     <string name="lib_search_hint">Search in Your Library</string>
     <string name="lib_search_tooltip">Search in Your Library</string>
+    <string name="lib_filter_tooltip">Filter by type</string>
     <string name="lib_sort_alphabetical">Alphabetical</string>
     <string name="lib_sort_by_title">Sort by</string>
     <string name="lib_sort_creator">Creator</string>
@@ -1328,6 +1329,7 @@
     <string name="restore_toast_error">Restore failed</string>
     <string name="restore_toast_success">Data restored</string>
     <string name="search_filter_all">All</string>
+    <string name="search_source_tooltip">Where to search</string>
     <string name="search_filter_artists">Artists</string>
     <string name="search_filter_playlists">Playlists</string>
     <string name="search_filter_tracks">Tracks</string>

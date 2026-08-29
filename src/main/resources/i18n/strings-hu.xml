@@ -828,6 +828,7 @@
     <string name="lib_restore_tooltip">Könyvtár visszaállítása</string>
     <string name="lib_search_hint">Keresés a könyvtárban</string>
     <string name="lib_search_tooltip">Keresés a könyvtárban</string>
+    <string name="lib_filter_tooltip">Szűrés típus szerint</string>
     <string name="lib_sort_alphabetical">Betűrendben</string>
     <string name="lib_sort_by_title">Rendezés</string>
     <string name="lib_sort_creator">Készítő</string>
@@ -1334,6 +1335,7 @@
     <string name="restore_toast_error">Hiba a visszaállításkor</string>
     <string name="restore_toast_success">Adatok visszaállítva</string>
     <string name="search_filter_all">Összes</string>
+    <string name="search_source_tooltip">Hol keressen</string>
     <string name="search_filter_artists">Előadók</string>
     <string name="search_filter_playlists">Lejátszási listák</string>
     <string name="search_filter_tracks">Számok</string>
