@@ -22,11 +22,15 @@ import androidx.compose.ui.window.PopupPositionProvider
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Tip(text: String, content: @Composable () -> Unit) {
+fun Tip(text: String, enabled: Boolean = true, content: @Composable () -> Unit) {
     TooltipBox(
         positionProvider = rememberEdgeSafeTooltipPositionProvider(),
         tooltip = { PlainTooltip { Text(text) } },
         state = rememberTooltipState(),
+        // A row that only sometimes needs a tooltip — a sidebar label is repeated by the tooltip while
+        // the panel is open and replaced by it once collapsed — turns this off rather than dropping the
+        // wrapper. Dropping it would change the shape of the tree mid-animation (issue #33).
+        enableUserInput = enabled,
         content = content,
     )
 }
