@@ -1130,6 +1130,7 @@
     <string name="pref_lyrics_show_button">Dalszöveg gomb megjelenítése</string>
     <string name="pref_lyrics_show_button_sub">Gyors elérésű gomb megjelenítése a lejátszóban</string>
     <string name="pref_lyrics_size">Méret</string>
+    <string name="pref_lyrics_fullscreen_size">Méret (teljes képernyő)</string>
     <string name="pref_lyrics_subtitle">Megjelenítés és forrás</string>
     <string name="pref_lyrics_title">Dalszövegek</string>
     <string name="pref_lyrics_translation_lang">Fordítás nyelve</string>
@@ -1343,6 +1344,14 @@
     <string name="search_filter_all">Összes</string>
     <string name="search_source_tooltip">Hol keressen</string>
     <string name="search_apple_music_notice">Az Apple Music találatok katalógusbejegyzések. Egyre rákattintva megkeressük ugyanazt a dalt egy lejátszható forráson.</string>
+    <string name="yandex_not_connected">Add meg a Yandex Music tokent a beállításokban a katalógus kereséséhez.</string>
+    <string name="yandex_region_blocked">A Yandex Music nem érhető el az országodban.</string>
+    <string name="yandex_failed">A Yandex Music nem elérhető.</string>
+    <string name="search_yandex_notice">A Yandex Music találatok katalógusbejegyzések. Egyre kattintva megkeressük ugyanazt a dalt egy lejátszható forráson.</string>
+    <string name="pref_yandex_token">Yandex Music token</string>
+    <string name="pref_yandex_token_sub">A katalógus kereséséhez kell. A lejátszás mindig másik forrásból jön.</string>
+    <string name="pref_yandex_token_get">Hogyan szerezz tokent</string>
+    <string name="pref_yandex_token_clear">Token törlése</string>
     <string name="search_apple_music_unplayable">Nem található lejátszható forráson.</string>
     <string name="search_filter_artists">Előadók</string>
     <string name="search_filter_playlists">Lejátszási listák</string>

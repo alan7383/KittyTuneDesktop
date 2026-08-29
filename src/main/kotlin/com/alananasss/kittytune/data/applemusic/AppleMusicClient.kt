@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
  * date. **Never audio.** Apple's streams are DRM-protected through MusicKit and that is not something to
  * work around; the point of having the catalogue at all is that "many artists don't upload their music to
  * soundcloud, youtube, spotify", so a match here is a name to go and find on a source that can play it.
- * The resolver that does that is [AppleMusicFallback].
+ * The resolver that does that is [com.alananasss.kittytune.data.catalog.CatalogFallback].
  *
  * ## The credential
  *
@@ -98,7 +98,10 @@ object AppleMusicClient {
      * @return the songs Apple knows about, or an empty list for every failure there is. A source that
      *   depends on scraping must never be able to empty a search that other sources answered.
      */
-    suspend fun searchSongs(term: String, limit: Int = 25): List<AppleSong> = withContext(Dispatchers.IO) {
+    suspend fun searchSongs(
+        term: String,
+        limit: Int = 25,
+    ): List<com.alananasss.kittytune.data.catalog.CatalogSong> = withContext(Dispatchers.IO) {
         if (term.isBlank()) return@withContext emptyList()
         val body = withToken { token ->
             callCatalog(

@@ -112,6 +112,7 @@ import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.ui.home.HomeViewModel
 import com.alananasss.kittytune.ui.home.SearchFilter
 import com.alananasss.kittytune.ui.home.SearchSource
+import com.alananasss.kittytune.ui.home.YandexNotice
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.util.Calendar
@@ -659,6 +660,7 @@ private fun SearchSourceButton(vm: HomeViewModel) {
         SearchSource.YOUTUBE,
         SearchSource.SPOTIFY,
         SearchSource.APPLE_MUSIC,
+        SearchSource.YANDEX_MUSIC,
     )
 
     Box {
@@ -713,6 +715,7 @@ private fun searchSourceLabel(source: SearchSource): String = when (source) {
     SearchSource.YOUTUBE -> "YouTube"
     SearchSource.SPOTIFY -> "Spotify"
     SearchSource.APPLE_MUSIC -> "Apple Music"
+    SearchSource.YANDEX_MUSIC -> "Yandex Music"
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
@@ -826,7 +829,10 @@ private fun SearchResults(
             when (vm.activeSearchSource) {
                 SearchSource.YOUTUBE -> YoutubeResults(vm, playerViewModel, listState)
                 SearchSource.SPOTIFY -> SpotifyResults(vm, playerViewModel, navController)
-                SearchSource.APPLE_MUSIC -> AppleMusicResults(vm, playerViewModel, listState)
+                // One list for both catalogues, because they produce the same type and behave the same way:
+                // press a row, it goes and finds the song on a source that can play it (issue #33).
+                SearchSource.APPLE_MUSIC, SearchSource.YANDEX_MUSIC ->
+                    CatalogResults(vm, playerViewModel, listState)
                 SearchSource.SOUNDCLOUD -> SoundCloudResults(vm, playerViewModel, navController, listState)
             }
         }
@@ -1143,17 +1149,26 @@ private fun YoutubeResults(
 // ──────────────────────────────────────────────────────────────────────
 
 @Composable
-private fun AppleMusicResults(
+private fun CatalogResults(
     vm: HomeViewModel,
     playerViewModel: PlayerViewModel,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
     if (vm.searchResultsApple.isEmpty() && !vm.isSearchLoading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
             Text(
-                text = str("search_no_results"),
+                // "Nothing matched" and "this is not available where you are" look identical as an empty
+                // list and are not the same thing to read. Yandex has two such states — no token, and a
+                // country it does not serve — so it says which (issue #33).
+                text = when (vm.yandexNotice) {
+                    YandexNotice.NOT_CONNECTED -> str("yandex_not_connected")
+                    YandexNotice.REGION_BLOCKED -> str("yandex_region_blocked")
+                    YandexNotice.FAILED -> str("yandex_failed")
+                    null -> str("search_no_results")
+                },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
         }
         return
@@ -1169,16 +1184,19 @@ private fun AppleMusicResults(
         // decorate forty rows with the same badge (issue #33).
         item {
             Text(
-                text = str("search_apple_music_notice"),
+                text = when (vm.activeSearchSource) {
+                    SearchSource.YANDEX_MUSIC -> str("search_yandex_notice")
+                    else -> str("search_apple_music_notice")
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
-        items(vm.searchResultsApple, key = { it.id }) { song ->
-            AppleSongRow(
+        items(vm.searchResultsApple, key = { it.key }) { song ->
+            CatalogSongRow(
                 song = song,
-                resolving = vm.resolvingAppleSongId == song.id,
+                resolving = vm.resolvingAppleSongId == song.key,
                 onClick = {
                     vm.resolveAppleSong(song) { track ->
                         if (track != null) {
@@ -1201,7 +1219,11 @@ private fun AppleMusicResults(
  * place of nothing is what says so: this press is a search, and it takes as long as a search does.
  */
 @Composable
-private fun AppleSongRow(song: com.alananasss.kittytune.data.applemusic.AppleSong, resolving: Boolean, onClick: () -> Unit) {
+private fun CatalogSongRow(
+    song: com.alananasss.kittytune.data.catalog.CatalogSong,
+    resolving: Boolean,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

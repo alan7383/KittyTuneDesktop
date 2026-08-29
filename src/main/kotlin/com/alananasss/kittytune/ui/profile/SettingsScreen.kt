@@ -1,5 +1,12 @@
 package com.alananasss.kittytune.ui.profile
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -64,6 +71,36 @@ fun SettingsScreen(
                 )
             )
             
+            Spacer(Modifier.height(32.dp))
+
+            // Where the Yandex token goes.
+            //
+            // Under the import section rather than under a "sources" heading of its own, because that is all it
+            // is: a credential the user brings so their catalogue can be read. Nothing here unlocks playback —
+            // Yandex serves audio only through a signing scheme lifted out of their own client, which is not
+            // something to reproduce, so a Yandex hit always plays from wherever else the song exists
+            // (issue #33).
+            var showYandexTokenDialog by remember { mutableStateOf(false) }
+            val yandexConnected = com.alananasss.kittytune.data.yandex.YandexMusicClient.isConnected
+            SettingsGroup(
+                title = str("pref_yandex_token"),
+                items = listOf(
+                    { shape ->
+                        SettingsItem(
+                            shape = shape,
+                            title = str("pref_yandex_token"),
+                            subtitle = if (yandexConnected) str("pref_yandex_token_sub")
+                            else str("yandex_not_connected"),
+                            icon = Icons.Rounded.Key,
+                            onClick = { showYandexTokenDialog = true },
+                        )
+                    }
+                )
+            )
+            if (showYandexTokenDialog) {
+                YandexTokenDialog(onDismiss = { showYandexTokenDialog = false })
+            }
+
             Spacer(Modifier.height(32.dp))
 
             MainCategoryTitle(str("pref_audio_title"), Icons.Rounded.GraphicEq)
@@ -171,5 +208,95 @@ fun MainCategoryTitle(title: String, icon: ImageVector) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+/**
+ * Where the Yandex Music token is pasted (issue #33).
+ *
+ * ## Why a paste box and not a sign-in button
+ *
+ * "Possibilité de se connecter via le web aussi ?" — and the honest answer is not yet. A browser sign-in needs
+ * a registered Yandex application's id and secret, and the only ones lying around belong to other projects.
+ * Shipping somebody else's OAuth client is the same objection as shipping Apple's developer token out of their
+ * APK, so this asks for the token instead, which is what their own API documentation describes and what every
+ * third-party client does.
+ *
+ * The link goes to that documentation. If a Yandex application is ever registered for KittyTune, filling in
+ * `YandexMusicClient.OAUTH_CLIENT_ID` turns this dialog into a sign-in button and nothing else has to change.
+ *
+ * The field is masked while it is at rest and legible while it is being typed, because a token is a password
+ * that people paste and then need to check they pasted correctly.
+ */
+@Composable
+private fun YandexTokenDialog(onDismiss: () -> Unit) {
+    val client = com.alananasss.kittytune.data.yandex.YandexMusicClient
+    var value by remember { mutableStateOf(client.token.orEmpty()) }
+    var reveal by remember { mutableStateOf(false) }
+
+    com.alananasss.kittytune.core.BackHandler(onBack = onDismiss)
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text(str("pref_yandex_token"), style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    str("pref_yandex_token_sub"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(20.dp))
+
+                androidx.compose.material3.OutlinedTextField(
+                    value = value,
+                    onValueChange = { value = it.trim() },
+                    singleLine = true,
+                    label = { Text(str("pref_yandex_token")) },
+                    visualTransformation =
+                        if (reveal) androidx.compose.ui.text.input.VisualTransformation.None
+                        else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { reveal = !reveal }) {
+                            Icon(
+                                if (reveal) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = {
+                        runCatching {
+                            java.awt.Desktop.getDesktop()
+                                .browse(java.net.URI(com.alananasss.kittytune.data.yandex.YandexMusicClient.TOKEN_HELP_URL))
+                        }
+                    }
+                ) { Text(str("pref_yandex_token_get")) }
+
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(
+                        onClick = {
+                            client.token = null
+                            value = ""
+                            onDismiss()
+                        }
+                    ) { Text(str("pref_yandex_token_clear")) }
+                    TextButton(
+                        onClick = {
+                            client.token = value
+                            onDismiss()
+                        }
+                    ) { Text(str("btn_save")) }
+                }
+            }
+        }
     }
 }

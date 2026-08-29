@@ -1049,10 +1049,15 @@ import kotlin.math.roundToInt
 @Composable
 fun QuickLyricsSettingsDialog(
     viewModel: PlayerViewModel,
+    isFullScreen: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val prefs = remember { PlayerPreferences() }
-    val fontSize = viewModel.lyricsFontSize
+    val fontSize = if (isFullScreen) viewModel.lyricsFullScreenFontSize else viewModel.lyricsFontSize
+    val updateFontSize: (Float) -> Unit = {
+        if (isFullScreen) viewModel.updateLyricsFullScreenFontSize(it)
+        else viewModel.updateLyricsFontSize(it)
+    }
     val alignment = viewModel.lyricsAlignment
     var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
     val currentOffsetMs = viewModel.lyricsOffset
@@ -1299,17 +1304,17 @@ fun QuickLyricsSettingsDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.updateLyricsFontSize((fontSize - 2f).coerceAtLeast(12f)) }) {
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { updateFontSize((fontSize - 2f).coerceAtLeast(12f)) }) {
                                         Icon(Icons.Rounded.Remove, null)
                                     }
                                     Slider(
                                         value = fontSize,
-                                        onValueChange = { viewModel.updateLyricsFontSize(it) },
+                                        onValueChange = { updateFontSize(it) },
                                         valueRange = 12f..100f,
                                         steps = 43,
                                         modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                                     )
-                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(100f)) }) {
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { updateFontSize((fontSize + 2f).coerceAtMost(100f)) }) {
                                         Icon(Icons.Rounded.Add, null)
                                     }
                                 }

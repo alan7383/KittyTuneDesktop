@@ -1124,6 +1124,7 @@
     <string name="pref_lyrics_show_button">Show lyrics button</string>
     <string name="pref_lyrics_show_button_sub">Show a quick access button on the player</string>
     <string name="pref_lyrics_size">Size</string>
+    <string name="pref_lyrics_fullscreen_size">Size (full screen)</string>
     <string name="pref_lyrics_subtitle">Display &amp; Source</string>
     <string name="pref_lyrics_title">Lyrics</string>
     <string name="pref_lyrics_translation_lang">Translation language</string>
@@ -1337,6 +1338,14 @@
     <string name="search_filter_all">All</string>
     <string name="search_source_tooltip">Where to search</string>
     <string name="search_apple_music_notice">Apple Music results are catalogue entries. Pressing one looks for the same song on a source that can play it.</string>
+    <string name="yandex_not_connected">Add your Yandex Music token in Settings to search their catalogue.</string>
+    <string name="yandex_region_blocked">Yandex Music is not available in your country.</string>
+    <string name="yandex_failed">Could not reach Yandex Music.</string>
+    <string name="search_yandex_notice">Yandex Music results are catalogue entries. Pressing one looks for the same song on a source that can play it.</string>
+    <string name="pref_yandex_token">Yandex Music token</string>
+    <string name="pref_yandex_token_sub">Needed to search their catalogue. Playback always comes from another source.</string>
+    <string name="pref_yandex_token_get">How to get a token</string>
+    <string name="pref_yandex_token_clear">Remove token</string>
     <string name="search_apple_music_unplayable">Not found on a source that can play it.</string>
     <string name="search_filter_artists">Artists</string>
     <string name="search_filter_playlists">Playlists</string>
