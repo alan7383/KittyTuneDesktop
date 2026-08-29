@@ -2,6 +2,7 @@ package com.alananasss.kittytune.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -29,6 +30,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloseFullscreen
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Lyrics
 import androidx.compose.material.icons.rounded.MoreHoriz
@@ -59,6 +62,7 @@ import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.main.PanelLyrics
+import com.alananasss.kittytune.ui.utils.fadingEdge
 
 /**
  * The player at the size of the window, built from the reference he sent (issue #33).
@@ -122,23 +126,22 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     // produced the search-field fix a few commits ago (issue #33).
     com.alananasss.kittytune.core.BackHandler(onBack = onExitFullScreen)
 
+    // And the window itself goes full screen, rather than this covering it. Tied to being composed rather
+    // than to the flag, so every way out of here — the button, Escape, the mouse, or the track ending and
+    // this leaving on its own — gives the window back without any of them having to remember to.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        com.alananasss.kittytune.core.AppWindowState.fullScreen = true
+        onDispose { com.alananasss.kittytune.core.AppWindowState.fullScreen = false }
+    }
+
     val palette = rememberFullPlayerPalette()
+    val drift = rememberMeshDrift()
 
     Box(
         Modifier
             .fillMaxSize()
             .background(palette.base)
-            // The bloom. One soft light off the top right, which is the only thing breaking the flat
-            // colour in the reference and the whole reason it does not look like a coloured rectangle.
-            .drawBehind {
-                drawRect(
-                    Brush.radialGradient(
-                        colors = listOf(palette.bloom, Color.Transparent),
-                        center = Offset(size.width * 0.82f, size.height * 0.06f),
-                        radius = size.minDimension * 0.9f,
-                    )
-                )
-            }
+            .drawBehind { drawMesh(palette, drift) }
     ) {
         Row(
             modifier = Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 40.dp),
@@ -169,6 +172,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             ) {
                 LyricsOnCoverColour(viewModel, palette)
             }
+
         }
 
         // The two things this screen needs of its own, in the corner and dim: the way out, and the lyrics
@@ -206,7 +210,84 @@ private const val LYRICS_SHARE = 1.3f
  * does, and why a pale pink cover still gives a screen you can read. The bloom is the same hue lifted, not
  * white, or it would read as a lens flare rather than as light on a wall.
  */
-private class FullPlayerPalette(val base: Color, val bloom: Color, val bright: Color, val dim: Color)
+private class FullPlayerPalette(
+    val base: Color,
+    /** Four soft lights of the record's own hue family, for [drawMesh]. */
+    val mesh: List<Color>,
+    val bright: Color,
+    val dim: Color,
+)
+
+/**
+ * The background: several huge soft lights of the record's colour, drifting.
+ *
+ * "Refais aussi le fond car un fond simple comme ça c'est pas ouf, refais-le entièrement, faut que ça claque
+ * mais lisible."
+ *
+ * One flat colour with a single bloom in the corner was the previous answer and he is right that it is not
+ * much. What Apple's screen actually has is a mesh: four or five enormous overlapping blobs in colours from
+ * the sleeve, moving slowly enough that you notice it only if you look. The blobs here are derived from the
+ * one seed colour the app extracts — rotated around it and lifted — because a single dominant colour is all
+ * there is, and four tints of one hue still reads as a mesh where four unrelated colours would read as a mess.
+ *
+ * "Mais lisible" is the constraint that sets every number below. The blobs are drawn at low alpha over a deep
+ * base, and they are wide enough that no edge of one lands in the middle of a line of text: a hard boundary
+ * behind a word is what makes a pretty background unreadable.
+ */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMesh(
+    palette: FullPlayerPalette,
+    drift: Float,
+) {
+    val w = size.width
+    val h = size.height
+    // Each blob gets its own phase and its own rate, so they never line up into one pulsing shape.
+    val blobs = listOf(
+        Triple(0.80f, 0.10f, 0f),
+        Triple(0.22f, 0.78f, 0.33f),
+        Triple(0.95f, 0.62f, 0.66f),
+        Triple(0.05f, 0.18f, 0.85f),
+    )
+    blobs.forEachIndexed { index, (baseX, baseY, phase) ->
+        val angle = ((drift + phase) * 2f * Math.PI).toFloat()
+        val x = w * (baseX + WANDER * kotlin.math.cos(angle + index))
+        val y = h * (baseY + WANDER * kotlin.math.sin(angle * 0.8f + index))
+        drawRect(
+            Brush.radialGradient(
+                colors = listOf(palette.mesh[index % palette.mesh.size], Color.Transparent),
+                center = Offset(x, y),
+                radius = size.minDimension * BLOB_RADIUS,
+            )
+        )
+    }
+}
+
+/** How far a blob strays from where it started, as a fraction of the screen. */
+private const val WANDER = 0.10f
+
+/** Wide enough that no blob has a visible edge to catch a line of text on. */
+private const val BLOB_RADIUS = 1.05f
+
+/**
+ * One slow revolution, shared by every blob.
+ *
+ * Forty seconds, which is long enough that the movement is something you notice having happened rather than
+ * something you can watch — the difference between a background and an animation.
+ */
+@Composable
+private fun rememberMeshDrift(): Float {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "mesh")
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = tween(MESH_CYCLE_MS, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "meshDrift",
+    )
+    return drift
+}
+
+private const val MESH_CYCLE_MS = 40_000
 
 @Composable
 private fun rememberFullPlayerPalette(): FullPlayerPalette {
@@ -217,11 +298,14 @@ private fun rememberFullPlayerPalette(): FullPlayerPalette {
     // Animated, so a track change travels to the next record's colour instead of cutting to it — the
     // palette elsewhere in the app already does this, and a full screen cutting would be worse.
     val base by animateColorAsState(deepen(seed), tween(COLOUR_TRAVEL_MS), label = "fullPlayerBase")
-    val bloom by animateColorAsState(lift(seed), tween(COLOUR_TRAVEL_MS), label = "fullPlayerBloom")
+    val meshOne by animateColorAsState(lift(seed, 0.34f), tween(COLOUR_TRAVEL_MS), label = "mesh1")
+    val meshTwo by animateColorAsState(lift(rotate(seed, 0.06f), 0.26f), tween(COLOUR_TRAVEL_MS), label = "mesh2")
+    val meshThree by animateColorAsState(lift(rotate(seed, -0.08f), 0.30f), tween(COLOUR_TRAVEL_MS), label = "mesh3")
+    val meshFour by animateColorAsState(deepen(rotate(seed, 0.12f)).copy(alpha = 0.55f), tween(COLOUR_TRAVEL_MS), label = "mesh4")
 
     return FullPlayerPalette(
         base = base,
-        bloom = bloom,
+        mesh = listOf(meshOne, meshTwo, meshThree, meshFour),
         // White rather than a tint: on a saturated ground, tinted text reads as faded rather than as
         // written, and the reference is plainly white at two opacities.
         bright = Color.White.copy(alpha = 0.94f),
@@ -245,13 +329,32 @@ private fun deepen(color: Color): Color = Color(
     alpha = 1f,
 )
 
-/** The same hue with some white mixed in, for the bloom. */
-private fun lift(color: Color): Color = Color(
+/** The same hue with some white mixed in, for a light rather than a shadow. */
+private fun lift(color: Color, alpha: Float): Color = Color(
     red = color.red * 0.62f + 0.30f,
     green = color.green * 0.62f + 0.30f,
     blue = color.blue * 0.62f + 0.30f,
-    alpha = 0.55f,
+    alpha = alpha,
 )
+
+/**
+ * The same colour, nudged around the wheel.
+ *
+ * A few degrees only. Enough that four blobs of it are four colours rather than one at four opacities, and
+ * not enough that a red sleeve produces a green corner — the mesh has to stay the record's.
+ */
+private fun rotate(color: Color, turns: Float): Color {
+    // java.awt rather than android.graphics: this is a desktop JVM app, and AWT is already on the classpath
+    // for the window and the cursors.
+    val hsb = java.awt.Color.RGBtoHSB(
+        (color.red * 255f).toInt(),
+        (color.green * 255f).toInt(),
+        (color.blue * 255f).toInt(),
+        null,
+    )
+    val hue = ((hsb[0] + turns) % 1f + 1f) % 1f
+    return Color(java.awt.Color.HSBtoRGB(hue, hsb[1], hsb[2]))
+}
 
 /**
  * The panel's lyrics renderer, handed a theme that says "white, on this record's colour, four times
@@ -263,6 +366,20 @@ private fun lift(color: Color): Color = Color(
  */
 @Composable
 private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerPalette) {
+    // Faded at both ends. "Les lyrics à droite il faut le refaire car y'a pas de fond dégradé en sombre en
+    // bas" — without it the lines are cut off mid-letter by the bottom of the window, which is the one detail
+    // that makes a column of huge type look like a clipped list rather than like text passing through
+    // (issue #33). The screen's own lyrics view has had this from the start; the panel renderer had not,
+    // because in a panel the list is short enough not to need it.
+    val fade = remember {
+        Brush.verticalGradient(
+            0f to Color.Transparent,
+            0.10f to Color.Black,
+            0.78f to Color.Black,
+            1f to Color.Transparent,
+        )
+    }
+
     val scheme = MaterialTheme.colorScheme.copy(
         onSurface = palette.bright,
         onSurfaceVariant = palette.dim,
@@ -277,12 +394,27 @@ private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerP
         )
     }
     MaterialTheme(colorScheme = scheme, typography = type, shapes = MaterialTheme.shapes) {
-        PanelLyrics(viewModel, Modifier.fillMaxSize())
+        PanelLyrics(
+            vm = viewModel,
+            modifier = Modifier
+                .fillMaxSize()
+                .fadingEdge(fade),
+            lineSpacing = LYRIC_SPACING,
+        )
     }
 }
 
 private val LYRIC_SIZE = 34.sp
 private val LYRIC_LINE_HEIGHT = 44.sp
+
+/**
+ * Air between one line and the next, at this size.
+ *
+ * Sixteen against the panel's six. At 34 sp a six dp gap runs the lines together into a paragraph, which is
+ * what "il met tout ligne par ligne" was describing — every line touching its neighbour, so the eye has
+ * nothing to separate them by.
+ */
+private val LYRIC_SPACING = 16.dp
 
 /**
  * The cover, and under it the only controls the reference shows.
@@ -317,7 +449,11 @@ private fun CoverColumn(
                     .clip(RoundedCornerShape(14.dp)),
             )
 
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(22.dp))
+            Box(Modifier.width(side)) {
+                TrackCredit(viewModel = viewModel, palette = palette)
+            }
+            Spacer(Modifier.height(14.dp))
             Box(Modifier.width(side)) {
                 FullPlayerControls(
                     viewModel = viewModel,
@@ -334,6 +470,87 @@ private fun CoverColumn(
  * Wide enough to be the subject on a laptop, small enough that a 4K window does not turn it into a poster.
  */
 private val COVER_MAX = 420.dp
+
+/**
+ * What is playing, and the two things you do to it from here (issue #33).
+ *
+ * "Le titre, l'artiste, le like et les trois petits points comme t'as mis, mais façon material 3."
+ *
+ * The reference puts the title and the credit under the sleeve with two small round buttons opposite them,
+ * and this had neither — the screen said what the words were and never what the song was. Material 3 rather
+ * than Apple's chrome: the buttons are tonal circles rather than grey pills, sized to Material's own 40 dp,
+ * and the type is the scheme's title and body rather than a copy of San Francisco's proportions.
+ *
+ * The heart is filled when the track is liked, which is the app's own convention everywhere else. The three
+ * dots stay where they were, in the transport row, because he asked for them there.
+ */
+@Composable
+private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) {
+    val track = viewModel.currentTrack ?: return
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            androidx.compose.material3.Text(
+                text = track.title ?: "",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                color = palette.bright,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            androidx.compose.material3.Text(
+                // Artist and album on one line, separated by an em dash, which is how the reference reads and
+                // is one line instead of two for something nobody needs two lines of.
+                text = listOfNotNull(
+                    track.user?.username?.takeIf { it.isNotBlank() },
+                    track.publisherMetadata?.albumTitle?.takeIf { it.isNotBlank() },
+                ).joinToString(" — "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = palette.dim,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+
+        Spacer(Modifier.width(8.dp))
+        TonalGlyph(
+            icon = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+            label = str("player_like"),
+            tint = if (viewModel.isLiked) palette.bright else palette.dim,
+            onClick = { viewModel.toggleLike() },
+        )
+    }
+}
+
+/**
+ * A glyph on a tonal circle — Material's shape language on a ground that is not Material's colour.
+ *
+ * The container is white at a low alpha rather than a scheme colour, because the scheme knows nothing about
+ * the record's hue and a `surfaceVariant` circle here would be a grey coin on a red wall.
+ */
+@Composable
+private fun TonalGlyph(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    androidx.compose.material3.IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(40.dp)
+            .background(Color.White.copy(alpha = 0.14f), androidx.compose.foundation.shape.CircleShape),
+    ) {
+        androidx.compose.material3.Icon(
+            icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(20.dp),
+        )
+    }
+}
 
 /**
  * The progress bar and the transport, as quiet as the reference has them.
