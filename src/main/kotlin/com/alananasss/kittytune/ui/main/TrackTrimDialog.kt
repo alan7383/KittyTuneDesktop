@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.main
 
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -286,7 +287,7 @@ private fun TimeField(
         label = { Text(label) },
         singleLine = true,
         isError = text.isNotBlank() && parsed == null,
-        modifier = modifier,
+        modifier = modifier.trackTextInput(),
     )
 }
 

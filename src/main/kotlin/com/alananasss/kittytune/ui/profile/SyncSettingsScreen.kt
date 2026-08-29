@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.profile
 
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -450,7 +451,7 @@ private fun PairDeviceDialog(
                         onValueChange = { peerCode = it; error = null },
                         label = { Text(str("sync_peer_code")) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                     )
                     Button(
                         onClick = {
@@ -522,7 +523,7 @@ private fun AdvancedSection(
             },
             label = { Text(str("sync_device_name")) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().trackTextInput(),
         )
 
         // Their own column, tight. [getSettingsShape] gives a group large outer corners and small inner

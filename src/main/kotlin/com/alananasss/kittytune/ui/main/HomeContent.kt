@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.material3.ButtonDefaults
 
 import androidx.compose.foundation.LocalIndication
@@ -1828,7 +1829,7 @@ private fun MixOptionsDialog(
                         onValueChange = { artist = it },
                         singleLine = true,
                         placeholder = { Text(str("mix_artist_hint")) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                     )
                     Spacer(Modifier.width(8.dp))
                     Button(

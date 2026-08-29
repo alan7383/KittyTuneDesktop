@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.upload
 
+import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -918,7 +919,7 @@ private fun BasicInfoTabContent(
             placeholder = { Text(str("upload_field_track_title")) },
             singleLine = true,
             isError = !viewModel.isTitleValid && viewModel.title.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().trackTextInput(),
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -930,7 +931,7 @@ private fun BasicInfoTabContent(
             placeholder = { Text(str("upload_field_artist_name")) },
             supportingText = { Text(str("upload_field_hint_artist")) },
             singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().trackTextInput(),
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -950,7 +951,7 @@ private fun BasicInfoTabContent(
                     Text(str("upload_field_permalink_invalid"), color = MaterialTheme.colorScheme.error)
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().trackTextInput(),
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -1028,6 +1029,7 @@ private fun BasicInfoTabContent(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .trackTextInput()
                     .onKeyEvent { event ->
                         if (event.type == KeyEventType.KeyUp && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
                             viewModel.addTag(viewModel.tagInput)
@@ -1077,7 +1079,7 @@ private fun BasicInfoTabContent(
             placeholder = { Text(str("upload_field_description_hint")) },
             minLines = 3,
             maxLines = 6,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().trackTextInput(),
             shape = RoundedCornerShape(12.dp)
         )
 
@@ -1089,7 +1091,7 @@ private fun BasicInfoTabContent(
             placeholder = { Text(str("upload_field_caption_hint")) },
             supportingText = {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
@@ -1555,7 +1557,7 @@ private fun MetadataTabContent(
                         label = { Text(str("upload_field_album_title")) },
                         placeholder = { Text(str("upload_field_album_title_hint")) },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                     OutlinedTextField(
@@ -1564,7 +1566,7 @@ private fun MetadataTabContent(
                         label = { Text(str("upload_field_release_title")) },
                         placeholder = { Text(str("upload_field_release_title_hint")) },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
@@ -1586,7 +1588,7 @@ private fun MetadataTabContent(
                                 Icons.Rounded.CalendarToday,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(20.dp).trackTextInput()
                             )
                         },
                         trailingIcon = {
@@ -1659,7 +1661,7 @@ private fun MetadataTabContent(
                         onValueChange = { viewModel.labelName = it },
                         label = { Text(str("upload_field_record_label")) },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                     OutlinedTextField(
@@ -1667,7 +1669,7 @@ private fun MetadataTabContent(
                         onValueChange = { viewModel.publisher = it },
                         label = { Text(str("upload_field_publisher_meta")) },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
@@ -1677,7 +1679,7 @@ private fun MetadataTabContent(
                     onValueChange = { viewModel.composer = it },
                     label = { Text(str("upload_field_composer_meta")) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
                     shape = RoundedCornerShape(12.dp)
                 )
 
@@ -1698,7 +1700,7 @@ private fun MetadataTabContent(
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                     OutlinedTextField(
@@ -1714,7 +1716,7 @@ private fun MetadataTabContent(
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
@@ -1762,7 +1764,7 @@ private fun MetadataTabContent(
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                     OutlinedTextField(
@@ -1778,7 +1780,7 @@ private fun MetadataTabContent(
                             )
                         },
                         singleLine = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
@@ -1789,7 +1791,7 @@ private fun MetadataTabContent(
                     label = { Text(str("upload_field_upc_or_ean")) },
                     placeholder = { Text(str("upload_field_upc_or_ean_hint")) },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
                     shape = RoundedCornerShape(12.dp)
                 )
             }
@@ -2071,7 +2073,7 @@ private fun MetadataTabContent(
                         label = { Text(str("upload_field_purchase_title")) },
                         placeholder = { Text(str("upload_field_purchase_title_hint")) },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
@@ -2087,7 +2089,7 @@ private fun MetadataTabContent(
                                 Text(str("upload_field_url_invalid"), color = MaterialTheme.colorScheme.error)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
                 } else {
@@ -2575,7 +2577,7 @@ private fun ArtistStorefrontDialog(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().trackTextInput()
                             )
                         },
                         singleLine = true,
@@ -2624,7 +2626,7 @@ private fun ArtistStorefrontDialog(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().trackTextInput()
                         )
                     },
                     singleLine = true,
@@ -2646,7 +2648,7 @@ private fun ArtistStorefrontDialog(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().trackTextInput()
                         )
                     },
                     minLines = 2,
@@ -2673,7 +2675,7 @@ private fun ArtistStorefrontDialog(
                             )
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().trackTextInput(),
                     shape = RoundedCornerShape(12.dp)
                 )
 
@@ -2691,7 +2693,7 @@ private fun ArtistStorefrontDialog(
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().trackTextInput()
                         )
                     },
                     singleLine = true,
@@ -3004,7 +3006,7 @@ private fun PermissionsTabContent(
                         },
                         placeholder = { Text("FR, US, DE, GB") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
                         shape = RoundedCornerShape(12.dp)
                     )
 
