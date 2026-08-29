@@ -113,6 +113,7 @@ class PlayerPreferences {
 
         private const val KEY_INFO_PANEL_HALF = "info_panel_half"
         private const val KEY_INFO_PANEL_LAST_LYRICS = "info_panel_last_lyrics"
+        private const val KEY_RIGHT_PANEL_OPEN = "right_panel_open"
 
         private const val KEY_PANEL_TABS_HIDDEN = "now_playing_tabs_hidden"
 
@@ -161,6 +162,7 @@ class PlayerPreferences {
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
         private const val KEY_LYRICS_DISPLAY_STYLE = "lyrics_display_style"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
+        private const val KEY_LYRICS_FULLSCREEN_FONT_SIZE = "lyrics_fullscreen_font_size"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
         private const val KEY_LYRICS_TRANSLATION_ENABLED = "lyrics_translation_enabled"
@@ -328,6 +330,9 @@ class PlayerPreferences {
     fun getLyricsFontSize(): Float = Prefs.getFloat(KEY_LYRICS_FONT_SIZE, 42f)
     fun setLyricsFontSize(size: Float) = Prefs.putFloat(KEY_LYRICS_FONT_SIZE, size)
 
+    fun getLyricsFullScreenFontSize(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_FONT_SIZE, 34f)
+    fun setLyricsFullScreenFontSize(size: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_FONT_SIZE, size)
+
     fun getLocalMediaEnabled(): Boolean = Prefs.getBoolean(KEY_LOCAL_MEDIA_ENABLED, false)
     fun setLocalMediaEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LOCAL_MEDIA_ENABLED, enabled)
     fun getLocalMediaUris(): Set<String> = Prefs.getStringSet(KEY_LOCAL_MEDIA_URIS_SET, emptySet())
@@ -396,6 +401,9 @@ class PlayerPreferences {
 
     fun getRightPanelWidth(): Float = Prefs.getFloat("right_panel_width", RIGHT_PANEL_DEFAULT_WIDTH).coerceIn(RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH)
     fun setRightPanelWidth(width: Float) = Prefs.putFloat("right_panel_width", width.coerceIn(RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH))
+
+    fun getRightPanelOpen(): Boolean = Prefs.getBoolean(KEY_RIGHT_PANEL_OPEN, true)
+    fun setRightPanelOpen(open: Boolean) = Prefs.putBoolean(KEY_RIGHT_PANEL_OPEN, open)
 
     fun getKeyColor(): Int = Prefs.getInt(KEY_KEY_COLOR, 0)
     fun setKeyColor(color: Int) = Prefs.putInt(KEY_KEY_COLOR, color)

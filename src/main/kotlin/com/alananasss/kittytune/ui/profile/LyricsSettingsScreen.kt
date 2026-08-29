@@ -48,6 +48,7 @@ import com.alananasss.kittytune.ui.common.Slider
             val prefs = remember { PlayerPreferences() }
     
         val fontSize = playerViewModel.lyricsFontSize
+        val fullScreenFontSize = playerViewModel.lyricsFullScreenFontSize
         val alignment = playerViewModel.lyricsAlignment
         var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
         var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
@@ -56,6 +57,7 @@ import com.alananasss.kittytune.ui.common.Slider
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showDisplayStyleDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
+        var showFullScreenFontSizeDialog by remember { mutableStateOf(false) }
         var showAutoScrollSpeedDialog by remember { mutableStateOf(false) }
         var showWheelStepDialog by remember { mutableStateOf(false) }
         var provider by remember { mutableStateOf(playerViewModel.lyricsProvider) }
@@ -172,8 +174,45 @@ import com.alananasss.kittytune.ui.common.Slider
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsFontSize(26f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(onClick = { playerViewModel.updateLyricsFontSize(42f) }) { Text(str("pref_lyrics_reset")) }
                             TextButton(onClick = { showFontSizeDialog = false }) { Text(str("btn_close")) }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showFullScreenFontSizeDialog) {
+            BackHandler(onBack = { showFullScreenFontSizeDialog = false })
+            Dialog(onDismissRequest = { showFullScreenFontSizeDialog = false }) {
+                Card(
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text(str("pref_lyrics_fullscreen_size"), style = MaterialTheme.typography.headlineSmall)
+                        Spacer(Modifier.height(24.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("${fullScreenFontSize.roundToInt()} sp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
+                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            Slider(
+                                value = fullScreenFontSize,
+                                onValueChange = { playerViewModel.updateLyricsFullScreenFontSize(it) },
+                                valueRange = 12f..100f,
+                                steps = 43,
+                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                            )
+                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            TextButton(onClick = { playerViewModel.updateLyricsFullScreenFontSize(34f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(onClick = { showFullScreenFontSizeDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -444,7 +483,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             // the shapes are derived from has to follow both.
                             val autoScrollOn = playerViewModel.isPlainAutoScrollEnabled
                             val totalVisibleItems =
-                                (if (showLyricsButton) 8 else 7) + (if (autoScrollOn) 1 else 0)
+                                (if (showLyricsButton) 9 else 8) + (if (autoScrollOn) 1 else 0)
     
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 0),
@@ -511,9 +550,17 @@ import com.alananasss.kittytune.ui.common.Slider
                                 onClick = { showFontSizeDialog = true }
                             )
 
+                            val fullScreenSizeIndex = sizeIndex + 1
+                            SettingsItem(
+                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, fullScreenSizeIndex),
+                                title = str("pref_lyrics_fullscreen_size"),
+                                subtitle = "${fullScreenFontSize.roundToInt()} sp",
+                                onClick = { showFullScreenFontSizeDialog = true }
+                            )
+
                             // Only unsynced lyrics scroll on their own — synced ones already
                             // follow the track (issue #33).
-                            val autoScrollIndex = sizeIndex + 1
+                            val autoScrollIndex = fullScreenSizeIndex + 1
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, autoScrollIndex),
                                 title = str("pref_lyrics_autoscroll"),

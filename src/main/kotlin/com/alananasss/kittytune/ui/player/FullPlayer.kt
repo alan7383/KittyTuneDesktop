@@ -21,9 +21,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.Favorite
@@ -35,13 +37,16 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -113,6 +118,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
         // the one thing you reach for *while* reading along, which is exactly what this screen is for.
         com.alananasss.kittytune.ui.player.lyrics.QuickLyricsSettingsDialog(
             viewModel = viewModel,
+            isFullScreen = true,
             onDismiss = { showQuickSettings = false },
         )
     }
@@ -146,7 +152,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
         label = "lyricsShare",
     )
 
-    Box(
+    BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .background(palette.base)
@@ -168,6 +174,11 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 }
             }
     ) {
+        val totalWidth = maxWidth
+        val fullLyricsWidth = totalWidth * (LYRICS_SHARE / (1f + LYRICS_SHARE))
+        val progress = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f)
+        val coverStartPadding = 24.dp + 32.dp * progress
+
         Row(
             // No padding on this Row, and the two halves inset themselves. The lyrics half has to reach the
             // window's own edge so that its scrollbar sits against it — "met la barre de slide tout à droite"
@@ -179,7 +190,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .padding(start = 56.dp, end = 24.dp, top = 40.dp, bottom = 40.dp),
+                    .padding(start = coverStartPadding, end = 24.dp, top = 40.dp, bottom = 40.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 CoverColumn(
@@ -187,7 +198,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                     palette = palette,
                     // How much room the cover has to itself, which is what decides how large it gets: the
                     // sleeve grows into the space the words leave rather than sliding across it.
-                    roomToItself = 1f - (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f),
+                    roomToItself = 1f - progress,
                     showText = showText,
                     onToggleText = { showText = !showText },
                 )
@@ -195,17 +206,26 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
 
             // Kept out of the row entirely once it has no width, since `weight` refuses zero — and there is
             // nothing left to draw at that point anyway.
-            if (lyricsShare > 0.01f) {
+            if (lyricsShare > 0.001f) {
+                val alpha = if (showText) progress else (progress * 1.4f - 0.4f).coerceIn(0f, 1f)
                 Box(
                     Modifier
                         .weight(lyricsShare)
                         .fillMaxHeight()
-                        .padding(vertical = 24.dp)
-                        // Fades on the way out as well as narrowing, or the last few pixels of a line hang
-                        // against the edge at full strength.
-                        .graphicsLayer { alpha = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f) },
+                        .clipToBounds()
+                        .graphicsLayer {
+                            this.alpha = alpha
+                            this.translationX = (1f - progress) * 40.dp.toPx()
+                        },
                 ) {
-                    LyricsOnCoverColour(viewModel, palette)
+                    Box(
+                        Modifier
+                            .requiredWidth(fullLyricsWidth)
+                            .fillMaxHeight()
+                            .padding(vertical = 24.dp)
+                    ) {
+                        LyricsOnCoverColour(viewModel, palette)
+                    }
                 }
             }
 
@@ -338,19 +358,23 @@ private const val BLOB_RADIUS = 0.80f
  */
 @Composable
 private fun rememberMeshDrift(): Float {
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "mesh")
-    val drift by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = tween(MESH_CYCLE_MS, easing = androidx.compose.animation.core.LinearEasing),
-        ),
-        label = "meshDrift",
-    )
-    return drift
+    var elapsedSeconds by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        var lastNanos = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (lastNanos != 0L) {
+                    val dt = ((now - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.1f)
+                    elapsedSeconds += dt
+                }
+                lastNanos = now
+            }
+        }
+    }
+    return elapsedSeconds / (MESH_CYCLE_MS / 1000f)
 }
 
-private const val MESH_CYCLE_MS = 26_000
+private const val MESH_CYCLE_MS = 26_000f
 
 @Composable
 private fun rememberFullPlayerPalette(): FullPlayerPalette {
@@ -431,11 +455,7 @@ private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerP
     // The reader's own size, not a constant. "Quand on augmente/baisse la taille des lyrics, que ça fasse
     // vraiment quelque chose" — it did nothing here, because this view set its own 34 sp and ignored the
     // setting the small screen has always honoured (issue #33).
-    //
-    // Scaled down from it rather than used raw: the setting was chosen against a view that is the full width
-    // of the window, and this column is a little over half of it, so the same number would wrap every line.
-    // Three quarters keeps the *relative* change — bigger is bigger — which is all the control has to do.
-    val size = (viewModel.lyricsFontSize * FULL_SCREEN_TYPE_SCALE).coerceIn(LYRIC_MIN, LYRIC_MAX).sp
+    val size = viewModel.lyricsFullScreenFontSize.coerceIn(LYRIC_MIN, LYRIC_MAX).sp
     val type = MaterialTheme.typography.let { t ->
         t.copy(
             // What `PanelLyrics` sets a line in, whether or not it carries timings.
@@ -468,9 +488,8 @@ private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerP
  * meaningful — turning it up still turns this up — and the bounds stop either end of the slider producing
  * something unreadable.
  */
-private const val FULL_SCREEN_TYPE_SCALE = 0.78f
-private const val LYRIC_MIN = 16f
-private const val LYRIC_MAX = 64f
+private const val LYRIC_MIN = 12f
+private const val LYRIC_MAX = 100f
 
 /** Leading, as a multiple of the size, so it follows the type instead of being set once for one size. */
 private const val LINE_HEIGHT_RATIO = 1.28f
@@ -594,39 +613,12 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
         }
 
         Spacer(Modifier.width(8.dp))
-        TonalGlyph(
+        QuietButton(
             icon = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
             label = str("player_like"),
-            tint = if (viewModel.isLiked) palette.bright else palette.dim,
+            tint = if (viewModel.isLiked) MaterialTheme.colorScheme.primary else palette.dim,
+            size = 22.dp,
             onClick = { viewModel.toggleLike() },
-        )
-    }
-}
-
-/**
- * A glyph on a tonal circle — Material's shape language on a ground that is not Material's colour.
- *
- * The container is white at a low alpha rather than a scheme colour, because the scheme knows nothing about
- * the record's hue and a `surfaceVariant` circle here would be a grey coin on a red wall.
- */
-@Composable
-private fun TonalGlyph(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit,
-) {
-    androidx.compose.material3.IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(40.dp)
-            .background(Color.White.copy(alpha = 0.14f), androidx.compose.foundation.shape.CircleShape),
-    ) {
-        androidx.compose.material3.Icon(
-            icon,
-            contentDescription = label,
-            tint = tint,
-            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -711,7 +703,11 @@ private fun QuietButton(
     size: androidx.compose.ui.unit.Dp = 20.dp,
     onClick: () -> Unit,
 ) {
-    androidx.compose.material3.IconButton(onClick = onClick, modifier = Modifier.size(size + 18.dp)) {
+    androidx.compose.material3.IconButton(
+        onClick = onClick,
+        shapes = IconButtonDefaults.shapes(),
+        modifier = Modifier.size(size + 18.dp),
+    ) {
         androidx.compose.material3.Icon(
             icon,
             contentDescription = label,

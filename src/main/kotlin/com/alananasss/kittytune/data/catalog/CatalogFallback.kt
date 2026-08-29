@@ -1,4 +1,4 @@
-package com.alananasss.kittytune.data.applemusic
+package com.alananasss.kittytune.data.catalog
 
 import com.alananasss.kittytune.data.LyricsMatcher
 import com.alananasss.kittytune.data.network.RetrofitClient
@@ -7,7 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Turns an Apple Music result into something that will actually play (issue #33).
+ * Turns a catalogue entry into something that will actually play (issue #33).
  *
  * ## Why a result you cannot play is not shown as one
  *
@@ -16,15 +16,17 @@ import kotlinx.coroutines.withContext
  *
  * What he wants from those two is coverage: the song exists, so find it. What he does not want — and what
  * a metadata-only source gives you by default — is a row that looks like every other row and does nothing
- * when clicked. So an Apple result carries no stream and never reaches the queue directly. Pressing it
+ * when clicked. So a catalogue entry carries no stream and never reaches the queue directly. Pressing it
  * asks this: *the catalogue says this song is called X by Y and runs for Z; is it anywhere we can play?*
+ *
+ * Shared by both catalogues, because the question does not depend on which one asked it.
  *
  * The matching is [LyricsMatcher]'s, unchanged, because it is the same problem it already solves — a title
  * padded with `(Official Video)` and an artist field that is really an uploader's account name — and it has
  * been tuned against a real user's library for several rounds. Reusing it means one place gets better
  * rather than two places drifting.
  */
-object AppleMusicFallback {
+object CatalogFallback {
 
     private val api by lazy { RetrofitClient.create() }
 
@@ -35,7 +37,7 @@ object AppleMusicFallback {
      * worse than saying nothing happened. [LyricsMatcher.CONFIDENT_MATCH] is the same bar the lyrics use
      * for believing a sheet belongs to a track, and it means the same thing here.
      */
-    suspend fun resolve(song: AppleSong): Track? = withContext(Dispatchers.IO) {
+    suspend fun resolve(song: CatalogSong): Track? = withContext(Dispatchers.IO) {
         val target = LyricsMatcher.Target(
             title = song.title,
             artist = song.artist,

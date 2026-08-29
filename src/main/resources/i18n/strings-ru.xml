@@ -1126,6 +1126,7 @@
     <string name="pref_lyrics_show_button">Кнопка текста песни</string>
     <string name="pref_lyrics_show_button_sub">Показать кнопку быстрого доступа на плеере</string>
     <string name="pref_lyrics_size">Размер</string>
+    <string name="pref_lyrics_fullscreen_size">Размер (полный экран)</string>
     <string name="pref_lyrics_subtitle">Отображение &amp; источники</string>
     <string name="pref_lyrics_title">Текст песни</string>
     <string name="pref_lyrics_translation_lang">Язык перевода</string>
@@ -1339,6 +1340,14 @@
     <string name="search_filter_all">Все</string>
     <string name="search_source_tooltip">Где искать</string>
     <string name="search_apple_music_notice">Результаты Apple Music — это записи каталога. При нажатии мы ищем ту же песню на источнике, который может её воспроизвести.</string>
+    <string name="yandex_not_connected">Добавьте токен Яндекс Музыки в настройках, чтобы искать по их каталогу.</string>
+    <string name="yandex_region_blocked">Яндекс Музыка недоступна в вашей стране.</string>
+    <string name="yandex_failed">Не удалось связаться с Яндекс Музыкой.</string>
+    <string name="search_yandex_notice">Результаты Яндекс Музыки — это записи каталога. При нажатии мы ищем ту же песню на источнике, который может её воспроизвести.</string>
+    <string name="pref_yandex_token">Токен Яндекс Музыки</string>
+    <string name="pref_yandex_token_sub">Нужен для поиска по каталогу. Воспроизведение всегда идёт из другого источника.</string>
+    <string name="pref_yandex_token_get">Как получить токен</string>
+    <string name="pref_yandex_token_clear">Удалить токен</string>
     <string name="search_apple_music_unplayable">Не найдено на источнике, который может её воспроизвести.</string>
     <string name="search_filter_artists">Исполнители</string>
     <string name="search_filter_playlists">Плейлисты</string>

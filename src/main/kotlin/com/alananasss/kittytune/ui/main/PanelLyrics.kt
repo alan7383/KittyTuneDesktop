@@ -347,45 +347,49 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
         lastManualScrollMs = { lastUserScrollMs },
     )
 
-    LazyColumn(
-        modifier
-            .fillMaxSize()
-            .lyricsWheel(
-                listState = listState,
-                scope = scope,
-                lines = { vm.lyricsWheelLines },
-                onManualScroll = { lastUserScrollMs = System.currentTimeMillis() },
+    BoxWithConstraints(modifier) {
+        val viewportHeight = if (maxHeight.isSpecified && maxHeight.value.isFinite()) maxHeight else 320.dp
+
+        LazyColumn(
+            Modifier
+                .fillMaxSize()
+                .lyricsWheel(
+                    listState = listState,
+                    scope = scope,
+                    lines = { vm.lyricsWheelLines },
+                    onManualScroll = { lastUserScrollMs = System.currentTimeMillis() },
+                ),
+            state = listState,
+            contentPadding = PaddingValues(
+                start = style.startPadding,
+                end = style.endPadding,
+                top = viewportHeight * style.topInsetFraction,
+                bottom = viewportHeight * style.tailFraction,
             ),
-        state = listState,
-        contentPadding = PaddingValues(
-            start = style.startPadding,
-            end = style.endPadding,
-            top = 12.dp,
-            bottom = 24.dp,
-        ),
-    ) {
-        items(lines) { line ->
-            // The same type and the same alignment a sung line gets, because "les lyrics qui sont juste en
-            // texte tout seul, c'est vraiment moche" was about exactly this: untimed words were set in
-            // `bodyMedium` and left-aligned whatever the reader had chosen, so a song without timings looked
-            // like a different app from the same song with them. There is no current line to light up — that
-            // is what untimed means — but everything else about how they are set can match (issue #33).
-            //
-            // A blank line in the source stays a blank line: the verse breaks are most of what makes a sheet
-            // readable, and they were the one thing the old version did keep.
-            if (line.isBlank()) {
-                Spacer(Modifier.height(style.lineSpacing * 2))
-            } else {
-                Text(
-                    text = line,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = alignmentOf(vm),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = style.lineSpacing),
-                )
+        ) {
+            items(lines) { line ->
+                // The same type and the same alignment a sung line gets, because "les lyrics qui sont juste en
+                // texte tout seul, c'est vraiment moche" was about exactly this: untimed words were set in
+                // `bodyMedium` and left-aligned whatever the reader had chosen, so a song without timings looked
+                // like a different app from the same song with them. There is no current line to light up — that
+                // is what untimed means — but everything else about how they are set can match (issue #33).
+                //
+                // A blank line in the source stays a blank line: the verse breaks are most of what makes a sheet
+                // readable, and they were the one thing the old version did keep.
+                if (line.isBlank()) {
+                    Spacer(Modifier.height(style.lineSpacing * 2))
+                } else {
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = alignmentOf(vm),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = style.lineSpacing),
+                    )
+                }
             }
         }
     }

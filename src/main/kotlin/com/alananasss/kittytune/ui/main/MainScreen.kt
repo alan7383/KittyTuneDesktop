@@ -89,7 +89,8 @@ fun MainScreen() {
     val libraryViewModel: LibraryViewModel = viewModel { LibraryViewModel(AppInstance.application) }
 
     val navController = rememberNavController()
-    var showNowPlayingPanel by remember { mutableStateOf(true) }
+    val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    var showNowPlayingPanel by remember { mutableStateOf(playerPrefs.getRightPanelOpen()) }
     var nowPlayingTab by remember { mutableStateOf(NowPlayingTab.TRACK) }
 
 
@@ -122,6 +123,7 @@ fun MainScreen() {
 
             if (destinationId == "expanded_queue") {
                 showNowPlayingPanel = true
+                playerPrefs.setRightPanelOpen(true)
                 nowPlayingTab = NowPlayingTab.QUEUE
             } else if (!isSameRoute(navController, targetRoute)) {
                 playerViewModel.isPlayerExpanded = false
@@ -246,6 +248,7 @@ fun MainScreen() {
                         Key.H -> showShortcutsDialog = true
                         Key.Q -> {
                             showNowPlayingPanel = true
+                            playerPrefs.setRightPanelOpen(true)
                             nowPlayingTab = NowPlayingTab.QUEUE
                         }
                     }
@@ -928,7 +931,10 @@ fun MainScreen() {
                     playerViewModel = playerViewModel,
                     tab = nowPlayingTab,
                     onTabChange = { nowPlayingTab = it },
-                    onClose = { showNowPlayingPanel = false },
+                    onClose = {
+                        showNowPlayingPanel = false
+                        playerPrefs.setRightPanelOpen(false)
+                    },
                     onOpenFullLyrics = { playerViewModel.showLyricsSheet = true },
                     modifier = Modifier.width(rightPanelWidth)
                 )
@@ -938,9 +944,14 @@ fun MainScreen() {
 
         PlayerBar(
             playerViewModel = playerViewModel,
-            onToggleNowPlaying = { showNowPlayingPanel = !showNowPlayingPanel },
+            onToggleNowPlaying = {
+                val next = !showNowPlayingPanel
+                showNowPlayingPanel = next
+                playerPrefs.setRightPanelOpen(next)
+            },
             onOpenQueue = {
                 showNowPlayingPanel = true
+                playerPrefs.setRightPanelOpen(true)
                 nowPlayingTab = NowPlayingTab.QUEUE
             },
             onOpenLyrics = {

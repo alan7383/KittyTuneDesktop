@@ -97,11 +97,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     var currentUserId by mutableLongStateOf(0L)
     var currentUser by mutableStateOf<User?>(null)
-    var currentTrack by mutableStateOf<Track?>(null)
+    private val initialTrack = if (playerPrefs.getPersistentQueueEnabled()) playerPrefs.getLastTrack() else null
+    var currentTrack by mutableStateOf<Track?>(initialTrack)
     var isPlaying by mutableStateOf(false)
     var isLoading by mutableStateOf(false)
-    var duration by mutableLongStateOf(0L)
-    var currentPosition by mutableLongStateOf(0L)
+    var duration by mutableLongStateOf(initialTrack?.durationMs ?: 0L)
+    var currentPosition by mutableLongStateOf(
+        if (playerPrefs.getPersistentQueueEnabled() && playerPrefs.getSavePositionEnabled()) playerPrefs.getLastPosition() else 0L
+    )
     var isScrubbing by mutableStateOf(false)
     var isPlayerExpanded by mutableStateOf(false)
     var isLiked by mutableStateOf(false)
@@ -480,6 +483,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val unifiedLyricSearchResults = mutableStateListOf<UnifiedLyricResult>()
 
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
+    var lyricsFullScreenFontSize by mutableFloatStateOf(playerPrefs.getLyricsFullScreenFontSize())
     var lyricsAlignment by mutableStateOf(playerPrefs.getLyricsAlignment())
 
     /** How the line being sung is set apart. See [LyricsDisplayStyle]. */
@@ -1443,6 +1447,11 @@ flushListenSession("TRACK_CHANGE")
     fun updateLyricsFontSize(size: Float) {
         lyricsFontSize = size
         playerPrefs.setLyricsFontSize(size)
+    }
+
+    fun updateLyricsFullScreenFontSize(size: Float) {
+        lyricsFullScreenFontSize = size
+        playerPrefs.setLyricsFullScreenFontSize(size)
     }
 
     fun updateLyricsAlignment(alignment: LyricsAlignment) {

@@ -81,7 +81,20 @@ import com.alananasss.kittytune.utils.Logger
          * "many artists don't upload their music to soundcloud, youtube, spotify" (issue #33).
          */
         APPLE_MUSIC,
+
+        /**
+         * Also catalogue only, and for a second reason on top of Apple's: reaching Yandex's audio needs a
+         * signing secret out of their own client. See [com.alananasss.kittytune.data.yandex.YandexMusicClient].
+         */
+        YANDEX_MUSIC,
     }
+
+    /**
+     * Why a Yandex search produced nothing, when the answer is not "nothing matched".
+     *
+     * Three states that all look like an empty list and are not the same thing to the person looking at it.
+     */
+    enum class YandexNotice { NOT_CONNECTED, REGION_BLOCKED, FAILED }
     
     class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private val api = RetrofitClient.create()
@@ -127,7 +140,12 @@ import com.alananasss.kittytune.utils.Logger
          * player, and a list whose type says so is what stops one reaching the queue by accident. Pressing
          * one goes through [com.alananasss.kittytune.data.applemusic.AppleMusicFallback] first (issue #33).
          */
-        val searchResultsApple = mutableStateListOf<com.alananasss.kittytune.data.applemusic.AppleSong>()
+        val searchResultsApple =
+            mutableStateListOf<com.alananasss.kittytune.data.catalog.CatalogSong>()
+
+        /** Why a Yandex search came back with nothing, when that was not simply "nothing matched". */
+        var yandexNotice by mutableStateOf<YandexNotice?>(null)
+            private set
 
         /** The Apple result currently being looked for on a source that streams, if any. */
         var resolvingAppleSongId by mutableStateOf<String?>(null)
@@ -396,6 +414,7 @@ import com.alananasss.kittytune.utils.Logger
             searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear(); searchResultsYoutube.clear()
             searchResultsSpotify.clear(); searchResultsSpotifyAlbums.clear(); searchResultsSpotifyPlaylists.clear(); searchResultsSpotifyArtists.clear()
             searchResultsApple.clear()
+            yandexNotice = null
             tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
         }
     
@@ -407,6 +426,7 @@ import com.alananasss.kittytune.utils.Logger
                     SearchSource.YOUTUBE -> performYoutubeSearch(query)
                     SearchSource.SPOTIFY -> performSpotifySearch(query)
                     SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
+                    SearchSource.YANDEX_MUSIC -> performYandexSearch(query)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -440,20 +460,47 @@ import com.alananasss.kittytune.utils.Logger
          * swallow — a press that silently does nothing is the complaint this whole feature came from.
          */
         fun resolveAppleSong(
-            song: com.alananasss.kittytune.data.applemusic.AppleSong,
+            song: com.alananasss.kittytune.data.catalog.CatalogSong,
             onResolved: (Track?) -> Unit,
         ) {
             if (resolvingAppleSongId != null) return
-            resolvingAppleSongId = song.id
+            resolvingAppleSongId = song.key
             viewModelScope.launch {
                 val track = try {
-                    com.alananasss.kittytune.data.applemusic.AppleMusicFallback.resolve(song)
+                    com.alananasss.kittytune.data.catalog.CatalogFallback.resolve(song)
                 } catch (e: Exception) {
                     e.printStackTrace()
                     null
                 }
                 resolvingAppleSongId = null
                 onResolved(track)
+            }
+        }
+
+        /**
+         * Yandex hits for [query].
+         *
+         * The only search here that can fail in a way worth saying out loud. Apple's either answers or does
+         * not; Yandex has two states that look identical as an empty list and are not — no token stored, and
+         * a country it does not serve (HTTP 451, which it returns with or without a token). Somebody searching
+         * from Berlin and getting silence would reasonably conclude the feature is broken (issue #33).
+         */
+        private suspend fun performYandexSearch(query: String) {
+            val result = com.alananasss.kittytune.data.yandex.YandexMusicClient.searchSongs(query)
+            withContext(Dispatchers.Main) {
+                searchResultsApple.clear()
+                yandexNotice = when (result) {
+                    is com.alananasss.kittytune.data.yandex.YandexMusicClient.Result.Found -> {
+                        searchResultsApple.addAll(result.songs)
+                        null
+                    }
+                    com.alananasss.kittytune.data.yandex.YandexMusicClient.Result.NotConnected ->
+                        YandexNotice.NOT_CONNECTED
+                    com.alananasss.kittytune.data.yandex.YandexMusicClient.Result.RegionBlocked ->
+                        YandexNotice.REGION_BLOCKED
+                    com.alananasss.kittytune.data.yandex.YandexMusicClient.Result.Failed ->
+                        YandexNotice.FAILED
+                }
             }
         }
 

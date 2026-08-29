@@ -1126,6 +1126,7 @@
     <string name="pref_lyrics_show_button">Afficher le bouton paroles</string>
     <string name="pref_lyrics_show_button_sub">Affiche un bouton d\'accès rapide sur le lecteur</string>
     <string name="pref_lyrics_size">Taille</string>
+    <string name="pref_lyrics_fullscreen_size">Taille (plein écran)</string>
     <string name="pref_lyrics_subtitle">Affichage et source</string>
     <string name="pref_lyrics_title">Paroles</string>
     <string name="pref_lyrics_translation_lang">Langue de traduction</string>
@@ -1339,6 +1340,14 @@
     <string name="search_filter_all">Tout</string>
     <string name="search_source_tooltip">Où chercher</string>
     <string name="search_apple_music_notice">Les résultats Apple Music viennent du catalogue. Appuyer dessus cherche la même chanson sur une source qui peut la jouer.</string>
+    <string name="yandex_not_connected">Ajoute ton token Yandex Music dans les réglages pour chercher dans leur catalogue.</string>
+    <string name="yandex_region_blocked">Yandex Music n’est pas disponible dans ton pays.</string>
+    <string name="yandex_failed">Impossible de joindre Yandex Music.</string>
+    <string name="search_yandex_notice">Les résultats Yandex Music viennent du catalogue. Appuyer dessus cherche la même chanson sur une source qui peut la jouer.</string>
+    <string name="pref_yandex_token">Token Yandex Music</string>
+    <string name="pref_yandex_token_sub">Nécessaire pour chercher dans leur catalogue. La lecture vient toujours d’une autre source.</string>
+    <string name="pref_yandex_token_get">Comment obtenir un token</string>
+    <string name="pref_yandex_token_clear">Supprimer le token</string>
     <string name="search_apple_music_unplayable">Introuvable sur une source qui peut la jouer.</string>
     <string name="search_filter_artists">Artistes</string>
     <string name="search_filter_playlists">Playlists</string>
