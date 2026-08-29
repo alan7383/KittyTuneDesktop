@@ -238,10 +238,11 @@ private class FullPlayerPalette(
  * rectangle on a nearly black one — which is the screenshot that prompted this, and the reason is that a
  * palette faked from one colour is still one colour.
  *
- * So the lights are the sleeve's *own* colours now, read from the same histogram the theme's seed comes from
- * (see [ArtworkPalette.meshPalette]), normalised onto a spread of brightnesses so that a black cover still
- * gives a mesh you can see rather than an honest black screen. Four of them move; the fifth and darkest is
- * the ground they move over.
+ * So the lights are the sleeve's own *shades* now — "le fond est animé sur différentes nuances de la cover" —
+ * read from the same histogram the theme's seed comes from and keeping the brightness they had there, which is
+ * why one corner of this screen can be nearly cream while another is nearly black. See
+ * [ArtworkPalette.meshPalette] for what is held back and why. Four of them move; the fifth and darkest is the
+ * ground they move over.
  *
  * "Faut que ça claque mais lisible" is the constraint that sets every number here. Claquer is the travel —
  * a light crosses forty per cent of the screen, so a corner that was cream becomes deep red inside half a
@@ -360,16 +361,20 @@ private fun rememberFullPlayerPalette(): FullPlayerPalette {
  * Mirrors what the extractor does to a monochrome sleeve, so the fallback and the real thing differ in which
  * colours move rather than in how the screen is built.
  */
-private fun spreadFrom(seed: Color): List<Color> =
-    listOf(0.62f, 0.46f, 0.34f, 0.26f, 0.19f).map { value ->
-        val hsb = java.awt.Color.RGBtoHSB(
-            (seed.red * 255f).toInt(),
-            (seed.green * 255f).toInt(),
-            (seed.blue * 255f).toInt(),
-            null,
-        )
-        Color(java.awt.Color.HSBtoRGB(hsb[0], maxOf(hsb[1], 0.34f), value))
+private fun spreadFrom(seed: Color): List<Color> {
+    val hsb = java.awt.Color.RGBtoHSB(
+        (seed.red * 255f).toInt(),
+        (seed.green * 255f).toInt(),
+        (seed.blue * 255f).toInt(),
+        null,
+    )
+    // Around the seed's own brightness rather than on a fixed ramp, so the stand-in is shades of this colour
+    // the way the extractor's answer will be shades of that cover.
+    val middle = hsb[2].coerceIn(0.30f, 0.52f)
+    return listOf(1.38f, 1.12f, 0.90f, 0.70f, 0.52f).map { factor ->
+        Color(java.awt.Color.HSBtoRGB(hsb[0], maxOf(hsb[1], 0.30f), (middle * factor).coerceIn(0.14f, 0.72f)))
     }
+}
 
 /** Long enough to be a transition and short enough to be over before the next line is sung. */
 private const val COLOUR_TRAVEL_MS = 900
