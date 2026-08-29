@@ -244,6 +244,23 @@ fun main() {
             // down and the app can crash (issue #27).
             window.minimumSize = java.awt.Dimension(960, 600)
 
+            // Leaving full screen, said to the toolkit as well as to Compose.
+            //
+            // "Quand je quitte le plein écran je suis encore en plein écran dans l'appli." Compose's placement
+            // is a *request* to the window manager, and a window manager is free to take its time or to
+            // decline — on a tiling or compositing desktop the frame can stay full screen while Compose
+            // believes it is not, and then nothing will ever ask again. AWT's exclusive-full-screen handle is
+            // a second lever on the same window, so this releases that too rather than guessing which of the
+            // two is holding it (issue #33).
+            androidx.compose.runtime.LaunchedEffect(com.alananasss.kittytune.core.AppWindowState.fullScreen) {
+                if (!com.alananasss.kittytune.core.AppWindowState.fullScreen) {
+                    runCatching {
+                        val device = window.graphicsConfiguration?.device
+                        if (device?.fullScreenWindow === window) device.fullScreenWindow = null
+                    }
+                }
+            }
+
             // The macOS Dock image and the multi-size window icons are outside what
             // Window(icon = …) can set, so they are applied here — from inside the window's
             // own composition, where `window` is guaranteed to exist.
