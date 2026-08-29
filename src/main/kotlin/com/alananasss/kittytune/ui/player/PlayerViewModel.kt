@@ -4066,6 +4066,7 @@ flushListenSession("TRACK_CHANGE")
                 .collect { track ->
                     if (track == null) {
                         com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = null
+                        com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors = emptyList()
                     } else {
                         updatePlayerColors(track)
                     }
@@ -4082,6 +4083,7 @@ flushListenSession("TRACK_CHANGE")
             // colour the user picked.
             if (track.fullResArtwork.startsWith(PLACEHOLDER_ARTWORK_PREFIX)) {
                 com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor = null
+                com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors = emptyList()
                 return@launch
             }
 
@@ -4118,6 +4120,10 @@ flushListenSession("TRACK_CHANGE")
                 // the palette style the user chose is what should decide tone from there.
                 com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor =
                     ArtworkPalette.dominantSeed(bitmap).toArgb()
+                // And the several colours the full player's background moves through — read from the same
+                // bitmap we already have decoded, so this costs a histogram and no extra request (issue #33).
+                com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors =
+                    ArtworkPalette.meshPalette(bitmap).map { it.toArgb() }
             } else {
                 backgroundColor = Color(0xFF1E1E1E)
             }
