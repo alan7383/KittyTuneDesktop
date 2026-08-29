@@ -1126,6 +1126,7 @@
     <string name="pref_lyrics_show_button">Afficher le bouton paroles</string>
     <string name="pref_lyrics_show_button_sub">Affiche un bouton d\'accès rapide sur le lecteur</string>
     <string name="pref_lyrics_size">Taille</string>
+    <string name="pref_lyrics_line_spacing">Interligne</string>
     <string name="pref_lyrics_subtitle">Affichage et source</string>
     <string name="pref_lyrics_title">Paroles</string>
     <string name="pref_lyrics_translation_lang">Langue de traduction</string>

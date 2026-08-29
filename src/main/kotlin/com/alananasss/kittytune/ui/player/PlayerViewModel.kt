@@ -480,6 +480,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val unifiedLyricSearchResults = mutableStateListOf<UnifiedLyricResult>()
 
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
+
+    /** @see com.alananasss.kittytune.data.local.PlayerPreferences.getLyricsLineSpacing */
+    var lyricsLineSpacing by mutableFloatStateOf(playerPrefs.getLyricsLineSpacing())
     var lyricsAlignment by mutableStateOf(playerPrefs.getLyricsAlignment())
 
     /** How the line being sung is set apart. See [LyricsDisplayStyle]. */
@@ -1443,6 +1446,20 @@ flushListenSession("TRACK_CHANGE")
     fun updateLyricsFontSize(size: Float) {
         lyricsFontSize = size
         playerPrefs.setLyricsFontSize(size)
+    }
+
+    /**
+     * The range the line-spacing control moves in.
+     *
+     * Zero would let somebody stack the lines on top of each other, and past thirty a phrase and its answer
+     * are too far apart to read as one thought. Four to thirty covers "tight" to "airy" and nothing silly.
+     */
+    private val LYRICS_SPACING_MIN = 4f
+    private val LYRICS_SPACING_MAX = 30f
+
+    fun updateLyricsLineSpacing(dp: Float) {
+        lyricsLineSpacing = dp.coerceIn(LYRICS_SPACING_MIN, LYRICS_SPACING_MAX)
+        playerPrefs.setLyricsLineSpacing(lyricsLineSpacing)
     }
 
     fun updateLyricsAlignment(alignment: LyricsAlignment) {

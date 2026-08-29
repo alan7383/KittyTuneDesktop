@@ -132,14 +132,23 @@ fun main() {
         val placementBeforeFullScreen = remember {
             mutableStateOf(androidx.compose.ui.window.WindowPlacement.Floating)
         }
-        LaunchedEffect(com.alananasss.kittytune.core.AppWindowState.fullScreen) {
+        // Keyed on the flag *and* on the placement, so it re-asserts rather than firing once. A window manager
+        // that declines a placement change — or grants it and then puts the window back itself, which
+        // happens — used to leave the two permanently out of step with no way back (issue #33).
+        LaunchedEffect(
+            com.alananasss.kittytune.core.AppWindowState.fullScreen,
+            windowState.placement,
+        ) {
             val wanted = com.alananasss.kittytune.core.AppWindowState.fullScreen
             val isFullScreen = windowState.placement == androidx.compose.ui.window.WindowPlacement.Fullscreen
             if (wanted && !isFullScreen) {
                 placementBeforeFullScreen.value = windowState.placement
                 windowState.placement = androidx.compose.ui.window.WindowPlacement.Fullscreen
             } else if (!wanted && isFullScreen) {
+                // Never back to Fullscreen, whatever was stored: that is how a restore turns into a no-op.
                 windowState.placement = placementBeforeFullScreen.value
+                    .takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
+                    ?: androidx.compose.ui.window.WindowPlacement.Floating
             }
         }
 

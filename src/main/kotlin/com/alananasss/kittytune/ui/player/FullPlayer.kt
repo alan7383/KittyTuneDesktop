@@ -144,10 +144,19 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             .drawBehind { drawMesh(palette, drift) }
     ) {
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 40.dp),
+            // No padding on this Row, and the two halves inset themselves. The lyrics half has to reach the
+            // window's own edge so that its scrollbar sits against it — "met la barre de slide tout à droite"
+            // — and a Row-level inset would hold it 56 dp short of that (issue #33).
+            modifier = Modifier.fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(start = 56.dp, end = 24.dp, top = 40.dp, bottom = 40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
                 CoverColumn(
                     viewModel = viewModel,
                     palette = palette,
@@ -168,7 +177,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
                         shrinkTowards = Alignment.Start,
                     ),
-                modifier = Modifier.weight(LYRICS_SHARE).fillMaxHeight(),
+                modifier = Modifier.weight(LYRICS_SHARE).fillMaxHeight().padding(vertical = 24.dp),
             ) {
                 LyricsOnCoverColour(viewModel, palette)
             }
@@ -386,11 +395,18 @@ private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerP
         surface = Color.Transparent,
         surfaceContainerLow = Color.Transparent,
     )
+    // The reader's own size, not a constant. "Quand on augmente/baisse la taille des lyrics, que ça fasse
+    // vraiment quelque chose" — it did nothing here, because this view set its own 34 sp and ignored the
+    // setting the small screen has always honoured (issue #33).
+    //
+    // Scaled down from it rather than used raw: the setting was chosen against a view that is the full width
+    // of the window, and this column is a little over half of it, so the same number would wrap every line.
+    // Three quarters keeps the *relative* change — bigger is bigger — which is all the control has to do.
+    val size = (viewModel.lyricsFontSize * FULL_SCREEN_TYPE_SCALE).coerceIn(LYRIC_MIN, LYRIC_MAX).sp
     val type = MaterialTheme.typography.let { t ->
         t.copy(
-            // What `PanelLyrics` sets a synced line in, and what it sets untimed text in.
-            titleMedium = t.displaySmall.copy(fontSize = LYRIC_SIZE, lineHeight = LYRIC_LINE_HEIGHT),
-            bodyMedium = t.headlineSmall,
+            // What `PanelLyrics` sets a line in, whether or not it carries timings.
+            titleMedium = t.displaySmall.copy(fontSize = size, lineHeight = size * LINE_HEIGHT_RATIO),
         )
     }
     MaterialTheme(colorScheme = scheme, typography = type, shapes = MaterialTheme.shapes) {
@@ -399,22 +415,25 @@ private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerP
             modifier = Modifier
                 .fillMaxSize()
                 .fadingEdge(fade),
-            lineSpacing = LYRIC_SPACING,
+            style = com.alananasss.kittytune.ui.main.PanelLyricsStyle.FullScreen,
         )
     }
 }
 
-private val LYRIC_SIZE = 34.sp
-private val LYRIC_LINE_HEIGHT = 44.sp
-
 /**
- * Air between one line and the next, at this size.
+ * What the lyrics font-size setting is multiplied by here, and the range the result is held to.
  *
- * Sixteen against the panel's six. At 34 sp a six dp gap runs the lines together into a paragraph, which is
- * what "il met tout ligne par ligne" was describing — every line touching its neighbour, so the eye has
- * nothing to separate them by.
+ * The setting is calibrated against the lyrics screen, which is the width of the window. This column is a
+ * little over half that, so using the number raw would wrap every line in two. The scale keeps the control
+ * meaningful — turning it up still turns this up — and the bounds stop either end of the slider producing
+ * something unreadable.
  */
-private val LYRIC_SPACING = 16.dp
+private const val FULL_SCREEN_TYPE_SCALE = 0.78f
+private const val LYRIC_MIN = 16f
+private const val LYRIC_MAX = 64f
+
+/** Leading, as a multiple of the size, so it follows the type instead of being set once for one size. */
+private const val LINE_HEIGHT_RATIO = 1.28f
 
 /**
  * The cover, and under it the only controls the reference shows.

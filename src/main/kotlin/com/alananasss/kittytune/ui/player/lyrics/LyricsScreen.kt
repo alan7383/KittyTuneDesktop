@@ -1316,6 +1316,63 @@ fun QuickLyricsSettingsDialog(
                             }
                         }
 
+                        // 2a. INTERLIGNE
+                        //
+                        // Next to the size, because it is the same decision: how much room a line takes. He
+                        // asked for it in both dialogs — "ça il faut le rajouter dans les paramètres des
+                        // lyrics rapides et non rapides, pouvoir l'ajuster" — and the reason is that no
+                        // default can be right for every size and every language at once (issue #33).
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = str("pref_lyrics_line_spacing"),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "${viewModel.lyricsLineSpacing.roundToInt()} dp",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                Spacer(Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        shapes = IconButtonDefaults.shapes(),
+                                        onClick = { viewModel.updateLyricsLineSpacing(viewModel.lyricsLineSpacing - 2f) },
+                                    ) {
+                                        Icon(Icons.Rounded.Remove, null)
+                                    }
+                                    Slider(
+                                        value = viewModel.lyricsLineSpacing,
+                                        onValueChange = { viewModel.updateLyricsLineSpacing(it) },
+                                        valueRange = 4f..30f,
+                                        steps = 12,
+                                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                    )
+                                    IconButton(
+                                        shapes = IconButtonDefaults.shapes(),
+                                        onClick = { viewModel.updateLyricsLineSpacing(viewModel.lyricsLineSpacing + 2f) },
+                                    ) {
+                                        Icon(Icons.Rounded.Add, null)
+                                    }
+                                }
+                            }
+                        }
+
                         // 2b. VITESSE DE DÉFILEMENT (texte non synchronisé)
                         // Here as well as in the full settings: this is the screen you are on when
                         // you notice the speed is wrong (issue #33).
