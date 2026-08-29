@@ -28,6 +28,18 @@ object ThemeState {
 
     /** Dominant color extracted from the current track artwork (null = none). */
     var coverSeedColor by mutableStateOf<Int?>(null)
+
+    /**
+     * Several of the artwork's colours, brightest first, for the full player's moving background.
+     *
+     * Separate from [coverSeedColor] because they answer different questions: the seed is "what colour is this
+     * record", which is what a Material palette wants, and this is "what colours are *in* it", which is what
+     * a mesh gradient wants. Deriving the second from the first is what produced a flat grey rectangle for a
+     * black sleeve (issue #33).
+     *
+     * Empty until a cover has been read, and empty again for a track with no real artwork.
+     */
+    var coverMeshColors by mutableStateOf<List<Int>>(emptyList())
 }
 
 internal val KittyTuneDefaultSeedColor = Color(0xFFFF7A1A)

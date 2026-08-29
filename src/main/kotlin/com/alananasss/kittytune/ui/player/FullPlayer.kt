@@ -233,15 +233,20 @@ private class FullPlayerPalette(
  * "Refais aussi le fond car un fond simple comme ça c'est pas ouf, refais-le entièrement, faut que ça claque
  * mais lisible."
  *
- * One flat colour with a single bloom in the corner was the previous answer and he is right that it is not
- * much. What Apple's screen actually has is a mesh: four or five enormous overlapping blobs in colours from
- * the sleeve, moving slowly enough that you notice it only if you look. The blobs here are derived from the
- * one seed colour the app extracts — rotated around it and lifted — because a single dominant colour is all
- * there is, and four tints of one hue still reads as a mesh where four unrelated colours would read as a mess.
+ * Three attempts. A flat colour with one bloom in the corner was "pas ouf". Four tints of the single dominant
+ * colour, rotated a few degrees apart, was better on a colourful sleeve and produced a flat dark grey
+ * rectangle on a nearly black one — which is the screenshot that prompted this, and the reason is that a
+ * palette faked from one colour is still one colour.
  *
- * "Mais lisible" is the constraint that sets every number below. The blobs are drawn at low alpha over a deep
- * base, and they are wide enough that no edge of one lands in the middle of a line of text: a hard boundary
- * behind a word is what makes a pretty background unreadable.
+ * So the lights are the sleeve's *own* colours now, read from the same histogram the theme's seed comes from
+ * (see [ArtworkPalette.meshPalette]), normalised onto a spread of brightnesses so that a black cover still
+ * gives a mesh you can see rather than an honest black screen. Four of them move; the fifth and darkest is
+ * the ground they move over.
+ *
+ * "Faut que ça claque mais lisible" is the constraint that sets every number here. Claquer is the travel —
+ * a light crosses forty per cent of the screen, so a corner that was cream becomes deep red inside half a
+ * minute. Lisible is the radius: wide enough that no light has an edge sharp enough to catch a line of text
+ * on, because a hard boundary behind a word is what makes a pretty background unreadable.
  */
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMesh(
     palette: FullPlayerPalette,
@@ -249,17 +254,21 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMesh(
 ) {
     val w = size.width
     val h = size.height
-    // Each blob gets its own phase and its own rate, so they never line up into one pulsing shape.
-    val blobs = listOf(
-        Triple(0.80f, 0.10f, 0f),
-        Triple(0.22f, 0.78f, 0.33f),
-        Triple(0.95f, 0.62f, 0.66f),
-        Triple(0.05f, 0.18f, 0.85f),
+    // Where each light starts, how fast it goes round, and where in its circuit it begins. The rates are
+    // deliberately not multiples of each other: shared or harmonic rates make four lights read as one shape
+    // pulsing, which is the thing that gives a mesh away as an animation rather than as weather.
+    val lights = listOf(
+        Blob(baseX = 0.78f, baseY = 0.12f, rate = 1.00f, phase = 0.00f),
+        Blob(baseX = 0.20f, baseY = 0.74f, rate = 0.71f, phase = 0.31f),
+        Blob(baseX = 0.92f, baseY = 0.66f, rate = 1.29f, phase = 0.63f),
+        Blob(baseX = 0.10f, baseY = 0.22f, rate = 0.53f, phase = 0.86f),
     )
-    blobs.forEachIndexed { index, (baseX, baseY, phase) ->
-        val angle = ((drift + phase) * 2f * Math.PI).toFloat()
-        val x = w * (baseX + WANDER * kotlin.math.cos(angle + index))
-        val y = h * (baseY + WANDER * kotlin.math.sin(angle * 0.8f + index))
+    lights.forEachIndexed { index, blob ->
+        val angle = ((drift * blob.rate + blob.phase) * 2f * Math.PI).toFloat()
+        // Different multipliers on the two axes, so a light travels an ellipse rather than a circle and the
+        // whole field never returns to a shape you recognise from a moment ago.
+        val x = w * (blob.baseX + WANDER * kotlin.math.cos(angle))
+        val y = h * (blob.baseY + WANDER * 0.72f * kotlin.math.sin(angle * 1.3f))
         drawRect(
             Brush.radialGradient(
                 colors = listOf(palette.mesh[index % palette.mesh.size], Color.Transparent),
@@ -270,17 +279,34 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMesh(
     }
 }
 
-/** How far a blob strays from where it started, as a fraction of the screen. */
-private const val WANDER = 0.10f
-
-/** Wide enough that no blob has a visible edge to catch a line of text on. */
-private const val BLOB_RADIUS = 1.05f
+/** One light in the mesh: where it lives, how fast it circles, and where in that circle it starts. */
+private data class Blob(val baseX: Float, val baseY: Float, val rate: Float, val phase: Float)
 
 /**
- * One slow revolution, shared by every blob.
+ * How far a light strays from where it started, as a fraction of the screen.
  *
- * Forty seconds, which is long enough that the movement is something you notice having happened rather than
- * something you can watch — the difference between a background and an animation.
+ * Was a tenth, which is why the background barely moved: "je veux vraiment que ça ressemble à la vidéo, le
+ * fond est animé genre un truc de ouf". In the reference the whole character of the screen changes inside
+ * twenty seconds — a corner that was cream becomes deep red — and that takes lights crossing a real distance,
+ * not shifting by a tenth of one (issue #33).
+ */
+private const val WANDER = 0.40f
+
+/**
+ * How wide a light is, as a fraction of the screen's shorter side.
+ *
+ * Smaller than it was, because bigger travel needs it: four lights this size at the old radius overlapped
+ * everywhere and averaged into one flat colour. Still large enough that no light has an edge sharp enough to
+ * catch a line of text on, which is the readability half of "faut que ça claque mais lisible".
+ */
+private const val BLOB_RADIUS = 0.80f
+
+/**
+ * The clock every light circles on, at its own rate.
+ *
+ * Twenty-six seconds for one turn of the slowest, which is about what the reference does: long enough that
+ * you never catch a light moving, short enough that the screen you are looking at is not the screen you
+ * looked at a minute ago.
  */
 @Composable
 private fun rememberMeshDrift(): Float {
@@ -296,83 +322,58 @@ private fun rememberMeshDrift(): Float {
     return drift
 }
 
-private const val MESH_CYCLE_MS = 40_000
+private const val MESH_CYCLE_MS = 26_000
 
 @Composable
 private fun rememberFullPlayerPalette(): FullPlayerPalette {
-    val seedArgb = com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor
-    val fallback = MaterialTheme.colorScheme.primary
-    val seed = if (seedArgb != null) Color(seedArgb) else fallback
+    val cover = com.alananasss.kittytune.ui.theme.ThemeState.coverMeshColors
+    val fallbackSeed = com.alananasss.kittytune.ui.theme.ThemeState.coverSeedColor
+        ?.let { Color(it) }
+        ?: MaterialTheme.colorScheme.primary
 
-    // Animated, so a track change travels to the next record's colour instead of cutting to it — the
-    // palette elsewhere in the app already does this, and a full screen cutting would be worse.
-    val base by animateColorAsState(deepen(seed), tween(COLOUR_TRAVEL_MS), label = "fullPlayerBase")
-    val meshOne by animateColorAsState(lift(seed, 0.34f), tween(COLOUR_TRAVEL_MS), label = "mesh1")
-    val meshTwo by animateColorAsState(lift(rotate(seed, 0.06f), 0.26f), tween(COLOUR_TRAVEL_MS), label = "mesh2")
-    val meshThree by animateColorAsState(lift(rotate(seed, -0.08f), 0.30f), tween(COLOUR_TRAVEL_MS), label = "mesh3")
-    val meshFour by animateColorAsState(deepen(rotate(seed, 0.12f)).copy(alpha = 0.55f), tween(COLOUR_TRAVEL_MS), label = "mesh4")
+    // The sleeve's own colours when they have been read, and a spread derived from the one seed until then, so
+    // the first frame after opening is never a flat rectangle waiting for a histogram.
+    val target = remember(cover, fallbackSeed) {
+        if (cover.size >= 2) cover.map { Color(it) } else spreadFrom(fallbackSeed)
+    }
+
+    // Animated per light, so a track change is the whole field travelling to the next record rather than
+    // cutting to it. Five, because the reference has about that many and a sixth adds nothing you can see.
+    val one by animateColorAsState(target[0], tween(COLOUR_TRAVEL_MS), label = "mesh1")
+    val two by animateColorAsState(target.getOrElse(1) { target[0] }, tween(COLOUR_TRAVEL_MS), label = "mesh2")
+    val three by animateColorAsState(target.getOrElse(2) { target[0] }, tween(COLOUR_TRAVEL_MS), label = "mesh3")
+    val four by animateColorAsState(target.getOrElse(3) { target[0] }, tween(COLOUR_TRAVEL_MS), label = "mesh4")
+    val five by animateColorAsState(target.getOrElse(4) { target[0] }, tween(COLOUR_TRAVEL_MS), label = "mesh5")
 
     return FullPlayerPalette(
-        base = base,
-        mesh = listOf(meshOne, meshTwo, meshThree, meshFour),
-        // White rather than a tint: on a saturated ground, tinted text reads as faded rather than as
-        // written, and the reference is plainly white at two opacities.
+        // The ground is the darkest of them, which is what the extractor puts last.
+        base = five,
+        mesh = listOf(one, two, three, four),
         bright = Color.White.copy(alpha = 0.94f),
         dim = Color.White.copy(alpha = 0.34f),
     )
 }
 
+/**
+ * Five brightnesses of one colour, for the moment before the cover has been read.
+ *
+ * Mirrors what the extractor does to a monochrome sleeve, so the fallback and the real thing differ in which
+ * colours move rather than in how the screen is built.
+ */
+private fun spreadFrom(seed: Color): List<Color> =
+    listOf(0.62f, 0.46f, 0.34f, 0.26f, 0.19f).map { value ->
+        val hsb = java.awt.Color.RGBtoHSB(
+            (seed.red * 255f).toInt(),
+            (seed.green * 255f).toInt(),
+            (seed.blue * 255f).toInt(),
+            null,
+        )
+        Color(java.awt.Color.HSBtoRGB(hsb[0], maxOf(hsb[1], 0.34f), value))
+    }
+
 /** Long enough to be a transition and short enough to be over before the next line is sung. */
-private const val COLOUR_TRAVEL_MS = 500
+private const val COLOUR_TRAVEL_MS = 900
 
-/**
- * Towards a dark, saturated version of a colour.
- *
- * Multiplying the channels keeps the hue and drops the luminance, which is what makes a pastel cover
- * produce a deep ground rather than a pale one nothing can be read on.
- */
-private fun deepen(color: Color): Color = Color(
-    red = color.red * 0.52f,
-    green = color.green * 0.52f,
-    blue = color.blue * 0.52f,
-    alpha = 1f,
-)
-
-/** The same hue with some white mixed in, for a light rather than a shadow. */
-private fun lift(color: Color, alpha: Float): Color = Color(
-    red = color.red * 0.62f + 0.30f,
-    green = color.green * 0.62f + 0.30f,
-    blue = color.blue * 0.62f + 0.30f,
-    alpha = alpha,
-)
-
-/**
- * The same colour, nudged around the wheel.
- *
- * A few degrees only. Enough that four blobs of it are four colours rather than one at four opacities, and
- * not enough that a red sleeve produces a green corner — the mesh has to stay the record's.
- */
-private fun rotate(color: Color, turns: Float): Color {
-    // java.awt rather than android.graphics: this is a desktop JVM app, and AWT is already on the classpath
-    // for the window and the cursors.
-    val hsb = java.awt.Color.RGBtoHSB(
-        (color.red * 255f).toInt(),
-        (color.green * 255f).toInt(),
-        (color.blue * 255f).toInt(),
-        null,
-    )
-    val hue = ((hsb[0] + turns) % 1f + 1f) % 1f
-    return Color(java.awt.Color.HSBtoRGB(hue, hsb[1], hsb[2]))
-}
-
-/**
- * The panel's lyrics renderer, handed a theme that says "white, on this record's colour, four times
- * bigger".
- *
- * The alternative was a third copy of the following logic. The sidebar spent three rounds of this issue
- * proving where that ends: two implementations of one thing, disagreeing in ways nobody can fix from the
- * outside. This keeps one renderer and moves the appearance into the caller, where it belongs.
- */
 @Composable
 private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerPalette) {
     // Faded at both ends. "Les lyrics à droite il faut le refaire car y'a pas de fond dégradé en sombre en
