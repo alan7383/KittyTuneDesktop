@@ -311,6 +311,48 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             .coerceIn(SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH)
     )
     var isSidebarCollapsed by mutableStateOf(prefs.getBoolean("sidebar_collapsed", false))
+
+    /**
+     * The measured height of the library's header, chip row and search row together, in pixels, and of
+     * the header row alone — remembered across launches.
+     *
+     * The collapsed rail is pinned to the height of the block it stands in for, so that "Favorites" and
+     * everything under it sits at the same height open or closed (issue #33). That height has to be
+     * measured, because hard-coding it is only ever right for one font size at one density.
+     *
+     * The catch is when the measurement can happen: only the expanded layout can be measured, and a
+     * session that *starts* collapsed has never laid it out. Kept only in composition, the rail then
+     * fell back to a constant for the whole session — so the alignment was wrong on every launch until
+     * the panel was opened once, which is most launches for anybody who keeps it shut. Persisted, the
+     * first frame of the second launch onwards is already right.
+     *
+     * Pixels rather than dp on purpose: it is a measurement, and converting it twice through a density
+     * that may have changed would lose more than it saves. A display change between launches costs one
+     * frame at the old value.
+     */
+    var leadingBlockPx by mutableStateOf(prefs.getInt("lib_leading_block_px", 0))
+        private set
+
+    /** @see leadingBlockPx */
+    var headerRowPx by mutableStateOf(prefs.getInt("lib_header_row_px", 0))
+        private set
+
+    /**
+     * Records what the expanded layout actually measured, and writes it down if it has changed.
+     *
+     * Guarded on change because this is called from a layout callback: a write per frame would rewrite
+     * the preferences file for every resize.
+     */
+    fun noteLibraryLeadingBlock(blockPx: Int, headerPx: Int) {
+        if (blockPx > 0 && blockPx != leadingBlockPx) {
+            leadingBlockPx = blockPx
+            prefs.putInt("lib_leading_block_px", blockPx)
+        }
+        if (headerPx > 0 && headerPx != headerRowPx) {
+            headerRowPx = headerPx
+            prefs.putInt("lib_header_row_px", headerPx)
+        }
+    }
     var isLibraryFullScreen by mutableStateOf(false)
     var isCreatingPlaylist by mutableStateOf(false)
 
