@@ -4,6 +4,9 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import com.alananasss.kittytune.ui.player.lyrics.lyricUnderline
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -212,9 +215,13 @@ private fun PanelLyricLine(
     val alpha by animateFloatAsState(treatment.alpha, tween(260), label = "panelLyricAlpha")
     val blur by animateDpAsState(treatment.blur, tween(260), label = "panelLyricBlur")
 
+    // The same weights the lyrics screen uses. "En plein écran ça doit être aussi des lignes comme dans le
+    // lyricsscreen" — and the pair is half of what makes a line read as a line: ExtraBold against Bold is a
+    // difference you feel without being able to name, where Bold against SemiBold at this size reads as one
+    // heavy block with a heavier bit in it (issue #33).
     val base = MaterialTheme.typography.titleMedium
-    val activeStyle = base.copy(fontWeight = FontWeight.Bold, lineHeight = base.fontSize * 1.35f)
-    val inactiveStyle = activeStyle.copy(fontWeight = FontWeight.SemiBold)
+    val activeStyle = base.copy(fontWeight = FontWeight.ExtraBold, lineHeight = base.fontSize * 1.35f)
+    val inactiveStyle = base.copy(fontWeight = FontWeight.Bold, lineHeight = base.fontSize * 1.35f)
 
     // The reader's own alignment, which this view used to ignore: "ça doit prendre en compte les paramètres
     // lyrics, si on met centré ça met centré" (issue #33). The full screen honoured it and the panel did not,
@@ -226,18 +233,34 @@ private fun PanelLyricLine(
         else -> Alignment.Start
     }
 
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isHovered by interaction.collectIsHoveredAsState()
+    var hoverLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+
     Column(
         horizontalAlignment = columnAlign,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .hoverable(interaction)
+            // No indication. The default is a ripple, and a ripple across a full-screen line of 34 sp type is
+            // the "gros truc en surbrillance moche" — the lyrics screen has always drawn a rule under the
+            // hovered line instead, and that is the affordance these lines should have too (issue #33).
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(vertical = lineSpacing)
             .graphicsLayer {
-                // Scaled about the leading edge rather than the middle, so a shrinking line does not
-                // drift inward and back as the song moves past it.
+                // Scaled about whichever edge the text is aligned to, so a shrinking line does not drift away
+                // from its own margin. Centred text scales about its centre, which is what the lyrics screen
+                // does for every alignment because its own text is always centred in its column.
                 scaleX = scale
                 scaleY = scale
-                transformOrigin = TransformOrigin(0f, 0.5f)
+                transformOrigin = TransformOrigin(
+                    pivotFractionX = when (textAlign) {
+                        TextAlign.Center -> 0.5f
+                        TextAlign.End -> 1f
+                        else -> 0f
+                    },
+                    pivotFractionY = 0.5f,
+                )
             }
             .alpha(alpha)
             // Only when there is something to blur: the modifier forces the line into its own layer,
@@ -256,6 +279,13 @@ private fun PanelLyricLine(
             inactiveColor = scheme.onSurfaceVariant,
             unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.5f),
             textAlign = textAlign,
+            textModifier = Modifier.lyricUnderline(
+                { hoverLayout },
+                isHovered,
+                base.fontSize.value,
+                if (isActive) scheme.onSurface else scheme.onSurfaceVariant,
+            ),
+            onTextLayout = { hoverLayout = it },
         )
         // Gated on the switches, which it was not: a fetched translation stayed in the line, so turning the
         // setting *off* left it on screen until the track changed. "Quand on active la traduction,

@@ -1811,7 +1811,14 @@ fun UploadYamlDialog(
  * @param fontSizeSp the line's font size, which the thickness and the drop below the baseline
  *   are both derived from, so the rule scales with the lyrics font-size setting.
  */
-private fun Modifier.lyricUnderline(
+/**
+ * The hover rule under a lyric line.
+ *
+ * Internal rather than private because the panel renderer draws the same lines and needs the same affordance:
+ * it was relying on `clickable`'s default indication instead, which on a 34 sp line at full-screen width is a
+ * ripple the width of the screen — "un gros truc en surbrillance moche" (issue #33).
+ */
+internal fun Modifier.lyricUnderline(
     layout: () -> androidx.compose.ui.text.TextLayoutResult?,
     visible: Boolean,
     fontSizeSp: Float,
