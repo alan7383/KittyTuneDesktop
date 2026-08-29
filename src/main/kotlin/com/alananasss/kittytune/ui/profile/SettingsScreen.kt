@@ -29,7 +29,9 @@ fun SettingsScreen(
     onBackClick: (() -> Unit)? = null,
     playerViewModel: PlayerViewModel
 ) {
-    val scrollState = androidx.compose.foundation.rememberScrollState()
+    // Restored after the sections have hydrated, not before — see [rememberRestorableScrollState]
+    // for why the framework's own saver loses the position on a page built this way (issue #33).
+    val scrollState = com.alananasss.kittytune.ui.common.rememberRestorableScrollState()
     SettingsScaffold(
         title = str("settings_title"),
         onBackClick = onBackClick,

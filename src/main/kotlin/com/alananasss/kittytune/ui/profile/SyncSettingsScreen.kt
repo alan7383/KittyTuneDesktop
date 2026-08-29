@@ -69,7 +69,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SyncSettingsScreen(onBackClick: (() -> Unit)? = null) {
     val scope = rememberCoroutineScope()
-    val scrollState = rememberScrollState()
+    val scrollState = com.alananasss.kittytune.ui.common.rememberRestorableScrollState()
 
     var devices by remember { mutableStateOf(SyncPeers.all()) }
     var pairing by remember { mutableStateOf(false) }
