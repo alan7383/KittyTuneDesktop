@@ -56,6 +56,44 @@ object LyricsMatcher {
     }
 
     /**
+     * Above this, a candidate's title and artist agree with the track well enough that it is believed
+     * over a rival that merely carries better timings. Below it, the candidate is plausible and no more.
+     *
+     * The same threshold [isAcceptable] uses for a title that passes on its own, and for the same
+     * reason: it is the point at which the words are about this song rather than about a song with some
+     * words in common.
+     */
+    const val CONFIDENT_MATCH = 0.60f
+
+    /**
+     * How provider results are ordered against each other.
+     *
+     * ## Why the sync tier is no longer the first thing asked
+     *
+     * It used to be `syncTier * 10 + matchScore`, and since [score] never exceeds 1, that made the tier
+     * decide every comparison outright: a *wrong* song with word-level timings scored 30.4 against the
+     * right song with line-level timings at 21.0, and won. That is the report that has survived every
+     * round of this — "I still find other lyrics, and when I do a manual search, it gives me the correct
+     * one, without any changes." The correct sheet was in the same response all along; it was simply
+     * outranked by a better-synchronised stranger, which is also why picking by hand fixed it.
+     *
+     * Identity comes first now. A confident match wins over any number of tiers, so the right song with
+     * no timings at all is preferred to the wrong song in perfect word-by-word sync — which is the only
+     * defensible order: unsynchronised words the reader can follow are worth something, and synchronised
+     * words from another song are worth less than nothing. Within one confidence bracket the tier decides,
+     * as it did, and [score] settles the ties inside that.
+     */
+    fun rank(syncTier: Int, matchScore: Float, providerBonus: Float = 0f): Float =
+        (if (matchScore >= CONFIDENT_MATCH) CONFIDENCE_WEIGHT else 0f) +
+            syncTier * TIER_WEIGHT + matchScore + providerBonus
+
+    /** Larger than every tier put together, because identity is not a tie-break. */
+    private const val CONFIDENCE_WEIGHT = 100f
+
+    /** Larger than any [score] difference, so the tier still decides within a bracket. */
+    private const val TIER_WEIGHT = 10f
+
+    /**
      * How close a candidate is, in `0f..1f`. Only comparable between candidates for the same
      * [Target]; the absolute value means nothing on its own beyond [isAcceptable].
      */
@@ -83,7 +121,7 @@ object LyricsMatcher {
         target: Target,
     ): Boolean {
         val titleSim = similarity(candidateTitle ?: "", target.title)
-        if (titleSim >= 0.60f) return true
+        if (titleSim >= CONFIDENT_MATCH) return true
         val artistSim = similarity(candidateArtist ?: "", target.artist)
         return titleSim >= 0.35f && artistSim >= 0.45f
     }
