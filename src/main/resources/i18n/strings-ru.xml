@@ -1126,7 +1126,6 @@
     <string name="pref_lyrics_show_button">Кнопка текста песни</string>
     <string name="pref_lyrics_show_button_sub">Показать кнопку быстрого доступа на плеере</string>
     <string name="pref_lyrics_size">Размер</string>
-    <string name="pref_lyrics_line_spacing">Межстрочный интервал</string>
     <string name="pref_lyrics_subtitle">Отображение &amp; источники</string>
     <string name="pref_lyrics_title">Текст песни</string>
     <string name="pref_lyrics_translation_lang">Язык перевода</string>

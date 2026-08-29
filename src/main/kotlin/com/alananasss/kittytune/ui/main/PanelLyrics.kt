@@ -117,7 +117,11 @@ private fun PanelSyncedLyrics(
         // opened on a large empty rectangle with the lyrics below it, and ended on the same rectangle upside
         // down. Anchoring with a scroll offset costs nothing when there is content above the line, and when
         // there is not, the first line simply sits at the top where it belongs (issue #33).
-        val anchorPx = (viewportPx * style.anchorFraction).toInt()
+        // The inset counts towards the anchor rather than adding to it. A list applies its scroll offset
+        // inside its content padding, so asking for 30% on top of a 36% inset put the current line at two
+        // thirds of the way down the screen — "quand on zoome, les lyrics se retrouvent en bas" (issue #33).
+        val anchorPx =
+            (viewportPx * (style.anchorFraction - style.topInsetFraction).coerceAtLeast(0f)).toInt()
 
         FollowActiveLine(listState, activeIndex, anchorPx)
 
@@ -153,7 +157,7 @@ private fun PanelSyncedLyrics(
                 PanelLyricLine(
                     vm = vm,
                     line = line,
-                    lineSpacing = vm.lyricsLineSpacing.dp,
+                    lineSpacing = style.lineSpacing,
                     // Negative for lines already sung. Before the first line starts there is no current
                     // line, and treating every line as "far away" would shrink the whole panel — so the
                     // distance is zero for all of them until the song reaches the words.
@@ -320,7 +324,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
             // A blank line in the source stays a blank line: the verse breaks are most of what makes a sheet
             // readable, and they were the one thing the old version did keep.
             if (line.isBlank()) {
-                Spacer(Modifier.height(vm.lyricsLineSpacing.dp * 2))
+                Spacer(Modifier.height(style.lineSpacing * 2))
             } else {
                 Text(
                     text = line,
@@ -330,7 +334,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
                     textAlign = alignmentOf(vm),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = vm.lyricsLineSpacing.dp / 2),
+                        .padding(vertical = style.lineSpacing),
                 )
             }
         }
@@ -361,7 +365,13 @@ private fun alignmentOf(vm: PlayerViewModel): TextAlign = when (vm.lyricsAlignme
  *   the viewport. A list with nothing to scroll to sits at its top inset, so this is what puts the opening
  *   line in the middle of the page rather than against the ceiling.
  * @param tailFraction how much room the closing lines get to rise into.
- * @param anchorFraction how far down the current line settles once the song is following.
+ * @param anchorFraction how far down the current line settles once the song is following. Measured from the
+ *   top of the viewport, and [topInsetFraction] counts towards it: a list's scroll offset is applied inside
+ *   the content padding, so an inset of 0.36 and an anchor of 0.30 put the line at 0.66 rather than 0.30 —
+ *   which is what sent the current line to the bottom of the screen as soon as the type got large enough for
+ *   the inset to matter (issue #33).
+ * @param lineSpacing air between one line and the next. Part of the preset rather than a setting: it is a
+ *   consequence of how big the type is, and the type is what the reader actually adjusts.
  */
 data class PanelLyricsStyle(
     val startPadding: Dp,
@@ -369,6 +379,7 @@ data class PanelLyricsStyle(
     val topInsetFraction: Float,
     val tailFraction: Float,
     val anchorFraction: Float,
+    val lineSpacing: Dp,
 ) {
     companion object {
         /**
@@ -383,15 +394,19 @@ data class PanelLyricsStyle(
             topInsetFraction = 0.03f,
             tailFraction = 0.35f,
             anchorFraction = 0.32f,
+            lineSpacing = 6.dp,
         )
 
         /** A full screen, where the same air is the point of the thing. */
         val FullScreen = PanelLyricsStyle(
             startPadding = 24.dp,
             endPadding = 48.dp,
-            topInsetFraction = 0.36f,
+            topInsetFraction = 0.34f,
             tailFraction = 0.55f,
-            anchorFraction = 0.30f,
+            // The inset already puts the line a third of the way down, so this asks for nothing on top of it.
+            anchorFraction = 0.34f,
+            // Overwritten by the caller, which scales it to whatever size the reader has chosen.
+            lineSpacing = 14.dp,
         )
     }
 }
