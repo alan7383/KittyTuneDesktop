@@ -1008,6 +1008,12 @@
     <string name="player_effects">Effets</string>
     <string name="player_like_action">Like</string>
     <string name="player_lyrics">Paroles</string>
+    <string name="player_shuffle">Lecture aléatoire</string>
+    <string name="player_previous">Piste précédente</string>
+    <string name="player_play_pause">Lecture / pause</string>
+    <string name="player_next">Piste suivante</string>
+    <string name="player_repeat">Répéter</string>
+    <string name="player_like">J’aime</string>
     <string name="player_pitch">Pitch</string>
     <string name="player_playing_now">LECTURE EN COURS</string>
     <string name="player_queue">File d\'attente</string>

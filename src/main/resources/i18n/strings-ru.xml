@@ -1008,6 +1008,12 @@
     <string name="player_effects">Эффекты</string>
     <string name="player_like_action">Нравится</string>
     <string name="player_lyrics">Текст песни</string>
+    <string name="player_shuffle">Перемешать</string>
+    <string name="player_previous">Предыдущий трек</string>
+    <string name="player_play_pause">Воспроизведение / пауза</string>
+    <string name="player_next">Следующий трек</string>
+    <string name="player_repeat">Повтор</string>
+    <string name="player_like">Нравится</string>
     <string name="player_pitch">Питч</string>
     <string name="player_playing_now">СЕЙЧАС ИГРАЕТ</string>
     <string name="player_queue">Очередь</string>
