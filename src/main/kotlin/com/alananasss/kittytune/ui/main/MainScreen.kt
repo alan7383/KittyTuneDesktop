@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.hoverable
@@ -62,6 +64,14 @@ import com.alananasss.kittytune.ui.common.CoverViewerOverlay
 
 val PanelShape get() = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
 const val PANEL_GUTTER = 8
+
+/**
+ * How long the centre panel takes to hand over between the lyrics and everything else.
+ *
+ * Shorter than the panels' own springs: this is one rectangle's contents changing, not an edge
+ * travelling, and a fade that outlasts the click reads as lag rather than as motion.
+ */
+private const val SHEET_SWAP_MS = 220
 
 @Composable
 fun MainScreen() {
@@ -343,7 +353,32 @@ fun MainScreen() {
                 shape = PanelShape,
                 color = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
-                if (playerViewModel.showLyricsSheet) {
+                // The words arrive rather than replace (issue #33).
+                //
+                // "I think it would be nice to do this for the entire interface, for opening text, etc."
+                //
+                // A fade with a little depth, and the size snapped: the two branches are the same
+                // rectangle, so there is nothing to resize, and animating the size would only make the
+                // whole window breathe. The state holder stays outside this, which is what lets the
+                // NavHost keep every list's scroll position across the swap — it survived the plain `if`
+                // and it survives being cross-faded for the same reason.
+                androidx.compose.animation.AnimatedContent(
+                    targetState = playerViewModel.showLyricsSheet,
+                    transitionSpec = {
+                        (androidx.compose.animation.fadeIn(
+                            androidx.compose.animation.core.tween(SHEET_SWAP_MS)
+                        ) + androidx.compose.animation.scaleIn(
+                            androidx.compose.animation.core.tween(SHEET_SWAP_MS),
+                            initialScale = 0.98f,
+                        )) togetherWith androidx.compose.animation.fadeOut(
+                            androidx.compose.animation.core.tween(SHEET_SWAP_MS)
+                        ) using androidx.compose.animation.SizeTransform(clip = false) { _, _ ->
+                            androidx.compose.animation.core.snap()
+                        }
+                    },
+                    label = "lyricsSheet",
+                ) { showLyrics ->
+                if (showLyrics) {
                     com.alananasss.kittytune.ui.player.lyrics.LyricsScreen(
                         viewModel = playerViewModel,
                         onClose = { playerViewModel.showLyricsSheet = false }
@@ -795,10 +830,44 @@ fun MainScreen() {
                     }
                 }
                 }
+                }
             }
             } // end if (!isLibraryFullScreen)
 
-            if (showNowPlayingPanel && playerViewModel.currentTrack != null) {
+            // Slides out instead of appearing (issue #33).
+            //
+            // "I also think that I can add the same opening animation as on the left panel, only for the
+            // right panel, when clicked, it also slides out smoothly and beautifully."
+            //
+            // Its *width* was already on the same spring the left panel uses, but only once it existed:
+            // the whole panel was behind a plain `if`, so it arrived at full width in one frame and the
+            // spring had nothing left to do. Expanding from zero is what makes the click open something
+            // rather than reveal it, and the same stiffness on both sides means the two panels feel like
+            // one interface.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showNowPlayingPanel && playerViewModel.currentTrack != null,
+                enter = androidx.compose.animation.fadeIn(
+                    androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)
+                ) + androidx.compose.animation.expandHorizontally(
+                    animationSpec = androidx.compose.animation.core.spring(
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                        visibilityThreshold = androidx.compose.ui.unit.IntSize.VisibilityThreshold,
+                    ),
+                    // Anchored to the window's edge, so the panel's inner edge is the one that travels and
+                    // the content does not slide sideways underneath itself.
+                    expandFrom = Alignment.End,
+                ),
+                exit = androidx.compose.animation.fadeOut(
+                    androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)
+                ) + androidx.compose.animation.shrinkHorizontally(
+                    animationSpec = androidx.compose.animation.core.spring(
+                        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                        visibilityThreshold = androidx.compose.ui.unit.IntSize.VisibilityThreshold,
+                    ),
+                    shrinkTowards = Alignment.End,
+                ),
+            ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 var draggingRightPanel by remember { mutableStateOf(false) }
                 val targetRightPanelWidth = playerViewModel.rightPanelWidth
                 val animatedRightPanelWidth by androidx.compose.animation.core.animateDpAsState(
@@ -854,6 +923,7 @@ fun MainScreen() {
                     onOpenFullLyrics = { playerViewModel.showLyricsSheet = true },
                     modifier = Modifier.width(rightPanelWidth)
                 )
+            }
             }
         }
 
