@@ -824,6 +824,7 @@
     <string name="lib_restore_tooltip">Восстановить библиотеку</string>
     <string name="lib_search_hint">Поиск в библиотеке</string>
     <string name="lib_search_tooltip">Поиск в библиотеке</string>
+    <string name="lib_filter_tooltip">Фильтр по типу</string>
     <string name="lib_sort_alphabetical">По алфавиту</string>
     <string name="lib_sort_by_title">Сортировка</string>
     <string name="lib_sort_creator">Автор</string>
@@ -1330,6 +1331,7 @@
     <string name="restore_toast_error">Ошибка восстановления</string>
     <string name="restore_toast_success">Данные восстановлены</string>
     <string name="search_filter_all">Все</string>
+    <string name="search_source_tooltip">Где искать</string>
     <string name="search_filter_artists">Исполнители</string>
     <string name="search_filter_playlists">Плейлисты</string>
     <string name="search_filter_tracks">Треки</string>

@@ -69,6 +69,8 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
 import com.alananasss.kittytune.data.local.HistoryItem
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -639,6 +641,74 @@ fun MediaCard(
 //  Full Search Experience — mirrors Android KittyTune's SearchScreen
 // ──────────────────────────────────────────────────────────────────────
 
+/**
+ * Which platform to search, as one button rather than one button each (issue #33).
+ *
+ * "Only after them make the platform selection button, again 1 button, and when you click on it you can
+ * switch to another one."
+ *
+ * A menu rather than a button that cycles, for the reason he gave in the same message: he wants Apple
+ * Music and Yandex Music adding. Cycling through three is a shortcut; cycling through five is a puzzle,
+ * and a menu is the same single button either way.
+ */
+@Composable
+private fun SearchSourceButton(vm: HomeViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+    val sources = listOf(SearchSource.SOUNDCLOUD, SearchSource.YOUTUBE, SearchSource.SPOTIFY)
+
+    Box {
+        com.alananasss.kittytune.ui.common.Tip(str("search_source_tooltip")) {
+            androidx.compose.material3.OutlinedButton(
+                onClick = { expanded = true },
+                shapes = ButtonDefaults.shapes(),
+                contentPadding = PaddingValues(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            ) {
+                Text(
+                    text = searchSourceLabel(vm.activeSearchSource),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+                Icon(
+                    Icons.Rounded.ArrowDropDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+
+        androidx.compose.material3.DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            sources.forEach { source ->
+                androidx.compose.material3.DropdownMenuItem(
+                    text = { Text(searchSourceLabel(source)) },
+                    leadingIcon = {
+                        // The current one is marked rather than merely styled: a menu of three names with
+                        // no indication of which is live reads as three actions, not as a choice.
+                        if (source == vm.activeSearchSource) {
+                            Icon(Icons.Rounded.Check, contentDescription = null)
+                        } else {
+                            Spacer(Modifier.size(24.dp))
+                        }
+                    },
+                    onClick = {
+                        expanded = false
+                        if (source != vm.activeSearchSource) vm.onSearchSourceChanged(source)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** Platform names are brands, so they are not translated. */
+private fun searchSourceLabel(source: SearchSource): String = when (source) {
+    SearchSource.SOUNDCLOUD -> "SoundCloud"
+    SearchSource.YOUTUBE -> "YouTube"
+    SearchSource.SPOTIFY -> "Spotify"
+}
+
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun SearchResults(
@@ -673,30 +743,18 @@ private fun SearchResults(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
-                options = listOf(SearchSource.SOUNDCLOUD, SearchSource.YOUTUBE, SearchSource.SPOTIFY),
-                selectedOption = vm.activeSearchSource,
-                onOptionSelected = { vm.onSearchSourceChanged(it) },
-                fillMaxWidth = false,
-                labelProvider = { source ->
-                    Text(
-                        text = when (source) {
-                            SearchSource.SOUNDCLOUD -> "SoundCloud"
-                            SearchSource.YOUTUBE -> "YouTube"
-                            SearchSource.SPOTIFY -> "Spotify"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                }
-            )
-
+            // What you are looking for comes before where to look for it (issue #33).
+            //
+            // "Make the first filter 'All', then 'Tracks', 'Artists', 'Playlists' and only after them make
+            // the platform selection button, again 1 button, and when you click on it you can switch to
+            // another one."
+            //
+            // He is right about the order for a reason worth stating: the platform is set once and then
+            // left alone, while All/Tracks/Artists is touched on every search. The thing you reach for
+            // constantly was sitting to the right of the thing you almost never change, and three
+            // side-by-side platform buttons took as much of the row as the four filters did — which is
+            // also why the row started scrolling sideways on a narrow window.
             if (vm.activeSearchSource == SearchSource.SOUNDCLOUD || vm.activeSearchSource == SearchSource.SPOTIFY) {
-                VerticalDivider(
-                    modifier = Modifier.height(20.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                )
-
                 val filters = listOf(
                     SearchFilter.ALL,
                     SearchFilter.TRACKS,
@@ -722,7 +780,14 @@ private fun SearchResults(
                         )
                     }
                 )
+
+                VerticalDivider(
+                    modifier = Modifier.height(20.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                )
             }
+
+            SearchSourceButton(vm)
         }
 
         // ── Loading bar ──

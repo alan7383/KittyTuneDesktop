@@ -3,23 +3,17 @@ package com.alananasss.kittytune.ui.main
 
 import androidx.compose.foundation.background
 
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Brush
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeOut
-import androidx.compose.material.icons.rounded.ChevronLeft
-import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.onClick
 import androidx.compose.ui.input.pointer.PointerButton
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -363,9 +357,12 @@ fun LibraryPanel(
     // the difference would fix it for one font at one density and go wrong again at the next; taking the
     // real height of the block being replaced cannot. The constants are only for the first frame after a
     // launch that starts collapsed, when the full layout has never been laid out to measure (issue #33).
+    // Held on the view model rather than in composition, so it survives a launch that starts collapsed —
+    // the one case where the block being measured is never laid out at all. See
+    // [LibraryViewModel.leadingBlockPx]; the constants below are now only for a first-ever launch.
     val density = androidx.compose.ui.platform.LocalDensity.current
-    var leadingBlockPx by remember { mutableStateOf(0) }
-    var headerRowPx by remember { mutableStateOf(0) }
+    val leadingBlockPx = libraryViewModel.leadingBlockPx
+    val headerRowPx = libraryViewModel.headerRowPx
     val leadingBlockHeight =
         if (leadingBlockPx > 0) with(density) { leadingBlockPx.toDp() }
         else SidebarMorph.FALLBACK_LEADING_BLOCK
@@ -434,10 +431,13 @@ fun LibraryPanel(
                 }
             } else {
                 Column(fixedWidth.fillMaxHeight()) {
+                    var measuredHeaderPx by remember { mutableStateOf(0) }
                     Column(
-                        Modifier.onSizeChanged { leadingBlockPx = it.height }
+                        Modifier.onSizeChanged {
+                            libraryViewModel.noteLibraryLeadingBlock(it.height, measuredHeaderPx)
+                        }
                     ) {
-                        Box(Modifier.onSizeChanged { headerRowPx = it.height }) {
+                        Box(Modifier.onSizeChanged { measuredHeaderPx = it.height }) {
                             LibraryHeader(
                                 libraryViewModel = libraryViewModel,
                                 playerViewModel = playerViewModel,
@@ -450,9 +450,9 @@ fun LibraryPanel(
                                 onUpload = onUpload,
                             )
                         }
-                        // The two rows the rail replaces outright. They recede in place — see
-                        // [receded] for why they must not give up their height doing it.
-                        Box(Modifier.receded(collapse)) { LibraryFilterChips(libraryViewModel) }
+                        // The row the rail replaces outright. It recedes in place — see [receded] for
+                        // why it must not give up its height doing it. The filter chips used to be a
+                        // second one; they are a button inside this row now.
                         Box(Modifier.receded(collapse)) { LibrarySearchRow(libraryViewModel) }
                     }
                     LibraryContent(
@@ -1039,142 +1039,6 @@ private fun LibraryHeader(
 }
 
 // ---------------------------------------------------------------------------
-// Filter chips: Playlists / Albums / Artists / Stations
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun LibraryFilterChips(libraryViewModel: LibraryViewModel) {
-    // Each filter carries its icon: narrowed all the way down the labels truncate to a couple of
-    // letters, and in a language with long words there was nothing left to recognise them by
-    // (issue #33). The main navigation rail already pairs icon and label the same way.
-    val filters = remember(libraryViewModel.uploadedTracks.size) {
-        buildList {
-            add(str("lib_playlists") to Icons.Rounded.QueueMusic)
-            add(str("lib_albums") to Icons.Rounded.Album)
-            add(str("lib_artists") to Icons.Rounded.Person)
-            add(str("lib_stations") to Icons.Rounded.Radio)
-            if (libraryViewModel.uploadedTracks.isNotEmpty()) {
-                add(str("lib_your_uploads") to Icons.Rounded.CloudUpload)
-            }
-        }
-    }
-    val scrollState = rememberScrollState()
-    val scope = rememberCoroutineScope()
-
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.type == PointerEventType.Scroll) {
-                                val delta = event.changes.first().scrollDelta.y
-                                scope.launch {
-                                    scrollState.scrollBy(delta * 50f)
-                                }
-                            }
-                        }
-                    }
-                }
-                .horizontalScroll(scrollState)
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            filters.forEach { (label, icon) ->
-                val selected = libraryViewModel.selectedFilter == label
-                Button(
-                    onClick = {
-                        libraryViewModel.selectedFilter = if (selected) null else label
-                    },
-                    shapes = ButtonDefaults.shapes(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
-                        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                    ),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-
-        // Left shadow & arrow
-        androidx.compose.animation.AnimatedVisibility(
-            visible = scrollState.value > 0,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.CenterStart)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(60.dp)
-                    .height(48.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.surfaceContainerLow,
-                                Color.Transparent
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(22.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                        .clip(CircleShape)
-                        .clickable { scope.launch { scrollState.animateScrollBy(-200f) } },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Rounded.ChevronLeft, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                }
-            }
-        }
-
-        // Right shadow & arrow
-        androidx.compose.animation.AnimatedVisibility(
-            visible = scrollState.value < scrollState.maxValue,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.CenterEnd)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(60.dp)
-                    .height(48.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                Color.Transparent,
-                                MaterialTheme.colorScheme.surfaceContainerLow
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Box(
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .size(22.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                        .clip(CircleShape)
-                        .clickable { scope.launch { scrollState.animateScrollBy(200f) } },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Search + sort/view-mode row
 // ---------------------------------------------------------------------------
 
@@ -1272,8 +1136,102 @@ private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
         }
 
         Spacer(Modifier.width(8.dp))
+        LibraryCategoryButton(libraryViewModel)
+        Spacer(Modifier.width(4.dp))
         SortAndViewMenuButton(libraryViewModel)
     }
+}
+
+/**
+ * Playlists / Albums / Artists / Stations, as one button instead of a row of five (issue #33).
+ *
+ * "I think they can be moved below and do it as a filter, you can click and select what you need, by
+ * default it is there as 'all' […] because now these filters take up a lot of space, they are spacious,
+ * but they are used infrequently and stand out too much from the rest."
+ *
+ * All three observations hold. They were filled buttons, which in Material's hierarchy is the loudest
+ * thing you can draw, sitting above a library where nothing else asks for attention at all; they were a
+ * horizontally scrolling row with its own gradient shadows and arrow buttons, for five entries; and they
+ * cost a whole row of a panel whose vertical space is the thing in shortest supply. As one button beside
+ * the search field they cost nothing until they are used, and the panel loses a row — which the collapsed
+ * rail follows on its own, since it is pinned to the measured height of what it replaces.
+ *
+ * The absence of a filter is a choice with a name here, rather than the state of nothing being pressed:
+ * "All" is what a reader looks for, and a menu has room to say it.
+ */
+@Composable
+private fun LibraryCategoryButton(libraryViewModel: LibraryViewModel) {
+    var expanded by remember { mutableStateOf(false) }
+    val all = str("search_filter_all")
+    val categories = buildList {
+        add(str("lib_playlists") to Icons.Rounded.QueueMusic)
+        add(str("lib_albums") to Icons.Rounded.Album)
+        add(str("lib_artists") to Icons.Rounded.Person)
+        add(str("lib_stations") to Icons.Rounded.Radio)
+        if (libraryViewModel.uploadedTracks.isNotEmpty()) {
+            add(str("lib_your_uploads") to Icons.Rounded.CloudUpload)
+        }
+    }
+    val selected = libraryViewModel.selectedFilter
+
+    Box {
+        Tip(str("lib_filter_tooltip")) {
+            TextButton(
+                onClick = { expanded = true },
+                shapes = ButtonDefaults.shapes(),
+                contentPadding = PaddingValues(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            ) {
+                Text(
+                    text = selected ?: all,
+                    style = MaterialTheme.typography.labelMedium,
+                    // Single line and truncated rather than wrapped: this sits in a row that follows the
+                    // panel's width, and a label that wraps takes the row's height with it.
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (selected == null) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface,
+                )
+                Icon(
+                    Icons.Rounded.ArrowDropDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(all) },
+                leadingIcon = { CategoryCheck(isSelected = selected == null) },
+                onClick = {
+                    expanded = false
+                    libraryViewModel.selectedFilter = null
+                },
+            )
+            categories.forEach { (label, icon) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    leadingIcon = {
+                        if (selected == label) CategoryCheck(isSelected = true)
+                        else Icon(icon, contentDescription = null)
+                    },
+                    onClick = {
+                        expanded = false
+                        libraryViewModel.selectedFilter = label
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** The tick that says which one is live, or the space it would take, so the labels stay in a column. */
+@Composable
+private fun CategoryCheck(isSelected: Boolean) {
+    if (isSelected) Icon(Icons.Rounded.Check, contentDescription = null)
+    else Spacer(Modifier.size(24.dp))
 }
 
 private fun viewModeIcon(mode: LibraryViewMode): ImageVector = when (mode) {
@@ -1802,8 +1760,13 @@ private fun CollapsedLibraryRail(
                         onClick = onExpand,
                         shapes = IconButtonDefaults.shapes()
                     ) {
+                        // The same icon the expanded header shows, which is both what he asked for —
+                        // "the icon of the 'open library' button should be replaced with something
+                        // similar to the icon of a regular library" — and one less thing for the
+                        // handover between the two layouts to give away: same glyph, same size, same
+                        // place, so only the panel around it changes (issue #33).
                         Icon(
-                            Icons.AutoMirrored.Rounded.ViewSidebar,
+                            Icons.Filled.LibraryMusic,
                             contentDescription = str("lib_open_tooltip"),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(SidebarMorph.ICON_SIZE),
