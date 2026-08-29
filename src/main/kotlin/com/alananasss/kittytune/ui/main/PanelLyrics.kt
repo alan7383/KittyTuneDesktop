@@ -37,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
@@ -65,10 +66,23 @@ import kotlinx.coroutines.isActive
  * the lyrics half of the info tab, so the two cannot drift apart.
  */
 @Composable
-fun PanelLyrics(vm: PlayerViewModel, modifier: Modifier = Modifier) {
+fun PanelLyrics(
+    vm: PlayerViewModel,
+    modifier: Modifier = Modifier,
+    /**
+     * Air between one line and the next.
+     *
+     * A parameter because the two callers are reading at completely different sizes. In a side panel a line
+     * is about twenty dp tall and six dp of gap is plenty; on the full player it is three times that, and the
+     * same six dp packs the lines into a block — "il faut qu'il prenne beaucoup plus de saut de ligne car là
+     * il met tout ligne par ligne" (issue #33). Spacing that does not follow the type is spacing that is
+     * wrong at one of the two sizes.
+     */
+    lineSpacing: Dp = 6.dp,
+) {
     val lines = vm.lyricsLines
     when {
-        lines.isNotEmpty() -> PanelSyncedLyrics(vm, lines, modifier)
+        lines.isNotEmpty() -> PanelSyncedLyrics(vm, lines, modifier, lineSpacing)
         !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier)
         else -> Box(modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
             Text(
@@ -81,7 +95,12 @@ fun PanelLyrics(vm: PlayerViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PanelSyncedLyrics(vm: PlayerViewModel, lines: List<LyricLine>, modifier: Modifier) {
+private fun PanelSyncedLyrics(
+    vm: PlayerViewModel,
+    lines: List<LyricLine>,
+    modifier: Modifier,
+    lineSpacing: Dp,
+) {
     val listState = rememberLazyListState()
     // Derived rather than read straight from the position, so the lines recompose when the line
     // changes and not on every progress tick.
@@ -134,6 +153,7 @@ private fun PanelSyncedLyrics(vm: PlayerViewModel, lines: List<LyricLine>, modif
                 PanelLyricLine(
                     vm = vm,
                     line = line,
+                    lineSpacing = lineSpacing,
                     // Negative for lines already sung. Before the first line starts there is no current
                     // line, and treating every line as "far away" would shrink the whole panel — so the
                     // distance is zero for all of them until the song reaches the words.
@@ -168,6 +188,7 @@ private fun PanelSyncedLyrics(vm: PlayerViewModel, lines: List<LyricLine>, modif
 private fun PanelLyricLine(
     vm: PlayerViewModel,
     line: LyricLine,
+    lineSpacing: Dp,
     distance: Int,
     positionMs: Float,
     onClick: () -> Unit,
@@ -191,11 +212,26 @@ private fun PanelLyricLine(
     val activeStyle = base.copy(fontWeight = FontWeight.Bold, lineHeight = base.fontSize * 1.35f)
     val inactiveStyle = activeStyle.copy(fontWeight = FontWeight.SemiBold)
 
+    // The reader's own alignment, which this view used to ignore: "ça doit prendre en compte les paramètres
+    // lyrics, si on met centré ça met centré" (issue #33). The full screen honoured it and the panel did not,
+    // which is the same class of bug as every other one where these two disagreed.
+    val textAlign = when (vm.lyricsAlignment) {
+        com.alananasss.kittytune.data.local.LyricsAlignment.LEFT -> TextAlign.Start
+        com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> TextAlign.Center
+        com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT -> TextAlign.End
+    }
+    val columnAlign = when (textAlign) {
+        TextAlign.Center -> Alignment.CenterHorizontally
+        TextAlign.End -> Alignment.End
+        else -> Alignment.Start
+    }
+
     Column(
-        Modifier
+        horizontalAlignment = columnAlign,
+        modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp)
+            .padding(vertical = lineSpacing)
             .graphicsLayer {
                 // Scaled about the leading edge rather than the middle, so a shrinking line does not
                 // drift inward and back as the song moves past it.
@@ -219,7 +255,7 @@ private fun PanelLyricLine(
             activeColor = scheme.onSurface,
             inactiveColor = scheme.onSurfaceVariant,
             unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.5f),
-            textAlign = TextAlign.Start,
+            textAlign = textAlign,
         )
         val secondary = line.translation ?: line.romanization
         if (!secondary.isNullOrBlank()) {

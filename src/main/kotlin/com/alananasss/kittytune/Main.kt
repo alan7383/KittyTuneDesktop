@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -118,6 +119,30 @@ fun main() {
             )
         }
 
+        // Hoisted so the full player can ask for a real full screen rather than an overlay that covers the
+        // window: the title bar, the taskbar and everything that reacts near a screen edge stay put
+        // otherwise, which is what "pas un pop up mais un vrai écran" is about (issue #33).
+        //
+        // The placement it came from is remembered, so leaving gives a maximised window back to somebody who
+        // had one and a floating window back to somebody who did not.
+        val windowState = rememberWindowState(
+            size = DpSize(1440.dp, 900.dp),
+            position = androidx.compose.ui.window.WindowPosition(androidx.compose.ui.Alignment.Center),
+        )
+        val placementBeforeFullScreen = remember {
+            mutableStateOf(androidx.compose.ui.window.WindowPlacement.Floating)
+        }
+        LaunchedEffect(com.alananasss.kittytune.core.AppWindowState.fullScreen) {
+            val wanted = com.alananasss.kittytune.core.AppWindowState.fullScreen
+            val isFullScreen = windowState.placement == androidx.compose.ui.window.WindowPlacement.Fullscreen
+            if (wanted && !isFullScreen) {
+                placementBeforeFullScreen.value = windowState.placement
+                windowState.placement = androidx.compose.ui.window.WindowPlacement.Fullscreen
+            } else if (!wanted && isFullScreen) {
+                windowState.placement = placementBeforeFullScreen.value
+            }
+        }
+
         Window(
             visible = isWindowVisible,
             onCloseRequest = {
@@ -130,7 +155,7 @@ fun main() {
                 },
                 title = "KittyTune",
                 icon = appIcon,
-            state = rememberWindowState(size = DpSize(1440.dp, 900.dp), position = androidx.compose.ui.window.WindowPosition(androidx.compose.ui.Alignment.Center)),
+            state = windowState,
             onPreviewKeyEvent = { event ->
                 if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
                     DesktopBackDispatcher.onBack()
