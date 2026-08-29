@@ -120,6 +120,10 @@ internal object LyricsScrolling {
  * rather than skipped — a reader who scrolled away and stopped is brought back to where the song is, instead
  * of being left behind until the next line happens to start.
  *
+ * The very first placement is a jump rather than an animation, which is what makes opening the lyrics
+ * mid-song show the line being sung instead of scrolling to it from the top of the file. See the scroll
+ * itself for the report that asked for it.
+ *
  * @param activeIndex the line to keep in view, or a negative value before the first line starts.
  * @param anchorPx how far below the top of the viewport the active line should settle. Zero puts it at the
  *   top of the content area, which is what a view with a large top inset already wants; a short view passes
@@ -131,6 +135,15 @@ internal fun FollowActiveLine(listState: LazyListState, activeIndex: Int, anchor
 
     /** True for exactly as long as the scroll below is ours, so the flag cannot be misattributed. */
     var autoScrolling by remember { mutableStateOf(false) }
+
+    /**
+     * Whether this list has ever been put where the song is.
+     *
+     * False means the view has just appeared and is sitting at line one because that is where a list
+     * starts, not because anybody scrolled it there. The scroll below reads it to decide between
+     * putting the list where the song is and animating it there.
+     */
+    var placed by remember(listState) { mutableStateOf(false) }
 
     // Drags and presses only — a programmatic scroll emits nothing here, which is the whole point.
     LaunchedEffect(listState) {
@@ -163,7 +176,26 @@ internal fun FollowActiveLine(listState: LazyListState, activeIndex: Int, anchor
 
         autoScrolling = true
         try {
-            listState.animateScrollToItem(index = activeIndex, scrollOffset = -anchorPx)
+            // Snapped the first time, animated afterwards (issue #33).
+            //
+            // "When you click on the text, playback does not start from the very beginning, but
+            // continues from the line where the song stopped or is currently playing — both in
+            // full-screen mode and in the sidebar."
+            //
+            // Opening the lyrics on a song already two minutes in composed the list at line one and
+            // then *animated* to line thirty, so the words visibly ran from the top of the song down
+            // to where it actually was, every time the view was opened. The panel's tab and the full
+            // screen both build their list state fresh, so both did it, which is the "both" in the
+            // report. There is nothing to animate on a first placement: no reader is following a
+            // line yet, and the position the list happens to start at means nothing. Once the view
+            // *is* placed, the animation is the point — that is the song moving from one line to the
+            // next, and it should glide.
+            if (placed) {
+                listState.animateScrollToItem(index = activeIndex, scrollOffset = -anchorPx)
+            } else {
+                listState.scrollToItem(index = activeIndex, scrollOffset = -anchorPx)
+            }
+            placed = true
         } finally {
             autoScrolling = false
         }
