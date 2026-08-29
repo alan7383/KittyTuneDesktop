@@ -379,10 +379,7 @@ fun MainScreen() {
                     label = "lyricsSheet",
                 ) { showLyrics ->
                 if (showLyrics) {
-                    // The lyrics screen with a cover and the transport beside it — see [FullPlayerScreen].
-                    // The same flag opens both, because they are the same thing: the words are the right
-                    // two thirds of the player, not a separate destination (issue #33).
-                    com.alananasss.kittytune.ui.player.FullPlayerScreen(
+                    com.alananasss.kittytune.ui.player.lyrics.LyricsScreen(
                         viewModel = playerViewModel,
                         onClose = { playerViewModel.showLyricsSheet = false }
                     )
@@ -940,7 +937,10 @@ fun MainScreen() {
             onOpenLyrics = {
                 playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
             },
-            onOpenFullPlayer = { playerViewModel.showLyricsSheet = true },
+            onOpenTrackInfo = {
+                showNowPlayingPanel = true
+                nowPlayingTab = NowPlayingTab.TRACK
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = PANEL_GUTTER.dp)
