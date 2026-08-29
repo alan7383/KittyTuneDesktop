@@ -3679,6 +3679,15 @@ flushListenSession("TRACK_CHANGE")
         if (DownloadManager.isTrackDownloading(track.id)) return; DownloadManager.downloadTrack(track)
     }
 
+    /**
+     * Says something to the user, through the same channel the sleep timer uses.
+     *
+     * Public because a press can now fail for a reason worth saying out loud: an Apple Music result is a
+     * catalogue entry, and finding it on a source that streams is a search that can come back empty. A
+     * press that silently does nothing is the complaint the whole feature came from (issue #33).
+     */
+    fun notify(message: String) = emitUiEvent(message)
+
     private fun emitUiEvent(msg: String) {
         viewModelScope.launch { _uiEvent.emit(msg) }
     }

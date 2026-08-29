@@ -1336,6 +1336,8 @@
     <string name="restore_toast_success">Adatok visszaállítva</string>
     <string name="search_filter_all">Összes</string>
     <string name="search_source_tooltip">Hol keressen</string>
+    <string name="search_apple_music_notice">Az Apple Music találatok katalógusbejegyzések. Egyre rákattintva megkeressük ugyanazt a dalt egy lejátszható forráson.</string>
+    <string name="search_apple_music_unplayable">Nem található lejátszható forráson.</string>
     <string name="search_filter_artists">Előadók</string>
     <string name="search_filter_playlists">Lejátszási listák</string>
     <string name="search_filter_tracks">Számok</string>

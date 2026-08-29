@@ -1332,6 +1332,8 @@
     <string name="restore_toast_success">Données restaurées</string>
     <string name="search_filter_all">Tout</string>
     <string name="search_source_tooltip">Où chercher</string>
+    <string name="search_apple_music_notice">Les résultats Apple Music viennent du catalogue. Appuyer dessus cherche la même chanson sur une source qui peut la jouer.</string>
+    <string name="search_apple_music_unplayable">Introuvable sur une source qui peut la jouer.</string>
     <string name="search_filter_artists">Artistes</string>
     <string name="search_filter_playlists">Playlists</string>
     <string name="search_filter_tracks">Titres</string>
