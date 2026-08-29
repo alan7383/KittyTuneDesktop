@@ -1330,6 +1330,8 @@
     <string name="restore_toast_success">Data restored</string>
     <string name="search_filter_all">All</string>
     <string name="search_source_tooltip">Where to search</string>
+    <string name="search_apple_music_notice">Apple Music results are catalogue entries. Pressing one looks for the same song on a source that can play it.</string>
+    <string name="search_apple_music_unplayable">Not found on a source that can play it.</string>
     <string name="search_filter_artists">Artists</string>
     <string name="search_filter_playlists">Playlists</string>
     <string name="search_filter_tracks">Tracks</string>

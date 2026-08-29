@@ -654,7 +654,12 @@ fun MediaCard(
 @Composable
 private fun SearchSourceButton(vm: HomeViewModel) {
     var expanded by remember { mutableStateOf(false) }
-    val sources = listOf(SearchSource.SOUNDCLOUD, SearchSource.YOUTUBE, SearchSource.SPOTIFY)
+    val sources = listOf(
+        SearchSource.SOUNDCLOUD,
+        SearchSource.YOUTUBE,
+        SearchSource.SPOTIFY,
+        SearchSource.APPLE_MUSIC,
+    )
 
     Box {
         com.alananasss.kittytune.ui.common.Tip(str("search_source_tooltip")) {
@@ -707,6 +712,7 @@ private fun searchSourceLabel(source: SearchSource): String = when (source) {
     SearchSource.SOUNDCLOUD -> "SoundCloud"
     SearchSource.YOUTUBE -> "YouTube"
     SearchSource.SPOTIFY -> "Spotify"
+    SearchSource.APPLE_MUSIC -> "Apple Music"
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
@@ -808,7 +814,8 @@ private fun SearchResults(
             vm.searchResultsArtists.isEmpty() &&
             vm.searchResultsPlaylists.isEmpty() &&
             vm.searchResultsYoutube.isEmpty() &&
-            vm.searchResultsSpotify.isEmpty()
+            vm.searchResultsSpotify.isEmpty() &&
+            vm.searchResultsApple.isEmpty()
         ) {
             // Initial loading — centered spinner
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -816,12 +823,11 @@ private fun SearchResults(
             }
         } else {
             // Actual results
-            if (vm.activeSearchSource == SearchSource.YOUTUBE) {
-                YoutubeResults(vm, playerViewModel, listState)
-            } else if (vm.activeSearchSource == SearchSource.SPOTIFY) {
-                SpotifyResults(vm, playerViewModel, navController)
-            } else {
-                SoundCloudResults(vm, playerViewModel, navController, listState)
+            when (vm.activeSearchSource) {
+                SearchSource.YOUTUBE -> YoutubeResults(vm, playerViewModel, listState)
+                SearchSource.SPOTIFY -> SpotifyResults(vm, playerViewModel, navController)
+                SearchSource.APPLE_MUSIC -> AppleMusicResults(vm, playerViewModel, listState)
+                SearchSource.SOUNDCLOUD -> SoundCloudResults(vm, playerViewModel, navController, listState)
             }
         }
     }
@@ -1135,6 +1141,110 @@ private fun YoutubeResults(
 // ──────────────────────────────────────────────────────────────────────
 //  Spotify Search Results
 // ──────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun AppleMusicResults(
+    vm: HomeViewModel,
+    playerViewModel: PlayerViewModel,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+) {
+    if (vm.searchResultsApple.isEmpty() && !vm.isSearchLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = str("search_no_results"),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+    ) {
+        // Said once at the top rather than on every row: these results come from a catalogue, and pressing
+        // one goes looking for the same song somewhere it can be played. Better to explain the rule than to
+        // decorate forty rows with the same badge (issue #33).
+        item {
+            Text(
+                text = str("search_apple_music_notice"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        items(vm.searchResultsApple, key = { it.id }) { song ->
+            AppleSongRow(
+                song = song,
+                resolving = vm.resolvingAppleSongId == song.id,
+                onClick = {
+                    vm.resolveAppleSong(song) { track ->
+                        if (track != null) {
+                            playerViewModel.playPlaylist(listOf(track), 0)
+                        } else {
+                            playerViewModel.notify(str("search_apple_music_unplayable"))
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+/**
+ * One catalogue entry.
+ *
+ * Shaped like the other search rows on purpose — artwork, title, artist — because it is the same kind of
+ * thing to the person reading it. What is different is only what happens on a press, and the spinner in
+ * place of nothing is what says so: this press is a search, and it takes as long as a search does.
+ */
+@Composable
+private fun AppleSongRow(song: com.alananasss.kittytune.data.applemusic.AppleSong, resolving: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = !resolving, onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        coil3.compose.AsyncImage(
+            model = song.artworkUrl,
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = song.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = listOfNotNull(song.artist, song.album).joinToString(" • "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        if (resolving) {
+            CircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
+        } else if (song.durationMs > 0L) {
+            Text(
+                text = com.alananasss.kittytune.utils.makeTimeString(song.durationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
 
 @Composable
 private fun SpotifyResults(

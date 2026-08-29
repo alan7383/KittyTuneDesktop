@@ -73,7 +73,14 @@ import com.alananasss.kittytune.utils.Logger
     }
     
     enum class SearchSource {
-        SOUNDCLOUD, YOUTUBE, SPOTIFY
+        SOUNDCLOUD, YOUTUBE, SPOTIFY,
+
+        /**
+         * Catalogue only — see [com.alananasss.kittytune.data.applemusic.AppleMusicClient]. Apple's own
+         * streams are DRM-protected, so a result here is a name to go and find on a source that plays:
+         * "many artists don't upload their music to soundcloud, youtube, spotify" (issue #33).
+         */
+        APPLE_MUSIC,
     }
     
     class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -112,6 +119,19 @@ import com.alananasss.kittytune.utils.Logger
         val searchResultsPlaylists = mutableStateListOf<Playlist>()
         val searchResultsYoutube = mutableStateListOf<Track>()
         val searchResultsSpotify = mutableStateListOf<Track>()
+
+        /**
+         * Apple Music hits, kept as catalogue entries rather than as tracks.
+         *
+         * Deliberately not `mutableStateListOf<Track>` like the others: nothing here can be handed to the
+         * player, and a list whose type says so is what stops one reaching the queue by accident. Pressing
+         * one goes through [com.alananasss.kittytune.data.applemusic.AppleMusicFallback] first (issue #33).
+         */
+        val searchResultsApple = mutableStateListOf<com.alananasss.kittytune.data.applemusic.AppleSong>()
+
+        /** The Apple result currently being looked for on a source that streams, if any. */
+        var resolvingAppleSongId by mutableStateOf<String?>(null)
+            private set
         val searchResultsSpotifyAlbums = mutableStateListOf<com.alananasss.kittytune.data.spotify.SpotifyAlbum>()
         val searchResultsSpotifyPlaylists = mutableStateListOf<com.alananasss.kittytune.data.spotify.SpotifyPlaylist>()
         val searchResultsSpotifyArtists = mutableStateListOf<com.alananasss.kittytune.data.spotify.SpotifyArtist>()
@@ -375,6 +395,7 @@ import com.alananasss.kittytune.utils.Logger
         private fun clearSearchResults() {
             searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear(); searchResultsYoutube.clear()
             searchResultsSpotify.clear(); searchResultsSpotifyAlbums.clear(); searchResultsSpotifyPlaylists.clear(); searchResultsSpotifyArtists.clear()
+            searchResultsApple.clear()
             tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
         }
     
@@ -385,11 +406,54 @@ import com.alananasss.kittytune.utils.Logger
                     SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
                     SearchSource.YOUTUBE -> performYoutubeSearch(query)
                     SearchSource.SPOTIFY -> performSpotifySearch(query)
+                    SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isSearchLoading = false
+            }
+        }
+
+        /**
+         * Apple Music hits for [query].
+         *
+         * No failure handling of its own beyond an empty list, because the client already answers null for
+         * everything that can go wrong — the token expiring, the web player changing shape, the network.
+         * An Apple failure looks the same as Apple having nothing, which is the only safe way for a source
+         * that depends on scraping to behave (issue #33).
+         */
+        private suspend fun performAppleMusicSearch(query: String) {
+            val songs = com.alananasss.kittytune.data.applemusic.AppleMusicClient.searchSongs(query, limit = 25)
+            withContext(Dispatchers.Main) {
+                searchResultsApple.clear()
+                searchResultsApple.addAll(songs)
+            }
+        }
+
+        /**
+         * Finds [song] on a source that streams and hands the result to [onResolved].
+         *
+         * The id of the row being worked on is published so it can show that something is happening: this
+         * is a search inside a click, and it takes as long as a search does. [onResolved] is called with
+         * null when nothing close enough was found, which the caller should say out loud rather than
+         * swallow — a press that silently does nothing is the complaint this whole feature came from.
+         */
+        fun resolveAppleSong(
+            song: com.alananasss.kittytune.data.applemusic.AppleSong,
+            onResolved: (Track?) -> Unit,
+        ) {
+            if (resolvingAppleSongId != null) return
+            resolvingAppleSongId = song.id
+            viewModelScope.launch {
+                val track = try {
+                    com.alananasss.kittytune.data.applemusic.AppleMusicFallback.resolve(song)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
+                resolvingAppleSongId = null
+                onResolved(track)
             }
         }
 

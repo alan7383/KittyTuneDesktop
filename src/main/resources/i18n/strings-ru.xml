@@ -1332,6 +1332,8 @@
     <string name="restore_toast_success">Данные восстановлены</string>
     <string name="search_filter_all">Все</string>
     <string name="search_source_tooltip">Где искать</string>
+    <string name="search_apple_music_notice">Результаты Apple Music — это записи каталога. При нажатии мы ищем ту же песню на источнике, который может её воспроизвести.</string>
+    <string name="search_apple_music_unplayable">Не найдено на источнике, который может её воспроизвести.</string>
     <string name="search_filter_artists">Исполнители</string>
     <string name="search_filter_playlists">Плейлисты</string>
     <string name="search_filter_tracks">Треки</string>
