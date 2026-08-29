@@ -56,7 +56,6 @@ import com.alananasss.kittytune.ui.common.Slider
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showDisplayStyleDialog by remember { mutableStateOf(false) }
         var showFontSizeDialog by remember { mutableStateOf(false) }
-        var showLineSpacingDialog by remember { mutableStateOf(false) }
         var showAutoScrollSpeedDialog by remember { mutableStateOf(false) }
         var showWheelStepDialog by remember { mutableStateOf(false) }
         var provider by remember { mutableStateOf(playerViewModel.lyricsProvider) }
@@ -144,55 +143,6 @@ import com.alananasss.kittytune.ui.common.Slider
     
         // --- DIALOGS ---
     
-        if (showLineSpacingDialog) {
-            BackHandler(onBack = { showLineSpacingDialog = false })
-            Dialog(onDismissRequest = { showLineSpacingDialog = false }) {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(24.dp)) {
-                        Text(str("pref_lyrics_line_spacing"), style = MaterialTheme.typography.headlineSmall)
-                        Spacer(Modifier.height(24.dp))
-                        val spacing = playerViewModel.lyricsLineSpacing
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                "${spacing.roundToInt()} dp",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.width(60.dp),
-                            )
-                            IconButton(onClick = { playerViewModel.updateLyricsLineSpacing(spacing - 2f) }) {
-                                Icon(Icons.Rounded.Remove, null)
-                            }
-                            Slider(
-                                value = spacing,
-                                onValueChange = { playerViewModel.updateLyricsLineSpacing(it) },
-                                valueRange = 4f..30f,
-                                steps = 12,
-                                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                            )
-                            IconButton(onClick = { playerViewModel.updateLyricsLineSpacing(spacing + 2f) }) {
-                                Icon(Icons.Rounded.Add, null)
-                            }
-                        }
-                        Spacer(Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsLineSpacing(14f) }) {
-                                Text(str("pref_lyrics_reset"))
-                            }
-                            TextButton(onClick = { showLineSpacingDialog = false }) { Text(str("btn_close")) }
-                        }
-                    }
-                }
-            }
-        }
-
         if (showFontSizeDialog) {
             BackHandler(onBack = { showFontSizeDialog = false })
             Dialog(onDismissRequest = { showFontSizeDialog = false }) {
@@ -493,10 +443,8 @@ import com.alananasss.kittytune.ui.common.Slider
                             // the inline row only while the lyrics button is shown, so the count
                             // the shapes are derived from has to follow both.
                             val autoScrollOn = playerViewModel.isPlainAutoScrollEnabled
-                            // Nine now, with the line spacing: the count and the chain of indices below have
-                            // to move together, since the rounded corners are derived from both (issue #33).
                             val totalVisibleItems =
-                                (if (showLyricsButton) 9 else 8) + (if (autoScrollOn) 1 else 0)
+                                (if (showLyricsButton) 8 else 7) + (if (autoScrollOn) 1 else 0)
     
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, 0),
@@ -563,19 +511,9 @@ import com.alananasss.kittytune.ui.common.Slider
                                 onClick = { showFontSizeDialog = true }
                             )
 
-                            // Beside the size, because it is the same decision: how much room a line takes.
-                            // In both dialogs, as asked (issue #33).
-                            val spacingIndex = sizeIndex + 1
-                            SettingsItem(
-                                shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, spacingIndex),
-                                title = str("pref_lyrics_line_spacing"),
-                                subtitle = "${playerViewModel.lyricsLineSpacing.roundToInt()} dp",
-                                onClick = { showLineSpacingDialog = true }
-                            )
-
                             // Only unsynced lyrics scroll on their own — synced ones already
                             // follow the track (issue #33).
-                            val autoScrollIndex = spacingIndex + 1
+                            val autoScrollIndex = sizeIndex + 1
                             SettingsItem(
                                 shape = com.alananasss.kittytune.ui.common.getSettingsShape(totalVisibleItems, autoScrollIndex),
                                 title = str("pref_lyrics_autoscroll"),

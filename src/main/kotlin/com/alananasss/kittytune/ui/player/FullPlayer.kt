@@ -415,7 +415,14 @@ private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerP
             modifier = Modifier
                 .fillMaxSize()
                 .fadingEdge(fade),
-            style = com.alananasss.kittytune.ui.main.PanelLyricsStyle.FullScreen,
+            // Spacing scaled from the size the reader chose, rather than a setting of its own. The knob was
+            // there for one round and taken back out: "enlève le line spacing stp en paramètres". It was
+            // asked for because lines ran together, and lines ran together because the gap was fixed while
+            // the type was not — so tying it to the type is the fix the setting was standing in for
+            // (issue #33).
+            style = com.alananasss.kittytune.ui.main.PanelLyricsStyle.FullScreen.copy(
+                lineSpacing = (size.value * SPACING_PER_SP).dp,
+            ),
         )
     }
 }
@@ -434,6 +441,14 @@ private const val LYRIC_MAX = 64f
 
 /** Leading, as a multiple of the size, so it follows the type instead of being set once for one size. */
 private const val LINE_HEIGHT_RATIO = 1.28f
+
+/**
+ * Gap between lines, per sp of type.
+ *
+ * A third of the size, which holds at both ends of the slider: at 16 sp it is five dp and the lines are close
+ * without touching, at 64 sp it is twenty-one and they are separate without drifting apart.
+ */
+private const val SPACING_PER_SP = 0.34f
 
 /**
  * The cover, and under it the only controls the reference shows.

@@ -161,7 +161,6 @@ class PlayerPreferences {
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
         private const val KEY_LYRICS_DISPLAY_STYLE = "lyrics_display_style"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
-        private const val KEY_LYRICS_LINE_SPACING = "lyrics_line_spacing"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
         private const val KEY_LYRICS_TRANSLATION_ENABLED = "lyrics_translation_enabled"
@@ -329,18 +328,6 @@ class PlayerPreferences {
     fun getLyricsFontSize(): Float = Prefs.getFloat(KEY_LYRICS_FONT_SIZE, 42f)
     fun setLyricsFontSize(size: Float) = Prefs.putFloat(KEY_LYRICS_FONT_SIZE, size)
 
-    /**
-     * Air between one lyric line and the next, in dp, at the reader's chosen size.
-     *
-     * Adjustable because the right amount is not something a default can know: it depends on the font size,
-     * on the language — a line of Cyrillic is taller than the same line of Latin — and on whether you are
-     * reading along or glancing. Asked for in both dialogs: "ça il faut le rajouter dans les paramètres des
-     * lyrics rapides et non rapides, pouvoir l'ajuster" (issue #33).
-     *
-     * The default is generous rather than tight, because the complaint was that lines ran together.
-     */
-    fun getLyricsLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_LINE_SPACING, 14f)
-    fun setLyricsLineSpacing(dp: Float) = Prefs.putFloat(KEY_LYRICS_LINE_SPACING, dp)
     fun getLocalMediaEnabled(): Boolean = Prefs.getBoolean(KEY_LOCAL_MEDIA_ENABLED, false)
     fun setLocalMediaEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LOCAL_MEDIA_ENABLED, enabled)
     fun getLocalMediaUris(): Set<String> = Prefs.getStringSet(KEY_LOCAL_MEDIA_URIS_SET, emptySet())

@@ -1130,7 +1130,6 @@
     <string name="pref_lyrics_show_button">Dalszöveg gomb megjelenítése</string>
     <string name="pref_lyrics_show_button_sub">Gyors elérésű gomb megjelenítése a lejátszóban</string>
     <string name="pref_lyrics_size">Méret</string>
-    <string name="pref_lyrics_line_spacing">Sortávolság</string>
     <string name="pref_lyrics_subtitle">Megjelenítés és forrás</string>
     <string name="pref_lyrics_title">Dalszövegek</string>
     <string name="pref_lyrics_translation_lang">Fordítás nyelve</string>
