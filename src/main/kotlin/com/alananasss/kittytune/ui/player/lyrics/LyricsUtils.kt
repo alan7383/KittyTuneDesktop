@@ -40,6 +40,41 @@ object LyricsUtils {
     fun activeLineIndex(lines: List<LyricLine>, positionMs: Long): Int =
         lines.indexOfLast { positionMs >= it.startTime }
 
+    /**
+     * Where a click on [line] should move the playhead, or null when it should move nothing.
+     *
+     * ## Why this is shared, and why it can answer "nowhere"
+     *
+     * Both lyrics views had their own copy of this arithmetic and the two disagreed: the panel
+     * subtracted [lyricsOffsetMs] and the full screen did not, so with a non-zero offset clicking the
+     * line the full screen was highlighting jumped somewhere else. Same sum, one place.
+     *
+     * The clamp is the interesting half. It used to be `coerceIn(0, duration - 1)`, which turns two
+     * different situations into a wrong answer:
+     *
+     *  - **A duration that is not known yet.** A track's duration is nullable in the API and the engine reports
+     *    nothing until the stream opens, so `duration` is legitimately 0 for a while. `duration - 1`
+     *    coerced up to 0 then made the upper bound *zero*, and every click on every line seeked to the
+     *    start of the track. That is the report — "when you click on the text, playback starts from the
+     *    very beginning" — reintroduced by the clamp that was meant to fix it.
+     *  - **A line that starts after this track ends.** A sheet matched from a longer song carries
+     *    timestamps past the end. Clamping those to `duration - 1` seeks to the final millisecond,
+     *    where the decoder immediately sees EOF: the track "finishes", and the queue moves on or
+     *    repeat-one starts it again from the beginning. Also the report, by a longer route.
+     *
+     * So an unknown duration clamps nothing, and a line past the end returns null — the caller does
+     * not seek and playback simply continues, which is what was asked for.
+     *
+     * @param lyricsOffsetMs the offset shifting the lyrics against the audio. The position that makes
+     *   [line] current is its start minus that offset.
+     * @param durationMs this track's length, or 0 while it is still unknown.
+     */
+    fun seekTargetFor(line: LyricLine, lyricsOffsetMs: Long, durationMs: Long): Long? {
+        val target = line.startTime - lyricsOffsetMs
+        if (durationMs > 0L && target >= durationMs) return null
+        return target.coerceAtLeast(0L)
+    }
+
     fun parseLyricsContent(content: String, totalDurationMs: Long): List<LyricLine> {
         return if (content.trim().startsWith("version:")) {
             parseLyricsFile(content, totalDurationMs)

@@ -3297,8 +3297,19 @@ flushListenSession("TRACK_CHANGE")
         }
     }
 
+    /**
+     * Moves the playhead to [position], clamped to the track when its length is known.
+     *
+     * Only when it is known. [duration] starts at the track's metadata length, which the API leaves
+     * out often enough to matter, and is not corrected until the stream opens and the engine reports
+     * one. `coerceIn(0, duration)` against a zero duration is `coerceIn(0, 0)`: every seek arrived at
+     * the start of the track instead of where it was aimed, which is the whole of "playback starts
+     * from the very beginning" for anyone whose track came in without a duration (issue #33).
+     */
     fun seekTo(position: Long) {
-        val target = position.coerceIn(0L, duration.coerceAtLeast(0L))
+        val known = duration.takeIf { it > 0L }
+        val target =
+            if (known != null) position.coerceIn(0L, known) else position.coerceAtLeast(0L)
         isScrubbing = false
         seekTargetPosition = target
         lastSeekTimestamp = System.currentTimeMillis()
@@ -3726,6 +3737,11 @@ flushListenSession("TRACK_CHANGE")
                         val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
                         val crossfadeMs = playerPrefs.getCrossfadeDuration() * 1000L
                         val dur = MusicManager.player.duration
+                        // Taken here as well as at STATE_READY. A track whose metadata carried no
+                        // duration is READY before the decoder has one, so that single assignment
+                        // could miss it for the whole track — leaving the progress bar and every
+                        // clamp built on it working against a length of zero (issue #33).
+                        if (dur > 0L && dur != duration) duration = dur
                         val continuousPlaybackEnabled = playerPrefs.getContinuousPlaybackEnabled()
                         val shouldCrossfade =
                             crossfadeEnabled && (continuousPlaybackEnabled || repeatMode == RepeatMode.ONE)
