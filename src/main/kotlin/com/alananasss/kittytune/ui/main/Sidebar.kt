@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.fadeOut
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
@@ -21,6 +22,7 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -80,6 +82,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -125,14 +128,26 @@ fun Sidebar(
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
-    val collapsed = libraryViewModel.isSidebarCollapsed
 
     // Whole sections of the app somebody may never open; Home always stays (issue #33).
     val navPrefs = remember { PlayerPreferences() }
     val hiddenNav by navPrefs.hiddenSidebarNavFlow()
         .collectAsState(initial = navPrefs.getHiddenSidebarNav())
 
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(PANEL_GUTTER.dp)) {
+    // How far into a collapse the panel is, read from the width it is actually being laid out at rather
+    // than from an animation of this file's own. `MainScreen` puts that width on a spring; a second
+    // schedule here could only ever finish too early or too late, which is the "doesn't look smooth, it
+    // looks abrupt" half of the report. See [SidebarMorph] for the rest of the reasoning.
+    BoxWithConstraints(modifier) {
+    val collapse = SidebarMorph.progressFor(
+        expanded = libraryViewModel.sidebarWidth.dp,
+        actual = maxWidth,
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(PANEL_GUTTER.dp),
+    ) {
 
         // --- top card: Home / Explore ------------------------------------------------
         Surface(
@@ -140,16 +155,13 @@ fun Sidebar(
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            // Pinned to the width these rows were laid out for, and clipped by the card, for the same
-            // reason the library card below is (issue #33). Left to the panel's animating width, a
-            // label being faded out is re-wrapped narrower on every frame — "Explorer" ends up one
-            // letter per line — which looks less like a transition than like a broken layout.
+            // Laid out at the panel's real width now, not pinned to one of the two end states. The
+            // pinning existed because a label re-wrapped as the panel narrowed; the labels are single
+            // non-wrapping lines that leave through [pushedBack], so there is nothing left to re-wrap
+            // and the rows can simply follow the edge (issue #33).
             Column(
                 Modifier
-                    .requiredWidth(
-                        if (collapsed) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH.dp
-                        else libraryViewModel.sidebarWidth.dp
-                    )
+                    .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
                 SidebarNavItem(
@@ -157,7 +169,7 @@ fun Sidebar(
                     selected = currentRoute == "home",
                     iconSelected = Icons.Filled.Home,
                     iconUnselected = Icons.Outlined.Home,
-                    compact = collapsed,
+                    collapse = collapse,
                 ) {
                     homeViewModel?.clearSearch()
                     if (currentRoute != "home") {
@@ -174,7 +186,7 @@ fun Sidebar(
                     selected = currentRoute == "feed",
                     iconSelected = Icons.Rounded.DynamicFeed,
                     iconUnselected = Icons.Rounded.DynamicFeed,
-                    compact = collapsed,
+                    collapse = collapse,
                 ) {
                     if (currentRoute != "feed") {
                         navController.navigate("feed") { launchSingleTop = true }
@@ -187,7 +199,7 @@ fun Sidebar(
                     selected = currentRoute == "genres",
                     iconSelected = Icons.Filled.Explore,
                     iconUnselected = Icons.Outlined.Explore,
-                    compact = collapsed,
+                    collapse = collapse,
                 ) {
                     if (currentRoute != "genres") {
                         navController.navigate("genres") { launchSingleTop = true }
@@ -200,7 +212,7 @@ fun Sidebar(
                     selected = currentRoute == "recognition",
                     iconSelected = Icons.Rounded.GraphicEq,
                     iconUnselected = Icons.Rounded.GraphicEq,
-                    compact = collapsed,
+                    collapse = collapse,
                 ) {
                     if (currentRoute != "recognition") {
                         navController.navigate("recognition") { launchSingleTop = true }
@@ -215,7 +227,7 @@ fun Sidebar(
                     selected = currentRoute == "sync_settings",
                     iconSelected = Icons.Rounded.Devices,
                     iconUnselected = Icons.Rounded.Devices,
-                    compact = collapsed,
+                    collapse = collapse,
                 ) {
                     if (currentRoute != "sync_settings") {
                         navController.navigate("sync_settings") { launchSingleTop = true }
@@ -231,11 +243,13 @@ fun Sidebar(
             libraryViewModel = libraryViewModel,
             playerViewModel = playerViewModel,
             fullScreen = false,
+            collapse = collapse,
             onImport = { navController.navigate("music_import") },
             onHistory = { navController.navigate("history") },
             onUpload = { navController.navigate("upload") },
             modifier = Modifier.weight(1f),
         )
+    }
     }
 }
 
@@ -291,6 +305,8 @@ fun LibraryPanel(
     libraryViewModel: LibraryViewModel,
     playerViewModel: PlayerViewModel,
     fullScreen: Boolean,
+    /** How far into a collapse the panel is: 0 open, 1 a rail. See [SidebarMorph]. */
+    collapse: Float = 0f,
     onImport: () -> Unit = {},
     onHistory: () -> Unit = {},
     onUpload: () -> Unit = {},
@@ -336,24 +352,60 @@ fun LibraryPanel(
 
     val entries = buildLibraryEntries(libraryViewModel)
 
+    // Measured from the full layout, so the rail can start its entries at exactly the same height.
+    //
+    // "I also noticed that the 'Favorites' folder and so on are positioned lower when collapsed than when
+    // expanded, and this looks strange when closing."
+    //
+    // They were. The rail stacked three icon buttons above its entries — each 48 dp once Material's
+    // minimum touch target is applied — where the full panel had a header, a chip row and a search row:
+    // about 168 dp against about 138 dp, so everything below dropped thirty as the panel closed. Hard-coding
+    // the difference would fix it for one font at one density and go wrong again at the next; taking the
+    // real height of the block being replaced cannot. The constants are only for the first frame after a
+    // launch that starts collapsed, when the full layout has never been laid out to measure (issue #33).
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var leadingBlockPx by remember { mutableStateOf(0) }
+    var headerRowPx by remember { mutableStateOf(0) }
+    val leadingBlockHeight =
+        if (leadingBlockPx > 0) with(density) { leadingBlockPx.toDp() }
+        else SidebarMorph.FALLBACK_LEADING_BLOCK
+    val headerRowHeight =
+        if (headerRowPx > 0) with(density) { headerRowPx.toDp() }
+        else SidebarMorph.FALLBACK_HEADER
+
     Surface(shape = PanelShape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = modifier) {
-        // Faded rather than swapped (issue #33).
+        // Pushed back rather than cross-dissolved (issue #33).
         //
-        // "When I minimize and then open the library, all the lines shift down, and the opening
-        // doesn't look smooth, it looks abrupt."
+        // "I think we need to improve the minimisation, because right now it looks as cheap as possible.
+        // […] the text should be minimised in a way similar to how it works in search when you scale down
+        // the window — so that the text seems to be pushed back."
         //
-        // The panel's *width* was already animated, on a spring, in MainScreen. Its *contents* were
-        // not: this was a plain `if`, so the rail and the full column replaced each other in a single
-        // frame while the width was still travelling. Every frame of the resize therefore showed one
-        // layout at a width belonging to the other, and the swap itself was a cut. Crossfading them
-        // costs nothing and gives the eye something continuous to follow while the panel moves.
+        // A cross-dissolve was the previous answer to the layout swapping in a single frame, and it is
+        // fairly described as cheap: two unrelated pictures, one appearing exactly where the other
+        // disappears. This scales as well as fades, about a point just inside the leading edge — the icon
+        // column both layouts share — so the full library recedes behind the rail rather than dissolving
+        // into it, and the rail comes forward out of the same place.
         //
-        // Timed to outlast the width spring rather than to a round number, so the fade is not already
-        // over while the edge is still moving, which is the half of "abrupt" that a fade alone would
-        // leave behind.
-        androidx.compose.animation.Crossfade(
-            targetState = libraryViewModel.isSidebarCollapsed && !fullScreen,
-            animationSpec = androidx.compose.animation.core.tween(LIBRARY_SWAP_MS),
+        // The size is snapped rather than animated: the panel's own width is already on a spring in
+        // MainScreen, and a second size animation here would fight it.
+        androidx.compose.animation.AnimatedContent(
+            // Keyed on how far the panel has actually travelled, not on the flag that says where it is
+            // headed. The flag flips on the click, so the rail used to start appearing over a panel still
+            // at full width with every label still on it; by nine tenths of the way the labels have gone
+            // and both layouts are the same column of icons, so the handover has nothing to show. See
+            // [SidebarMorph.RAIL_SWAP_AT].
+            targetState = collapse >= SidebarMorph.RAIL_SWAP_AT && !fullScreen,
+            transitionSpec = {
+                // A plain fade. Scaling was the previous attempt at depth here and it worked against the
+                // rest of this: it moves the icon column, which is the one thing that must not move.
+                androidx.compose.animation.fadeIn(
+                    androidx.compose.animation.core.tween(SidebarMorph.RAIL_SWAP_MS)
+                ) togetherWith androidx.compose.animation.fadeOut(
+                    androidx.compose.animation.core.tween(SidebarMorph.RAIL_SWAP_MS)
+                ) using androidx.compose.animation.SizeTransform(clip = false) { _, _ ->
+                    androidx.compose.animation.core.snap()
+                }
+            },
             label = "libraryCollapse",
         ) { showRail ->
             // Each layout keeps the width it was designed for while the panel travels, and the panel
@@ -364,13 +416,15 @@ fun LibraryPanel(
             val fixedWidth =
                 if (fullScreen) Modifier
                 else Modifier.requiredWidth(
-                    if (showRail) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH.dp
+                    if (showRail) SidebarMorph.RAIL_WIDTH
                     else libraryViewModel.sidebarWidth.dp
                 )
             if (showRail) {
                 androidx.compose.foundation.layout.Box(fixedWidth) {
                 CollapsedLibraryRail(
                     entries = entries,
+                    leadingBlockHeight = leadingBlockHeight,
+                    headerRowHeight = headerRowHeight,
                     onExpand = { libraryViewModel.toggleSidebarCollapsed() },
                     onCreate = { showCreatePlaylistDialog = true },
                     onHistory = onHistory,
@@ -380,22 +434,32 @@ fun LibraryPanel(
                 }
             } else {
                 Column(fixedWidth.fillMaxHeight()) {
-                    LibraryHeader(
-                        libraryViewModel = libraryViewModel,
-                        playerViewModel = playerViewModel,
-                        fullScreen = fullScreen,
-                        onCreatePlaylist = { showCreatePlaylistDialog = true },
-                        onCreateFolder = { showCreateFolderDialog = true },
-                        onImport = onImport,
-                        onHistory = onHistory,
-                        onUpload = onUpload,
-                    )
-                    LibraryFilterChips(libraryViewModel)
-                    LibrarySearchRow(libraryViewModel)
+                    Column(
+                        Modifier.onSizeChanged { leadingBlockPx = it.height }
+                    ) {
+                        Box(Modifier.onSizeChanged { headerRowPx = it.height }) {
+                            LibraryHeader(
+                                libraryViewModel = libraryViewModel,
+                                playerViewModel = playerViewModel,
+                                fullScreen = fullScreen,
+                                collapse = collapse,
+                                onCreatePlaylist = { showCreatePlaylistDialog = true },
+                                onCreateFolder = { showCreateFolderDialog = true },
+                                onImport = onImport,
+                                onHistory = onHistory,
+                                onUpload = onUpload,
+                            )
+                        }
+                        // The two rows the rail replaces outright. They recede in place — see
+                        // [receded] for why they must not give up their height doing it.
+                        Box(Modifier.receded(collapse)) { LibraryFilterChips(libraryViewModel) }
+                        Box(Modifier.receded(collapse)) { LibrarySearchRow(libraryViewModel) }
+                    }
                     LibraryContent(
                         libraryViewModel = libraryViewModel,
                         entries = entries,
                         fullScreen = fullScreen,
+                        collapse = collapse,
                         onOpen = openEntry,
                         onRightClick = rightClickEntry,
                     )
@@ -749,6 +813,8 @@ private fun LibraryHeader(
     libraryViewModel: LibraryViewModel,
     playerViewModel: PlayerViewModel,
     fullScreen: Boolean,
+    /** How far into a collapse the panel is: 0 open, 1 a rail. See [SidebarMorph]. */
+    collapse: Float = 0f,
     onCreatePlaylist: () -> Unit,
     onCreateFolder: () -> Unit,
     onImport: () -> Unit,
@@ -762,7 +828,19 @@ private fun LibraryHeader(
         .collectAsState(initial = headerPrefs.getHiddenLibraryButtons())
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            // Inset so this header's icon sits on the same vertical line as the rail's toggle, the
+            // navigation icons above and the artwork of every entry below — the line at the middle of
+            // [SidebarMorph.RAIL_WIDTH]. It was 12 dp, which put it 12 dp to the left of where the rail
+            // puts it, so it jumped sideways as the panel closed (issue #33). The full-screen library is
+            // not a rail and keeps its own inset.
+            .padding(
+                start = if (fullScreen) 12.dp else SidebarMorph.ICON_INSET - 4.dp,
+                end = 8.dp,
+                top = 10.dp,
+                bottom = 4.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val currentFolder = libraryViewModel.currentFolder
@@ -823,14 +901,21 @@ private fun LibraryHeader(
                         Icons.Filled.LibraryMusic,
                         contentDescription = str("lib_collapse_tooltip"),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(SidebarMorph.ICON_SIZE),
                     )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = str("nav_library"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    // Leaves the way the navigation labels above it do, so the whole panel closes with
+                    // one gesture instead of the top half receding and the library card cutting.
+                    Box(Modifier.pushedBack(collapse).padding(start = 10.dp)) {
+                        Text(
+                            text = str("nav_library"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            softWrap = false,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -1314,6 +1399,12 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
     libraryViewModel: LibraryViewModel,
     entries: List<LibEntry>,
     fullScreen: Boolean,
+    /**
+     * How far into a collapse the panel is: 0 open, 1 a rail. The two list modes hand their text back
+     * over this, so that by the time the rail takes over there is nothing left beside the artwork for
+     * the handover to cut (issue #33). See [SidebarMorph].
+     */
+    collapse: Float = 0f,
     onOpen: (LibEntry) -> Unit,
     onRightClick: (LibEntry) -> (() -> Unit)?,
 ) {
@@ -1371,7 +1462,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
                 state = compactListState
             ) {
                 items(entries, key = { it.key }) { entry ->
-                    CompactListRow(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
+                    CompactListRow(entry, collapse = collapse, onRightClick = onRightClick(entry)) { onOpen(entry) }
                 }
             }
 
@@ -1381,7 +1472,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
                 state = listState
             ) {
                 items(entries, key = { it.key }) { entry ->
-                    LibraryRow(entry, onRightClick = onRightClick(entry)) { onOpen(entry) }
+                    LibraryRow(entry, collapse = collapse, onRightClick = onRightClick(entry)) { onOpen(entry) }
                 }
             }
 
@@ -1423,9 +1514,20 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
     }
 }
 
-/** One-line row: title • type (no artwork). */
+/**
+ * One-line row: title • type (no artwork).
+ *
+ * @param collapse hands the text back as the panel closes. This mode has no artwork to leave behind, so
+ *   what is left at the end is the small leading icon — which is as close as a text-only row gets to the
+ *   rail that replaces it (issue #33).
+ */
 @Composable
-private fun CompactListRow(entry: LibEntry, onRightClick: (() -> Unit)? = null, onClick: () -> Unit) {
+private fun CompactListRow(
+    entry: LibEntry,
+    collapse: Float = 0f,
+    onRightClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1453,28 +1555,49 @@ private fun CompactListRow(entry: LibEntry, onRightClick: (() -> Unit)? = null, 
                 Spacer(Modifier.width(6.dp))
             }
         }
-        Text(
-            entry.title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "• ${entry.subtitle.substringBefore(" • ")}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(
+            modifier = Modifier.weight(1f, fill = false).pushedBack(collapse, unbounded = false),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                entry.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "• ${entry.subtitle.substringBefore(" • ")}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
-/** Default row: 48dp artwork + title + subtitle. */
+/**
+ * Default row: 48dp artwork + title + subtitle.
+ *
+ * This is the row the collapse was reported against — "the Favorites folder and so on are positioned
+ * lower when collapsed than when expanded" — and it is now the same row on both sides of one. The
+ * artwork is 48 dp inside 8 dp of padding inside a list inset by 8 dp, which puts its centre on the rail's
+ * centre line and its row at the rail's row height, so neither moves by a pixel. The only difference
+ * between the two states is the text, and that leaves through [pushedBack] rather than being dropped
+ * (issue #33).
+ *
+ * @param collapse 0 when the panel is open, 1 when it is a rail.
+ */
 @Composable
-private fun LibraryRow(entry: LibEntry, onRightClick: (() -> Unit)? = null, onClick: () -> Unit) {
+private fun LibraryRow(
+    entry: LibEntry,
+    collapse: Float = 0f,
+    onRightClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1484,8 +1607,14 @@ private fun LibraryRow(entry: LibEntry, onRightClick: (() -> Unit)? = null, onCl
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EntryArtwork(entry, Modifier.size(48.dp), iconFraction = 0.5f)
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f, fill = false)) {
+        // The gap goes inside the part that is leaving, so the row closes up completely instead of
+        // keeping 12 dp of nothing beside the artwork.
+        Column(
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .pushedBack(collapse, unbounded = false)
+                .padding(start = 12.dp)
+        ) {
             Text(
                 entry.title,
                 style = MaterialTheme.typography.bodyLarge,
@@ -1638,73 +1767,107 @@ private fun EntryArtwork(
 @Composable
 private fun CollapsedLibraryRail(
     entries: List<LibEntry>,
+    /**
+     * Height of the block the rail stands in for: the full panel's header, chip row and search row,
+     * measured rather than guessed. Everything below it therefore starts where it started before the
+     * panel closed, which is what "the Favorites folder is positioned lower when collapsed" was about
+     * (issue #33).
+     */
+    leadingBlockHeight: Dp,
+    /** Height of the full panel's header row alone, so the toggle lands on the header's own icon. */
+    headerRowHeight: Dp,
     onExpand: () -> Unit,
     onCreate: () -> Unit,
     onHistory: () -> Unit,
     onOpen: (LibEntry) -> Unit,
     onRightClick: (LibEntry) -> (() -> Unit)?,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Tip(str("lib_open_tooltip")) {
-            IconButton(
-                onClick = onExpand,
-                shapes = IconButtonDefaults.shapes()
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Rounded.ViewSidebar,
-                    contentDescription = str("lib_open_tooltip"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        // Same treatment as the expanded header: no tonal fill, a plain clock, and both hideable
-        // (issue #33).
+    Column(modifier = Modifier.fillMaxSize()) {
         val railPrefs = remember { PlayerPreferences() }
         val hiddenButtons by railPrefs.hiddenLibraryButtonsFlow()
             .collectAsState(initial = railPrefs.getHiddenLibraryButtons())
 
-        if (PlayerPreferences.LIBRARY_BUTTON_CREATE !in hiddenButtons) {
-            Spacer(Modifier.height(4.dp))
-            Tip(str("lib_create_playlist_tooltip")) {
-                IconButton(
-                    onClick = onCreate,
-                    shapes = IconButtonDefaults.shapes(),
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.Add,
-                        contentDescription = str("lib_create_playlist_tooltip"),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp),
-                    )
+        // Pinned to the height of what it replaces, not to the height of what it contains. Left to
+        // itself this block was about thirty dp taller than the header, chips and search row it stands
+        // in for, and every entry below it dropped by that much as the panel closed.
+        Column(Modifier.fillMaxWidth().height(leadingBlockHeight)) {
+            // The toggle occupies the header's own row, so it and the header's library icon are the same
+            // icon in the same place — the panel closing around it is the only thing that changes.
+            Box(
+                modifier = Modifier.fillMaxWidth().height(headerRowHeight),
+                contentAlignment = Alignment.Center,
+            ) {
+                Tip(str("lib_open_tooltip")) {
+                    IconButton(
+                        onClick = onExpand,
+                        shapes = IconButtonDefaults.shapes()
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ViewSidebar,
+                            contentDescription = str("lib_open_tooltip"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(SidebarMorph.ICON_SIZE),
+                        )
+                    }
+                }
+            }
+
+            // What is left of the block once the header has its row: the space the chip row and the
+            // search row occupied, which is where the actions that no longer fit in a header go. Same
+            // treatment as the expanded header — no tonal fill, a plain clock, and both hideable
+            // (issue #33).
+            Column(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                if (PlayerPreferences.LIBRARY_BUTTON_CREATE !in hiddenButtons) {
+                    Tip(str("lib_create_playlist_tooltip")) {
+                        IconButton(
+                            onClick = onCreate,
+                            shapes = IconButtonDefaults.shapes(),
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Icon(
+                                Icons.Rounded.Add,
+                                contentDescription = str("lib_create_playlist_tooltip"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+                if (PlayerPreferences.LIBRARY_BUTTON_HISTORY !in hiddenButtons) {
+                    Tip(str("history_title")) {
+                        IconButton(
+                            onClick = onHistory,
+                            shapes = IconButtonDefaults.shapes(),
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Icon(
+                                Icons.Rounded.Schedule,
+                                contentDescription = str("history_title"),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
                 }
             }
         }
-        if (PlayerPreferences.LIBRARY_BUTTON_HISTORY !in hiddenButtons) {
-            Spacer(Modifier.height(4.dp))
-            Tip(str("history_title")) {
-                IconButton(
-                    onClick = onHistory,
-                    shapes = IconButtonDefaults.shapes(),
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.Schedule,
-                        contentDescription = str("history_title"),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+
+        // Padded exactly as [LibraryRow] is, and scrolled by a list with the same content padding, so an
+        // entry's artwork is the same size in the same place in both states: the row is 8 + 48 + 8 dp
+        // tall either way, and the artwork's centre falls on the shared icon line either way. Collapsing
+        // the panel in list mode now takes the titles away from beside the covers and moves nothing else
+        // (issue #33).
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+        ) {
             items(entries, key = { it.key }) { entry ->
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Tip(entry.title) {
@@ -1730,59 +1893,71 @@ private fun CollapsedLibraryRail(
 // Shared bits
 // ---------------------------------------------------------------------------
 
+/**
+ * One navigation row, in every state between open and collapsed to a rail.
+ *
+ * ## One layout, not two
+ *
+ * This was written twice — `if (compact) { centred icon } else { icon and label }` — and that is the
+ * whole of "the text doesn't shrink, it's just removed, and the icons are moved to the centre"
+ * (issue #33). Two layouts cannot animate into each other: at best they can be cross-dissolved, which
+ * is a cut with a fade over it, and the icon still arrives 12 dp from where it left.
+ *
+ * There is one row now. The icon is inset by [SidebarMorph.ICON_INSET], which is exactly the inset that
+ * puts it on the centre line of the rail, so as the panel closes around it the icon does not move at
+ * all — not by a pixel, and not at any point along the way. The label leaves through [pushedBack].
+ *
+ * `softWrap = false` is load-bearing rather than cosmetic: the row now follows the panel's real width,
+ * and a wrapping label re-flows on every frame of a resize. That is what turned "Explorer" into one
+ * letter per line, and it is why the previous fix had to pin these rows to a fixed width instead.
+ *
+ * @param collapse 0 when the panel is open, 1 when it is a rail, and every value in between while it
+ *   travels.
+ */
 @Composable
 private fun SidebarNavItem(
     label: String,
     selected: Boolean,
     iconSelected: ImageVector,
     iconUnselected: ImageVector,
-    compact: Boolean = false,
+    collapse: Float = 0f,
     onClick: () -> Unit,
 ) {
     val color = if (selected) MaterialTheme.colorScheme.onSurface
     else MaterialTheme.colorScheme.onSurfaceVariant
 
-    if (compact) {
-        Tip(label) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onClick)
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(if (selected) iconSelected else iconUnselected, contentDescription = label, tint = color)
+    // Present in every state so the tree does not change shape part-way through the animation, but only
+    // able to open once the label it would be repeating has actually gone.
+    Tip(label, enabled = collapse > 0.6f) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .padding(start = SidebarMorph.ICON_INSET, end = 8.dp)
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                if (selected) iconSelected else iconUnselected,
+                contentDescription = label,
+                tint = color,
+                modifier = Modifier.size(SidebarMorph.ICON_SIZE),
+            )
+            // The gap goes inside the part that is leaving, so the row closes up completely rather
+            // than keeping 14 dp of nothing beside the icon.
+            Box(Modifier.pushedBack(collapse).padding(start = SidebarMorph.LABEL_GAP)) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = color,
+                    softWrap = false,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
-        return
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(if (selected) iconSelected else iconUnselected, contentDescription = label, tint = color)
-        Spacer(Modifier.width(14.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = color,
-        )
     }
 }
 
-/**
- * How long the library takes to fade between its rail and its full contents.
- *
- * Longer than it feels it should be, on purpose: the panel's width is on a medium-low spring, which
- * takes appreciably more than a typical 200 ms fade to settle. A shorter fade finishes while the edge
- * of the panel is still moving, and the leftover movement reads as the same lurch the fade was added
- * to remove.
- */
-private const val LIBRARY_SWAP_MS = 320
