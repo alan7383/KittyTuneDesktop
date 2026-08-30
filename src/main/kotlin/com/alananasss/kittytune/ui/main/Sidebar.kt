@@ -349,7 +349,22 @@ private fun SidebarProfileRow(
     }
 }
 
-/** The same four destinations the top bar's avatar offered, plus signing in or out. */
+/**
+ * The same four destinations the top bar's avatar offered, plus signing in or out — in reverse reading order,
+ * deliberately (issue #33).
+ *
+ * "Previously the 'Log Out' button was at the very bottom, and it was impossible to accidentally click on it since
+ * it was so low. I think we should do it like this: at the bottom, there should be a 'Profile' button, then
+ * 'Upload', then 'Settings', 'Support', and only then 'Log Out'."
+ *
+ * The anchor is the last row of the sidebar, so this menu has no room beneath it and Compose flips it upward: its
+ * *bottom* edge lands on the avatar the pointer just clicked. Listing the items in reading order therefore put
+ * "Log Out" directly under the cursor — one careless second click and the session was gone. Reversed, the item
+ * against the cursor is "Profile" and signing out is the furthest thing in the menu from it, which is the property
+ * the account controls had when they lived at the bottom of the panel as plain rows.
+ *
+ * So the source reads bottom-to-top on purpose. It is not a list somebody put in backwards.
+ */
 @Composable
 private fun ProfileMenu(
     expanded: Boolean,
@@ -359,18 +374,20 @@ private fun ProfileMenu(
     onAbout: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        val isGuest = playerViewModel.currentUserId == 0L
         DropdownMenuItem(
-            text = { Text(str("nav_profile")) },
+            text = { Text(if (isGuest) str("profile_menu_login") else str("profile_menu_logout")) },
             onClick = {
                 onDismiss()
-                playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
+                com.alananasss.kittytune.data.TokenManager.logout()
             },
         )
+        androidx.compose.material3.HorizontalDivider()
         DropdownMenuItem(
-            text = { Text(str("nav_upload")) },
+            text = { Text(str("nav_about_support")) },
             onClick = {
                 onDismiss()
-                navController.navigate("upload")
+                onAbout()
             },
         )
         DropdownMenuItem(
@@ -381,19 +398,17 @@ private fun ProfileMenu(
             },
         )
         DropdownMenuItem(
-            text = { Text(str("nav_about_support")) },
+            text = { Text(str("nav_upload")) },
             onClick = {
                 onDismiss()
-                onAbout()
+                navController.navigate("upload")
             },
         )
-        androidx.compose.material3.HorizontalDivider()
-        val isGuest = playerViewModel.currentUserId == 0L
         DropdownMenuItem(
-            text = { Text(if (isGuest) str("profile_menu_login") else str("profile_menu_logout")) },
+            text = { Text(str("nav_profile")) },
             onClick = {
                 onDismiss()
-                com.alananasss.kittytune.data.TokenManager.logout()
+                playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
             },
         )
     }

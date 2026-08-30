@@ -36,6 +36,9 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -166,13 +169,13 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                         .clip(RoundedCornerShape(12.dp))
                         .viewableCover(displayTrack.fullResArtwork)
                 )
-                Text(
-                    text = displayTrack.title ?: "",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                    Text(
+                        text = displayTrack.title ?: "",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // navigateToTrackArtist already routes both sources, and opens the
                     // picker when the track credits several artists.
@@ -477,10 +480,9 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Above the comments, below the lyrics — see [trackTagsAndDetails]. With comments showing there
-        // is nothing to be "under": that list has no end, and a year at the bottom of it is a year
-        // nobody will find.
-        if (!isSpotifyTrack && !lyricsHalf) trackTagsAndDetails(vm, displayTrack, scope)
+        // Release date, genre, and tags — kept in a stable position above the toggle
+        // so switching between Comments and Lyrics doesn't cause the buttons to jump (issue #33).
+        if (!isSpotifyTrack) trackTagsAndDetails(vm, displayTrack, scope)
 
         // Social Liked Proof Banner (e.g. "Mandra and 1,400 others liked this track")
         val socialLiker = vm.socialLikerUser
@@ -699,7 +701,6 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         }
 
         if (lyricsHalf) trackLyricsHalf(vm, showHeader = isSpotifyTrack)
-        if (!isSpotifyTrack && lyricsHalf) trackTagsAndDetails(vm, displayTrack, scope)
     }
 }
 
@@ -793,7 +794,11 @@ private fun InfoHalfChip(
  * @param showHeader whether to name the section. Only needed where no toggle names it, which is
  *   Spotify catalog tracks: they have no comments to switch between.
  */
-private fun LazyListScope.trackLyricsHalf(vm: PlayerViewModel, showHeader: Boolean) {
+private fun LazyListScope.trackLyricsHalf(
+    vm: PlayerViewModel,
+    showHeader: Boolean,
+    lyricsHeight: androidx.compose.ui.unit.Dp = LYRICS_HALF_HEIGHT,
+) {
     item {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -817,7 +822,7 @@ private fun LazyListScope.trackLyricsHalf(vm: PlayerViewModel, showHeader: Boole
                     ContainedLoadingIndicator()
                 }
             } else {
-                PanelLyrics(vm, Modifier.fillMaxWidth().height(LYRICS_HALF_HEIGHT))
+                PanelLyrics(vm, Modifier.fillMaxWidth().height(lyricsHeight))
             }
 
             if (vm.hasLyrics) {
@@ -900,14 +905,6 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                             )
                         }
-                    }
-                    val relTime = getRelativeTime(comment.createdAt)
-                    if (relTime.isNotBlank()) {
-                        Text(
-                            text = relTime,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
                     }
                 }
             var translatedText by remember { mutableStateOf<String?>(null) }
@@ -1011,6 +1008,16 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.clickable { vm.startReplying(comment) }
                     )
+
+                    val relTime = getRelativeTime(comment.createdAt)
+                    if (relTime.isNotBlank()) {
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            text = relTime,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
         }
@@ -1258,16 +1265,10 @@ private fun CreditArtistRow(
 
 
 /**
- * The release date, the genre and the tags — below the words rather than above them (issue #33).
+ * The release date, the genre and the tags (issue #33).
  *
- * "I also think that it is necessary to change the action of the button […] I consider it necessary to
- * move the date of the track under the text, to the right menu, and make the text higher."
- *
- * Asked twice, so it goes below, and the height it was taking goes to the lyrics. The reservation this
- * block used to carry in a comment still stands — a year under a whole song takes scrolling to find —
- * which is why it goes below the *lyrics* and not below the comments: a comment list has no end, and
- * "under the text" only means anything where there is text. With comments showing it stays where it
- * was, above them.
+ * Kept in a stable position above the Comments / Lyrics toggle rather than swapping between
+ * top (in comments) and bottom (in lyrics), which caused the toggle buttons to jump up and down.
  *
  * One line for the date and the genre, not two rows twelve dp apart, and no labels: a calendar before a
  * date and a note before a genre say the same thing in no horizontal space at all.

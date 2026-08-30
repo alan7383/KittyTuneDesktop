@@ -88,6 +88,7 @@ import androidx.compose.material.icons.rounded.FormatAlignLeft
 import androidx.compose.material.icons.rounded.FormatAlignCenter
 import androidx.compose.material.icons.rounded.FormatAlignRight
 import com.alananasss.kittytune.ui.common.ArtistLinkText
+import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.ui.common.Slider
@@ -1192,6 +1193,7 @@ fun QuickLyricsSettingsDialog(
                                 )
                                 Spacer(Modifier.height(10.dp))
                                 ExpressiveConnectedButtonGroup(
+                                    fillMaxWidth = true,
                                     options = listOf(com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY, com.alananasss.kittytune.ui.player.LyricsProvider.OPEN_SOURCE),
                                     selectedOption = viewModel.lyricsProvider,
                                     onOptionSelected = { viewModel.updateLyricsProvider(it) },
@@ -1485,6 +1487,7 @@ fun QuickLyricsSettingsDialog(
                                 )
                                 Spacer(Modifier.height(10.dp))
                                 ExpressiveConnectedButtonGroup(
+                                    fillMaxWidth = true,
                                     options = listOf(LyricsAlignment.LEFT, LyricsAlignment.CENTER, LyricsAlignment.RIGHT),
                                     selectedOption = alignment,
                                     onOptionSelected = { updateAlignment(it) },
@@ -1522,6 +1525,7 @@ fun QuickLyricsSettingsDialog(
                                 )
                                 Spacer(Modifier.height(10.dp))
                                 ExpressiveConnectedButtonGroup(
+                                    fillMaxWidth = true,
                                     options = LyricsDisplayStyle.entries,
                                     selectedOption = displayStyle,
                                     onOptionSelected = { updateDisplayStyle(it) },
@@ -1673,47 +1677,6 @@ fun QuickLyricsSettingsDialog(
                             Text(str("lyrics_manual_search"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun <T> ExpressiveConnectedButtonGroup(
-    options: List<T>,
-    selectedOption: T,
-    onOptionSelected: (T) -> Unit,
-    modifier: Modifier = Modifier,
-    labelProvider: @Composable (T) -> Unit,
-    iconProvider: (@Composable (T) -> Unit)? = null
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-    ) {
-        options.forEachIndexed { index, option ->
-            ToggleButton(
-                checked = selectedOption == option,
-                onCheckedChange = { onOptionSelected(option) },
-                modifier = Modifier.weight(1f),
-                shapes = when (index) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                },
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (iconProvider != null) {
-                        iconProvider(option)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    labelProvider(option)
                 }
             }
         }

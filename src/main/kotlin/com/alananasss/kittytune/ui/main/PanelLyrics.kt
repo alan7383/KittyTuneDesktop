@@ -456,7 +456,7 @@ data class PanelLyricsStyle(
             endPadding = 16.dp,
             topInsetFraction = 0.03f,
             tailFraction = 0.35f,
-            anchorFraction = 0.32f,
+            anchorFraction = 0.42f,
             lineSpacing = 6.dp,
             isFullScreen = false,
         )
