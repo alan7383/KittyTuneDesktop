@@ -10,8 +10,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
@@ -34,11 +37,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.data.local.ListeningStatsEvent
 import com.alananasss.kittytune.data.local.TopArtistResult
 import com.alananasss.kittytune.data.local.TopTrackResult
 import java.util.Locale
 import java.util.Calendar
 import com.alananasss.kittytune.data.local.PlayerPreferences
+
+private enum class StatsDetailDialog { NONE, PLAYS, TRACKS, ARTISTS }
 
 @Composable
 fun ListeningStatsScreen(
@@ -64,6 +70,7 @@ fun ListeningStatsScreen(
         val prefs = remember { PlayerPreferences() }
     var showSettingsDialog by remember { mutableStateOf(false) }
     var isTrackingEnabled by remember { mutableStateOf(prefs.getListeningStatsEnabled()) }
+    var activeDetailDialog by remember { mutableStateOf(StatsDetailDialog.NONE) }
 
     if (showSettingsDialog) {
         EscapableAlertDialog(
@@ -138,6 +145,347 @@ fun ListeningStatsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showSettingsDialog = false }) {
+                    Text(str("btn_close"))
+                }
+            }
+        )
+    }
+
+    if (activeDetailDialog == StatsDetailDialog.PLAYS) {
+        val playsState by produceState<List<ListeningStatsEvent>?>(initialValue = null, selectedPeriod) {
+            value = viewModel.getAllPlaysForPeriod()
+        }
+        EscapableAlertDialog(
+            onDismissRequest = { activeDetailDialog = StatsDetailDialog.NONE },
+            title = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "${str("listening_stats_all_plays")} (${stats.totalPlays})",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = str("listening_stats_disclaimer"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+            },
+            text = {
+                val plays = playsState
+                if (plays == null) {
+                    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                        CircularWavyProgressIndicator()
+                    }
+                } else if (plays.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                        Text(str("listening_stats_empty_title"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    val dateFormat = remember { java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale.getDefault()) }
+                    LazyColumn(
+                        modifier = Modifier.widthIn(min = 340.dp, max = 560.dp).heightIn(max = 450.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(plays) { event ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                                    activeDetailDialog = StatsDetailDialog.NONE
+                                    if ((event.source ?: "soundcloud") == "soundcloud") {
+                                        onTrackClick(
+                                            TopTrackResult(
+                                                trackId = event.trackId,
+                                                trackTitle = event.trackTitle,
+                                                artistName = event.artistName,
+                                                artworkUrl = event.artworkUrl,
+                                                source = event.source,
+                                                playCount = 1,
+                                                totalListenMs = event.listenDurationMs
+                                            )
+                                        )
+                                    }
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    AsyncImage(
+                                        model = event.artworkUrl,
+                                        contentDescription = event.trackTitle,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = event.trackTitle,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = event.artistName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = dateFormat.format(java.util.Date(event.timestamp)),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
+                                        if (event.listenDurationMs > 0) {
+                                            Text(
+                                                text = formatDurationMs(event.listenDurationMs),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeDetailDialog = StatsDetailDialog.NONE }) {
+                    Text(str("btn_close"))
+                }
+            }
+        )
+    }
+
+    if (activeDetailDialog == StatsDetailDialog.TRACKS) {
+        val tracksState by produceState<List<TopTrackResult>?>(initialValue = null, selectedPeriod) {
+            value = viewModel.getAllTracksForPeriod()
+        }
+        EscapableAlertDialog(
+            onDismissRequest = { activeDetailDialog = StatsDetailDialog.NONE },
+            title = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Rounded.BarChart, null, tint = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "${str("listening_stats_all_tracks")} (${stats.uniqueTracks})",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = str("listening_stats_disclaimer"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+            },
+            text = {
+                val tracks = tracksState
+                if (tracks == null) {
+                    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                        CircularWavyProgressIndicator()
+                    }
+                } else if (tracks.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                        Text(str("listening_stats_empty_title"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.widthIn(min = 340.dp, max = 560.dp).heightIn(max = 450.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(tracks) { index, track ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                                    activeDetailDialog = StatsDetailDialog.NONE
+                                    if ((track.source ?: "soundcloud") == "soundcloud") {
+                                        onTrackClick(track)
+                                    }
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "#${index + 1}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.width(28.dp),
+                                        textAlign = TextAlign.Center
+                                    )
+                                    AsyncImage(
+                                        model = track.artworkUrl,
+                                        contentDescription = track.trackTitle,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = track.trackTitle,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = track.artistName,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = str("listening_stats_play_count", track.playCount),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = formatDurationMs(track.totalListenMs),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeDetailDialog = StatsDetailDialog.NONE }) {
+                    Text(str("btn_close"))
+                }
+            }
+        )
+    }
+
+    if (activeDetailDialog == StatsDetailDialog.ARTISTS) {
+        val artistsState by produceState<List<TopArtistResult>?>(initialValue = null, selectedPeriod) {
+            value = viewModel.getAllArtistsForPeriod()
+        }
+        EscapableAlertDialog(
+            onDismissRequest = { activeDetailDialog = StatsDetailDialog.NONE },
+            title = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Rounded.People, null, tint = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = "${str("listening_stats_all_artists")} (${stats.uniqueArtists})",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = str("listening_stats_disclaimer"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+            },
+            text = {
+                val artists = artistsState
+                if (artists == null) {
+                    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
+                        CircularWavyProgressIndicator()
+                    }
+                } else if (artists.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                        Text(str("listening_stats_empty_title"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.widthIn(min = 340.dp, max = 560.dp).heightIn(max = 450.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(artists) { index, artist ->
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                                    activeDetailDialog = StatsDetailDialog.NONE
+                                    onArtistClick(artist)
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "#${index + 1}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                        modifier = Modifier.width(28.dp),
+                                        textAlign = TextAlign.Center
+                                    )
+                                    AsyncImage(
+                                        model = artist.artworkUrl,
+                                        contentDescription = artist.artistName,
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.size(44.dp).clip(CircleShape)
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = artist.artistName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                            shape = RoundedCornerShape(6.dp)
+                                        ) {
+                                            Text(
+                                                text = str("listening_stats_play_count", artist.playCount),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                        Text(
+                                            text = formatDurationMs(artist.totalListenMs),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { activeDetailDialog = StatsDetailDialog.NONE }) {
                     Text(str("btn_close"))
                 }
             }
@@ -223,7 +571,10 @@ fun ListeningStatsScreen(
                         totalListenTimeMs = stats.totalListenTimeMs,
                         totalPlays = stats.totalPlays,
                         uniqueTracks = stats.uniqueTracks,
-                        uniqueArtists = stats.uniqueArtists
+                        uniqueArtists = stats.uniqueArtists,
+                        onPlaysClick = { activeDetailDialog = StatsDetailDialog.PLAYS },
+                        onTracksClick = { activeDetailDialog = StatsDetailDialog.TRACKS },
+                        onArtistsClick = { activeDetailDialog = StatsDetailDialog.ARTISTS },
                     )
                 }
 
@@ -410,7 +761,10 @@ private fun HeroStatsCard(
     totalListenTimeMs: Long,
     totalPlays: Int,
     uniqueTracks: Int,
-    uniqueArtists: Int
+    uniqueArtists: Int,
+    onPlaysClick: () -> Unit = {},
+    onTracksClick: () -> Unit = {},
+    onArtistsClick: () -> Unit = {},
 ) {
     val targetSeconds = (totalListenTimeMs / 1000f)
     val animatedSeconds by animateFloatAsState(
@@ -459,19 +813,22 @@ private fun HeroStatsCard(
                     icon = Icons.Rounded.MusicNote,
                     value = totalPlays.toString(),
                     label = str("listening_stats_plays"),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onPlaysClick
                 )
                 MiniStatChip(
                     icon = Icons.Rounded.BarChart,
                     value = uniqueTracks.toString(),
                     label = str("listening_stats_unique_tracks"),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onTracksClick
                 )
                 MiniStatChip(
                     icon = Icons.Rounded.People,
                     value = uniqueArtists.toString(),
                     label = str("listening_stats_unique_artists"),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    onClick = onArtistsClick
                 )
             }
         }
@@ -483,12 +840,16 @@ private fun MiniStatChip(
     icon: ImageVector,
     value: String,
     label: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.1f),
+        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f),
         shape = RoundedCornerShape(20.dp),
         modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor(java.awt.Cursor.HAND_CURSOR)))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
