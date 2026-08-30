@@ -189,6 +189,7 @@ object MixRanking {
     fun score(candidate: Candidate, taste: MixProfile.Taste): Float? {
         val track = candidate.track
         if (track.id in taste.knownTrackIds) return null
+        if (!isPlayable(track)) return null
         val duration = track.durationMs ?: 0L
         if (duration in 1 until MIN_DURATION_MS) return null
 
@@ -201,6 +202,29 @@ object MixRanking {
         return candidate.seedAffinity * AFFINITY_WEIGHT +
             popularityTerm * POPULARITY_WEIGHT +
             (if (familiar) FAMILIAR_ARTIST_PENALTY else 0f)
+    }
+
+    /**
+     * Whether SoundCloud will actually play this.
+     *
+     * The bug this exists for is the one he described as "la queue est bizarre parfois, parfois il va sortir un
+     * titre": a blank row in the queue, or a track that skips itself the moment it comes round. Their search and
+     * related endpoints return tracks the account cannot stream — geo-blocked, taken down, or preview-only for
+     * anybody without Go+ — and they look exactly like any other result apart from these two fields.
+     *
+     * Every other list in the app gets away with ignoring them because a human chose the row and can see it
+     * failed. A mix chooses a hundred rows nobody looked at, so one unplayable track in twenty is a queue that
+     * misbehaves for no visible reason (issue #33).
+     *
+     * `SNIPPET` is the interesting one: it is thirty seconds of a paid track, which is worse than an outright
+     * block because it plays, and then stops.
+     */
+    fun isPlayable(track: Track): Boolean {
+        if (track.streamable == false) return false
+        return when (track.policy?.uppercase()) {
+            "BLOCK", "SNIPPET" -> false
+            else -> true
+        }
     }
 
     private const val AFFINITY_WEIGHT = 1.0f
@@ -285,4 +309,82 @@ object MixRanking {
 
     /** The band at the top that is shuffled, so two presses give two mixes. */
     private const val SHUFFLE_HEAD = 6
+}
+
+
+/**
+ * Choosing which SoundCloud account somebody meant (issue #33).
+ *
+ * ## The bug
+ *
+ * "J'écris snorunt, un vrai artiste qui existe sur SoundCloud, et il me sort absolument rien."
+ *
+ * `search/users?q=snorunt&limit=1` answers with **Snorunt, 7 followers**. The artist anybody means is
+ * `snorunt★`, 10,011 followers, third in the same response. SoundCloud's user search is not ordered by
+ * prominence, so taking the first row seeded the mix on a stranger with no catalogue and no station — which is
+ * exactly the empty result he got.
+ *
+ * Pure and separate from the request so the choice can be tested, because the choice is what was wrong.
+ */
+object MixArtistMatch {
+
+    /** What the chooser needs to know about a candidate account. */
+    data class Account(val id: Long, val username: String?, val followers: Long)
+
+    /**
+     * The account [wanted] most likely means, or null when the list is empty.
+     *
+     * Follower count decides, but only among names that plausibly *are* the name typed — and that filter matters
+     * as much as the count. Without it, searching a short word finds whichever unrelated large account happens to
+     * contain those letters, which would be the same bug pointing the other way.
+     *
+     * Decoration is not a difference: `snorunt★` is snorunt, `Snorunt.` is snorunt, and `ian` is not `Brian`
+     * only because containment is checked both ways rather than by prefix.
+     */
+    fun best(candidates: List<Account>, wanted: String): Long? {
+        if (candidates.isEmpty()) return null
+        val target = wanted.letters()
+        if (target.isEmpty()) return candidates.maxByOrNull { it.followers }?.id
+
+        // Two tiers, and the tier beats the follower count. Containment alone was not enough: searching "ian"
+        // matches "brianenoofficialfanuploads", and on followers alone a fan page with four million wins over the
+        // artist with forty thousand. An exact match on the letters is a different kind of answer from a substring
+        // and has to be treated as one.
+        val scored = candidates.mapNotNull { account ->
+            val name = account.username?.letters()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            val tier = when {
+                name == target -> EXACT
+                name.contains(target) || target.contains(name) -> CONTAINS
+                else -> return@mapNotNull null
+            }
+            account to tier
+        }
+
+        // Nothing resembled it, so trust their search over our own filter rather than answering nothing: a mix is
+        // better seeded on their best guess than not built at all.
+        if (scored.isEmpty()) return candidates.maxByOrNull { it.followers }?.id
+
+        return scored
+            .sortedWith(
+                compareByDescending<Pair<Account, Int>> { it.second }.thenByDescending { it.first.followers }
+            )
+            .first().first.id
+    }
+
+    private const val EXACT = 2
+    private const val CONTAINS = 1
+
+    /**
+     * Letters and digits only, lower-cased, after compatibility normalisation.
+     *
+     * The normalisation is the part that is not obvious and is not optional on SoundCloud, where decorated names
+     * are the norm. `𝐘𝐄𝐀𝐓 ✪` is made of mathematical bold capitals, which *are* letters and which `lowercase()`
+     * leaves exactly as they are — so without NFKC the real account with half a million followers does not match
+     * the word "yeat" and loses to an impostor with ten. NFKC maps them onto the plain letters they are drawn to
+     * look like, which is precisely what it is for.
+     */
+    private fun String.letters(): String =
+        java.text.Normalizer.normalize(this, java.text.Normalizer.Form.NFKC)
+            .lowercase()
+            .filter { it.isLetterOrDigit() }
 }

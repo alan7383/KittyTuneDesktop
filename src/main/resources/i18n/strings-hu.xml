@@ -882,6 +882,8 @@
     <string name="mix_customise">Mix testreszabása</string>
     <string name="mix_needs_history">Hallgass meg pár számot — a mix a hallgatásaidból épül.</string>
     <string name="mix_nothing_found">Semmi nem jött vissza. Ellenőrizd a kapcsolatot.</string>
+    <string name="mix_no_seeds">Nem található ez az előadó a SoundCloudon. Próbáld a pontos nevet.</string>
+    <string name="mix_all_known">Minden találat már a könyvtáradban van. Próbálj másik előadót vagy műfajt.</string>
     <string name="mix_in_the_style_of">Egy előadó stílusában</string>
     <string name="mix_artist_hint">Yeat, Fred again.., …</string>
     <string name="mix_by_genre">Vagy egy műfaj</string>

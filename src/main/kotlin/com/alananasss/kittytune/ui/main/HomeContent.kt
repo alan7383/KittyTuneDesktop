@@ -1715,8 +1715,19 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                 }
                 com.alananasss.kittytune.data.mix.MixEngine.Result.NotEnoughHistory ->
                     MixState.Empty(str("mix_needs_history"))
-                com.alananasss.kittytune.data.mix.MixEngine.Result.NothingFound ->
-                    MixState.Empty(str("mix_nothing_found"))
+                // Each stage is a different thing to tell somebody. "Check your connection" was the message he got
+                // for an artist whose name had matched the wrong account, which is why one message for three
+                // failures was worse than none (issue #33).
+                is com.alananasss.kittytune.data.mix.MixEngine.Result.NothingFound -> MixState.Empty(
+                    when (result.stage) {
+                        com.alananasss.kittytune.data.mix.MixEngine.Result.Stage.NO_SEEDS ->
+                            str("mix_no_seeds")
+                        com.alananasss.kittytune.data.mix.MixEngine.Result.Stage.NO_CANDIDATES ->
+                            str("mix_nothing_found")
+                        com.alananasss.kittytune.data.mix.MixEngine.Result.Stage.ALL_FILTERED ->
+                            str("mix_all_known")
+                    }
+                )
             }
         }
     }
