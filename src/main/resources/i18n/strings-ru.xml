@@ -878,6 +878,8 @@
     <string name="mix_customise">Настроить микс</string>
     <string name="mix_needs_history">Послушай сначала несколько треков — микс строится по твоим прослушиваниям.</string>
     <string name="mix_nothing_found">Ничего не вернулось. Проверь соединение и попробуй снова.</string>
+    <string name="mix_no_seeds">Не удалось найти этого исполнителя на SoundCloud. Попробуй точное имя.</string>
+    <string name="mix_all_known">Всё найденное уже есть в твоей библиотеке. Попробуй другого исполнителя или жанр.</string>
     <string name="mix_in_the_style_of">В стиле исполнителя</string>
     <string name="mix_artist_hint">Yeat, Fred again.., …</string>
     <string name="mix_by_genre">Или жанр</string>

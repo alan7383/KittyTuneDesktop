@@ -878,6 +878,8 @@
     <string name="mix_customise">Personnaliser le mix</string>
     <string name="mix_needs_history">Écoute quelques titres d’abord — le mix se construit sur tes écoutes.</string>
     <string name="mix_nothing_found">Rien n’est revenu. Vérifie ta connexion et réessaie.</string>
+    <string name="mix_no_seeds">Artiste introuvable sur SoundCloud. Essaie le nom exact.</string>
+    <string name="mix_all_known">Tout ce qui est sorti est déjà dans ta bibliothèque. Essaie un autre artiste ou genre.</string>
     <string name="mix_in_the_style_of">Dans le style d’un artiste</string>
     <string name="mix_artist_hint">Yeat, Fred again.., …</string>
     <string name="mix_by_genre">Ou un genre</string>

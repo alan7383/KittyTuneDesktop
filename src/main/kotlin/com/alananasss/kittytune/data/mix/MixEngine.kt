@@ -62,15 +62,42 @@ object MixEngine {
         /** Nothing to profile and no seed given: the honest answer is "play something first". */
         data object NotEnoughHistory : Result
 
-        /** Seeds were found and every expansion came back empty. Usually the network. */
-        data object NothingFound : Result
+        /**
+         * Nothing came back, and *which* nothing it was.
+         *
+         * "Diagnostique partout." One message for three different failures is what made the snorunt report hard to
+         * act on: "check your connection" was wrong, the connection was fine, the artist had simply been resolved
+         * to the wrong account. Each of these is a different thing to tell somebody and a different thing to look
+         * at in a log (issue #33).
+         */
+        data class NothingFound(val stage: Stage) : Result
+
+        enum class Stage {
+            /** No seed could be built — for an artist recipe, the name matched nobody. */
+            NO_SEEDS,
+
+            /** Seeds existed and every expansion returned nothing. Network, or an artist with no catalogue. */
+            NO_CANDIDATES,
+
+            /** Candidates existed and every one was disqualified: all known, all unplayable, all too short. */
+            ALL_FILTERED,
+        }
     }
 
     /** How far back the profile looks. Longer than the decay's half-life, so old phases fade rather than cut. */
     private const val HISTORY_WINDOW_DAYS = 120L
 
-    /** How many tracks a mix holds. Long enough to be an evening, short enough to be all listenable. */
-    const val MIX_SIZE = 20
+    /**
+     * How many tracks a mix holds.
+     *
+     * "Ça doit en mettre 100 dans la queue direct." A hundred is about six hours, which is not an evening's
+     * listening — it is a queue you stop thinking about, which is the point of a mix you press once.
+     *
+     * It also changes the shape of everything upstream: a hundred slots with a two-per-artist cap needs fifty
+     * distinct artists among the candidates, so the seed counts and the per-request limits below are what actually
+     * make the number reachable rather than aspirational (issue #33).
+     */
+    const val MIX_SIZE = 100
 
     suspend fun mix(recipe: Recipe = Recipe.MyTaste, size: Int = MIX_SIZE): Result =
         withContext(Dispatchers.IO) {
@@ -79,14 +106,20 @@ object MixEngine {
 
             val seeds = seedsFor(recipe, taste)
             if (seeds.isEmpty()) {
-                return@withContext if (taste.isEmpty) Result.NotEnoughHistory else Result.NothingFound
+                return@withContext if (taste.isEmpty) Result.NotEnoughHistory
+                else Result.NothingFound(Result.Stage.NO_SEEDS)
             }
 
             val candidates = expand(seeds)
-            if (candidates.isEmpty()) return@withContext Result.NothingFound
+            // Printed rather than swallowed, because the three numbers are the whole diagnosis: how many seeds were
+            // drawn, how much they returned, and how much survived the filters. A mix that comes back short is one
+            // of those three being small, and there is no way to tell which from the outside.
+            println("KittyTune mix: ${seeds.size} seeds -> ${candidates.size} candidates")
+            if (candidates.isEmpty()) return@withContext Result.NothingFound(Result.Stage.NO_CANDIDATES)
 
             val tracks = MixRanking.order(candidates, taste, size, seed = now)
-            if (tracks.isEmpty()) Result.NothingFound
+            println("KittyTune mix: ${candidates.size} candidates -> ${tracks.size} tracks")
+            if (tracks.isEmpty()) Result.NothingFound(Result.Stage.ALL_FILTERED)
             else Result.Mixed(tracks, describe(recipe, seeds))
         }
 
@@ -154,10 +187,18 @@ object MixEngine {
     private fun <T> sample(pool: List<T>, count: Int, random: java.util.Random): List<T> =
         if (pool.size <= count) pool else pool.shuffled(random).take(count)
 
-    private const val SEED_POOL = 12
-    private const val ARTIST_SEEDS = 3
-    private const val TRACK_SEEDS = 2
-    private const val GENRE_SEEDS = 1
+    /**
+     * How wide the band is that seeds are drawn from, and how many come from each kind.
+     *
+     * Sized for a hundred-track mix. Eight seeds at fifty candidates each is four hundred before deduplication,
+     * which after the known-track filter, the unplayable filter and the two-per-artist cap leaves comfortably more
+     * than a hundred — and comfortably is what matters, because a mix that returns eighty because the arithmetic
+     * was tight is a mix that looks broken.
+     */
+    private const val SEED_POOL = 20
+    private const val ARTIST_SEEDS = 4
+    private const val TRACK_SEEDS = 3
+    private const val GENRE_SEEDS = 2
 
     private fun sinceForSeeds(): Long =
         System.currentTimeMillis() - HISTORY_WINDOW_DAYS * 24 * 60 * 60 * 1000L
@@ -169,9 +210,25 @@ object MixEngine {
             .toMap()
     }.getOrDefault(emptyMap())
 
-    /** For a hand-picked artist that is not in the history: find them by name. */
+    /**
+     * For a hand-picked artist that is not in the history: find them by name.
+     *
+     * ## Why the first result is the wrong one
+     *
+     * Typing "snorunt" returned nothing at all, and this is why. `search/users?q=snorunt&limit=1` answers with
+     * **Snorunt, 7 followers** — not `snorunt★`, 10,011, who is the artist anybody means. SoundCloud's user search
+     * is not sorted by prominence, and taking the first row means seeding the mix on a stranger with no catalogue
+     * and no station, which produces exactly the empty result he saw (issue #33).
+     *
+     * So it asks for several and picks by follower count among the names that actually look like what was typed.
+     * The name check matters as much as the count: without it, searching a short word finds whichever unrelated
+     * big account happens to contain it.
+     */
     private suspend fun resolveArtistId(name: String): Long? = runCatching {
-        api.searchUsers(name, limit = 1).collection.firstOrNull()?.id
+        val accounts = api.searchUsers(name, limit = 10).collection.map {
+            MixArtistMatch.Account(id = it.id, username = it.username, followers = it.followersCount.toLong())
+        }
+        MixArtistMatch.best(accounts, name)
     }.getOrNull()
 
     /**
@@ -191,9 +248,7 @@ object MixEngine {
             api.getRelatedTracks(seed.trackId, limit = PER_SEED).collection
                 .map { MixRanking.Candidate(it, seed.affinity) }
 
-        is Seed.OfArtist ->
-            api.getArtistStation(seed.artistId).tracks.orEmpty()
-                .map { MixRanking.Candidate(it, seed.affinity) }
+        is Seed.OfArtist -> artistCandidates(seed)
 
         is Seed.OfGenre ->
             // Sorted by recency rather than by all-time popularity: "what is good in this genre" should mean
@@ -202,8 +257,61 @@ object MixEngine {
                 .map { MixRanking.Candidate(it, seed.affinity) }
     }
 
-    /** How many candidates one seed contributes. Six seeds at this rate is plenty to fill twenty slots. */
-    private const val PER_SEED = 20
+    /**
+     * Everything an artist seed can reach, gathered from four places at once.
+     *
+     * ## Why four and not one
+     *
+     * This used to be the artist station alone, and that is why "in the style of snorunt" came back empty:
+     * `system-playlists:artist-stations:{id}` **404s for most artists** — verified against two separate accounts —
+     * because SoundCloud only generates a station for acts above some popularity it does not document. One
+     * endpoint, one point of failure, and the failure is the common case rather than the rare one (issue #33).
+     *
+     * So four paths, and any one of them can carry the mix:
+     *
+     *  - the **station**, when it exists, which is the best answer because it is already a neighbourhood;
+     *  - their **top tracks** and their **uploads**, which are the artist themselves rather than their style, and
+     *    are the seed for the hop below;
+     *  - a **search on the name**, which is the only one that never comes back empty on SoundCloud, where an
+     *    artist's own account is often quiet while re-uploads, features and edits are everywhere.
+     *
+     * Then one hop through `related` on whatever the first three found, which is what turns "their songs" into
+     * "their style" — the request he actually made. The hop is what a station would have given for free.
+     */
+    private suspend fun artistCandidates(seed: Seed.OfArtist): List<MixRanking.Candidate> = coroutineScope {
+        val station = async { runCatching { api.getArtistStation(seed.artistId).tracks.orEmpty() }.getOrDefault(emptyList()) }
+        val top = async { runCatching { api.getUserTopTracks(seed.artistId, limit = PER_SEED).collection }.getOrDefault(emptyList()) }
+        val posted = async { runCatching { api.getUserTracks(seed.artistId, limit = PER_SEED).collection }.getOrDefault(emptyList()) }
+        val byName = async { runCatching { api.searchTracksPop(seed.name, limit = PER_SEED).collection }.getOrDefault(emptyList()) }
+
+        val direct = (station.await() + top.await() + posted.await() + byName.await()).distinctBy { it.id }
+
+        // The hop. Taken from the most popular of what was found rather than the first: a related lookup is only
+        // as good as the track it starts from, and an obscure re-upload has no neighbours worth having.
+        val hopSeeds = direct
+            .filter { MixRanking.isPlayable(it) }
+            .sortedByDescending { it.playbackCount }
+            .take(HOP_SEEDS)
+
+        val related = hopSeeds
+            .map { track -> async { runCatching { api.getRelatedTracks(track.id, limit = PER_SEED).collection }.getOrDefault(emptyList()) } }
+            .flatMap { it.await() }
+
+        // The artist's own tracks score a little below their neighbourhood, because "in the style of" is a request
+        // for the neighbourhood — but they stay in, since a mix in somebody's style with none of them in it reads
+        // as having missed the point.
+        direct.map { MixRanking.Candidate(it, seed.affinity * OWN_TRACK_AFFINITY) } +
+            related.map { MixRanking.Candidate(it, seed.affinity) }
+    }
+
+    /** How many of an artist's own tracks are used as a starting point for the related hop. */
+    private const val HOP_SEEDS = 6
+
+    /** An artist's own track against their neighbourhood, for a request that asked for the style. */
+    private const val OWN_TRACK_AFFINITY = 0.75f
+
+    /** How many candidates one request contributes. */
+    private const val PER_SEED = 50
 
     /** What the mix says it is, on the card. */
     private fun describe(recipe: Recipe, seeds: List<Seed>): String = when (recipe) {
