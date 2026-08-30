@@ -12,6 +12,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -34,7 +35,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ContainedLoadingIndicator
-
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.ElectricBolt
+import androidx.compose.material.icons.rounded.WaterDrop
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.onClick
@@ -73,6 +78,19 @@ import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tag
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import com.alananasss.kittytune.ui.common.Tip
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
@@ -155,192 +173,213 @@ fun HomeContent(
     }
 
     var quickPage by remember { mutableStateOf(0) }
-    val pageSize = 6
-    val maxPages = ((contextHistory.size + pageSize - 1) / pageSize).coerceAtLeast(1)
-    val currentPage = quickPage.coerceIn(0, maxPages - 1)
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        // Greeting
-        item {
-            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            // Desktop-only greeting (no Android key for this) — localized by app language.
-            val lang = Strings.resolvedLanguage
-            val greeting = when (hour) {
-                in 5..11 -> when (lang) { "fr" -> "Bonjour"; "hu" -> "Jó reggelt"; "ru" -> "Доброе утро"; else -> "Good morning" }
-                in 12..17 -> when (lang) { "fr" -> "Bon après-midi"; "hu" -> "Jó napot"; "ru" -> "Добрый день"; else -> "Good afternoon" }
-                else -> when (lang) { "fr" -> "Bonsoir"; "hu" -> "Jó estét"; "ru" -> "Добрый вечер"; else -> "Good evening" }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = greeting,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-                if (maxPages > 1) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { if (currentPage > 0) quickPage = currentPage - 1 },
-                            enabled = currentPage > 0,
-                            modifier = Modifier.size(32.dp),
-                            shapes = IconButtonDefaults.shapes()
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(20.dp))
-                        }
-                        IconButton(
-                            onClick = { if (currentPage < maxPages - 1) quickPage = currentPage + 1 },
-                            enabled = currentPage < maxPages - 1,
-                            modifier = Modifier.size(32.dp),
-                            shapes = IconButtonDefaults.shapes()
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWideScreen = maxWidth >= 880.dp
+        val pageSize = if (isWideScreen) 9 else 6
+        val maxPages = ((contextHistory.size + pageSize - 1) / pageSize).coerceAtLeast(1)
+        val currentPage = quickPage.coerceIn(0, maxPages - 1)
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            // Greeting
+            item {
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                // Desktop-only greeting (no Android key for this) — localized by app language.
+                val lang = Strings.resolvedLanguage
+                val greeting = when (hour) {
+                    in 5..11 -> when (lang) { "fr" -> "Bonjour"; "hu" -> "Jó reggelt"; "ru" -> "Доброе утро"; else -> "Good morning" }
+                    in 12..17 -> when (lang) { "fr" -> "Bon après-midi"; "hu" -> "Jó napot"; "ru" -> "Добрый день"; else -> "Good afternoon" }
+                    else -> when (lang) { "fr" -> "Bonsoir"; "hu" -> "Jó estét"; "ru" -> "Добрый вечер"; else -> "Good evening" }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = greeting,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (maxPages > 1) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = { if (currentPage > 0) quickPage = currentPage - 1 },
+                                enabled = currentPage > 0,
+                                modifier = Modifier.size(32.dp),
+                                shapes = IconButtonDefaults.shapes()
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(20.dp))
+                            }
+                            IconButton(
+                                onClick = { if (currentPage < maxPages - 1) quickPage = currentPage + 1 },
+                                enabled = currentPage < maxPages - 1,
+                                modifier = Modifier.size(32.dp),
+                                shapes = IconButtonDefaults.shapes()
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Quick tiles: recently played contexts (2 rows x 3 cols with pagination)
-        if (contextHistory.isNotEmpty()) {
-            item {
-                val pageItems = contextHistory.drop(currentPage * pageSize).take(pageSize)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    pageItems.chunked(3).forEach { rowItems ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowItems.forEach { entry ->
-                                val isLikes = entry.id == "likes" || entry.numericId == -1L || entry.id == "pin_likes" ||
-                                        entry.title.equals("Titres Likés", ignoreCase = true) ||
-                                        entry.title.equals(str("lib_liked_tracks"), ignoreCase = true) ||
-                                        entry.title.equals(str("history_title_likes"), ignoreCase = true) ||
-                                        entry.title.equals("Liked Tracks", ignoreCase = true)
-                                val isDownloads = entry.id == "downloads" || entry.numericId == -2L || entry.id == "pin_downloads" ||
-                                        entry.title.equals(str("lib_downloads"), ignoreCase = true) ||
-                                        entry.title.equals(str("history_title_downloads"), ignoreCase = true) ||
-                                        entry.title.equals("Downloads", ignoreCase = true)
-                                val isLocalFiles = entry.id == "local_files" || entry.id == "pin_local" ||
-                                        entry.title.equals(str("lib_local_media"), ignoreCase = true)
+            // Quick tiles: recently played contexts (3 rows x 3 cols or 2 rows x 3 cols with pagination)
+            if (contextHistory.isNotEmpty()) {
+                item {
+                    val pageItems = contextHistory.drop(currentPage * pageSize).take(pageSize)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pageItems.chunked(3).forEach { rowItems ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                rowItems.forEach { entry ->
+                                    val isLikes = entry.id == "likes" || entry.numericId == -1L || entry.id == "pin_likes" ||
+                                            entry.title.equals("Titres Likés", ignoreCase = true) ||
+                                            entry.title.equals(str("lib_liked_tracks"), ignoreCase = true) ||
+                                            entry.title.equals(str("history_title_likes"), ignoreCase = true) ||
+                                            entry.title.equals("Liked Tracks", ignoreCase = true)
+                                    val isDownloads = entry.id == "downloads" || entry.numericId == -2L || entry.id == "pin_downloads" ||
+                                            entry.title.equals(str("lib_downloads"), ignoreCase = true) ||
+                                            entry.title.equals(str("history_title_downloads"), ignoreCase = true) ||
+                                            entry.title.equals("Downloads", ignoreCase = true)
+                                    val isLocalFiles = entry.id == "local_files" || entry.id == "pin_local" ||
+                                            entry.title.equals(str("lib_local_media"), ignoreCase = true)
 
-                                QuickTile(
-                                    title = entry.title,
-                                    imageUrl = if (isLikes || isDownloads || isLocalFiles) null else entry.imageUrl,
-                                    isLikes = isLikes,
-                                    isDownloads = isDownloads,
-                                    isLocalFiles = isLocalFiles,
-                                    modifier = Modifier.weight(1f),
-                                    // Right-click on tile = playlist/track options sheet.
-                                    onRightClick = when {
-                                        entry.id.startsWith("playlist:") -> {
-                                            {
-                                                playerViewModel.showPlaylistOptions(
-                                                    Playlist(
-                                                        id = entry.numericId,
-                                                        title = entry.title,
-                                                        artworkUrl = entry.imageUrl,
-                                                        calculatedArtworkUrl = null,
-                                                        trackCount = null,
-                                                        user = null,
-                                                        tracks = null,
+                                    QuickTile(
+                                        title = entry.title,
+                                        imageUrl = if (isLikes || isDownloads || isLocalFiles) null else entry.imageUrl,
+                                        isLikes = isLikes,
+                                        isDownloads = isDownloads,
+                                        isLocalFiles = isLocalFiles,
+                                        modifier = Modifier.weight(1f),
+                                        // Right-click on tile = playlist/track options sheet.
+                                        onRightClick = when {
+                                            entry.id.startsWith("playlist:") -> {
+                                                {
+                                                    playerViewModel.showPlaylistOptions(
+                                                        Playlist(
+                                                            id = entry.numericId,
+                                                            title = entry.title,
+                                                            artworkUrl = entry.imageUrl,
+                                                            calculatedArtworkUrl = null,
+                                                            trackCount = null,
+                                                            user = null,
+                                                            tracks = null,
+                                                        )
                                                     )
-                                                )
+                                                }
                                             }
-                                        }
-                                        entry.type == "TRACK" || entry.id.startsWith("track:") -> {
-                                            {
-                                                playerViewModel.showTrackOptions(
-                                                    Track(
-                                                        id = entry.numericId,
-                                                        title = entry.title,
-                                                        artworkUrl = entry.imageUrl,
-                                                        durationMs = null,
-                                                        user = User(0, entry.subtitle ?: "", null),
-                                                        source = entry.source,
-                                                        permalinkUrl = entry.originalUrl
+                                            entry.type == "TRACK" || entry.id.startsWith("track:") -> {
+                                                {
+                                                    playerViewModel.showTrackOptions(
+                                                        Track(
+                                                            id = entry.numericId,
+                                                            title = entry.title,
+                                                            artworkUrl = entry.imageUrl,
+                                                            durationMs = null,
+                                                            user = User(0, entry.subtitle ?: "", null),
+                                                            source = entry.source,
+                                                            permalinkUrl = entry.originalUrl
+                                                        )
                                                     )
-                                                )
+                                                }
                                             }
-                                        }
-                                        else -> null
-                                    },
-                                ) {
-                                    if (entry.type == "TRACK" || entry.id.startsWith("track:")) {
-                                        val trackToPlay = Track(
-                                            id = entry.numericId,
-                                            title = entry.title,
-                                            artworkUrl = entry.imageUrl,
-                                            durationMs = null,
-                                            user = User(0, entry.subtitle ?: "", null),
-                                            source = entry.source,
-                                            permalinkUrl = entry.originalUrl
-                                        )
-                                        playerViewModel.playPlaylist(listOf(trackToPlay), 0)
-                                    } else {
-                                        playerViewModel.navigateToPlaylistId = when {
-                                            entry.id.startsWith("playlist:") -> entry.numericId.toString()
-                                            entry.id.startsWith("spotify_artist:") -> entry.id
-                                            entry.id.startsWith("spotify_radio:") -> entry.id
-                                            entry.id.startsWith("spotify:") -> entry.id
-                                            entry.type == "STATION" && entry.id.contains("spotify") -> {
-                                                val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                                                "spotify_radio:$clean"
-                                            }
-                                            entry.type == "PROFILE" -> {
-                                                val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                                                if (clean.isNotBlank() && clean != "0" && (entry.id.contains("spotify") || clean.length == 22)) {
-                                                    "spotify_artist:$clean"
-                                                } else if (entry.id == "profile:0" || entry.numericId == 0L) {
-                                                    if (entry.title.isNotBlank()) {
-                                                        "profile:${entry.title}"
+                                            else -> null
+                                        },
+                                    ) {
+                                        if (entry.type == "TRACK" || entry.id.startsWith("track:")) {
+                                            val trackToPlay = Track(
+                                                id = entry.numericId,
+                                                title = entry.title,
+                                                artworkUrl = entry.imageUrl,
+                                                durationMs = null,
+                                                user = User(0, entry.subtitle ?: "", null),
+                                                source = entry.source,
+                                                permalinkUrl = entry.originalUrl
+                                            )
+                                            playerViewModel.playPlaylist(listOf(trackToPlay), 0)
+                                        } else {
+                                            playerViewModel.navigateToPlaylistId = when {
+                                                entry.id.startsWith("playlist:") -> entry.numericId.toString()
+                                                entry.id.startsWith("spotify_artist:") -> entry.id
+                                                entry.id.startsWith("spotify_radio:") -> entry.id
+                                                entry.id.startsWith("spotify:") -> entry.id
+                                                entry.type == "STATION" && entry.id.contains("spotify") -> {
+                                                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
+                                                    "spotify_radio:$clean"
+                                                }
+                                                entry.type == "PROFILE" -> {
+                                                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
+                                                    if (clean.isNotBlank() && clean != "0" && (entry.id.contains("spotify") || clean.length == 22)) {
+                                                        "spotify_artist:$clean"
+                                                    } else if (entry.id == "profile:0" || entry.numericId == 0L) {
+                                                        if (entry.title.isNotBlank()) {
+                                                            "profile:${entry.title}"
+                                                        } else {
+                                                            entry.id
+                                                        }
                                                     } else {
                                                         entry.id
                                                     }
-                                                } else {
-                                                    entry.id
                                                 }
+                                                else -> entry.id
                                             }
-                                            else -> entry.id // likes, downloads, station:, profile:, yt_radio:
                                         }
                                     }
                                 }
+                                repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
                             }
-                            repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
             }
-        }
 
-        // "Add your own mix, on the main screen, above your time" — above the listening statistics, which is
-        // literally where he put it, and it is the right place: the stats are what you *did*, and this is what
-        // to do next (issue #33).
-        item { StartMixingCard(playerViewModel) }
+            // "Your Mix" and "Listening Stats" split side-by-side on wide window, stacked on narrow (issue #33)
+            item {
+                if (isWideScreen) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Box(Modifier.weight(1.15f)) {
+                            StartMixingCard(playerViewModel)
+                        }
+                        Box(Modifier.weight(1f)) {
+                            ListeningStatsCard(navController)
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        StartMixingCard(playerViewModel)
+                        ListeningStatsCard(navController)
+                    }
+                }
+            }
 
-        // Listening statistics, as a card on the home page rather than an entry in a menu: it was
-        // asked for as something you come across, not something you go looking for (issue #33).
-        item { ListeningStatsCard(navController) }
-
-        // Section carousels
-        items(vm.homeSections, key = { it.title }) { section ->
-            Column {
-                Text(
-                    text = section.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                section.subtitle?.let {
+            // Section carousels
+            items(vm.homeSections, key = { it.title }) { section ->
+                Column {
                     Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = section.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
                     )
+                    section.subtitle?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(12.dp))
                 
@@ -458,7 +497,7 @@ fun HomeContent(
             }
         }
     }
-    }
+}
 
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -1670,17 +1709,7 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
 }
 
 /**
- * The week's listening, on the home page (issue #33).
- *
- * Statistics were already being recorded and there was a screen for them, but nothing navigated to
- * it, so they were invisible. A card is the form that was asked for: the three numbers worth
- * knowing at a glance, the artist behind them, and a way through to everything else.
- *
- * Absent entirely until there is something to show. A card reading zero minutes on a fresh install
- * is noise, and it is the state every new listener starts in.
- */
-/**
- * "Start mixing" — the button, and what happens when it is not that simple (issue #33).
+ * "Start mixing" — the button, what it is built from, and what happens when it is not that simple (issue #33).
  *
  * "Just click the start mixing button, which, according to your interests, gives out songs that you like (these
  * are not your favorite songs), you can also customize your mix, select a genre or artist's songs, for example,
@@ -1690,18 +1719,121 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
  * choices, no dialog, it reads your listening and plays. The small one beside it opens the customisation, for
  * when you already know what you are in the mood for.
  *
- * Three states worth showing plainly rather than as a spinner and a silence:
+ * ## Why the card names its own sources
+ *
+ * "Qu'est-ce que ça fait quand on fait start mix tout seul ? Ça se base sur quoi ?" A button that reads your
+ * history and then says nothing about what it read is indistinguishable from a shuffle, so the card carries the
+ * answer: the three artists it is leaning on, their faces, and how many more are behind them. Nobody should have
+ * to ask a recommender what it is recommending from.
+ *
+ * Four states worth showing plainly rather than as a spinner and a silence:
  *
  *  - **Building.** It is five or six requests deep and takes a couple of seconds, so it says so.
+ *  - **Done.** A hundred tracks went into the queue, from something: the card says what, because the queue is on
+ *    the far side of the window and a press with no visible consequence reads as a press that failed.
  *  - **Nothing to go on.** A fresh install has no listening to profile. "Play something first" is the honest
  *    answer and it is better than an empty mix that looks like a bug.
  *  - **Found nothing.** Seeds existed and every expansion came back empty, which in practice means the network.
  */
+private data class VibeStation(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val color: Color,
+    val recipe: com.alananasss.kittytune.data.mix.MixEngine.Recipe
+)
+
 @Composable
 private fun StartMixingCard(playerViewModel: PlayerViewModel) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<MixState>(MixState.Idle) }
     var showOptions by remember { mutableStateOf(false) }
+
+    val basis by produceState<com.alananasss.kittytune.data.mix.MixEngine.Basis?>(initialValue = null) {
+        value = com.alananasss.kittytune.data.mix.MixEngine.basis()
+    }
+
+    val topArtist = basis?.topArtists?.firstOrNull()
+    val stations = remember(topArtist) {
+        buildList {
+            add(
+                VibeStation(
+                    id = "my_vibe",
+                    title = str("mix_vibe_my_taste"),
+                    subtitle = str("mix_vibe_my_taste_sub"),
+                    icon = Icons.Rounded.AutoAwesome,
+                    color = Color(0xFFB388FF),
+                    recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.MyTaste
+                )
+            )
+            add(
+                VibeStation(
+                    id = "rock",
+                    title = str("mix_vibe_rock"),
+                    subtitle = str("mix_vibe_rock_sub"),
+                    icon = Icons.Rounded.ElectricBolt,
+                    color = Color(0xFF448AFF),
+                    recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("rock")
+                )
+            )
+            add(
+                VibeStation(
+                    id = "sad",
+                    title = str("mix_vibe_sad"),
+                    subtitle = str("mix_vibe_sad_sub"),
+                    icon = Icons.Rounded.WaterDrop,
+                    color = Color(0xFF00E5FF),
+                    recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("sad")
+                )
+            )
+            add(
+                VibeStation(
+                    id = "rap",
+                    title = str("mix_vibe_rap"),
+                    subtitle = str("mix_vibe_rap_sub"),
+                    icon = Icons.Rounded.Mic,
+                    color = Color(0xFF00E676),
+                    recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("hiphop")
+                )
+            )
+            add(
+                VibeStation(
+                    id = "dance",
+                    title = str("mix_vibe_dance"),
+                    subtitle = str("mix_vibe_dance_sub"),
+                    icon = Icons.Rounded.MusicNote,
+                    color = Color(0xFFFF9100),
+                    recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("electronic")
+                )
+            )
+            add(
+                VibeStation(
+                    id = "pop",
+                    title = str("mix_vibe_pop"),
+                    subtitle = str("mix_vibe_pop_sub"),
+                    icon = Icons.Filled.Favorite,
+                    color = Color(0xFFFF4081),
+                    recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("pop")
+                )
+            )
+            if (topArtist != null) {
+                add(
+                    VibeStation(
+                        id = "artist",
+                        title = str("mix_vibe_artist", topArtist.artistName),
+                        subtitle = str("mix_title"),
+                        icon = Icons.Rounded.Person,
+                        color = Color(0xFFE040FB),
+                        recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.LikeArtist(topArtist.artistId, topArtist.artistName)
+                    )
+                )
+            }
+        }
+    }
+
+    var selectedStationIndex by remember { mutableStateOf(0) }
+    val currentStation = stations.getOrElse(selectedStationIndex) { stations.first() }
 
     fun start(recipe: com.alananasss.kittytune.data.mix.MixEngine.Recipe) {
         if (state is MixState.Building) return
@@ -1711,13 +1843,10 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
             state = when (result) {
                 is com.alananasss.kittytune.data.mix.MixEngine.Result.Mixed -> {
                     playerViewModel.playPlaylist(result.tracks, 0)
-                    MixState.Idle
+                    MixState.Done(result.tracks.size, result.describedBy.takeIf { it.isNotBlank() })
                 }
                 com.alananasss.kittytune.data.mix.MixEngine.Result.NotEnoughHistory ->
                     MixState.Empty(str("mix_needs_history"))
-                // Each stage is a different thing to tell somebody. "Check your connection" was the message he got
-                // for an artist whose name had matched the wrong account, which is why one message for three
-                // failures was worse than none (issue #33).
                 is com.alananasss.kittytune.data.mix.MixEngine.Result.NothingFound -> MixState.Empty(
                     when (result.stage) {
                         com.alananasss.kittytune.data.mix.MixEngine.Result.Stage.NO_SEEDS ->
@@ -1742,155 +1871,458 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
         )
     }
 
+    val accent = MaterialTheme.colorScheme.primary
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.padding(20.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
+            // Left Column: Header, Subtitle, [▶ Enable mix ▶] Button & Tune Icon
+            Column(
+                modifier = Modifier.weight(1.15f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Text(
                     text = str("mix_title"),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.height(2.dp))
                 Text(
                     text = when (val current = state) {
                         is MixState.Empty -> current.message
+                        is MixState.Done ->
+                            if (current.from == null) str("mix_track_count", current.count)
+                            else str("mix_done", current.count, current.from)
                         MixState.Building -> str("mix_building")
-                        MixState.Idle -> str("mix_subtitle")
+                        MixState.Idle -> str("mix_card_subtitle")
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = when (state) {
+                        is MixState.Done -> accent
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-            }
 
-            Spacer(Modifier.width(12.dp))
-            Tip(str("mix_customise")) {
-                IconButton(
-                    onClick = { showOptions = true },
-                    shapes = IconButtonDefaults.shapes(),
+                Spacer(Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(Icons.Rounded.Tune, contentDescription = str("mix_customise"))
+                    Button(
+                        onClick = { start(currentStation.recipe) },
+                        shapes = ButtonDefaults.shapes(),
+                        enabled = state !is MixState.Building,
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        if (state is MixState.Building) {
+                            CircularWavyProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
+                        } else {
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(str("mix_enable"), fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    Tip(str("mix_customise")) {
+                        FilledTonalIconButton(
+                            onClick = { showOptions = true },
+                            shapes = IconButtonDefaults.shapes(),
+                        ) {
+                            Icon(Icons.Rounded.Tune, contentDescription = str("mix_customise"))
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.width(4.dp))
-            Button(
-                onClick = { start(com.alananasss.kittytune.data.mix.MixEngine.Recipe.MyTaste) },
-                shapes = ButtonDefaults.shapes(),
-                enabled = state !is MixState.Building,
+
+            // Right Column: Vertical Vibe Stations Selector
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(max = 140.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                if (state is MixState.Building) {
-                    CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
-                } else {
-                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(str("mix_start"))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    stations.forEachIndexed { index, station ->
+                        val isSelected = index == selectedStationIndex
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) station.color.copy(alpha = 0.16f) else Color.Transparent,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { selectedStationIndex = index }
+                                .pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor(java.awt.Cursor.HAND_CURSOR)))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(station.color.copy(alpha = 0.25f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        station.icon,
+                                        contentDescription = null,
+                                        tint = station.color,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = station.title,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) station.color else MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = station.subtitle,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (isSelected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(4.dp)
+                                            .height(20.dp)
+                                            .clip(CircleShape)
+                                            .background(station.color)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 }
 
-/** What the card is doing. Not an enum, because one of the three carries a reason. */
+/**
+ * The artists the mix is leaning on: three faces, overlapped, and the names.
+ *
+ * Overlapped rather than spaced because three separated avatars read as three things to press, while a stack
+ * reads as one fact about the mix — which is what it is. The ring is the card's own colour, so a photo with a
+ * dark edge still separates from the one behind it.
+ */
+@Composable
+private fun MixBasisRow(basis: com.alananasss.kittytune.data.mix.MixEngine.Basis) {
+    val ring = MaterialTheme.colorScheme.surfaceContainer
+    val names = basis.topArtists.joinToString(", ") { it.artistName }
+    val rest = (basis.artistCount - basis.topArtists.size).coerceAtLeast(0)
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            basis.topArtists.forEachIndexed { index, artist ->
+                Box(
+                    modifier = Modifier
+                        .padding(start = (index * 15).dp)
+                        .size(24.dp)
+                        .border(2.dp, ring, CircleShape)
+                        .padding(2.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (artist.artworkUrl.isNullOrBlank()) {
+                        Icon(
+                            Icons.Rounded.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(12.dp),
+                        )
+                    } else {
+                        AsyncImage(
+                            model = artist.artworkUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = str("mix_basis", names).let {
+                if (rest > 0) "$it · ${str("mix_basis_more", rest)}" else it
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** What the card is doing. Not an enum, because two of the four carry something to say. */
 private sealed interface MixState {
     data object Idle : MixState
     data object Building : MixState
+
+    /** A mix went into the queue: how many tracks, and what it was built around when that can be named. */
+    data class Done(val count: Int, val from: String?) : MixState
     data class Empty(val message: String) : MixState
 }
 
 /**
- * Choosing a genre or an artist to build around.
+ * Choosing an artist or a genre to build around.
  *
  * The artist field is free text rather than a picker on purpose: "in the Yeat style" is something you type, and
  * the name you have in mind is very often not somebody in your own history — which is the whole point of asking.
  * It is resolved by search when the mix is built.
  *
- * The genres offered are the ones the listener actually plays, most-played first, because a list of every genre
- * SoundCloud has is a list nobody reads. Their own top genres are three taps from useful.
+ * ## Why the genres are searched rather than listed
+ *
+ * "On peut chercher des genres dans la recherche ?" You could not. The dialog showed the first twelve of the
+ * app's fifty-odd categories in alphabetical order — Afro through Celtic, a list with no relationship to anybody's
+ * taste and no way at all to reach the other forty-five. So there is a field, and it does two things: it filters
+ * every category the app knows, and anything typed that matches none of them is offered as a tag in its own
+ * right. SoundCloud's tags are not a fixed vocabulary, "sigilkore" is a real thing to want a mix of, and the
+ * genre expansion takes whatever word it is given (issue #33).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MixOptionsDialog(
     onDismiss: () -> Unit,
     onPick: (com.alananasss.kittytune.data.mix.MixEngine.Recipe) -> Unit,
 ) {
     var artist by remember { mutableStateOf("") }
-    val genres = remember { com.alananasss.kittytune.data.GenreData.getGenres().take(12) }
+    var genreQuery by remember { mutableStateOf("") }
+
+    val all = remember { com.alananasss.kittytune.data.GenreData.getGenres() }
+    val needle = genreQuery.trim()
+    val matches = remember(needle, all) {
+        if (needle.isEmpty()) all
+        else all.filter { it.title.contains(needle, true) || it.query.contains(needle, true) }
+    }
+    // Typed something the app has no chip for? It is still a tag SoundCloud may well know, so it is offered as one.
+    val custom = needle.takeIf {
+        it.isNotEmpty() && all.none { known -> known.title.equals(it, true) || known.query.equals(it, true) }
+    }
+
+    fun startArtist() {
+        if (artist.isNotBlank()) {
+            onPick(
+                com.alananasss.kittytune.data.mix.MixEngine.Recipe.LikeArtist(
+                    artistId = null,
+                    artistName = artist.trim(),
+                )
+            )
+        }
+    }
 
     com.alananasss.kittytune.core.BackHandler(onBack = onDismiss)
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Column(Modifier.padding(24.dp).widthIn(max = 460.dp)) {
-                Text(str("mix_customise"), style = MaterialTheme.typography.headlineSmall)
-
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    str("mix_in_the_style_of"),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(8.dp))
+            Column(Modifier.width(520.dp).padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.material3.OutlinedTextField(
-                        value = artist,
-                        onValueChange = { artist = it },
-                        singleLine = true,
-                        placeholder = { Text(str("mix_artist_hint")) },
-                        modifier = Modifier.weight(1f).trackTextInput(),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            onPick(
-                                com.alananasss.kittytune.data.mix.MixEngine.Recipe.LikeArtist(
-                                    artistId = null,
-                                    artistName = artist.trim(),
-                                )
-                            )
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                        enabled = artist.isNotBlank(),
-                    ) { Text(str("mix_start")) }
-                }
-
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    str("mix_by_genre"),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.height(8.dp))
-                androidx.compose.foundation.layout.FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    genres.forEach { genre ->
-                        AssistChip(
-                            onClick = {
-                                onPick(
-                                    com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre(genre.query)
-                                )
-                            },
-                            label = { Text(genre.title) },
-                            leadingIcon = {
-                                Icon(genre.icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                            },
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Rounded.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
                         )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            str("mix_customise"),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            str("mix_customise_sub"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    // The only way out that the dialog needs: a "Cancel" button at the bottom of a panel whose
+                    // every other control starts something was one press too many and read as the primary action.
+                    IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
+                        Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text(str("btn_cancel")) }
+                Spacer(Modifier.height(22.dp))
+                MixSectionLabel(Icons.Rounded.Person, str("mix_in_the_style_of"))
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = artist,
+                    onValueChange = { artist = it },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    placeholder = { Text(str("mix_artist_hint")) },
+                    // Where the "Start mixing" button used to sit beside the field, at half the width of the one
+                    // on the card and doing the same thing. Enter does it too, which is what a text field implies.
+                    trailingIcon = {
+                        if (artist.isNotBlank()) {
+                            IconButton(onClick = { startArtist() }, shapes = IconButtonDefaults.shapes()) {
+                                Icon(
+                                    Icons.Rounded.AutoAwesome,
+                                    contentDescription = str("mix_start"),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .trackTextInput()
+                        .onKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyUp &&
+                                (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                            ) {
+                                startArtist()
+                                true
+                            } else false
+                        },
+                )
+
+                Spacer(Modifier.height(24.dp))
+                MixSectionLabel(Icons.Rounded.MusicNote, str("mix_by_genre"))
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.material3.OutlinedTextField(
+                    value = genreQuery,
+                    onValueChange = { genreQuery = it },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    placeholder = { Text(str("mix_genre_search_hint")) },
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (genreQuery.isNotEmpty()) {
+                            IconButton(onClick = { genreQuery = "" }, shapes = IconButtonDefaults.shapes()) {
+                                Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .trackTextInput()
+                        .onKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyUp &&
+                                (event.key == Key.Enter || event.key == Key.NumPadEnter)
+                            ) {
+                                // Enter takes the tag as typed, or the first chip still standing after filtering.
+                                val target = custom ?: matches.firstOrNull()?.query
+                                if (target != null) {
+                                    onPick(com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre(target))
+                                }
+                                true
+                            } else false
+                        },
+                )
+
+                Spacer(Modifier.height(14.dp))
+                // Every category, scrolled, rather than the twelve that fit: the list is fifty-odd long and the
+                // field above it is what makes that a feature instead of a wall.
+                Box(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        custom?.let { tag ->
+                            AssistChip(
+                                onClick = {
+                                    onPick(com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre(tag))
+                                },
+                                label = { Text(str("mix_genre_custom", tag)) },
+                                // A hash, not the sparkles the start controls use: this chip's whole point is that
+                                // the word is being taken as a raw tag rather than as one of the app's categories.
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Rounded.Tag,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                    labelColor = MaterialTheme.colorScheme.primary,
+                                    leadingIconContentColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        }
+                        matches.forEach { genre ->
+                            AssistChip(
+                                onClick = {
+                                    onPick(
+                                        com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre(genre.query)
+                                    )
+                                },
+                                label = { Text(genre.title) },
+                                leadingIcon = {
+                                    Icon(genre.icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
+
+/** A heading inside the customisation dialog: an icon, a label, and a rule running out to the edge. */
+@Composable
+private fun MixSectionLabel(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(12.dp))
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+        )
+    }
+}
+
+/**
+ * The week's listening, on the home page (issue #33).
+ *
+ * Statistics were already being recorded and there was a screen for them, but nothing navigated to
+ * it, so they were invisible. A card is the form that was asked for: the three numbers worth
+ * knowing at a glance, the artist behind them, and a way through to everything else.
+ *
+ * Absent entirely until there is something to show. A card reading zero minutes on a fresh install
+ * is noise, and it is the state every new listener starts in.
+ */
 
 @Composable
 private fun ListeningStatsCard(navController: NavController) {
@@ -1914,11 +2346,11 @@ private fun ListeningStatsCard(navController: NavController) {
 
     Surface(
         onClick = { navController.navigate("listening_stats") },
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Rounded.BarChart,
@@ -1940,11 +2372,12 @@ private fun ListeningStatsCard(navController: NavController) {
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.width(4.dp))
                 Icon(
                     Icons.AutoMirrored.Rounded.ArrowForwardIos,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(12.dp),
                 )
             }
 

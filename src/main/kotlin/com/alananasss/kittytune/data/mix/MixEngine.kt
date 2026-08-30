@@ -154,7 +154,11 @@ object MixEngine {
             if (id != null) listOf(Seed.OfArtist(id, recipe.artistName, 1f)) else emptyList()
         }
 
-        is Recipe.InGenre -> listOf(Seed.OfGenre(recipe.genre, 1f))
+        // `wide`, because this one seed is the entire mix: eight seeds at fifty candidates each is what makes a
+        // hundred-track mix reachable, and one seed at fifty cannot get past about thirty-five once the known,
+        // the unplayable and the two-per-artist cap have taken their share. The search endpoint honours a
+        // larger limit, so a genre mix asks for one rather than coming back a third full.
+        is Recipe.InGenre -> listOf(Seed.OfGenre(recipe.genre, 1f, wide = true))
 
         Recipe.MyTaste -> {
             if (taste.isEmpty) emptyList() else buildList {
@@ -185,6 +189,32 @@ object MixEngine {
             }
         }
     }
+
+    /**
+     * What the plain press is built from, in the form the card can show it.
+     *
+     * "Qu'est-ce que ça fait quand on fait start mix tout seul ? Ça se base sur quoi ?" — a question the card
+     * should not have made anybody ask, when the answer is sitting in the same table the mix reads. So the card
+     * names it: these artists, and how many more are behind them.
+     *
+     * Artists rather than tracks or genres because artists are what most of the seeds are, and they are the part
+     * somebody recognises — three names and three faces say "it read your listening" in a way no sentence does.
+     */
+    suspend fun basis(): Basis? = withContext(Dispatchers.IO) {
+        runCatching {
+            val since = sinceForSeeds()
+            val top = ListeningStatsRepository.getTopArtists(since, limit = 3)
+                .filter { it.artistName.isNotBlank() }
+            if (top.isEmpty()) null
+            else Basis(topArtists = top, artistCount = ListeningStatsRepository.getUniqueArtists(since))
+        }.getOrNull()
+    }
+
+    /** The faces and the count on the card: who the mix is being built from, and how deep the profile goes. */
+    data class Basis(
+        val topArtists: List<com.alananasss.kittytune.data.local.TopArtistResult>,
+        val artistCount: Int,
+    )
 
     /** Where a weight sits relative to the strongest one, so affinity is comparable across seed kinds. */
     private fun affinityOf(weight: Float, all: Map<String, Float>): Float {
@@ -259,12 +289,49 @@ object MixEngine {
 
         is Seed.OfArtist -> artistCandidates(seed)
 
-        is Seed.OfGenre ->
-            // Sorted by recency rather than by all-time popularity: "what is good in this genre" should mean
-            // this month, not the same five anthems everybody has already heard.
-            api.searchTracksStrict(tag = seed.genre, sort = "recent", limit = PER_SEED).collection
-                .map { MixRanking.Candidate(it, seed.affinity) }
+        is Seed.OfGenre -> genreCandidates(seed)
     }
+
+    /**
+     * A genre seed, which needs two requests rather than one, because SoundCloud's tag filter is stricter than
+     * the words a chip is written in — and that is the whole of "les filtres de catégorie marchent pas" (issue #33).
+     *
+     * ## The lower-casing
+     *
+     * `filter.genre_or_tag` is case-sensitive and answers an *empty collection* for anything else — HTTP 200, no
+     * error, nothing to catch. Measured against the live endpoint: `phonk` returns 487,036 tracks and `Phonk`
+     * returns none; `hip hop` returns 7.8 million and `Hip Hop` returns none. Every category in this app is
+     * written in title case, because that is how a chip is read, so every genre mix in the app was empty.
+     *
+     * ## The fallback
+     *
+     * Lower-casing fixes most of them and not all, because the filter matches a tag *literally* and several of
+     * these categories are phrases rather than tags: `variété française` has 0 tracks behind it, `calm relax` has
+     * 2, `80s 90s` has 63. Those chips would still come back empty. So when the tag answers thinly, the same
+     * words are searched as words instead, sorted by popularity — which is what the browse screens have always
+     * done and what never returns nothing. The second request only happens in the case that needs it.
+     */
+    private suspend fun genreCandidates(seed: Seed.OfGenre): List<MixRanking.Candidate> {
+        val genre = seed.genre.trim()
+        val limit = if (seed.wide) WIDE_PER_SEED else PER_SEED
+        // Sorted by recency rather than all-time popularity: "what is good in this genre" should mean this month,
+        // not the same five anthems everybody has already heard.
+        val tagged = runCatching {
+            api.searchTracksStrict(tag = genre.lowercase(), sort = "recent", limit = limit).collection
+        }.getOrDefault(emptyList())
+
+        val searched =
+            if (tagged.size >= THIN_TAG) emptyList()
+            else runCatching { api.searchTracksPop(genre, limit = limit).collection }.getOrDefault(emptyList())
+
+        return (tagged + searched).distinctBy { it.id }.map { MixRanking.Candidate(it, seed.affinity) }
+    }
+
+    /** Below this many results, a tag has not really answered and the words get asked instead. */
+    private const val THIN_TAG = 10
+
+    /** What one seed asks for when it is carrying the whole mix. Their search endpoint returns all of them. */
+    private const val WIDE_PER_SEED = 200
 
     /**
      * Everything an artist seed can reach, gathered from four places at once.
@@ -372,5 +439,9 @@ private sealed interface Seed {
 
     data class OfTrack(val trackId: Long, override val affinity: Float) : Seed
     data class OfArtist(val artistId: Long, val name: String, override val affinity: Float) : Seed
-    data class OfGenre(val genre: String, override val affinity: Float) : Seed
+    /**
+     * @param wide whether this seed is the whole mix rather than one of eight, and so has to reach far enough on
+     *   its own to fill it.
+     */
+    data class OfGenre(val genre: String, override val affinity: Float, val wide: Boolean = false) : Seed
 }
