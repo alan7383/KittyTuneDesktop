@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.OpenInFull
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.ui.draw.shadow
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -381,8 +382,35 @@ private fun ReorderableCollectionItemScope.QueueRow(
 /** How far the already-played rows recede. Legible on purpose — they are still part of the queue. */
 private const val PAST_ROW_ALPHA = 0.55f
 
+/**
+ * The panel's lyrics tab: a header, and the words underneath (issue #33).
+ *
+ * ## Why the gear is here too
+ *
+ * "You can also add the scale + focus mode for lyrics."
+ *
+ * Both have existed for two releases — [com.alananasss.kittytune.data.local.LyricsDisplayStyle] — and both were
+ * unreachable from the one place a desktop listener actually reads along. The full screen has a gear and the full
+ * player has a gear; the panel, which is the view that is open all the time, had a fullscreen button and nothing
+ * else, so the only route to "scale" or "focus" was the settings page. Asking for a feature that shipped is what
+ * a feature with no control in sight looks like from outside.
+ *
+ * It opens the same dialog as the other two, with `isFullScreen = false`, so it edits the panel's own copy of
+ * those settings rather than the full screen's — they are deliberately separate: a 16 sp line in a side panel and
+ * a 42 sp headline do not want the same treatment.
+ */
 @Composable
 private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
+    var showQuickSettings by remember { mutableStateOf(false) }
+
+    if (showQuickSettings) {
+        com.alananasss.kittytune.ui.player.lyrics.QuickLyricsSettingsDialog(
+            viewModel = vm,
+            isFullScreen = false,
+            onDismiss = { showQuickSettings = false },
+        )
+    }
+
     Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -397,19 +425,37 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontWeight = FontWeight.Bold
             )
-            androidx.compose.material3.FilledTonalButton(
-                onClick = onOpenFullLyrics,
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                shapes = ButtonDefaults.shapes(),
-                modifier = Modifier.height(30.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.OpenInFull,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(str("btn_fullscreen"), style = MaterialTheme.typography.labelSmall)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Same glyph and same label as the gear on the full screen, because it opens the same dialog.
+                Tip(str("pref_lyrics_title")) {
+                    IconButton(
+                        onClick = { showQuickSettings = true },
+                        shapes = IconButtonDefaults.shapes(),
+                        modifier = Modifier.size(30.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Settings,
+                            contentDescription = str("pref_lyrics_title"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(6.dp))
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = onOpenFullLyrics,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    shapes = ButtonDefaults.shapes(),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.OpenInFull,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(str("btn_fullscreen"), style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
 

@@ -49,41 +49,31 @@ import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.ui.home.HomeViewModel
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
+import com.alananasss.kittytune.ui.common.Tip
+
 /**
  * Top bar of the content panel: back/forward navigation, centered search field
- * (embedded Home search, same as the Android app), avatar on the right.
+ * (embedded Home search, same as the Android app), right panel toggle arrow on the right.
  */
-object NavigationTracker {
-    val forwardStack = androidx.compose.runtime.mutableStateListOf<String>()
-    var isNavigatingBackOrForward = false
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainTopBar(
     navController: NavController,
     homeViewModel: HomeViewModel,
     playerViewModel: PlayerViewModel,
+    historyNavigator: HistoryNavigator? = null,
+    isRightPanelOpen: Boolean = false,
+    onToggleRightPanel: () -> Unit = {},
 ) {
     val vm = homeViewModel
-
-    // Observe back stack entry changes to clear forward stack on normal navigation
     val currentEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route
-    
-    androidx.compose.runtime.LaunchedEffect(currentEntry) {
-        if (!NavigationTracker.isNavigatingBackOrForward) {
-            NavigationTracker.forwardStack.clear()
-        }
-        // reset the flag
-        NavigationTracker.isNavigatingBackOrForward = false
-    }
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val canGoBack = navController.previousBackStackEntry != null
+        val canGoBack = historyNavigator?.canGoBack ?: (navController.previousBackStackEntry != null)
         val backInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
         FilledTonalIconButton(
             shapes = IconButtonDefaults.shapes(),
@@ -94,29 +84,11 @@ fun MainTopBar(
             enabled = canGoBack,
             interactionSource = backInteractionSource,
             onClick = {
-                NavigationTracker.isNavigatingBackOrForward = true
-                val entry = navController.currentBackStackEntry
-                val route = entry?.destination?.route
-                if (route != null) {
-                    var resolved: String = route
-                    try {
-                        val args = entry.arguments
-                        if (args != null) {
-                            val possibleKeys = listOf("playlistId", "userId", "query", "albumId", "trackId", "section", "tagName", "genreName", "genreQuery", "tabIndex")
-                            possibleKeys.forEach { key ->
-                                val valStr = runCatching { args.read { getString(key) } }.getOrNull()
-                                if (!valStr.isNullOrEmpty()) {
-                                    resolved = resolved.replace("{$key}", valStr)
-                                }
-                            }
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                    resolved = resolved.replace(Regex("\\?tab=\\{tabIndex\\}"), "").replace(Regex("\\{[^}]+\\}"), "")
-                    NavigationTracker.forwardStack.add(resolved)
+                if (historyNavigator != null) {
+                    historyNavigator.back()
+                } else {
+                    navController.popBackStack()
                 }
-                navController.popBackStack()
             }
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = str("btn_back"))
@@ -124,7 +96,7 @@ fun MainTopBar(
 
         androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
 
-        val canGoForward = NavigationTracker.forwardStack.isNotEmpty()
+        val canGoForward = historyNavigator?.canGoForward ?: false
         val forwardInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
         FilledTonalIconButton(
             shapes = IconButtonDefaults.shapes(),
@@ -135,11 +107,7 @@ fun MainTopBar(
             enabled = canGoForward,
             interactionSource = forwardInteractionSource,
             onClick = {
-                if (NavigationTracker.forwardStack.isNotEmpty()) {
-                    NavigationTracker.isNavigatingBackOrForward = true
-                    val nextRoute = NavigationTracker.forwardStack.removeLast()
-                    navController.navigate(nextRoute)
-                }
+                historyNavigator?.forward()
             }
         ) {
             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Forward")
@@ -223,10 +191,94 @@ fun MainTopBar(
             )
         }
 
-        // Still here with nothing after it, so the search stays in the middle of the bar rather than
-        // sliding to the right edge now that the avatar has moved to the bottom of the sidebar
-        // (issue #33).
+        // Spacer to balance the centered search field
         androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+
+        // Permanent icon on the right panel when open to collapse it, and when closed to open it (issue #33).
+        // Located where the avatar used to be, visible on all pages.
+        Tip(if (isRightPanelOpen) str("panel_collapse") else str("panel_expand")) {
+            FilledTonalIconButton(
+                shapes = IconButtonDefaults.shapes(),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                ),
+                onClick = onToggleRightPanel
+            ) {
+                RightPanelToggleIcon(isOpen = isRightPanelOpen)
+            }
+        }
     }
 }
+
+/**
+ * Custom sidebar toggle icon matching the user interface specifications (issue #33).
+ * Draws a panel layout icon with an integrated collapse/expand indicator.
+ */
+@Composable
+fun RightPanelToggleIcon(
+    isOpen: Boolean,
+    modifier: Modifier = Modifier.size(19.dp),
+    tint: androidx.compose.ui.graphics.Color = androidx.compose.material3.LocalContentColor.current
+) {
+    androidx.compose.foundation.Canvas(modifier = modifier) {
+        val strokeWidth = 1.65.dp.toPx()
+        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.5.dp.toPx(), 3.5.dp.toPx())
+        val padding = 1.5.dp.toPx()
+        val rectLeft = padding
+        val rectTop = padding
+        val rectRight = size.width - padding
+        val rectBottom = size.height - padding
+        val rectWidth = rectRight - rectLeft
+        val rectHeight = rectBottom - rectTop
+
+        // Outer rounded rectangle
+        drawRoundRect(
+            color = tint,
+            topLeft = androidx.compose.ui.geometry.Offset(rectLeft, rectTop),
+            size = androidx.compose.ui.geometry.Size(rectWidth, rectHeight),
+            cornerRadius = cornerRadius,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+        )
+
+        // Vertical divider separating the main area from the right panel (at ~62% width)
+        val dividerX = rectLeft + rectWidth * 0.62f
+        drawLine(
+            color = tint,
+            start = androidx.compose.ui.geometry.Offset(dividerX, rectTop),
+            end = androidx.compose.ui.geometry.Offset(dividerX, rectBottom),
+            strokeWidth = strokeWidth
+        )
+
+        // Chevron inside the right panel partition
+        val panelCenterX = dividerX + (rectRight - dividerX) * 0.5f
+        val centerY = rectTop + rectHeight * 0.5f
+        val arrowHalfH = 2.8.dp.toPx()
+        val arrowW = 2.0.dp.toPx()
+
+        val path = androidx.compose.ui.graphics.Path()
+        if (isOpen) {
+            // Arrow pointing right > (collapse towards edge)
+            path.moveTo(panelCenterX - arrowW * 0.5f, centerY - arrowHalfH)
+            path.lineTo(panelCenterX + arrowW * 0.5f, centerY)
+            path.lineTo(panelCenterX - arrowW * 0.5f, centerY + arrowHalfH)
+        } else {
+            // Arrow pointing left < (expand into view)
+            path.moveTo(panelCenterX + arrowW * 0.5f, centerY - arrowHalfH)
+            path.lineTo(panelCenterX - arrowW * 0.5f, centerY)
+            path.lineTo(panelCenterX + arrowW * 0.5f, centerY + arrowHalfH)
+        }
+
+        drawPath(
+            path = path,
+            color = tint,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = strokeWidth * 0.9f,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round
+            )
+        )
+    }
+}
+
 

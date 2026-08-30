@@ -658,6 +658,14 @@ class PlayerPreferences {
     fun getLyricsPlainAutoScroll(): Boolean = Prefs.getBoolean("lyrics_plain_autoscroll", false)
     fun setLyricsPlainAutoScroll(enabled: Boolean) = Prefs.putBoolean("lyrics_plain_autoscroll", enabled)
 
+    /**
+     * Whether hovering over the collapsed sidebar automatically expands it temporarily (issue #33).
+     * Off by default so it has to be chosen in settings.
+     */
+    fun isSidebarHoverExpandEnabled(): Boolean = Prefs.getBoolean("sidebar_hover_expand", false)
+    fun setSidebarHoverExpandEnabled(enabled: Boolean) = Prefs.putBoolean("sidebar_hover_expand", enabled)
+    fun sidebarHoverExpandFlow(): Flow<Boolean> = Prefs.booleanFlow("sidebar_hover_expand", false)
+
     /** Multiplier on the base auto-scroll rate, clamped to the range the slider offers. */
     fun getLyricsPlainAutoScrollSpeed(): Float =
         Prefs.getFloat("lyrics_plain_autoscroll_speed", 1.5f).coerceIn(0.25f, 4f)

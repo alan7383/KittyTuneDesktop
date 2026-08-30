@@ -15,6 +15,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 
+import androidx.savedstate.read
+import com.alananasss.kittytune.ui.player.PlayerViewModel
+
 /**
  * Back and forward, on the side buttons of the mouse (issue #33).
  *
@@ -42,6 +45,8 @@ class HistoryNavigator internal constructor(
     private val hasPrevious: () -> Boolean,
     private val pop: () -> Boolean,
     private val go: (String) -> Unit,
+    private val isLyricsOpen: () -> Boolean = { false },
+    private val setLyricsOpen: (Boolean) -> Unit = {},
 ) {
 
     /** Routes popped by [back], most recent last. */
@@ -50,7 +55,7 @@ class HistoryNavigator internal constructor(
     /** Set around our own navigations, so the observer can tell them from the reader's. */
     internal var moving = false
 
-    val canGoBack: Boolean get() = hasPrevious()
+    val canGoBack: Boolean get() = isLyricsOpen() || hasPrevious()
 
     val canGoForward: Boolean get() = forward.isNotEmpty()
 
@@ -58,6 +63,14 @@ class HistoryNavigator internal constructor(
     val forwardSize: Int get() = forward.size
 
     fun back() {
+        if (isLyricsOpen()) {
+            moving = true
+            setLyricsOpen(false)
+            forward.add(LYRICS_ROUTE)
+            if (forward.size > MAX_FORWARD) forward.removeAt(0)
+            moving = false
+            return
+        }
         if (!hasPrevious()) return
         val leaving = currentRoute() ?: return
         moving = true
@@ -73,7 +86,12 @@ class HistoryNavigator internal constructor(
     fun forward() {
         val route = forward.removeLastOrNull() ?: return
         moving = true
-        go(route)
+        if (route == LYRICS_ROUTE) {
+            setLyricsOpen(true)
+            moving = false
+        } else {
+            go(route)
+        }
     }
 
     /**
@@ -85,23 +103,49 @@ class HistoryNavigator internal constructor(
         if (moving) moving = false else forward.clear()
     }
 
-    private companion object {
-        const val MAX_FORWARD = 32
+    companion object {
+        const val LYRICS_ROUTE = "__lyrics_screen__"
+        private const val MAX_FORWARD = 32
     }
 }
 
 /**
- * @return a navigator whose forward list follows [navController], cleared by any navigation the
- *   reader makes for themselves.
+ * @return a navigator whose forward list follows [navController] and lyrics sheet state,
+ *   cleared by any navigation the reader makes for themselves.
  */
 @Composable
-fun rememberHistoryNavigator(navController: NavHostController): HistoryNavigator {
-    val navigator = remember(navController) {
+fun rememberHistoryNavigator(
+    navController: NavHostController,
+    playerViewModel: PlayerViewModel? = null
+): HistoryNavigator {
+    val navigator = remember(navController, playerViewModel) {
         HistoryNavigator(
-            currentRoute = { navController.currentBackStackEntry?.destination?.route },
+            currentRoute = {
+                val entry = navController.currentBackStackEntry
+                val route = entry?.destination?.route
+                if (route != null) {
+                    var resolved: String = route
+                    val args = entry.arguments
+                    if (args != null) {
+                        val possibleKeys = listOf(
+                            "playlistId", "userId", "query", "albumId", "trackId",
+                            "section", "tagName", "genreName", "genreQuery", "tabIndex"
+                        )
+                        possibleKeys.forEach { key ->
+                            val valStr = runCatching { args.read { getString(key) } }.getOrNull()
+                            if (!valStr.isNullOrEmpty()) {
+                                resolved = resolved.replace("{$key}", valStr)
+                            }
+                        }
+                    }
+                    resolved.replace(Regex("\\?tab=\\{tabIndex\\}"), "").replace(Regex("\\{[^}]+\\}"), "")
+                } else null
+            },
             hasPrevious = { navController.previousBackStackEntry != null },
             pop = { navController.popBackStack() },
             go = { navController.navigate(it) },
+            isLyricsOpen = { playerViewModel?.showLyricsSheet == true },
+            setLyricsOpen = { playerViewModel?.showLyricsSheet = it }
         )
     }
     val entry by navController.currentBackStackEntryAsState()
@@ -114,6 +158,21 @@ fun rememberHistoryNavigator(navController: NavHostController): HistoryNavigator
             navigator.onRouteChanged()
         }
     }
+
+    val isLyricsOpen = playerViewModel?.showLyricsSheet ?: false
+    var lastLyricsOpen by remember(playerViewModel) { mutableStateOf(isLyricsOpen) }
+    LaunchedEffect(isLyricsOpen) {
+        if (isLyricsOpen != lastLyricsOpen) {
+            lastLyricsOpen = isLyricsOpen
+            if (!navigator.moving) {
+                // If user opened lyrics manually from UI (not via forward button), clear stale forward
+                if (isLyricsOpen && navigator.forward.lastOrNull() == HistoryNavigator.LYRICS_ROUTE) {
+                    navigator.forward.removeLastOrNull()
+                }
+            }
+        }
+    }
+
     return navigator
 }
 

@@ -260,7 +260,7 @@ fun MainScreen() {
     val density = androidx.compose.ui.platform.LocalDensity.current
 
     // The mouse's side buttons, on the root so they work wherever the pointer happens to be.
-    val historyNavigator = rememberHistoryNavigator(navController)
+    val historyNavigator = rememberHistoryNavigator(navController, playerViewModel)
 
     Column(
         modifier = Modifier
@@ -296,8 +296,14 @@ fun MainScreen() {
             } else {
 
             var draggingSidebar by remember { mutableStateOf(false) }
+            val sidebarHoverInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            val isSidebarHovered by sidebarHoverInteraction.collectIsHoveredAsState()
+            val isHoverExpandEnabled by playerPrefs.sidebarHoverExpandFlow().collectAsState(initial = playerPrefs.isSidebarHoverExpandEnabled())
+
+            val isHoverExpanded = libraryViewModel.isSidebarCollapsed && isHoverExpandEnabled && isSidebarHovered && !draggingSidebar
+
             val targetSidebarWidth =
-                if (libraryViewModel.isSidebarCollapsed) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH
+                if (libraryViewModel.isSidebarCollapsed && !isHoverExpanded) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH
                 else libraryViewModel.sidebarWidth
             val animatedSidebarWidth by androidx.compose.animation.core.animateDpAsState(
                 targetValue = targetSidebarWidth.dp,
@@ -311,7 +317,7 @@ fun MainScreen() {
                 libraryViewModel = libraryViewModel,
                 playerViewModel = playerViewModel,
                 homeViewModel = homeViewModel,
-                modifier = Modifier.width(sidebarWidth)
+                modifier = Modifier.width(sidebarWidth).hoverable(sidebarHoverInteraction)
             )
 
             // Resize handle: drag to resize the library, drag far left to snap it
@@ -401,6 +407,13 @@ fun MainScreen() {
                             navController = navController,
                             homeViewModel = homeViewModel,
                             playerViewModel = playerViewModel,
+                            historyNavigator = historyNavigator,
+                            isRightPanelOpen = showNowPlayingPanel,
+                            onToggleRightPanel = {
+                                val next = !showNowPlayingPanel
+                                showNowPlayingPanel = next
+                                playerPrefs.setRightPanelOpen(next)
+                            }
                         )
                         NavHost(
                             navController = navController,
@@ -459,16 +472,19 @@ fun MainScreen() {
                                     playerViewModel = playerViewModel,
                                     onNavigate = { id ->
                                         when {
+                                            id == "upload" -> navController.navigate("upload")
                                             id == "history" -> navController.navigate("history")
                                             id == "recognition_history" -> navController.navigate("recognition_history")
+                                            id == "listening_stats" -> navController.navigate("listening_stats")
+                                            id == "settings" -> navController.navigate("settings")
                                             id.startsWith("profile:") -> {
-                                            val target = id.removePrefix("profile:")
-                                            if (target.startsWith("spotify:artist:") || target.startsWith("spotify_artist:")) {
-                                                navController.navigate("profile/${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(target)}")
-                                            } else {
-                                                navController.navigate("profile/$target")
+                                                val target = id.removePrefix("profile:")
+                                                if (target.startsWith("spotify:artist:") || target.startsWith("spotify_artist:")) {
+                                                    navController.navigate("profile/${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(target)}")
+                                                } else {
+                                                    navController.navigate("profile/$target")
+                                                }
                                             }
-                                        }
                                             id.startsWith("spotify_artist:") -> navController.navigate("profile/${id.removePrefix("spotify_artist:")}")
                                             id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                             id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
@@ -578,8 +594,11 @@ fun MainScreen() {
                                 playerViewModel = playerViewModel,
                                 onNavigate = { id ->
                                     when {
+                                        id == "upload" -> navController.navigate("upload")
                                         id == "history" -> navController.navigate("history")
                                         id == "recognition_history" -> navController.navigate("recognition_history")
+                                        id == "listening_stats" -> navController.navigate("listening_stats")
+                                        id == "settings" -> navController.navigate("settings")
                                         id.startsWith("profile:") -> {
                                             val target = id.removePrefix("profile:")
                                             if (target.startsWith("spotify:artist:") || target.startsWith("spotify_artist:")) {
@@ -959,7 +978,7 @@ fun MainScreen() {
                         showNowPlayingPanel = false
                         playerPrefs.setRightPanelOpen(false)
                     },
-                    onOpenFullLyrics = { playerViewModel.showLyricsSheet = true },
+                    onOpenFullLyrics = { playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet },
                     modifier = Modifier.width(rightPanelWidth)
                 )
             }
