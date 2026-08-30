@@ -186,10 +186,15 @@ object MixRanking {
      *
      * @return the score, or null when the candidate is disqualified.
      */
-    fun score(candidate: Candidate, taste: MixProfile.Taste): Float? {
+    fun score(
+        candidate: Candidate,
+        taste: MixProfile.Taste,
+        /** Passed in rather than read here, so the scoring stays pure and testable at both settings. */
+        youtubeFallback: Boolean = true,
+    ): Float? {
         val track = candidate.track
         if (track.id in taste.knownTrackIds) return null
-        if (!isPlayable(track)) return null
+        if (!isPlayable(track, youtubeFallback)) return null
         val duration = track.durationMs ?: 0L
         if (duration in 1 until MIN_DURATION_MS) return null
 
@@ -205,26 +210,37 @@ object MixRanking {
     }
 
     /**
-     * Whether SoundCloud will actually play this.
+     * Whether *anything* can play this — which is not the same question as whether SoundCloud can.
      *
-     * The bug this exists for is the one he described as "la queue est bizarre parfois, parfois il va sortir un
-     * titre": a blank row in the queue, or a track that skips itself the moment it comes round. Their search and
-     * related endpoints return tracks the account cannot stream — geo-blocked, taken down, or preview-only for
-     * anybody without Go+ — and they look exactly like any other result apart from these two fields.
+     * ## Why the first version of this was wrong
      *
-     * Every other list in the app gets away with ignoring them because a human chose the row and can see it
-     * failed. A mix chooses a hundred rows nobody looked at, so one unplayable track in twenty is a queue that
-     * misbehaves for no visible reason (issue #33).
+     * "Les titres injouables pourquoi ils sont injouables, car c'est des titres Go+ ? Si c'est le cas pourquoi ne
+     * pas faire un fallback YouTube ?"
      *
-     * `SNIPPET` is the interesting one: it is thirty seconds of a paid track, which is worse than an outright
-     * block because it plays, and then stops.
+     * Because I had not looked, and the answer is that the app already does. `SNIP` and a `SUB_HIGH_TIER`
+     * monetisation are Go+ — a real SoundCloud track whose full audio needs a subscription — and `BLOCK` is one
+     * that is geo-restricted or taken down. [com.alananasss.kittytune.data.StreamResolver] has resolved exactly
+     * those through YouTube for as long as the setting has existed. My filter was throwing away tracks the player
+     * would have played (issue #33).
+     *
+     * It was also checking `SNIPPET`, which is not a value their API returns — theirs is `SNIP` — so it was a
+     * second, subtly wrong copy of a predicate that already existed. It defers to the real one now: one place
+     * decides what "restricted" means, and this only asks whether there is a way to hear it.
+     *
+     * What is still excluded is the case where there is no route at all: restricted *and* the YouTube fallback
+     * turned off. Then nothing can play it, and a hundred-track queue nobody vetted is the one list in the app
+     * that cannot afford a row that silently fails.
+     *
+     * The candidates themselves remain SoundCloud's alone. Only where the audio comes from may differ, which is
+     * exactly the instruction: "assure-toi que tous les titres du mix viennent uniquement de SoundCloud, mais
+     * l'audio tu peux mettre YouTube uniquement si c'est Go+ ou injouable."
+     *
+     * @param youtubeFallback whether the setting that lets a restricted track be heard from YouTube is on.
      */
-    fun isPlayable(track: Track): Boolean {
-        if (track.streamable == false) return false
-        return when (track.policy?.uppercase()) {
-            "BLOCK", "SNIPPET" -> false
-            else -> true
-        }
+    fun isPlayable(track: Track, youtubeFallback: Boolean): Boolean {
+        val restricted = com.alananasss.kittytune.data.StreamResolver.isRestricted(track) ||
+            track.streamable == false
+        return !restricted || youtubeFallback
     }
 
     private const val AFFINITY_WEIGHT = 1.0f
@@ -259,9 +275,15 @@ object MixRanking {
      * opposite of a mix, so a mix that can only continue by breaking it ends short instead. [ARTIST_GAP] is
      * soft, because a mix of twenty with one artist twice in a row beats a mix of eleven.
      */
-    fun order(candidates: List<Candidate>, taste: MixProfile.Taste, size: Int, seed: Long): List<Track> {
+    fun order(
+        candidates: List<Candidate>,
+        taste: MixProfile.Taste,
+        size: Int,
+        seed: Long,
+        youtubeFallback: Boolean = true,
+    ): List<Track> {
         val scored = candidates
-            .mapNotNull { candidate -> score(candidate, taste)?.let { candidate.track to it } }
+            .mapNotNull { candidate -> score(candidate, taste, youtubeFallback)?.let { candidate.track to it } }
             .distinctBy { it.first.id }
             .sortedByDescending { it.second }
             .toMutableList()
