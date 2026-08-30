@@ -1408,6 +1408,10 @@ flushListenSession("TRACK_CHANGE")
                 isLiked = LikeRepository.isTrackLiked(lastTrack.id)
                 currentQueueIndex = _queue.indexOfFirst { it.id == lastTrack.id }.coerceAtLeast(0)
             }
+            if (shuffleEnabled && _queue.size > 1) {
+                applyShuffle(currentQueueIndex)
+                updateQueueState()
+            }
 
             try {
                 isPlaying = player.isPlaying
@@ -1485,7 +1489,8 @@ flushListenSession("TRACK_CHANGE")
 
     fun openLyrics(targetTrack: Track? = null, forceSheet: Boolean = false) {
         val target = targetTrack ?: currentTrack ?: return
-        if (target.id != currentTrack?.id) playPlaylist(listOf(target), 0)
+        val isDifferentTrack = target.id != currentTrack?.id
+        if (isDifferentTrack) playPlaylist(listOf(target), 0)
 
         if (!forceSheet && playerPrefs.getInlineLyricsEnabled()) {
             toggleInlineLyrics()
@@ -1496,7 +1501,7 @@ flushListenSession("TRACK_CHANGE")
                 LyricsMode.PLAIN
             }
             showMenuSheet = false
-            showLyricsSheet = true
+            showLyricsSheet = if (isDifferentTrack) true else !showLyricsSheet
         }
     }
 
@@ -3356,6 +3361,23 @@ flushListenSession("TRACK_CHANGE")
         seekTargetPosition = target
         lastSeekTimestamp = System.currentTimeMillis()
         currentPosition = target
+
+        // If seeking to the very end of the track (within 500ms of duration or at duration),
+        // cleanly advance to the next track in the queue or loop instead of freezing (issue #33).
+        if (known != null && target >= known - 500L) {
+            listenSession?.onSeek(target)
+            SoundCloudTelemetryTracker.onTrackSeeked(target)
+            saveStateAsync(savePositionOnly = true)
+            if (repeatMode == RepeatMode.ONE) {
+                currentPosition = 0L
+                player.seekTo(0)
+                player.play()
+            } else {
+                playNext(manual = false, isCrossfade = playerPrefs.getCrossfadeEnabled())
+            }
+            return
+        }
+
         // Crossing the track deliberately is not listening to what was crossed (issue #33).
         listenSession?.onSeek(target)
         player.seekTo(target)
@@ -3945,6 +3967,10 @@ flushListenSession("TRACK_CHANGE")
                                 lastTrack
                             ); updateQueueState(); currentQueueIndex = 0
                         }
+                        if (shuffleEnabled && _queue.size > 1) {
+                            applyShuffle(currentQueueIndex)
+                            updateQueueState()
+                        }
                         val currentPlayerMediaId = MusicManager.player.currentMediaItem?.mediaId
                         Logger.e(
                             "PlayerViewModel",
@@ -4005,6 +4031,10 @@ flushListenSession("TRACK_CHANGE")
 
                         if (currentTrack != null) {
                             currentQueueIndex = _queue.indexOfFirst { it.id == currentTrack!!.id }.coerceAtLeast(0)
+                        }
+                        if (shuffleEnabled && _queue.size > 1) {
+                            applyShuffle(currentQueueIndex)
+                            updateQueueState()
                         }
                     }
                     if (savedContext != null) {

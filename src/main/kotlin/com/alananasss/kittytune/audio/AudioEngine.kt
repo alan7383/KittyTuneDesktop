@@ -741,6 +741,14 @@ class AudioEngine {
                     }
 
                     if (!seekOk) {
+                        if (durationMs > 0 && seek >= durationMs - 1500L) {
+                            Logger.e("AudioEngine", "Seek reached end of stream at $seek ms (duration=$durationMs ms). Ending track.")
+                            positionMs = durationMs
+                            drainStretcher(outBuf, localLine)
+                            setStateAsync(State.ENDED)
+                            break
+                        }
+
                         val recovered = recoverStream(
                             grabber,
                             activeUrl,
@@ -753,6 +761,12 @@ class AudioEngine {
                             if (recovered.second != null) activeUrl = recovered.second!!
                             seekFrame = try { grabber?.grabSamples() } catch (_: Exception) { null }
                             seekOk = seekFrame != null
+                        } else if (durationMs > 0 && seek >= durationMs - 3000L) {
+                            Logger.e("AudioEngine", "Seek recovery at end of track failed at $seek ms. Ending track.")
+                            positionMs = durationMs
+                            drainStretcher(outBuf, localLine)
+                            setStateAsync(State.ENDED)
+                            break
                         }
                     }
 
@@ -817,7 +831,7 @@ class AudioEngine {
 
                 if (frame == null) {
                     if (!stopFlag && activeWorkerId == workerId) {
-                        val isNearEnd = durationMs > 0 && positionMs >= durationMs - 3000L
+                        val isNearEnd = (durationMs > 0 && positionMs >= durationMs - 3000L) || (durationMs == 0L)
                         if (isNearEnd) {
                             drainStretcher(outBuf, localLine)
                             setStateAsync(State.ENDED)
@@ -834,6 +848,8 @@ class AudioEngine {
                                 Logger.e("AudioEngine", "Stream recovery succeeded at $positionMs ms!")
                                 continue
                             } else {
+                                drainStretcher(outBuf, localLine)
+                                setStateAsync(State.ENDED)
                                 break
                             }
                         }

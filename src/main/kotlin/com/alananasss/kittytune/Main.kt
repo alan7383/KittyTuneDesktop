@@ -240,6 +240,14 @@ fun main() {
         ) {
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
 
+            // Set dark background immediately on the AWT window before composition to prevent white flash on Win32/DirectX resize
+            runCatching {
+                val darkBg = java.awt.Color(0x13, 0x13, 0x13)
+                window.background = darkBg
+                (window.contentPane as? javax.swing.JComponent)?.background = darkBg
+                window.rootPane?.background = darkBg
+            }
+
             // Enforce a minimum window size: below this the three-panel layout breaks
             // down and the app can crash (issue #27).
             window.minimumSize = java.awt.Dimension(960, 600)
@@ -278,10 +286,11 @@ fun main() {
 
             CompositionLocalProvider(LocalDensity provides customDensity) {
                 KittyTuneTheme {
-                    // Inside the theme, so the title bar tracks the live palette — the
-                    // cover-seeded dynamic theme included — instead of a colour read once at
-                    // startup (issue #33).
+                    // Inside the theme, so the title bar and underlying window canvas track
+                    // the live palette — the cover-seeded dynamic theme included — instead of
+                    // a colour read once at startup (issue #33).
                     ThemedTitleBarEffect(window)
+                    ThemedWindowBackgroundEffect(window)
                     Surface { AppRouter() }
                 }
             }
@@ -316,5 +325,34 @@ private fun ThemedTitleBarEffect(window: java.awt.Window) {
                 com.alananasss.kittytune.data.theme.WindowsTitleBar.reset(window)
             }
         }
+    }
+}
+
+/**
+ * Sets the underlying AWT Window and component background to match the dynamic theme palette.
+ * This prevents the white Win32/DirectX background from showing through during rapid window resize (issue #33).
+ */
+@Composable
+private fun ThemedWindowBackgroundEffect(window: java.awt.Window) {
+    val scheme = androidx.compose.material3.MaterialTheme.colorScheme
+    val background = scheme.background
+
+    androidx.compose.runtime.LaunchedEffect(background) {
+        val r = (background.red * 255f).toInt().coerceIn(0, 255)
+        val g = (background.green * 255f).toInt().coerceIn(0, 255)
+        val b = (background.blue * 255f).toInt().coerceIn(0, 255)
+        val awtBg = java.awt.Color(r, g, b)
+
+        fun applyBg(comp: java.awt.Component?) {
+            if (comp == null) return
+            comp.background = awtBg
+            if (comp is java.awt.Container) {
+                for (child in comp.components) {
+                    applyBg(child)
+                }
+            }
+        }
+
+        applyBg(window)
     }
 }
