@@ -9,15 +9,19 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The two things that made the mix misbehave in his hands (issue #33).
+ * Which candidates a mix may keep, and where their audio is allowed to come from (issue #33).
  *
- * "J'écris snorunt, un vrai artiste qui existe sur SoundCloud, et il me sort absolument rien" and "la queue est
- * bizarre parfois, parfois il va sortir un titre".
+ * "Les titres injouables pourquoi ils sont injouables, car c'est des titres Go+ ? Si c'est le cas pourquoi ne pas
+ * faire un fallback YouTube ? […] assure-toi que tous les titres du mix viennent uniquement de SoundCloud, mais
+ * l'audio tu peux mettre YouTube uniquement si c'est Go+ ou injouable."
  *
- * Both turned out to be about what a recommender does with a result it should not have accepted. The first was
- * upstream of the arithmetic — the wrong artist was resolved and the only endpoint used for them 404s — and is
- * covered by [MixArtistSeedTest]. This is the second: a candidate SoundCloud will not stream, which looks exactly
- * like a good one apart from two fields nothing else in the app has to care about.
+ * He was right and my first filter was wrong. `SNIP` and `SUB_HIGH_TIER` are Go+ — a real SoundCloud track whose
+ * full audio needs a subscription — and `StreamResolver` has resolved exactly those through YouTube for as long as
+ * the setting has existed. Excluding them threw away tracks the player would have played.
+ *
+ * So the rule these tests hold is the one he stated: a restricted track stays in the mix when there is a route to
+ * its audio, and is dropped only when there is none. The candidates are always SoundCloud's; only the route may
+ * differ.
  */
 class MixPlayabilityTest {
 
@@ -28,6 +32,7 @@ class MixPlayabilityTest {
         policy: String? = "MONETIZE",
         streamable: Boolean? = true,
         durationMs: Long = 200_000,
+        monetization: String? = null,
     ) = Track(
         id = id,
         title = "track $id",
@@ -36,60 +41,67 @@ class MixPlayabilityTest {
         durationMs = durationMs,
         playbackCount = 1_000,
         policy = policy,
+        monetizationModel = monetization,
         streamable = streamable,
     )
 
     private val emptyTaste = MixProfile.build(emptyList(), emptyList(), now)
 
     /**
-     * A blocked track is the blank row in his queue. Every other list in the app survives one because a human
-     * chose it and can see it failed; a mix chooses a hundred nobody looked at.
+     * The answer to his question, as an assertion. `SNIP` is Go+, the resolver gets it from YouTube, so it belongs
+     * in the mix — and the value is `SNIP`, not `SNIPPET`, which is what my first filter looked for and why it was
+     * a second wrong copy of a predicate that already existed.
      */
     @Test
-    fun `a blocked track is not a candidate`() {
-        assertFalse(MixRanking.isPlayable(track(1, policy = "BLOCK")))
-        assertNull(MixRanking.score(MixRanking.Candidate(track(1, policy = "BLOCK"), 1f), emptyTaste))
+    fun `a Go+ track stays in the mix when YouTube can play it`() {
+        assertTrue(MixRanking.isPlayable(track(1, policy = "SNIP"), youtubeFallback = true))
+        assertTrue(MixRanking.isPlayable(track(2, monetization = "SUB_HIGH_TIER"), youtubeFallback = true))
     }
 
-    /** Worse than a block, because it plays and then stops after thirty seconds. */
+    /** A blocked or unstreamable track is still a real SoundCloud track, and YouTube still has the song. */
     @Test
-    fun `a snippet is not a candidate`() {
-        assertFalse(MixRanking.isPlayable(track(2, policy = "SNIPPET")))
-        assertNull(MixRanking.score(MixRanking.Candidate(track(2, policy = "SNIPPET"), 1f), emptyTaste))
+    fun `a blocked or unstreamable track stays in when YouTube can play it`() {
+        assertTrue(MixRanking.isPlayable(track(3, policy = "BLOCK"), youtubeFallback = true))
+        assertTrue(MixRanking.isPlayable(track(4, streamable = false), youtubeFallback = true))
     }
 
+    /** With no route to the audio there is nothing to keep: a queue nobody vetted cannot carry a silent row. */
     @Test
-    fun `an unstreamable track is not a candidate`() {
-        assertFalse(MixRanking.isPlayable(track(3, streamable = false)))
-        assertNull(MixRanking.score(MixRanking.Candidate(track(3, streamable = false), 1f), emptyTaste))
+    fun `the same tracks are dropped when the fallback is off`() {
+        assertFalse(MixRanking.isPlayable(track(5, policy = "SNIP"), youtubeFallback = false))
+        assertFalse(MixRanking.isPlayable(track(6, policy = "BLOCK"), youtubeFallback = false))
+        assertFalse(MixRanking.isPlayable(track(7, monetization = "SUB_HIGH_TIER"), youtubeFallback = false))
+        assertFalse(MixRanking.isPlayable(track(8, streamable = false), youtubeFallback = false))
     }
 
-    /** The normal case, and the two fields being absent must not be read as a refusal. */
+    /** The normal case, and the fields being absent must never be read as a refusal. */
     @Test
-    fun `a monetized track is playable and so is one that says nothing`() {
-        assertTrue(MixRanking.isPlayable(track(4, policy = "MONETIZE")))
-        assertTrue(MixRanking.isPlayable(track(5, policy = "ALLOW")))
-        assertTrue(MixRanking.isPlayable(track(6, policy = null, streamable = null)))
+    fun `an ordinary track is playable either way`() {
+        listOf(true, false).forEach { fallback ->
+            assertTrue(MixRanking.isPlayable(track(9, policy = "MONETIZE"), fallback))
+            assertTrue(MixRanking.isPlayable(track(10, policy = "ALLOW"), fallback))
+            assertTrue(MixRanking.isPlayable(track(11, policy = null, streamable = null), fallback))
+        }
     }
 
-    /** Their casing is not consistent across endpoints, and a lowercase block is still a block. */
+    /** The running order follows the same rule, since that is what actually reaches the queue. */
     @Test
-    fun `the policy is read whatever its casing`() {
-        assertFalse(MixRanking.isPlayable(track(7, policy = "block")))
-        assertFalse(MixRanking.isPlayable(track(8, policy = "Snippet")))
-    }
-
-    /** And the whole point: an unplayable track never reaches the queue, however well it scored otherwise. */
-    @Test
-    fun `unplayable tracks are absent from the running order`() {
+    fun `the running order keeps restricted tracks only when they can be heard`() {
         val candidates = listOf(
-            MixRanking.Candidate(track(10, policy = "BLOCK"), 1f),
-            MixRanking.Candidate(track(11, streamable = false), 1f),
-            MixRanking.Candidate(track(12, policy = "SNIPPET"), 1f),
-            MixRanking.Candidate(track(13), 0.2f),
+            MixRanking.Candidate(track(20, policy = "BLOCK"), 1f),
+            MixRanking.Candidate(track(21, policy = "SNIP"), 1f),
+            MixRanking.Candidate(track(22), 0.2f),
         )
-        val order = MixRanking.order(candidates, emptyTaste, size = 10, seed = 1)
-        assertEquals(listOf(13L), order.map { it.id })
+        assertEquals(
+            listOf(20L, 21L, 22L),
+            MixRanking.order(candidates, emptyTaste, size = 10, seed = 1, youtubeFallback = true)
+                .map { it.id }.sorted(),
+        )
+        assertEquals(
+            listOf(22L),
+            MixRanking.order(candidates, emptyTaste, size = 10, seed = 1, youtubeFallback = false)
+                .map { it.id },
+        )
     }
 
     /**
@@ -124,7 +136,7 @@ class MixPlayabilityTest {
                 ),
             )
         }
-        val order = MixRanking.order(candidates, emptyTaste, size = 100, seed = 7)
+        val order = MixRanking.order(candidates, emptyTaste, size = 100, seed = 7, youtubeFallback = true)
         assertEquals(100, order.size, "a hundred candidates' worth of artists should fill a hundred slots")
         assertEquals(100, order.map { it.id }.distinct().size, "and none of them twice")
     }

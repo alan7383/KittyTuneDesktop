@@ -44,6 +44,15 @@ object MixEngine {
 
     private val api by lazy { RetrofitClient.create() }
 
+    /**
+     * Whether a Go+ or geo-blocked track can still be heard, which decides whether it belongs in a mix at all.
+     *
+     * Read from the setting each time rather than captured: somebody who turns the fallback off between two mixes
+     * should get the second one without those tracks.
+     */
+    private fun youtubeFallback(): Boolean =
+        com.alananasss.kittytune.data.local.PlayerPreferences().getYouTubeFallbackEnabled()
+
     /** How the mix was asked for. */
     sealed interface Recipe {
         /** From everything the listener plays. The plain "start mixing" press. */
@@ -117,7 +126,7 @@ object MixEngine {
             println("KittyTune mix: ${seeds.size} seeds -> ${candidates.size} candidates")
             if (candidates.isEmpty()) return@withContext Result.NothingFound(Result.Stage.NO_CANDIDATES)
 
-            val tracks = MixRanking.order(candidates, taste, size, seed = now)
+            val tracks = MixRanking.order(candidates, taste, size, seed = now, youtubeFallback = youtubeFallback())
             println("KittyTune mix: ${candidates.size} candidates -> ${tracks.size} tracks")
             if (tracks.isEmpty()) Result.NothingFound(Result.Stage.ALL_FILTERED)
             else Result.Mixed(tracks, describe(recipe, seeds))
@@ -289,7 +298,7 @@ object MixEngine {
         // The hop. Taken from the most popular of what was found rather than the first: a related lookup is only
         // as good as the track it starts from, and an obscure re-upload has no neighbours worth having.
         val hopSeeds = direct
-            .filter { MixRanking.isPlayable(it) }
+            .filter { MixRanking.isPlayable(it, youtubeFallback()) }
             .sortedByDescending { it.playbackCount }
             .take(HOP_SEEDS)
 
