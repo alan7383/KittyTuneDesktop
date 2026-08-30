@@ -69,6 +69,7 @@ fun AppearanceSettingsScreen(
     var appLanguage by remember { mutableStateOf(prefs.getAppLanguage()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
     var customFontEnabled by remember { mutableStateOf(prefs.getCustomFontEnabled()) }
+    var sidebarHoverExpand by remember { mutableStateOf(prefs.isSidebarHoverExpandEnabled()) }
 
     var showStartDestDialog by remember { mutableStateOf(false) }
     var showInfoHalfDialog by remember { mutableStateOf(false) }
@@ -358,7 +359,6 @@ fun AppearanceSettingsScreen(
                             shape = getSettingsShape(totalVisibleItems, 4),
                             title = str("pref_colors"),
                             subtitle = str("pref_colors_subtitle"),
-                            icon = Icons.Rounded.Palette,
                             onClick = onNavigateToColors
                         )
 
@@ -397,7 +397,6 @@ fun AppearanceSettingsScreen(
                             shape = getSettingsShape(totalVisibleItems, customizeIndex),
                             title = str("pref_customize_buttons"),
                             subtitle = str("pref_customize_buttons_sub"),
-                            icon = Icons.Rounded.Tune,
                             onClick = { showCustomizeDialog = true }
                         )
                     }
@@ -500,6 +499,19 @@ fun AppearanceSettingsScreen(
                                 onClick = if (customFontEnabled) {
                                     { showFontConfigDialog = true }
                                 } else null
+                            )
+                        },
+                        { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_sidebar_hover_expand"),
+                                subtitle = str("pref_sidebar_hover_expand_sub"),
+                                hasSwitch = true,
+                                switchState = sidebarHoverExpand,
+                                onSwitchChange = {
+                                    sidebarHoverExpand = it
+                                    prefs.setSidebarHoverExpandEnabled(it)
+                                }
                             )
                         }
                     )

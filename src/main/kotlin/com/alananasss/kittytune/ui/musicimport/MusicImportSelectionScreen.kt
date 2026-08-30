@@ -98,7 +98,6 @@ fun MusicImportSelectionScreen(
                                         shape = shape,
                                         title = stringResource(R.string.music_import_likes_title),
                                         subtitle = stringResource(R.string.music_import_likes_subtitle, viewModel.likedTracksCount),
-                                        icon = Icons.Rounded.Favorite,
                                         hasSwitch = true,
                                         switchState = viewModel.includeLikes,
                                         onSwitchChange = { viewModel.toggleLikes() }

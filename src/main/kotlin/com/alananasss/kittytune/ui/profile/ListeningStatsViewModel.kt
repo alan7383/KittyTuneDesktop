@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.alananasss.kittytune.data.ListeningStatsRepository
+import com.alananasss.kittytune.data.local.ListeningStatsEvent
 import com.alananasss.kittytune.data.local.StatsMonth
 import com.alananasss.kittytune.data.local.StatsSnapshot
 import com.alananasss.kittytune.data.local.TopArtistResult
@@ -109,6 +110,17 @@ class ListeningStatsViewModel : ViewModel() {
 
     fun refreshStats() = load()
 
+    suspend fun getAllPlaysForPeriod(): List<ListeningStatsEvent> =
+        ListeningStatsRepository.getEvents(sinceFor(selectedPeriod)).sortedByDescending { it.timestamp }
+
+    suspend fun getAllTracksForPeriod(): List<TopTrackResult> =
+        ListeningStatsRepository.getTopTracks(sinceFor(selectedPeriod), limit = 500)
+            .sortedWith(compareByDescending<TopTrackResult> { it.playCount }.thenByDescending { it.totalListenMs })
+
+    suspend fun getAllArtistsForPeriod(): List<TopArtistResult> =
+        ListeningStatsRepository.getTopArtists(sinceFor(selectedPeriod), limit = 500)
+            .sortedWith(compareByDescending<TopArtistResult> { it.playCount }.thenByDescending { it.totalListenMs })
+
     /**
      * Loads the selected period, replacing any load still in flight.
      *
@@ -176,16 +188,10 @@ class ListeningStatsViewModel : ViewModel() {
     }
 
     private fun sinceFor(period: StatsPeriod): Long {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
+        val now = System.currentTimeMillis()
         return when (period) {
-            // The current week, from its own first day — which is Monday or Sunday depending on where
-            // you are, so the calendar is asked rather than assumed.
-            StatsPeriod.WEEK -> cal.apply { set(Calendar.DAY_OF_WEEK, firstDayOfWeek) }.timeInMillis
-            StatsPeriod.MONTH -> cal.apply { set(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
+            StatsPeriod.WEEK -> now - 7L * 24 * 60 * 60 * 1000
+            StatsPeriod.MONTH -> now - 30L * 24 * 60 * 60 * 1000
             StatsPeriod.ALL_TIME -> 0L
         }
     }
