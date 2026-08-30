@@ -44,8 +44,8 @@ dependencies {
     implementation("org.jetbrains.androidx.navigation:navigation-compose:2.10.0-alpha02")
     implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
 
-    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.0")
 
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
