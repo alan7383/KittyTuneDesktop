@@ -35,9 +35,18 @@ enum class LyricsAlignment { LEFT, CENTER, RIGHT }
  * it, and [FOCUS] pushes the rest well back instead — the two treatments asked for, each useful
  * on a different kind of lyric sheet.
  */
-enum class LyricsDisplayStyle { STANDARD, SCALE, FOCUS }
+enum class LyricsDisplayStyle { STANDARD, SCALE, FOCUS, SCALE_FOCUS }
 
 enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
+/**
+ * What the full-screen player draws behind the words.
+ *
+ * [APPLE_MUSIC] was called `ORBS` and drew soft radial lights in the cover's shades; it is now the album
+ * art itself, stacked and twisted the way Apple Music's own background is — the same effect, not an
+ * impression of it, which is why it is named after it. See the legacy branch in
+ * [PlayerPreferences.getFullPlayerBgStyle] for what happens to a saved `ORBS`.
+ */
+enum class FullPlayerBgStyle { APPLE_MUSIC, BLUR, GRADIENT, PURE_BLACK }
 
 enum class AppLanguage(val code: String) {
     SYSTEM("system"),
@@ -83,6 +92,18 @@ class PlayerPreferences {
         private const val KEY_CONTINUOUS_PLAYBACK = "continuous_playback_enabled"
         private const val KEY_AUDIO_QUALITY = "audio_quality_pref"
         private const val KEY_PERSISTENT_QUEUE = "persistent_queue_enabled"
+        private const val KEY_QUEUE_PRESERVE_UPCOMING_ON_JUMP = "queue_preserve_upcoming_on_jump"
+        private const val KEY_MIX_DISLIKED_TRACK_IDS = "mix_disliked_track_ids"
+        private const val KEY_MINI_PLAYER_ENABLED = "mini_player_enabled"
+        private const val KEY_MINI_PLAYER_X = "mini_player_pos_x"
+        private const val KEY_MINI_PLAYER_Y = "mini_player_pos_y"
+        private const val KEY_MINI_PLAYER_WIDTH = "mini_player_width"
+        private const val KEY_FULL_PLAYER_BG_STYLE = "full_player_bg_style"
+
+        /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
+        private const val LEGACY_ORBS_STYLE = "ORBS"
+        private const val KEY_FULL_PLAYER_COVER_SCALE = "full_player_cover_scale"
+        private const val KEY_FULL_PLAYER_LYRICS_ALIGN = "full_player_lyrics_align"
         private const val KEY_SAVE_POSITION = "save_position_enabled"
         private const val KEY_START_DESTINATION = "start_destination_pref"
         private const val KEY_DYNAMIC_THEME = "dynamic_theme_enabled"
@@ -166,6 +187,7 @@ class PlayerPreferences {
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
         private const val KEY_LYRICS_FULLSCREEN_FONT_SIZE = "lyrics_fullscreen_font_size"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
+
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
         private const val KEY_LYRICS_TRANSLATION_ENABLED = "lyrics_translation_enabled"
         private const val KEY_LYRICS_TRANSLATION_LANG = "lyrics_translation_lang"
@@ -222,9 +244,13 @@ class PlayerPreferences {
         private const val KEY_PROXY_PASSWORD = "proxy_password"
         private const val KEY_PROXY_PROFILES = "proxy_profiles_json"
         private const val KEY_SELECTED_PROXY_PROFILE_ID = "selected_proxy_profile_id"
+        private const val KEY_SYNC_DISCLAIMER_DISMISSED = "sync_disclaimer_dismissed"
 
         private val queueLock = Any()
     }
+
+    fun isSyncDisclaimerDismissed(): Boolean = Prefs.getBoolean(KEY_SYNC_DISCLAIMER_DISMISSED, false)
+    fun setSyncDisclaimerDismissed(dismissed: Boolean) = Prefs.putBoolean(KEY_SYNC_DISCLAIMER_DISMISSED, dismissed)
 
     fun getSyncLikesEnabled(): Boolean = Prefs.getBoolean(KEY_SYNC_LIKES, true)
     fun setSyncLikesEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SYNC_LIKES, enabled)
@@ -412,6 +438,69 @@ class PlayerPreferences {
     fun setAudioQuality(quality: String) = Prefs.putString(KEY_AUDIO_QUALITY, quality)
     fun getPersistentQueueEnabled(): Boolean = Prefs.getBoolean(KEY_PERSISTENT_QUEUE, true)
     fun setPersistentQueueEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PERSISTENT_QUEUE, enabled)
+    fun getQueuePreserveUpcomingOnJump(): Boolean = Prefs.getBoolean(KEY_QUEUE_PRESERVE_UPCOMING_ON_JUMP, true)
+    fun setQueuePreserveUpcomingOnJump(enabled: Boolean) = Prefs.putBoolean(KEY_QUEUE_PRESERVE_UPCOMING_ON_JUMP, enabled)
+    fun getMixDislikedTrackIds(): Set<Long> {
+        val json = Prefs.getString(KEY_MIX_DISLIKED_TRACK_IDS, null) ?: return emptySet()
+        return try {
+            gson.fromJson(json, object : com.google.gson.reflect.TypeToken<Set<Long>>() {}.type) ?: emptySet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+    fun addMixDislikedTrack(trackId: Long) {
+        val current = getMixDislikedTrackIds().toMutableSet()
+        current.add(trackId)
+        Prefs.putString(KEY_MIX_DISLIKED_TRACK_IDS, gson.toJson(current))
+    }
+    fun removeMixDislikedTrack(trackId: Long) {
+        val current = getMixDislikedTrackIds().toMutableSet()
+        current.remove(trackId)
+        Prefs.putString(KEY_MIX_DISLIKED_TRACK_IDS, gson.toJson(current))
+    }
+    fun isMixTrackDisliked(trackId: Long): Boolean = getMixDislikedTrackIds().contains(trackId)
+
+    fun getMiniPlayerEnabled(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_ENABLED, false)
+    fun setMiniPlayerEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_ENABLED, enabled)
+    fun miniPlayerEnabledFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_ENABLED, false)
+
+    fun getMiniPlayerX(): Int? = Prefs.getInt(KEY_MINI_PLAYER_X, -1).takeIf { it >= 0 }
+    fun getMiniPlayerY(): Int? = Prefs.getInt(KEY_MINI_PLAYER_Y, -1).takeIf { it >= 0 }
+    fun getMiniPlayerWidth(): Int = Prefs.getInt(KEY_MINI_PLAYER_WIDTH, 560).coerceIn(320, 1200)
+
+    fun setMiniPlayerBounds(x: Int, y: Int, width: Int) {
+        Prefs.putInt(KEY_MINI_PLAYER_X, x)
+        Prefs.putInt(KEY_MINI_PLAYER_Y, y)
+        Prefs.putInt(KEY_MINI_PLAYER_WIDTH, width.coerceIn(320, 1200))
+    }
+
+        fun getFullPlayerBgStyle(): FullPlayerBgStyle {
+        val name = Prefs.getString(KEY_FULL_PLAYER_BG_STYLE, FullPlayerBgStyle.APPLE_MUSIC.name)
+        // "ORBS" is what this style was called when it drew radial lights instead of the sleeve. Anyone who
+        // ever opened the setting has it written down, and dropping them to the default would look like the
+        // preference had been forgotten rather than renamed.
+        if (name == LEGACY_ORBS_STYLE) return FullPlayerBgStyle.APPLE_MUSIC
+        return try {
+            FullPlayerBgStyle.valueOf(name ?: FullPlayerBgStyle.APPLE_MUSIC.name)
+        } catch (_: Exception) {
+            FullPlayerBgStyle.APPLE_MUSIC
+        }
+    }
+    fun setFullPlayerBgStyle(style: FullPlayerBgStyle) = Prefs.putString(KEY_FULL_PLAYER_BG_STYLE, style.name)
+
+    fun getFullPlayerCoverScale(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_SCALE, 1.0f).coerceIn(0.6f, 1.4f)
+    fun setFullPlayerCoverScale(scale: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_SCALE, scale.coerceIn(0.6f, 1.4f))
+
+    fun getFullPlayerLyricsAlign(): LyricsAlignment {
+        val name = Prefs.getString(KEY_FULL_PLAYER_LYRICS_ALIGN, LyricsAlignment.LEFT.name)
+        return try {
+            LyricsAlignment.valueOf(name ?: LyricsAlignment.LEFT.name)
+        } catch (_: Exception) {
+            LyricsAlignment.LEFT
+        }
+    }
+    fun setFullPlayerLyricsAlign(align: LyricsAlignment) = Prefs.putString(KEY_FULL_PLAYER_LYRICS_ALIGN, align.name)
+
     fun getSavePositionEnabled(): Boolean = Prefs.getBoolean(KEY_SAVE_POSITION, true)
     fun setSavePositionEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SAVE_POSITION, enabled)
 
@@ -472,6 +561,7 @@ class PlayerPreferences {
 
     fun getLyricsAppleEffectEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_APPLE_EFFECT, true)
     fun setLyricsAppleEffectEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_APPLE_EFFECT, enabled)
+
 
     fun getLyricsWordSyncEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_WORD_SYNC, true)
     fun setLyricsWordSyncEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_WORD_SYNC, enabled)

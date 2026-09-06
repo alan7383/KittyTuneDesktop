@@ -122,6 +122,8 @@ fun AudioSettingsScreen(
 
     var showNormDialog by remember { mutableStateOf(false) }
     var showNormalizationInfoDialog by remember { mutableStateOf(false) }
+    var showFullPlayerBgDialog by remember { mutableStateOf(false) }
+    var showFullPlayerCoverZoomDialog by remember { mutableStateOf(false) }
 
     if (showNormDialog) {
         EscapableAlertDialog(
@@ -329,6 +331,87 @@ fun AudioSettingsScreen(
         )
     }
 
+    if (showFullPlayerBgDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showFullPlayerBgDialog = false },
+            title = { Text(str("full_player_bg_style")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.entries.forEach { style ->
+                        val name = when (style) {
+                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC -> str("full_player_bg_apple_music")
+                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.BLUR -> str("full_player_bg_blur")
+                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.GRADIENT -> str("full_player_bg_gradient")
+                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.PURE_BLACK -> str("full_player_bg_pure_black")
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    playerViewModel.updateFullPlayerBgStyle(style)
+                                    showFullPlayerBgDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = playerViewModel.fullPlayerBgStyle == style,
+                                onClick = null
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(name)
+                            // Only while it is the style in use: the aside is about the background you are
+                            // looking at, not about an option in a list.
+                            if (style == com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC &&
+                                playerViewModel.fullPlayerBgStyle == style
+                            ) {
+                                Spacer(Modifier.width(4.dp))
+                                com.alananasss.kittytune.ui.common.FunFactDot(
+                                    str("full_player_bg_apple_music_fact")
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFullPlayerBgDialog = false }) {
+                    Text(str("btn_cancel"))
+                }
+            }
+        )
+    }
+
+    if (showFullPlayerCoverZoomDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showFullPlayerCoverZoomDialog = false },
+            title = { Text(str("full_player_cover_zoom")) },
+            text = {
+                Column {
+                    Text(
+                        "${(playerViewModel.fullPlayerCoverScale * 100).toInt()}%",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Slider(
+                        value = playerViewModel.fullPlayerCoverScale,
+                        onValueChange = { playerViewModel.updateFullPlayerCoverScale(it) },
+                        valueRange = 0.6f..1.4f,
+                        steps = 15,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showFullPlayerCoverZoomDialog = false }) {
+                    Text(str("btn_ok"))
+                }
+            }
+        )
+    }
+
     if (showQualityDialog) {
         EscapableAlertDialog(
             onDismissRequest = { showQualityDialog = false },
@@ -424,18 +507,19 @@ fun AudioSettingsScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         val isNormEnabled = playerViewModel.effectsState.isNormalizationEnabled
                         val isGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
-                        val totalVisibleItems = if (!isGuest) 10 else 9
+                        val totalVisibleItems = if (!isGuest) 11 else 10
 
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) })
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) })
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 2), title = str("pref_stop_on_task_clear"), hasSwitch = true, switchState = stopOnTaskClear, onSwitchChange = { stopOnTaskClear = it; prefs.setStopOnTaskClear(it) })
                         SettingsItem(shape = getSettingsShape(totalVisibleItems, 3), title = str("pref_persist_queue"), subtitle = str("pref_persist_queue_sub"), hasSwitch = true, switchState = persistentQueueEnabled, onSwitchChange = { persistentQueueEnabled = it; prefs.setPersistentQueueEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 4), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 4), title = str("pref_queue_preserve_upcoming"), subtitle = str("pref_queue_preserve_upcoming_sub"), hasSwitch = true, switchState = playerViewModel.isQueuePreserveUpcomingEnabled, onSwitchChange = { playerViewModel.toggleQueuePreserveUpcoming(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 7), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) })
                         
                         SplitSettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 7),
+                            shape = getSettingsShape(totalVisibleItems, 8),
                             title = str("pref_norm_title"),
                             subtitle = str("pref_norm_sub"),
                             onClick = { showNormDialog = true },
@@ -446,7 +530,7 @@ fun AudioSettingsScreen(
                         if (!isGuest) {
                             var scHistorySyncEnabled by remember { mutableStateOf(prefs.getSoundCloudHistorySyncEnabled()) }
                             SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 8),
+                                shape = getSettingsShape(totalVisibleItems, 9),
                                 title = str("pref_sc_sync_title"),
                                 subtitle = str("pref_sc_sync_sub"),
                                 hasSwitch = true,
@@ -461,7 +545,7 @@ fun AudioSettingsScreen(
                         // Last, because the wheel over the progress bar works out of the box and this
                         // only changes how far a notch goes (issue #33).
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, if (!isGuest) 9 else 8),
+                            shape = getSettingsShape(totalVisibleItems, if (!isGuest) 10 else 9),
                             title = str("pref_seek_wheel_step"),
                             subtitle = str(
                                 "pref_seek_wheel_step_value",
@@ -605,6 +689,35 @@ fun AudioSettingsScreen(
                                 hasSwitch = true,
                                 switchState = playerViewModel.effectsState.isMonoEnabled,
                                 onSwitchChange = { playerViewModel.toggleMono() }
+                            )
+                        }
+                    )
+                )
+            }
+
+            Box {
+                SettingsGroup(
+                    title = str("full_player_section_title"),
+                    items = listOf(
+                        { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("full_player_bg_style"),
+                                subtitle = when (playerViewModel.fullPlayerBgStyle) {
+                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC -> str("full_player_bg_apple_music")
+                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.BLUR -> str("full_player_bg_blur")
+                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.GRADIENT -> str("full_player_bg_gradient")
+                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.PURE_BLACK -> str("full_player_bg_pure_black")
+                                },
+                                onClick = { showFullPlayerBgDialog = true }
+                            )
+                        },
+                        { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("full_player_cover_zoom"),
+                                subtitle = "${(playerViewModel.fullPlayerCoverScale * 100).toInt()}%",
+                                onClick = { showFullPlayerCoverZoomDialog = true }
                             )
                         }
                     )

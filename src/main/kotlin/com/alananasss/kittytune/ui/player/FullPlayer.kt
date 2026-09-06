@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.HeartBroken
 import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -37,8 +38,13 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.blur
+import com.alananasss.kittytune.data.local.FullPlayerBgStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -155,16 +161,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(palette.base)
-            .drawBehind { drawMesh(palette, drift) }
-            // Nothing behind this is reachable while it is up. "Quand on survole la souris en plein écran, les
-            // trucs sont sélectionnables derrière le pop up, donc le truc de volume on peut y accéder" — the
-            // player bar and the panels are still laid out underneath, and a Box hit-tests every child it
-            // covers rather than stopping at the top one.
-            //
-            // Consumed on the Final pass, which is the only place this works: Initial runs parent-before-child
-            // and would swallow this screen's own controls, while by Final anything of ours has had its turn
-            // and everything left is on its way to something underneath.
+            // Nothing behind this is reachable while it is up.
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -174,6 +171,13 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 }
             }
     ) {
+        FullPlayerBackground(
+            style = viewModel.fullPlayerBgStyle,
+            palette = palette,
+            drift = drift,
+            artworkUrl = track.fullResArtwork
+        )
+
         val totalWidth = maxWidth
         val fullLyricsWidth = totalWidth * (LYRICS_SHARE / (1f + LYRICS_SHARE))
         val progress = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f)
@@ -274,8 +278,102 @@ private class FullPlayerPalette(
     val dim: Color,
 )
 
+@Composable
+private fun FullPlayerBackground(
+    style: FullPlayerBgStyle,
+    palette: FullPlayerPalette,
+    drift: Float,
+    artworkUrl: String?,
+) {
+    when (style) {
+        FullPlayerBgStyle.APPLE_MUSIC -> {
+            FluidArtworkBackground(artworkUrl = artworkUrl, modifier = Modifier.fillMaxSize()) {
+                // The lights are the stand-in, not the effect. A sleeve has to be fetched and decoded before
+                // there is anything to twist, and the honest alternative — a flat rectangle for a second or
+                // two after the screen opens — is the thing three rounds of the old background were spent
+                // removing. This is also what is left on a track with no artwork.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(palette.base)
+                        .drawBehind { drawMesh(palette, drift) }
+                )
+            }
+        }
+        FullPlayerBgStyle.BLUR -> {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(palette.base)
+            ) {
+                if (!artworkUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = artworkUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .blur(70.dp)
+                            .graphicsLayer { alpha = 0.55f }
+                    )
+                }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.40f),
+                                    Color.Black.copy(alpha = 0.70f)
+                                )
+                            )
+                        )
+                )
+            }
+        }
+        FullPlayerBgStyle.GRADIENT -> {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                palette.mesh.firstOrNull() ?: palette.base,
+                                palette.base
+                            ),
+                            center = Offset.Unspecified,
+                            radius = Float.POSITIVE_INFINITY
+                        )
+                    )
+                    .drawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                listOf(
+                                    palette.mesh.getOrElse(0) { palette.base }.copy(alpha = 0.6f),
+                                    palette.base
+                                )
+                            )
+                        )
+                    }
+            )
+        }
+        FullPlayerBgStyle.PURE_BLACK -> {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF080808))
+            )
+        }
+    }
+}
+
 /**
- * The background: several huge soft lights of the record's colour, drifting.
+ * Several huge soft lights of the record's colour, drifting.
+ *
+ * No longer the background it was written to be: [FluidArtworkBackground] is, and this stands in for the
+ * second or so before the sleeve has been decoded — plus for good on a track that has no artwork, or a
+ * machine whose driver refuses the shader. Kept rather than deleted because those cases are exactly the ones
+ * a flat rectangle would look broken in, and this is a background that needs nothing but four colours.
  *
  * "Refais aussi le fond car un fond simple comme ça c'est pas ouf, refais-le entièrement, faut que ça claque
  * mais lisible."
@@ -521,9 +619,9 @@ private fun CoverColumn(
     val track = viewModel.currentTrack ?: return
 
     BoxWithConstraints {
-        // The cap rises as the words leave, so the sleeve grows into the space instead of being re-centred in
-        // it. Re-centring alone is what read as a jump even once the widths were animating (issue #33).
-        val cap = COVER_MAX + (COVER_MAX_ALONE - COVER_MAX) * roomToItself
+        // The cap rises as the words leave, and incorporates user cover zoom factor
+        val coverScale = viewModel.fullPlayerCoverScale
+        val cap = (COVER_MAX + (COVER_MAX_ALONE - COVER_MAX) * roomToItself) * coverScale
         val side = min(min(maxWidth, maxHeight * 0.56f), cap)
 
         Column(horizontalAlignment = Alignment.Start) {
@@ -537,14 +635,26 @@ private fun CoverColumn(
                     // A real shadow, because in the reference the sleeve sits above the wall rather than
                     // being printed on it. It is most of what makes that screen feel like an object.
                     .shadow(28.dp, RoundedCornerShape(14.dp), clip = false)
-                    .clip(RoundedCornerShape(14.dp)),
+                    .clip(RoundedCornerShape(14.dp))
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                                if (scrollDelta != 0f) {
+                                    val next = (viewModel.fullPlayerCoverScale - scrollDelta * 0.04f).coerceIn(0.6f, 1.4f)
+                                    viewModel.updateFullPlayerCoverScale(next)
+                                }
+                            }
+                        }
+                    },
             )
 
-            Spacer(Modifier.height(22.dp))
+            Spacer(Modifier.height(18.dp))
             Box(Modifier.width(side)) {
                 TrackCredit(viewModel = viewModel, palette = palette)
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             Box(Modifier.width(side)) {
                 FullPlayerControls(
                     viewModel = viewModel,
@@ -620,6 +730,16 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
             size = 22.dp,
             onClick = { viewModel.toggleLike() },
         )
+        if (viewModel.isYourMixActive) {
+            Spacer(Modifier.width(6.dp))
+            QuietButton(
+                icon = Icons.Outlined.HeartBroken,
+                label = str("mix_dislike"),
+                tint = palette.dim,
+                size = 22.dp,
+                onClick = { viewModel.dislikeCurrentTrackInMix() },
+            )
+        }
     }
 }
 
@@ -642,7 +762,7 @@ private fun FullPlayerControls(
     Column(Modifier.fillMaxWidth()) {
         FullPlayerSeekBar(viewModel, palette)
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -691,6 +811,117 @@ private fun FullPlayerControls(
                 onClick = onToggleText,
             )
         }
+
+        Spacer(Modifier.height(6.dp))
+        FullPlayerVolumeBar(viewModel = viewModel, palette = palette)
+    }
+}
+
+@Composable
+private fun FullPlayerVolumeBar(
+    viewModel: PlayerViewModel,
+    palette: FullPlayerPalette,
+) {
+    val vol = viewModel.volume.coerceIn(0f, 1f)
+    val volPercent = (vol * 100).toInt()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                        if (scrollDelta != 0f) {
+                            val next = (viewModel.volume - scrollDelta * 0.02f).coerceIn(0f, 1f)
+                            viewModel.updateVolume(next)
+                            viewModel.persistVolumeSoon()
+                        }
+                    }
+                }
+            },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        val volumeIcon = when {
+            vol <= 0.001f -> Icons.AutoMirrored.Filled.VolumeOff
+            vol < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
+            else -> Icons.AutoMirrored.Filled.VolumeUp
+        }
+
+        QuietButton(
+            icon = volumeIcon,
+            label = str("volume_title"),
+            tint = palette.dim,
+            size = 18.dp,
+            onClick = { viewModel.toggleMute() }
+        )
+
+        var scrubbingVolume by remember { mutableStateOf(false) }
+        var scrubVolFraction by remember { mutableFloatStateOf(vol) }
+
+        val activeFraction = if (scrubbingVolume) scrubVolFraction else vol
+
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(20.dp)
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            scrubbingVolume = true
+                            scrubVolFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                            viewModel.updateVolume(scrubVolFraction)
+                        },
+                        onDragEnd = {
+                            viewModel.updateVolume(scrubVolFraction)
+                            viewModel.persistVolumeSoon()
+                            scrubbingVolume = false
+                        },
+                        onDragCancel = { scrubbingVolume = false },
+                        onHorizontalDrag = { change, _ ->
+                            scrubVolFraction = (change.position.x / size.width).coerceIn(0f, 1f)
+                            viewModel.updateVolume(scrubVolFraction)
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures { offset ->
+                        val next = (offset.x / size.width).coerceIn(0f, 1f)
+                        viewModel.updateVolume(next)
+                        viewModel.persistVolumeSoon()
+                    }
+                }
+                .drawBehind {
+                    val track = 3.dp.toPx()
+                    val y = size.height / 2f
+                    val radius = track / 2f
+                    drawRoundRect(
+                        color = palette.dim.copy(alpha = 0.22f),
+                        topLeft = Offset(0f, y - radius),
+                        size = androidx.compose.ui.geometry.Size(size.width, track),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius),
+                    )
+                    val played = size.width * activeFraction
+                    if (played > 0f) {
+                        drawRoundRect(
+                            color = palette.dim.copy(alpha = 0.8f),
+                            topLeft = Offset(0f, y - radius),
+                            size = androidx.compose.ui.geometry.Size(played, track),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius),
+                        )
+                    }
+                    drawCircle(color = palette.bright, radius = track * 1.3f, center = Offset(played, y))
+                }
+        )
+
+        androidx.compose.material3.Text(
+            text = "$volPercent%",
+            style = MaterialTheme.typography.labelSmall,
+            color = palette.dim,
+            modifier = Modifier.width(36.dp)
+        )
     }
 }
 

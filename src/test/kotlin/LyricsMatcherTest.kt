@@ -188,6 +188,21 @@ class LyricsMatcherTest {
         assertFalse(LyricsMatcher.isAcceptable("Другая песня", "Кто-то", cyrillic))
     }
 
+    @Test
+    fun `soundCloud track with channel uploader correctly matches candidate parsed artist and title`() {
+        val soundCloudTrack = LyricsMatcher.Target(
+            title = "Resonance",
+            artist = "HOME",
+            durationMs = 212_000L,
+            alternativeTitles = listOf("HOME - Resonance", "Resonance"),
+            alternativeArtists = listOf("Electronic Gems", "HOME"),
+        )
+        val rightSongScore = LyricsMatcher.score("Resonance", "HOME", 212.0, soundCloudTrack)
+        val strangerSongScore = LyricsMatcher.score("Resonance", "Completely Different Artist", 212.0, soundCloudTrack)
+        assertTrue("right song should score >= 0.95f, was $rightSongScore", rightSongScore >= 0.95f)
+        assertTrue("stranger song should score < 0.78f, was $strangerSongScore", strangerSongScore < 0.78f)
+        assertTrue(LyricsMatcher.isAcceptable("Resonance", "HOME", soundCloudTrack))
+    }
 }
 
 /**

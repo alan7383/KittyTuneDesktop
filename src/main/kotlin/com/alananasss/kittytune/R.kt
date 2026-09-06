@@ -547,6 +547,8 @@ object R {
         const val pref_stop_on_task_clear = "pref_stop_on_task_clear"
         const val pref_persist_queue = "pref_persist_queue"
         const val pref_persist_queue_sub = "pref_persist_queue_sub"
+        const val pref_queue_preserve_upcoming = "pref_queue_preserve_upcoming"
+        const val pref_queue_preserve_upcoming_sub = "pref_queue_preserve_upcoming_sub"
         const val pref_quality = "pref_quality"
         const val quality_high = "quality_high"
         const val quality_low = "quality_low"

@@ -133,6 +133,18 @@ object MusicManager {
 
             // Note: playTrack is used for direct URI launches, normal playback uses PlayerViewModel.playRobustly
             val headers = buildStreamHeaders(track)
+            val cached = TrackLoudnessRepository.getLoudness(track.id)
+            if (cached != null) {
+                player.activeEngine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
+            } else {
+                player.activeEngine.clearTrackLoudness()
+                TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
+                    if (currentTrack?.id == track.id) {
+                        player.activeEngine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                    }
+                }
+            }
+
             player.setMediaItemUrl(url, headers, startPositionMs)
             player.prepare()
             if (autoPlay) player.play()

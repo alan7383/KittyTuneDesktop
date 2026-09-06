@@ -123,7 +123,6 @@ fun MainTopBar(
                 vm.onSearchQueryChanged(it)
                 if (currentRoute != "home" && it.isNotBlank()) {
                     navController.navigate("home") {
-                        popUpTo("home") { inclusive = false }
                         launchSingleTop = true
                     }
                 }

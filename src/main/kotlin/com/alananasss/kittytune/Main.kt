@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 package com.alananasss.kittytune
 
 import androidx.compose.material3.Surface
@@ -35,6 +36,8 @@ import com.alananasss.kittytune.ui.main.MainScreen
 import com.alananasss.kittytune.ui.setup.SetupScreen
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.core.AppInstance
+import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -44,7 +47,7 @@ import androidx.compose.ui.input.key.isShiftPressed
 enum class AppState { WELCOME, LOGIN, SETUP, MAIN }
 
 @Composable
-fun AppRouter() {
+fun AppRouter(playerViewModel: PlayerViewModel? = null) {
     val tokenManager = remember { TokenManager }
     val isLoggedIn = !tokenManager.getAccessToken().isNullOrEmpty()
     val isGuestMode = tokenManager.isGuestMode()
@@ -81,7 +84,7 @@ fun AppRouter() {
         AppState.SETUP -> SetupScreen(
             onSetupComplete = { appState = AppState.MAIN }
         )
-        AppState.MAIN -> MainScreen()
+        AppState.MAIN -> if (playerViewModel != null) MainScreen(playerViewModel = playerViewModel) else MainScreen()
     }
 }
 
@@ -90,6 +93,7 @@ fun main() {
     AppBootstrap.init()
 
     application {
+        val playerViewModel = remember { PlayerViewModel(AppInstance.application) }
         val prefsForTray = remember { PlayerPreferences() }
         val stopOnTaskClear by prefsForTray.stopOnTaskClearFlow().collectAsState(initial = prefsForTray.getStopOnTaskClear())
 
@@ -105,15 +109,79 @@ fun main() {
                 }
             }.getOrNull()
         }
+        val trayIcon = androidx.compose.runtime.remember(appIconVariant) {
+            com.alananasss.kittytune.core.AppIconRuntime.loadTrayPainter(appIconVariant) ?: appIcon
+        }
         var isWindowVisible by remember { mutableStateOf(true) }
 
-        if (!stopOnTaskClear && appIcon != null) {
+        fun showMainWindow() {
+            isWindowVisible = true
+            val win = java.awt.Window.getWindows().firstOrNull { it is androidx.compose.ui.awt.ComposeWindow }
+                ?: java.awt.Window.getWindows().firstOrNull { it.isVisible }
+            win?.let { w ->
+                runCatching {
+                    w.isVisible = true
+                    if (w is java.awt.Frame && (w.extendedState and java.awt.Frame.ICONIFIED) != 0) {
+                        w.extendedState = w.extendedState and java.awt.Frame.ICONIFIED.inv()
+                    }
+                    w.toFront()
+                    w.requestFocus()
+                }
+            }
+        }
+
+        val osName = remember { System.getProperty("os.name").lowercase() }
+        val isLinux = remember { osName.contains("linux") || osName.contains("nix") }
+
+        var useSniTray by remember { mutableStateOf(isLinux) }
+
+        if (isLinux) {
+            androidx.compose.runtime.DisposableEffect(appIconVariant) {
+                runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
+                val iconBaseName = if (appIconVariant == "og") "kittytune" else "kittytune-$appIconVariant"
+                val service = com.alananasss.kittytune.core.LinuxStatusNotifierService(
+                    iconName = iconBaseName,
+                    isMiniPlayerVisible = { playerViewModel.isMiniPlayerVisible },
+                    onActivate = { showMainWindow() },
+                    onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
+                    onExit = {
+                        com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                        exitApplication()
+                    },
+                    onContextMenu = { x, y ->
+                        com.alananasss.kittytune.core.LinuxTrayMenuHelper.showMenu(
+                            preferredX = x,
+                            preferredY = y,
+                            isMiniPlayerVisible = { playerViewModel.isMiniPlayerVisible },
+                            onShowWindow = { showMainWindow() },
+                            onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
+                            onExit = {
+                                com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                                exitApplication()
+                            }
+                        )
+                    }
+                )
+                val started = service.start()
+                useSniTray = started
+
+                onDispose {
+                    service.close()
+                }
+            }
+        }
+
+        if (trayIcon != null && !useSniTray) {
             Tray(
-                icon = appIcon,
+                icon = trayIcon,
                 tooltip = "KittyTune",
-                onAction = { isWindowVisible = true },
+                onAction = { showMainWindow() },
                 menu = {
-                    Item(str("menu_show_window"), onClick = { isWindowVisible = true })
+                    Item(str("menu_show_window"), onClick = { showMainWindow() })
+                    Item(
+                        if (playerViewModel.isMiniPlayerVisible) str("menu_mini_player_hide") else str("menu_mini_player_show"),
+                        onClick = { playerViewModel.toggleMiniPlayer() }
+                    )
                     Item(str("menu_exit"), onClick = { com.alananasss.kittytune.core.AppInstance.isShuttingDown = true; exitApplication() })
                 }
             )
@@ -129,12 +197,20 @@ fun main() {
             size = DpSize(1440.dp, 900.dp),
             position = androidx.compose.ui.window.WindowPosition(androidx.compose.ui.Alignment.Center),
         )
-        val placementBeforeFullScreen = remember {
-            mutableStateOf(androidx.compose.ui.window.WindowPlacement.Floating)
+        var savedPlacement by remember { mutableStateOf(androidx.compose.ui.window.WindowPlacement.Floating) }
+        var savedFloatingSize by remember { mutableStateOf(DpSize(1440.dp, 900.dp)) }
+        var savedFloatingPosition by remember { mutableStateOf<androidx.compose.ui.window.WindowPosition>(androidx.compose.ui.window.WindowPosition(androidx.compose.ui.Alignment.Center)) }
+
+        // Track user's chosen placement and floating dimensions whenever not in fullscreen
+        if (windowState.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+            savedPlacement = windowState.placement
+            if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating) {
+                savedFloatingSize = windowState.size
+                savedFloatingPosition = windowState.position
+            }
         }
-        // Keyed on the flag *and* on the placement, so it re-asserts rather than firing once. A window manager
-        // that declines a placement change — or grants it and then puts the window back itself, which
-        // happens — used to leave the two permanently out of step with no way back (issue #33).
+
+        // Re-assert placement changes between Compose window state and AppWindowState.fullScreen
         LaunchedEffect(
             com.alananasss.kittytune.core.AppWindowState.fullScreen,
             windowState.placement,
@@ -142,16 +218,48 @@ fun main() {
             val wanted = com.alananasss.kittytune.core.AppWindowState.fullScreen
             val isFullScreen = windowState.placement == androidx.compose.ui.window.WindowPlacement.Fullscreen
             if (wanted && !isFullScreen) {
-                placementBeforeFullScreen.value = windowState.placement
+                savedPlacement = windowState.placement
+                if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating) {
+                    savedFloatingSize = windowState.size
+                    savedFloatingPosition = windowState.position
+                }
                 windowState.placement = androidx.compose.ui.window.WindowPlacement.Fullscreen
             } else if (!wanted && isFullScreen) {
-                // Never back to Fullscreen, whatever was stored: that is how a restore turns into a no-op.
-                windowState.placement = placementBeforeFullScreen.value
-                    .takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
+                val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
                     ?: androidx.compose.ui.window.WindowPlacement.Floating
+                if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
+                    windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                    windowState.size = savedFloatingSize
+                    windowState.position = savedFloatingPosition
+                } else {
+                    windowState.placement = restorePlacement
+                }
             }
         }
 
+        CompositionLocalProvider(
+            androidx.compose.ui.window.LocalWindowExceptionHandlerFactory provides androidx.compose.ui.window.WindowExceptionHandlerFactory { window ->
+                androidx.compose.ui.window.WindowExceptionHandler { throwable ->
+                    var curr: Throwable? = throwable
+                    var isBenign = false
+                    while (curr != null) {
+                        val msg = curr.message.orEmpty()
+                        if (msg.contains("RootNodeOwner is already disposed", ignoreCase = true) ||
+                            (msg.contains("ComposeScene", ignoreCase = true) && msg.contains("disposed", ignoreCase = true)) ||
+                            (msg.contains("Owner is already disposed", ignoreCase = true))
+                        ) {
+                            isBenign = true
+                            break
+                        }
+                        curr = curr.cause
+                    }
+                    if (!isBenign) {
+                        Thread.currentThread().uncaughtExceptionHandler?.uncaughtException(Thread.currentThread(), throwable)
+                            ?: throwable.printStackTrace()
+                    }
+                }
+            }
+        ) {
         Window(
             visible = isWindowVisible,
             onCloseRequest = {
@@ -265,6 +373,13 @@ fun main() {
                     runCatching {
                         val device = window.graphicsConfiguration?.device
                         if (device?.fullScreenWindow === window) device.fullScreenWindow = null
+                        if (window is java.awt.Frame) {
+                            if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                                window.extendedState = java.awt.Frame.MAXIMIZED_BOTH
+                            } else if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
+                                window.extendedState = java.awt.Frame.NORMAL
+                            }
+                        }
                     }
                 }
             }
@@ -291,10 +406,15 @@ fun main() {
                     // a colour read once at startup (issue #33).
                     ThemedTitleBarEffect(window)
                     ThemedWindowBackgroundEffect(window)
-                    Surface { AppRouter() }
+                    Surface { AppRouter(playerViewModel = playerViewModel) }
                 }
             }
         } // End Window
+        } // End CompositionLocalProvider
+
+        if (playerViewModel.isMiniPlayerVisible) {
+            com.alananasss.kittytune.ui.player.mini.MiniLyricsPlayerWindow(viewModel = playerViewModel)
+        }
     } // End application
 } // End main
 
@@ -329,30 +449,66 @@ private fun ThemedTitleBarEffect(window: java.awt.Window) {
 }
 
 /**
- * Sets the underlying AWT Window and component background to match the dynamic theme palette.
- * This prevents the white Win32/DirectX background from showing through during rapid window resize (issue #33).
+ * Sets the underlying AWT Window, root panes and child canvas components to match the dynamic theme palette.
+ * Uses synchronous DisposableEffect with hierarchy and resize listeners to prevent light/gray flashes during resize.
  */
 @Composable
 private fun ThemedWindowBackgroundEffect(window: java.awt.Window) {
     val scheme = androidx.compose.material3.MaterialTheme.colorScheme
-    val background = scheme.background
+    val background = scheme.surfaceContainerLowest
 
-    androidx.compose.runtime.LaunchedEffect(background) {
-        val r = (background.red * 255f).toInt().coerceIn(0, 255)
-        val g = (background.green * 255f).toInt().coerceIn(0, 255)
-        val b = (background.blue * 255f).toInt().coerceIn(0, 255)
-        val awtBg = java.awt.Color(r, g, b)
+    val r = (background.red * 255f).toInt().coerceIn(0, 255)
+    val g = (background.green * 255f).toInt().coerceIn(0, 255)
+    val b = (background.blue * 255f).toInt().coerceIn(0, 255)
+    val awtBg = remember(r, g, b) { java.awt.Color(r, g, b) }
 
+    androidx.compose.runtime.DisposableEffect(window, awtBg) {
         fun applyBg(comp: java.awt.Component?) {
-            if (comp == null) return
-            comp.background = awtBg
+            if (comp == null || !window.isDisplayable) return
+            runCatching {
+                comp.background = awtBg
+                if (comp is javax.swing.JComponent) {
+                    comp.isOpaque = true
+                }
+            }
             if (comp is java.awt.Container) {
-                for (child in comp.components) {
+                val children = runCatching { comp.components }.getOrNull() ?: return
+                for (child in children) {
                     applyBg(child)
                 }
             }
         }
 
-        applyBg(window)
+        fun applyAll() {
+            if (!window.isDisplayable) return
+            runCatching {
+                window.background = awtBg
+                if (window is javax.swing.JFrame) {
+                    window.rootPane?.background = awtBg
+                    window.contentPane?.background = awtBg
+                    window.layeredPane?.background = awtBg
+                }
+                applyBg(window)
+            }
+        }
+
+        applyAll()
+
+        val hierarchyListener = java.awt.event.HierarchyListener {
+            applyAll()
+        }
+        val compListener = object : java.awt.event.ComponentAdapter() {
+            override fun componentResized(e: java.awt.event.ComponentEvent?) {
+                applyAll()
+            }
+        }
+
+        window.addHierarchyListener(hierarchyListener)
+        window.addComponentListener(compListener)
+
+        onDispose {
+            window.removeHierarchyListener(hierarchyListener)
+            window.removeComponentListener(compListener)
+        }
     }
 }

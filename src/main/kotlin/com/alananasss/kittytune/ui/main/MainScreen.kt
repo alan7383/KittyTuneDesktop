@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -7,13 +8,24 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import com.alananasss.kittytune.core.str
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.savedstate.read
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.*
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +51,12 @@ import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -83,8 +102,9 @@ private const val FULLSCREEN_ENTER_MS = 320
 private const val FULLSCREEN_EXIT_MS = 220
 
 @Composable
-fun MainScreen() {
-    val playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(AppInstance.application) }
+fun MainScreen(
+    playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(AppInstance.application) },
+) {
     val homeViewModel: HomeViewModel = viewModel { HomeViewModel(AppInstance.application) }
     val libraryViewModel: LibraryViewModel = viewModel { LibraryViewModel(AppInstance.application) }
 
@@ -296,29 +316,96 @@ fun MainScreen() {
             } else {
 
             var draggingSidebar by remember { mutableStateOf(false) }
-            val sidebarHoverInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-            val isSidebarHovered by sidebarHoverInteraction.collectIsHoveredAsState()
             val isHoverExpandEnabled by playerPrefs.sidebarHoverExpandFlow().collectAsState(initial = playerPrefs.isSidebarHoverExpandEnabled())
+            var isSidebarHovered by remember { mutableStateOf(false) }
+            val hoverScope = rememberCoroutineScope()
+            var exitHoverJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
-            val isHoverExpanded = libraryViewModel.isSidebarCollapsed && isHoverExpandEnabled && isSidebarHovered && !draggingSidebar
+            val isHoverExpanded = libraryViewModel.isSidebarCollapsed && isHoverExpandEnabled &&
+                    (isSidebarHovered || libraryViewModel.isSidebarPopupOpen) && !draggingSidebar
+
+            // Keep hover active while a popup/dropdown is open, and grant a 600ms grace period on close
+            // so that if the cursor is still resting on the sidebar, it stays open.
+            LaunchedEffect(libraryViewModel.isSidebarPopupOpen) {
+                if (libraryViewModel.isSidebarPopupOpen) {
+                    exitHoverJob?.cancel()
+                    exitHoverJob = null
+                    isSidebarHovered = true
+                } else if (isSidebarHovered) {
+                    exitHoverJob?.cancel()
+                    exitHoverJob = hoverScope.launch {
+                        kotlinx.coroutines.delay(600L)
+                        isSidebarHovered = false
+                    }
+                }
+            }
 
             val targetSidebarWidth =
                 if (libraryViewModel.isSidebarCollapsed && !isHoverExpanded) com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH
                 else libraryViewModel.sidebarWidth
             val animatedSidebarWidth by androidx.compose.animation.core.animateDpAsState(
                 targetValue = targetSidebarWidth.dp,
-                animationSpec = androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow),
+                animationSpec = androidx.compose.animation.core.spring(
+                    stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow,
+                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy
+                ),
                 label = "sidebarWidth"
             )
             val sidebarWidth = if (draggingSidebar) targetSidebarWidth.dp else animatedSidebarWidth
 
-            Sidebar(
-                navController = navController,
-                libraryViewModel = libraryViewModel,
-                playerViewModel = playerViewModel,
-                homeViewModel = homeViewModel,
-                modifier = Modifier.width(sidebarWidth).hoverable(sidebarHoverInteraction)
-            )
+            // The hover detection wraps both the sidebar and the resize handle with full height so that the cursor
+            // can move anywhere on the left panel or cross the handle gap without triggering an unexpected exit.
+            // When exiting, a 400 ms grace period prevents jittery collapse when swiping across boundaries.
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .pointerInput(isHoverExpandEnabled) {
+                        if (!isHoverExpandEnabled) return@pointerInput
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                                when (event.type) {
+                                    androidx.compose.ui.input.pointer.PointerEventType.Enter,
+                                    androidx.compose.ui.input.pointer.PointerEventType.Move -> {
+                                        exitHoverJob?.cancel()
+                                        exitHoverJob = null
+                                        if (!isSidebarHovered) {
+                                            isSidebarHovered = true
+                                        }
+                                    }
+                                    androidx.compose.ui.input.pointer.PointerEventType.Exit -> {
+                                        if (!libraryViewModel.isSidebarPopupOpen) {
+                                            exitHoverJob?.cancel()
+                                            exitHoverJob = hoverScope.launch {
+                                                kotlinx.coroutines.delay(400L)
+                                                isSidebarHovered = false
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+            ) {
+                Row(modifier = Modifier.fillMaxHeight()) {
+
+            // When hover-expand is active for the collapsed sidebar, hovering expands the panel
+            // directly to show the real labels. Tooltips are suppressed so that popup scenes
+            // are not spawned and destroyed in quick succession.
+            val suppressTooltips = isHoverExpandEnabled && libraryViewModel.isSidebarCollapsed
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.alananasss.kittytune.ui.common.LocalSuppressTooltips provides suppressTooltips
+            ) {
+                Sidebar(
+                    navController = navController,
+                    libraryViewModel = libraryViewModel,
+                    playerViewModel = playerViewModel,
+                    homeViewModel = homeViewModel,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(sidebarWidth)
+                )
+            }
 
             // Resize handle: drag to resize the library, drag far left to snap it
             // into the icon rail. Shows a divider line on hover, like the reference.
@@ -358,6 +445,9 @@ fun MainScreen() {
                     )
                 }
             }
+
+                } // End Row inside hover Box
+            } // End hover detection Box
 
             // The lyrics screen and the whole NavHost are the two branches of one `if`, so opening
             // the lyrics takes every destination out of the composition. `rememberSaveable` state
@@ -1029,15 +1119,10 @@ fun MainScreen() {
             androidx.compose.animation.core.tween(FULLSCREEN_ENTER_MS)
         ) + androidx.compose.animation.scaleIn(
             androidx.compose.animation.core.tween(FULLSCREEN_ENTER_MS),
-            // Grows a little into place rather than appearing at size: the screen it comes from stays
-            // visible underneath for those few frames, so this reads as rising out of it.
-            initialScale = 0.94f,
+            initialScale = 0.98f,
         ),
         exit = androidx.compose.animation.fadeOut(
             androidx.compose.animation.core.tween(FULLSCREEN_EXIT_MS)
-        ) + androidx.compose.animation.scaleOut(
-            androidx.compose.animation.core.tween(FULLSCREEN_EXIT_MS),
-            targetScale = 0.94f,
         ),
     ) {
         com.alananasss.kittytune.ui.player.FullPlayerScreen(

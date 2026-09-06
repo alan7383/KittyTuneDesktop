@@ -26,7 +26,13 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
@@ -175,14 +181,22 @@ fun NowPlayingPanel(
  * Nothing is hidden and nothing is trimmed. What was already played stays in the list, because
  * [PlayerViewModel.smartPrevious] walks this very list backwards and [PlayerViewModel.toggleShuffle]
  * rebuilds it from the untouched original — deleting the past would cost the Previous button and the
- * way back out of shuffle, for a complaint that is about attention rather than storage. It simply
- * stops claiming the same importance: compact rows, dimmed, under a heading, with the track just
- * played left at full size because that is the one worth recognising.
+ * way back out of shuffle, for a complaint that is about attention rather than storage. Instead the
+ * rows before the previous one are compacted: half-size artwork, no artist line, dimmed, under an
+ * expandable "Already played" heading with an arrow, with the track just played left at full size
+ * because that is the one worth recognising.
  *
- * Every index here is an index into [PlayerViewModel.queueState] and stays one — this list draws no
- * item of its own that the queue does not have — which is what lets the click, the cross and the
- * drag all pass `index` straight through.
+ * When there are too many played tracks, they collapse under the arrow to avoid cluttering the queue.
+ * Clicking the arrow opens them completely.
  */
+private sealed interface QueueListItem {
+    data class PastHeader(val count: Int, val isExpanded: Boolean) : QueueListItem
+    data class TrackItem(val queueIndex: Int, val track: Track) : QueueListItem
+}
+
+/** Beyond this many heard tracks, they collapse under an arrow so the queue stays tidy (issue #33). */
+private const val PAST_COLLAPSE_THRESHOLD = 3
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun QueueList(vm: PlayerViewModel) {
@@ -196,15 +210,42 @@ private fun QueueList(vm: PlayerViewModel) {
     // really heard as still to come (issue #33). The track just played keeps its full row either way,
     // since that is the one worth recognising.
     val played = vm.playedTrackIds
-    val firstPast = remember(queue, currentIndex, played) {
-        queue.indices.firstOrNull { it < currentIndex - 1 && queue[it].id in played }
+    val pastIndices = remember(queue, currentIndex, played) {
+        queue.indices.filter { it < currentIndex - 1 && queue[it].id in played }
+    }
+    val pastCount = pastIndices.size
+    val firstPast = pastIndices.firstOrNull()
+
+    val hasTooManyPast = pastCount > PAST_COLLAPSE_THRESHOLD
+    var pastExpandedByUser by remember { mutableStateOf<Boolean?>(null) }
+    val isPastExpanded = pastExpandedByUser ?: (!hasTooManyPast)
+
+    val listItems = remember(queue, currentIndex, played, isPastExpanded) {
+        val items = mutableListOf<QueueListItem>()
+        var pastHeaderAdded = false
+
+        for (index in queue.indices) {
+            val track = queue[index]
+            val isPast = index < currentIndex - 1 && track.id in played
+
+            if (firstPast != null && index == firstPast && !pastHeaderAdded) {
+                items.add(QueueListItem.PastHeader(count = pastCount, isExpanded = isPastExpanded))
+                pastHeaderAdded = true
+            }
+
+            if (isPast && !isPastExpanded) {
+                continue
+            }
+
+            items.add(QueueListItem.TrackItem(queueIndex = index, track = track))
+        }
+        items
     }
 
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState,
-        // Resolved through the keys rather than the raw lazy-list indices. The two agree today, and
-        // they would stop agreeing the moment this list gained a header of its own — at which point
-        // a drag would quietly move the wrong track.
+        // Resolved through the keys rather than the raw lazy-list indices so reordering
+        // stays robust even when a header is present or past rows are collapsed.
         onMove = { from, to ->
             val fromIndex = keys.indexOf(from.key)
             val toIndex = keys.indexOf(to.key)
@@ -212,38 +253,69 @@ private fun QueueList(vm: PlayerViewModel) {
         }
     )
 
+    val currentKey = if (currentIndex in keys.indices) keys[currentIndex] else null
+    val targetTrackIndex = (currentIndex - 1).coerceAtLeast(0)
+    val targetListIndex = listItems.indexOfFirst {
+        it is QueueListItem.TrackItem && it.queueIndex == targetTrackIndex
+    }.coerceAtLeast(0)
+
     com.alananasss.kittytune.ui.player.AnchorCurrentQueueItem(
         listState = listState,
         currentIndex = currentIndex,
         currentTrackId = vm.currentTrack?.id,
+        currentKey = currentKey,
+        targetIndex = targetListIndex,
     )
 
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
     ) {
-        itemsIndexed(items = queue, key = { index, _ -> keys[index] }) { index, track ->
-            ReorderableItem(
-                state = reorderableState,
-                key = keys[index]
-            ) { isDragging ->
-                val isCurrent = index == currentIndex
-                val isPast = index < currentIndex - 1 && track.id in played
-
-                Column {
-                    // Named where the treatment changes, so the compact rows read as a section rather
-                    // than as rows that failed to load properly.
-                    if (firstPast != null && index == firstPast) QueueSectionRule(str("queue_played"))
-                    if (currentIndex >= 0 && index == currentIndex + 1) QueueSectionRule(str("queue_up_next"))
-
-                    QueueRow(
-                        vm = vm,
-                        track = track,
-                        index = index,
-                        isCurrent = isCurrent,
-                        isPast = isPast,
-                        isDragging = isDragging,
+        items(
+            items = listItems,
+            key = { item ->
+                when (item) {
+                    is QueueListItem.PastHeader -> "queue_header_past"
+                    is QueueListItem.TrackItem -> keys[item.queueIndex]
+                }
+            }
+        ) { item ->
+            when (item) {
+                is QueueListItem.PastHeader -> {
+                    QueueSectionRule(
+                        label = str("queue_played"),
+                        count = item.count,
+                        isCollapsible = true,
+                        isExpanded = item.isExpanded,
+                        onToggle = { pastExpandedByUser = !item.isExpanded },
                     )
+                }
+                is QueueListItem.TrackItem -> {
+                    val index = item.queueIndex
+                    val track = item.track
+                    val isCurrent = index == currentIndex
+                    val isPast = index < currentIndex - 1 && track.id in played
+
+                    ReorderableItem(
+                        state = reorderableState,
+                        key = keys[index]
+                    ) { isDragging ->
+                        Column {
+                            // Named where the treatment changes, so the upcoming tracks read as a section.
+                            if (currentIndex >= 0 && index == currentIndex + 1) {
+                                QueueSectionRule(str("queue_up_next"))
+                            }
+
+                            QueueRow(
+                                vm = vm,
+                                track = track,
+                                index = index,
+                                isCurrent = isCurrent,
+                                isPast = isPast,
+                                isDragging = isDragging,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -252,17 +324,63 @@ private fun QueueList(vm: PlayerViewModel) {
 
 /** The heading that marks where one part of the queue stops and the next begins. */
 @Composable
-private fun QueueSectionRule(label: String) {
+private fun QueueSectionRule(
+    label: String,
+    count: Int? = null,
+    isCollapsible: Boolean = false,
+    isExpanded: Boolean = true,
+    onToggle: (() -> Unit)? = null,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 10.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (isCollapsible && onToggle != null) {
+            val interactionSource = remember { MutableInteractionSource() }
+            val isHovered by interactionSource.collectIsHoveredAsState()
+            val arrowRotation by animateFloatAsState(
+                targetValue = if (isExpanded) 180f else 0f,
+                label = "past_arrow_rot"
+            )
+
+            Tip(if (isExpanded) str("queue_collapse_played") else str("queue_expand_played")) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = onToggle
+                        )
+                        .pointerHoverIcon(PointerIcon.Hand)
+                        .padding(vertical = 2.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (count != null) "$label ($count)" else label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) str("queue_collapse_played") else str("queue_expand_played"),
+                        tint = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .rotate(arrowRotation),
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = if (count != null) "$label ($count)" else label,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.width(8.dp))
         HorizontalDivider(
             modifier = Modifier.weight(1f),

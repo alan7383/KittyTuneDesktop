@@ -83,8 +83,11 @@ object SyncScheduler {
     fun start() {
         if (heartbeat != null) return
         heartbeat = scope.launch {
+            if (SyncPeers.anyDialable()) {
+                runCatching { syncAll("startup") }
+            }
             delay(FIRST_RUN_DELAY_MS)
-            var lastPassAtMs = 0L
+            var lastPassAtMs = System.currentTimeMillis()
             var lastAddress = ""
             while (isActive) {
                 val address = runCatching { SyncService.localAddress() }.getOrDefault("")
@@ -134,6 +137,16 @@ object SyncScheduler {
         pending?.cancel()
         pending = scope.launch {
             delay(DEBOUNCE_MS)
+            runCatching { syncAll(reason) }
+        }
+    }
+
+    /**
+     * Immediately starts an exchange with all dialable devices without waiting for debounce.
+     */
+    fun triggerImmediateSync(reason: String = "immediate") {
+        if (!SyncPeers.anyDialable()) return
+        scope.launch {
             runCatching { syncAll(reason) }
         }
     }
@@ -196,7 +209,9 @@ object SyncScheduler {
         var sent = 0
         var last: SyncClient.Result = SyncClient.Result.Failed("not attempted")
 
-        repeat(MAX_ROUNDS) {
+        var rounds = 0
+        while (rounds < MAX_ROUNDS && received + sent < MAX_TOTAL_EVENTS_PER_DRAIN) {
+            rounds++
             // Re-read between rounds: the first one may have found the device at a new address and
             // corrected the entry, and starting the next round from the stale one would spend a connect
             // timeout rediscovering what is already known.
@@ -212,16 +227,28 @@ object SyncScheduler {
                 return SyncClient.Result.Success(result.peerName, received, sent)
             }
         }
-        // Ran out of rounds with the peer still reporting more. Report what was actually moved rather than
-        // just the last round's share of it.
+        // Ran out of rounds or hit the event cap with the peer still reporting more. Report what was
+        // actually moved rather than just the last round's share of it.
         return (last as? SyncClient.Result.Success)
             ?.let { SyncClient.Result.Success(it.peerName, received, sent) }
             ?: last
     }
 
     /**
-     * Enough rounds for a very long history at 500 events each, and few enough that a peer stuck in a loop
-     * costs a bounded number of requests rather than an evening.
+     * Hard ceiling on how many events one [drain] may move in total (received + sent).
+     *
+     * Generous enough for even a very large first pairing to converge in a single drain instead of looking
+     * stuck across several heartbeats; strict enough that a peer which keeps accepting or injecting full
+     * batches costs a bounded amount rather than an evening.
      */
-    private const val MAX_ROUNDS = 40
+    private const val MAX_TOTAL_EVENTS_PER_DRAIN = 500_000
+
+    /**
+     * Hard ceiling on rounds, kept as a second, explicit guard alongside [MAX_TOTAL_EVENTS_PER_DRAIN].
+     *
+     * The event cap already bounds the round count — every "more" round moves at least
+     * [SyncMerge.MAX_EVENTS_PER_EXCHANGE] events, so [MAX_TOTAL_EVENTS_PER_DRAIN] alone would do — but a
+     * stated round limit is clearer about the intent and costs nothing.
+     */
+    private const val MAX_ROUNDS = 1_000
 }

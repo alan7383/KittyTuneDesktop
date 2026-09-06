@@ -394,6 +394,16 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     private var lastChannels = 0
     private var lastSampleRate = 0
 
+    // Every access to nativeHandle and every JNI call below is serialised through this
+    // lock. The native state (the ebur128 analyser and the limiter's delay buffer) is
+    // destroyed and re-created by setTrackLoudness/clearTrackLoudness/ensureNativeHandle,
+    // which run on track-change threads, while nativeProcessShort/onFlush/nativeResetLoudness
+    // run on the audio decode thread. Without a common lock those two sides race: one
+    // thread frees the ebur128 state while the other is mid-way through a chunk, which is
+    // the use-after-free SIGSEGV seen in the crash logs (SEGV_ACCERR in nativeResetLoudness,
+    // and malloc-metadata corruption that later faults on the VM thread).
+    private val nativeLock = Any()
+
     companion object {
         private var isLibraryLoaded = false
 
@@ -452,12 +462,41 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     }
 
     fun setParameters(enabled: Boolean, level: com.alananasss.kittytune.ui.player.NormalizationLevel) {
-        this.enabled = enabled
-        this.level = level
-        if (nativeHandle != 0L && isLibraryLoaded) {
-            try {
-                nativeSetTargetLevel(nativeHandle, getTargetLufs())
-            } catch (_: Throwable) {}
+        synchronized(nativeLock) {
+            this.enabled = enabled
+            this.level = level
+            if (nativeHandle != 0L && isLibraryLoaded) {
+                try {
+                    nativeSetTargetLevel(nativeHandle, getTargetLufs())
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    private var pendingKnownLufs: Float? = null
+    private var pendingKnownPeakDb: Float = 0f
+
+    fun setTrackLoudness(trackLufs: Float, maxPeakDb: Float = 0f) {
+        synchronized(nativeLock) {
+            pendingKnownLufs = trackLufs
+            pendingKnownPeakDb = maxPeakDb
+            if (nativeHandle != 0L && isLibraryLoaded) {
+                try {
+                    nativeSetTrackLoudness(nativeHandle, trackLufs, maxPeakDb)
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
+    fun clearTrackLoudness() {
+        synchronized(nativeLock) {
+            pendingKnownLufs = null
+            pendingKnownPeakDb = 0f
+            if (nativeHandle != 0L && isLibraryLoaded) {
+                try {
+                    nativeClearTrackLoudness(nativeHandle)
+                } catch (_: Throwable) {}
+            }
         }
     }
 
@@ -468,27 +507,35 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     }
 
     private fun ensureNativeHandle(channels: Int, sampleRate: Int) {
-        if (!isLibraryLoaded) return
-        if (nativeHandle == 0L || channels != lastChannels || sampleRate != lastSampleRate) {
-            destroyNative()
-            lastChannels = channels
-            lastSampleRate = sampleRate
-            try {
-                nativeHandle = nativeInit(channels, sampleRate)
-                nativeSetTargetLevel(nativeHandle, getTargetLufs())
-            } catch (t: Throwable) {
-                System.err.println("Failed to initialize native DSP: ${t.message}")
-                nativeHandle = 0L
+        synchronized(nativeLock) {
+            if (!isLibraryLoaded) return
+            if (nativeHandle == 0L || channels != lastChannels || sampleRate != lastSampleRate) {
+                destroyNative()
+                lastChannels = channels
+                lastSampleRate = sampleRate
+                try {
+                    nativeHandle = nativeInit(channels, sampleRate)
+                    nativeSetTargetLevel(nativeHandle, getTargetLufs())
+                    val lufs = pendingKnownLufs
+                    if (lufs != null) {
+                        nativeSetTrackLoudness(nativeHandle, lufs, pendingKnownPeakDb)
+                    }
+                } catch (t: Throwable) {
+                    System.err.println("Failed to initialize native DSP: ${t.message}")
+                    nativeHandle = 0L
+                }
             }
         }
     }
 
     private fun destroyNative() {
-        if (nativeHandle != 0L && isLibraryLoaded) {
-            try {
-                nativeDestroy(nativeHandle)
-            } catch (_: Throwable) {}
-            nativeHandle = 0
+        synchronized(nativeLock) {
+            if (nativeHandle != 0L && isLibraryLoaded) {
+                try {
+                    nativeDestroy(nativeHandle)
+                } catch (_: Throwable) {}
+                nativeHandle = 0
+            }
         }
     }
 
@@ -498,10 +545,17 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onFlush() {
-        if (nativeHandle != 0L && isLibraryLoaded) {
-            try {
-                nativeResetLoudness(nativeHandle)
-            } catch (_: Throwable) {}
+        synchronized(nativeLock) {
+            if (nativeHandle != 0L && isLibraryLoaded) {
+                try {
+                    val lufs = pendingKnownLufs
+                    if (lufs != null) {
+                        nativeSetTrackLoudness(nativeHandle, lufs, pendingKnownPeakDb)
+                    } else {
+                        nativeResetLoudness(nativeHandle)
+                    }
+                } catch (_: Throwable) {}
+            }
         }
     }
 
@@ -513,18 +567,23 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
-        if (!enabled || nativeHandle == 0L || !isLibraryLoaded) {
-            val buffer = replaceOutputBuffer(remaining)
-            buffer.put(inputBuffer)
-            buffer.flip()
-            return
-        }
-
         val buffer = replaceOutputBuffer(remaining)
 
-        val numFrames = remaining / (inputAudioFormat.channelCount * 2)
+        synchronized(nativeLock) {
+            val numFrames = remaining / (inputAudioFormat.channelCount * 2)
+            val canProcessNative = enabled &&
+                nativeHandle != 0L &&
+                isLibraryLoaded &&
+                inputBuffer.isDirect &&
+                buffer.isDirect &&
+                numFrames > 0
 
-        if (inputBuffer.isDirect && buffer.isDirect && numFrames > 0) {
+            if (!canProcessNative) {
+                buffer.put(inputBuffer)
+                buffer.flip()
+                return
+            }
+
             try {
                 val inOffset = inputBuffer.position()
                 nativeProcessShort(nativeHandle, inputBuffer, buffer, numFrames, inOffset)
@@ -532,37 +591,64 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
                 buffer.position(remaining)
                 buffer.flip()
             } catch (t: Throwable) {
+                // Native processing failed mid-way; fall back to an unprocessed copy.
                 val fallbackBuffer = replaceOutputBuffer(remaining)
                 fallbackBuffer.put(inputBuffer)
                 fallbackBuffer.flip()
             }
-        } else {
-            buffer.put(inputBuffer)
-            buffer.flip()
         }
     }
 
-    fun getIntegratedLoudness(): Float {
-        if (nativeHandle == 0L || !isLibraryLoaded) return -70f
-        return try {
+    fun getShortTermLoudness(): Float = synchronized(nativeLock) {
+        if (nativeHandle == 0L || !isLibraryLoaded) return@synchronized -70f
+        try {
+            nativeGetShortTermLoudness(nativeHandle)
+        } catch (_: Throwable) {
+            -70f
+        }
+    }
+
+    fun getMomentaryLoudness(): Float = synchronized(nativeLock) {
+        if (nativeHandle == 0L || !isLibraryLoaded) return@synchronized -70f
+        try {
+            nativeGetMomentaryLoudness(nativeHandle)
+        } catch (_: Throwable) {
+            -70f
+        }
+    }
+
+    fun getIntegratedLoudness(): Float = synchronized(nativeLock) {
+        if (nativeHandle == 0L || !isLibraryLoaded) return@synchronized -70f
+        try {
             nativeGetIntegratedLoudness(nativeHandle)
         } catch (_: Throwable) {
             -70f
         }
     }
 
-    fun getMaxTruePeakDb(): Float {
-        if (nativeHandle == 0L || !isLibraryLoaded) return -120f
-        return try {
+    fun getMaxTruePeakDb(): Float = synchronized(nativeLock) {
+        if (nativeHandle == 0L || !isLibraryLoaded) return@synchronized -120f
+        try {
             nativeGetTruePeakDb(nativeHandle)
         } catch (_: Throwable) {
             -120f
         }
     }
 
+    fun getCurrentGainDb(): Float = synchronized(nativeLock) {
+        if (nativeHandle == 0L || !isLibraryLoaded) return@synchronized 0f
+        try {
+            nativeGetCurrentGainDb(nativeHandle)
+        } catch (_: Throwable) {
+            0f
+        }
+    }
+
     private external fun nativeInit(channels: Int, sampleRate: Int): Long
     private external fun nativeDestroy(handle: Long)
     private external fun nativeSetTargetLevel(handle: Long, targetLUFS: Float)
+    private external fun nativeSetTrackLoudness(handle: Long, trackLufs: Float, maxPeakDb: Float)
+    private external fun nativeClearTrackLoudness(handle: Long)
     private external fun nativeProcessShort(
         handle: Long,
         inputBuffer: ByteBuffer,
@@ -573,6 +659,7 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
 
     private external fun nativeResetLoudness(handle: Long)
     private external fun nativeGetShortTermLoudness(handle: Long): Float
+    private external fun nativeGetMomentaryLoudness(handle: Long): Float
     private external fun nativeGetIntegratedLoudness(handle: Long): Float
     private external fun nativeGetTruePeakDb(handle: Long): Float
     private external fun nativeGetCurrentGainDb(handle: Long): Float

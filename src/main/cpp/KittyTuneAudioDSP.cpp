@@ -18,6 +18,10 @@ static const float kLimiterThresholdLinear = 0.8912509381337455f; // -1 dBFS in 
 static const float kLimiterAttackMs = 5.0f;
 static const float kLimiterReleaseMs = 100.0f;
 
+// Dedicated time constants for loudness normalization
+static const float kNormAttackMs = 350.0f;   // 350ms smooth attenuation
+static const float kNormReleaseMs = 3000.0f; // 3000ms pump-free release
+
 typedef struct {
     ebur128_state* ebur128;
     int sampleRate;
@@ -27,20 +31,32 @@ typedef struct {
     float targetGainLinear;
     float targetLUFS;
 
+    // Normalization gain smoothing coefficients
+    float normAttackCoeff;
+    float normReleaseCoeff;
+
+    // Limiter state
     float* delayBuffer;
     int delaySamples;
     int delayWritePos;
 
     float envelope;
     float smoothedGain;
-    float attackCoeff;
-    float releaseCoeff;
+    float limiterAttackCoeff;
+    float limiterReleaseCoeff;
     float envReleaseCoeff;     // fast release for envelope (instant rise)
 
     float shortTermLoudness;
+    float momentaryLoudness;
     float integratedLoudness;
     float truePeakLinear;
     float maxTruePeakDb;
+
+    long long framesProcessedSinceReset;
+
+    int hasKnownTrackLoudness;
+    float knownTrackLufs;
+    float knownTrackPeakDb;
 
     float* processBuffer;
     int processBufferCapacity;
@@ -68,10 +84,15 @@ static void initLimiter(KittyTuneDSPState* s) {
     s->envelope = 0.0f;
     s->smoothedGain = 1.0f;
 
-    float attackTime = kLimiterAttackMs / 1000.0f;
-    float releaseTime = kLimiterReleaseMs / 1000.0f;
-    s->attackCoeff = expf(-1.0f / ((float)s->sampleRate * attackTime));
-    s->releaseCoeff = expf(-1.0f / ((float)s->sampleRate * releaseTime));
+    float limiterAttackTime = kLimiterAttackMs / 1000.0f;
+    float limiterReleaseTime = kLimiterReleaseMs / 1000.0f;
+    s->limiterAttackCoeff = expf(-1.0f / ((float)s->sampleRate * limiterAttackTime));
+    s->limiterReleaseCoeff = expf(-1.0f / ((float)s->sampleRate * limiterReleaseTime));
+
+    float normAttackTime = kNormAttackMs / 1000.0f;
+    float normReleaseTime = kNormReleaseMs / 1000.0f;
+    s->normAttackCoeff = expf(-1.0f / ((float)s->sampleRate * normAttackTime));
+    s->normReleaseCoeff = expf(-1.0f / ((float)s->sampleRate * normReleaseTime));
 
     float envRelease = 0.02f; // 20ms release for envelope
     s->envReleaseCoeff = expf(-1.0f / ((float)s->sampleRate * envRelease));
@@ -85,32 +106,59 @@ static void destroyLimiter(KittyTuneDSPState* s) {
     s->delayBuffer = NULL;
 }
 
-static float processLimiterSample(KittyTuneDSPState* s, float gainedInput, int channelIndex) {
-    int idx = s->delayWritePos * s->channels + channelIndex;
-    s->delayBuffer[idx] = gainedInput;
-
-    float absSample = fabsf(gainedInput);
-    s->envelope = (absSample > s->envelope) ? absSample : s->envReleaseCoeff * s->envelope;
-
-    float targetGain = kLimiterThresholdLinear / fmaxf(s->envelope, kLimiterThresholdLinear);
-    if (targetGain < s->smoothedGain) {
-        s->smoothedGain = targetGain;  // instant attack: lookahead prevents audible click
-    } else {
-        s->smoothedGain = s->releaseCoeff * s->smoothedGain
-            + (1.0f - s->releaseCoeff) * targetGain;
-    }
-
-    int readIdx = ((s->delayWritePos + 1) % s->delaySamples) * s->channels + channelIndex;
-    float delayed = s->delayBuffer[readIdx];
-
-    return delayed * s->smoothedGain;
-}
-
 static void smoothGain(KittyTuneDSPState* s) {
     float gainCoeff = (s->targetGainLinear < s->currentGainLinear)
-        ? s->attackCoeff : s->releaseCoeff;
+        ? s->normAttackCoeff : s->normReleaseCoeff;
     s->currentGainLinear = gainCoeff * s->currentGainLinear
         + (1.0f - gainCoeff) * s->targetGainLinear;
+}
+
+static void resetDspState(KittyTuneDSPState* s, float knownLufs, float knownPeakDb) {
+    if (!s) return;
+
+    int mode = EBUR128_MODE_I | EBUR128_MODE_S | EBUR128_MODE_TRUE_PEAK | EBUR128_MODE_HISTOGRAM;
+    if (s->ebur128) {
+        ebur128_destroy(&s->ebur128);
+    }
+    s->ebur128 = ebur128_init((unsigned int)s->channels, (unsigned long)s->sampleRate, mode);
+
+    s->shortTermLoudness = -70.0f;
+    s->momentaryLoudness = -70.0f;
+    s->integratedLoudness = -70.0f;
+    s->truePeakLinear = 0.0f;
+    s->maxTruePeakDb = -120.0f;
+    s->framesProcessedSinceReset = 0;
+
+    s->envelope = 0.0f;
+    s->smoothedGain = 1.0f;
+
+    if (knownLufs > -60.0f && knownLufs < 0.0f) {
+        s->hasKnownTrackLoudness = 1;
+        s->knownTrackLufs = knownLufs;
+        s->knownTrackPeakDb = knownPeakDb;
+
+        float targetGainDb = s->targetLUFS - knownLufs;
+        if (targetGainDb > 0.0f && knownPeakDb > -120.0f) {
+            float maxHeadroom = -1.0f - knownPeakDb;
+            if (targetGainDb > maxHeadroom) targetGainDb = maxHeadroom;
+        }
+        if (targetGainDb < -24.0f) targetGainDb = -24.0f;
+        if (targetGainDb > 12.0f) targetGainDb = 12.0f;
+
+        s->currentGainLinear = dbToLinear(targetGainDb);
+        s->targetGainLinear = s->currentGainLinear;
+    } else {
+        s->hasKnownTrackLoudness = 0;
+        s->knownTrackLufs = -70.0f;
+        s->knownTrackPeakDb = -120.0f;
+
+        float nominalGainDb = s->targetLUFS - (-10.0f);
+        if (nominalGainDb > 0.0f) nominalGainDb = 0.0f;
+        if (nominalGainDb < -15.0f) nominalGainDb = -15.0f;
+
+        s->currentGainLinear = dbToLinear(nominalGainDb);
+        s->targetGainLinear = s->currentGainLinear;
+    }
 }
 
 static KittyTuneDSPState* createDspState(int channels, int sampleRate, int mode, float targetLUFS) {
@@ -124,9 +172,15 @@ static KittyTuneDSPState* createDspState(int channels, int sampleRate, int mode,
     s->channels = channels;
     s->targetLUFS = targetLUFS;
     s->shortTermLoudness = -70.0f;
+    s->momentaryLoudness = -70.0f;
     s->integratedLoudness = -70.0f;
     s->truePeakLinear = 0.0f;
     s->maxTruePeakDb = -120.0f;
+    s->framesProcessedSinceReset = 0;
+    s->hasKnownTrackLoudness = 0;
+    s->knownTrackLufs = -70.0f;
+    s->knownTrackPeakDb = -120.0f;
+
     s->frameCount = 0;
     s->logInterval = (long long)sampleRate / 2; // log every 0.5s
 
@@ -141,7 +195,207 @@ static KittyTuneDSPState* createDspState(int channels, int sampleRate, int mode,
     }
 
     initLimiter(s);
+    resetDspState(s, -70.0f, -120.0f);
     return s;
+}
+
+// Returns max true peak across all channels in dBTP
+static float computeMaxTruePeakDb(KittyTuneDSPState* s) {
+    double maxTp = 0.0;
+    for (int ch = 0; ch < s->channels; ch++) {
+        double tp;
+        if (ebur128_true_peak(s->ebur128, (unsigned int)ch, &tp) == EBUR128_SUCCESS && isfinite(tp)) {
+            if (tp > maxTp) maxTp = tp;
+        }
+    }
+    if (maxTp <= 0.0) return -120.0f;
+    return (float)(20.0 * log10(maxTp));
+}
+
+// Shared chunk-processing core used by both the playback path (nativeProcessShort)
+// and the diagnostics harness. forcedGainDb = NaN means "auto" (compute from LUFS +
+// headroom, as in production). Otherwise the given fixed gain in dB is used so the
+// limiter can be stressed in isolation.
+static void processChunk(KittyTuneDSPState* s, short* in, short* out, int numFrames, float forcedGainDb) {
+    int totalSamples = numFrames * s->channels;
+
+    if (totalSamples > s->processBufferCapacity) {
+        float* newBuf = (float*)realloc(s->processBuffer, totalSamples * sizeof(float));
+        if (!newBuf) return;
+        s->processBuffer = newBuf;
+        s->processBufferCapacity = totalSamples;
+    }
+    float* floatBuf = s->processBuffer;
+
+    for (int i = 0; i < totalSamples; i++) {
+        floatBuf[i] = (float)in[i] / 32768.0f;
+    }
+
+    ebur128_add_frames_float(s->ebur128, floatBuf, (size_t)numFrames);
+    s->framesProcessedSinceReset += numFrames;
+
+    // 1. Measure momentary loudness (400ms window) with warmup energy correction
+    double mMomentary = -HUGE_VAL;
+    float currentMomentaryLufs = -70.0f;
+    if (ebur128_loudness_momentary(s->ebur128, &mMomentary) == EBUR128_SUCCESS && isfinite(mMomentary) && mMomentary > -HUGE_VAL) {
+        size_t momentaryWindowFrames = (size_t)(s->sampleRate * 0.4);
+        if (s->framesProcessedSinceReset < (long long)momentaryWindowFrames && s->framesProcessedSinceReset > 0) {
+            double correctionDb = 10.0 * log10((double)momentaryWindowFrames / (double)s->framesProcessedSinceReset);
+            if (correctionDb > 30.0) correctionDb = 30.0;
+            currentMomentaryLufs = (float)(mMomentary + correctionDb);
+        } else {
+            currentMomentaryLufs = (float)mMomentary;
+        }
+        s->momentaryLoudness = currentMomentaryLufs;
+    }
+
+    // 2. Measure short-term loudness (3s window) with warmup energy correction
+    double stLoudness = -HUGE_VAL;
+    float currentShortTermLufs = -70.0f;
+    if (ebur128_loudness_shortterm(s->ebur128, &stLoudness) == EBUR128_SUCCESS && isfinite(stLoudness) && stLoudness > -HUGE_VAL) {
+        size_t shortTermWindowFrames = (size_t)(s->sampleRate * 3.0);
+        if (s->framesProcessedSinceReset < (long long)shortTermWindowFrames && s->framesProcessedSinceReset > 0) {
+            double correctionDb = 10.0 * log10((double)shortTermWindowFrames / (double)s->framesProcessedSinceReset);
+            if (correctionDb > 40.0) correctionDb = 40.0;
+            currentShortTermLufs = (float)(stLoudness + correctionDb);
+        } else {
+            currentShortTermLufs = (float)stLoudness;
+        }
+        s->shortTermLoudness = currentShortTermLufs;
+    }
+
+    // 3. Measure integrated global loudness so far
+    double integrated = -HUGE_VAL;
+    if (ebur128_loudness_global(s->ebur128, &integrated) == EBUR128_SUCCESS && isfinite(integrated) && integrated > -HUGE_VAL) {
+        s->integratedLoudness = (float)integrated;
+    }
+
+    s->maxTruePeakDb = computeMaxTruePeakDb(s);
+
+    // 4. Determine target gain in dB
+    float gainDb;
+    int isForced = (forcedGainDb != forcedGainDb) ? 0 : 1;  // NaN check
+    if (isForced) {
+        gainDb = forcedGainDb;
+    } else if (s->hasKnownTrackLoudness) {
+        gainDb = s->targetLUFS - s->knownTrackLufs;
+        float maxTpDb = (s->knownTrackPeakDb > s->maxTruePeakDb) ? s->knownTrackPeakDb : s->maxTruePeakDb;
+        if (gainDb > 0.0f && maxTpDb > -120.0f) {
+            float maxGainForHeadroom = -1.0f - maxTpDb;
+            if (gainDb > maxGainForHeadroom) gainDb = maxGainForHeadroom;
+        }
+    } else {
+        float effectiveLufs = -70.0f;
+        size_t momentaryWindowFrames = (size_t)(s->sampleRate * 0.4);
+        size_t shortTermWindowFrames = (size_t)(s->sampleRate * 3.0);
+
+        if (s->framesProcessedSinceReset < (long long)momentaryWindowFrames) {
+            effectiveLufs = currentMomentaryLufs;
+        } else if (s->framesProcessedSinceReset < (long long)shortTermWindowFrames) {
+            effectiveLufs = (currentShortTermLufs > -60.0f) ? currentShortTermLufs : currentMomentaryLufs;
+        } else {
+            if (s->integratedLoudness > -60.0f) {
+                if (s->shortTermLoudness > s->integratedLoudness) {
+                    effectiveLufs = s->shortTermLoudness;
+                } else {
+                    effectiveLufs = s->integratedLoudness;
+                }
+            } else if (s->shortTermLoudness > -60.0f) {
+                effectiveLufs = s->shortTermLoudness;
+            } else {
+                effectiveLufs = currentMomentaryLufs;
+            }
+        }
+
+        // Silence / Gating logic:
+        if (effectiveLufs < -42.0f) {
+            if (s->integratedLoudness > -60.0f) {
+                // Pause / silence during song: freeze at integrated level
+                gainDb = s->targetLUFS - s->integratedLoudness;
+            } else {
+                // Intro silence: safe nominal gain, never boost
+                gainDb = s->targetLUFS - (-10.0f);
+                if (gainDb > 0.0f) gainDb = 0.0f;
+            }
+        } else {
+            gainDb = s->targetLUFS - effectiveLufs;
+        }
+
+        float maxTpDb = s->maxTruePeakDb;
+        if (gainDb > 0.0f && maxTpDb > -120.0f) {
+            float maxGainForHeadroom = -1.0f - maxTpDb;
+            if (gainDb > maxGainForHeadroom) {
+                gainDb = maxGainForHeadroom;
+            }
+        }
+
+        if (gainDb < -24.0f) gainDb = -24.0f;
+        if (gainDb > 12.0f) gainDb = 12.0f;
+    }
+
+    if (!isfinite(gainDb)) gainDb = 0.0f;
+    s->targetGainLinear = dbToLinear(gainDb);
+
+    // If audio is detected right at start of track, snap currentGain to targetGain
+    // so there is NEVER an initial loud burst!
+    if (s->framesProcessedSinceReset <= (long long)(s->sampleRate * 0.15f) && !isForced && !s->hasKnownTrackLoudness) {
+        if (s->momentaryLoudness > -42.0f) {
+            s->currentGainLinear = s->targetGainLinear;
+        }
+    }
+
+    for (int frame = 0; frame < numFrames; frame++) {
+        smoothGain(s);
+
+        // Max sample across channels for stereo-linked limiter
+        float maxAbs = 0.0f;
+        for (int ch = 0; ch < s->channels; ch++) {
+            int sampleIdx = frame * s->channels + ch;
+            float gained = floatBuf[sampleIdx] * s->currentGainLinear;
+            s->delayBuffer[s->delayWritePos * s->channels + ch] = gained;
+            float a = fabsf(gained);
+            if (a > maxAbs) maxAbs = a;
+        }
+
+        if (maxAbs > s->envelope) {
+            s->envelope = maxAbs;
+        } else {
+            s->envelope = s->envReleaseCoeff * s->envelope;
+        }
+
+        float targetLimiterGain = kLimiterThresholdLinear / fmaxf(s->envelope, kLimiterThresholdLinear);
+        if (targetLimiterGain < s->smoothedGain) {
+            s->smoothedGain = targetLimiterGain; // instant attack
+        } else {
+            s->smoothedGain = s->limiterReleaseCoeff * s->smoothedGain
+                + (1.0f - s->limiterReleaseCoeff) * targetLimiterGain;
+        }
+
+        int readPos = (s->delayWritePos + 1) % s->delaySamples;
+        for (int ch = 0; ch < s->channels; ch++) {
+            int sampleIdx = frame * s->channels + ch;
+            float delayed = s->delayBuffer[readPos * s->channels + ch];
+            float processed = delayed * s->smoothedGain;
+
+            if (processed > 1.0f) processed = 1.0f;
+            if (processed < -1.0f) processed = -1.0f;
+            out[sampleIdx] = (short)(processed * 32767.0f);
+        }
+
+        s->delayWritePos = readPos;
+    }
+
+    s->frameCount += numFrames;
+    if (s->debugLogging && s->frameCount >= s->logInterval) {
+        float currentDb = linearToDb(s->currentGainLinear);
+        float limiterDb = linearToDb(s->smoothedGain);
+        LOGI("LUFS mom=%.1f short=%.1f int=%.1f | gain=%.1fdB lim=%.1fdB | TP=%.1fdB target=%.1f%s",
+             s->momentaryLoudness, s->shortTermLoudness, s->integratedLoudness,
+             currentDb, limiterDb,
+             s->maxTruePeakDb, s->targetLUFS,
+             isForced ? " (forced)" : "");
+        s->frameCount = 0;
+    }
 }
 
 extern "C" {
@@ -187,6 +441,16 @@ Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeSetTargetL
     KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
     if (!s) return;
     s->targetLUFS = targetLUFS;
+    if (s->hasKnownTrackLoudness) {
+        float targetGainDb = s->targetLUFS - s->knownTrackLufs;
+        if (targetGainDb > 0.0f && s->knownTrackPeakDb > -120.0f) {
+            float maxHeadroom = -1.0f - s->knownTrackPeakDb;
+            if (targetGainDb > maxHeadroom) targetGainDb = maxHeadroom;
+        }
+        if (targetGainDb < -24.0f) targetGainDb = -24.0f;
+        if (targetGainDb > 12.0f) targetGainDb = 12.0f;
+        s->targetGainLinear = dbToLinear(targetGainDb);
+    }
     LOGI("Target LUFS set to %.1f", targetLUFS);
 }
 
@@ -197,120 +461,29 @@ Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeResetLoudn
     KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
     if (!s || !s->ebur128) return;
 
-    int mode = EBUR128_MODE_I | EBUR128_MODE_S | EBUR128_MODE_TRUE_PEAK | EBUR128_MODE_HISTOGRAM;
-    ebur128_destroy(&s->ebur128);
-    s->ebur128 = ebur128_init((unsigned int)s->channels, (unsigned long)s->sampleRate, mode);
-    s->shortTermLoudness = -70.0f;
-    s->integratedLoudness = -70.0f;
-    s->truePeakLinear = 0.0f;
-    s->maxTruePeakDb = -120.0f;
-
-    s->envelope = 0.0f;
-    s->smoothedGain = 1.0f;
-    s->currentGainLinear = 1.0f;
-    s->targetGainLinear = 1.0f;
-}
-
-// Returns max true peak across all channels in dBTP
-static float computeMaxTruePeakDb(KittyTuneDSPState* s) {
-    double maxTp = 0.0;
-    for (int ch = 0; ch < s->channels; ch++) {
-        double tp;
-        if (ebur128_true_peak(s->ebur128, (unsigned int)ch, &tp) == EBUR128_SUCCESS && isfinite(tp)) {
-            if (tp > maxTp) maxTp = tp;
-        }
-    }
-    if (maxTp <= 0.0) return -120.0f;
-    return (float)(20.0 * log10(maxTp));
-}
-
-// Shared chunk-processing core used by both the playback path (nativeProcessShort)
-// and the diagnostics harness. forcedGainDb = NaN means "auto" (compute from LUFS +
-// headroom, as in production). Otherwise the given fixed gain in dB is used so the
-// limiter can be stressed in isolation.
-static void processChunk(KittyTuneDSPState* s, short* in, short* out, int numFrames, float forcedGainDb) {
-    int totalSamples = numFrames * s->channels;
-
-    if (totalSamples > s->processBufferCapacity) {
-        float* newBuf = (float*)realloc(s->processBuffer, totalSamples * sizeof(float));
-        if (!newBuf) return;
-        s->processBuffer = newBuf;
-        s->processBufferCapacity = totalSamples;
-    }
-    float* floatBuf = s->processBuffer;
-
-    for (int i = 0; i < totalSamples; i++) {
-        floatBuf[i] = (float)in[i] / 32768.0f;
-    }
-
-    ebur128_add_frames_float(s->ebur128, floatBuf, (size_t)numFrames);
-
-    double stLoudness = -HUGE_VAL;
-    if (ebur128_loudness_shortterm(s->ebur128, &stLoudness) == EBUR128_SUCCESS) {
-        if (isfinite((float)stLoudness) && stLoudness > -HUGE_VAL) {
-            s->shortTermLoudness = (float)stLoudness;
-        }
-    }
-
-    float gainDb;
-    int isForced = (forcedGainDb != forcedGainDb) ? 0 : 1;  // NaN check
-    if (isForced) {
-        gainDb = forcedGainDb;
+    if (s->hasKnownTrackLoudness) {
+        resetDspState(s, s->knownTrackLufs, s->knownTrackPeakDb);
     } else {
-        gainDb = s->targetLUFS - s->shortTermLoudness;
-        float maxTpDb = computeMaxTruePeakDb(s);
-
-        if (gainDb > 0.0f && maxTpDb > -120.0f) {
-            float maxGainForHeadroom = -1.0f - maxTpDb;
-            if (gainDb > maxGainForHeadroom) {
-                gainDb = maxGainForHeadroom;
-            }
-        }
-
-        if (gainDb < -24.0f) gainDb = -24.0f;
-        if (gainDb > 24.0f) gainDb = 24.0f;
+        resetDspState(s, -70.0f, -120.0f);
     }
+}
 
-    if (!isfinite(gainDb)) gainDb = 0.0f;
-    s->targetGainLinear = dbToLinear(gainDb);
+JNIEXPORT void JNICALL
+Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeSetTrackLoudness(
+    JNIEnv* env, jclass clazz, jlong handle, jfloat trackLufs, jfloat maxPeakDb) {
 
-    for (int frame = 0; frame < numFrames; frame++) {
-        smoothGain(s);
+    KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
+    if (!s) return;
+    resetDspState(s, trackLufs, maxPeakDb);
+}
 
-        for (int ch = 0; ch < s->channels; ch++) {
-            int sampleIdx = frame * s->channels + ch;
-            float inputSample = floatBuf[sampleIdx];
-            float gainedInput = inputSample * s->currentGainLinear;
-            float processed = processLimiterSample(s, gainedInput, ch);
+JNIEXPORT void JNICALL
+Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeClearTrackLoudness(
+    JNIEnv* env, jclass clazz, jlong handle) {
 
-            if (processed > 1.0f) processed = 1.0f;
-            if (processed < -1.0f) processed = -1.0f;
-            out[sampleIdx] = (short)(processed * 32767.0f);
-        }
-
-        s->delayWritePos = (s->delayWritePos + 1) % s->delaySamples;
-    }
-
-    double integrated = -HUGE_VAL;
-    if (ebur128_loudness_global(s->ebur128, &integrated) == EBUR128_SUCCESS) {
-        if (isfinite((float)integrated) && integrated > -HUGE_VAL) {
-            s->integratedLoudness = (float)integrated;
-        }
-    }
-
-    s->maxTruePeakDb = computeMaxTruePeakDb(s);
-
-    s->frameCount += numFrames;
-    if (s->debugLogging && s->frameCount >= s->logInterval) {
-        float currentDb = linearToDb(s->currentGainLinear);
-        float limiterDb = linearToDb(s->smoothedGain);
-        LOGI("LUFS short=%.1f integrated=%.1f | gain=%.1fdB lim=%.1fdB | TP=%.1fdB target=%.1f%s",
-             s->shortTermLoudness, s->integratedLoudness,
-             currentDb, limiterDb,
-             s->maxTruePeakDb, s->targetLUFS,
-             isForced ? " (forced)" : "");
-        s->frameCount = 0;
-    }
+    KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
+    if (!s) return;
+    resetDspState(s, -70.0f, -120.0f);
 }
 
 JNIEXPORT void JNICALL
@@ -335,6 +508,15 @@ Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeGetShortTe
     KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
     if (!s) return -70.0f;
     return s->shortTermLoudness;
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeGetMomentaryLoudness(
+    JNIEnv* env, jclass clazz, jlong handle) {
+
+    KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
+    if (!s) return -70.0f;
+    return s->momentaryLoudness;
 }
 
 JNIEXPORT jfloat JNICALL
@@ -418,6 +600,34 @@ Java_com_alananasss_kittytune_data_AudioScannerManager_nativeAddFramesFloat(
     ebur128_add_frames_float(s->ebur128, data, (size_t)numFrames);
 
     env->ReleaseFloatArrayElements(samples, data, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_com_alananasss_kittytune_data_AudioScannerManager_nativeAddFramesShort(
+    JNIEnv* env, jclass clazz, jlong handle,
+    jshortArray samples, jint numFrames) {
+
+    KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
+    if (!s || !s->ebur128) return;
+
+    int totalSamples = numFrames * s->channels;
+    if (totalSamples > s->processBufferCapacity) {
+        float* newBuf = (float*)realloc(s->processBuffer, totalSamples * sizeof(float));
+        if (!newBuf) return;
+        s->processBuffer = newBuf;
+        s->processBufferCapacity = totalSamples;
+    }
+
+    jshort* data = env->GetShortArrayElements(samples, NULL);
+    if (!data) return;
+
+    for (int i = 0; i < totalSamples; i++) {
+        s->processBuffer[i] = (float)data[i] / 32768.0f;
+    }
+
+    env->ReleaseShortArrayElements(samples, data, JNI_ABORT);
+
+    ebur128_add_frames_float(s->ebur128, s->processBuffer, (size_t)numFrames);
 }
 
 JNIEXPORT jfloat JNICALL

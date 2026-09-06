@@ -57,11 +57,36 @@ class LyricLineStylingTest {
 
     /** The other two styles do not touch size at all — that is what makes them the other two styles. */
     @Test
-    fun `only the scale style scales`() {
+    fun `scale styles scale inactive lines with distance`() {
+        for (style in listOf(LyricsDisplayStyle.SCALE, LyricsDisplayStyle.SCALE_FOCUS)) {
+            assertEquals(1f, LyricLineStyling.treatmentFor(style, 0).scale)
+            assertTrue(LyricLineStyling.treatmentFor(style, 1).scale < 1f)
+            assertTrue(LyricLineStyling.treatmentFor(style, 2).scale < LyricLineStyling.treatmentFor(style, 1).scale)
+        }
+    }
+
+    @Test
+    fun `non-scale styles keep full size`() {
         for (distance in -3..3) {
             assertEquals(1f, scaleAt(distance, LyricsDisplayStyle.STANDARD))
             assertEquals(1f, scaleAt(distance, LyricsDisplayStyle.FOCUS))
         }
+    }
+
+    @Test
+    fun `scale plus focus both scales and blurs inactive lines`() {
+        val active = LyricLineStyling.treatmentFor(LyricsDisplayStyle.SCALE_FOCUS, 0)
+        val near = LyricLineStyling.treatmentFor(LyricsDisplayStyle.SCALE_FOCUS, 1)
+        val mid = LyricLineStyling.treatmentFor(LyricsDisplayStyle.SCALE_FOCUS, 2)
+
+        assertEquals(1f, active.scale)
+        assertEquals(0.dp, active.blur)
+        assertEquals(1f, active.alpha)
+
+        assertTrue(near.scale < 1f, "inactive lines should scale down")
+        assertTrue(mid.scale < near.scale, "scale should fall away with distance")
+        assertTrue(near.blur > 0.dp, "inactive lines should blur")
+        assertTrue(near.alpha < active.alpha, "inactive lines should dim")
     }
 
     @Test

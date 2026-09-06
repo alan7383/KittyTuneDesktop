@@ -33,6 +33,9 @@ import com.alananasss.kittytune.core.trackTextInput
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.ui.common.escapeDismisses
+import androidx.compose.ui.platform.LocalFocusManager
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.ArtistLinkText
@@ -680,13 +683,22 @@ fun LibraryScreen(
         onProfileClick: () -> Unit,
         isGuest: Boolean
     ) {
+        val focusManager = LocalFocusManager.current
+        BackHandler(enabled = query.isNotEmpty()) {
+            onQueryChange("")
+            focusManager.clearFocus()
+        }
         TextField(
             value = query,
             onValueChange = onQueryChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .trackTextInput()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp)
+                .escapeDismisses {
+                    onQueryChange("")
+                    focusManager.clearFocus()
+                },
             placeholder = {
                 Text(str("search_library_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
             },

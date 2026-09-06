@@ -46,13 +46,43 @@ class LyricsRankTest {
     /** Within one bracket nothing has changed: sync is still what decides. */
     @Test
     fun `among equally confident matches the timings decide`() {
+        // Within strong matches (where artist and title both agree):
         assertTrue(
-            LyricsMatcher.rank(wordSync, matchScore = 0.62f) >
+            LyricsMatcher.rank(wordSync, matchScore = 0.85f) >
                 LyricsMatcher.rank(lineSync, matchScore = 0.95f)
         )
         assertTrue(
-            LyricsMatcher.rank(lineSync, matchScore = 0.62f) >
+            LyricsMatcher.rank(lineSync, matchScore = 0.85f) >
                 LyricsMatcher.rank(plain, matchScore = 0.95f)
+        )
+        // Within title-only/partial matches:
+        assertTrue(
+            LyricsMatcher.rank(wordSync, matchScore = 0.62f) >
+                LyricsMatcher.rank(lineSync, matchScore = 0.70f)
+        )
+    }
+
+    /**
+     * An artist-matched song must never lose to a title-only stranger, even if the stranger has
+     * word-level timings.
+     */
+    @Test
+    fun `the right song with line sync beats a title-only stranger with word sync`() {
+        val rightSongLineSynced = LyricsMatcher.rank(lineSync, matchScore = 0.85f)
+        val strangerWordSynced = LyricsMatcher.rank(wordSync, matchScore = 0.65f)
+        assertTrue(
+            rightSongLineSynced > strangerWordSynced,
+            "an artist-verified match with line sync must beat a title-only stranger with word sync",
+        )
+    }
+
+    @Test
+    fun `the right song with plain text beats a title-only stranger with word sync`() {
+        val rightSongPlain = LyricsMatcher.rank(plain, matchScore = 0.85f)
+        val strangerWordSynced = LyricsMatcher.rank(wordSync, matchScore = 0.65f)
+        assertTrue(
+            rightSongPlain > strangerWordSynced,
+            "an artist-verified match even with plain text must beat a title-only stranger with word sync",
         )
     }
 
