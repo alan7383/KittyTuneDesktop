@@ -16,6 +16,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.selection.SelectionContainer
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
@@ -166,6 +169,164 @@ fun ProfileScreen(
         }
     }
 
+    val artistPresets = remember(
+        user?.id,
+        user?.username,
+        profileViewModel.isCurrentUser
+    ) {
+        if (user == null || profileViewModel.isCurrentUser) emptyList<ArtistPresetItem>()
+        else {
+            val artistName = user.username ?: str("generic_artist")
+            val presets = mutableListOf<ArtistPresetItem>()
+
+            // 1. Radio preset (always immediate)
+            presets.add(
+                ArtistPresetItem(
+                    id = "preset_radio",
+                    title = str("artist_preset_radio", artistName),
+                    subtitle = str("artist_preset_radio_sub"),
+                    badgeLabel = "RADIO",
+                    icon = Icons.Rounded.Radio,
+                    fallbackGradient = listOf(Color(0xFF2E1065), Color(0xFF4C1D95), Color(0xFF6D28D9)),
+                    artworkProvider = { user.avatarUrl },
+                    onClick = {
+                        if (profileViewModel.isSpotifyProfile) {
+                            val spotifyId = user.permalink ?: user.urn?.removePrefix("spotify:artist:") ?: ""
+                            val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(spotifyId)
+                            if (cleanId.isNotBlank()) onNavigate("spotify_radio:$cleanId")
+                        } else {
+                            onNavigate("station_artist:${user.id}")
+                        }
+                    }
+                )
+            )
+
+            // 2. Essentials preset (always immediate, uses #1 popular track artwork)
+            presets.add(
+                ArtistPresetItem(
+                    id = "preset_essentials",
+                    title = str("artist_preset_essentials"),
+                    subtitle = str("artist_preset_essentials_sub"),
+                    badgeLabel = "ESSENTIALS",
+                    icon = Icons.Rounded.LocalFireDepartment,
+                    fallbackGradient = listOf(Color(0xFF431407), Color(0xFF9A3412), Color(0xFFC2410C)),
+                    artworkProvider = { profileViewModel.popularTracks.firstOrNull()?.fullResArtwork ?: user.avatarUrl },
+                    onClick = {
+                        val tracks = if (profileViewModel.popularTracks.isNotEmpty()) {
+                            profileViewModel.popularTracks.toList()
+                        } else if (profileViewModel.allTracks.isNotEmpty()) {
+                            profileViewModel.allTracks.take(10).toList()
+                        } else {
+                            emptyList()
+                        }
+                        if (tracks.isNotEmpty()) {
+                            playerViewModel.playPlaylist(tracks, 0, context = artistPlaybackContext)
+                        } else {
+                            if (profileViewModel.isSpotifyProfile) {
+                                val spotifyId = user.permalink ?: user.urn?.removePrefix("spotify:artist:") ?: ""
+                                val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(spotifyId)
+                                if (cleanId.isNotBlank()) onNavigate("spotify_radio:$cleanId")
+                            } else {
+                                onNavigate("station_artist:${user.id}")
+                            }
+                        }
+                    }
+                )
+            )
+
+            // 3. Artist Mix preset (always immediate, uses 2nd track artwork)
+            presets.add(
+                ArtistPresetItem(
+                    id = "preset_mix",
+                    title = str("artist_preset_mix", artistName),
+                    subtitle = str("artist_preset_mix_sub"),
+                    badgeLabel = "MIX",
+                    icon = Icons.Rounded.AutoAwesome,
+                    fallbackGradient = listOf(Color(0xFF022C22), Color(0xFF065F46), Color(0xFF0D9488)),
+                    artworkProvider = { profileViewModel.popularTracks.getOrNull(1)?.fullResArtwork ?: profileViewModel.allTracks.getOrNull(1)?.fullResArtwork ?: user.avatarUrl },
+                    onClick = {
+                        val tracks = (profileViewModel.popularTracks + profileViewModel.allTracks + profileViewModel.likedTracks)
+                            .distinctBy { it.id }
+                            .shuffled()
+                        if (tracks.isNotEmpty()) {
+                            playerViewModel.playPlaylist(tracks, 0, context = artistPlaybackContext)
+                        } else {
+                            if (profileViewModel.isSpotifyProfile) {
+                                val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(user.permalink ?: user.urn ?: "")
+                                if (cleanId.isNotBlank()) onNavigate("spotify_radio:$cleanId")
+                            } else {
+                                onNavigate("station_artist:${user.id}")
+                            }
+                        }
+                    }
+                )
+            )
+
+            // 4. Discovery & Deep Cuts preset (always immediate, uses deep track artwork)
+            presets.add(
+                ArtistPresetItem(
+                    id = "preset_discovery",
+                    title = str("artist_preset_discovery"),
+                    subtitle = str("artist_preset_discovery_sub"),
+                    badgeLabel = "DEEP CUTS",
+                    icon = Icons.Rounded.Explore,
+                    fallbackGradient = listOf(Color(0xFF0F172A), Color(0xFF1E3A8A), Color(0xFF2563EB)),
+                    artworkProvider = { profileViewModel.allTracks.getOrNull(5)?.fullResArtwork ?: profileViewModel.popularTracks.getOrNull(2)?.fullResArtwork ?: user.avatarUrl },
+                    onClick = {
+                        val pool = if (profileViewModel.allTracks.size > 5) {
+                            profileViewModel.allTracks.drop(5) + profileViewModel.repostedTracks
+                        } else if (profileViewModel.repostedTracks.isNotEmpty()) {
+                            profileViewModel.repostedTracks.toList()
+                        } else if (profileViewModel.allTracks.isNotEmpty()) {
+                            profileViewModel.allTracks.shuffled()
+                        } else {
+                            profileViewModel.popularTracks.shuffled()
+                        }
+                        val tracks = pool.distinctBy { it.id }.shuffled()
+                        if (tracks.isNotEmpty()) {
+                            playerViewModel.playPlaylist(tracks, 0, context = artistPlaybackContext)
+                        } else {
+                            if (profileViewModel.isSpotifyProfile) {
+                                val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(user.permalink ?: user.urn ?: "")
+                                if (cleanId.isNotBlank()) onNavigate("spotify_radio:$cleanId")
+                            } else {
+                                onNavigate("station_artist:${user.id}")
+                            }
+                        }
+                    }
+                )
+            )
+
+            // 5. Complete Discography preset (always immediate, uses album artwork)
+            presets.add(
+                ArtistPresetItem(
+                    id = "preset_discography",
+                    title = str("artist_preset_discography"),
+                    subtitle = str("artist_preset_discography_sub"),
+                    badgeLabel = "ALL RELEASES",
+                    icon = Icons.Rounded.LibraryMusic,
+                    fallbackGradient = listOf(Color(0xFF0F172A), Color(0xFF334155), Color(0xFF475569)),
+                    artworkProvider = { profileViewModel.albums.firstOrNull()?.fullResArtwork ?: profileViewModel.popularReleases.firstOrNull()?.fullResArtwork ?: profileViewModel.popularTracks.getOrNull(3)?.fullResArtwork ?: user.avatarUrl },
+                    onClick = {
+                        val allArtistTracks = (profileViewModel.allTracks + profileViewModel.popularTracks).distinctBy { it.id }
+                        if (allArtistTracks.isNotEmpty()) {
+                            playerViewModel.playPlaylist(allArtistTracks, 0, context = artistPlaybackContext)
+                        } else if (!profileViewModel.isSpotifyProfile) {
+                            onNavigate("profile_collection:${user.id}:tracks")
+                        } else {
+                            val spotifyId = user.permalink ?: user.urn?.removePrefix("spotify:artist:") ?: ""
+                            val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(spotifyId)
+                            if (cleanId.isNotBlank()) onNavigate("spotify_radio:$cleanId")
+                            else onNavigate("station_artist:${user.id}")
+                        }
+                    }
+                )
+            )
+
+            presets
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (profileViewModel.isLoading && user == null) {
             ProfileScreenShimmer(onBackClick)
@@ -270,6 +431,17 @@ fun ProfileScreen(
                             onMoreClick = { profileViewModel.loadMoreDiscography() }
                         ) { playlist ->
                             ProfileSquareCard(playlist) { onNavigate(if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()) }
+                        }
+                    }
+                }
+
+                if (artistPresets.isNotEmpty()) {
+                    item {
+                        ProfileHorizontalCarouselRow(
+                            title = str("artist_presets_title"),
+                            items = artistPresets
+                        ) { preset ->
+                            ArtistPresetCard(preset)
                         }
                     }
                 }
@@ -1758,5 +1930,155 @@ fun ProfileCollectionScreen(
                 )
             }
         }
+    }
+}
+
+/**
+ * Data model for artist mixes and stations.
+ */
+data class ArtistPresetItem(
+    val id: String,
+    val title: String,
+    val subtitle: String,
+    val badgeLabel: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val fallbackGradient: List<Color>,
+    val artworkProvider: () -> String?,
+    val onClick: () -> Unit
+)
+
+/**
+ * Editorial 140dp square card for artist mixes matching ProfileSquareCard and MediaCard.
+ * Uses the artist's real track / album covers with a dark gradient and frosted category badge.
+ */
+@Composable
+fun ArtistPresetCard(preset: ArtistPresetItem) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val artwork = remember(preset.id) { preset.artworkProvider() }
+
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                onClick = preset.onClick
+            )
+            .hoverable(interactionSource)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center
+        ) {
+            // Real album / song artwork or deep dark gradient fallback
+            if (!artwork.isNullOrBlank() && !artwork.isDefaultAvatar()) {
+                AsyncImage(
+                    model = artwork,
+                    contentDescription = preset.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(
+                                colors = preset.fallbackGradient
+                            )
+                        )
+                )
+            }
+
+            // High-contrast dark gradient overlay for text readability
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.20f),
+                                Color.Black.copy(alpha = 0.65f)
+                            )
+                        )
+                    )
+            )
+
+            // Top-left editorial category tag
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = Color.Black.copy(alpha = 0.65f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.20f)),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                ) {
+                    Icon(
+                        preset.icon,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(11.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = preset.badgeLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.8.sp,
+                            fontSize = 9.sp
+                        ),
+                        color = Color.White
+                    )
+                }
+            }
+
+            // Bottom-right floating play button on hover
+            if (isHovered) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = preset.title,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = preset.subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

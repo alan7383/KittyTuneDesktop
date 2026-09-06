@@ -123,8 +123,17 @@ private fun PanelSyncedLyrics(
         // The inset counts towards the anchor rather than adding to it. A list applies its scroll offset
         // inside its content padding, so asking for 30% on top of a 36% inset put the current line at two
         // thirds of the way down the screen — "quand on zoome, les lyrics se retrouvent en bas" (issue #33).
+        val effectiveStyle = if (viewportHeight < 360.dp && !style.isFullScreen) {
+            PanelLyricsStyle.Compact.copy(
+                startPadding = style.startPadding,
+                endPadding = style.endPadding
+            )
+        } else {
+            style
+        }
+
         val anchorPx =
-            (viewportPx * (style.anchorFraction - style.topInsetFraction).coerceAtLeast(0f)).toInt()
+            (viewportPx * (effectiveStyle.anchorFraction - effectiveStyle.topInsetFraction).coerceAtLeast(0f)).toInt()
 
         FollowActiveLine(listState, activeIndex, anchorPx)
 
@@ -140,19 +149,10 @@ private fun PanelSyncedLyrics(
             Modifier.fillMaxSize(),
             state = listState,
             contentPadding = PaddingValues(
-                start = style.startPadding,
-                end = style.endPadding,
-                // Before the first line there is nothing to scroll to, so the list sits where it starts —
-                // and a list starts at its top inset. On a full screen that is the difference between the
-                // words beginning in the middle of the page and beginning jammed against the ceiling:
-                // "quand on est au début, il faut que le lyrics soit au milieu ou un peu vers le haut et pas
-                // tout en haut car ça fait vraiment pas beau" (issue #33). Once the song reaches the words
-                // the anchored scroll takes over and this costs nothing.
-                top = viewportHeight * style.topInsetFraction,
-                // Enough for the closing lines to rise clear of the bottom edge, and no more. This was half
-                // the panel, which left the same empty rectangle at the end of a song that the top inset
-                // left at the start.
-                bottom = viewportHeight * style.tailFraction,
+                start = effectiveStyle.startPadding,
+                end = effectiveStyle.endPadding,
+                top = viewportHeight * effectiveStyle.topInsetFraction,
+                bottom = viewportHeight * effectiveStyle.tailFraction,
             ),
         ) {
             items(lines.size) { index ->
@@ -160,7 +160,7 @@ private fun PanelSyncedLyrics(
                 PanelLyricLine(
                     vm = vm,
                     line = line,
-                    style = style,
+                    style = effectiveStyle,
                     // Negative for lines already sung. Before the first line starts there is no current
                     // line, and treating every line as "far away" would shrink the whole panel — so the
                     // distance is zero for all of them until the song reaches the words.
@@ -220,7 +220,8 @@ private fun PanelLyricLine(
     // lyricsscreen" — and the pair is half of what makes a line read as a line: ExtraBold against Bold is a
     // difference you feel without being able to name, where Bold against SemiBold at this size reads as one
     // heavy block with a heavier bit in it (issue #33).
-    val base = MaterialTheme.typography.titleMedium
+    val isCompact = style.anchorFraction == 0.50f && !style.isFullScreen
+    val base = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium
     val activeStyle = base.copy(fontWeight = FontWeight.ExtraBold, lineHeight = base.fontSize * 1.35f)
     val inactiveStyle = base.copy(fontWeight = FontWeight.Bold, lineHeight = base.fontSize * 1.35f)
 
@@ -458,6 +459,21 @@ data class PanelLyricsStyle(
             tailFraction = 0.35f,
             anchorFraction = 0.42f,
             lineSpacing = 6.dp,
+            isFullScreen = false,
+        )
+
+        /**
+         * Compact style for constrained height / zoomed-out side panel:
+         * Centers the active line in the exact middle (0.50f anchor) and balances
+         * insets and spacing so 5 lines are visible: 2 above, 1 active in middle, 2 below.
+         */
+        val Compact = PanelLyricsStyle(
+            startPadding = 16.dp,
+            endPadding = 16.dp,
+            topInsetFraction = 0.40f,
+            tailFraction = 0.40f,
+            anchorFraction = 0.50f,
+            lineSpacing = 4.dp,
             isFullScreen = false,
         )
 

@@ -89,8 +89,10 @@ internal object LyricLineStyling {
         focusBlur: Dp = 2.dp,
     ): LyricLineTreatment {
         val isActive = distance == 0
+        val hasScale = style == LyricsDisplayStyle.SCALE || style == LyricsDisplayStyle.SCALE_FOCUS
+        val hasFocus = style == LyricsDisplayStyle.FOCUS || style == LyricsDisplayStyle.SCALE_FOCUS
         val scale = when {
-            isActive || style != LyricsDisplayStyle.SCALE -> 1f
+            isActive || !hasScale -> 1f
             else -> when (kotlin.math.abs(distance)) {
                 1 -> SCALE_NEAR
                 2 -> SCALE_MID
@@ -99,11 +101,11 @@ internal object LyricLineStyling {
         }
         val alpha = when {
             isActive -> 1f
-            style == LyricsDisplayStyle.FOCUS -> FOCUS_ALPHA
+            hasFocus -> FOCUS_ALPHA
             distance < 0 -> PAST_ALPHA
             else -> UPCOMING_ALPHA
         }
-        val blur = if (!isActive && style == LyricsDisplayStyle.FOCUS) focusBlur else 0.dp
+        val blur = if (!isActive && hasFocus) focusBlur else 0.dp
         return LyricLineTreatment(scale = scale, alpha = alpha, blur = blur)
     }
 }

@@ -380,6 +380,17 @@ class AudioEngine {
 
     fun getVolume(): Float = volume
 
+    fun setTrackLoudness(lufs: Float, truePeakDb: Float = 0f) {
+        normalization.setTrackLoudness(lufs, truePeakDb)
+    }
+
+    fun clearTrackLoudness() {
+        normalization.clearTrackLoudness()
+    }
+
+    fun getIntegratedLoudness(): Float = normalization.getIntegratedLoudness()
+    fun getMaxTruePeakDb(): Float = normalization.getMaxTruePeakDb()
+
     @Synchronized
     fun stop() {
         stopInternal()

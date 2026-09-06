@@ -422,7 +422,8 @@ object MixEngine {
             )
         }
         val likes = runCatching { LikeRepository.likedTracks.value }.getOrDefault(emptyList())
-        return MixProfile.build(plays, likes, now)
+        val disliked = runCatching { com.alananasss.kittytune.data.local.PlayerPreferences().getMixDislikedTrackIds() }.getOrDefault(emptySet())
+        return MixProfile.build(plays, likes, now, disliked)
     }
 }
 

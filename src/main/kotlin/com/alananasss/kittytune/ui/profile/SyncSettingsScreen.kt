@@ -15,14 +15,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.*
@@ -79,6 +83,73 @@ fun SyncSettingsScreen(onBackClick: (() -> Unit)? = null) {
 
     val isSyncing by SyncScheduler.isSyncing.collectAsState()
     val lastSyncAtMs by SyncScheduler.lastSyncAtMs.collectAsState()
+
+    val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    var syncLikesEnabled by remember { mutableStateOf(playerPrefs.getSyncLikesEnabled()) }
+    var showDisclaimerDialog by remember { mutableStateOf(!playerPrefs.isSyncDisclaimerDismissed()) }
+
+    if (showDisclaimerDialog) {
+        var dontShowAgain by remember { mutableStateOf(false) }
+        EscapableAlertDialog(
+            onDismissRequest = {
+                if (dontShowAgain) playerPrefs.setSyncDisclaimerDismissed(true)
+                showDisclaimerDialog = false
+            },
+            icon = {
+                Icon(
+                    Icons.Rounded.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
+            },
+            title = {
+                Text(
+                    text = str("sync_disclaimer_title"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = str("sync_disclaimer_body"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { dontShowAgain = !dontShowAgain }
+                            .padding(vertical = 4.dp),
+                    ) {
+                        Checkbox(
+                            checked = dontShowAgain,
+                            onCheckedChange = { dontShowAgain = it },
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = str("sync_disclaimer_dont_show_again"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (dontShowAgain) playerPrefs.setSyncDisclaimerDismissed(true)
+                        showDisclaimerDialog = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+        )
+    }
 
     // Re-read after anything that could have changed the list, including an exchange a paired phone
     // started on its own while this screen was open.
@@ -166,6 +237,27 @@ fun SyncSettingsScreen(onBackClick: (() -> Unit)? = null) {
                         )
                     }
                 }
+
+                SettingsGroupTitle(str("sync_likes_title"))
+                SettingsItem(
+                    shape = getSettingsShape(1, 0),
+                    title = str("sync_likes_title"),
+                    subtitle = str("sync_likes_sub"),
+                    icon = Icons.Rounded.Favorite,
+                    hasSwitch = true,
+                    switchState = syncLikesEnabled,
+                    onSwitchChange = { enabled ->
+                        syncLikesEnabled = enabled
+                        playerPrefs.setSyncLikesEnabled(enabled)
+                        if (enabled) {
+                            scope.launch {
+                                com.alananasss.kittytune.data.sync.SyncLikes.seedMissing()
+                                com.alananasss.kittytune.data.sync.SyncLikes.seedMissingPlaylists()
+                                SyncScheduler.triggerImmediateSync("sync likes enabled")
+                            }
+                        }
+                    },
+                )
 
                 Spacer(Modifier.height(8.dp))
                 TextButton(onClick = { showAdvanced = !showAdvanced }) {

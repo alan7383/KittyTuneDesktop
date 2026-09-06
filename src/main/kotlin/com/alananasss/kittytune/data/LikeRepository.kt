@@ -122,6 +122,11 @@ object LikeRepository {
         pruneBlacklist()
         loadFromPrefs()
 
+        scope.launch {
+            com.alananasss.kittytune.data.sync.SyncLikes.seedMissing()
+            com.alananasss.kittytune.data.sync.SyncLikes.seedMissingPlaylists()
+        }
+
         // Closes the coalescing window. Prefs has a hook of its own, but the order between shutdown
         // hooks is undefined, so this forces the flush rather than hoping ours ran first.
         Runtime.getRuntime().addShutdownHook(
@@ -164,6 +169,7 @@ object LikeRepository {
         }
 
         scheduleSave()
+        com.alananasss.kittytune.data.sync.SyncLikes.record(track.id, liked = true, track = track)
 
         scope.launch {
             if (track.source == "spotify" || track.user?.urn?.startsWith("spotify") == true || (track.permalinkUrl != null && track.permalinkUrl!!.contains("spotify"))) return@launch
@@ -198,6 +204,7 @@ object LikeRepository {
         // Was a synchronous whole-library serialisation on whichever thread unliked — the UI one,
         // when it came from a row in a list.
         scheduleSave()
+        com.alananasss.kittytune.data.sync.SyncLikes.record(trackId, liked = false, track = null)
 
         if (isSpotify) return
 
@@ -279,6 +286,7 @@ object LikeRepository {
         _likedPlaylists.value = current
         DownloadManager.notifyLibraryUpdated()
         scheduleSave()
+        com.alananasss.kittytune.data.sync.SyncLikes.recordPlaylist(playlistId, isLiked, permalink, urn)
 
         scope.launch {
             if (!isLiked && playlistId > 0) {
@@ -380,6 +388,107 @@ object LikeRepository {
 
         scheduleSave()
         _isSyncing.value = false
+        scope.launch {
+            com.alananasss.kittytune.data.sync.SyncLikes.seedMissing()
+        }
+    }
+
+    /**
+     * Applies a like merged from a paired device.
+     * Does NOT emit a new SyncEvent to prevent feedback loops.
+     */
+    fun applyRemoteLike(track: Track, likedAtMs: Long) {
+        removeFromBlacklist(track.id)
+        _likedTracks.update { current ->
+            val safeSource = (track.source as? String) ?: "soundcloud"
+            if (current.any { it.id == track.id }) {
+                current.map {
+                    if (it.id == track.id) {
+                        it.copy(
+                            isLiked = true,
+                            source = safeSource,
+                            likedAt = likedAtMs.takeIf { t -> t > 0 } ?: it.likedAt ?: System.currentTimeMillis()
+                        )
+                    } else it
+                }.sortedByDescending { it.likedAt ?: 0L }
+            } else {
+                val newTrack = track.copy(
+                    isLiked = true,
+                    source = safeSource,
+                    likedAt = likedAtMs.takeIf { it > 0 } ?: System.currentTimeMillis()
+                )
+                (listOf(newTrack) + current).sortedByDescending { it.likedAt ?: 0L }
+            }
+        }
+        scheduleSave()
+    }
+
+    /**
+     * Applies a batch of likes merged from a paired device in a single atomic update.
+     * Prevents UI thrashing and repeated sorting for large libraries.
+     */
+    fun applyRemoteLikesBatch(tracks: List<Pair<Track, Long>>) {
+        if (tracks.isEmpty()) return
+        tracks.forEach { removeFromBlacklist(it.first.id) }
+        _likedTracks.update { current ->
+            val trackMap = current.associateBy { it.id }.toMutableMap()
+            val now = System.currentTimeMillis()
+            for ((track, likedAtMs) in tracks) {
+                val safeSource = (track.source as? String) ?: "soundcloud"
+                val existing = trackMap[track.id]
+                if (existing != null) {
+                    trackMap[track.id] = existing.copy(
+                        isLiked = true,
+                        source = safeSource,
+                        likedAt = likedAtMs.takeIf { t -> t > 0 } ?: existing.likedAt ?: now,
+                    )
+                } else {
+                    trackMap[track.id] = track.copy(
+                        isLiked = true,
+                        source = safeSource,
+                        likedAt = likedAtMs.takeIf { it > 0 } ?: now,
+                    )
+                }
+            }
+            trackMap.values.sortedByDescending { it.likedAt ?: 0L }
+        }
+        scheduleSave()
+    }
+
+    /**
+     * Applies an unlike merged from a paired device.
+     */
+    fun applyRemoteUnlike(trackId: Long) {
+        addToBlacklist(trackId)
+        _likedTracks.update { it.filterNot { t -> t.id == trackId } }
+        scheduleSave()
+    }
+
+    /**
+     * Applies a batch of unlikes merged from a paired device in a single atomic update.
+     */
+    fun applyRemoteUnlikesBatch(trackIds: Set<Long>) {
+        if (trackIds.isEmpty()) return
+        trackIds.forEach { addToBlacklist(it) }
+        _likedTracks.update { it.filterNot { t -> t.id in trackIds } }
+        scheduleSave()
+    }
+
+    /**
+     * Applies a playlist like/unlike merged from a paired device.
+     */
+    fun applyRemotePlaylistLike(playlistId: Long, liked: Boolean, permalinkUrl: String? = null, urn: String? = null) {
+        val current = _likedPlaylists.value.toMutableSet()
+        if (liked) {
+            current.add(playlistId)
+            DownloadManager.clearDeletedPlaylistId(playlistId)
+        } else {
+            current.remove(playlistId)
+            DownloadManager.addDeletedPlaylistId(playlistId)
+        }
+        _likedPlaylists.value = current
+        DownloadManager.notifyLibraryUpdated()
+        scheduleSave()
     }
 
     fun clear() {

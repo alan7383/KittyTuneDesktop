@@ -13,6 +13,7 @@ import com.alananasss.kittytune.media.Player
 import com.alananasss.kittytune.media.Player as ExoPlayer
 import com.alananasss.kittytune.R
 import com.alananasss.kittytune.data.*
+import com.alananasss.kittytune.data.sync.*
 import com.alananasss.kittytune.data.local.LocalPlaylist
 import com.alananasss.kittytune.data.local.LyricsAlignment
 import com.alananasss.kittytune.data.local.LyricsDisplayStyle
@@ -27,6 +28,8 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -65,6 +68,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private val gson = Gson()
     private val lyricsOverridesPrefs =
         com.alananasss.kittytune.core.NamedPrefs("lyrics_overrides")
+    private val trackGainPrefs =
+        com.alananasss.kittytune.core.NamedPrefs("track_gain")
+
+    var trackGainDb by mutableIntStateOf(com.alananasss.kittytune.audio.TrackGain.NONE)
+        private set
 
     /**
      * Manual lyrics persistence (issue #27): when the user picks a lyric result by
@@ -118,6 +126,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * lyrics rather than back on the library (issue #33).
      */
     var isLyricsFullScreen by mutableStateOf(false)
+    var isMiniPlayerVisible by mutableStateOf(playerPrefs.getMiniPlayerEnabled())
+
+    fun toggleMiniPlayer(enabled: Boolean = !isMiniPlayerVisible) {
+        isMiniPlayerVisible = enabled
+        playerPrefs.setMiniPlayerEnabled(enabled)
+    }
+
+    fun saveMiniPlayerBounds(x: Int, y: Int, width: Int) {
+        playerPrefs.setMiniPlayerBounds(x, y, width)
+    }
     var backgroundColor by mutableStateOf(Color(0xFF1E1E1E))
     val hasLyrics by derivedStateOf { lyricsLines.isNotEmpty() || !rawPlainLyrics.isNullOrBlank() }
     var commentSort by mutableStateOf(CommentSort.NEWEST)
@@ -143,6 +161,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     var effectsState by mutableStateOf(playerPrefs.getLastEffects())
     var isPreciseSpeedEnabled by mutableStateOf(playerPrefs.getPreciseSpeedEnabled())
+    var isQueuePreserveUpcomingEnabled by mutableStateOf(playerPrefs.getQueuePreserveUpcomingOnJump())
+    var fullPlayerBgStyle by mutableStateOf(playerPrefs.getFullPlayerBgStyle())
+        private set
+    var fullPlayerCoverScale by mutableFloatStateOf(playerPrefs.getFullPlayerCoverScale())
+        private set
+    var fullPlayerLyricsAlign by mutableStateOf(playerPrefs.getFullPlayerLyricsAlign())
+        private set
 
     /**
      * Seeded straight from preferences rather than from the engine: [player] is a lazy getter,
@@ -1054,7 +1079,6 @@ flushListenSession("TRACK_CHANGE")
             )
         }
 
-
         MusicManager.onNextClick = {
             val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
             playNext(manual = true, isCrossfade = crossfadeEnabled)
@@ -1505,12 +1529,10 @@ flushListenSession("TRACK_CHANGE")
         }
     }
 
-    private fun generateSearchQueries(title: String, uploader: String): List<String> {
-        val queries = mutableSetOf<String>()
-
+    private fun parseArtistAndTitle(title: String, uploader: String): Pair<String, String> {
         val cleanArtist = uploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-
-        val cleanTitle = title.replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
+        val normalizedTitle = title.replace('–', '-').replace('—', '-')
+        val cleanTitle = normalizedTitle.replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
 
         var parsedArtist = cleanArtist
         var parsedTitle = cleanTitle
@@ -1518,8 +1540,30 @@ flushListenSession("TRACK_CHANGE")
             val parts = cleanTitle.split("-", limit = 2)
             parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
             parsedTitle = parts[1].trim()
-        } else if (title.contains("-")) {
-            val parts = title.split("-", limit = 2)
+        } else if (normalizedTitle.contains("-")) {
+            val parts = normalizedTitle.split("-", limit = 2)
+            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
+            parsedTitle = parts[1].replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
+        }
+        val ultraCleanTitle = parsedTitle.replace(Regex("(?i)\\s+(w/|feat\\.?|ft\\.?|prod\\.?|x(?=\\s)).*"), "").trim()
+        return Pair(parsedArtist, ultraCleanTitle.ifBlank { parsedTitle })
+    }
+
+    private fun generateSearchQueries(title: String, uploader: String): List<String> {
+        val queries = mutableSetOf<String>()
+
+        val cleanArtist = uploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
+        val normalizedTitle = title.replace('–', '-').replace('—', '-')
+        val cleanTitle = normalizedTitle.replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
+
+        var parsedArtist = cleanArtist
+        var parsedTitle = cleanTitle
+        if (cleanTitle.contains("-")) {
+            val parts = cleanTitle.split("-", limit = 2)
+            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
+            parsedTitle = parts[1].trim()
+        } else if (normalizedTitle.contains("-")) {
+            val parts = normalizedTitle.split("-", limit = 2)
             parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
             parsedTitle = parts[1].replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
         }
@@ -1742,10 +1786,18 @@ flushListenSession("TRACK_CHANGE")
         queries: List<String>,
         variant: LyricsVariant,
     ): LyricsPayload? = coroutineScope {
+        val (parsedArtist, parsedTitle) = parseArtistAndTitle(track.title ?: "", track.user?.username ?: "")
         val target = LyricsMatcher.Target(
-            title = track.title ?: "",
-            artist = track.user?.username ?: "",
+            title = parsedTitle.ifBlank { track.title ?: "" },
+            artist = parsedArtist.ifBlank { track.user?.username ?: "" },
             durationMs = track.durationMs ?: 0L,
+            alternativeTitles = listOfNotNull(track.title, parsedTitle, track.title?.let { cleanTitleNoise(it) }).filter { it.isNotBlank() }.distinct(),
+            alternativeArtists = listOfNotNull(
+                track.user?.username,
+                parsedArtist,
+                track.publisherMetadata?.artist,
+                track.displayArtist,
+            ).filter { it.isNotBlank() }.distinct(),
         )
         val trackDurationMs = track.durationMs ?: 0L
         val preferLrcLib = lyricsProvider == LyricsProvider.OPEN_SOURCE
@@ -1776,13 +1828,13 @@ flushListenSession("TRACK_CHANGE")
                 best = bestOfQuery
             }
 
-            // Word-level sync from a confident match is as good as this gets, so stop spending
-            // requests on the remaining, progressively looser, generated queries.
+            // Word-level sync from a confident match or line-level sync from an exact artist match
+            // is as good as this gets, so stop spending requests on progressively looser queries.
             val current = best
-            if (current != null &&
-                current.syncTier >= LyricsMatcher.SYNC_TIER_WORD &&
-                current.matchScore >= 0.6f
-            ) break
+            if (current != null && (
+                (current.syncTier >= LyricsMatcher.SYNC_TIER_LINE && current.matchScore >= LyricsMatcher.STRONG_MATCH) ||
+                (current.syncTier >= LyricsMatcher.SYNC_TIER_WORD && current.matchScore >= LyricsMatcher.CONFIDENT_MATCH)
+            )) break
         }
 
         // Genius only once everything else has come up empty: it never carries timings, so it is
@@ -1864,8 +1916,13 @@ flushListenSession("TRACK_CHANGE")
         val pick = results
             .filter { LyricsMatcher.isAcceptable(it.trackName, it.artistName, target) }
             .maxByOrNull { hit ->
+                val syncTier = when {
+                    hit.hasRichSync == 1 -> LyricsMatcher.SYNC_TIER_WORD
+                    hit.hasSubtitles == 1 -> LyricsMatcher.SYNC_TIER_LINE
+                    else -> LyricsMatcher.SYNC_TIER_PLAIN
+                }
                 LyricsMatcher.rank(
-                    syncTier = hit.hasRichSync * 2 + hit.hasSubtitles,
+                    syncTier = syncTier,
                     matchScore = LyricsMatcher.score(
                         hit.trackName, hit.artistName, hit.trackLength.toDouble(), target
                     ),
@@ -2845,7 +2902,13 @@ flushListenSession("TRACK_CHANGE")
     }
 
     fun skipToQueueItem(index: Int) {
-        playTrackAtIndex(index, addToHistory = false)
+        if (isQueuePreserveUpcomingEnabled && index > currentQueueIndex && currentQueueIndex >= 0 && index < _queue.size) {
+            val targetIndex = currentQueueIndex + 1
+            moveQueueItem(index, targetIndex)
+            playTrackAtIndex(targetIndex, addToHistory = false)
+        } else {
+            playTrackAtIndex(index, addToHistory = false)
+        }
     }
 
     private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true, isCrossfade: Boolean = false) {
@@ -3166,6 +3229,14 @@ flushListenSession("TRACK_CHANGE")
         }
     }
 
+    fun play() {
+        if (!isPlaying) togglePlayPause()
+    }
+
+    fun pause() {
+        if (isPlaying) togglePlayPause()
+    }
+
     fun toggleShuffle() {
         shuffleEnabled = !shuffleEnabled;
         if (shuffleEnabled) applyShuffle() else revertShuffle();
@@ -3397,8 +3468,48 @@ flushListenSession("TRACK_CHANGE")
         }
     }
 
+    val isYourMixActive: Boolean
+        get() = currentContext?.navigationId == "your_mix"
+
+    fun dislikeCurrentTrackInMix() {
+        val track = currentTrack ?: return
+        playerPrefs.addMixDislikedTrack(track.id)
+        if (isLiked) {
+            isLiked = false
+            LikeRepository.removeLike(track.id)
+        }
+        val currentIndex = currentQueueIndex
+        if (_queue.size > 1 && currentIndex in _queue.indices) {
+            playNext(manual = true)
+            removeTrackFromQueue(currentIndex)
+        } else {
+            playNext(manual = true)
+        }
+    }
+
     fun togglePreciseSpeedEnabled(enabled: Boolean) {
         isPreciseSpeedEnabled = enabled; playerPrefs.setPreciseSpeedEnabled(enabled)
+    }
+
+    fun toggleQueuePreserveUpcoming(enabled: Boolean) {
+        isQueuePreserveUpcomingEnabled = enabled
+        playerPrefs.setQueuePreserveUpcomingOnJump(enabled)
+    }
+
+    fun updateFullPlayerBgStyle(style: com.alananasss.kittytune.data.local.FullPlayerBgStyle) {
+        fullPlayerBgStyle = style
+        playerPrefs.setFullPlayerBgStyle(style)
+    }
+
+    fun updateFullPlayerCoverScale(scale: Float) {
+        val clamped = scale.coerceIn(0.6f, 1.4f)
+        fullPlayerCoverScale = clamped
+        playerPrefs.setFullPlayerCoverScale(clamped)
+    }
+
+    fun updateFullPlayerLyricsAlign(align: com.alananasss.kittytune.data.local.LyricsAlignment) {
+        fullPlayerLyricsAlign = align
+        playerPrefs.setFullPlayerLyricsAlign(align)
     }
 
     fun toggleRain() {
@@ -4069,11 +4180,6 @@ flushListenSession("TRACK_CHANGE")
      * few seconds in. Kept in its own file rather than the main preferences, which is rewritten
      * whole on every change and would grow a key per track.
      */
-    private val trackGainPrefs = com.alananasss.kittytune.core.NamedPrefs("track_gain")
-
-    var trackGainDb by mutableIntStateOf(com.alananasss.kittytune.audio.TrackGain.NONE)
-        private set
-
     private fun trackGainKey(trackId: Long) = "gain_$trackId"
 
     private fun observeTrackGain() {

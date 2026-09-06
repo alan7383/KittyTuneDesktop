@@ -177,6 +177,7 @@ fun Modifier.pushedBack(progress: Float): Modifier {
  */
 fun Modifier.receded(progress: Float): Modifier {
     if (progress <= 0f) return this
+    val shouldBlockClicks = progress > POINTERS_OFF_AT
     return this
         .graphicsLayer {
             alpha = fadeOut(progress)
@@ -191,15 +192,17 @@ fun Modifier.receded(progress: Float): Modifier {
                 0.5f,
             )
         }
-        .then(
-            if (progress > POINTERS_OFF_AT) Modifier.pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial).changes.forEach { it.consume() }
+        .pointerInput(shouldBlockClicks) {
+            if (!shouldBlockClicks) return@pointerInput
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Main)
+                    if (event.changes.any { it.pressed }) {
+                        event.changes.forEach { it.consume() }
                     }
                 }
-            } else Modifier
-        )
+            }
+        }
 }
 
 /** One fade curve for everything that leaves, so nothing is still visible when the layouts swap. */

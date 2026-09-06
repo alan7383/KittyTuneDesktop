@@ -30,26 +30,30 @@ internal fun AnchorCurrentQueueItem(
     listState: LazyListState,
     currentIndex: Int,
     currentTrackId: Long?,
+    currentKey: Any? = null,
+    targetIndex: Int = (currentIndex - 1).coerceAtLeast(0),
 ) {
-    LaunchedEffect(currentIndex, currentTrackId) {
-        if (currentIndex < 0) return@LaunchedEffect
+    LaunchedEffect(currentIndex, currentTrackId, targetIndex) {
+        if (currentIndex < 0 || targetIndex < 0) return@LaunchedEffect
 
         val visible = listState.layoutInfo.visibleItemsInfo
         // Empty before the first measure — which is the panel opening. Nothing is on screen yet, so
         // this falls through and anchors, exactly as it should.
-        if (visible.any { it.index == currentIndex }) return@LaunchedEffect
+        val isVisible = if (currentKey != null) {
+            visible.any { it.key == currentKey }
+        } else {
+            visible.any { it.index == currentIndex }
+        }
+        if (isVisible) return@LaunchedEffect
 
-        // One row above the current track, so the one just played stays visible: it is the single
-        // piece of the past worth seeing at rest, and everything after it is still to come.
-        val target = (currentIndex - 1).coerceAtLeast(0)
-        val distance = visible.firstOrNull()?.index?.let { abs(target - it) }
+        val distance = visible.firstOrNull()?.index?.let { abs(targetIndex - it) }
 
         // Animating across a long queue crawls through every row in between. Past a screenful there
         // is nothing for the eye to follow anyway, so it jumps.
         if (distance == null || distance > FAR_JUMP_ITEMS) {
-            listState.scrollToItem(target)
+            listState.scrollToItem(targetIndex)
         } else {
-            listState.animateScrollToItem(target)
+            listState.animateScrollToItem(targetIndex)
         }
     }
 }

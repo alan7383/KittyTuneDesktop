@@ -1147,14 +1147,16 @@ private fun HabitCard(
 
 @Composable
 private fun InsightsSection(stats: PeriodStats) {
+    val cs = MaterialTheme.colorScheme
     Column(
         modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         if (stats.topTracks.isNotEmpty()) {
             val topTrack = stats.topTracks.first()
             InsightCard(
-                emoji = "🔥",
+                icon = Icons.Rounded.Whatshot,
+                tint = cs.primary,
                 text = str("listening_stats_insight_top_track",
                     topTrack.trackTitle,
                     topTrack.playCount
@@ -1164,7 +1166,8 @@ private fun InsightsSection(stats: PeriodStats) {
 
         if (stats.manualReplays > 0) {
             InsightCard(
-                emoji = "🔁",
+                icon = Icons.Rounded.Replay,
+                tint = cs.secondary,
                 text = str("listening_stats_insight_replays",
                     stats.manualReplays
                 )
@@ -1173,7 +1176,8 @@ private fun InsightsSection(stats: PeriodStats) {
 
         if (stats.totalSkips > 5) {
             InsightCard(
-                emoji = "⏭️",
+                icon = Icons.Rounded.SkipNext,
+                tint = cs.error,
                 text = str("listening_stats_insight_skips", String.format(Locale.US, "%.0f", stats.skipRate * 100)
                 )
             )
@@ -1181,7 +1185,8 @@ private fun InsightsSection(stats: PeriodStats) {
 
         if (stats.repeatOneLoops > 0) {
             InsightCard(
-                emoji = "🔂",
+                icon = Icons.Rounded.RepeatOne,
+                tint = cs.tertiary,
                 text = str("listening_stats_insight_repeat",
                     stats.repeatOneLoops
                 )
@@ -1190,7 +1195,8 @@ private fun InsightsSection(stats: PeriodStats) {
 
         if (stats.uniqueArtists > 5) {
             InsightCard(
-                emoji = "🎨",
+                icon = Icons.Rounded.Palette,
+                tint = cs.primary,
                 text = str("listening_stats_insight_variety",
                     stats.uniqueArtists
                 )
@@ -1200,23 +1206,41 @@ private fun InsightsSection(stats: PeriodStats) {
 }
 
 @Composable
-private fun InsightCard(emoji: String, text: String) {
+private fun InsightCard(
+    icon: ImageVector,
+    tint: Color = MaterialTheme.colorScheme.primary,
+    text: String
+) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(emoji, fontSize = 28.sp)
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(tint.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Text(
                 text = text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
             )
         }
     }

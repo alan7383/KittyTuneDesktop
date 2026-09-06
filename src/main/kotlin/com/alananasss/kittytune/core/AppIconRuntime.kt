@@ -1,8 +1,10 @@
 package com.alananasss.kittytune.core
 
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.Taskbar
 import java.awt.Window
 import java.awt.image.BufferedImage
+import kotlin.math.roundToInt
 
 /**
  * The part of the icon switch that applies to the process while it runs, as opposed to what
@@ -61,5 +63,88 @@ object AppIconRuntime {
             val targets = if (window != null) listOf(window) else Window.getWindows().toList()
             targets.forEach { target -> runCatching { target.iconImages = images } }
         }
+    }
+    /**
+     * Loads a variant icon specially prepared for the system tray (Linux/Windows/macOS).
+     *
+     * System tray icons on Linux (AWT XTrayIconPeer / XEmbed) do not support true alpha transparency
+     * and fill any transparent corner pixels with the default AWT window background (light gray/white
+     * #dfdedd), creating ugly white triangle artifacts around rounded squircle icons.
+     * Furthermore, single-step downscaling from 256px to 22px causes severe aliasing artifacts.
+     *
+     * This method:
+     * 1. Detects and fills transparent/semi-transparent squircle corners using edge ray-marching,
+     *    ensuring the tray icon has solid, matching corner colors without white edges.
+     * 2. Pre-scales the icon to a clean 48x48 tray resolution using high-quality progressive
+     *    bicubic downsampling (IconEncoders.scaled), preserving fine logo details.
+     */
+    fun loadTrayPainter(variantKey: String): androidx.compose.ui.graphics.painter.Painter? = runCatching {
+        val source = load(variantKey) ?: return@runCatching null
+        val filled = fillTransparentCorners(source)
+        val scaled = IconEncoders.scaled(filled, 48)
+        androidx.compose.ui.graphics.painter.BitmapPainter(
+            scaled.toComposeImageBitmap()
+        )
+    }.getOrNull()
+
+    /**
+     * Fills any transparent pixels (e.g. rounded squircle corners from Android adaptive icons)
+     * by ray-marching towards the center to find the nearest opaque pixel.
+     */
+    fun fillTransparentCorners(source: BufferedImage): BufferedImage {
+        val w = source.width
+        val h = source.height
+        // Quick check: if the 4 extreme corners are already fully opaque, nothing to fill
+        if ((source.getRGB(0, 0) ushr 24) == 255 &&
+            (source.getRGB(w - 1, 0) ushr 24) == 255 &&
+            (source.getRGB(0, h - 1) ushr 24) == 255 &&
+            (source.getRGB(w - 1, h - 1) ushr 24) == 255
+        ) {
+            return source
+        }
+
+        val result = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
+        val pixels = IntArray(w * h)
+        source.getRGB(0, 0, w, h, pixels, 0, w)
+
+        val cx = w / 2.0
+        val cy = h / 2.0
+
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val idx = y * w + x
+                val argb = pixels[idx]
+                val alpha = (argb ushr 24) and 0xff
+                if (alpha < 255) {
+                    val dx = cx - x
+                    val dy = cy - y
+                    val dist = kotlin.math.hypot(dx, dy)
+                    if (dist > 0.0) {
+                        val ux = dx / dist
+                        val uy = dy / dist
+                        var nearestRgb = argb and 0x00ffffff
+                        var step = 1
+                        val maxSteps = dist.toInt()
+                        while (step <= maxSteps) {
+                            val nx = (x + ux * step).roundToInt().coerceIn(0, w - 1)
+                            val ny = (y + uy * step).roundToInt().coerceIn(0, h - 1)
+                            val nArgb = pixels[ny * w + nx]
+                            val nAlpha = (nArgb ushr 24) and 0xff
+                            if (nAlpha >= 250) {
+                                nearestRgb = nArgb and 0x00ffffff
+                                break
+                            }
+                            step++
+                        }
+                        pixels[idx] = (0xff shl 24) or nearestRgb
+                    } else {
+                        pixels[idx] = (0xff shl 24) or (argb and 0x00ffffff)
+                    }
+                }
+            }
+        }
+
+        result.setRGB(0, 0, w, h, pixels, 0, w)
+        return result
     }
 }

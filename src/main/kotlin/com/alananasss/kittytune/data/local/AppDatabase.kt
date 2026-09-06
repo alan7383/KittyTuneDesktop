@@ -89,6 +89,9 @@ object AppDatabase {
             // (issue #33).
             """CREATE TABLE IF NOT EXISTS lyrics_scroll_speed (
                 trackId INTEGER PRIMARY KEY NOT NULL, speed REAL NOT NULL, updatedAt INTEGER NOT NULL)""",
+            """CREATE TABLE IF NOT EXISTS track_loudness (
+                trackId INTEGER PRIMARY KEY NOT NULL, integratedLufs REAL NOT NULL,
+                truePeakDb REAL NOT NULL, updatedAt INTEGER NOT NULL)""",
             """CREATE TABLE IF NOT EXISTS library_item_meta (
                 itemKey TEXT PRIMARY KEY NOT NULL, folderId INTEGER, isPinned INTEGER NOT NULL DEFAULT 0,
                 addedAt INTEGER NOT NULL)""",

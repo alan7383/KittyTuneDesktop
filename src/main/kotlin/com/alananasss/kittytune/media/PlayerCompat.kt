@@ -161,7 +161,17 @@ class Player {
             onError?.invoke(err)
             listeners.forEach { it.onPlayerError(err) } 
         }
-        eng.onCompletion = { onCompletion?.invoke() }
+        eng.onCompletion = {
+            val trackId = currentMediaItem?.track?.id ?: com.alananasss.kittytune.data.MusicManager.currentTrack?.id
+            trackId?.let { id ->
+                val lufs = eng.getIntegratedLoudness()
+                val tp = eng.getMaxTruePeakDb()
+                if (lufs > -60f && lufs < 0f) {
+                    com.alananasss.kittytune.data.TrackLoudnessRepository.saveLoudness(id, lufs, tp)
+                }
+            }
+            onCompletion?.invoke()
+        }
         eng.onReResolveUrl = { failedUrl ->
             val track = currentMediaItem?.track ?: com.alananasss.kittytune.data.MusicManager.currentTrack
             track?.let { t ->
@@ -274,6 +284,23 @@ class Player {
             }
             val headers = buildHeaders(item.track)
             
+            val track = item.track
+            if (track != null) {
+                val cached = com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(track.id)
+                if (cached != null) {
+                    activeEngine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
+                } else {
+                    activeEngine.clearTrackLoudness()
+                    com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
+                        if (currentMediaItem?.track?.id == track.id) {
+                            activeEngine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                        }
+                    }
+                }
+            } else {
+                activeEngine.clearTrackLoudness()
+            }
+
             if (isCrossfade) {
                 val oldEngine = fadingEngine
                 activeEngine.setMediaItem(url, headers, startPositionMs)

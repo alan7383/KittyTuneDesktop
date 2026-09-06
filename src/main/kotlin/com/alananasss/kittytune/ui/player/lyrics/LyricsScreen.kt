@@ -16,6 +16,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.foundation.interaction.MutableInteractionSource
     import androidx.compose.foundation.interaction.collectIsHoveredAsState
     import androidx.compose.foundation.layout.*
+import androidx.compose.ui.unit.min
     import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
     import androidx.compose.foundation.lazy.items
     import androidx.compose.foundation.lazy.itemsIndexed
@@ -31,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.material.icons.rounded.Notes
     import androidx.compose.material.icons.rounded.FormatSize
     import androidx.compose.material.icons.rounded.CenterFocusStrong
+    import androidx.compose.material.icons.rounded.FilterCenterFocus
     import androidx.compose.material.icons.rounded.Add
     import androidx.compose.material.icons.rounded.ArrowDropDown
     import androidx.compose.material.icons.rounded.ContentCopy
@@ -131,6 +133,14 @@ import kotlin.math.roundToInt
                 viewModel = viewModel,
                 onDismiss = { showUploadYamlDialog = false }
             )
+        }
+
+        BackHandler {
+            if (viewModel.isSearchingLyrics) {
+                viewModel.isSearchingLyrics = false
+            } else {
+                onClose()
+            }
         }
 
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
@@ -1047,6 +1057,17 @@ import kotlin.math.roundToInt
         }
     }
 
+/**
+ * How large the lyrics quick-settings panel is allowed to get.
+ *
+ * A cap rather than a size: the panel takes 94% of the window up to these, so it grows on a big screen
+ * without ever running past the edges of a small one. Wide because the left column carries four-up button
+ * groups whose labels have to fit on one line, tall because the alternative to scrolling inside itself was
+ * being cut off by the bottom of the window.
+ */
+private val QUICK_SETTINGS_MAX_WIDTH = 1080.dp
+private val QUICK_SETTINGS_MAX_HEIGHT = 940.dp
+
 @Composable
 fun QuickLyricsSettingsDialog(
     viewModel: PlayerViewModel,
@@ -1128,214 +1149,393 @@ fun QuickLyricsSettingsDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            tonalElevation = 6.dp,
-            modifier = Modifier.width(860.dp).padding(8.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .verticalScroll(rememberScrollState()) 
+        // Sized against the window rather than fixed at 860 dp. Two columns of cards inside 860 left each
+        // segment of a four-up button group about forty dp of text, which is why "Gradient" was breaking
+        // across two lines in the middle of the word; and a panel taller than the window was simply cut off
+        // at the bottom edge instead of scrolling inside itself. `min` also copes with an unbounded
+        // measurement, where the fractions come back infinite and the caps are what is left.
+        BoxWithConstraints {
+            val panelWidth = min(QUICK_SETTINGS_MAX_WIDTH, maxWidth * 0.94f)
+            val panelHeight = min(QUICK_SETTINGS_MAX_HEIGHT, maxHeight * 0.94f)
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 6.dp,
+                modifier = Modifier.width(panelWidth).heightIn(max = panelHeight).padding(8.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .verticalScroll(rememberScrollState()) 
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = str("pref_lyrics_title"),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, str("btn_close"))
-                    }
-                }
-
-                Spacer(Modifier.height(20.dp))
-
-                // --- LAYOUT EN 2 COLONNES ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    
-                    // ==========================================
-                    // COLONNE GAUCHE (Visuel & Synchro)
-                    // ==========================================
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 0. FOURNISSEUR
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Rounded.Settings,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text = str("pref_lyrics_title"),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) {
+                            Icon(Icons.Rounded.Close, str("btn_close"))
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
+                    // --- LAYOUT EN 2 COLONNES ---
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                    
+                        // ==========================================
+                        // COLONNE GAUCHE (Visuel & Synchro)
+                        // ==========================================
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = str("pref_lyrics_provider_title"),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                ExpressiveConnectedButtonGroup(
-                                    fillMaxWidth = true,
-                                    options = listOf(com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY, com.alananasss.kittytune.ui.player.LyricsProvider.OPEN_SOURCE),
-                                    selectedOption = viewModel.lyricsProvider,
-                                    onOptionSelected = { viewModel.updateLyricsProvider(it) },
-                                    labelProvider = { prov ->
-                                        val text = when (prov) {
-                                            com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY -> "Musixmatch"
-                                            com.alananasss.kittytune.ui.player.LyricsProvider.OPEN_SOURCE -> "LrcLib"
+                            if (isFullScreen) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = str("full_player_bg_style"),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            // Beside the heading rather than beside the Apple Music button,
+                                            // because four buttons split this card between them and none of
+                                            // them has room for a dot. Only while that style is the one in
+                                            // use, since the aside is about that style.
+                                            if (viewModel.fullPlayerBgStyle ==
+                                                com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC
+                                            ) {
+                                                com.alananasss.kittytune.ui.common.FunFactDot(
+                                                    str("full_player_bg_apple_music_fact")
+                                                )
+                                            }
                                         }
-                                        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                                    }
-                                )
-                            }
-                        }
-
-                        // 1. SYNCHRONISATION (SYNC OFFSET)
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Rounded.Timer, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            text = str("lyrics_sync"),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                        Spacer(Modifier.height(10.dp))
+                                        ExpressiveConnectedButtonGroup(
+                                            fillMaxWidth = true,
+                                            // Four segments across one column of the panel: at the button's
+                                            // own 24 dp either side there is no room for "Apple Music" on a
+                                            // single line.
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                                            options = com.alananasss.kittytune.data.local.FullPlayerBgStyle.entries,
+                                            selectedOption = viewModel.fullPlayerBgStyle,
+                                            onOptionSelected = { viewModel.updateFullPlayerBgStyle(it) },
+                                            labelProvider = { style ->
+                                                val text = when (style) {
+                                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC -> str("full_player_bg_apple_music")
+                                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.BLUR -> str("full_player_bg_blur")
+                                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.GRADIENT -> str("full_player_bg_gradient")
+                                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.PURE_BLACK -> str("full_player_bg_pure_black")
+                                                }
+                                                Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                            }
                                         )
+
+                                        Spacer(Modifier.height(14.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = str("full_player_cover_zoom"),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "${(viewModel.fullPlayerCoverScale * 100).toInt()}%",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Spacer(Modifier.height(6.dp))
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.updateFullPlayerCoverScale(viewModel.fullPlayerCoverScale - 0.05f) }) {
+                                                Icon(Icons.Rounded.Remove, null)
+                                            }
+                                            Slider(
+                                                value = viewModel.fullPlayerCoverScale,
+                                                onValueChange = { viewModel.updateFullPlayerCoverScale(it) },
+                                                valueRange = 0.6f..1.4f,
+                                                steps = 15,
+                                                modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                            )
+                                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.updateFullPlayerCoverScale(viewModel.fullPlayerCoverScale + 0.05f) }) {
+                                                Icon(Icons.Rounded.Add, null)
+                                            }
+                                        }
                                     }
-                                    val sign = if (currentOffsetMs > 0) "+" else ""
-                                    val formattedOffset = String.format("%.2fs", currentOffsetSec)
-                                    Text(
-                                        text = "$sign$formattedOffset",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (currentOffsetMs != 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Spacer(Modifier.height(12.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    ToggleButton(
-                                        checked = false,
-                                        onCheckedChange = { viewModel.adjustLyricsOffset(-1000L) },
-                                        shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("-1s", style = MaterialTheme.typography.labelMedium) }
-
-                                    ToggleButton(
-                                        checked = false,
-                                        onCheckedChange = { viewModel.adjustLyricsOffset(-100L) },
-                                        shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("-.1s", style = MaterialTheme.typography.labelMedium) }
-
-                                    ToggleButton(
-                                        checked = viewModel.lyricsOffset == 0L,
-                                        onCheckedChange = { viewModel.lyricsOffset = 0L },
-                                        shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-                                        modifier = Modifier.weight(1f)
-                                    ) { 
-                                        Text("0s", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) 
-                                    }
-
-                                    ToggleButton(
-                                        checked = false,
-                                        onCheckedChange = { viewModel.adjustLyricsOffset(100L) },
-                                        shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("+.1s", style = MaterialTheme.typography.labelMedium) }
-
-                                    ToggleButton(
-                                        checked = false,
-                                        onCheckedChange = { viewModel.adjustLyricsOffset(1000L) },
-                                        shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("+1s", style = MaterialTheme.typography.labelMedium) }
                                 }
                             }
-                        }
 
-                        // 2. TAILLE DU TEXTE
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                            // 0. FOURNISSEUR
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
                                     Text(
-                                        text = str("pref_lyrics_size"),
+                                        text = str("pref_lyrics_provider_title"),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Text(
-                                        text = "${fontSize.roundToInt()} sp",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
+                                    Spacer(Modifier.height(10.dp))
+                                    ExpressiveConnectedButtonGroup(
+                                        fillMaxWidth = true,
+                                        options = listOf(com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY, com.alananasss.kittytune.ui.player.LyricsProvider.OPEN_SOURCE),
+                                        selectedOption = viewModel.lyricsProvider,
+                                        onOptionSelected = { viewModel.updateLyricsProvider(it) },
+                                        labelProvider = { prov ->
+                                            val text = when (prov) {
+                                                com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY -> "Musixmatch"
+                                                com.alananasss.kittytune.ui.player.LyricsProvider.OPEN_SOURCE -> "LrcLib"
+                                            }
+                                            Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                        }
                                     )
                                 }
-                                Spacer(Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { updateFontSize((fontSize - 2f).coerceAtLeast(12f)) }) {
-                                        Icon(Icons.Rounded.Remove, null)
+                            }
+
+                            // 1. SYNCHRONISATION (SYNC OFFSET)
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Rounded.Timer, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                text = str("lyrics_sync"),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        val sign = if (currentOffsetMs > 0) "+" else ""
+                                        val formattedOffset = String.format("%.2fs", currentOffsetSec)
+                                        Text(
+                                            text = "$sign$formattedOffset",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (currentOffsetMs != 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
-                                    Slider(
-                                        value = fontSize,
-                                        onValueChange = { updateFontSize(it) },
-                                        valueRange = 12f..100f,
-                                        steps = 43,
-                                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
-                                    )
-                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { updateFontSize((fontSize + 2f).coerceAtMost(100f)) }) {
-                                        Icon(Icons.Rounded.Add, null)
+
+                                    Spacer(Modifier.height(12.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        ToggleButton(
+                                            checked = false,
+                                            onCheckedChange = { viewModel.adjustLyricsOffset(-1000L) },
+                                            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+                                            modifier = Modifier.weight(1f)
+                                        ) { Text("-1s", style = MaterialTheme.typography.labelMedium) }
+
+                                        ToggleButton(
+                                            checked = false,
+                                            onCheckedChange = { viewModel.adjustLyricsOffset(-100L) },
+                                            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+                                            modifier = Modifier.weight(1f)
+                                        ) { Text("-.1s", style = MaterialTheme.typography.labelMedium) }
+
+                                        ToggleButton(
+                                            checked = viewModel.lyricsOffset == 0L,
+                                            onCheckedChange = { viewModel.lyricsOffset = 0L },
+                                            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+                                            modifier = Modifier.weight(1f)
+                                        ) { 
+                                            Text("0s", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold) 
+                                        }
+
+                                        ToggleButton(
+                                            checked = false,
+                                            onCheckedChange = { viewModel.adjustLyricsOffset(100L) },
+                                            shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
+                                            modifier = Modifier.weight(1f)
+                                        ) { Text("+.1s", style = MaterialTheme.typography.labelMedium) }
+
+                                        ToggleButton(
+                                            checked = false,
+                                            onCheckedChange = { viewModel.adjustLyricsOffset(1000L) },
+                                            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+                                            modifier = Modifier.weight(1f)
+                                        ) { Text("+1s", style = MaterialTheme.typography.labelMedium) }
                                     }
                                 }
                             }
-                        }
 
-                        // 2b. VITESSE DE DÉFILEMENT (texte non synchronisé)
-                        // Here as well as in the full settings: this is the screen you are on when
-                        // you notice the speed is wrong (issue #33).
-                        if (viewModel.isPlainAutoScrollEnabled) {
+                            // 2. TAILLE DU TEXTE
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = str("pref_lyrics_size"),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${fontSize.roundToInt()} sp",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { updateFontSize((fontSize - 2f).coerceAtLeast(12f)) }) {
+                                            Icon(Icons.Rounded.Remove, null)
+                                        }
+                                        Slider(
+                                            value = fontSize,
+                                            onValueChange = { updateFontSize(it) },
+                                            valueRange = 12f..100f,
+                                            steps = 43,
+                                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                        )
+                                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { updateFontSize((fontSize + 2f).coerceAtMost(100f)) }) {
+                                            Icon(Icons.Rounded.Add, null)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2b. VITESSE DE DÉFILEMENT (texte non synchronisé)
+                            // Here as well as in the full settings: this is the screen you are on when
+                            // you notice the speed is wrong (issue #33).
+                            if (viewModel.isPlainAutoScrollEnabled) {
+                                Card(
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                text = str("pref_lyrics_autoscroll_speed"),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = autoScrollSpeedLabel(viewModel.effectivePlainAutoScrollSpeed),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Spacer(Modifier.height(6.dp))
+
+                                        // One slider for both, because they are one question asked of
+                                        // different scopes: the switch below decides whether the number
+                                        // being dragged belongs to this song or to every song (issue #33).
+                                        val perTrack = viewModel.trackAutoScrollSpeed != null
+                                        val speed = viewModel.effectivePlainAutoScrollSpeed
+                                        val setSpeed: (Float) -> Unit = { value ->
+                                            if (perTrack) viewModel.setTrackAutoScrollSpeed(value)
+                                            else viewModel.updatePlainAutoScrollSpeed(value)
+                                        }
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                                                setSpeed(speed - 0.25f)
+                                            }) { Icon(Icons.Rounded.Remove, null) }
+                                            Slider(
+                                                value = speed,
+                                                onValueChange = setSpeed,
+                                                valueRange = 0.25f..4f,
+                                                steps = 14,
+                                                modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                            )
+                                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                                                setSpeed(speed + 0.25f)
+                                            }) { Icon(Icons.Rounded.Add, null) }
+                                        }
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text(
+                                                    text = str("pref_lyrics_speed_this_track"),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                                Text(
+                                                    text = str("pref_lyrics_speed_this_track_sub"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                            Switch(
+                                                checked = perTrack,
+                                                onCheckedChange = { on ->
+                                                    // Turning it on starts from whatever is on screen, so
+                                                    // the number does not jump when the scope changes.
+                                                    if (on) viewModel.setTrackAutoScrollSpeed(speed)
+                                                    else viewModel.clearTrackAutoScrollSpeed()
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2c. PAS DE LA MOLETTE
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                                 shape = RoundedCornerShape(16.dp),
@@ -1348,333 +1548,297 @@ fun QuickLyricsSettingsDialog(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            text = str("pref_lyrics_autoscroll_speed"),
+                                            text = str("pref_lyrics_wheel_step"),
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = autoScrollSpeedLabel(viewModel.effectivePlainAutoScrollSpeed),
+                                            text = str(
+                                                "pref_lyrics_wheel_step_value",
+                                                wheelLinesLabel(viewModel.lyricsWheelLines),
+                                            ),
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
+                                    Text(
+                                        text = str("pref_lyrics_wheel_step_sub"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                     Spacer(Modifier.height(6.dp))
-
-                                    // One slider for both, because they are one question asked of
-                                    // different scopes: the switch below decides whether the number
-                                    // being dragged belongs to this song or to every song (issue #33).
-                                    val perTrack = viewModel.trackAutoScrollSpeed != null
-                                    val speed = viewModel.effectivePlainAutoScrollSpeed
-                                    val setSpeed: (Float) -> Unit = { value ->
-                                        if (perTrack) viewModel.setTrackAutoScrollSpeed(value)
-                                        else viewModel.updatePlainAutoScrollSpeed(value)
-                                    }
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
-                                            setSpeed(speed - 0.25f)
+                                            viewModel.updateLyricsWheelLines(viewModel.lyricsWheelLines - 0.5f)
                                         }) { Icon(Icons.Rounded.Remove, null) }
                                         Slider(
-                                            value = speed,
-                                            onValueChange = setSpeed,
-                                            valueRange = 0.25f..4f,
-                                            steps = 14,
+                                            value = viewModel.lyricsWheelLines,
+                                            onValueChange = { viewModel.updateLyricsWheelLines(it) },
+                                            valueRange = PlayerPreferences.LYRICS_WHEEL_LINES_MIN..PlayerPreferences.LYRICS_WHEEL_LINES_MAX,
+                                            steps = 21,
                                             modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
                                         )
                                         IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
-                                            setSpeed(speed + 0.25f)
+                                            viewModel.updateLyricsWheelLines(viewModel.lyricsWheelLines + 0.5f)
                                         }) { Icon(Icons.Rounded.Add, null) }
-                                    }
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(
-                                                text = str("pref_lyrics_speed_this_track"),
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                            )
-                                            Text(
-                                                text = str("pref_lyrics_speed_this_track_sub"),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                        Switch(
-                                            checked = perTrack,
-                                            onCheckedChange = { on ->
-                                                // Turning it on starts from whatever is on screen, so
-                                                // the number does not jump when the scope changes.
-                                                if (on) viewModel.setTrackAutoScrollSpeed(speed)
-                                                else viewModel.clearTrackAutoScrollSpeed()
-                                            },
-                                        )
                                     }
                                 }
                             }
-                        }
 
-                        // 2c. PAS DE LA MOLETTE
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
+                            // 3. ALIGNEMENT
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
                                     Text(
-                                        text = str("pref_lyrics_wheel_step"),
+                                        text = str("pref_lyrics_align"),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
-                                    Text(
-                                        text = str(
-                                            "pref_lyrics_wheel_step_value",
-                                            wheelLinesLabel(viewModel.lyricsWheelLines),
-                                        ),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                                Text(
-                                    text = str("pref_lyrics_wheel_step_sub"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
-                                        viewModel.updateLyricsWheelLines(viewModel.lyricsWheelLines - 0.5f)
-                                    }) { Icon(Icons.Rounded.Remove, null) }
-                                    Slider(
-                                        value = viewModel.lyricsWheelLines,
-                                        onValueChange = { viewModel.updateLyricsWheelLines(it) },
-                                        valueRange = PlayerPreferences.LYRICS_WHEEL_LINES_MIN..PlayerPreferences.LYRICS_WHEEL_LINES_MAX,
-                                        steps = 21,
-                                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
-                                    )
-                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
-                                        viewModel.updateLyricsWheelLines(viewModel.lyricsWheelLines + 0.5f)
-                                    }) { Icon(Icons.Rounded.Add, null) }
-                                }
-                            }
-                        }
-
-                        // 3. ALIGNEMENT
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = str("pref_lyrics_align"),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                ExpressiveConnectedButtonGroup(
-                                    fillMaxWidth = true,
-                                    options = listOf(LyricsAlignment.LEFT, LyricsAlignment.CENTER, LyricsAlignment.RIGHT),
-                                    selectedOption = alignment,
-                                    onOptionSelected = { updateAlignment(it) },
-                                    iconProvider = { align ->
-                                        val icon = when (align) {
-                                            LyricsAlignment.LEFT -> Icons.Rounded.FormatAlignLeft
-                                            LyricsAlignment.CENTER -> Icons.Rounded.FormatAlignCenter
-                                            LyricsAlignment.RIGHT -> Icons.Rounded.FormatAlignRight
-                                        }
-                                        Icon(icon, null, modifier = Modifier.size(16.dp))
-                                    },
-                                    labelProvider = { align ->
-                                        val text = when (align) {
-                                            LyricsAlignment.LEFT -> str("align_left")
-                                            LyricsAlignment.CENTER -> str("align_center_simple")
-                                            LyricsAlignment.RIGHT -> str("align_right")
-                                        }
-                                        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-                                    }
-                                )
-                            }
-                        }
-
-                        // 3b. STYLE D'AFFICHAGE DE LA LIGNE COURANTE
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Text(
-                                    text = str("pref_lyrics_display_style"),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(Modifier.height(10.dp))
-                                ExpressiveConnectedButtonGroup(
-                                    fillMaxWidth = true,
-                                    options = LyricsDisplayStyle.entries,
-                                    selectedOption = displayStyle,
-                                    onOptionSelected = { updateDisplayStyle(it) },
-                                    iconProvider = { style ->
-                                        val icon = when (style) {
-                                            LyricsDisplayStyle.STANDARD -> Icons.Rounded.Notes
-                                            LyricsDisplayStyle.SCALE -> Icons.Rounded.FormatSize
-                                            LyricsDisplayStyle.FOCUS -> Icons.Rounded.CenterFocusStrong
-                                        }
-                                        Icon(icon, null, modifier = Modifier.size(16.dp))
-                                    },
-                                    labelProvider = { style ->
-                                        val text = when (style) {
-                                            LyricsDisplayStyle.STANDARD -> str("lyrics_style_standard")
-                                            LyricsDisplayStyle.SCALE -> str("lyrics_style_scale")
-                                            LyricsDisplayStyle.FOCUS -> str("lyrics_style_focus")
-                                        }
-                                        Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    // ==========================================
-                    // COLONNE DROITE (Toggles & Recherche)
-                    // ==========================================
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // 4. TOGGLES (Fichiers locaux, Karaoké, Effet Apple, etc.)
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
-                                
-                                // Fichiers locaux
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                        Text(str("pref_lyrics_local"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Text(str("pref_lyrics_local_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Switch(checked = preferLocal, onCheckedChange = { preferLocal = it; prefs.setLyricsPreferLocal(it) })
-                                }
-
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                                // Synchro Mot par mot
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                        Text(str("pref_lyrics_word_sync"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Text(str("pref_lyrics_word_sync_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Switch(checked = viewModel.isWordSyncEnabled, onCheckedChange = { viewModel.toggleWordSync(it) })
-                                }
-
-                                // Effet Apple Music (Uniquement si Word Sync activé)
-                                AnimatedVisibility(visible = viewModel.isWordSyncEnabled) {
-                                    Column {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                                Text(str("pref_lyrics_apple_effect"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                                Text(str("pref_lyrics_apple_effect_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Spacer(Modifier.height(10.dp))
+                                    ExpressiveConnectedButtonGroup(
+                                        fillMaxWidth = true,
+                                        options = listOf(LyricsAlignment.LEFT, LyricsAlignment.CENTER, LyricsAlignment.RIGHT),
+                                        selectedOption = alignment,
+                                        onOptionSelected = { updateAlignment(it) },
+                                        iconProvider = { align ->
+                                            val icon = when (align) {
+                                                LyricsAlignment.LEFT -> Icons.Rounded.FormatAlignLeft
+                                                LyricsAlignment.CENTER -> Icons.Rounded.FormatAlignCenter
+                                                LyricsAlignment.RIGHT -> Icons.Rounded.FormatAlignRight
                                             }
-                                            Switch(checked = viewModel.isAppleMusicEffectEnabled, onCheckedChange = { viewModel.toggleAppleMusicEffect(it) })
+                                            Icon(icon, null, modifier = Modifier.size(16.dp))
+                                        },
+                                        labelProvider = { align ->
+                                            val text = when (align) {
+                                                LyricsAlignment.LEFT -> str("align_left")
+                                                LyricsAlignment.CENTER -> str("align_center_simple")
+                                                LyricsAlignment.RIGHT -> str("align_right")
+                                            }
+                                            Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
+                                        }
+                                    )
+                                }
+                            }
+
+                            // 3b. STYLE D'AFFICHAGE DE LA LIGNE COURANTE
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text(
+                                        text = str("pref_lyrics_display_style"),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(Modifier.height(10.dp))
+                                    val hasScale = displayStyle == LyricsDisplayStyle.SCALE || displayStyle == LyricsDisplayStyle.SCALE_FOCUS
+                                    val hasFocus = displayStyle == LyricsDisplayStyle.FOCUS || displayStyle == LyricsDisplayStyle.SCALE_FOCUS
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                                    ) {
+                                        ToggleButton(
+                                            checked = hasScale,
+                                            onCheckedChange = { nextScale ->
+                                                val next = when {
+                                                    nextScale && hasFocus -> LyricsDisplayStyle.SCALE_FOCUS
+                                                    nextScale -> LyricsDisplayStyle.SCALE
+                                                    hasFocus -> LyricsDisplayStyle.FOCUS
+                                                    else -> LyricsDisplayStyle.STANDARD
+                                                }
+                                                updateDisplayStyle(next)
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+                                        ) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.Center,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Rounded.FormatSize, null, modifier = Modifier.size(16.dp))
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(
+                                                    str("lyrics_style_scale"),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
+                                        }
+
+                                        ToggleButton(
+                                            checked = hasFocus,
+                                            onCheckedChange = { nextFocus ->
+                                                val next = when {
+                                                    hasScale && nextFocus -> LyricsDisplayStyle.SCALE_FOCUS
+                                                    hasScale -> LyricsDisplayStyle.SCALE
+                                                    nextFocus -> LyricsDisplayStyle.FOCUS
+                                                    else -> LyricsDisplayStyle.STANDARD
+                                                }
+                                                updateDisplayStyle(next)
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+                                        ) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.Center,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(Icons.Rounded.CenterFocusStrong, null, modifier = Modifier.size(16.dp))
+                                                Spacer(Modifier.width(6.dp))
+                                                Text(
+                                                    str("lyrics_style_focus"),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    softWrap = false
+                                                )
+                                            }
                                         }
                                     }
                                 }
+                            }
+                        }
 
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                                // Prononciation (Romaji)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                        Text(str("pref_lyrics_romanization"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Text(str("pref_lyrics_romanization_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Switch(checked = viewModel.isRomanizationEnabled, onCheckedChange = { viewModel.toggleRomanization(it) })
-                                }
-
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-
-                                // Traduction
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
-                                        Text(str("pref_lyrics_translation_title"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Text(str("pref_lyrics_translation_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                    Switch(checked = enableTranslation, onCheckedChange = { 
-                                        enableTranslation = it
-                                        viewModel.toggleLyricsTranslation(it)
-                                    })
-                                }
-
-                                AnimatedVisibility(visible = enableTranslation) {
+                        // ==========================================
+                        // COLONNE DROITE (Toggles & Recherche)
+                        // ==========================================
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // 4. TOGGLES (Fichiers locaux, Karaoké, Effet Apple, etc.)
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                                
+                                    // Fichiers locaux
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().clickable { showLangDialog = true }.padding(vertical = 12.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(str("pref_lyrics_translation_lang"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(targetLang.uppercase(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                            Icon(Icons.Rounded.ArrowDropDown, null, tint = MaterialTheme.colorScheme.primary)
+                                        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                            Text(str("pref_lyrics_local"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                            Text(str("pref_lyrics_local_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Switch(checked = preferLocal, onCheckedChange = { preferLocal = it; prefs.setLyricsPreferLocal(it) })
+                                    }
+
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                                    // Synchro Mot par mot
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                            Text(str("pref_lyrics_word_sync"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                            Text(str("pref_lyrics_word_sync_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Switch(checked = viewModel.isWordSyncEnabled, onCheckedChange = { viewModel.toggleWordSync(it) })
+                                    }
+
+                                    // Effet Apple Music (Uniquement si Word Sync activé)
+                                    AnimatedVisibility(visible = viewModel.isWordSyncEnabled) {
+                                        Column {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                                    Text(str("pref_lyrics_apple_effect"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                                    Text(str("pref_lyrics_apple_effect_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                                Switch(checked = viewModel.isAppleMusicEffectEnabled, onCheckedChange = { viewModel.toggleAppleMusicEffect(it) })
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                                    // Prononciation (Romaji)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                            Text(str("pref_lyrics_romanization"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                            Text(str("pref_lyrics_romanization_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Switch(checked = viewModel.isRomanizationEnabled, onCheckedChange = { viewModel.toggleRomanization(it) })
+                                    }
+
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                                    // Traduction
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                            Text(str("pref_lyrics_translation_title"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                            Text(str("pref_lyrics_translation_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Switch(checked = enableTranslation, onCheckedChange = { 
+                                            enableTranslation = it
+                                            viewModel.toggleLyricsTranslation(it)
+                                        })
+                                    }
+
+                                    AnimatedVisibility(visible = enableTranslation) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().clickable { showLangDialog = true }.padding(vertical = 12.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(str("pref_lyrics_translation_lang"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(targetLang.uppercase(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                                Icon(Icons.Rounded.ArrowDropDown, null, tint = MaterialTheme.colorScheme.primary)
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        // Bouton RECHERCHE MANUELLE en bas de la colonne de droite
-                        Button(
-                            onClick = {
-                                onDismiss()
-                                viewModel.isSearchingLyrics = true
-                            },
-                            shapes = ButtonDefaults.shapes(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer, 
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            modifier = Modifier.fillMaxWidth().height(56.dp)
-                        ) {
-                            Icon(Icons.Rounded.Search, null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("lyrics_manual_search"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+
+
+                            // Bouton RECHERCHE MANUELLE en bas de la colonne de droite
+                            Button(
+                                onClick = {
+                                    onDismiss()
+                                    viewModel.isSearchingLyrics = true
+                                },
+                                shapes = ButtonDefaults.shapes(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer, 
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ),
+                                modifier = Modifier.fillMaxWidth().height(56.dp)
+                            ) {
+                                Icon(Icons.Rounded.Search, null, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(str("lyrics_manual_search"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

@@ -21,7 +21,13 @@ import java.text.Normalizer
 object LyricsMatcher {
 
     /** What we are looking for: the track as the app knows it. */
-    data class Target(val title: String, val artist: String, val durationMs: Long)
+    data class Target(
+        val title: String,
+        val artist: String,
+        val durationMs: Long,
+        val alternativeTitles: List<String> = emptyList(),
+        val alternativeArtists: List<String> = emptyList(),
+    )
 
     /** Word-level timings. */
     const val SYNC_TIER_WORD = 3
@@ -56,6 +62,12 @@ object LyricsMatcher {
     }
 
     /**
+     * Above this, a candidate has matched both title and artist with high fidelity,
+     * so it is definitively the right song and should never be outranked by a stranger.
+     */
+    const val STRONG_MATCH = 0.78f
+
+    /**
      * Above this, a candidate's title and artist agree with the track well enough that it is believed
      * over a rival that merely carries better timings. Below it, the candidate is plausible and no more.
      *
@@ -68,30 +80,48 @@ object LyricsMatcher {
     /**
      * How provider results are ordered against each other.
      *
-     * ## Why the sync tier is no longer the first thing asked
-     *
-     * It used to be `syncTier * 10 + matchScore`, and since [score] never exceeds 1, that made the tier
-     * decide every comparison outright: a *wrong* song with word-level timings scored 30.4 against the
-     * right song with line-level timings at 21.0, and won. That is the report that has survived every
-     * round of this — "I still find other lyrics, and when I do a manual search, it gives me the correct
-     * one, without any changes." The correct sheet was in the same response all along; it was simply
-     * outranked by a better-synchronised stranger, which is also why picking by hand fixed it.
-     *
-     * Identity comes first now. A confident match wins over any number of tiers, so the right song with
-     * no timings at all is preferred to the wrong song in perfect word-by-word sync — which is the only
-     * defensible order: unsynchronised words the reader can follow are worth something, and synchronised
-     * words from another song are worth less than nothing. Within one confidence bracket the tier decides,
-     * as it did, and [score] settles the ties inside that.
+     * Identity comes first. A strong match (where both title and artist agree) outranks
+     * title-only/partial matches regardless of sync tier, so that a stranger with word-level sync
+     * cannot steal the place of the right song that has line-level sync or plain text.
+     * Within the same match bracket, sync tier decides.
      */
-    fun rank(syncTier: Int, matchScore: Float, providerBonus: Float = 0f): Float =
-        (if (matchScore >= CONFIDENT_MATCH) CONFIDENCE_WEIGHT else 0f) +
-            syncTier * TIER_WEIGHT + matchScore + providerBonus
+    fun rank(syncTier: Int, matchScore: Float, providerBonus: Float = 0f): Float {
+        val confidenceBonus = when {
+            matchScore >= STRONG_MATCH -> STRONG_MATCH_WEIGHT
+            matchScore >= CONFIDENT_MATCH -> CONFIDENCE_WEIGHT
+            else -> 0f
+        }
+        return confidenceBonus + syncTier * TIER_WEIGHT + matchScore + providerBonus
+    }
+
+    /** Larger than every tier put together, so a verified artist match beats any stranger. */
+    private const val STRONG_MATCH_WEIGHT = 200f
 
     /** Larger than every tier put together, because identity is not a tie-break. */
     private const val CONFIDENCE_WEIGHT = 100f
 
     /** Larger than any [score] difference, so the tier still decides within a bracket. */
     private const val TIER_WEIGHT = 10f
+
+    fun titleSimilarity(candidateTitle: String?, target: Target): Float {
+        val cand = candidateTitle ?: return 0f
+        var best = similarity(cand, target.title)
+        for (alt in target.alternativeTitles) {
+            val s = similarity(cand, alt)
+            if (s > best) best = s
+        }
+        return best
+    }
+
+    fun artistSimilarity(candidateArtist: String?, target: Target): Float {
+        val cand = candidateArtist ?: return 0f
+        var best = similarity(cand, target.artist)
+        for (alt in target.alternativeArtists) {
+            val s = similarity(cand, alt)
+            if (s > best) best = s
+        }
+        return best
+    }
 
     /**
      * How close a candidate is, in `0f..1f`. Only comparable between candidates for the same
@@ -103,8 +133,8 @@ object LyricsMatcher {
         candidateDurationSec: Double,
         target: Target,
     ): Float {
-        val titleSim = similarity(candidateTitle ?: "", target.title)
-        val artistSim = similarity(candidateArtist ?: "", target.artist)
+        val titleSim = titleSimilarity(candidateTitle, target)
+        val artistSim = artistSimilarity(candidateArtist, target)
         return titleSim * 0.60f + artistSim * 0.25f + durationCloseness(candidateDurationSec, target.durationMs) * 0.15f
     }
 
@@ -120,9 +150,9 @@ object LyricsMatcher {
         candidateArtist: String?,
         target: Target,
     ): Boolean {
-        val titleSim = similarity(candidateTitle ?: "", target.title)
+        val titleSim = titleSimilarity(candidateTitle, target)
         if (titleSim >= CONFIDENT_MATCH) return true
-        val artistSim = similarity(candidateArtist ?: "", target.artist)
+        val artistSim = artistSimilarity(candidateArtist, target)
         return titleSim >= 0.35f && artistSim >= 0.45f
     }
 

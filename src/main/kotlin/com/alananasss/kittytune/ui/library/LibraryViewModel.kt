@@ -315,6 +315,17 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     var isLibraryFullScreen by mutableStateOf(false)
     var isCreatingPlaylist by mutableStateOf(false)
 
+    var openSidebarPopupCount by mutableStateOf(0)
+    val isSidebarPopupOpen: Boolean get() = openSidebarPopupCount > 0
+
+    fun registerSidebarPopup() {
+        openSidebarPopupCount++
+    }
+
+    fun unregisterSidebarPopup() {
+        openSidebarPopupCount = (openSidebarPopupCount - 1).coerceAtLeast(0)
+    }
+
     private var sidebarDragRaw = 0f
 
     fun sidebarDragStart() {
@@ -1108,7 +1119,7 @@ enum class LibraryViewMode { COMPACT_LIST, LIST, COMPACT_GRID, GRID }
 const val SIDEBAR_MIN_WIDTH = 264f
 const val SIDEBAR_MAX_WIDTH = 480f
 const val SIDEBAR_DEFAULT_WIDTH = 300f
-const val SIDEBAR_COLLAPSED_WIDTH = 80f
+const val SIDEBAR_COLLAPSED_WIDTH = 72f
 const val SIDEBAR_SNAP_THRESHOLD = 176f
 
 /**

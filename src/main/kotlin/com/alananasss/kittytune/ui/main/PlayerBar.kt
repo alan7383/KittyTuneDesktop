@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.main
 
 import androidx.compose.material3.ButtonDefaults
+import com.alananasss.kittytune.core.str
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,8 +24,10 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.TextSnippet
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.outlined.HeartBroken
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
@@ -70,6 +73,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.Slider
+import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.alananasss.kittytune.utils.makeTimeString
@@ -192,7 +196,7 @@ fun PlayerBar(
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f, fill = false).widthIn(max = 220.dp)) {
                             Text(
-                                text = track.title ?: "",
+                                text = track.title.orEmpty(),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -202,7 +206,7 @@ fun PlayerBar(
                                 ArtistLinkText(
                                     track = track,
                                     onArtistClick = { vm.navigateToTrackArtist(it) },
-                                    text = track.user?.username ?: "",
+                                    text = track.user?.username.orEmpty(),
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.weight(1f, fill = false)
                                 )
@@ -223,11 +227,25 @@ fun PlayerBar(
                         IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleLike() }) {
                             Icon(
                                 if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = null,
+                                contentDescription = str("player_like"),
                                 tint = if (vm.isLiked) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp),
                             )
+                        }
+                        if (vm.isYourMixActive) {
+                            Spacer(Modifier.width(4.dp))
+                            IconButton(
+                                shapes = IconButtonDefaults.shapes(),
+                                onClick = { vm.dislikeCurrentTrackInMix() }
+                            ) {
+                                Icon(
+                                    Icons.Outlined.HeartBroken,
+                                    contentDescription = str("mix_dislike"),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -433,6 +451,20 @@ fun PlayerBar(
                             painter = androidx.compose.ui.res.painterResource("icons/lyrics.svg"),
                             contentDescription = "Lyrics",
                             tint = if (vm.hasLyrics) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                Tip(str("mini_player_title")) {
+                    IconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = { vm.toggleMiniPlayer() },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.PictureInPictureAlt,
+                            contentDescription = str("mini_player_title"),
+                            tint = if (vm.isMiniPlayerVisible) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                         )

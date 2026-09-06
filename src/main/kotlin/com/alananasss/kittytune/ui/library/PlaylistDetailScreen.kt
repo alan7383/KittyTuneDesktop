@@ -20,6 +20,9 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import androidx.compose.ui.platform.LocalFocusManager
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.ui.common.escapeDismisses
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.rememberReleaseDate
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -377,6 +380,11 @@ fun PlaylistDetailScreen(
     var showDetailsSheet by remember { mutableStateOf(false) }
 
     var playlistSearchQuery by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    BackHandler(enabled = playlistSearchQuery.isNotEmpty()) {
+        playlistSearchQuery = ""
+        focusManager.clearFocus()
+    }
     var playlistSortBy by remember { mutableStateOf(TrackSortBy.FIRST_ADDED) }
 
     val listState = rememberLazyListState()
@@ -1507,7 +1515,10 @@ fun PlaylistDetailScreen(
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     trailingIcon = {
                                         if (playlistSearchQuery.isNotEmpty()) {
-                                            IconButton(onClick = { playlistSearchQuery = "" }) { Icon(Icons.Rounded.Close, null) }
+                                            IconButton(onClick = {
+                                                playlistSearchQuery = ""
+                                                focusManager.clearFocus()
+                                            }) { Icon(Icons.Rounded.Close, null) }
                                         }
                                     },
                                     singleLine = true,
@@ -1515,7 +1526,13 @@ fun PlaylistDetailScreen(
                                     colors = OutlinedTextFieldDefaults.colors(
                                         unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                                     ),
-                                    modifier = Modifier.weight(1f).trackTextInput()
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .trackTextInput()
+                                        .escapeDismisses {
+                                            playlistSearchQuery = ""
+                                            focusManager.clearFocus()
+                                        }
                                 )
                                 Box {
                                     FilledTonalIconButton(onClick = { showSortMenu = true }) {

@@ -170,7 +170,6 @@ fun Sidebar(
                     homeViewModel?.clearSearch()
                     if (currentRoute != "home") {
                         navController.navigate("home") {
-                            popUpTo("home")
                             launchSingleTop = true
                         }
                     } else {
@@ -249,9 +248,24 @@ fun Sidebar(
         SidebarProfileRow(
             playerViewModel = playerViewModel,
             navController = navController,
+            libraryViewModel = libraryViewModel,
             collapse = collapse,
         )
     }
+    }
+}
+
+@Composable
+private fun TrackSidebarPopup(isOpen: Boolean, libraryViewModel: LibraryViewModel) {
+    DisposableEffect(isOpen) {
+        if (isOpen) {
+            libraryViewModel.registerSidebarPopup()
+        }
+        onDispose {
+            if (isOpen) {
+                libraryViewModel.unregisterSidebarPopup()
+            }
+        }
     }
 }
 
@@ -274,10 +288,12 @@ fun Sidebar(
 private fun SidebarProfileRow(
     playerViewModel: PlayerViewModel,
     navController: NavController,
+    libraryViewModel: LibraryViewModel,
     collapse: Float,
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    TrackSidebarPopup(showMenu || showAboutDialog, libraryViewModel)
 
     if (showAboutDialog) {
         com.alananasss.kittytune.ui.profile.AboutDialog(onDismiss = { showAboutDialog = false })
@@ -297,7 +313,7 @@ private fun SidebarProfileRow(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box {
-            Tip(name, enabled = collapse > SidebarMorph.FADE_DONE_AT) {
+            Tip(name, enabled = collapse >= 1f) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -484,6 +500,11 @@ fun LibraryPanel(
     var movingItemKey by remember { mutableStateOf<String?>(null) }
     var playlistForDetails by remember { mutableStateOf<com.alananasss.kittytune.domain.Playlist?>(null) }
 
+    val isAnyDialogOpen = showCreatePlaylistDialog || showCreateFolderDialog || folderForMenu != null ||
+            folderToRename != null || folderToDelete != null || playlistForMenu != null ||
+            movingItemKey != null || playlistForDetails != null
+    TrackSidebarPopup(isAnyDialogOpen, libraryViewModel)
+
     val openEntry: (LibEntry) -> Unit = { entry ->
         if (entry.track != null) {
             val tracks = libraryViewModel.uploadedTracks.toList()
@@ -550,12 +571,18 @@ fun LibraryPanel(
                 onUpload = onUpload,
             )
 
-            // One row, two occupants, handing over inside it. The search field recedes without giving up
-            // any of its height — see [receded] — so this row is the same height throughout, which is the
-            // whole reason everything below it stays put.
-            Box(contentAlignment = Alignment.Center) {
-                Box(Modifier.receded(collapse)) { LibrarySearchRow(libraryViewModel) }
-                if (!fullScreen) RailActions(
+            if (collapse < 1f) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = ((1f - collapse) * 44f).dp)
+                        .receded(collapse)
+                ) {
+                    LibrarySearchRow(libraryViewModel)
+                }
+            }
+            if (!fullScreen && collapse > 0f) {
+                RailActions(
                     collapse = collapse,
                     onCreate = { showCreatePlaylistDialog = true },
                     onHistory = onHistory,
@@ -927,23 +954,23 @@ private fun LibraryHeader(
     onUpload: () -> Unit = {},
 ) {
     var showCreateMenu by remember { mutableStateOf(false) }
+    TrackSidebarPopup(showCreateMenu, libraryViewModel)
 
     val headerPrefs = remember { PlayerPreferences() }
     val hiddenButtons by headerPrefs.hiddenLibraryButtonsFlow()
         .collectAsState(initial = headerPrefs.getHiddenLibraryButtons())
 
+    val headerVerticalPadding = androidx.compose.ui.unit.lerp(10.dp, 8.dp, collapse)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             // Inset so this header's icon sits on the same vertical line as the rail's toggle, the
             // navigation icons above and the artwork of every entry below — the line at the middle of
-            // [SidebarMorph.RAIL_WIDTH]. It was 12 dp, which put it 12 dp to the left of where the rail
-            // puts it, so it jumped sideways as the panel closed (issue #33). The full-screen library is
-            // not a rail and keeps its own inset.
+            // [SidebarMorph.RAIL_WIDTH].
             .padding(
                 start = if (fullScreen) 12.dp else SidebarMorph.ICON_INSET - 4.dp,
                 end = 8.dp,
-                top = 10.dp,
+                top = headerVerticalPadding,
                 bottom = 4.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
@@ -995,7 +1022,7 @@ private fun LibraryHeader(
             Spacer(Modifier.weight(1f))
         } else {
             // One control for both directions now that there is one layout: the same icon in the same
-            // place, saying which way it will go. The rail used to carry a second button of its own.
+            // place, saying which way it will go.
             val toggleTip =
                 if (libraryViewModel.isSidebarCollapsed) str("lib_open_tooltip")
                 else str("lib_collapse_tooltip")
@@ -1004,7 +1031,7 @@ private fun LibraryHeader(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { libraryViewModel.toggleSidebarCollapsed() }
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -1028,16 +1055,13 @@ private fun LibraryHeader(
                     }
                 }
             }
-            Spacer(Modifier.weight(1f))
+            if (collapse < 0.9f) {
+                Spacer(Modifier.weight(1f))
+            }
         }
 
-        // Everything a header holds besides its own icon goes away with the panel (issue #33).
-        //
-        // At 80 dp there is no room for four icon buttons, and there is no rail layout to hand them to any
-        // more — so they recede where they stand and the two a rail actually needs come back beside the
-        // search field instead. Receding rather than being dropped keeps this row the height it was, which
-        // is what every entry below it is aligned against.
-        Row(Modifier.receded(collapse), verticalAlignment = Alignment.CenterVertically) {
+        if (collapse < 0.9f) {
+            Row(Modifier.receded(collapse), verticalAlignment = Alignment.CenterVertically) {
         // Extended "+ Créer" with dropdown menu. Outlined rather than filled tonal: next to a row
         // of plain icon buttons the tonal fill made it the loudest thing in the header, which is
         // not what a secondary action should be (issue #33).
@@ -1155,6 +1179,7 @@ private fun LibraryHeader(
         }
     }
 }
+}
 
 // ---------------------------------------------------------------------------
 // Search + sort/view-mode row
@@ -1163,6 +1188,7 @@ private fun LibraryHeader(
 @Composable
 private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
     var searchActive by remember { mutableStateOf(libraryViewModel.searchQuery.isNotBlank()) }
+    TrackSidebarPopup(searchActive, libraryViewModel)
     // One way out, whichever gesture asked for it: the cross, Escape, or a click anywhere else.
     val dismiss = {
         libraryViewModel.searchQuery = ""
@@ -1278,6 +1304,7 @@ private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
 @Composable
 private fun LibraryCategoryButton(libraryViewModel: LibraryViewModel) {
     var expanded by remember { mutableStateOf(false) }
+    TrackSidebarPopup(expanded, libraryViewModel)
     val all = str("search_filter_all")
     val categories = buildList {
         add(str("lib_playlists") to Icons.Rounded.QueueMusic)
@@ -1367,6 +1394,7 @@ private fun viewModeLabel(mode: LibraryViewMode): String = when (mode) {
 @Composable
 private fun SortAndViewMenuButton(libraryViewModel: LibraryViewModel) {
     var menuOpen by remember { mutableStateOf(false) }
+    TrackSidebarPopup(menuOpen, libraryViewModel)
     val shouldShowOwnershipFilter = libraryViewModel.selectedFilter == null ||
             libraryViewModel.selectedFilter == str("lib_playlists") ||
             libraryViewModel.selectedFilter == str("lib_albums")
@@ -1532,7 +1560,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
         when (libraryViewModel.viewMode) {
             LibraryViewMode.COMPACT_LIST -> LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp),
                 state = compactListState
             ) {
                 items(entries, key = { it.key }) { entry ->
@@ -1542,7 +1570,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LibraryContent(
 
             LibraryViewMode.LIST -> LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(horizontal = 8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp),
                 state = listState
             ) {
                 items(entries, key = { it.key }) { entry ->
@@ -1629,26 +1657,26 @@ private fun CompactListRow(
                 Spacer(Modifier.width(6.dp))
             }
         }
-        Row(
-            modifier = Modifier.weight(1f, fill = false).pushedBack(collapse),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                entry.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "• ${entry.subtitle.substringBefore(" • ")}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Box(modifier = Modifier.pushedBack(collapse)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    entry.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "• ${entry.subtitle.substringBefore(" • ")}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -1656,12 +1684,9 @@ private fun CompactListRow(
 /**
  * Default row: 48dp artwork + title + subtitle.
  *
- * This is the row the collapse was reported against — "the Favorites folder and so on are positioned
- * lower when collapsed than when expanded" — and it is now the same row on both sides of one. The
- * artwork is 48 dp inside 8 dp of padding inside a list inset by 8 dp, which puts its centre on the rail's
- * centre line and its row at the rail's row height, so neither moves by a pixel. The only difference
- * between the two states is the text, and that leaves through [pushedBack] rather than being dropped
- * (issue #33).
+ * The artwork is 48 dp inside 8 dp of row padding inside a list inset by 4 dp, which puts its centre on the rail's
+ * centre line (12 dp from each edge in a 72 dp rail) so the artwork stays completely stationary.
+ * The text leaves smoothly through [pushedBack] without re-wrapping or jumping.
  *
  * @param collapse 0 when the panel is open, 1 when it is a rail.
  */
@@ -1672,54 +1697,53 @@ private fun LibraryRow(
     onRightClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
-    // Only once the title has actually gone. Present in every state so the tree does not change shape
-    // part-way through the collapse, exactly as the navigation rows do it.
-    Tip(entry.title, enabled = collapse > SidebarMorph.FADE_DONE_AT) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .libClicks(onClick, onRightClick)
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        EntryArtwork(entry, Modifier.size(48.dp), iconFraction = 0.5f)
-        // The gap goes inside the part that is leaving, so the row closes up completely instead of
-        // keeping 12 dp of nothing beside the artwork.
-        Column(
+    Tip(entry.title, enabled = collapse >= 1f) {
+        Row(
             modifier = Modifier
-                .weight(1f, fill = false)
-                .pushedBack(collapse)
-                .padding(start = 12.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .libClicks(onClick, onRightClick)
+                .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                entry.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (entry.isPinned) {
-                    Icon(
-                        imageVector = Icons.Rounded.PushPin,
-                        contentDescription = "Pinned",
-                        modifier = Modifier.size(13.dp),
-                        tint = MaterialTheme.colorScheme.primary
+            EntryArtwork(entry, Modifier.size(48.dp), iconFraction = 0.5f)
+            Box(
+                modifier = Modifier
+                    .pushedBack(collapse)
+                    .padding(start = 12.dp)
+            ) {
+                Column {
+                    Text(
+                        entry.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Spacer(Modifier.width(3.dp))
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (entry.isPinned) {
+                            Icon(
+                                imageVector = Icons.Rounded.PushPin,
+                                contentDescription = "Pinned",
+                                modifier = Modifier.size(13.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(3.dp))
+                        }
+                        Text(
+                            entry.subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                Text(
-                    entry.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
-    }
     }
 }
 
@@ -1877,8 +1901,11 @@ private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> 
         .collectAsState(initial = railPrefs.getHiddenLibraryButtons())
 
     Row(
-        modifier = Modifier.graphicsLayer { alpha = appearance },
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer { alpha = appearance }
+            .padding(top = 4.dp, bottom = 6.dp),
+        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (PlayerPreferences.LIBRARY_BUTTON_CREATE !in hiddenButtons) {
@@ -1953,7 +1980,7 @@ private fun SidebarNavItem(
 
     // Present in every state so the tree does not change shape part-way through the animation, but only
     // able to open once the label it would be repeating has actually gone.
-    Tip(label, enabled = collapse > 0.6f) {
+    Tip(label, enabled = collapse >= 1f) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

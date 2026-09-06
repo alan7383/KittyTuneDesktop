@@ -30,6 +30,43 @@ object AppBootstrap {
         if (done) return
         done = true
 
+        // Suppress benign Skiko / Compose Multiplatform desktop redrawer race conditions
+        // such as "RootNodeOwner is already disposed" during fast scene disposal on AWT event thread.
+        fun isBenign(t: Throwable?): Boolean {
+            var curr: Throwable? = t
+            while (curr != null) {
+                val msg = curr.message.orEmpty()
+                if (msg.contains("RootNodeOwner is already disposed", ignoreCase = true) ||
+                    (msg.contains("ComposeScene", ignoreCase = true) && msg.contains("disposed", ignoreCase = true))
+                ) {
+                    return true
+                }
+                curr = curr.cause
+            }
+            return false
+        }
+
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            if (isBenign(throwable)) return@setDefaultUncaughtExceptionHandler
+            defaultHandler?.uncaughtException(thread, throwable) ?: throwable.printStackTrace()
+        }
+
+        runCatching {
+            java.awt.Toolkit.getDefaultToolkit().systemEventQueue.push(object : java.awt.EventQueue() {
+                override fun dispatchEvent(event: java.awt.AWTEvent) {
+                    try {
+                        super.dispatchEvent(event)
+                    } catch (t: Throwable) {
+                        if (!isBenign(t)) {
+                            Thread.currentThread().uncaughtExceptionHandler?.uncaughtException(Thread.currentThread(), t)
+                                ?: t.printStackTrace()
+                        }
+                    }
+                }
+            })
+        }
+
         // 0. Memory diagnostics, before anything has had a chance to allocate. Does nothing at all
         //    unless the launcher asked for it, which only the diagnostic build does (issue #33).
         com.alananasss.kittytune.utils.MemoryDiagnostics.start()

@@ -24,8 +24,8 @@ class SidebarMorphTest {
 
     @Test
     fun `progress is linear in the width between them`() {
-        // 300 down to 80 is 220 dp of travel; 190 dp is half of it.
-        assertEquals(0.5f, SidebarMorph.progressFor(expanded = 300.dp, actual = 190.dp))
+        // 300 down to 72 is 228 dp of travel; 186 dp is half of it.
+        assertEquals(0.5f, SidebarMorph.progressFor(expanded = 300.dp, actual = 186.dp))
     }
 
     /** A spring can overshoot either end, and neither end may report more than it means. */

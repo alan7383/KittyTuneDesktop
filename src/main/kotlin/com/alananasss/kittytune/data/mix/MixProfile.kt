@@ -108,10 +108,10 @@ object MixProfile {
      * much weaker one than a play and it does not decay. Their real job here is the other one: everything liked
      * goes into [Taste.knownTrackIds], so the mix knows not to hand it back.
      */
-    fun build(plays: List<Play>, likes: List<Track>, nowMs: Long): Taste {
+    fun build(plays: List<Play>, likes: List<Track>, nowMs: Long, dislikedTrackIds: Set<Long> = emptySet()): Taste {
         val artists = HashMap<String, Float>()
         val genres = HashMap<String, Float>()
-        val known = HashSet<Long>()
+        val known = HashSet<Long>(dislikedTrackIds)
         val knownArtists = HashSet<String>()
 
         for (play in plays) {

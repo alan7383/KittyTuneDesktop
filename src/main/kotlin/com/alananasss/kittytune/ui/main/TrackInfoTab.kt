@@ -150,54 +150,116 @@ fun TrackInfoTab(vm: PlayerViewModel) {
     var showLyricsHalf by remember { mutableStateOf(playerPrefs.infoPanelOpensOnLyrics()) }
     val lyricsHalf = isSpotifyTrack || showLyricsHalf
 
-    LazyColumn(
-        // The horizontal inset belongs to the content, not to the container: applied to the
-        // container it also pushed the scrollbar 16.dp inwards, which parked it against the text
-        // instead of at the panel edge (issue #33).
-        Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
-    ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                AsyncImage(
-                    model = displayTrack.fullResArtwork,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .viewableCover(displayTrack.fullResArtwork)
-                )
-                    Text(
-                        text = displayTrack.title ?: "",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // navigateToTrackArtist already routes both sources, and opens the
-                    // picker when the track credits several artists.
-                    com.alananasss.kittytune.ui.common.ArtistLinkText(
-                        track = displayTrack,
-                        onArtistClick = { vm.navigateToTrackArtist(it) },
-                        text = displayTrack.user?.username ?: "",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        hoverColor = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (displayTrack.user?.verified == true) {
-                        Spacer(Modifier.width(4.dp))
-                        Icon(
-                            Icons.Rounded.Verified, null,
-                            tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val panelHeight = maxHeight
+        val isCompact = lyricsHalf && panelHeight < 780.dp
+        val isUltraCompact = lyricsHalf && panelHeight < 580.dp
+
+        val dynamicLyricsHeight = when {
+            !lyricsHalf -> LYRICS_HALF_HEIGHT
+            isUltraCompact -> (panelHeight - 120.dp).coerceAtLeast(180.dp)
+            isCompact -> (panelHeight - 160.dp).coerceAtLeast(220.dp)
+            else -> LYRICS_HALF_HEIGHT
+        }
+
+        LazyColumn(
+            // The horizontal inset belongs to the content, not to the container: applied to the
+            // container it also pushed the scrollbar 16.dp inwards, which parked it against the text
+            // instead of at the panel edge (issue #33).
+            Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(if (isCompact) 14.dp else 24.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
+        ) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 12.dp)) {
+                    if (isCompact) {
+                        val coverSize = if (isUltraCompact) 64.dp else 96.dp
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = displayTrack.fullResArtwork,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(coverSize)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .viewableCover(displayTrack.fullResArtwork)
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = displayTrack.title ?: "",
+                                    style = if (isUltraCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    com.alananasss.kittytune.ui.common.ArtistLinkText(
+                                        track = displayTrack,
+                                        onArtistClick = { vm.navigateToTrackArtist(it) },
+                                        text = displayTrack.user?.username ?: "",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        hoverColor = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (displayTrack.user?.verified == true) {
+                                        Spacer(Modifier.width(4.dp))
+                                        Icon(
+                                            Icons.Rounded.Verified, null,
+                                            tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        AsyncImage(
+                            model = displayTrack.fullResArtwork,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .viewableCover(displayTrack.fullResArtwork)
                         )
+                        Text(
+                            text = displayTrack.title ?: "",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // navigateToTrackArtist already routes both sources, and opens the
+                            // picker when the track credits several artists.
+                            com.alananasss.kittytune.ui.common.ArtistLinkText(
+                                track = displayTrack,
+                                onArtistClick = { vm.navigateToTrackArtist(it) },
+                                text = displayTrack.user?.username ?: "",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                hoverColor = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (displayTrack.user?.verified == true) {
+                                Spacer(Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Rounded.Verified, null,
+                                    tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
-                }
 
                 // Spotify catalog chip
                 if (isSpotifyTrack) {
@@ -700,7 +762,8 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        if (lyricsHalf) trackLyricsHalf(vm, showHeader = isSpotifyTrack)
+        if (lyricsHalf) trackLyricsHalf(vm, showHeader = isSpotifyTrack, lyricsHeight = dynamicLyricsHeight)
+    }
     }
 }
 

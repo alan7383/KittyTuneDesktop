@@ -1,9 +1,11 @@
 package com.alananasss.kittytune
 
 import org.bytedeco.javacv.FFmpegFrameGrabber
+import org.junit.Ignore
 import org.junit.Test
 
 class TestHls {
+    @Ignore("Network dependent test stream")
     @Test
     fun testHlsSeek() {
         val url = "hls+https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8"

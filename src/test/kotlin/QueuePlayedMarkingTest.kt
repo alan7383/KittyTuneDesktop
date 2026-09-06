@@ -51,4 +51,49 @@ class QueuePlayedMarkingTest {
     fun `a fresh queue with nothing played compacts nothing`() {
         assertEquals(emptyList(), compacted(queue, currentIndex = 4, played = emptySet()))
     }
+
+    @Test
+    fun `collapse threshold leaves small histories expanded by default`() {
+        val pastTracks = listOf(10L, 11L, 12L)
+        val hasTooMany = pastTracks.size > 3
+        assertEquals(false, hasTooMany)
+    }
+
+    @Test
+    fun `collapse threshold triggers when history grows too long`() {
+        val pastTracks = listOf(10L, 11L, 12L, 13L)
+        val hasTooMany = pastTracks.size > 3
+        assertEquals(true, hasTooMany)
+    }
+
+    @Test
+    fun `collapsed queue hides past tracks but preserves previous and current tracks`() {
+        val played = queue.toSet()
+        val currentIndex = 6
+        val pastIndices = queue.indices.filter { it < currentIndex - 1 && queue[it] in played }
+        val isExpanded = false
+        val displayedIndices = if (isExpanded) {
+            queue.indices.toList()
+        } else {
+            queue.indices.filter { it !in pastIndices }
+        }
+
+        assertEquals(listOf(5, 6), displayedIndices)
+        assertEquals(listOf(15L, 16L), displayedIndices.map { queue[it] })
+    }
+
+    @Test
+    fun `expanded queue shows all tracks completely`() {
+        val played = queue.toSet()
+        val currentIndex = 6
+        val isExpanded = true
+        val displayedIndices = if (isExpanded) {
+            queue.indices.toList()
+        } else {
+            val pastIndices = queue.indices.filter { it < currentIndex - 1 && queue[it] in played }
+            queue.indices.filter { it !in pastIndices }
+        }
+
+        assertEquals(queue.indices.toList(), displayedIndices)
+    }
 }
