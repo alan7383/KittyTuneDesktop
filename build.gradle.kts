@@ -87,7 +87,7 @@ dependencies {
     implementation("com.google.zxing:core:3.5.4")
 
     implementation("org.json:json:20260814")
-    implementation("org.yaml:snakeyaml:2.6")
+    implementation("org.yaml:snakeyaml:2.7")
     implementation("com.github.pemistahl:lingua:1.2.2")
     implementation("net.java.dev.jna:jna:5.19.1")
     implementation("net.java.dev.jna:jna-platform:5.19.1")
