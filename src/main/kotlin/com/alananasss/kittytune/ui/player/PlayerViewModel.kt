@@ -531,6 +531,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var rawPlainLyrics by mutableStateOf<String?>(null)
     var showInlineLyrics by mutableStateOf(false)
     var lyricsOffset by mutableLongStateOf(0L)
+        private set
     var showLyricsOffsetControls by mutableStateOf(false)
 
     var rightPanelWidth by mutableFloatStateOf(playerPrefs.getRightPanelWidth())
@@ -1657,9 +1658,13 @@ flushListenSession("TRACK_CHANGE")
         trackAutoScrollSpeed = null
         viewModelScope.launch(Dispatchers.IO) {
             val speed = com.alananasss.kittytune.data.LyricsScrollSpeedRepository.get(track.id)
+            val offset = com.alananasss.kittytune.data.LyricsOffsetRepository.get(track.id)
             withContext(Dispatchers.Main) {
                 // Only if we are still on the track that asked.
-                if (currentTrack?.id == track.id) trackAutoScrollSpeed = speed
+                if (currentTrack?.id == track.id) {
+                    trackAutoScrollSpeed = speed
+                    lyricsOffset = offset
+                }
             }
         }
         showLyricsOffsetControls = false
@@ -2071,7 +2076,23 @@ flushListenSession("TRACK_CHANGE")
     }
 
     fun adjustLyricsOffset(amount: Long) {
-        lyricsOffset += amount
+        updateLyricsOffset(lyricsOffset + amount)
+    }
+
+    fun resetLyricsOffset() {
+        updateLyricsOffset(0L)
+    }
+
+    fun updateLyricsOffset(offset: Long) {
+        lyricsOffset = offset
+        val trackId = currentTrack?.id ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            if (offset == 0L) {
+                com.alananasss.kittytune.data.LyricsOffsetRepository.remove(trackId)
+            } else {
+                com.alananasss.kittytune.data.LyricsOffsetRepository.put(trackId, offset)
+            }
+        }
     }
 
     fun loadCustomLyrics(content: String) {

@@ -89,6 +89,9 @@ object AppDatabase {
             // (issue #33).
             """CREATE TABLE IF NOT EXISTS lyrics_scroll_speed (
                 trackId INTEGER PRIMARY KEY NOT NULL, speed REAL NOT NULL, updatedAt INTEGER NOT NULL)""",
+            // One row per track whose lyrics sync offset was set by hand. Absent means 0L (no offset).
+            """CREATE TABLE IF NOT EXISTS lyrics_offset (
+                trackId INTEGER PRIMARY KEY NOT NULL, offsetMs INTEGER NOT NULL, updatedAt INTEGER NOT NULL)""",
             """CREATE TABLE IF NOT EXISTS track_loudness (
                 trackId INTEGER PRIMARY KEY NOT NULL, integratedLufs REAL NOT NULL,
                 truePeakDb REAL NOT NULL, updatedAt INTEGER NOT NULL)""",
