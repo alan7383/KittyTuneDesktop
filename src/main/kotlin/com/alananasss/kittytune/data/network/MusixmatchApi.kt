@@ -2,6 +2,7 @@ package com.alananasss.kittytune.data.network
 
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
+import com.alananasss.kittytune.ui.player.lyrics.LyricSinger
 import com.alananasss.kittytune.ui.player.lyrics.LyricWord
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
@@ -71,6 +72,36 @@ data class MxmRichSyncWordItem(
     val o: Float = 0f
 )
 
+data class MxmTrackBody(val track: MxmTrackDetail?)
+data class MxmTrackDetail(
+    @SerializedName("track_id") val trackId: Long,
+    @SerializedName("track_name") val trackName: String?,
+    @SerializedName("artist_id") val artistId: Long?,
+    @SerializedName("artist_name") val artistName: String?,
+    @SerializedName("performer_tagging") val performerTagging: MxmPerformerTagging?
+)
+data class MxmPerformerTagging(
+    val completed: Boolean = false,
+    val content: List<MxmPerformerPart>? = null,
+    val resources: MxmPerformerResources? = null
+)
+data class MxmPerformerPart(
+    val snippet: String? = null,
+    val position: Int = 0,
+    val performers: List<MxmPerformer>? = null
+)
+data class MxmPerformer(
+    val type: String? = null,
+    val fqid: String? = null
+)
+data class MxmPerformerResources(
+    val artists: List<MxmPerformerArtist>? = null
+)
+data class MxmPerformerArtist(
+    @SerializedName("artist_id") val artistId: Long,
+    @SerializedName("artist_name") val artistName: String?
+)
+
 interface MusixmatchApiService {
     @GET("token.get")
     suspend fun getToken(
@@ -118,6 +149,13 @@ interface MusixmatchApiService {
         @Query("translation_fields_set") fieldsSet: String = "minimal",
         @Query("usertoken") token: String
     ): MxmResponse<MxmTranslationListBody>
+
+    @GET("track.get")
+    suspend fun getTrack(
+        @Query("track_id") trackId: Long,
+        @Query("part") part: String = "track_performer_tagging",
+        @Query("usertoken") token: String
+    ): MxmResponse<MxmTrackBody>
 }
 
 object MusixmatchClient {
@@ -280,6 +318,55 @@ object MusixmatchClient {
             romanizationMap.putAll(rom)
         }
 
+        val trackRes = try { api.getTrack(trackId = trackId, part = "track_performer_tagging", token = token) } catch (e: Exception) { null }
+        val trackDetail = trackRes?.message?.body?.track
+        val performerTagging = trackDetail?.performerTagging
+        val parts = performerTagging?.content.orEmpty()
+        val leadArtistId = trackDetail?.artistId
+        val leadArtistName = trackDetail?.artistName
+
+        val partSingers = if (parts.isNotEmpty()) {
+            val allArtists = parts.flatMap { it.performers.orEmpty() }
+                .filter { it.type != "fan_chant" }
+                .mapNotNull { it.fqid }
+                .distinct()
+
+            val leadFqid = performerTagging?.resources?.artists?.firstOrNull {
+                (leadArtistId != null && it.artistId == leadArtistId) ||
+                (leadArtistName != null && it.artistName.equals(leadArtistName, ignoreCase = true))
+            }?.let { "mxm:artist:${it.artistId}" } ?: allArtists.firstOrNull()
+
+            val secondFqid = allArtists.firstOrNull { it != leadFqid }
+
+            parts.map { part ->
+                val performers = part.performers.orEmpty()
+                when {
+                    performers.isEmpty() -> LyricSinger.DEFAULT
+                    performers.any { it.type == "fan_chant" } || performers.size > 1 -> LyricSinger.BOTH
+                    performers[0].fqid == leadFqid -> LyricSinger.SINGER_1
+                    performers[0].fqid == secondFqid -> LyricSinger.SINGER_2
+                    else -> if (allArtists.size > 1) LyricSinger.SINGER_2 else LyricSinger.SINGER_1
+                }
+            }
+        } else emptyList()
+
+        var currentPartIdx = 0
+        fun findSingerForLine(lineText: String): LyricSinger {
+            if (parts.isEmpty()) return LyricSinger.DEFAULT
+            val cleaned = lineText.trim().lowercase().replace(Regex("[^\\p{L}\\p{Nd}]+"), "")
+            if (cleaned.isBlank()) return LyricSinger.DEFAULT
+
+            for (offset in parts.indices) {
+                val idx = (currentPartIdx + offset) % parts.size
+                val snippetClean = parts[idx].snippet.orEmpty().lowercase().replace(Regex("[^\\p{L}\\p{Nd}]+"), "")
+                if (snippetClean.contains(cleaned)) {
+                    currentPartIdx = idx
+                    return partSingers.getOrElse(idx) { LyricSinger.DEFAULT }
+                }
+            }
+            return LyricSinger.DEFAULT
+        }
+
         if (mxmRichLines.isNotEmpty()) {
             for (rLine in mxmRichLines) {
                 val lineText = rLine.x ?: ""
@@ -296,7 +383,8 @@ object MusixmatchClient {
 
                 val translationText = translationMap[lineText.trim()]
                 val romanizationText = romanizationMap[lineText.trim()]
-                lines.add(LyricLine(lineText, startMs, endMs, words, translationText, romanizationText))
+                val singer = findSingerForLine(lineText)
+                lines.add(LyricLine(lineText, startMs, endMs, words, translationText, romanizationText, singer))
             }
         } else if (mxmLines.isNotEmpty()) {
             for (i in mxmLines.indices) {
@@ -309,7 +397,8 @@ object MusixmatchClient {
 
                 val translationText = translationMap[lineText.trim()]
                 val romanizationText = romanizationMap[lineText.trim()]
-                lines.add(LyricLine(lineText, startMs, endMs, emptyList(), translationText, romanizationText))
+                val singer = findSingerForLine(lineText)
+                lines.add(LyricLine(lineText, startMs, endMs, emptyList(), translationText, romanizationText, singer))
             }
         }
 

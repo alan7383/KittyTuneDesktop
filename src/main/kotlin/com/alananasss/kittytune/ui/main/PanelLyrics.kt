@@ -51,6 +51,7 @@ import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.lyrics.FollowActiveLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
+import com.alananasss.kittytune.ui.player.lyrics.LyricSinger
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineStyling
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
 import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
@@ -228,12 +229,28 @@ private fun PanelLyricLine(
     // The reader's own alignment, which this view used to ignore: "ça doit prendre en compte les paramètres
     // lyrics, si on met centré ça met centré" (issue #33). The full screen honoured it and the panel did not,
     // which is the same class of bug as every other one where these two disagreed.
-    val textAlign = alignmentOf(vm, style)
-    val columnAlign = when (textAlign) {
+    val defaultTextAlign = alignmentOf(vm, style)
+    val defaultColumnAlign = when (defaultTextAlign) {
         TextAlign.Center -> Alignment.CenterHorizontally
         TextAlign.End -> Alignment.End
         else -> Alignment.Start
     }
+
+    val textAlign = when (line.singer) {
+        LyricSinger.SINGER_1 -> TextAlign.Start
+        LyricSinger.SINGER_2 -> TextAlign.End
+        LyricSinger.BOTH -> TextAlign.Center
+        else -> defaultTextAlign
+    }
+    val columnAlign = when (line.singer) {
+        LyricSinger.SINGER_1 -> Alignment.Start
+        LyricSinger.SINGER_2 -> Alignment.End
+        LyricSinger.BOTH -> Alignment.CenterHorizontally
+        else -> defaultColumnAlign
+    }
+    val duetPadding = if (style.isFullScreen) 100.dp else 40.dp
+    val linePaddingStart = if (line.singer == LyricSinger.SINGER_2) duetPadding else 0.dp
+    val linePaddingEnd = if (line.singer == LyricSinger.SINGER_1) duetPadding else 0.dp
 
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
@@ -249,6 +266,7 @@ private fun PanelLyricLine(
             // hovered line instead, and that is the affordance these lines should have too (issue #33).
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
             .padding(vertical = style.lineSpacing)
+            .padding(start = linePaddingStart, end = linePaddingEnd)
             .graphicsLayer {
                 // Scaled about whichever edge the text is aligned to, so a shrinking line does not drift away
                 // from its own margin. Centred text scales about its centre, which is what the lyrics screen
