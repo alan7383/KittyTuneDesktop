@@ -1,11 +1,16 @@
 package com.alananasss.kittytune.ui.player
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -178,61 +183,129 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             artworkUrl = track.fullResArtwork
         )
 
-        val totalWidth = maxWidth
-        val fullLyricsWidth = totalWidth * (LYRICS_SHARE / (1f + LYRICS_SHARE))
-        val progress = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f)
-        val coverStartPadding = 24.dp + 32.dp * progress
+        val isPortrait = maxHeight > maxWidth
+        val hasLyrics = viewModel.hasLyrics
+        val showPortraitLyrics = isPortrait && hasLyrics && showText
 
-        Row(
-            // No padding on this Row, and the two halves inset themselves. The lyrics half has to reach the
-            // window's own edge so that its scrollbar sits against it — "met la barre de slide tout à droite"
-            // — and a Row-level inset would hold it 56 dp short of that (issue #33).
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(start = coverStartPadding, end = 24.dp, top = 40.dp, bottom = 40.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CoverColumn(
-                    viewModel = viewModel,
-                    palette = palette,
-                    // How much room the cover has to itself, which is what decides how large it gets: the
-                    // sleeve grows into the space the words leave rather than sliding across it.
-                    roomToItself = 1f - progress,
-                    showText = showText,
-                    onToggleText = { showText = !showText },
-                )
-            }
-
-            // Kept out of the row entirely once it has no width, since `weight` refuses zero — and there is
-            // nothing left to draw at that point anyway.
-            if (lyricsShare > 0.001f) {
-                val alpha = if (showText) progress else (progress * 1.4f - 0.4f).coerceIn(0f, 1f)
-                Box(
-                    Modifier
-                        .weight(lyricsShare)
-                        .fillMaxHeight()
-                        .clipToBounds()
-                        .graphicsLayer {
-                            this.alpha = alpha
-                            this.translationX = (1f - progress) * 40.dp.toPx()
-                        },
-                ) {
-                    Box(
-                        Modifier
-                            .requiredWidth(fullLyricsWidth)
-                            .fillMaxHeight()
-                            .padding(vertical = 24.dp)
+        if (isPortrait) {
+            AnimatedContent(
+                targetState = showPortraitLyrics,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(220)).togetherWith(fadeOut(animationSpec = tween(220)))
+                },
+                label = "portraitCoverLyricsCrossfade",
+                modifier = Modifier.fillMaxSize()
+            ) { isShowingLyrics ->
+                if (isShowingLyrics) {
+                    // Portrait mode with lyrics: Cover is HIDDEN, lyrics take full width/height
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        LyricsOnCoverColour(viewModel, palette)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(top = 44.dp, bottom = 10.dp, start = 24.dp, end = 24.dp)
+                        ) {
+                            LyricsOnCoverColour(viewModel, palette)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 24.dp, end = 24.dp, bottom = 28.dp, top = 6.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(
+                                modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                TrackCredit(viewModel = viewModel, palette = palette)
+                                Spacer(Modifier.height(10.dp))
+                                FullPlayerControls(
+                                    viewModel = viewModel,
+                                    palette = palette,
+                                    showText = showText,
+                                    onToggleText = { showText = !showText },
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Portrait mode with NO lyrics or user toggled lyrics off: Cover is centered
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp, vertical = 40.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CoverColumn(
+                            viewModel = viewModel,
+                            palette = palette,
+                            roomToItself = 1f,
+                            showText = showText,
+                            onToggleText = { showText = !showText },
+                        )
                     }
                 }
             }
+        } else {
+            val totalWidth = maxWidth
+            val fullLyricsWidth = totalWidth * (LYRICS_SHARE / (1f + LYRICS_SHARE))
+            val progress = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f)
+            val coverStartPadding = 24.dp + 32.dp * progress
 
+            Row(
+                // No padding on this Row, and the two halves inset themselves. The lyrics half has to reach the
+                // window's own edge so that its scrollbar sits against it — "met la barre de slide tout à droite"
+                // — and a Row-level inset would hold it 56 dp short of that (issue #33).
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = coverStartPadding, end = 24.dp, top = 40.dp, bottom = 40.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CoverColumn(
+                        viewModel = viewModel,
+                        palette = palette,
+                        // How much room the cover has to itself, which is what decides how large it gets: the
+                        // sleeve grows into the space the words leave rather than sliding across it.
+                        roomToItself = 1f - progress,
+                        showText = showText,
+                        onToggleText = { showText = !showText },
+                    )
+                }
+
+                // Kept out of the row entirely once it has no width, since `weight` refuses zero — and there is
+                // nothing left to draw at that point anyway.
+                if (lyricsShare > 0.001f) {
+                    val alpha = if (showText) progress else (progress * 1.4f - 0.4f).coerceIn(0f, 1f)
+                    Box(
+                        Modifier
+                            .weight(lyricsShare)
+                            .fillMaxHeight()
+                            .clipToBounds()
+                            .graphicsLayer {
+                                this.alpha = alpha
+                                this.translationX = (1f - progress) * 40.dp.toPx()
+                            },
+                    ) {
+                        Box(
+                            Modifier
+                                .requiredWidth(fullLyricsWidth)
+                                .fillMaxHeight()
+                                .padding(vertical = 24.dp)
+                        ) {
+                            LyricsOnCoverColour(viewModel, palette)
+                        }
+                    }
+                }
+            }
         }
 
         // The two things this screen needs of its own, in the corner and dim: the way out, and the lyrics
