@@ -25,7 +25,7 @@ data class LyricLine(
     val words: List<LyricWord> = emptyList(),
     val translation: String? = null,
     val romanization: String? = null,
-    val singer: LyricSinger = LyricSinger.DEFAULT
+    val singer: LyricSinger? = LyricSinger.DEFAULT
 )
 
 object LyricsUtils {
