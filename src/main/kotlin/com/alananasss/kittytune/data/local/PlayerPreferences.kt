@@ -99,6 +99,11 @@ class PlayerPreferences {
         private const val KEY_MINI_PLAYER_X = "mini_player_pos_x"
         private const val KEY_MINI_PLAYER_Y = "mini_player_pos_y"
         private const val KEY_MINI_PLAYER_WIDTH = "mini_player_width"
+        private const val KEY_MINI_PLAYER_HEIGHT = "mini_player_height"
+        const val MINI_PLAYER_MIN_WIDTH = 340
+        const val MINI_PLAYER_MAX_WIDTH = 1000
+        const val MINI_PLAYER_MIN_HEIGHT = 68
+        const val MINI_PLAYER_MAX_HEIGHT = 120
         private const val KEY_FULL_PLAYER_BG_STYLE = "full_player_bg_style"
 
         /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
@@ -469,12 +474,18 @@ class PlayerPreferences {
 
     fun getMiniPlayerX(): Int? = Prefs.getInt(KEY_MINI_PLAYER_X, -1).takeIf { it >= 0 }
     fun getMiniPlayerY(): Int? = Prefs.getInt(KEY_MINI_PLAYER_Y, -1).takeIf { it >= 0 }
-    fun getMiniPlayerWidth(): Int = Prefs.getInt(KEY_MINI_PLAYER_WIDTH, 560).coerceIn(320, 1200)
+    fun getMiniPlayerWidth(): Int = Prefs.getInt(KEY_MINI_PLAYER_WIDTH, 560).coerceIn(MINI_PLAYER_MIN_WIDTH, MINI_PLAYER_MAX_WIDTH)
+    fun getMiniPlayerHeight(): Int = Prefs.getInt(KEY_MINI_PLAYER_HEIGHT, 82).coerceIn(MINI_PLAYER_MIN_HEIGHT, MINI_PLAYER_MAX_HEIGHT)
 
-    fun setMiniPlayerBounds(x: Int, y: Int, width: Int) {
+    fun setMiniPlayerBounds(x: Int, y: Int, width: Int, height: Int) {
         Prefs.putInt(KEY_MINI_PLAYER_X, x)
         Prefs.putInt(KEY_MINI_PLAYER_Y, y)
-        Prefs.putInt(KEY_MINI_PLAYER_WIDTH, width.coerceIn(320, 1200))
+        Prefs.putInt(KEY_MINI_PLAYER_WIDTH, width.coerceIn(MINI_PLAYER_MIN_WIDTH, MINI_PLAYER_MAX_WIDTH))
+        Prefs.putInt(KEY_MINI_PLAYER_HEIGHT, height.coerceIn(MINI_PLAYER_MIN_HEIGHT, MINI_PLAYER_MAX_HEIGHT))
+    }
+
+    fun setMiniPlayerBounds(x: Int, y: Int, width: Int) {
+        setMiniPlayerBounds(x, y, width, getMiniPlayerHeight())
     }
 
         fun getFullPlayerBgStyle(): FullPlayerBgStyle {

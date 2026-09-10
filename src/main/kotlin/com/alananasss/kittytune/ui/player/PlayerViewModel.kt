@@ -133,6 +133,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setMiniPlayerEnabled(enabled)
     }
 
+    fun saveMiniPlayerBounds(x: Int, y: Int, width: Int, height: Int) {
+        playerPrefs.setMiniPlayerBounds(x, y, width, height)
+    }
+
     fun saveMiniPlayerBounds(x: Int, y: Int, width: Int) {
         playerPrefs.setMiniPlayerBounds(x, y, width)
     }

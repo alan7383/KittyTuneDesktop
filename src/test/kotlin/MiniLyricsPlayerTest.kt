@@ -1,3 +1,4 @@
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.lyrics.LyricWord
 import com.alananasss.kittytune.ui.player.mini.resolveActiveChunk
 import com.alananasss.kittytune.ui.player.mini.splitIntoChunks
@@ -59,5 +60,75 @@ class MiniLyricsPlayerTest {
         assertEquals(1, resolveActiveChunk(chunks, 2500f))
         assertEquals(1, resolveActiveChunk(chunks, 3900f))
         assertEquals(1, resolveActiveChunk(chunks, 9999f))
+    }
+
+    @Test
+    fun mini_player_scaling_bounds_persists_width_and_height() {
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val origX = prefs.getMiniPlayerX() ?: 100
+        val origY = prefs.getMiniPlayerY() ?: 100
+        val origW = prefs.getMiniPlayerWidth()
+        val origH = prefs.getMiniPlayerHeight()
+
+        try {
+            // Save custom scaled bounds
+            prefs.setMiniPlayerBounds(x = 250, y = 350, width = 780, height = 110)
+
+            assertEquals(250, prefs.getMiniPlayerX())
+            assertEquals(350, prefs.getMiniPlayerY())
+            assertEquals(780, prefs.getMiniPlayerWidth())
+            assertEquals(110, prefs.getMiniPlayerHeight())
+        } finally {
+            // Restore original values
+            prefs.setMiniPlayerBounds(origX, origY, origW, origH)
+        }
+    }
+
+    @Test
+    fun mini_player_bounds_coerces_extreme_scale_dimensions() {
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val origX = prefs.getMiniPlayerX() ?: 100
+        val origY = prefs.getMiniPlayerY() ?: 100
+        val origW = prefs.getMiniPlayerWidth()
+        val origH = prefs.getMiniPlayerHeight()
+
+        try {
+            // Test below min limits
+            prefs.setMiniPlayerBounds(x = 10, y = 20, width = 100, height = 20)
+            assertEquals(PlayerPreferences.MINI_PLAYER_MIN_WIDTH, prefs.getMiniPlayerWidth(), "Width should clamp to min 340")
+            assertEquals(PlayerPreferences.MINI_PLAYER_MIN_HEIGHT, prefs.getMiniPlayerHeight(), "Height should clamp to min 68")
+
+            // Test above max limits
+            prefs.setMiniPlayerBounds(x = 10, y = 20, width = 5000, height = 3000)
+            assertEquals(PlayerPreferences.MINI_PLAYER_MAX_WIDTH, prefs.getMiniPlayerWidth(), "Width should clamp to max 1000")
+            assertEquals(PlayerPreferences.MINI_PLAYER_MAX_HEIGHT, prefs.getMiniPlayerHeight(), "Height should clamp to max 120")
+        } finally {
+            prefs.setMiniPlayerBounds(origX, origY, origW, origH)
+        }
+    }
+
+    @Test
+    fun chunking_adapts_to_wide_and_narrow_scale() {
+        val words = listOf(
+            LyricWord("Never ", 0L, 500L),
+            LyricWord("gonna ", 500L, 1000L),
+            LyricWord("give ", 1000L, 1500L),
+            LyricWord("you ", 1500L, 2000L),
+            LyricWord("up, ", 2000L, 2500L),
+            LyricWord("never ", 2500L, 3000L),
+            LyricWord("gonna ", 3000L, 3500L),
+            LyricWord("let ", 3500L, 4000L),
+            LyricWord("you ", 4000L, 4500L),
+            LyricWord("down", 4500L, 5000L),
+        )
+        val text = words.joinToString("") { it.text }
+
+        // Scaled wide (e.g. 70 chars max)
+        val wideChunks = splitIntoChunks(text, words, maxChunkChars = 70)
+        assertEquals(1, wideChunks.size, "Wide scaled mini player should fit full line without split")
+
+        // Scaled narrow (e.g. 22 chars max)
+        val narrowChunks = splitIntoChunks(text, words, maxChunkChars = 22)
+        assertTrue(narrowChunks.size >= 2, "Narrow scaled mini player should split into multiple chunks")
     }
 }
