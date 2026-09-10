@@ -1621,6 +1621,7 @@ flushListenSession("TRACK_CHANGE")
         val plain: String?,
         val provider: String,
         val matchScore: Float,
+        val titleSimilarity: Float = matchScore,
         /**
          * Small nudge for the provider named first in the settings, deliberately smaller than any
          * meaningful difference in [matchScore]: it decides a genuine tie, it does not let the
@@ -1632,7 +1633,7 @@ flushListenSession("TRACK_CHANGE")
          * Identity first, then sync, then match quality — see [LyricsMatcher.rank] for why that order
          * had to change.
          */
-        val rank: Float get() = LyricsMatcher.rank(syncTier, matchScore, providerBonus)
+        val rank: Float get() = LyricsMatcher.rank(syncTier, matchScore, titleSimilarity, providerBonus)
 
         /** See [LyricsMatcher.syncTier]: real timings first, provider second. */
         val syncTier: Int get() = LyricsMatcher.syncTier(lines, plain)
@@ -1812,12 +1813,27 @@ flushListenSession("TRACK_CHANGE")
         for (query in queries) {
             if (!isActive) return@coroutineScope null
 
-            val found = if (preferLrcLib) {
-                searchLrcLibCandidates(query, target, trackDurationMs)
+            val found = mutableListOf<LyricsCandidate>()
+            if (preferLrcLib) {
+                val lrc = searchLrcLibCandidates(query, target, trackDurationMs)
+                found.addAll(lrc)
+                val hasConfidentSynced = lrc.any {
+                    it.isUsable && it.syncTier >= LyricsMatcher.SYNC_TIER_LINE && it.titleSimilarity >= LyricsMatcher.CONFIDENT_MATCH
+                }
+                if (!hasConfidentSynced) {
+                    val mxm = searchMusixmatchCandidates(query, target, trackDurationMs, variant)
+                    found.addAll(mxm)
+                }
             } else {
-                val mxm = async { searchMusixmatchCandidates(query, target, trackDurationMs, variant) }
-                val lrc = async { searchLrcLibCandidates(query, target, trackDurationMs) }
-                mxm.await() + lrc.await()
+                val mxm = searchMusixmatchCandidates(query, target, trackDurationMs, variant)
+                found.addAll(mxm)
+                val hasConfidentSynced = mxm.any {
+                    it.isUsable && it.syncTier >= LyricsMatcher.SYNC_TIER_LINE && it.titleSimilarity >= LyricsMatcher.CONFIDENT_MATCH
+                }
+                if (!hasConfidentSynced) {
+                    val lrc = searchLrcLibCandidates(query, target, trackDurationMs)
+                    found.addAll(lrc)
+                }
             }
             val candidates = found.map { candidate ->
                 if (candidate.provider == preferredProvider) {
@@ -1835,16 +1851,20 @@ flushListenSession("TRACK_CHANGE")
             // Word-level sync from a confident match or line-level sync from an exact artist match
             // is as good as this gets, so stop spending requests on progressively looser queries.
             val current = best
-            if (current != null && (
+            if (current != null && current.titleSimilarity >= LyricsMatcher.CONFIDENT_MATCH && (
                 (current.syncTier >= LyricsMatcher.SYNC_TIER_LINE && current.matchScore >= LyricsMatcher.STRONG_MATCH) ||
                 (current.syncTier >= LyricsMatcher.SYNC_TIER_WORD && current.matchScore >= LyricsMatcher.CONFIDENT_MATCH)
             )) break
         }
 
-        // Genius only once everything else has come up empty: it never carries timings, so it is
-        // about having the words at all rather than about having them in sync (issue #33).
-        if (best == null) {
-            best = searchGeniusCandidate(queries, target)
+        // Genius fallback: if everything else came up empty OR if the best result is not a confident match
+        // (meaning Musixmatch/LRCLIB only had loose or wrong songs), give Genius a chance.
+        // A high-fidelity plain match from Genius for the right song will outrank an unconfident synced song.
+        if (best == null || best.rank < 100f) {
+            val genius = searchGeniusCandidate(queries, target)
+            if (genius != null && (best == null || genius.rank > best.rank)) {
+                best = genius
+            }
         }
 
         val candidate = best ?: return@coroutineScope null
@@ -1872,14 +1892,34 @@ flushListenSession("TRACK_CHANGE")
         target: LyricsMatcher.Target,
         trackDurationMs: Long,
     ): List<LyricsCandidate> {
-        val results = try {
+        val directResults = if (target.title.isNotBlank() && target.artist.isNotBlank()) {
+            try {
+                LrcLibClient.api.searchLyricsStructured(target.title, target.artist)
+            } catch (e: Exception) {
+                emptyList()
+            }
+        } else emptyList()
+
+        val queryResults = try {
             LrcLibClient.api.searchLyrics(query)
         } catch (e: Exception) {
             emptyList()
         }
-        return results
-            .filter { LyricsMatcher.isAcceptable(it.name, it.artistName, target) }
-            .map { result ->
+
+        val allResults = (directResults + queryResults).distinctBy { it.id }
+        return allResults
+            .mapNotNull { result ->
+                val candTitle = result.trackName?.takeIf { it.isNotBlank() } ?: result.name
+                val altTitle = if (candTitle != result.name) result.name else null
+
+                val titleSim = maxOf(
+                    LyricsMatcher.titleSimilarity(candTitle, target),
+                    altTitle?.let { LyricsMatcher.titleSimilarity(it, target) } ?: 0f
+                )
+                val isAcceptable = LyricsMatcher.isAcceptable(candTitle, result.artistName, target) ||
+                    (altTitle != null && LyricsMatcher.isAcceptable(altTitle, result.artistName, target))
+                if (!isAcceptable) return@mapNotNull null
+
                 val synced = result.lyricsfile ?: result.syncedLyrics
                 val lines = synced
                     ?.takeIf { it.isNotBlank() }
@@ -1889,7 +1929,8 @@ flushListenSession("TRACK_CHANGE")
                     lines = lines,
                     plain = result.plainLyrics,
                     provider = "LRCLIB",
-                    matchScore = LyricsMatcher.score(result.name, result.artistName, result.duration, target),
+                    matchScore = LyricsMatcher.score(candTitle, result.artistName, result.duration, target),
+                    titleSimilarity = titleSim,
                 )
             }
     }
@@ -1925,11 +1966,14 @@ flushListenSession("TRACK_CHANGE")
                     hit.hasSubtitles == 1 -> LyricsMatcher.SYNC_TIER_LINE
                     else -> LyricsMatcher.SYNC_TIER_PLAIN
                 }
+                val score = LyricsMatcher.score(
+                    hit.trackName, hit.artistName, hit.trackLength.toDouble(), target
+                )
+                val titleSim = LyricsMatcher.titleSimilarity(hit.trackName, target)
                 LyricsMatcher.rank(
                     syncTier = syncTier,
-                    matchScore = LyricsMatcher.score(
-                        hit.trackName, hit.artistName, hit.trackLength.toDouble(), target
-                    ),
+                    matchScore = score,
+                    titleSimilarity = titleSim,
                 )
             } ?: return emptyList()
 
@@ -1954,6 +1998,7 @@ flushListenSession("TRACK_CHANGE")
                     pick.trackLength.toDouble(),
                     target,
                 ),
+                titleSimilarity = LyricsMatcher.titleSimilarity(pick.trackName, target),
             )
         )
     }
@@ -1972,11 +2017,13 @@ flushListenSession("TRACK_CHANGE")
                 .maxByOrNull { LyricsMatcher.score(it.title, it.artist, 0.0, target) }
                 ?: continue
             val plain = com.alananasss.kittytune.data.network.GeniusClient.lyrics(pick.id) ?: continue
+            val titleSim = LyricsMatcher.titleSimilarity(pick.title, target)
             return LyricsCandidate(
                 lines = emptyList(),
                 plain = plain,
                 provider = "GENIUS",
                 matchScore = LyricsMatcher.score(pick.title, pick.artist, 0.0, target),
+                titleSimilarity = titleSim,
             )
         }
         return null

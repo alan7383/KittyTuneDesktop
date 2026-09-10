@@ -142,16 +142,41 @@ class LyricsMatcherTest {
     }
 
     /**
-     * The deliberate middle tier. A provider holding this track as plain "Fortuna" is very likely
-     * right, since an uploader's title is the song plus whatever else they felt like typing. It is
-     * accepted, but it does not get to claim the confidence of a full match.
+     * A lone word from a multi-word messy title with an unrelated artist must not be accepted.
      */
     @Test
-    fun `one distinctive word of a messy title is accepted but ranked below an exact match`() {
+    fun `one word out of a five word title from an unrelated artist is rejected`() {
         val partial = LyricsMatcher.similarity("Fortuna", messy.title)
         val whole = LyricsMatcher.similarity("fortuna 812 go with me", messy.title)
-        assertTrue(LyricsMatcher.isAcceptable("Fortuna", "Another Artist", messy))
+        assertFalse(LyricsMatcher.isAcceptable("Fortuna", "Another Artist", messy))
         assertTrue("partial=$partial whole=$whole", partial < whole)
+    }
+
+    @Test
+    fun `right song plain lyrics outranks a different song by same artist with word sync`() {
+        val daftPunkTarget = LyricsMatcher.Target("One More Time", "Daft Punk", 320_000L)
+        // Candidate 1: Genius has the exact right song as plain text
+        val rightSongScore = LyricsMatcher.score("One More Time", "Daft Punk", 320.0, daftPunkTarget)
+        val rightSongTitleSim = LyricsMatcher.titleSimilarity("One More Time", daftPunkTarget)
+        val rightSongRank = LyricsMatcher.rank(
+            syncTier = LyricsMatcher.SYNC_TIER_PLAIN,
+            matchScore = rightSongScore,
+            titleSimilarity = rightSongTitleSim,
+        )
+
+        // Candidate 2: Musixmatch has another song by the same artist ("Another Time" or similar) with word sync
+        val partialSongScore = LyricsMatcher.score("Another Time", "Daft Punk", 320.0, daftPunkTarget)
+        val partialSongTitleSim = LyricsMatcher.titleSimilarity("Another Time", daftPunkTarget)
+        val partialSongRank = LyricsMatcher.rank(
+            syncTier = LyricsMatcher.SYNC_TIER_WORD,
+            matchScore = partialSongScore,
+            titleSimilarity = partialSongTitleSim,
+        )
+
+        assertTrue(
+            "Exact song on Genius (plain, rank=$rightSongRank) must beat different song by same artist (synced, rank=$partialSongRank)",
+            rightSongRank > partialSongRank,
+        )
     }
 
     @Test

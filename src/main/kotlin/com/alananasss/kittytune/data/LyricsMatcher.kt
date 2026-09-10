@@ -85,10 +85,18 @@ object LyricsMatcher {
      * cannot steal the place of the right song that has line-level sync or plain text.
      * Within the same match bracket, sync tier decides.
      */
-    fun rank(syncTier: Int, matchScore: Float, providerBonus: Float = 0f): Float {
+    fun rank(syncTier: Int, matchScore: Float, providerBonus: Float = 0f): Float =
+        rank(syncTier, matchScore, titleSimilarity = matchScore, providerBonus = providerBonus)
+
+    fun rank(
+        syncTier: Int,
+        matchScore: Float,
+        titleSimilarity: Float,
+        providerBonus: Float = 0f,
+    ): Float {
         val confidenceBonus = when {
-            matchScore >= STRONG_MATCH -> STRONG_MATCH_WEIGHT
-            matchScore >= CONFIDENT_MATCH -> CONFIDENCE_WEIGHT
+            matchScore >= STRONG_MATCH && titleSimilarity >= 0.65f -> STRONG_MATCH_WEIGHT
+            matchScore >= CONFIDENT_MATCH && titleSimilarity >= CONFIDENT_MATCH -> CONFIDENCE_WEIGHT
             else -> 0f
         }
         return confidenceBonus + syncTier * TIER_WEIGHT + matchScore + providerBonus
@@ -143,7 +151,8 @@ object LyricsMatcher {
      *
      * A strong title match passes by itself — that is the whole point for re-uploads, where the
      * artist we hold is the uploader's account name and cannot match. A weaker title needs the
-     * artist to back it up.
+     * artist to back it up, but still requires significant title overlap so another song by the
+     * same artist is not accepted as this one.
      */
     fun isAcceptable(
         candidateTitle: String?,
@@ -153,7 +162,7 @@ object LyricsMatcher {
         val titleSim = titleSimilarity(candidateTitle, target)
         if (titleSim >= CONFIDENT_MATCH) return true
         val artistSim = artistSimilarity(candidateArtist, target)
-        return titleSim >= 0.35f && artistSim >= 0.45f
+        return titleSim >= 0.50f && artistSim >= 0.45f
     }
 
     /**
@@ -206,7 +215,7 @@ object LyricsMatcher {
             // A single word can still identify a song when it is a word rather than a syllable, but
             // never with the confidence of two.
             val onlyToken = tokensA.intersect(tokensB).first()
-            if (onlyToken.length >= DISTINCTIVE_TOKEN_LENGTH) return 0.75f
+            if (more <= 2 && onlyToken.length >= DISTINCTIVE_TOKEN_LENGTH) return 0.75f
         }
 
         // Divided by the longer side, not the shorter one. Dividing by the shorter side scored a

@@ -10,6 +10,7 @@ import retrofit2.http.Query
 data class LrcLibResponse(
     val id: Long,
     val name: String,
+    @SerializedName("trackName") val trackName: String? = null,
     @SerializedName("artistName") val artistName: String,
     @SerializedName("albumName") val albumName: String?,
     @SerializedName("duration") val duration: Double,
@@ -29,6 +30,12 @@ interface LrcLibApiService {
     @GET("search")
     suspend fun searchLyrics(
         @Query("q") query: String
+    ): List<LrcLibResponse>
+
+    @GET("search")
+    suspend fun searchLyricsStructured(
+        @Query("track_name") trackName: String,
+        @Query("artist_name") artistName: String,
     ): List<LrcLibResponse>
 
     /**
