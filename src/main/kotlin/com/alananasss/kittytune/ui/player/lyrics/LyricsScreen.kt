@@ -607,7 +607,7 @@ import kotlin.math.roundToInt
                         LyricsOffsetControls(
                             offset = viewModel.lyricsOffset,
                             onAdjust = { viewModel.adjustLyricsOffset(it) },
-                            onReset = { viewModel.lyricsOffset = 0L },
+                            onReset = { viewModel.resetLyricsOffset() },
                             onClose = { viewModel.showLyricsOffsetControls = false },
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
@@ -1396,7 +1396,7 @@ fun QuickLyricsSettingsDialog(
 
                                         ToggleButton(
                                             checked = viewModel.lyricsOffset == 0L,
-                                            onCheckedChange = { viewModel.lyricsOffset = 0L },
+                                            onCheckedChange = { viewModel.resetLyricsOffset() },
                                             shapes = ButtonGroupDefaults.connectedMiddleButtonShapes(),
                                             modifier = Modifier.weight(1f)
                                         ) { 

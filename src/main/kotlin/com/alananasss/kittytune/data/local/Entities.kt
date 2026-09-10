@@ -191,6 +191,13 @@ data class LyricsScrollSpeedRow(
     val updatedAt: Long,
 )
 
+// table: lyrics_offset
+data class LyricsOffsetRow(
+    val trackId: Long,
+    val offsetMs: Long,
+    val updatedAt: Long,
+)
+
 // table: library_folders
 data class LibraryFolder(
     val id: Long = 0,
