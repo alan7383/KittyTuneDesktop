@@ -27,6 +27,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.window.WindowDraggableArea
@@ -100,9 +110,10 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
     val initialX = remember { prefs.getMiniPlayerX() }
     val initialY = remember { prefs.getMiniPlayerY() }
     val initialWidth = remember { prefs.getMiniPlayerWidth() }
+    val initialHeight = remember { prefs.getMiniPlayerHeight() }
 
     val windowState = rememberWindowState(
-        size = DpSize(initialWidth.dp, 82.dp),
+        size = DpSize(initialWidth.dp, initialHeight.dp),
         position = if (initialX != null && initialY != null) {
             WindowPosition(initialX.dp, initialY.dp)
         } else {
@@ -117,13 +128,37 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
         if (pos.isSpecified) {
             val x = pos.x.value.toInt()
             val y = pos.y.value.toInt()
-            val w = windowState.size.width.value.toInt()
-            viewModel.saveMiniPlayerBounds(x, y, w)
+            val w = windowState.size.width.value.toInt().coerceIn(
+                PlayerPreferences.MINI_PLAYER_MIN_WIDTH,
+                PlayerPreferences.MINI_PLAYER_MAX_WIDTH
+            )
+            val h = windowState.size.height.value.toInt().coerceIn(
+                PlayerPreferences.MINI_PLAYER_MIN_HEIGHT,
+                PlayerPreferences.MINI_PLAYER_MAX_HEIGHT
+            )
+            viewModel.saveMiniPlayerBounds(x, y, w, h)
         }
     }
 
+    val closeMiniPlayer = {
+        val pos = windowState.position
+        val x = if (pos.isSpecified) pos.x.value.toInt() else (prefs.getMiniPlayerX() ?: 0)
+        val y = if (pos.isSpecified) pos.y.value.toInt() else (prefs.getMiniPlayerY() ?: 0)
+        val w = windowState.size.width.value.toInt().coerceIn(
+            PlayerPreferences.MINI_PLAYER_MIN_WIDTH,
+            PlayerPreferences.MINI_PLAYER_MAX_WIDTH
+        )
+        val h = windowState.size.height.value.toInt().coerceIn(
+            PlayerPreferences.MINI_PLAYER_MIN_HEIGHT,
+            PlayerPreferences.MINI_PLAYER_MAX_HEIGHT
+        )
+        viewModel.saveMiniPlayerBounds(x, y, w, h)
+        com.alananasss.kittytune.core.Prefs.flush(force = true)
+        viewModel.toggleMiniPlayer(false)
+    }
+
     Window(
-        onCloseRequest = { viewModel.toggleMiniPlayer(false) },
+        onCloseRequest = closeMiniPlayer,
         state = windowState,
         alwaysOnTop = isPinned,
         undecorated = true,
@@ -131,42 +166,199 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
         resizable = true,
         title = "KittyTune Mini Player",
     ) {
-        LaunchedEffect(window) {
-            runCatching {
-                window.background = java.awt.Color(0, 0, 0, 0)
-                window.isAlwaysOnTop = isPinned
+        val density = LocalDensity.current
+        val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
+        val customDensity = remember(density, uiScale) {
+            Density(
+                density = density.density * uiScale,
+                fontScale = density.fontScale * uiScale
+            )
+        }
+
+        // Exact physical pixel limits for window sizing and OS window manager hints
+        val minWidthPx = with(density) { PlayerPreferences.MINI_PLAYER_MIN_WIDTH.dp.roundToPx() }
+        val maxWidthPx = with(density) { PlayerPreferences.MINI_PLAYER_MAX_WIDTH.dp.roundToPx() }
+        val minHeightPx = with(density) { PlayerPreferences.MINI_PLAYER_MIN_HEIGHT.dp.roundToPx() }
+        val maxHeightPx = with(density) { PlayerPreferences.MINI_PLAYER_MAX_HEIGHT.dp.roundToPx() }
+
+        val saveCurrentBounds: () -> Unit = remember(window) {
+            {
+                val pos = windowState.position
+                val x = if (pos.isSpecified) pos.x.value.toInt() else (window.x / density.density).toInt()
+                val y = if (pos.isSpecified) pos.y.value.toInt() else (window.y / density.density).toInt()
+                val w = (window.width / density.density).toInt().coerceIn(
+                    PlayerPreferences.MINI_PLAYER_MIN_WIDTH,
+                    PlayerPreferences.MINI_PLAYER_MAX_WIDTH
+                )
+                val h = (window.height / density.density).toInt().coerceIn(
+                    PlayerPreferences.MINI_PLAYER_MIN_HEIGHT,
+                    PlayerPreferences.MINI_PLAYER_MAX_HEIGHT
+                )
+                viewModel.saveMiniPlayerBounds(x, y, w, h)
             }
         }
 
-        KittyTuneTheme {
-            WindowDraggableArea {
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                    border = androidx.compose.foundation.BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
-                    ),
-                    shadowElevation = 8.dp,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                val currentLoc = window.location
-                                window.setLocation(
-                                    currentLoc.x + dragAmount.x.toInt(),
-                                    currentLoc.y + dragAmount.y.toInt()
+        DisposableEffect(window) {
+            runCatching {
+                window.background = java.awt.Color(0, 0, 0, 0)
+                window.isAlwaysOnTop = isPinned
+                window.minimumSize = java.awt.Dimension(minWidthPx, minHeightPx)
+                window.maximumSize = java.awt.Dimension(maxWidthPx, maxHeightPx)
+            }
+            val listener = object : java.awt.event.ComponentAdapter() {
+                override fun componentResized(e: java.awt.event.ComponentEvent) {
+                    val clampedW = window.width.coerceIn(minWidthPx, maxWidthPx)
+                    val clampedH = window.height.coerceIn(minHeightPx, maxHeightPx)
+                    if (window.width != clampedW || window.height != clampedH) {
+                        window.setSize(clampedW, clampedH)
+                    }
+                    saveCurrentBounds()
+                }
+                override fun componentMoved(e: java.awt.event.ComponentEvent) {
+                    saveCurrentBounds()
+                }
+            }
+            window.addComponentListener(listener)
+            onDispose {
+                window.removeComponentListener(listener)
+                saveCurrentBounds()
+                com.alananasss.kittytune.core.Prefs.flush(force = true)
+            }
+        }
+
+        CompositionLocalProvider(LocalDensity provides customDensity) {
+            KittyTuneTheme {
+                WindowDraggableArea {
+                    Surface(
+                        shape = RoundedCornerShape(22.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                        ),
+                        shadowElevation = 8.dp,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragEnd = { saveCurrentBounds() },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        val currentLoc = window.location
+                                        window.setLocation(
+                                            currentLoc.x + dragAmount.x.toInt(),
+                                            currentLoc.y + dragAmount.y.toInt()
+                                        )
+                                    }
                                 )
                             }
+                    ) {
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            MiniLyricsContent(
+                                viewModel = viewModel,
+                                isPinned = isPinned,
+                                onTogglePin = { isPinned = !isPinned },
+                                onClose = closeMiniPlayer,
+                                windowHeight = windowState.size.height,
+                            )
+
+                            // Right edge resize handle
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .fillMaxHeight()
+                                    .width(6.dp)
+                                    .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragEnd = { saveCurrentBounds() },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                val newW = (window.width + dragAmount.x.toInt()).coerceIn(minWidthPx, maxWidthPx)
+                                                window.setSize(newW, window.height)
+                                            }
+                                        )
+                                    }
+                            )
+
+                            // Bottom edge resize handle
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .pointerHoverIcon(PointerIcon(Cursor(Cursor.S_RESIZE_CURSOR)))
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragEnd = { saveCurrentBounds() },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                val newH = (window.height + dragAmount.y.toInt()).coerceIn(minHeightPx, maxHeightPx)
+                                                window.setSize(window.width, newH)
+                                            }
+                                        )
+                                    }
+                            )
+
+                            // Bottom-right corner resize grip
+                            var isGripHovered by remember { mutableStateOf(false) }
+                            val gripInteraction = remember { MutableInteractionSource() }
+                            val isHoveredByState by gripInteraction.collectIsHoveredAsState()
+                            val gripActive = isGripHovered || isHoveredByState
+
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(20.dp)
+                                    .hoverable(gripInteraction)
+                                    .pointerHoverIcon(PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)))
+                                    .pointerInput(Unit) {
+                                        detectDragGestures(
+                                            onDragEnd = {
+                                                isGripHovered = false
+                                                saveCurrentBounds()
+                                            },
+                                            onDragCancel = {
+                                                isGripHovered = false
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                isGripHovered = true
+                                                val newW = (window.width + dragAmount.x.toInt()).coerceIn(minWidthPx, maxWidthPx)
+                                                val newH = (window.height + dragAmount.y.toInt()).coerceIn(minHeightPx, maxHeightPx)
+                                                window.setSize(newW, newH)
+                                            }
+                                        )
+                                    },
+                                contentAlignment = Alignment.BottomEnd
+                            ) {
+                                val outlineColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                Canvas(
+                                    modifier = Modifier
+                                        .size(11.dp)
+                                        .padding(end = 4.dp, bottom = 4.dp)
+                                ) {
+                                    val strokeAlpha = if (gripActive) 0.85f else 0.35f
+                                    val strokeWidth = 1.5.dp.toPx()
+                                    val strokeColor = outlineColor.copy(alpha = strokeAlpha)
+                                    drawLine(
+                                        color = strokeColor,
+                                        start = Offset(size.width * 0.35f, size.height),
+                                        end = Offset(size.width, size.height * 0.35f),
+                                        strokeWidth = strokeWidth,
+                                        cap = StrokeCap.Round
+                                    )
+                                    drawLine(
+                                        color = strokeColor,
+                                        start = Offset(size.width * 0.72f, size.height),
+                                        end = Offset(size.width, size.height * 0.72f),
+                                        strokeWidth = strokeWidth,
+                                        cap = StrokeCap.Round
+                                    )
+                                }
+                            }
                         }
-                ) {
-                    MiniLyricsContent(
-                        viewModel = viewModel,
-                        isPinned = isPinned,
-                        onTogglePin = { isPinned = !isPinned },
-                        onClose = { viewModel.toggleMiniPlayer(false) },
-                    )
+                    }
                 }
             }
         }
@@ -179,6 +371,7 @@ private fun MiniLyricsContent(
     isPinned: Boolean,
     onTogglePin: () -> Unit,
     onClose: () -> Unit,
+    windowHeight: Dp = 82.dp,
 ) {
     val track = viewModel.currentTrack
     val isPlaying = viewModel.isPlaying
@@ -199,18 +392,21 @@ private fun MiniLyricsContent(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
+    val vPadding = (windowHeight.value * 0.12f).coerceIn(6f, 14f).dp
+    val artSize = (windowHeight.value - 38f).coerceIn(36f, 60f).dp
+
     Row(
         modifier = Modifier
             .fillMaxSize()
             .hoverable(interactionSource)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 14.dp, vertical = vPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Thumbnail Album Cover or Logo
         Box(
             modifier = Modifier
-                .size(44.dp)
+                .size(artSize)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
@@ -233,16 +429,20 @@ private fun MiniLyricsContent(
         }
 
         // Center Area: The Active Single Lyric Line (with smart chunking for long lines)
-        Box(
+        BoxWithConstraints(
             modifier = Modifier.weight(1f),
             contentAlignment = Alignment.CenterStart
         ) {
+            val maxChars = remember(maxWidth) {
+                (maxWidth.value / 9.2f).toInt().coerceIn(18, 90)
+            }
             if (track != null && activeLine != null && activeLine.text.isNotBlank()) {
                 MiniLyricDisplay(
                     line = activeLine,
                     positionMs = adjustedPosition,
                     wordSync = viewModel.isWordSyncEnabled,
                     fillEffect = viewModel.isAppleMusicEffectEnabled,
+                    maxChunkChars = maxChars,
                 )
             } else if (track != null) {
                 Column(verticalArrangement = Arrangement.Center) {
@@ -383,15 +583,16 @@ private fun MiniLyricDisplay(
     positionMs: Float,
     wordSync: Boolean,
     fillEffect: Boolean,
+    maxChunkChars: Int = 36,
 ) {
     val words = if (wordSync && line.words.isNotEmpty()) line.words else emptyList()
     val fullText = remember(line.text, words) {
         if (words.isNotEmpty()) words.joinToString("") { it.text } else line.text
     }
 
-    // Partition long lines into ~36-character chunks on word boundaries
-    val chunks = remember(fullText, words) {
-        splitIntoChunks(fullText, words, maxChunkChars = 36)
+    // Partition long lines into ~maxChunkChars-character chunks on word boundaries
+    val chunks = remember(fullText, words, maxChunkChars) {
+        splitIntoChunks(fullText, words, maxChunkChars = maxChunkChars)
     }
 
     // Determine which chunk is active based on current playback progress
