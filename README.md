@@ -220,9 +220,6 @@ licensed under the **MIT License**.
 
 thanks to everyone who helps make KittyTune Desktop better:
 
-<a href="https://github.com/alan7383" title="alan7383">
-  <img src="https://images.weserv.nl/?url=github.com/alan7383.png&mask=circle&w=64&h=64" width="64" height="64" alt="alan7383" />
-</a>
 <a href="https://github.com/dyr00l" title="dyr00l">
   <img src="https://images.weserv.nl/?url=github.com/dyr00l.png&mask=circle&w=64&h=64" width="64" height="64" alt="dyr00l" />
 </a>
