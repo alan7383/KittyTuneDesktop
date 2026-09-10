@@ -890,6 +890,8 @@
     <string name="mix_customise_sub">Build it around one artist, or one genre.</string>
     <string name="mix_genre_search_hint">Search a genre, or type any tag</string>
     <string name="mix_genre_custom">Mix “%1$s”</string>
+    <string name="mix_trusted_sources_title">Trusted sources &amp; verified artists</string>
+    <string name="mix_trusted_sources_sub">Prioritise artists with more followers. Turn off to freely include remixes, bootlegs and small creators.</string>
     <string name="listening_stats_top_artist_label">Top Artist</string>
     <string name="listening_stats_top_artists">Top Artists</string>
     <string name="listening_stats_top_track_label">Top Track</string>

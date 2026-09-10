@@ -2468,6 +2468,8 @@ private fun MixOptionsDialog(
     onDismiss: () -> Unit,
     onPick: (com.alananasss.kittytune.data.mix.MixEngine.Recipe) -> Unit,
 ) {
+    val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    var prioritizeTrusted by remember { mutableStateOf(playerPrefs.getMixPrioritizeTrusted()) }
     var artist by remember { mutableStateOf("") }
     var genreQuery by remember { mutableStateOf("") }
 
@@ -2532,7 +2534,59 @@ private fun MixOptionsDialog(
                     }
                 }
 
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(18.dp))
+                val cardShape = RoundedCornerShape(18.dp)
+                androidx.compose.material3.Card(
+                    onClick = {
+                        val next = !prioritizeTrusted
+                        prioritizeTrusted = next
+                        playerPrefs.setMixPrioritizeTrusted(next)
+                    },
+                    shape = cardShape,
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(cardShape),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Rounded.Verified,
+                                contentDescription = null,
+                                tint = if (prioritizeTrusted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = str("mix_trusted_sources_title"),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = str("mix_trusted_sources_sub"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        androidx.compose.material3.Switch(
+                            checked = prioritizeTrusted,
+                            onCheckedChange = null,
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
                 MixSectionLabel(Icons.Rounded.Person, str("mix_in_the_style_of"))
                 Spacer(Modifier.height(10.dp))
                 androidx.compose.material3.OutlinedTextField(

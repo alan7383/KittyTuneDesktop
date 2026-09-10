@@ -94,6 +94,7 @@ class PlayerPreferences {
         private const val KEY_PERSISTENT_QUEUE = "persistent_queue_enabled"
         private const val KEY_QUEUE_PRESERVE_UPCOMING_ON_JUMP = "queue_preserve_upcoming_on_jump"
         private const val KEY_MIX_DISLIKED_TRACK_IDS = "mix_disliked_track_ids"
+        private const val KEY_MIX_PRIORITIZE_TRUSTED = "mix_prioritize_trusted"
         private const val KEY_MINI_PLAYER_ENABLED = "mini_player_enabled"
         private const val KEY_MINI_PLAYER_X = "mini_player_pos_x"
         private const val KEY_MINI_PLAYER_Y = "mini_player_pos_y"
@@ -459,6 +460,8 @@ class PlayerPreferences {
         Prefs.putString(KEY_MIX_DISLIKED_TRACK_IDS, gson.toJson(current))
     }
     fun isMixTrackDisliked(trackId: Long): Boolean = getMixDislikedTrackIds().contains(trackId)
+    fun getMixPrioritizeTrusted(): Boolean = Prefs.getBoolean(KEY_MIX_PRIORITIZE_TRUSTED, true)
+    fun setMixPrioritizeTrusted(enabled: Boolean) = Prefs.putBoolean(KEY_MIX_PRIORITIZE_TRUSTED, enabled)
 
     fun getMiniPlayerEnabled(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_ENABLED, false)
     fun setMiniPlayerEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_ENABLED, enabled)

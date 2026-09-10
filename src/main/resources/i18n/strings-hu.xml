@@ -894,6 +894,8 @@
     <string name="mix_customise_sub">Építsd egy előadó vagy egy műfaj körül.</string>
     <string name="mix_genre_search_hint">Keress műfajt, vagy írj be bármilyen címkét</string>
     <string name="mix_genre_custom">„%1$s” mix</string>
+    <string name="mix_trusted_sources_title">Megbízható források és hitelesített előadók</string>
+    <string name="mix_trusted_sources_sub">Előnyben részesíti a több követővel rendelkező előadókat. Kapcsold ki a remixek és kisebb alkotók szabad megjelenítéséhez.</string>
     <string name="listening_stats_top_artist_label">Top Előadó</string>
     <string name="listening_stats_top_artists">Top előadók</string>
     <string name="listening_stats_top_track_label">Top Dal</string>
