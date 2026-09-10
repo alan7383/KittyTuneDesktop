@@ -43,11 +43,13 @@ class MixAlgorithmTest {
         artist: String,
         plays: Int = 5_000,
         durationMs: Long = 200_000,
+        followers: Int = 1_000,
+        verified: Boolean = false,
     ) = Track(
         id = id,
         title = "track $id",
         artworkUrl = null,
-        user = User(id = id * 100, username = artist, avatarUrl = null),
+        user = User(id = id * 100, username = artist, avatarUrl = null, followersCount = followers, verified = verified),
         durationMs = durationMs,
         playbackCount = plays,
     )
@@ -186,6 +188,54 @@ class MixAlgorithmTest {
 
         val obscureButRelevant = MixRanking.score(MixRanking.Candidate(track(32, "Z", plays = 3), 1f), taste)!!
         assertTrue(obscureButRelevant > popular, "but never more than fitting the listener")
+    }
+
+    @Test
+    fun `artists with more subscribers are prioritized when trusted sources is enabled`() {
+        val taste = MixProfile.build(listOf(play(1, "A")), emptyList(), now)
+        val bigArtist = MixRanking.score(
+            MixRanking.Candidate(track(40, "Star", plays = 10_000, followers = 500_000), 0.8f),
+            taste,
+            prioritizeTrusted = true,
+        )!!
+        val smallArtist = MixRanking.score(
+            MixRanking.Candidate(track(41, "Indie", plays = 10_000, followers = 100), 0.8f),
+            taste,
+            prioritizeTrusted = true,
+        )!!
+        assertTrue(bigArtist > smallArtist, "more followers should boost priority when enabled")
+    }
+
+    @Test
+    fun `verified trusted artists get authenticity bonus`() {
+        val taste = MixProfile.build(listOf(play(1, "A")), emptyList(), now)
+        val verified = MixRanking.score(
+            MixRanking.Candidate(track(42, "Official", plays = 10_000, followers = 5_000, verified = true), 0.8f),
+            taste,
+            prioritizeTrusted = true,
+        )!!
+        val unverified = MixRanking.score(
+            MixRanking.Candidate(track(43, "Fan", plays = 10_000, followers = 5_000, verified = false), 0.8f),
+            taste,
+            prioritizeTrusted = true,
+        )!!
+        assertTrue(verified > unverified, "verified badge should provide an authenticity bonus")
+    }
+
+    @Test
+    fun `when prioritizeTrusted is disabled, remixers and small uploaders are scored equally on same plays`() {
+        val taste = MixProfile.build(listOf(play(1, "A")), emptyList(), now)
+        val bigArtist = MixRanking.score(
+            MixRanking.Candidate(track(44, "MajorLabel", plays = 10_000, followers = 1_000_000, verified = true), 0.8f),
+            taste,
+            prioritizeTrusted = false,
+        )!!
+        val smallRemixer = MixRanking.score(
+            MixRanking.Candidate(track(45, "SmallRemixer", plays = 10_000, followers = 5, verified = false), 0.8f),
+            taste,
+            prioritizeTrusted = false,
+        )!!
+        assertEquals(bigArtist, smallRemixer, "disabling prioritizeTrusted treats creators equally without follower bias")
     }
 
     // ---- the running order --------------------------------------------------------------------

@@ -890,6 +890,8 @@
     <string name="mix_customise_sub">Construis-le autour d’un artiste ou d’un genre.</string>
     <string name="mix_genre_search_hint">Cherche un genre, ou tape n’importe quel tag</string>
     <string name="mix_genre_custom">Mixer « %1$s »</string>
+    <string name="mix_trusted_sources_title">Sources fiables et artistes certifiés</string>
+    <string name="mix_trusted_sources_sub">Privilégie les artistes avec plus d’abonnés. Désactive pour inclure librement les remix, bootlegs et petits créateurs.</string>
     <string name="listening_stats_top_artist_label">Top Artiste</string>
     <string name="listening_stats_top_artists">Top Artistes</string>
     <string name="listening_stats_top_track_label">Top Morceau</string>

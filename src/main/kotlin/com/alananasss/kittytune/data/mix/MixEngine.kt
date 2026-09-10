@@ -53,6 +53,9 @@ object MixEngine {
     private fun youtubeFallback(): Boolean =
         com.alananasss.kittytune.data.local.PlayerPreferences().getYouTubeFallbackEnabled()
 
+    private fun prioritizeTrusted(): Boolean =
+        com.alananasss.kittytune.data.local.PlayerPreferences().getMixPrioritizeTrusted()
+
     /** How the mix was asked for. */
     sealed interface Recipe {
         /** From everything the listener plays. The plain "start mixing" press. */
@@ -126,7 +129,14 @@ object MixEngine {
             println("KittyTune mix: ${seeds.size} seeds -> ${candidates.size} candidates")
             if (candidates.isEmpty()) return@withContext Result.NothingFound(Result.Stage.NO_CANDIDATES)
 
-            val tracks = MixRanking.order(candidates, taste, size, seed = now, youtubeFallback = youtubeFallback())
+            val tracks = MixRanking.order(
+                candidates = candidates,
+                taste = taste,
+                size = size,
+                seed = now,
+                youtubeFallback = youtubeFallback(),
+                prioritizeTrusted = prioritizeTrusted(),
+            )
             println("KittyTune mix: ${candidates.size} candidates -> ${tracks.size} tracks")
             if (tracks.isEmpty()) Result.NothingFound(Result.Stage.ALL_FILTERED)
             else Result.Mixed(tracks, describe(recipe, seeds))

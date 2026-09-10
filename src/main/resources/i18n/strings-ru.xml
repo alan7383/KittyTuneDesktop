@@ -890,6 +890,8 @@
     <string name="mix_customise_sub">Собери его вокруг артиста или жанра.</string>
     <string name="mix_genre_search_hint">Найди жанр или введи любой тег</string>
     <string name="mix_genre_custom">Микс «%1$s»</string>
+    <string name="mix_trusted_sources_title">Проверенные источники и авторы</string>
+    <string name="mix_trusted_sources_sub">Приоритет артистам с большим числом подписчиков. Отключите, чтобы свободно включать ремиксы, бутлеги и независимых авторов.</string>
     <string name="listening_stats_top_artist_label">Топ-исполнитель</string>
     <string name="listening_stats_top_artists">Лучшие исполнители</string>
     <string name="listening_stats_top_track_label">Топ-трек</string>

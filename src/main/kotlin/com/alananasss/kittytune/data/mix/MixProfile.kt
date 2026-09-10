@@ -191,6 +191,7 @@ object MixRanking {
         taste: MixProfile.Taste,
         /** Passed in rather than read here, so the scoring stays pure and testable at both settings. */
         youtubeFallback: Boolean = true,
+        prioritizeTrusted: Boolean = true,
     ): Float? {
         val track = candidate.track
         if (track.id in taste.knownTrackIds) return null
@@ -204,8 +205,22 @@ object MixRanking {
         val popularity = (track.playbackCount.coerceAtLeast(0) + 1).toDouble()
         val popularityTerm = (Math.log10(popularity) / 7.0).coerceIn(0.0, 1.0).toFloat()
 
+        val trustedTerm = if (prioritizeTrusted) {
+            val followers = (track.user?.followersCount ?: 0).coerceAtLeast(0)
+            val followersTerm = if (followers > 0) {
+                (Math.log10(followers.toDouble() + 1.0) / 6.0).coerceIn(0.0, 1.0).toFloat()
+            } else 0f
+
+            val isTrusted = track.user?.verified == true || track.user?.isPro == true
+            val verifiedBonus = if (isTrusted) TRUSTED_SOURCE_BONUS else 0f
+            val obscurePenalty = if (!isTrusted && followers < 30) OBSCURE_UPLOADER_PENALTY else 0f
+
+            followersTerm * FOLLOWERS_WEIGHT + verifiedBonus + obscurePenalty
+        } else 0f
+
         return candidate.seedAffinity * AFFINITY_WEIGHT +
             popularityTerm * POPULARITY_WEIGHT +
+            trustedTerm +
             (if (familiar) FAMILIAR_ARTIST_PENALTY else 0f)
     }
 
@@ -245,6 +260,9 @@ object MixRanking {
 
     private const val AFFINITY_WEIGHT = 1.0f
     private const val POPULARITY_WEIGHT = 0.25f
+    const val FOLLOWERS_WEIGHT = 0.20f
+    const val TRUSTED_SOURCE_BONUS = 0.12f
+    const val OBSCURE_UPLOADER_PENALTY = -0.10f
 
     /** Enough to push a familiar artist below an equally-good stranger, not enough to exclude them. */
     private const val FAMILIAR_ARTIST_PENALTY = -0.18f
@@ -281,9 +299,10 @@ object MixRanking {
         size: Int,
         seed: Long,
         youtubeFallback: Boolean = true,
+        prioritizeTrusted: Boolean = true,
     ): List<Track> {
         val scored = candidates
-            .mapNotNull { candidate -> score(candidate, taste, youtubeFallback)?.let { candidate.track to it } }
+            .mapNotNull { candidate -> score(candidate, taste, youtubeFallback, prioritizeTrusted)?.let { candidate.track to it } }
             .distinctBy { it.first.id }
             .sortedByDescending { it.second }
             .toMutableList()
