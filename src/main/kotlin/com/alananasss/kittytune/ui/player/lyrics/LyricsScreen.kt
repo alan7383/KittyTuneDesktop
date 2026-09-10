@@ -465,13 +465,14 @@ import kotlin.math.roundToInt
                     }
 
                     // For duet lines, override alignment per singer (normal style, no bubbles)
-                    val lineTextAlign = when (line.singer) {
+                    val lineSinger = line.singer ?: LyricSinger.DEFAULT
+                    val lineTextAlign = when (lineSinger) {
                         LyricSinger.SINGER_1 -> TextAlign.Start
                         LyricSinger.SINGER_2 -> TextAlign.End
                         LyricSinger.BOTH -> TextAlign.Center
                         else -> alignment
                     }
-                    val lineHzAlignment = when (line.singer) {
+                    val lineHzAlignment = when (lineSinger) {
                         LyricSinger.SINGER_1 -> Alignment.Start
                         LyricSinger.SINGER_2 -> Alignment.End
                         LyricSinger.BOTH -> Alignment.CenterHorizontally
@@ -486,8 +487,8 @@ import kotlin.math.roundToInt
                             .hoverable(lineInteractionSource)
                             // Duet lines are constrained to ~72% width and pushed to their side
                             .padding(
-                                start = if (line.singer == LyricSinger.SINGER_2) 100.dp else 24.dp,
-                                end = if (line.singer == LyricSinger.SINGER_1) 100.dp else 24.dp
+                                start = if (lineSinger == LyricSinger.SINGER_2) 100.dp else 24.dp,
+                                end = if (lineSinger == LyricSinger.SINGER_1) 100.dp else 24.dp
                             )
                             .scale(scale)
                             .alpha(alpha)

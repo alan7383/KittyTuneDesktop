@@ -236,21 +236,22 @@ private fun PanelLyricLine(
         else -> Alignment.Start
     }
 
-    val textAlign = when (line.singer) {
+    val lineSinger = line.singer ?: LyricSinger.DEFAULT
+    val textAlign = when (lineSinger) {
         LyricSinger.SINGER_1 -> TextAlign.Start
         LyricSinger.SINGER_2 -> TextAlign.End
         LyricSinger.BOTH -> TextAlign.Center
         else -> defaultTextAlign
     }
-    val columnAlign = when (line.singer) {
+    val columnAlign = when (lineSinger) {
         LyricSinger.SINGER_1 -> Alignment.Start
         LyricSinger.SINGER_2 -> Alignment.End
         LyricSinger.BOTH -> Alignment.CenterHorizontally
         else -> defaultColumnAlign
     }
     val duetPadding = if (style.isFullScreen) 100.dp else 40.dp
-    val linePaddingStart = if (line.singer == LyricSinger.SINGER_2) duetPadding else 0.dp
-    val linePaddingEnd = if (line.singer == LyricSinger.SINGER_1) duetPadding else 0.dp
+    val linePaddingStart = if (lineSinger == LyricSinger.SINGER_2) duetPadding else 0.dp
+    val linePaddingEnd = if (lineSinger == LyricSinger.SINGER_1) duetPadding else 0.dp
 
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()

@@ -2,6 +2,7 @@ package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
+import com.alananasss.kittytune.ui.player.lyrics.LyricSinger
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.io.File
@@ -37,7 +38,23 @@ object LyricsCache {
         val translationLang: String? = null,
         val romanized: Boolean = false,
         val savedAtMs: Long = System.currentTimeMillis(),
-    )
+    ) {
+        @Suppress("SENSELESS_COMPARISON")
+        fun sanitized(): Entry {
+            val rawLines: List<LyricLine>? = lines
+            val cleanLines = (rawLines ?: emptyList()).map { line ->
+                var updated = line
+                if (updated.words == null) {
+                    updated = updated.copy(words = emptyList())
+                }
+                if (updated.singer == null) {
+                    updated = updated.copy(singer = LyricSinger.DEFAULT)
+                }
+                updated
+            }
+            return copy(lines = cleanLines)
+        }
+    }
 
     private const val MAX_MEMORY_ENTRIES = 64
     private val FOUND_TTL_MS = 90L * 24 * 60 * 60 * 1000 // 90 days
@@ -72,8 +89,9 @@ object LyricsCache {
     }
 
     fun put(trackId: Long, entry: Entry) {
-        remember(trackId, entry)
-        runCatching { File(dir, "$trackId.json").writeText(gson.toJson(entry)) }
+        val cleanEntry = entry.sanitized()
+        remember(trackId, cleanEntry)
+        runCatching { File(dir, "$trackId.json").writeText(gson.toJson(cleanEntry)) }
     }
 
     /** Drops the entry for one track, so the next play resolves it again from the network. */
@@ -92,17 +110,17 @@ object LyricsCache {
     private fun readFromDisk(trackId: Long): Entry? = runCatching {
         val file = File(dir, "$trackId.json")
         if (!file.exists()) return null
-        gson.fromJson<Entry>(file.readText(), entryType)?.takeIf { it.isWellFormed() }
+        gson.fromJson<Entry>(file.readText(), entryType)?.takeIf { it.isWellFormed() }?.sanitized()
     }.getOrNull()
 
     /**
      * Gson fills fields by reflection and will happily leave a Kotlin non-null property null when
-     * the JSON is truncated — a half-written file after a crash, say. Catching that here keeps the
-     * damage to one cache miss instead of a null surfacing while the lyrics are being drawn.
+     * the JSON is truncated or saved by an older version. Sanitizing ensures default values are
+     * present so callers never encounter an unexpected null.
      */
     @Suppress("SENSELESS_COMPARISON")
     private fun Entry.isWellFormed(): Boolean = runCatching {
-        lines.all { it.text != null && it.words != null }
+        lines != null && lines.all { it != null && it.text != null }
     }.getOrDefault(false)
 
     private fun remember(trackId: Long, entry: Entry) {
