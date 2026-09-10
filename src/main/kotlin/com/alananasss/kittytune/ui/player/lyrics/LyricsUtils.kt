@@ -11,13 +11,21 @@ data class LyricWord(
     val endTime: Long
 )
 
+enum class LyricSinger {
+    DEFAULT,
+    SINGER_1,
+    SINGER_2,
+    BOTH
+}
+
 data class LyricLine(
     val text: String,
     val startTime: Long,
     val endTime: Long,
     val words: List<LyricWord> = emptyList(),
     val translation: String? = null,
-    val romanization: String? = null
+    val romanization: String? = null,
+    val singer: LyricSinger = LyricSinger.DEFAULT
 )
 
 object LyricsUtils {
@@ -105,7 +113,13 @@ object LyricsUtils {
                         words.add(LyricWord(wordText, wordStartMs, wordEndMs))
                     }
                 }
-                parsedLines.add(LyricLine(text, startMs, endMs, words))
+                val singer = when ((lineMap["singer"] as? String)?.lowercase() ?: (lineMap["singer"] as? Number)?.toString()) {
+                    "1", "singer1", "v1" -> LyricSinger.SINGER_1
+                    "2", "singer2", "v2" -> LyricSinger.SINGER_2
+                    "both", "3", "v3", "group" -> LyricSinger.BOTH
+                    else -> LyricSinger.DEFAULT
+                }
+                parsedLines.add(LyricLine(text, startMs, endMs, words, singer = singer))
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -127,11 +141,33 @@ object LyricsUtils {
 
                 val rawText = matcher.group(4)?.trim() ?: ""
                 val startTime = (min * 60 * 1000) + (sec * 1000) + ms
+
+                var singer = LyricSinger.DEFAULT
+                var processedText = rawText
+                val lower = rawText.trim().lowercase()
+                when {
+                    lower.startsWith("v1:") || lower.startsWith("[v1]") || lower.startsWith("(v1)") || lower.startsWith("[singer1]") -> {
+                        singer = LyricSinger.SINGER_1
+                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v1:|\\[v1\\]|\\(v1\\)|\\[singer1\\])\\s*"), "")
+                    }
+                    lower.startsWith("v2:") || lower.startsWith("[v2]") || lower.startsWith("(v2)") || lower.startsWith("[singer2]") -> {
+                        singer = LyricSinger.SINGER_2
+                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v2:|\\[v2\\]|\\(v2\\)|\\[singer2\\])\\s*"), "")
+                    }
+                    lower.startsWith("v3:") || lower.startsWith("[v3]") || lower.startsWith("(v3)") || lower.startsWith("[both]") || lower.startsWith("[all]") -> {
+                        singer = LyricSinger.BOTH
+                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v3:|\\[v3\\]|\\(v3\\)|\\[both\\]|\\[all\\])\\s*"), "")
+                    }
+                    lower.startsWith("[bg:") && lower.endsWith("]") -> {
+                        singer = LyricSinger.SINGER_2
+                        processedText = processedText.trim().removePrefix("[bg:").removeSuffix("]").trim()
+                    }
+                }
                 
                 val words = mutableListOf<LyricWord>()
-                var cleanText = rawText
-                if (rawText.contains("<")) {
-                    val wordMatcher = ENHANCED_WORD_PATTERN.matcher(rawText)
+                var cleanText = processedText
+                if (processedText.contains("<")) {
+                    val wordMatcher = ENHANCED_WORD_PATTERN.matcher(processedText)
                     val extractedWords = mutableListOf<LyricWord>()
                     while (wordMatcher.find()) {
                         val wMin = wordMatcher.group(1)?.toLong() ?: 0
@@ -154,7 +190,7 @@ object LyricsUtils {
                 }
 
                 if (cleanText.isNotEmpty()) {
-                    parsedLines.add(ParsedLineTemp(cleanText, startTime, words))
+                    parsedLines.add(ParsedLineTemp(cleanText, startTime, words, singer))
                 }
             }
         }
@@ -172,11 +208,16 @@ object LyricsUtils {
                 if (word.endTime == 0L) word.copy(endTime = nextTime) else word
             }
             
-            LyricLine(current.text, current.startTime, nextTime, updatedWords)
+            LyricLine(current.text, current.startTime, nextTime, updatedWords, singer = current.singer)
         }
     }
 
-    private data class ParsedLineTemp(val text: String, val startTime: Long, val words: List<LyricWord> = emptyList())
+    private data class ParsedLineTemp(
+        val text: String,
+        val startTime: Long,
+        val words: List<LyricWord> = emptyList(),
+        val singer: LyricSinger = LyricSinger.DEFAULT
+    )
 
     fun extractLocalLyrics(filePath: String): String? {
         return try {

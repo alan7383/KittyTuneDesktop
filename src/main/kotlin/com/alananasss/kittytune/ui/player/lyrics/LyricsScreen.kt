@@ -464,13 +464,31 @@ import kotlin.math.roundToInt
                         else -> Alignment.CenterHorizontally
                     }
 
+                    // For duet lines, override alignment per singer (normal style, no bubbles)
+                    val lineTextAlign = when (line.singer) {
+                        LyricSinger.SINGER_1 -> TextAlign.Start
+                        LyricSinger.SINGER_2 -> TextAlign.End
+                        LyricSinger.BOTH -> TextAlign.Center
+                        else -> alignment
+                    }
+                    val lineHzAlignment = when (line.singer) {
+                        LyricSinger.SINGER_1 -> Alignment.Start
+                        LyricSinger.SINGER_2 -> Alignment.End
+                        LyricSinger.BOTH -> Alignment.CenterHorizontally
+                        else -> hzAlignment
+                    }
+
                     // --- COLUMN GLOBALE DE LA LIGNE ---
                     Column(
-                        horizontalAlignment = hzAlignment,
+                        horizontalAlignment = lineHzAlignment,
                         modifier = Modifier
                             .fillMaxWidth()
                             .hoverable(lineInteractionSource)
-                            .padding(horizontal = 24.dp)
+                            // Duet lines are constrained to ~72% width and pushed to their side
+                            .padding(
+                                start = if (line.singer == LyricSinger.SINGER_2) 100.dp else 24.dp,
+                                end = if (line.singer == LyricSinger.SINGER_1) 100.dp else 24.dp
+                            )
                             .scale(scale)
                             .alpha(alpha)
                             // Only when there is something to blur: the modifier forces the line
@@ -514,7 +532,7 @@ import kotlin.math.roundToInt
                             activeColor = MaterialTheme.colorScheme.onSurface,
                             inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unsungColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                            textAlign = alignment,
+                            textAlign = lineTextAlign,
                             // The hover rule is drawn rather than set as a TextDecoration: Skia underlines
                             // each font run separately, so a line that falls back out of the variable font
                             // (Cyrillic, Arabic, CJK…) came out as a broken dashed rule.
@@ -540,7 +558,7 @@ import kotlin.math.roundToInt
                                     lineHeight = (fontSize * 1.2f).sp
                                 ),
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = if (isActive) 0.9f else 0.4f),
-                                textAlign = alignment,
+                                textAlign = lineTextAlign,
                                 modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
                             )
                         }
@@ -558,7 +576,7 @@ import kotlin.math.roundToInt
                                     lineHeight = (fontSize * 1.0f).sp
                                 ),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                                textAlign = alignment,
+                                textAlign = lineTextAlign,
                                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                             )
                         }

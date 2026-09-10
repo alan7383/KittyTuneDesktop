@@ -193,6 +193,7 @@ class PlayerPreferences {
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
         private const val KEY_LYRICS_FULLSCREEN_FONT_SIZE = "lyrics_fullscreen_font_size"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
+        private const val KEY_LYRICS_DUET_VIEW = "lyrics_duet_view"
 
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
         private const val KEY_LYRICS_TRANSLATION_ENABLED = "lyrics_translation_enabled"
@@ -372,6 +373,9 @@ class PlayerPreferences {
 
     fun setLyricsFullScreenDisplayStyle(style: LyricsDisplayStyle) =
         Prefs.putString(KEY_LYRICS_FULLSCREEN_DISPLAY_STYLE, style.name)
+
+    fun getLyricsDuetViewEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_DUET_VIEW, true)
+    fun setLyricsDuetViewEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_DUET_VIEW, enabled)
 
 
 

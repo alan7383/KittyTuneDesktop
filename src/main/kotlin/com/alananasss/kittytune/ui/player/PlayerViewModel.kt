@@ -339,6 +339,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setLyricsWordSyncEnabled(enabled)
     }
 
+    var isDuetViewEnabled by mutableStateOf(playerPrefs.getLyricsDuetViewEnabled())
+
+    fun toggleDuetView(enabled: Boolean) {
+        isDuetViewEnabled = enabled
+        playerPrefs.setLyricsDuetViewEnabled(enabled)
+    }
+
     var isRomanizationEnabled by mutableStateOf(playerPrefs.getLyricsRomanizationEnabled())
 
     /** Auto-scroll for lyrics with no timings, and its rate. See [PlainLyricsView]. */
