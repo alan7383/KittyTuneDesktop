@@ -22,10 +22,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -56,6 +60,7 @@ import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.ui.utils.isRtl
 import com.mocharealm.accompanist.lyrics.ui.utils.modifier.springPlacement
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
@@ -131,6 +136,7 @@ fun KaraokeLyricsView(
     offset: Dp = 32.dp,
     keepAliveZone: Dp = 100.dp,
     blurDelta: Float = 3f,
+    isScrubbing: Boolean = false,
     showDebugRectangles: Boolean = false
 ) {
     val density = LocalDensity.current
@@ -291,40 +297,72 @@ fun KaraokeLyricsView(
     }
 
     val scrollInCode = remember { mutableStateOf(false) }
+    val isSnapScroll = remember { mutableStateOf(false) }
+    var lastScrollTime by remember { mutableLongStateOf(0L) }
+    var lastFocusedIndex by remember { mutableIntStateOf(-1) }
 
     val isManualScrolling by remember {
         derivedStateOf {
-            listState.isScrollInProgress && !scrollInCode.value
+            (listState.isScrollInProgress && !scrollInCode.value) || isSnapScroll.value || isScrubbing
         }
     }
 
     LaunchedEffect(
         lyrics,
         stableOffsetPx,
+        isScrubbing,
     ) {
-        androidx.compose.runtime.snapshotFlow { lyricsFocusState.firstIndex }
-            .collect { firstIndex ->
-                if (firstIndex in lyrics.lines.indices && !scrollInCode.value) {
-                    val items = listState.layoutInfo.visibleItemsInfo
-                    val targetItem = items.firstOrNull { it.index == firstIndex }
-                    val scrollOffset =
-                        (targetItem?.offset?.minus(listState.layoutInfo.viewportStartOffset + stableOffsetPx + keepAliveZonePx))
-                    try {
-                        scrollInCode.value = true
-                        if (scrollOffset != null) {
-                            listState.scrollBy(scrollOffset)
-                        } else {
-                            listState.animateScrollToItem(
-                                firstIndex,
-                                (-stableOffsetPx - keepAliveZonePx).toInt()
-                            )
-                        }
-                    } catch (_: Exception) {
-                    } finally {
-                        scrollInCode.value = false
+        androidx.compose.runtime.snapshotFlow {
+            lyricsFocusState.firstIndex to isScrubbing
+        }.collectLatest { (firstIndex, scrubbing) ->
+            if (firstIndex in lyrics.lines.indices) {
+                val now = System.currentTimeMillis()
+                val timeDelta = now - lastScrollTime
+                val indexDelta = if (lastFocusedIndex >= 0) kotlin.math.abs(firstIndex - lastFocusedIndex) else 0
+                lastFocusedIndex = firstIndex
+
+                val items = listState.layoutInfo.visibleItemsInfo
+                val targetItem = items.firstOrNull { it.index == firstIndex }
+                val isRapidClick = timeDelta < 280L
+                val isLargeJump = targetItem == null || indexDelta > 2
+                val shouldSnap = scrubbing || isRapidClick || isLargeJump
+
+                lastScrollTime = now
+
+                try {
+                    scrollInCode.value = true
+                    if (shouldSnap) {
+                        isSnapScroll.value = true
                     }
+
+                    val desiredOffset = (listState.layoutInfo.viewportStartOffset + stableOffsetPx + keepAliveZonePx).toInt()
+
+                    if (targetItem != null && !isLargeJump) {
+                        val scrollOffset = targetItem.offset - desiredOffset
+                        if (kotlin.math.abs(scrollOffset) > 1) {
+                            listState.scrollBy(scrollOffset.toFloat())
+                        }
+                    } else {
+                        listState.scrollToItem(firstIndex)
+                        val refreshed = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == firstIndex }
+                        if (refreshed != null) {
+                            val correction = refreshed.offset - desiredOffset
+                            if (kotlin.math.abs(correction) > 1) {
+                                listState.scrollBy(correction.toFloat())
+                            }
+                        }
+                    }
+
+                    if (shouldSnap) {
+                        withFrameNanos { }
+                    }
+                } catch (_: Exception) {
+                } finally {
+                    isSnapScroll.value = false
+                    scrollInCode.value = false
                 }
             }
+        }
     }
     LookaheadScope {
         Crossfade(lyrics) { lyrics ->
@@ -402,7 +440,7 @@ fun KaraokeLyricsView(
 
                         val dynamicStiffness by remember(distanceWeightState.value) {
                             derivedStateOf {
-                                (120f - (distanceWeightState.value * 20f)).coerceAtLeast(20f)
+                                (140f - (distanceWeightState.value * 4f)).coerceAtLeast(115f)
                             }
                         }
 

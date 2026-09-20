@@ -149,7 +149,7 @@ fun LyricsEnhanced(
                 if (playbackPositionMs.longValue != rawPosition) {
                     playbackPositionMs.longValue = rawPosition
                 }
-                delay(100L)
+                delay(if (isSliderActive) 16L else 50L)
             } else {
                 val frameNanos = withFrameNanos { frameTimeNanos -> frameTimeNanos }
                 if (anchorFrameNanos == 0L) {
@@ -255,6 +255,7 @@ fun LyricsEnhanced(
                                 showPhonetic = showPhonetics,
                                 offset = lyricsViewportOffset,
                                 keepAliveZone = 72.dp,
+                                isScrubbing = viewModel.isScrubbing,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
