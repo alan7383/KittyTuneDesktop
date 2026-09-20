@@ -602,7 +602,7 @@ fun MainScreen(
                         }
                         composable("credits") {
                             com.alananasss.kittytune.ui.profile.CreditsScreen(
-                                onBackClick = { navController.popBackStack() }
+                                onBackClick = null
                             )
                         }
                         composable("appearance_settings") {
