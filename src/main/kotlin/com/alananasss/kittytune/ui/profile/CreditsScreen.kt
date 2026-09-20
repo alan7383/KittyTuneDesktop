@@ -57,7 +57,7 @@ data class CreditContributor(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreditsScreen(
-    onBackClick: () -> Unit
+    onBackClick: (() -> Unit)? = null
 ) {
     val uriHandler = LocalUriHandler.current
 
