@@ -27,12 +27,15 @@ dependencies {
     implementation("com.github.z-huang.InnerTune:lrclib:0.5.10")
     implementation("com.github.z-huang.InnerTune:kugou:0.5.10")
     implementation(compose.desktop.currentOs)
+    implementation("com.mocharealm.accompanist:lyrics-ui:1.0.19")
+    implementation("com.mocharealm.accompanist:lyrics-core:0.4.7")
     implementation("org.jetbrains.compose.material3:material3:1.12.0-alpha03")
     implementation(compose.materialIconsExtended)
     implementation(compose.components.resources)
 
     implementation(project(":kizzy"))
     implementation(project(":shazamkit"))
+    implementation(project(":innertube"))
 
     implementation("io.github.alexzhirkevich:compottie:2.3.0")
 
@@ -51,6 +54,13 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
+
+    val ktorVersion = "3.5.2"
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-client-encoding:$ktorVersion")
 
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("com.mpatric:mp3agic:0.9.1")

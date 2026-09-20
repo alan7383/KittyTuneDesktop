@@ -439,13 +439,30 @@ object DownloadManager {
         }
     }
 
-    fun updatePlaylistCover(playlistId: Long, sourceFile: File) {
+    fun updatePlaylistCover(playlistId: Long, sourceFile: File, title: String? = null, artist: String? = null) {
         scope.launch {
             try {
                 val file = File(AppDirs.imageCacheDir, "playlist_cover_$playlistId.jpg")
                 sourceFile.copyTo(file, overwrite = true)
                 val playlist = dao.getPlaylist(playlistId)
-                if (playlist != null) dao.updatePlaylist(playlist.copy(localCoverPath = file.absolutePath))
+                if (playlist != null) {
+                    dao.updatePlaylist(playlist.copy(localCoverPath = file.absolutePath))
+                } else {
+                    dao.insertPlaylist(
+                        LocalPlaylist(
+                            id = playlistId,
+                            title = title ?: str("untitled_track"),
+                            artist = artist ?: str("unknown_artist"),
+                            artworkUrl = file.absolutePath,
+                            localCoverPath = file.absolutePath,
+                            trackCount = 0,
+                            isUserCreated = true,
+                            permalinkUrl = null,
+                            isAlbum = false,
+                            isDownloaded = false
+                        )
+                    )
+                }
             } catch (e: Exception) { e.printStackTrace() }
         }
     }
@@ -488,10 +505,11 @@ object DownloadManager {
         playlist: Playlist,
         tracks: List<Track>,
         syncToCloud: Boolean = true,
-        isDownloaded: Boolean? = null
+        isDownloaded: Boolean? = null,
+        likePlaylist: Boolean = true
     ) {
         scope.launch {
-            if (playlist.id != 0L) {
+            if (likePlaylist && playlist.id != 0L) {
                 LikeRepository.togglePlaylistLike(
                     playlistId = playlist.id,
                     isLiked = true,
