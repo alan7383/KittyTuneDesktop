@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import com.alananasss.kittytune.data.local.AppThemeMode
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
@@ -50,6 +51,27 @@ internal val KittyTuneDefaultSeedColor = Color(0xFFFF7A1A)
  * finished looking at the new track.
  */
 private const val SEED_TRANSITION_MS = 450
+
+/** The near-black the player draws its icons in once a cover is bright enough to need it. */
+internal val DarkContentColor = Color(0xFF1D1B20)
+
+private const val CONTENT_FLIP_LOW = 0.28f
+private const val CONTENT_FLIP_HIGH = 0.52f
+
+/**
+ * The icon colour to draw on top of [background], blended rather than switched.
+ *
+ * Use this instead of comparing `background.luminance()` to a threshold whenever [background] is itself
+ * animated: because the input is a lerp, the result follows the fill frame by frame and no separate
+ * animation is needed. Still correct on a static background, where it simply returns white or
+ * [DarkContentColor].
+ */
+internal fun blendedContentColorOn(background: Color): Color {
+    val progress = ((background.luminance() - CONTENT_FLIP_LOW) / (CONTENT_FLIP_HIGH - CONTENT_FLIP_LOW))
+        .coerceIn(0f, 1f)
+    return androidx.compose.ui.graphics.lerp(Color.White, DarkContentColor, progress)
+}
+
 internal val MaterialKolorColorSpecOptions = listOf("SPEC_2025", "SPEC_2021")
 
 internal fun parseMaterialKolorPaletteStyle(colorStyle: String): PaletteStyle =
@@ -73,18 +95,14 @@ internal fun normalizedMaterialKolorColorSpecName(colorSpec: String): String =
 internal fun rememberSoundTuneColorScheme(
     useDarkTheme: Boolean,
     dynamicColor: Boolean,
+    trackDynamicColor: Boolean = false,
     pureBlack: Boolean,
     keyColor: Int,
     colorStyle: String,
     colorSpec: String,
 ): ColorScheme {
-    // Dynamic theme, seeded from the current cover, outranks the fixed-accent styles.
-    // Both "end4 (Material You)" and "Windows Accent" used to return from this function before
-    // the cover seed was ever read, so with either of them picked — and the setup screen offers
-    // both — the Dynamic Theme switch silently did nothing at all (issue #33). Read the seed
-    // first and let it take over when there is one; the accent styles still apply on their own
-    // whenever the switch is off or no artwork colour has been extracted yet.
-    val coverSeed = if (dynamicColor) ThemeState.coverSeedColor else null
+    // Artwork seed is only used when track-based dynamic color is enabled.
+    val coverSeed = if (trackDynamicColor) ThemeState.coverSeedColor else null
 
     if (coverSeed == null && colorStyle.contains("end4", ignoreCase = true)) {
         val end4Colors by com.alananasss.kittytune.data.theme.End4ThemeManager.colorsMap.collectAsState()
@@ -245,6 +263,7 @@ private fun ColorScheme.withAmoledSurfaces(): ColorScheme =
 fun SoundTuneTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     dynamicColor: Boolean = true,
+    trackDynamicColor: Boolean = false,
     pureBlack: Boolean = false,
     keyColor: Int = 0,
     colorStyle: String = "System",
@@ -263,6 +282,7 @@ fun SoundTuneTheme(
     val colorScheme = rememberSoundTuneColorScheme(
         useDarkTheme = useDarkTheme,
         dynamicColor = dynamicColor,
+        trackDynamicColor = trackDynamicColor,
         pureBlack = pureBlack,
         keyColor = keyColor,
         colorStyle = colorStyle,

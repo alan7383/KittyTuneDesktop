@@ -480,9 +480,11 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                                         val langText = when (language) {
                                             AppLanguage.SYSTEM -> str("setup_theme_system")
                                             AppLanguage.ENGLISH -> "English"
+                                            AppLanguage.GERMAN -> "Deutsch"
                                             AppLanguage.FRENCH -> "Français"
                                             AppLanguage.HUNGARIAN -> "Magyar"
                                             AppLanguage.RUSSIAN -> "Русский"
+                                            AppLanguage.VIETNAMESE -> "Tiếng Việt"
                                         }
                                         Text(langText)
                                     }
@@ -490,21 +492,24 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                                         expanded = expanded,
                                         onDismissRequest = { expanded = false }
                                     ) {
-                                        AppLanguage.values().forEach { lang ->
+                                        AppLanguage.entries.forEach { lang ->
                                             DropdownMenuItem(
                                                 text = {
                                                     val text = when (lang) {
                                                         AppLanguage.SYSTEM -> str("setup_theme_system")
                                                         AppLanguage.ENGLISH -> "English"
+                                                        AppLanguage.GERMAN -> "Deutsch"
                                                         AppLanguage.FRENCH -> "Français"
                                                         AppLanguage.HUNGARIAN -> "Magyar"
                                                         AppLanguage.RUSSIAN -> "Русский"
+                                                        AppLanguage.VIETNAMESE -> "Tiếng Việt"
                                                     }
                                                     Text(text)
                                                 },
                                                 onClick = {
                                                     language = lang
                                                     prefs.setAppLanguage(lang)
+                                                    com.alananasss.kittytune.core.Strings.appLanguage = lang.code
                                                     expanded = false
                                                 }
                                             )

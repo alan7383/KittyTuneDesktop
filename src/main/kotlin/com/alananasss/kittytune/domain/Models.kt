@@ -334,6 +334,26 @@
         @SerializedName("user") val user: User?
     )
     
+    data class TrackPublisherMetadata(
+        @SerializedName("artist") val artist: String? = null,
+        @SerializedName("album_title") val albumTitle: String? = null,
+        @SerializedName("contains_music") val containsMusic: Boolean? = true,
+        @SerializedName("publisher") val publisher: String? = null,
+        @SerializedName("isrc") val isrc: String? = null,
+        @SerializedName("iswc") val iswc: String? = null,
+        @SerializedName("upc_or_ean") val upcOrEan: String? = null,
+        @SerializedName("explicit") val explicit: Boolean? = false,
+        @SerializedName("c_line") val cLine: String? = null,
+        @SerializedName("p_line") val pLine: String? = null,
+        @SerializedName("writer_composer") val composer: String? = null,
+        @SerializedName("release_title") val releaseTitle: String? = null,
+        @SerializedName("album_id") val albumId: String? = null,
+        val id: String? = null,
+        val urn: String? = null
+    )
+
+    typealias PublisherMetadata = TrackPublisherMetadata
+
     // track
     data class Track(
         val id: Long,
@@ -363,7 +383,7 @@
         // fixed: source is now nullable to prevent gson crashes
         val source: String? = "soundcloud",
         val likedAt: Long? = null,
-        @SerializedName("publisher_metadata") val publisherMetadata: PublisherMetadata? = null,
+        @SerializedName("publisher_metadata") val publisherMetadata: TrackPublisherMetadata? = null,
         @SerializedName("set_type") val setType: String? = null,
         @SerializedName("kind") val kind: String? = null,
         val permalink: String? = null,
@@ -384,20 +404,45 @@
         val playCount: Long? = null,
         val artists: List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>? = null
     ) {
-        data class PublisherMetadata(
-            val id: String? = null,
-            val urn: String? = null,
-            @SerializedName("artist") val artist: String? = null,
-            @SerializedName("album_title") val albumTitle: String? = null,
-            @SerializedName("release_title") val releaseTitle: String? = null,
-            val publisher: String? = null,
-            val explicit: Boolean = false,
-            @SerializedName("album_id") val albumId: String? = null,
-            @SerializedName("writer_composer") val composer: String? = null
-        )
+        companion object {
+            fun PublisherMetadata(
+                artist: String? = null,
+                albumTitle: String? = null,
+                containsMusic: Boolean? = true,
+                publisher: String? = null,
+                isrc: String? = null,
+                iswc: String? = null,
+                upc_or_ean: String? = null,
+                explicit: Boolean? = false,
+                cLine: String? = null,
+                pLine: String? = null,
+                composer: String? = null,
+                releaseTitle: String? = null,
+                albumId: String? = null,
+                id: String? = null,
+                urn: String? = null
+            ): TrackPublisherMetadata = TrackPublisherMetadata(
+                artist = artist,
+                albumTitle = albumTitle,
+                containsMusic = containsMusic,
+                publisher = publisher,
+                isrc = isrc,
+                iswc = iswc,
+                upcOrEan = upc_or_ean,
+                explicit = explicit,
+                cLine = cLine,
+                pLine = pLine,
+                composer = composer,
+                releaseTitle = releaseTitle,
+                albumId = albumId,
+                id = id,
+                urn = urn
+            )
+        }
 
         val displayArtist: String
-            get() = publisherMetadata?.artist?.takeIf { it.isNotBlank() }
+            get() = artists?.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.name }?.takeIf { it.isNotBlank() }
+                ?: publisherMetadata?.artist?.takeIf { it.isNotBlank() }
                 ?: user?.username?.takeIf { it.isNotBlank() }
                 ?: ""
 
@@ -661,12 +706,25 @@
 
         val profileNavId: String
             get() = when {
+                urn?.startsWith("deezer:") == true -> urn!!
+                urn?.startsWith("tidal:") == true -> urn!!
+                urn?.startsWith("qobuz:") == true -> urn!!
+                permalinkUrl?.startsWith("deezer:") == true -> permalinkUrl!!
+                permalinkUrl?.startsWith("tidal:") == true -> permalinkUrl!!
+                permalinkUrl?.startsWith("qobuz:") == true -> permalinkUrl!!
+                urn?.startsWith("vk:artist:") == true -> "profile:$urn"
+                urn?.startsWith("vk:user:") == true -> "profile:$urn"
+                urn?.startsWith("vk:") == true -> "profile:$urn"
+                permalinkUrl?.startsWith("vk:artist:") == true -> "profile:$permalinkUrl"
+                permalinkUrl?.startsWith("vk:user:") == true -> "profile:$permalinkUrl"
+                permalinkUrl?.startsWith("vk:") == true -> "profile:$permalinkUrl"
                 urn?.startsWith("spotify:artist:") == true -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(urn)}"
                 urn?.contains("spotify") == true -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(urn)}"
                 permalinkUrl?.contains("spotify") == true -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(permalinkUrl)}"
                 !permalink.isNullOrBlank() && id == 0L -> "spotify_artist:${com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(permalink)}"
                 id > 0L -> "profile:$id"
                 !permalink.isNullOrBlank() -> "profile:$permalink"
+                !username.isNullOrBlank() -> "profile:$username"
                 else -> "profile:$id"
             }
     }

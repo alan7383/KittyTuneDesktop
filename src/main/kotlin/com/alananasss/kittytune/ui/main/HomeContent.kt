@@ -2,6 +2,7 @@
 package com.alananasss.kittytune.ui.main
 
 import com.alananasss.kittytune.core.trackTextInput
+import com.alananasss.kittytune.utils.SoundCloudLocalizationUtils
 import androidx.compose.material3.ButtonDefaults
 
 import androidx.compose.foundation.LocalIndication
@@ -361,11 +362,11 @@ fun HomeContent(
             items(vm.homeSections, key = { it.title }) { section ->
                 Column {
                     Text(
-                        text = section.title,
+                        text = SoundCloudLocalizationUtils.localizeSectionTitle(section.title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                     )
-                    section.subtitle?.let {
+                    SoundCloudLocalizationUtils.localizeSectionSubtitle(section.subtitle)?.let {
                         Text(
                             text = it,
                             style = MaterialTheme.typography.bodySmall,
@@ -702,6 +703,9 @@ private fun SearchSourceButton(vm: HomeViewModel) {
         SearchSource.SPOTIFY,
         SearchSource.APPLE_MUSIC,
         SearchSource.YANDEX_MUSIC,
+        SearchSource.DEEZER,
+        SearchSource.TIDAL,
+        SearchSource.QOBUZ,
     )
 
     Box {
@@ -757,6 +761,9 @@ private fun searchSourceLabel(source: SearchSource): String = when (source) {
     SearchSource.SPOTIFY -> "Spotify"
     SearchSource.APPLE_MUSIC -> "Apple Music"
     SearchSource.YANDEX_MUSIC -> "Yandex Music"
+    SearchSource.DEEZER -> "Deezer"
+    SearchSource.TIDAL -> "TIDAL"
+    SearchSource.QOBUZ -> "Qobuz"
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
@@ -812,7 +819,7 @@ private fun SearchResults(
             // constantly was sitting to the right of the thing you almost never change, and three
             // side-by-side platform buttons took as much of the row as the four filters did — which is
             // also why the row started scrolling sideways on a narrow window.
-            if (vm.activeSearchSource == SearchSource.SOUNDCLOUD || vm.activeSearchSource == SearchSource.SPOTIFY) {
+            if (vm.activeSearchSource in listOf(SearchSource.SOUNDCLOUD, SearchSource.SPOTIFY, SearchSource.DEEZER, SearchSource.TIDAL, SearchSource.QOBUZ)) {
                 val filters = listOf(
                     SearchFilter.ALL,
                     SearchFilter.TRACKS,
@@ -867,7 +874,10 @@ private fun SearchResults(
             vm.searchResultsPlaylists.isEmpty() &&
             vm.searchResultsYoutube.isEmpty() &&
             vm.searchResultsSpotify.isEmpty() &&
-            vm.searchResultsApple.isEmpty()
+            vm.searchResultsApple.isEmpty() &&
+            vm.searchResultsDeezerTracks.isEmpty() &&
+            vm.searchResultsTidalTracks.isEmpty() &&
+            vm.searchResultsQobuzTracks.isEmpty()
         ) {
             // Initial loading — centered spinner
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -882,6 +892,33 @@ private fun SearchResults(
                 // press a row, it goes and finds the song on a source that can play it (issue #33).
                 SearchSource.APPLE_MUSIC, SearchSource.YANDEX_MUSIC ->
                     CatalogResults(vm, playerViewModel, listState)
+                SearchSource.DEEZER -> ProviderResults(
+                    tracks = vm.searchResultsDeezerTracks,
+                    artists = vm.searchResultsDeezerArtists,
+                    albums = vm.searchResultsDeezerAlbums,
+                    playlists = vm.searchResultsDeezerPlaylists,
+                    vm = vm,
+                    playerViewModel = playerViewModel,
+                    listState = listState
+                )
+                SearchSource.TIDAL -> ProviderResults(
+                    tracks = vm.searchResultsTidalTracks,
+                    artists = vm.searchResultsTidalArtists,
+                    albums = vm.searchResultsTidalAlbums,
+                    playlists = vm.searchResultsTidalPlaylists,
+                    vm = vm,
+                    playerViewModel = playerViewModel,
+                    listState = listState
+                )
+                SearchSource.QOBUZ -> ProviderResults(
+                    tracks = vm.searchResultsQobuzTracks,
+                    artists = vm.searchResultsQobuzArtists,
+                    albums = vm.searchResultsQobuzAlbums,
+                    playlists = vm.searchResultsQobuzPlaylists,
+                    vm = vm,
+                    playerViewModel = playerViewModel,
+                    listState = listState
+                )
                 SearchSource.SOUNDCLOUD -> SoundCloudResults(vm, playerViewModel, navController, listState)
             }
         }
@@ -1043,22 +1080,20 @@ private fun SoundCloudResults(
         return
     }
 
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        // ── ALL mode: grouped sections ──
-        if (vm.activeFilter == SearchFilter.ALL) {
-            if (topArtist != null) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        // Left: Top Match Hero Card
-                        Column(modifier = Modifier.weight(1f)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isNarrow = maxWidth < 660.dp
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            // ── ALL mode: grouped sections ──
+            if (vm.activeFilter == SearchFilter.ALL) {
+                if (topArtist != null) {
+                    if (isNarrow) {
+                        item {
                             SectionHeader(
                                 title = str("search_top_result"),
                                 icon = Icons.Rounded.Person,
@@ -1080,10 +1115,9 @@ private fun SoundCloudResults(
                                 }
                             )
                         }
-
-                        // Right: Top Songs
                         if (tracks.isNotEmpty()) {
-                            Column(modifier = Modifier.weight(1.2f)) {
+                            item {
+                                Spacer(Modifier.height(14.dp))
                                 SectionHeader(
                                     title = str("search_filter_tracks"),
                                     icon = Icons.Rounded.MusicNote,
@@ -1095,8 +1129,53 @@ private fun SoundCloudResults(
                                 }
                             }
                         }
+                    } else {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
+                                // Left: Top Match Hero Card
+                                Column(modifier = Modifier.weight(1f)) {
+                                    SectionHeader(
+                                        title = str("search_top_result"),
+                                        icon = Icons.Rounded.Person,
+                                        onSeeAll = { vm.onFilterChanged(SearchFilter.ARTISTS) }
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    SearchTopMatchHeroCard(
+                                        user = topArtist,
+                                        isSpotify = false,
+                                        onArtistClick = {
+                                            playerViewModel.navigateToPlaylistId = topArtist.profileNavId
+                                        },
+                                        onPlayClick = {
+                                            if (tracks.isNotEmpty()) {
+                                                playerViewModel.playPlaylist(tracks.toList(), 0)
+                                            } else {
+                                                playerViewModel.navigateToPlaylistId = topArtist.profileNavId
+                                            }
+                                        }
+                                    )
+                                }
+
+                                // Right: Top Songs
+                                if (tracks.isNotEmpty()) {
+                                    Column(modifier = Modifier.weight(1.2f)) {
+                                        SectionHeader(
+                                            title = str("search_filter_tracks"),
+                                            icon = Icons.Rounded.MusicNote,
+                                            onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        tracks.take(4).forEach { track ->
+                                            SearchTrackRow(track, playerViewModel)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
 
                 // Remaining artists if any (excluding the selected top artist)
                 val remainingArtists = artists.filter { it.id != topArtist.id }
@@ -1144,45 +1223,87 @@ private fun SoundCloudResults(
                     }
                 }
             } else {
-                item {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                        // Left Column: Tracks
-                        Column(modifier = Modifier.weight(1f)) {
-                            if (tracks.isNotEmpty()) {
-                                SectionHeader(
-                                    title = str("search_filter_tracks"),
-                                    icon = Icons.Rounded.MusicNote,
-                                    onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                tracks.take(5).forEach { track ->
-                                    SearchTrackRow(track, playerViewModel)
+                if (isNarrow) {
+                    if (tracks.isNotEmpty()) {
+                        item {
+                            SectionHeader(
+                                title = str("search_filter_tracks"),
+                                icon = Icons.Rounded.MusicNote,
+                                onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            tracks.take(5).forEach { track ->
+                                SearchTrackRow(track, playerViewModel)
+                            }
+                        }
+                    }
+                    if (playlists.isNotEmpty()) {
+                        item {
+                            Spacer(Modifier.height(14.dp))
+                            SectionHeader(
+                                title = str("search_filter_playlists"),
+                                icon = Icons.Rounded.QueueMusic,
+                                onSeeAll = { vm.onFilterChanged(SearchFilter.PLAYLISTS) }
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            playlists.take(4).forEach { playlist ->
+                                SearchPlaylistRow(
+                                    playlist,
+                                    onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
+                                ) {
+                                    val dest = when {
+                                        playlist.isTrackStation || playlist.permalinkUrl?.contains("track-stations") == true || playlist.urn?.contains("track-stations") == true -> "station:${playlist.numericId}"
+                                        playlist.isArtistStation || playlist.permalinkUrl?.contains("artist-stations") == true || playlist.urn?.contains("artist-stations") == true -> "station_artist:${playlist.numericId}"
+                                        playlist.urn?.startsWith("soundcloud:system-playlists:") == true -> "system_playlist:${playlist.urn}"
+                                        playlist.id < 0 -> "local_playlist:${playlist.id}"
+                                        else -> playlist.id.toString()
+                                    }
+                                    playerViewModel.navigateToPlaylistId = dest
                                 }
                             }
                         }
+                    }
+                } else {
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            // Left Column: Tracks
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (tracks.isNotEmpty()) {
+                                    SectionHeader(
+                                        title = str("search_filter_tracks"),
+                                        icon = Icons.Rounded.MusicNote,
+                                        onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    tracks.take(5).forEach { track ->
+                                        SearchTrackRow(track, playerViewModel)
+                                    }
+                                }
+                            }
 
-                        // Right Column: Playlists
-                        Column(modifier = Modifier.weight(1f)) {
-                            if (playlists.isNotEmpty()) {
-                                SectionHeader(
-                                    title = str("search_filter_playlists"),
-                                    icon = Icons.Rounded.QueueMusic,
-                                    onSeeAll = { vm.onFilterChanged(SearchFilter.PLAYLISTS) }
-                                )
-                                Spacer(Modifier.height(8.dp))
-                                playlists.take(4).forEach { playlist ->
-                                    SearchPlaylistRow(
-                                        playlist,
-                                        onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
-                                    ) {
-                                        val dest = when {
-                                            playlist.isTrackStation || playlist.permalinkUrl?.contains("track-stations") == true || playlist.urn?.contains("track-stations") == true -> "station:${playlist.numericId}"
-                                            playlist.isArtistStation || playlist.permalinkUrl?.contains("artist-stations") == true || playlist.urn?.contains("artist-stations") == true -> "station_artist:${playlist.numericId}"
-                                            playlist.urn?.startsWith("soundcloud:system-playlists:") == true -> "system_playlist:${playlist.urn}"
-                                            playlist.id < 0 -> "local_playlist:${playlist.id}"
-                                            else -> playlist.id.toString()
+                            // Right Column: Playlists
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (playlists.isNotEmpty()) {
+                                    SectionHeader(
+                                        title = str("search_filter_playlists"),
+                                        icon = Icons.Rounded.QueueMusic,
+                                        onSeeAll = { vm.onFilterChanged(SearchFilter.PLAYLISTS) }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    playlists.take(4).forEach { playlist ->
+                                        SearchPlaylistRow(
+                                            playlist,
+                                            onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
+                                        ) {
+                                            val dest = when {
+                                                playlist.isTrackStation || playlist.permalinkUrl?.contains("track-stations") == true || playlist.urn?.contains("track-stations") == true -> "station:${playlist.numericId}"
+                                                playlist.isArtistStation || playlist.permalinkUrl?.contains("artist-stations") == true || playlist.urn?.contains("artist-stations") == true -> "station_artist:${playlist.numericId}"
+                                                playlist.urn?.startsWith("soundcloud:system-playlists:") == true -> "system_playlist:${playlist.urn}"
+                                                playlist.id < 0 -> "local_playlist:${playlist.id}"
+                                                else -> playlist.id.toString()
+                                            }
+                                            playerViewModel.navigateToPlaylistId = dest
                                         }
-                                        playerViewModel.navigateToPlaylistId = dest
                                     }
                                 }
                             }
@@ -1239,7 +1360,265 @@ private fun SoundCloudResults(
         }
     }
     }
+}
 
+// ──────────────────────────────────────────────────────────────────────
+//  Audio Provider (Deezer, Tidal, Qobuz) Search Results
+// ──────────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ProviderResults(
+    tracks: List<com.alananasss.kittytune.domain.Track>,
+    artists: List<com.alananasss.kittytune.domain.User>,
+    albums: List<com.alananasss.kittytune.domain.Playlist>,
+    playlists: List<com.alananasss.kittytune.domain.Playlist>,
+    vm: HomeViewModel,
+    playerViewModel: PlayerViewModel,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+) {
+    val allPlaylists = albums + playlists
+    val topArtist = remember(artists.size, vm.searchQuery) {
+        TopResultRanker.findTopArtist(artists, vm.searchQuery)
+    }
+
+    if (tracks.isEmpty() && artists.isEmpty() && allPlaylists.isEmpty() && !vm.isSearchLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = str("search_no_results"),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isNarrow = maxWidth < 660.dp
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            if (vm.activeFilter == SearchFilter.ALL) {
+                if (topArtist != null) {
+                    if (isNarrow) {
+                        item {
+                            SectionHeader(
+                                title = str("search_top_result"),
+                                icon = Icons.Rounded.Person,
+                                onSeeAll = { vm.onFilterChanged(SearchFilter.ARTISTS) }
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            SearchTopMatchHeroCard(
+                                user = topArtist,
+                                isSpotify = false,
+                                onArtistClick = {
+                                    playerViewModel.navigateToPlaylistId = topArtist.urn ?: topArtist.id.toString()
+                                },
+                                onPlayClick = {
+                                    if (tracks.isNotEmpty()) {
+                                        playerViewModel.playPlaylist(tracks, 0)
+                                    } else {
+                                        playerViewModel.navigateToPlaylistId = topArtist.urn ?: topArtist.id.toString()
+                                    }
+                                }
+                            )
+                        }
+                        if (tracks.isNotEmpty()) {
+                            item {
+                                Spacer(Modifier.height(14.dp))
+                                SectionHeader(
+                                    title = str("search_filter_tracks"),
+                                    icon = Icons.Rounded.MusicNote,
+                                    onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                tracks.take(4).forEach { track ->
+                                    SearchTrackRow(track, playerViewModel)
+                                }
+                            }
+                        }
+                    } else {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    SectionHeader(
+                                        title = str("search_top_result"),
+                                        icon = Icons.Rounded.Person,
+                                        onSeeAll = { vm.onFilterChanged(SearchFilter.ARTISTS) }
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    SearchTopMatchHeroCard(
+                                        user = topArtist,
+                                        isSpotify = false,
+                                        onArtistClick = {
+                                            playerViewModel.navigateToPlaylistId = topArtist.urn ?: topArtist.id.toString()
+                                        },
+                                        onPlayClick = {
+                                            if (tracks.isNotEmpty()) {
+                                                playerViewModel.playPlaylist(tracks, 0)
+                                            } else {
+                                                playerViewModel.navigateToPlaylistId = topArtist.urn ?: topArtist.id.toString()
+                                            }
+                                        }
+                                    )
+                                }
+
+                                if (tracks.isNotEmpty()) {
+                                    Column(modifier = Modifier.weight(1.2f)) {
+                                        SectionHeader(
+                                            title = str("search_filter_tracks"),
+                                            icon = Icons.Rounded.MusicNote,
+                                            onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        tracks.take(4).forEach { track ->
+                                            SearchTrackRow(track, playerViewModel)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                val remainingArtists = artists.filter { it.id != topArtist.id }
+                if (remainingArtists.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        SectionHeader(
+                            title = str("search_filter_artists"),
+                            icon = Icons.Rounded.Person,
+                            onSeeAll = { vm.onFilterChanged(SearchFilter.ARTISTS) }
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        remainingArtists.take(3).forEach { user ->
+                            SearchArtistRow(user) {
+                                playerViewModel.navigateToPlaylistId = user.urn ?: user.id.toString()
+                            }
+                        }
+                    }
+                }
+
+                if (allPlaylists.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        SectionHeader(
+                            title = str("search_filter_playlists"),
+                            icon = Icons.Rounded.QueueMusic,
+                            onSeeAll = { vm.onFilterChanged(SearchFilter.PLAYLISTS) }
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        allPlaylists.take(4).forEach { playlist ->
+                            SearchPlaylistRow(
+                                playlist,
+                                onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
+                            ) {
+                                playerViewModel.navigateToPlaylistId = playlist.urn ?: playlist.id.toString()
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (isNarrow) {
+                    if (tracks.isNotEmpty()) {
+                        item {
+                            SectionHeader(
+                                title = str("search_filter_tracks"),
+                                icon = Icons.Rounded.MusicNote,
+                                onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            tracks.take(5).forEach { track ->
+                                SearchTrackRow(track, playerViewModel)
+                            }
+                        }
+                    }
+                    if (allPlaylists.isNotEmpty()) {
+                        item {
+                            Spacer(Modifier.height(14.dp))
+                            SectionHeader(
+                                title = str("search_filter_playlists"),
+                                icon = Icons.Rounded.QueueMusic,
+                                onSeeAll = { vm.onFilterChanged(SearchFilter.PLAYLISTS) }
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            allPlaylists.take(4).forEach { playlist ->
+                                SearchPlaylistRow(
+                                    playlist,
+                                    onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
+                                ) {
+                                    playerViewModel.navigateToPlaylistId = playlist.urn ?: playlist.id.toString()
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (tracks.isNotEmpty()) {
+                                    SectionHeader(
+                                        title = str("search_filter_tracks"),
+                                        icon = Icons.Rounded.MusicNote,
+                                        onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    tracks.take(5).forEach { track ->
+                                        SearchTrackRow(track, playerViewModel)
+                                    }
+                                }
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                if (allPlaylists.isNotEmpty()) {
+                                    SectionHeader(
+                                        title = str("search_filter_playlists"),
+                                        icon = Icons.Rounded.QueueMusic,
+                                        onSeeAll = { vm.onFilterChanged(SearchFilter.PLAYLISTS) }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    allPlaylists.take(4).forEach { playlist ->
+                                        SearchPlaylistRow(
+                                            playlist,
+                                            onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
+                                        ) {
+                                            playerViewModel.navigateToPlaylistId = playlist.urn ?: playlist.id.toString()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (vm.activeFilter == SearchFilter.TRACKS) {
+            items(tracks) { track ->
+                SearchTrackRow(track, playerViewModel)
+            }
+        } else if (vm.activeFilter == SearchFilter.ARTISTS) {
+            items(artists) { user ->
+                SearchArtistRow(user) {
+                    playerViewModel.navigateToPlaylistId = user.urn ?: user.id.toString()
+                }
+            }
+        } else if (vm.activeFilter == SearchFilter.PLAYLISTS) {
+            items(allPlaylists) { playlist ->
+                SearchPlaylistRow(
+                    playlist,
+                    onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
+                ) {
+                    playerViewModel.navigateToPlaylistId = playlist.urn ?: playlist.id.toString()
+                }
+            }
+        }
+    }
+    }
+}
 
 // ──────────────────────────────────────────────────────────────────────
 //  YouTube Search Results
@@ -1428,21 +1807,19 @@ private fun SpotifyResults(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        // ── TOP MATCH / ARTISTS SECTION ──
-        if (hasArtists && vm.activeFilter == SearchFilter.ALL) {
-            if (topSpotifyArtist != null) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp)
-                    ) {
-                        // Left: Top Match Artist Hero Card
-                        Column(modifier = Modifier.weight(1f)) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isNarrow = maxWidth < 660.dp
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            // ── TOP MATCH / ARTISTS SECTION ──
+            if (hasArtists && vm.activeFilter == SearchFilter.ALL) {
+                if (topSpotifyArtist != null) {
+                    if (isNarrow) {
+                        item {
                             SectionHeader(
                                 title = str("search_top_result"),
                                 icon = Icons.Rounded.Person,
@@ -1466,10 +1843,9 @@ private fun SpotifyResults(
                                 }
                             )
                         }
-
-                        // Right: Top Songs
                         if (hasTracks) {
-                            Column(modifier = Modifier.weight(1.2f)) {
+                            item {
+                                Spacer(Modifier.height(14.dp))
                                 SectionHeader(
                                     title = str("search_filter_tracks"),
                                     icon = Icons.Rounded.MusicNote,
@@ -1481,8 +1857,55 @@ private fun SpotifyResults(
                                 }
                             }
                         }
+                    } else {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                            ) {
+                                // Left: Top Match Artist Hero Card
+                                Column(modifier = Modifier.weight(1f)) {
+                                    SectionHeader(
+                                        title = str("search_top_result"),
+                                        icon = Icons.Rounded.Person,
+                                        onSeeAll = { vm.onFilterChanged(SearchFilter.ARTISTS) }
+                                    )
+                                    Spacer(Modifier.height(6.dp))
+                                    SearchTopMatchHeroCard(
+                                        user = topSpotifyArtist,
+                                        isSpotify = true,
+                                        onArtistClick = {
+                                            val cleanId = topSpotifyArtist.permalink ?: topSpotifyArtist.urn?.removePrefix("spotify:artist:") ?: topSpotifyArtist.id.toString()
+                                            playerViewModel.navigateToPlaylistId = "spotify_artist:$cleanId"
+                                        },
+                                        onPlayClick = {
+                                            if (hasTracks) {
+                                                playerViewModel.playPlaylist(vm.searchResultsSpotify.toList(), 0)
+                                            } else {
+                                                val cleanId = topSpotifyArtist.permalink ?: topSpotifyArtist.urn?.removePrefix("spotify:artist:") ?: topSpotifyArtist.id.toString()
+                                                playerViewModel.navigateToPlaylistId = "spotify_artist:$cleanId"
+                                            }
+                                        }
+                                    )
+                                }
+
+                                // Right: Top Songs
+                                if (hasTracks) {
+                                    Column(modifier = Modifier.weight(1.2f)) {
+                                        SectionHeader(
+                                            title = str("search_filter_tracks"),
+                                            icon = Icons.Rounded.MusicNote,
+                                            onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
+                                        )
+                                        Spacer(Modifier.height(6.dp))
+                                        vm.searchResultsSpotify.take(4).forEach { track ->
+                                            SearchTrackRow(track, playerViewModel)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                }
 
                 // Remaining artists if any (excluding the selected top artist)
                 val remainingSpotifyArtists = spotifyUsers.filter { it.id != topSpotifyArtist.id }
@@ -1573,6 +1996,7 @@ private fun SpotifyResults(
                 }
             }
         }
+    }
     }
 }
 
@@ -1745,11 +2169,15 @@ private fun SearchTopMatchHeroCard(
         shadowElevation = if (isHovered) 4.dp else 1.dp,
         modifier = modifier.fillMaxWidth()
     ) {
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp)
         ) {
+            val isCompactCard = maxWidth < 320.dp
+            val isSmallCard = maxWidth < 280.dp
+            val avatarSize = if (isSmallCard) 72.dp else 92.dp
+
             Column(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1758,7 +2186,7 @@ private fun SearchTopMatchHeroCard(
                     shape = CircleShape,
                     shadowElevation = 6.dp,
                     color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier = Modifier.size(92.dp)
+                    modifier = Modifier.size(avatarSize)
                 ) {
                     val avatarUrl = if (user.avatarUrl.isDefaultAvatar()) null else (user.avatarUrl.getHighResAvatarUrl() ?: user.avatarUrl)
                     AsyncImage(
@@ -1771,7 +2199,7 @@ private fun SearchTopMatchHeroCard(
                     )
                 }
 
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(if (isSmallCard) 12.dp else 18.dp))
 
                 // Artist Name & Play Button Row
                 Row(
@@ -1807,7 +2235,8 @@ private fun SearchTopMatchHeroCard(
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -1817,7 +2246,9 @@ private fun SearchTopMatchHeroCard(
                                     text = str("generic_artist"),
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
 
@@ -1833,34 +2264,56 @@ private fun SearchTopMatchHeroCard(
                                 Text(
                                     text = followersText,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
                                 )
                             }
                         }
                     }
 
                     if (onPlayClick != null) {
-                        Button(
-                            onClick = onPlayClick,
-                            shapes = ButtonDefaults.shapes(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
-                        ) {
-                            Icon(
-                                Icons.Rounded.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = str("btn_play"),
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                maxLines = 1
-                            )
+                        if (isCompactCard) {
+                            androidx.compose.material3.FilledIconButton(
+                                onClick = onPlayClick,
+                                modifier = Modifier.size(42.dp),
+                                colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Icon(
+                                    Icons.Rounded.PlayArrow,
+                                    contentDescription = str("btn_play"),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = onPlayClick,
+                                shapes = ButtonDefaults.shapes(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                            ) {
+                                Icon(
+                                    Icons.Rounded.PlayArrow,
+                                    contentDescription = str("btn_play"),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = str("btn_play"),
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
                         }
                     }
                 }

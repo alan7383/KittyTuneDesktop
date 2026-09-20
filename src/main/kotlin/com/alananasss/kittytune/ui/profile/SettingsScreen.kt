@@ -57,7 +57,19 @@ fun SettingsScreen(
     val index = selected.coerceIn(sections.indices)
     val scrollStates = sections.map { androidx.compose.foundation.rememberScrollState() }
 
-    SettingsScaffold(title = str("settings_title"), onBackClick = onBackClick) { innerPadding ->
+    SettingsScaffold(
+        title = str("settings_title"),
+        onBackClick = onBackClick,
+        actions = {
+            IconButton(onClick = { navController.navigate("credits") }) {
+                Icon(
+                    imageVector = Icons.Rounded.Groups,
+                    contentDescription = str("about_credits"),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    ) { innerPadding ->
         Column(Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
             SettingsTabs(sections = sections, selectedIndex = index, onSelect = { selected = it })
 
@@ -183,6 +195,83 @@ private fun SettingsTabs(
  */
 @Composable
 private fun SourcesSection(navController: NavController) {
+    val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    val order = prefs.getAudioProviderOrder()
+    val orderSummary = order.joinToString(", ") { item ->
+        when (item) {
+            com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.QOBUZ -> "Qobuz"
+            com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.TIDAL -> "TIDAL"
+            com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.DEEZER -> "Deezer"
+            com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.YOUTUBE_MUSIC -> "YouTube Music"
+            com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.SOUNDCLOUD -> "SoundCloud"
+        }
+    }
+
+    val qobuzInstances = prefs.getQobuzCustomInstances().split("\n").filter { it.isNotBlank() }
+    val qobuzSubtitle = if (qobuzInstances.isEmpty() || prefs.getQobuzCustomInstances() == com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.DEFAULT_INSTANCE) {
+        "${prefs.getQobuzCountry()} • ${str("qobuz_custom_instances_desc_default")}"
+    } else {
+        "${prefs.getQobuzCountry()} • ${str("qobuz_custom_instances_desc_custom", qobuzInstances.size)}"
+    }
+
+    val tidalQuality = prefs.getTidalAudioQuality()
+    val tidalSubtitle = when (tidalQuality) {
+        com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.AAC_320 -> str("tidal_quality_aac_320")
+        com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.FLAC -> str("tidal_quality_flac")
+        com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.HI_RES_LOSSLESS -> str("tidal_quality_hires")
+    }
+
+    val deezerQuality = prefs.getDeezerAudioQuality()
+    val deezerSubtitle = when (deezerQuality) {
+        com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.FLAC -> str("deezer_quality_flac")
+        com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_320 -> str("deezer_quality_mp3_320")
+        com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_128 -> str("deezer_quality_mp3_128")
+    }
+
+    SettingsGroup(
+        title = str("audio_providers_title"),
+        items = listOf(
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("provider_order"),
+                    subtitle = orderSummary,
+                    icon = Icons.Rounded.SwapVert,
+                    onClick = { navController.navigate("provider_order") }
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("qobuz_integration"),
+                    subtitle = qobuzSubtitle,
+                    iconRes = com.alananasss.kittytune.R.drawable.ic_logo_qobuz,
+                    onClick = { navController.navigate("qobuz_settings") }
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("tidal_integration"),
+                    subtitle = tidalSubtitle,
+                    iconRes = com.alananasss.kittytune.R.drawable.ic_logo_tidal,
+                    onClick = { navController.navigate("tidal_settings") }
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("deezer_integration"),
+                    subtitle = deezerSubtitle,
+                    iconRes = com.alananasss.kittytune.R.drawable.ic_logo_deezer,
+                    onClick = { navController.navigate("deezer_settings") }
+                )
+            }
+        )
+    )
+
+    Spacer(Modifier.height(24.dp))
+
     SettingsGroup(
         title = str("music_import_title"),
         items = listOf(

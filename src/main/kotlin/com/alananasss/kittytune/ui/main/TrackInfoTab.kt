@@ -10,9 +10,11 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -55,6 +57,7 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.CommentSort
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.viewableCover
+import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import java.util.Locale
@@ -171,7 +174,14 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
         ) {
             item {
+                val lyricsUnderCoverPlacement = remember { vm.playerPrefs.getLyricsUnderCoverPlacement() }
+                val showUnderCover = vm.isLyricsUnderCoverActive && vm.hasLyrics
+
                 Column(verticalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 12.dp)) {
+                    val isCurrentPlayingTrack = displayTrack.id == vm.currentTrack?.id ||
+                        (displayTrack.title == vm.currentTrack?.title && displayTrack.user?.username == vm.currentTrack?.user?.username)
+                    val animatedCoverUrl = if (isCurrentPlayingTrack) vm.currentAnimatedCoverUrl else null
+
                     if (isCompact) {
                         val coverSize = if (isUltraCompact) 64.dp else 96.dp
                         Row(
@@ -179,8 +189,10 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            AsyncImage(
-                                model = displayTrack.fullResArtwork,
+                            AnimatedArtwork(
+                                artworkUrl = displayTrack.fullResArtwork,
+                                animatedCoverUrl = animatedCoverUrl,
+                                isPlaying = vm.isPlaying,
                                 contentDescription = null,
                                 modifier = Modifier
                                     .size(coverSize)
@@ -191,38 +203,63 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
-                                Text(
-                                    text = displayTrack.title ?: "",
-                                    style = if (isUltraCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    com.alananasss.kittytune.ui.common.ArtistLinkText(
-                                        track = displayTrack,
-                                        onArtistClick = { vm.navigateToTrackArtist(it) },
-                                        text = displayTrack.user?.username ?: "",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        hoverColor = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.Medium,
-                                        modifier = Modifier.weight(1f, fill = false)
+                                if (showUnderCover && lyricsUnderCoverPlacement == com.alananasss.kittytune.data.local.LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST) {
+                                    com.alananasss.kittytune.ui.player.lyrics.PlayerInlineLyrics(
+                                        viewModel = vm,
+                                        textColor = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
                                     )
-                                    if (displayTrack.user?.verified == true) {
-                                        Spacer(Modifier.width(4.dp))
-                                        Icon(
-                                            Icons.Rounded.Verified, null,
-                                            tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(14.dp)
+                                }
+                                AnimatedContent(
+                                    targetState = showUnderCover && lyricsUnderCoverPlacement == com.alananasss.kittytune.data.local.LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST,
+                                    transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
+                                    label = "TrackInfoCompactLyricsUnderCover"
+                                ) { showLyricsLine ->
+                                    if (showLyricsLine) {
+                                        com.alananasss.kittytune.ui.player.lyrics.PlayerInlineLyrics(
+                                            viewModel = vm,
+                                            textColor = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.fillMaxWidth()
                                         )
+                                    } else {
+                                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                            Text(
+                                                text = displayTrack.title ?: "",
+                                                style = if (isUltraCompact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                com.alananasss.kittytune.ui.common.ArtistLinkText(
+                                                    track = displayTrack,
+                                                    onArtistClick = { vm.navigateToTrackArtist(it) },
+                                                    text = displayTrack.user?.username ?: "",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    hoverColor = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Medium,
+                                                    modifier = Modifier.weight(1f, fill = false)
+                                                )
+                                                if (displayTrack.user?.verified == true) {
+                                                    Spacer(Modifier.width(4.dp))
+                                                    Icon(
+                                                        Icons.Rounded.Verified, null,
+                                                        tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(14.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     } else {
-                        AsyncImage(
-                            model = displayTrack.fullResArtwork,
+                        AnimatedArtwork(
+                            artworkUrl = displayTrack.fullResArtwork,
+                            animatedCoverUrl = animatedCoverUrl,
+                            isPlaying = vm.isPlaying,
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -230,33 +267,56 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                                 .clip(RoundedCornerShape(12.dp))
                                 .viewableCover(displayTrack.fullResArtwork)
                         )
-                        Text(
-                            text = displayTrack.title ?: "",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // navigateToTrackArtist already routes both sources, and opens the
-                            // picker when the track credits several artists.
-                            com.alananasss.kittytune.ui.common.ArtistLinkText(
-                                track = displayTrack,
-                                onArtistClick = { vm.navigateToTrackArtist(it) },
-                                text = displayTrack.user?.username ?: "",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                hoverColor = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.weight(1f, fill = false)
+                        if (showUnderCover && lyricsUnderCoverPlacement == com.alananasss.kittytune.data.local.LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST) {
+                            com.alananasss.kittytune.ui.player.lyrics.PlayerInlineLyrics(
+                                viewModel = vm,
+                                textColor = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
                             )
-                            if (displayTrack.user?.verified == true) {
-                                Spacer(Modifier.width(4.dp))
-                                Icon(
-                                    Icons.Rounded.Verified, null,
-                                    tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
+                        }
+                        AnimatedContent(
+                            targetState = showUnderCover && lyricsUnderCoverPlacement == com.alananasss.kittytune.data.local.LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST,
+                            transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
+                            label = "TrackInfoLyricsUnderCover"
+                        ) { showLyricsLine ->
+                            if (showLyricsLine) {
+                                com.alananasss.kittytune.ui.player.lyrics.PlayerInlineLyrics(
+                                    viewModel = vm,
+                                    textColor = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 )
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = displayTrack.title ?: "",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // navigateToTrackArtist already routes both sources, and opens the
+                                        // picker when the track credits several artists.
+                                        com.alananasss.kittytune.ui.common.ArtistLinkText(
+                                            track = displayTrack,
+                                            onArtistClick = { vm.navigateToTrackArtist(it) },
+                                            text = displayTrack.user?.username ?: "",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            hoverColor = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        if (displayTrack.user?.verified == true) {
+                                            Spacer(Modifier.width(4.dp))
+                                            Icon(
+                                                Icons.Rounded.Verified, null,
+                                                tint = if (isSpotifyTrack) SpotifyGreen else MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

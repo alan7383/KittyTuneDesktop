@@ -2,6 +2,8 @@ package com.alananasss.kittytune.ui.main
 
 import androidx.compose.material3.ButtonDefaults
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
+import com.alananasss.kittytune.ui.player.slider.PlayerSlider
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -76,6 +78,7 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
+import com.alananasss.kittytune.ui.player.automix.AutomixBadge
 import com.alananasss.kittytune.utils.makeTimeString
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -159,106 +162,124 @@ fun PlayerBar(
         shape = PanelShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // --- left: artwork + title/artist + like -----------------------------------
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val barWidth = maxWidth
+            val isCompact = barWidth < 900.dp
+            val isVeryCompact = barWidth < 740.dp
+            val centerMax = when {
+                barWidth >= 1100.dp -> 560.dp
+                barWidth >= 850.dp -> 440.dp
+                barWidth >= 700.dp -> 360.dp
+                else -> 280.dp
+            }
+            val centerMin = when {
+                barWidth >= 850.dp -> 300.dp
+                barWidth >= 700.dp -> 240.dp
+                else -> 180.dp
+            }
+
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (track != null) {
-                    // Artwork + title/artist open the now-playing panel on the track info tab (left click), or options popup (right click)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            // Yields width before the like button does. A Row measures its
-                            // unweighted children first, so without this the artwork and title
-                            // take what they want and the heart — last in the row — is the part
-                            // that gets clipped away as the UI scale goes up (issue #33).
-                            .weight(1f, fill = false)
-                            .clip(RoundedCornerShape(8.dp))
-                            .onClick(
-                                matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                                onClick = { vm.showTrackOptions(track, fromPlayer = true) }
-                            )
-                            .clickable { onOpenFullPlayer() }
-                            .padding(4.dp),
-                    ) {
-                        AsyncImage(
-                            model = track.fullResArtwork,
-                            contentDescription = null,
+                // --- left: artwork + title/artist + like -----------------------------------
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (track != null) {
+                        // Artwork + title/artist open the now-playing panel on the track info tab (left click), or options popup (right click)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(8.dp)),
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f, fill = false).widthIn(max = 220.dp)) {
-                            Text(
-                                text = track.title.orEmpty(),
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                ArtistLinkText(
-                                    track = track,
-                                    onArtistClick = { vm.navigateToTrackArtist(it) },
-                                    text = track.user?.username.orEmpty(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.weight(1f, fill = false)
+                                // Yields width before the like button does. A Row measures its
+                                // unweighted children first, so without this the artwork and title
+                                // take what they want and the heart — last in the row — is the part
+                                // that gets clipped away as the UI scale goes up (issue #33).
+                                .weight(1f, fill = false)
+                                .clip(RoundedCornerShape(8.dp))
+                                .onClick(
+                                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                                    onClick = { vm.showTrackOptions(track, fromPlayer = true) }
                                 )
-                                if (track.user?.verified == true) {
-                                    Spacer(Modifier.width(3.dp))
+                                .clickable { onOpenFullPlayer() }
+                                .padding(4.dp),
+                        ) {
+                            AnimatedArtwork(
+                                artworkUrl = track.fullResArtwork,
+                                animatedCoverUrl = vm.currentAnimatedCoverUrl,
+                                isPlaying = vm.isPlaying,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(if (isVeryCompact) 48.dp else 56.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                            )
+                            Spacer(Modifier.width(if (isVeryCompact) 8.dp else 12.dp))
+                            Column(Modifier.weight(1f, fill = false).widthIn(max = if (isCompact) 160.dp else 220.dp)) {
+                                Text(
+                                    text = track.title.orEmpty(),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    ArtistLinkText(
+                                        track = track,
+                                        onArtistClick = { vm.navigateToTrackArtist(it) },
+                                        text = track.user?.username.orEmpty(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (track.user?.verified == true) {
+                                        Spacer(Modifier.width(3.dp))
+                                        Icon(
+                                            Icons.Rounded.Verified,
+                                            null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleLike() }) {
+                                Icon(
+                                    if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    contentDescription = str("player_like"),
+                                    tint = if (vm.isLiked) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                            if (vm.isYourMixActive) {
+                                Spacer(Modifier.width(4.dp))
+                                IconButton(
+                                    shapes = IconButtonDefaults.shapes(),
+                                    onClick = { vm.dislikeCurrentTrackInMix() }
+                                ) {
                                     Icon(
-                                        Icons.Rounded.Verified,
-                                        null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(12.dp)
+                                        Icons.Outlined.HeartBroken,
+                                        contentDescription = str("mix_dislike"),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(20.dp),
                                     )
                                 }
                             }
                         }
                     }
-                    if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {
-                        Spacer(Modifier.width(8.dp))
-                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleLike() }) {
-                            Icon(
-                                if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                contentDescription = str("player_like"),
-                                tint = if (vm.isLiked) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        if (vm.isYourMixActive) {
-                            Spacer(Modifier.width(4.dp))
-                            IconButton(
-                                shapes = IconButtonDefaults.shapes(),
-                                onClick = { vm.dislikeCurrentTrackInMix() }
-                            ) {
-                                Icon(
-                                    Icons.Outlined.HeartBroken,
-                                    contentDescription = str("mix_dislike"),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                    }
                 }
-            }
 
-            // --- center: transport + progress ------------------------------------------
-            Column(
-                modifier = Modifier.widthIn(min = 340.dp, max = 560.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                // --- center: transport + progress ------------------------------------------
+                Column(
+                    modifier = Modifier.widthIn(min = centerMin, max = centerMax),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
                 ) {
                     // Active pill background makes on/off state obvious at a glance.
                     ExpressiveToggleButton(
@@ -384,10 +405,16 @@ fun PlayerBar(
                         contentDescription = "Repeat",
                         onClick = { vm.toggleRepeatMode() },
                     )
+
+                    AutomixBadge(
+                        textColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
                 }
 
                 // Progress row
                 val seekWheelSeconds = rememberSeekWheelSeconds()
+                val sliderStyle = rememberPlayerSliderStyle()
                 var scrubbing by remember { mutableStateOf(false) }
                 var scrubPosition by remember { mutableFloatStateOf(0f) }
                 val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition
@@ -399,7 +426,7 @@ fun PlayerBar(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Slider(
+                    PlayerSlider(
                         value = position.toFloat().coerceIn(0f, duration.toFloat()),
                         onValueChange = {
                             scrubbing = true
@@ -410,6 +437,8 @@ fun PlayerBar(
                             vm.seekTo(scrubPosition.toLong())
                             scrubbing = false
                         },
+                        sliderStyle = sliderStyle,
+                        isPlaying = vm.isPlaying,
                         valueRange = 0f..duration.toFloat(),
                         modifier = Modifier
                             .weight(1f)
@@ -456,18 +485,20 @@ fun PlayerBar(
                         )
                     }
                 }
-                Tip(str("mini_player_title")) {
-                    IconButton(
-                        shapes = IconButtonDefaults.shapes(),
-                        onClick = { vm.toggleMiniPlayer() },
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.PictureInPictureAlt,
-                            contentDescription = str("mini_player_title"),
-                            tint = if (vm.isMiniPlayerVisible) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
+                if (!isVeryCompact) {
+                    Tip(str("mini_player_title")) {
+                        IconButton(
+                            shapes = IconButtonDefaults.shapes(),
+                            onClick = { vm.toggleMiniPlayer() },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.PictureInPictureAlt,
+                                contentDescription = str("mini_player_title"),
+                                tint = if (vm.isMiniPlayerVisible) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
                 if (PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons) {
@@ -485,7 +516,7 @@ fun PlayerBar(
                 }
                 // The panel this opens also has a queue tab, so hiding this button costs the queue
                 // a click rather than access to it (issue #33).
-                if (PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons) {
+                if (!isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons) {
                     IconButton(
                         shapes = IconButtonDefaults.shapes(),
                         onClick = onOpenQueue,
@@ -561,6 +592,7 @@ fun PlayerBar(
             }
         }
     }
+}
 }
 
 
@@ -728,6 +760,17 @@ private fun rememberVerticalVolumeSlider(): Boolean {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) {
         com.alananasss.kittytune.data.local.PlayerPreferences().getVerticalVolumeSlider()
+    }
+}
+
+/**
+ * Reactive read of the "slider style" setting; recomposes when the pref changes.
+ */
+@Composable
+private fun rememberPlayerSliderStyle(): com.alananasss.kittytune.data.local.PlayerSliderStyle {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) {
+        com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerSliderStyle()
     }
 }
 

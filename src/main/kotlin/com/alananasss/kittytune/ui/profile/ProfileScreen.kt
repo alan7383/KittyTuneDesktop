@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -83,6 +84,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.size.Size
 import coil3.PlatformContext
+import com.alananasss.kittytune.data.cover.AppleMusicArtistBackgroundProvider
+import com.alananasss.kittytune.ui.player.cover.CanvasVideo
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.EscapableAlertDialog
@@ -327,6 +330,18 @@ fun ProfileScreen(
         }
     }
 
+    val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    val animatedProfilesEnabled by prefs.getAnimatedArtistProfilesFlow()
+        .collectAsState(initial = prefs.getAnimatedArtistProfilesEnabled())
+
+    val artistVideoUrl by produceState<String?>(initialValue = null, key1 = user?.username, key2 = animatedProfilesEnabled) {
+        if (!animatedProfilesEnabled || user?.username.isNullOrBlank() || profileViewModel.isCurrentUser) {
+            value = null
+        } else {
+            value = AppleMusicArtistBackgroundProvider.getByArtistName(user.username)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (profileViewModel.isLoading && user == null) {
             ProfileScreenShimmer(onBackClick)
@@ -346,7 +361,9 @@ fun ProfileScreen(
                         profileViewModel = profileViewModel,
                         artistContext = artistPlaybackContext,
                         onFollowersClick = { userListDialogType = "followers" },
-                        onFollowingClick = { userListDialogType = "followings" }
+                        onFollowingClick = { userListDialogType = "followings" },
+                        hasMotionVideo = !artistVideoUrl.isNullOrBlank(),
+                        artistVideoUrl = artistVideoUrl
                     )
                 }
 
@@ -686,22 +703,54 @@ fun ModernProfileHeader(
     profileViewModel: ProfileViewModel,
     artistContext: PlaybackContext?,
     onFollowersClick: () -> Unit = {},
-    onFollowingClick: () -> Unit = {}
+    onFollowingClick: () -> Unit = {},
+    hasMotionVideo: Boolean = false,
+    artistVideoUrl: String? = null,
 ) {
-    Box(modifier = Modifier.fillMaxWidth().height(420.dp)) {
-        val bgModel = if (user.bannerUrl != null) user.bannerUrl else if (!user.avatarUrl.isDefaultAvatar()) user.avatarUrl else null
-        if (bgModel != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(PlatformContext.INSTANCE)
-                    .data(bgModel)
-                    .size(Size(128, 128))
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().blur(32.dp).alpha(0.6f)
-            )
+    val bgModel = if (user.bannerUrl != null) user.bannerUrl else if (!user.avatarUrl.isDefaultAvatar()) user.avatarUrl else null
+    val showVideo = hasMotionVideo && !artistVideoUrl.isNullOrBlank()
+
+    Box(modifier = Modifier.fillMaxWidth().height(420.dp).clipToBounds()) {
+        if (bgModel != null || showVideo) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (bgModel != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(PlatformContext.INSTANCE)
+                            .data(bgModel)
+                            .size(Size(128, 128))
+                            .build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .blur(if (showVideo) 20.dp else 32.dp)
+                            .alpha(0.6f)
+                    )
+                }
+                if (showVideo && !artistVideoUrl.isNullOrBlank()) {
+                    CanvasVideo(
+                        canvasUrl = artistVideoUrl,
+                        isPlaying = true,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    if (showVideo) Color.Transparent else MaterialTheme.colorScheme.background.copy(alpha = 0.5f),
+                                    MaterialTheme.colorScheme.background.copy(alpha = if (showVideo) 0.7f else 1f),
+                                    MaterialTheme.colorScheme.background
+                                ),
+                                startY = 0f
+                            )
+                        )
+                )
+            }
         }
-        Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(Color.Transparent, MaterialTheme.colorScheme.background.copy(alpha = 0.5f), MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background), startY = 0f)))
 
         Column(
             modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 24.dp).padding(bottom = 24.dp).widthIn(max = 620.dp),

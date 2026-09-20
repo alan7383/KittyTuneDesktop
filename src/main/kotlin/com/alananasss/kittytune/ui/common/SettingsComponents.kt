@@ -89,6 +89,8 @@ fun SettingsItem(
     subtitle: String? = null,
     trailingText: String? = null,
     icon: ImageVector? = null,
+    iconPainter: androidx.compose.ui.graphics.painter.Painter? = null,
+    iconRes: String? = null,
     onClick: (() -> Unit)? = null,
     hasSwitch: Boolean = false,
     switchState: Boolean = false,
@@ -124,19 +126,29 @@ fun SettingsItem(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (icon != null) {
+            val resolvedPainter = iconPainter ?: (if (iconRes != null) androidx.compose.ui.res.painterResource(iconRes) else null)
+            if (icon != null || resolvedPainter != null) {
                 Surface(
                     modifier = Modifier.size(42.dp),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
+                        if (icon != null) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        } else if (resolvedPainter != null) {
+                            Icon(
+                                painter = resolvedPainter,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.width(16.dp))

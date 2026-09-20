@@ -12,6 +12,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.io.File
 import java.io.FileReader
+import com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider
+import com.alananasss.kittytune.data.lyrics.providers.DefaultLyricsProviderOrder
+import com.alananasss.kittytune.data.lyrics.providers.deserializeLyricsProviderOrder
+import com.alananasss.kittytune.data.lyrics.providers.serializeLyricsProviderOrder
+import com.alananasss.kittytune.data.lyrics.clients.PaxsenixClient
 
 
 enum class AppThemeMode { SYSTEM, LIGHT, DARK }
@@ -27,6 +32,9 @@ enum class StartDestination { HOME, LIBRARY }
  */
 enum class InfoPanelHalf { COMMENTS, LYRICS, REMEMBER }
 enum class LyricsAlignment { LEFT, CENTER, RIGHT }
+enum class LyricsUiStyle { ENHANCED, CLASSIC }
+enum class LyricsFont { APPLE, APP_DEFAULT }
+enum class PlayerSliderStyle { BAR, WAVY, SLIM, SQUIGGLY }
 
 /**
  * How much the lyrics views set the line being sung apart from the rest (issue #33).
@@ -36,6 +44,9 @@ enum class LyricsAlignment { LEFT, CENTER, RIGHT }
  * on a different kind of lyric sheet.
  */
 enum class LyricsDisplayStyle { STANDARD, SCALE, FOCUS, SCALE_FOCUS }
+
+enum class LyricsUnderCoverPlacement { REPLACE_TITLE_ARTIST, ABOVE_TITLE_ARTIST }
+enum class LyricsDisplayState { OFF, UNDER_COVER, COVER_REPLACED }
 
 enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
 /**
@@ -52,8 +63,10 @@ enum class AppLanguage(val code: String) {
     SYSTEM("system"),
     FRENCH("fr"),
     ENGLISH("en"),
+    GERMAN("de"),
     HUNGARIAN("hu"),
-    RUSSIAN("ru")
+    RUSSIAN("ru"),
+    VIETNAMESE("vi")
 }
 
 val DEFAULT_PINNED_AUDIO_FX = listOf(
@@ -194,8 +207,21 @@ class PlayerPreferences {
         private const val KEY_LYRICS_FULLSCREEN_FONT_SIZE = "lyrics_fullscreen_font_size"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
         private const val KEY_LYRICS_DUET_VIEW = "lyrics_duet_view"
+        private const val KEY_LYRICS_UNDER_COVER_ENABLED = "lyrics_under_cover_enabled"
+        private const val KEY_LYRICS_MULTI_STATE_TOGGLE = "lyrics_multi_state_toggle"
+        private const val KEY_LYRICS_UNDER_COVER_PLACEMENT = "lyrics_under_cover_placement"
+        private const val KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE = "lyrics_under_cover_always_visible"
 
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
+        private const val KEY_LYRICS_UI_STYLE = "lyrics_ui_style"
+        private const val KEY_LYRICS_FONT = "lyrics_font"
+        const val KEY_PLAYER_SLIDER_STYLE = "player_slider_style"
+        private const val KEY_LYRICS_LINE_BLUR = "lyrics_line_blur_enabled"
+        private const val KEY_LYRICS_LRC_BOUNCE_ENABLED = "lyrics_lrc_bounce_enabled"
+        private const val KEY_LYRICS_BOUNCE_FACTOR = "lyrics_bounce_factor"
+        private const val KEY_LYRICS_GLOW_FACTOR = "lyrics_glow_factor"
+        private const val KEY_LYRICS_FILL_TRANSITION_WIDTH = "lyrics_fill_transition_width"
+        private const val KEY_LYRICS_LINE_SPACING = "lyrics_line_spacing"
         private const val KEY_LYRICS_TRANSLATION_ENABLED = "lyrics_translation_enabled"
         private const val KEY_LYRICS_TRANSLATION_LANG = "lyrics_translation_lang"
         private const val KEY_APP_LANGUAGE = "app_language_code"
@@ -224,11 +250,25 @@ class PlayerPreferences {
         private const val KEY_SYNC_LIKES = "sync_likes_enabled"
         private const val KEY_CROSSFADE_ENABLED = "crossfade_enabled"
         private const val KEY_CROSSFADE_DURATION = "crossfade_duration"
+        private const val KEY_CROSSFADE_GAPLESS = "crossfade_gapless"
+        const val KEY_AUTOMIX_ENABLED = "automix_enabled"
+        const val KEY_AUTOMIX_DEBUG_OVERLAY = "automix_debug_overlay"
+        private const val KEY_AUTOMIX_TEMPO_MATCH = "automix_tempo_match"
+        private const val KEY_AUTOMIX_HARMONIC_MIX = "automix_harmonic_mix"
+        private const val KEY_AUTOMIX_DYNAMIC_MIX_POINTS = "automix_dynamic_mix_points"
+        private const val KEY_AUTOMIX_BASS_DUCKING = "automix_bass_ducking"
+        private const val KEY_AUTOMIX_OVERLAP_MODE = "automix_overlap_mode"
         private const val KEY_KEY_COLOR = "key_color"
         private const val KEY_COLOR_STYLE = "color_style"
         private const val KEY_COLOR_SPEC = "color_spec"
         private const val KEY_SLEEP_TIMER_FADE_DURATION = "sleep_timer_fade_duration"
         private const val KEY_SLEEP_TIMER_FADE_ENABLED = "sleep_timer_fade_enabled"
+        private const val KEY_CACHED_USER_ID = "cached_user_id"
+        private const val KEY_CACHED_USERNAME = "cached_username"
+        private const val KEY_TRACK_DYNAMIC_THEME = "track_dynamic_theme"
+        private const val KEY_ANIMATED_COVERS = "animated_covers_enabled"
+        private const val KEY_ANIMATED_COVERS_FADE_UI = "animated_covers_fade_ui_enabled"
+        private const val KEY_ANIMATED_ARTIST_PROFILES = "animated_artist_profiles_enabled"
 
         const val SLEEP_TIMER_FADE_DURATION_MIN = 0
         const val SLEEP_TIMER_FADE_DURATION_MAX = 30
@@ -253,6 +293,21 @@ class PlayerPreferences {
         private const val KEY_SELECTED_PROXY_PROFILE_ID = "selected_proxy_profile_id"
         private const val KEY_SYNC_DISCLAIMER_DISMISSED = "sync_disclaimer_dismissed"
 
+        const val KEY_AUDIO_PROVIDER_ORDER = "audio_provider_order"
+        const val KEY_QOBUZ_COUNTRY = "qobuz_country"
+        const val KEY_QOBUZ_CUSTOM_INSTANCES = "qobuz_custom_instances"
+        const val KEY_QOBUZ_QUALITY = "qobuz_quality"
+        const val KEY_TIDAL_RESOLVER_ENDPOINTS = "tidal_resolver_endpoints"
+        const val KEY_TIDAL_AUDIO_QUALITY = "tidal_audio_quality"
+        const val KEY_TIDAL_COOKIE = "tidal_cookie"
+        const val KEY_DEEZER_RESOLVER_URL = "deezer_resolver_url"
+        const val KEY_DEEZER_AUDIO_QUALITY = "deezer_audio_quality"
+        const val KEY_DEEZER_FAST_MODE = "deezer_fast_mode"
+        const val KEY_DEEZER_PROXY_MODE = "deezer_proxy_mode"
+        const val KEY_DEEZER_PROXY_URL = "deezer_proxy_url"
+        const val KEY_DEEZER_COOKIE = "deezer_cookie"
+        const val KEY_DEEZER_USE_ACCOUNT = "deezer_use_account"
+
         private val queueLock = Any()
     }
 
@@ -270,6 +325,35 @@ class PlayerPreferences {
 
     fun getCrossfadeDuration(): Int = Prefs.getInt(KEY_CROSSFADE_DURATION, 5)
     fun setCrossfadeDuration(seconds: Int) = Prefs.putInt(KEY_CROSSFADE_DURATION, seconds.coerceIn(1, 12))
+
+    fun getCrossfadeGapless(): Boolean = Prefs.getBoolean(KEY_CROSSFADE_GAPLESS, true)
+    fun setCrossfadeGapless(enabled: Boolean) = Prefs.putBoolean(KEY_CROSSFADE_GAPLESS, enabled)
+
+    fun getAutomixEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOMIX_ENABLED, false)
+    fun setAutomixEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOMIX_ENABLED, enabled)
+    fun automixEnabledFlow(): kotlinx.coroutines.flow.Flow<Boolean> = Prefs.booleanFlow(KEY_AUTOMIX_ENABLED, false)
+
+    fun getAutomixDebugOverlayEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOMIX_DEBUG_OVERLAY, false)
+    fun setAutomixDebugOverlayEnabled(enabled: Boolean) {
+        Prefs.putBoolean(KEY_AUTOMIX_DEBUG_OVERLAY, enabled)
+        com.alananasss.kittytune.audio.automix.AutomixManager.setDebugOverlayEnabled(enabled)
+    }
+    fun automixDebugOverlayEnabledFlow(): kotlinx.coroutines.flow.Flow<Boolean> = Prefs.booleanFlow(KEY_AUTOMIX_DEBUG_OVERLAY, false)
+
+    fun getAutomixTempoMatchEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOMIX_TEMPO_MATCH, true)
+    fun setAutomixTempoMatchEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOMIX_TEMPO_MATCH, enabled)
+
+    fun getAutomixHarmonicMixEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOMIX_HARMONIC_MIX, true)
+    fun setAutomixHarmonicMixEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOMIX_HARMONIC_MIX, enabled)
+
+    fun getAutomixDynamicMixPointsEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOMIX_DYNAMIC_MIX_POINTS, true)
+    fun setAutomixDynamicMixPointsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOMIX_DYNAMIC_MIX_POINTS, enabled)
+
+    fun getAutomixBassDuckingEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOMIX_BASS_DUCKING, true)
+    fun setAutomixBassDuckingEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOMIX_BASS_DUCKING, enabled)
+
+    fun getAutomixOverlapMode(): Int = Prefs.getInt(KEY_AUTOMIX_OVERLAP_MODE, 0)
+    fun setAutomixOverlapMode(mode: Int) = Prefs.putInt(KEY_AUTOMIX_OVERLAP_MODE, mode)
 
     fun getCustomFontEnabled() = Prefs.getBoolean(KEY_CUSTOM_FONT_ENABLED, true)
     fun setCustomFontEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_CUSTOM_FONT_ENABLED, enabled)
@@ -376,6 +460,54 @@ class PlayerPreferences {
 
     fun getLyricsDuetViewEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_DUET_VIEW, true)
     fun setLyricsDuetViewEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_DUET_VIEW, enabled)
+
+    fun getLyricsUnderCoverEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, false)
+    fun setLyricsUnderCoverEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, enabled)
+
+    fun getLyricsMultiStateToggle(): Boolean = Prefs.getBoolean(KEY_LYRICS_MULTI_STATE_TOGGLE, false)
+    fun setLyricsMultiStateToggle(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_MULTI_STATE_TOGGLE, enabled)
+
+    fun getLyricsUnderCoverPlacement(): LyricsUnderCoverPlacement {
+        val name = Prefs.getString(KEY_LYRICS_UNDER_COVER_PLACEMENT, LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST.name)
+        return runCatching { LyricsUnderCoverPlacement.valueOf(name ?: "") }.getOrDefault(LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST)
+    }
+    fun setLyricsUnderCoverPlacement(placement: LyricsUnderCoverPlacement) =
+        Prefs.putString(KEY_LYRICS_UNDER_COVER_PLACEMENT, placement.name)
+
+    fun getLyricsUnderCoverAlwaysVisible(): Boolean = Prefs.getBoolean(KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE, false)
+    fun setLyricsUnderCoverAlwaysVisible(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE, enabled)
+
+    fun setCachedUserId(id: Long) {
+        Prefs.putLong(KEY_CACHED_USER_ID, id)
+    }
+
+    fun getCachedUserId(): Long {
+        return Prefs.getLong(KEY_CACHED_USER_ID, 0L)
+    }
+
+    fun setCachedUsername(username: String?) {
+        Prefs.putString(KEY_CACHED_USERNAME, username)
+    }
+
+    fun getCachedUsername(): String? {
+        return Prefs.getString(KEY_CACHED_USERNAME, null)
+    }
+
+    fun getTrackDynamicTheme(): Boolean = Prefs.getBoolean(KEY_TRACK_DYNAMIC_THEME, false)
+    fun setTrackDynamicTheme(enabled: Boolean) = Prefs.putBoolean(KEY_TRACK_DYNAMIC_THEME, enabled)
+
+    fun getAnimatedCoversEnabled(): Boolean = Prefs.getBoolean(KEY_ANIMATED_COVERS, true)
+    fun setAnimatedCoversEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ANIMATED_COVERS, enabled)
+    fun animatedCoversFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_ANIMATED_COVERS, true)
+    fun getAnimatedCoversFlow(): Flow<Boolean> = animatedCoversFlow()
+
+    fun getAnimatedCoversFadeUiEnabled(): Boolean = Prefs.getBoolean(KEY_ANIMATED_COVERS_FADE_UI, false)
+    fun setAnimatedCoversFadeUiEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ANIMATED_COVERS_FADE_UI, enabled)
+
+    fun getAnimatedArtistProfilesEnabled(): Boolean = Prefs.getBoolean(KEY_ANIMATED_ARTIST_PROFILES, true)
+    fun setAnimatedArtistProfilesEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ANIMATED_ARTIST_PROFILES, enabled)
+    fun animatedArtistProfilesFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_ANIMATED_ARTIST_PROFILES, true)
+    fun getAnimatedArtistProfilesFlow(): Flow<Boolean> = animatedArtistProfilesFlow()
 
 
 
@@ -580,6 +712,62 @@ class PlayerPreferences {
     fun getLyricsAppleEffectEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_APPLE_EFFECT, true)
     fun setLyricsAppleEffectEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_APPLE_EFFECT, enabled)
 
+    fun getLyricsUiStyle(): LyricsUiStyle {
+        val name = Prefs.getString(KEY_LYRICS_UI_STYLE, LyricsUiStyle.ENHANCED.name)
+        return try {
+            LyricsUiStyle.valueOf(name ?: LyricsUiStyle.ENHANCED.name)
+        } catch (_: Exception) {
+            LyricsUiStyle.ENHANCED
+        }
+    }
+    fun setLyricsUiStyle(style: LyricsUiStyle) = Prefs.putString(KEY_LYRICS_UI_STYLE, style.name)
+
+    fun getLyricsFont(): LyricsFont {
+        val name = Prefs.getString(KEY_LYRICS_FONT, LyricsFont.APPLE.name)
+        return try {
+            LyricsFont.valueOf(name ?: LyricsFont.APPLE.name)
+        } catch (_: Exception) {
+            LyricsFont.APPLE
+        }
+    }
+    fun setLyricsFont(font: LyricsFont) = Prefs.putString(KEY_LYRICS_FONT, font.name)
+
+    fun getPlayerSliderStyle(): PlayerSliderStyle {
+        val name = Prefs.getString(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name)
+        return try {
+            PlayerSliderStyle.valueOf(name ?: PlayerSliderStyle.WAVY.name)
+        } catch (_: Exception) {
+            PlayerSliderStyle.WAVY
+        }
+    }
+    fun playerSliderStyleFlow(): Flow<PlayerSliderStyle> =
+        Prefs.stringFlow(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name).map { name ->
+            try {
+                PlayerSliderStyle.valueOf(name ?: PlayerSliderStyle.WAVY.name)
+            } catch (_: Exception) {
+                PlayerSliderStyle.WAVY
+            }
+        }
+    fun setPlayerSliderStyle(style: PlayerSliderStyle) = Prefs.putString(KEY_PLAYER_SLIDER_STYLE, style.name)
+
+    fun getLyricsLineBlurEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_LINE_BLUR, true)
+    fun setLyricsLineBlurEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_LINE_BLUR, enabled)
+
+    fun getLyricsLrcBounceEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, true)
+    fun setLyricsLrcBounceEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, enabled)
+
+    fun getLyricsBounceFactor(): Float = Prefs.getFloat(KEY_LYRICS_BOUNCE_FACTOR, 1.0f)
+    fun setLyricsBounceFactor(factor: Float) = Prefs.putFloat(KEY_LYRICS_BOUNCE_FACTOR, factor)
+
+    fun getLyricsGlowFactor(): Float = Prefs.getFloat(KEY_LYRICS_GLOW_FACTOR, 1.0f)
+    fun setLyricsGlowFactor(factor: Float) = Prefs.putFloat(KEY_LYRICS_GLOW_FACTOR, factor)
+
+    fun getLyricsFillTransitionWidth(): Float = Prefs.getFloat(KEY_LYRICS_FILL_TRANSITION_WIDTH, 8.0f)
+    fun setLyricsFillTransitionWidth(width: Float) = Prefs.putFloat(KEY_LYRICS_FILL_TRANSITION_WIDTH, width)
+
+    fun getLyricsLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_LINE_SPACING, 24.0f)
+    fun setLyricsLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_LINE_SPACING, spacing)
+
 
     fun getLyricsWordSyncEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_WORD_SYNC, true)
     fun setLyricsWordSyncEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_WORD_SYNC, enabled)
@@ -590,7 +778,9 @@ class PlayerPreferences {
     fun getLyricsTranslationLang(): String {
         val code = Prefs.getString(KEY_LYRICS_TRANSLATION_LANG, null)
         if (code != null) return code
-        return java.util.Locale.getDefault().language.take(2).lowercase()
+        val appLang = getAppLanguage()
+        if (appLang != AppLanguage.SYSTEM) return appLang.code
+        return com.alananasss.kittytune.utils.LocaleUtils.getCurrentLocale().language.take(2).lowercase()
     }
     fun setLyricsTranslationLang(lang: String) = Prefs.putString(KEY_LYRICS_TRANSLATION_LANG, lang)
 
@@ -823,6 +1013,34 @@ class PlayerPreferences {
     }
     fun setLyricsProvider(provider: com.alananasss.kittytune.ui.player.LyricsProvider) = Prefs.putString("lyrics_provider", provider.name)
 
+    fun getLyricsProviderOrder(): List<PreferredLyricsProvider> {
+        val raw = Prefs.getString("lyrics_provider_order", null)
+        return deserializeLyricsProviderOrder(raw)
+    }
+
+    fun setLyricsProviderOrder(order: List<PreferredLyricsProvider>) {
+        Prefs.putString("lyrics_provider_order", serializeLyricsProviderOrder(order))
+    }
+
+    fun getLyricsProviderEnabled(provider: PreferredLyricsProvider): Boolean {
+        return Prefs.getBoolean("enable_lyrics_provider_" + provider.name.lowercase(), true)
+    }
+
+    fun setLyricsProviderEnabled(provider: PreferredLyricsProvider, enabled: Boolean) {
+        Prefs.putBoolean("enable_lyrics_provider_" + provider.name.lowercase(), enabled)
+    }
+
+    fun getPaxsenixApiKey(): String {
+        val key = Prefs.getString("paxsenix_api_key", "") ?: ""
+        PaxsenixClient.setApiKey(key)
+        return key
+    }
+
+    fun setPaxsenixApiKey(key: String) {
+        PaxsenixClient.setApiKey(key)
+        Prefs.putString("paxsenix_api_key", key)
+    }
+
     fun savePlaybackState(track: Track?, position: Long, queue: List<Track>, context: PlaybackContext?, shuffleEnabled: Boolean, repeatMode: RepeatMode, saveQueue: Boolean = true) {
         if (!getPersistentQueueEnabled()) {
             Prefs.putBoolean(KEY_SHUFFLE_MODE, shuffleEnabled)
@@ -1019,6 +1237,82 @@ class PlayerPreferences {
     fun removeSpotifyArtistMapping(numericId: Long) {
         Prefs.remove("spotify_artist_mapping_$numericId")
     }
+
+    // Audio Provider Order
+    fun getAudioProviderOrder(): List<com.alananasss.kittytune.audio.providers.AudioProviderOrderItem> {
+        val raw = Prefs.getString(KEY_AUDIO_PROVIDER_ORDER, null)
+        return com.alananasss.kittytune.audio.providers.AudioProviderOrder.deserialize(raw)
+    }
+
+    fun setAudioProviderOrder(order: List<com.alananasss.kittytune.audio.providers.AudioProviderOrderItem>) {
+        Prefs.putString(KEY_AUDIO_PROVIDER_ORDER, com.alananasss.kittytune.audio.providers.AudioProviderOrder.serialize(order))
+    }
+
+    // Qobuz
+    fun getQobuzCountry(): String = Prefs.getString(KEY_QOBUZ_COUNTRY, "US") ?: "US"
+    fun setQobuzCountry(country: String) = Prefs.putString(KEY_QOBUZ_COUNTRY, country.trim().uppercase(java.util.Locale.US))
+
+    fun getQobuzCustomInstances(): String = Prefs.getString(KEY_QOBUZ_CUSTOM_INSTANCES, com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.DEFAULT_INSTANCE) ?: com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.DEFAULT_INSTANCE
+    fun setQobuzCustomInstances(instances: String) = Prefs.putString(KEY_QOBUZ_CUSTOM_INSTANCES, instances.trim())
+
+    fun getQobuzQuality(): Int = Prefs.getInt(KEY_QOBUZ_QUALITY, 27)
+    fun setQobuzQuality(quality: Int) = Prefs.putInt(KEY_QOBUZ_QUALITY, quality)
+
+    // Tidal
+    fun getTidalResolverEndpoints(): String = Prefs.getString(KEY_TIDAL_RESOLVER_ENDPOINTS, "") ?: ""
+    fun setTidalResolverEndpoints(endpoints: String) = Prefs.putString(KEY_TIDAL_RESOLVER_ENDPOINTS, endpoints.trim())
+
+    fun getTidalAudioQuality(): com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality {
+        val raw = Prefs.getString(KEY_TIDAL_AUDIO_QUALITY, com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.AAC_320.name)
+        return try {
+            com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.valueOf(raw ?: com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.AAC_320.name)
+        } catch (_: Exception) {
+            com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.AAC_320
+        }
+    }
+    fun setTidalAudioQuality(quality: com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality) =
+        Prefs.putString(KEY_TIDAL_AUDIO_QUALITY, quality.name)
+
+    fun getTidalCookie(): String = Prefs.getString(KEY_TIDAL_COOKIE, "") ?: ""
+    fun setTidalCookie(cookie: String) = Prefs.putString(KEY_TIDAL_COOKIE, cookie.trim())
+
+    // Deezer
+    fun getDeezerResolverUrl(): String = Prefs.getString(KEY_DEEZER_RESOLVER_URL, com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProvider.DEFAULT_RESOLVER_URL) ?: com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProvider.DEFAULT_RESOLVER_URL
+    fun setDeezerResolverUrl(url: String) = Prefs.putString(KEY_DEEZER_RESOLVER_URL, url.trim())
+
+    fun getDeezerAudioQuality(): com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality {
+        val raw = Prefs.getString(KEY_DEEZER_AUDIO_QUALITY, com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_128.name)
+        return try {
+            com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.valueOf(raw ?: com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_128.name)
+        } catch (_: Exception) {
+            com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_128
+        }
+    }
+    fun setDeezerAudioQuality(quality: com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality) =
+        Prefs.putString(KEY_DEEZER_AUDIO_QUALITY, quality.name)
+
+    fun getDeezerFastMode(): Boolean = Prefs.getBoolean(KEY_DEEZER_FAST_MODE, false)
+    fun setDeezerFastMode(fastMode: Boolean) = Prefs.putBoolean(KEY_DEEZER_FAST_MODE, fastMode)
+
+    fun getDeezerProxyMode(): com.alananasss.kittytune.audio.providers.deezer.DeezerProxyMode {
+        val raw = Prefs.getString(KEY_DEEZER_PROXY_MODE, com.alananasss.kittytune.audio.providers.deezer.DeezerProxyMode.DIRECT.name)
+        return try {
+            com.alananasss.kittytune.audio.providers.deezer.DeezerProxyMode.valueOf(raw ?: com.alananasss.kittytune.audio.providers.deezer.DeezerProxyMode.DIRECT.name)
+        } catch (_: Exception) {
+            com.alananasss.kittytune.audio.providers.deezer.DeezerProxyMode.DIRECT
+        }
+    }
+    fun setDeezerProxyMode(mode: com.alananasss.kittytune.audio.providers.deezer.DeezerProxyMode) =
+        Prefs.putString(KEY_DEEZER_PROXY_MODE, mode.name)
+
+    fun getDeezerProxyUrl(): String = Prefs.getString(KEY_DEEZER_PROXY_URL, "") ?: ""
+    fun setDeezerProxyUrl(url: String) = Prefs.putString(KEY_DEEZER_PROXY_URL, url.trim())
+
+    fun getDeezerCookie(): String = Prefs.getString(KEY_DEEZER_COOKIE, "") ?: ""
+    fun setDeezerCookie(cookie: String) = Prefs.putString(KEY_DEEZER_COOKIE, cookie.trim())
+
+    fun getDeezerUseAccount(): Boolean = Prefs.getBoolean(KEY_DEEZER_USE_ACCOUNT, true)
+    fun setDeezerUseAccount(useAccount: Boolean) = Prefs.putBoolean(KEY_DEEZER_USE_ACCOUNT, useAccount)
 }
 
 const val RIGHT_PANEL_MIN_WIDTH = 280f

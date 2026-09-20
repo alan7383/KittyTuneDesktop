@@ -31,69 +31,18 @@ import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
 import kotlinx.coroutines.launch
 
-data class Contributor(
-    val name: String,
-    val role: String,
-    val url: String
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AboutDialog(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onCreditsClick: () -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
     val appVersion = BuildConfig.VERSION_NAME
     val scope = rememberCoroutineScope()
     var tapCount by remember { mutableStateOf(0) }
     val updateStatus by UpdateManager.status.collectAsState()
-    var showCreditsSheet by remember { mutableStateOf(false) }
 
-    val contributors = listOf(
-        Contributor("alananasss", "Developer", "https://github.com/alan7383"),
-        Contributor("mattdotcat", "Translation", "https://t.me/b37246")
-    )
-
-    if (showCreditsSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showCreditsSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
-                Text(
-                    text = str("about_credits"),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 24.dp, bottom = 16.dp)
-                )
-                LazyColumn {
-                    items(contributors) { person ->
-                        ListItem(
-                            headlineContent = { Text(person.name, fontWeight = FontWeight.SemiBold) },
-                            supportingContent = { Text(person.role) },
-                            leadingContent = {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Text(
-                                            text = person.name.take(1).uppercase(),
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    }
-                                }
-                            },
-                            modifier = Modifier.clickable { uriHandler.openUri(person.url) }
-                        )
-                    }
-                }
-            }
-        }
-    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -296,7 +245,7 @@ fun AboutDialog(
                                     shape = shape,
                                     icon = Icons.Rounded.Groups,
                                     title = str("about_credits"),
-                                    onClick = { showCreditsSheet = true }
+                                    onClick = onCreditsClick
                                 )
                             },
                             { shape ->

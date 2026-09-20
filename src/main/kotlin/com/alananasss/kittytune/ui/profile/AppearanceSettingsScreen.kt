@@ -59,9 +59,14 @@ fun AppearanceSettingsScreen(
 
     var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
     var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme()) }
+    var trackDynamicTheme by remember { mutableStateOf(prefs.getTrackDynamicTheme()) }
+    var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
+    var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
+    var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
     var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
     var showCustomizeDialog by remember { mutableStateOf(false) }
     var verticalVolumeSlider by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
+    val sliderStyle by prefs.playerSliderStyleFlow().collectAsState(initial = prefs.getPlayerSliderStyle())
     var showIconDialog by remember { mutableStateOf(false) }
     val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
@@ -72,10 +77,21 @@ fun AppearanceSettingsScreen(
     var sidebarHoverExpand by remember { mutableStateOf(prefs.isSidebarHoverExpandEnabled()) }
 
     var showStartDestDialog by remember { mutableStateOf(false) }
+    var showSliderStyleDialog by remember { mutableStateOf(false) }
     var showInfoHalfDialog by remember { mutableStateOf(false) }
     var infoPanelHalf by remember { mutableStateOf(prefs.getInfoPanelHalf()) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showFontConfigDialog by remember { mutableStateOf(false) }
+
+    if (showSliderStyleDialog) {
+        com.alananasss.kittytune.ui.player.slider.SliderStyleDialog(
+            currentStyle = sliderStyle,
+            onStyleSelected = {
+                prefs.setPlayerSliderStyle(it)
+            },
+            onDismiss = { showSliderStyleDialog = false }
+        )
+    }
 
     val isPureBlackVisible = themeMode == AppThemeMode.DARK || (themeMode == AppThemeMode.SYSTEM && systemDark)
 
@@ -158,6 +174,12 @@ fun AppearanceSettingsScreen(
                         com.alananasss.kittytune.core.Strings.appLanguage = it.code
                         showLanguageDialog = false
                     }
+                    LanguageRadioButton(str("lang_german"), AppLanguage.GERMAN, appLanguage) {
+                        prefs.setAppLanguage(it)
+                        appLanguage = it
+                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
+                        showLanguageDialog = false
+                    }
                     LanguageRadioButton(str("lang_hungarian"), AppLanguage.HUNGARIAN, appLanguage) {
                         prefs.setAppLanguage(it)
                         appLanguage = it
@@ -165,6 +187,12 @@ fun AppearanceSettingsScreen(
                         showLanguageDialog = false
                     }
                     LanguageRadioButton(str("lang_russian"), AppLanguage.RUSSIAN, appLanguage) {
+                        prefs.setAppLanguage(it)
+                        appLanguage = it
+                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
+                        showLanguageDialog = false
+                    }
+                    LanguageRadioButton(str("lang_vietnamese"), AppLanguage.VIETNAMESE, appLanguage) {
                         prefs.setAppLanguage(it)
                         appLanguage = it
                         com.alananasss.kittytune.core.Strings.appLanguage = it.code
@@ -308,7 +336,7 @@ fun AppearanceSettingsScreen(
                         val isTitleBarRowVisible = remember {
                             System.getProperty("os.name").lowercase().contains("win")
                         }
-                        val titleBarIndex = if (isPureBlackVisible) 6 else 5
+                        val titleBarIndex = if (isPureBlackVisible) 8 else 7
                         val customizeIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
                         val totalVisibleItems = customizeIndex + 1
                         SettingsItem(
@@ -318,8 +346,10 @@ fun AppearanceSettingsScreen(
                                 AppLanguage.SYSTEM -> str("theme_system")
                                 AppLanguage.FRENCH -> str("lang_french")
                                 AppLanguage.ENGLISH -> str("lang_english")
+                                AppLanguage.GERMAN -> str("lang_german")
                                 AppLanguage.HUNGARIAN -> str("lang_hungarian")
                                 AppLanguage.RUSSIAN -> str("lang_russian")
+                                AppLanguage.VIETNAMESE -> str("lang_vietnamese")
                             },
                             onClick = { showLanguageDialog = true }
                         )
@@ -338,6 +368,18 @@ fun AppearanceSettingsScreen(
 
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 2),
+                            title = str("pref_theme_track_dynamic"),
+                            subtitle = str("pref_theme_track_dynamic_sub"),
+                            hasSwitch = true,
+                            switchState = trackDynamicTheme,
+                            onSwitchChange = {
+                                trackDynamicTheme = it
+                                prefs.setTrackDynamicTheme(it)
+                            }
+                        )
+
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, 3),
                             title = str("pref_vertical_volume_slider"),
                             subtitle = str("pref_vertical_volume_slider_sub"),
                             hasSwitch = true,
@@ -349,14 +391,26 @@ fun AppearanceSettingsScreen(
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 3),
+                            shape = getSettingsShape(totalVisibleItems, 4),
+                            title = str("pref_slider_style", "Style du curseur"),
+                            subtitle = when (sliderStyle) {
+                                PlayerSliderStyle.BAR -> str("slider_style_bar", "Bar")
+                                PlayerSliderStyle.WAVY -> str("slider_style_wavy", "Wavy")
+                                PlayerSliderStyle.SLIM -> str("slider_style_slim", "Slim")
+                                PlayerSliderStyle.SQUIGGLY -> str("slider_style_squiggly", "Squiggly")
+                            },
+                            onClick = { showSliderStyleDialog = true }
+                        )
+
+                        SettingsItem(
+                            shape = getSettingsShape(totalVisibleItems, 5),
                             title = str("pref_app_icon"),
                             subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.label ?: "Default",
                             onClick = { showIconDialog = true }
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 4),
+                            shape = getSettingsShape(totalVisibleItems, 6),
                             title = str("pref_colors"),
                             subtitle = str("pref_colors_subtitle"),
                             onClick = onNavigateToColors
@@ -368,7 +422,7 @@ fun AppearanceSettingsScreen(
                             exit = shrinkVertically() + fadeOut()
                         ) {
                             SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 5),
+                                shape = getSettingsShape(totalVisibleItems, 7),
                                 title = str("pref_pure_black"),
                                 hasSwitch = true,
                                 switchState = pureBlack,
@@ -448,8 +502,8 @@ fun AppearanceSettingsScreen(
             Box {
                 SettingsGroup(
                     title = str("settings_cat_general"),
-                    items = listOf(
-                        { shape ->
+                    items = buildList {
+                        add { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_start_screen"),
@@ -459,8 +513,8 @@ fun AppearanceSettingsScreen(
                                 },
                                 onClick = { showStartDestDialog = true }
                             )
-                        },
-                        { shape ->
+                        }
+                        add { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_info_half"),
@@ -471,8 +525,8 @@ fun AppearanceSettingsScreen(
                                 },
                                 onClick = { showInfoHalfDialog = true }
                             )
-                        },
-                        { shape ->
+                        }
+                        add { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_auto_update"),
@@ -484,8 +538,8 @@ fun AppearanceSettingsScreen(
                                     prefs.setAutoUpdateEnabled(it)
                                 }
                             )
-                        },
-                        { shape ->
+                        }
+                        add { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_custom_font"),
@@ -500,8 +554,8 @@ fun AppearanceSettingsScreen(
                                     { showFontConfigDialog = true }
                                 } else null
                             )
-                        },
-                        { shape ->
+                        }
+                        add { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_sidebar_hover_expand"),
@@ -514,7 +568,48 @@ fun AppearanceSettingsScreen(
                                 }
                             )
                         }
-                    )
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_animated_covers"),
+                                subtitle = str("pref_animated_covers_desc"),
+                                hasSwitch = true,
+                                switchState = animatedCovers,
+                                onSwitchChange = {
+                                    animatedCovers = it
+                                    prefs.setAnimatedCoversEnabled(it)
+                                }
+                            )
+                        }
+                        if (animatedCovers) {
+                            add { shape ->
+                                SettingsItem(
+                                    shape = shape,
+                                    title = str("pref_animated_covers_fade_ui"),
+                                    subtitle = str("pref_animated_covers_fade_ui_desc"),
+                                    hasSwitch = true,
+                                    switchState = animatedCoversFadeUi,
+                                    onSwitchChange = {
+                                        animatedCoversFadeUi = it
+                                        prefs.setAnimatedCoversFadeUiEnabled(it)
+                                    }
+                                )
+                            }
+                        }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_animated_artist_profiles"),
+                                subtitle = str("pref_animated_artist_profiles_desc"),
+                                hasSwitch = true,
+                                switchState = animatedArtistProfiles,
+                                onSwitchChange = {
+                                    animatedArtistProfiles = it
+                                    prefs.setAnimatedArtistProfilesEnabled(it)
+                                }
+                            )
+                        }
+                    }
                 )
             }
         }

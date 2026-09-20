@@ -281,7 +281,14 @@ object LikeRepository {
             DownloadManager.clearDeletedPlaylistId(playlistId)
         } else {
             current.remove(playlistId)
-            DownloadManager.addDeletedPlaylistId(playlistId)
+            val isUserCreated = try {
+                val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+                val p = kotlinx.coroutines.runBlocking { db.getPlaylist(playlistId) }
+                p?.isUserCreated == true
+            } catch (_: Exception) { false }
+            if (!isUserCreated) {
+                DownloadManager.addDeletedPlaylistId(playlistId)
+            }
         }
         _likedPlaylists.value = current
         DownloadManager.notifyLibraryUpdated()
@@ -484,7 +491,14 @@ object LikeRepository {
             DownloadManager.clearDeletedPlaylistId(playlistId)
         } else {
             current.remove(playlistId)
-            DownloadManager.addDeletedPlaylistId(playlistId)
+            val isUserCreated = try {
+                val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+                val p = kotlinx.coroutines.runBlocking { db.getPlaylist(playlistId) }
+                p?.isUserCreated == true
+            } catch (_: Exception) { false }
+            if (!isUserCreated) {
+                DownloadManager.addDeletedPlaylistId(playlistId)
+            }
         }
         _likedPlaylists.value = current
         DownloadManager.notifyLibraryUpdated()

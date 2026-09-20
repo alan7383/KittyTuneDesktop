@@ -87,6 +87,10 @@ import com.alananasss.kittytune.utils.Logger
          * signing secret out of their own client. See [com.alananasss.kittytune.data.yandex.YandexMusicClient].
          */
         YANDEX_MUSIC,
+
+        DEEZER,
+        TIDAL,
+        QOBUZ,
     }
 
     /**
@@ -132,6 +136,21 @@ import com.alananasss.kittytune.utils.Logger
         val searchResultsPlaylists = mutableStateListOf<Playlist>()
         val searchResultsYoutube = mutableStateListOf<Track>()
         val searchResultsSpotify = mutableStateListOf<Track>()
+
+        val searchResultsDeezerTracks = mutableStateListOf<Track>()
+        val searchResultsDeezerAlbums = mutableStateListOf<Playlist>()
+        val searchResultsDeezerPlaylists = mutableStateListOf<Playlist>()
+        val searchResultsDeezerArtists = mutableStateListOf<User>()
+
+        val searchResultsTidalTracks = mutableStateListOf<Track>()
+        val searchResultsTidalAlbums = mutableStateListOf<Playlist>()
+        val searchResultsTidalPlaylists = mutableStateListOf<Playlist>()
+        val searchResultsTidalArtists = mutableStateListOf<User>()
+
+        val searchResultsQobuzTracks = mutableStateListOf<Track>()
+        val searchResultsQobuzAlbums = mutableStateListOf<Playlist>()
+        val searchResultsQobuzPlaylists = mutableStateListOf<Playlist>()
+        val searchResultsQobuzArtists = mutableStateListOf<User>()
 
         /**
          * Apple Music hits, kept as catalogue entries rather than as tracks.
@@ -413,6 +432,9 @@ import com.alananasss.kittytune.utils.Logger
         private fun clearSearchResults() {
             searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear(); searchResultsYoutube.clear()
             searchResultsSpotify.clear(); searchResultsSpotifyAlbums.clear(); searchResultsSpotifyPlaylists.clear(); searchResultsSpotifyArtists.clear()
+            searchResultsDeezerTracks.clear(); searchResultsDeezerAlbums.clear(); searchResultsDeezerPlaylists.clear(); searchResultsDeezerArtists.clear()
+            searchResultsTidalTracks.clear(); searchResultsTidalAlbums.clear(); searchResultsTidalPlaylists.clear(); searchResultsTidalArtists.clear()
+            searchResultsQobuzTracks.clear(); searchResultsQobuzAlbums.clear(); searchResultsQobuzPlaylists.clear(); searchResultsQobuzArtists.clear()
             searchResultsApple.clear()
             yandexNotice = null
             tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
@@ -427,11 +449,74 @@ import com.alananasss.kittytune.utils.Logger
                     SearchSource.SPOTIFY -> performSpotifySearch(query)
                     SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
                     SearchSource.YANDEX_MUSIC -> performYandexSearch(query)
+                    SearchSource.DEEZER -> performDeezerSearch(query)
+                    SearchSource.TIDAL -> performTidalSearch(query)
+                    SearchSource.QOBUZ -> performQobuzSearch(query)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isSearchLoading = false
+            }
+        }
+
+        private suspend fun performDeezerSearch(query: String) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val result = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.search(query, limit = 50)
+                    withContext(Dispatchers.Main) {
+                        searchResultsDeezerTracks.clear()
+                        searchResultsDeezerTracks.addAll(result.tracks)
+                        searchResultsDeezerAlbums.clear()
+                        searchResultsDeezerAlbums.addAll(result.albums)
+                        searchResultsDeezerPlaylists.clear()
+                        searchResultsDeezerPlaylists.addAll(result.playlists)
+                        searchResultsDeezerArtists.clear()
+                        searchResultsDeezerArtists.addAll(result.artists)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        private suspend fun performTidalSearch(query: String) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val result = com.alananasss.kittytune.data.tidal.TidalSearchRepository.search(query, limit = 50)
+                    withContext(Dispatchers.Main) {
+                        searchResultsTidalTracks.clear()
+                        searchResultsTidalTracks.addAll(result.tracks)
+                        searchResultsTidalAlbums.clear()
+                        searchResultsTidalAlbums.addAll(result.albums)
+                        searchResultsTidalPlaylists.clear()
+                        searchResultsTidalPlaylists.addAll(result.playlists)
+                        searchResultsTidalArtists.clear()
+                        searchResultsTidalArtists.addAll(result.artists)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        private suspend fun performQobuzSearch(query: String) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val result = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.search(query, limit = 50)
+                    withContext(Dispatchers.Main) {
+                        searchResultsQobuzTracks.clear()
+                        searchResultsQobuzTracks.addAll(result.tracks)
+                        searchResultsQobuzAlbums.clear()
+                        searchResultsQobuzAlbums.addAll(result.albums)
+                        searchResultsQobuzPlaylists.clear()
+                        searchResultsQobuzPlaylists.addAll(result.playlists)
+                        searchResultsQobuzArtists.clear()
+                        searchResultsQobuzArtists.addAll(result.artists)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
 

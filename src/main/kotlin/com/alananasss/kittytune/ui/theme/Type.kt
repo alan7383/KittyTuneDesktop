@@ -1,10 +1,15 @@
 package com.alananasss.kittytune.ui.theme
 
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.platform.Font
+import com.alananasss.kittytune.data.local.LyricsFont
 
 val Typography = Typography()
 
@@ -95,3 +100,45 @@ fun getDynamicTypography(
         labelSmall = Typography.labelSmall.copy(fontFamily = customFamily)
     )
 }
+
+val LyricsFontFamily: FontFamily by lazy {
+    try {
+        val stream = object {}.javaClass.getResourceAsStream("/fonts/sfprodisplaybold.ttf")
+        if (stream != null) {
+            val bytes = stream.readBytes()
+            FontFamily(
+                listOf(
+                    androidx.compose.ui.text.font.FontWeight.W100,
+                    androidx.compose.ui.text.font.FontWeight.W200,
+                    androidx.compose.ui.text.font.FontWeight.W300,
+                    androidx.compose.ui.text.font.FontWeight.W400,
+                    androidx.compose.ui.text.font.FontWeight.W500,
+                    androidx.compose.ui.text.font.FontWeight.W600,
+                    androidx.compose.ui.text.font.FontWeight.W700,
+                    androidx.compose.ui.text.font.FontWeight.W800,
+                    androidx.compose.ui.text.font.FontWeight.W900
+                ).map { fw ->
+                    Font(identity = "sfprodisplaybold-$fw", data = bytes, weight = fw)
+                }
+            )
+        } else {
+            FontFamily.Default
+        }
+    } catch (_: Exception) {
+        FontFamily.Default
+    }
+}
+
+val LocalLyricsFontFamily = compositionLocalOf { LyricsFontFamily }
+
+@Composable
+fun rememberLyricsFontFamily(lyricsFont: LyricsFont): FontFamily {
+    val appFontFamily = MaterialTheme.typography.headlineMedium.fontFamily ?: FontFamily.Default
+    return remember(lyricsFont, appFontFamily) {
+        when (lyricsFont) {
+            LyricsFont.APPLE -> LyricsFontFamily
+            LyricsFont.APP_DEFAULT -> appFontFamily
+        }
+    }
+}
+
