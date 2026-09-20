@@ -2,9 +2,9 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
     kotlin("jvm") version "2.4.20"
-    kotlin("plugin.serialization") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.20"
     id("org.jetbrains.compose") version "1.12.0"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.20"
 }
 
 group = "com.alananasss"
@@ -37,18 +37,18 @@ dependencies {
     implementation(project(":shazamkit"))
     implementation(project(":innertube"))
 
-    implementation("io.github.alexzhirkevich:compottie:2.3.0")
+    implementation("io.github.alexzhirkevich:compottie:2.3.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
-    implementation("org.jetbrains.androidx.navigation:navigation-compose:2.10.0-alpha02")
+    implementation("org.jetbrains.androidx.navigation:navigation-compose:2.10.0-beta01")
     implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
 
-    implementation("io.coil-kt.coil3:coil-compose:3.6.0")
-    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.2")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.2")
 
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
@@ -88,16 +88,16 @@ dependencies {
     }
 
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
-    implementation("com.materialkolor:material-kolor:5.0.0")
+    implementation("com.materialkolor:material-kolor:5.0.1")
     implementation("org.xerial:sqlite-jdbc:3.53.4.0")
-    implementation("org.slf4j:slf4j-simple:2.0.18")
+    implementation("org.slf4j:slf4j-simple:2.0.19")
 
     // QR rendering for the Discord remote-auth (scan-to-log-in) flow. Same artifact and
     // version the Android app already uses for its VK QR login.
     implementation("com.google.zxing:core:3.5.4")
 
     implementation("org.json:json:20260814")
-    implementation("org.yaml:snakeyaml:2.6")
+    implementation("org.yaml:snakeyaml:2.7")
     implementation("com.github.pemistahl:lingua:1.2.2")
     implementation("net.java.dev.jna:jna:5.19.1")
     implementation("net.java.dev.jna:jna-platform:5.19.1")
