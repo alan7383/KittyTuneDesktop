@@ -35,15 +35,17 @@ object Strings {
      */
     fun locale(): Locale = Locale.forLanguageTag(effectiveLang())
 
-    /** The concrete language in use after resolving "system": "en", "fr", "hu" or "ru". */
+    /** The concrete language in use after resolving "system": "en", "fr", "de", "hu", "ru" or "vi". */
     val resolvedLanguage: String
         get() = effectiveLang()
 
     fun getAcceptLanguage(): String {
         return when (effectiveLang()) {
             "fr" -> "fr-FR,fr;q=0.9,en;q=0.8"
+            "de" -> "de-DE,de;q=0.9,en;q=0.8"
             "hu" -> "hu-HU,hu;q=0.9,en;q=0.8"
             "ru" -> "ru-RU,ru;q=0.9,en;q=0.8"
+            "vi" -> "vi-VN,vi;q=0.9,en;q=0.8"
             "en" -> "en-US,en;q=0.9"
             else -> {
                 val defaultLocale = Locale.getDefault()
@@ -59,11 +61,13 @@ object Strings {
     }
 
     private fun effectiveLang(): String = when (appLanguage) {
-        "fr", "en", "hu", "ru" -> appLanguage
+        "fr", "en", "de", "hu", "ru", "vi" -> appLanguage
         else -> when (Locale.getDefault().language) {
             "fr" -> "fr"
+            "de" -> "de"
             "hu" -> "hu"
             "ru" -> "ru"
+            "vi" -> "vi"
             else -> "en"
         }
     }
