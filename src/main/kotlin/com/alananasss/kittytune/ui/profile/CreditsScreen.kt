@@ -109,6 +109,15 @@ fun CreditsScreen(
                 category = ContributorCategory.COMMUNITY
             ),
             CreditContributor(
+                name = "dyr00l",
+                roleResKey = R.string.about_role_community_contrib,
+                descriptionResKey = R.string.about_role_community_contrib_desc,
+                badge = "QA & Feedback",
+                url = "https://github.com/dyr00l",
+                avatarUrl = "https://github.com/dyr00l.png",
+                category = ContributorCategory.COMMUNITY
+            ),
+            CreditContributor(
                 name = "sneoww98",
                 roleResKey = R.string.about_role_community_contrib,
                 descriptionResKey = R.string.about_role_community_contrib_desc,
