@@ -85,7 +85,7 @@ fun LyricsEnhanced(
 
     val lyricsLineBlurPreference = viewModel.lyricsLineBlurEnabled
     val lyricsLineBlur = lyricsLineBlurOverride ?: lyricsLineBlurPreference
-    val lyricsTextSize = fontSizeOverride ?: viewModel.lyricsFontSize
+    val lyricsTextSize = fontSizeOverride ?: if (isFullScreen) viewModel.lyricsFullScreenFontSize else viewModel.lyricsFontSize
     val lyricsLineSpacing = viewModel.lyricsLineSpacing
 
     val textColor = textColorOverride ?: MaterialTheme.colorScheme.onSurface
@@ -232,7 +232,17 @@ fun LyricsEnhanced(
                     val lyricsViewportOffset = remember(maxHeight) { maxHeight * 0.38f }
 
                     CompositionLocalProvider(LocalLayoutDirection provides lyricsLayoutDirection) {
-                        key(lyricsSessionKey, syncedLyrics, showTranslations, showPhonetics, isDuetActive, userAlignment, lyricsFontFamily) {
+                        key(
+                            lyricsSessionKey,
+                            syncedLyrics,
+                            showTranslations,
+                            showPhonetics,
+                            isDuetActive,
+                            userAlignment,
+                            lyricsFontFamily,
+                            lyricsTextSize,
+                            lyricsLineBlur
+                        ) {
                             KaraokeLyricsView(
                                 listState = listState,
                                 lyrics = syncedLyrics,
