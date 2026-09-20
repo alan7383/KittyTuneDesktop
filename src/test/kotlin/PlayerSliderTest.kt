@@ -46,7 +46,7 @@ class PlayerSliderTest {
 
         try {
             Prefs.putString(PlayerPreferences.KEY_PLAYER_SLIDER_STYLE, "UNKNOWN_INVALID_STYLE")
-            assertEquals(PlayerSliderStyle.BAR, prefs.getPlayerSliderStyle())
+            assertEquals(PlayerSliderStyle.WAVY, prefs.getPlayerSliderStyle())
         } finally {
             prefs.setPlayerSliderStyle(originalStyle)
         }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
@@ -46,7 +47,7 @@ fun <T> ExpressiveConnectedButtonGroup(
                 // Was accepted and then only used to decide the row's width, so every caller that passed it
                 // to squeeze a long label into a narrow segment got the default 24 dp either side anyway and
                 // watched the label wrap mid-word. It reaches the button now.
-                contentPadding = contentPadding ?: ToggleButtonDefaults.ContentPadding,
+                contentPadding = contentPadding ?: ButtonDefaults.ContentPadding,
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
