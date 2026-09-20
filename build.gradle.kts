@@ -90,7 +90,7 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("com.materialkolor:material-kolor:5.0.1")
     implementation("org.xerial:sqlite-jdbc:3.53.4.0")
-    implementation("org.slf4j:slf4j-simple:2.0.18")
+    implementation("org.slf4j:slf4j-simple:2.0.19")
 
     // QR rendering for the Discord remote-auth (scan-to-log-in) flow. Same artifact and
     // version the Android app already uses for its VK QR login.
