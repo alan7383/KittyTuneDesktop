@@ -79,8 +79,25 @@ fun PanelLyrics(
     style: PanelLyricsStyle = PanelLyricsStyle.Panel,
 ) {
     val lines = vm.lyricsLines
+    val effectiveFontSize = if (style.isFullScreen) vm.lyricsFullScreenFontSize else vm.lyricsFontSize
+    val textColor = MaterialTheme.colorScheme.onSurface
     when {
-        lines.isNotEmpty() -> PanelSyncedLyrics(vm, lines, modifier, style)
+        lines.isNotEmpty() -> {
+            when (vm.lyricsUiStyle) {
+                com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED -> {
+                    com.alananasss.kittytune.ui.player.lyrics.LyricsEnhanced(
+                        viewModel = vm,
+                        modifier = modifier,
+                        textColorOverride = textColor,
+                        fontSizeOverride = effectiveFontSize,
+                        isFullScreen = style.isFullScreen
+                    )
+                }
+                com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC -> {
+                    PanelSyncedLyrics(vm, lines, modifier, style)
+                }
+            }
+        }
         !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier, style)
         else -> Box(modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
             Text(
@@ -222,7 +239,8 @@ private fun PanelLyricLine(
     // difference you feel without being able to name, where Bold against SemiBold at this size reads as one
     // heavy block with a heavier bit in it (issue #33).
     val isCompact = style.anchorFraction == 0.50f && !style.isFullScreen
-    val base = if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium
+    val lyricsFontFamily = com.alananasss.kittytune.ui.theme.rememberLyricsFontFamily(vm.lyricsFont)
+    val base = (if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium).copy(fontFamily = lyricsFontFamily)
     val activeStyle = base.copy(fontWeight = FontWeight.ExtraBold, lineHeight = base.fontSize * 1.35f)
     val inactiveStyle = base.copy(fontWeight = FontWeight.Bold, lineHeight = base.fontSize * 1.35f)
 
@@ -236,7 +254,18 @@ private fun PanelLyricLine(
         else -> Alignment.Start
     }
 
-    val lineSinger = line.singer ?: LyricSinger.DEFAULT
+    val isDuetActive = vm.isDuetViewEnabled
+    val lineSinger = if (isDuetActive) {
+        line.singer?.takeIf { it != LyricSinger.DEFAULT }
+            ?: when (line.agent?.trim()?.lowercase()) {
+                "v2", "singer2", "2" -> LyricSinger.SINGER_2
+                "v1", "singer1", "1" -> LyricSinger.SINGER_1
+                "both", "group", "all", "v1000", "v2000", "3", "v3" -> LyricSinger.BOTH
+                else -> LyricSinger.DEFAULT
+            }
+    } else {
+        LyricSinger.DEFAULT
+    }
     val textAlign = when (lineSinger) {
         LyricSinger.SINGER_1 -> TextAlign.Start
         LyricSinger.SINGER_2 -> TextAlign.End

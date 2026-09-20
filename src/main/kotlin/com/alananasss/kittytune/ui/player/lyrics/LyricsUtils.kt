@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.player.lyrics
 
+import com.alananasss.kittytune.data.lyrics.parsers.QRCParser
+import com.alananasss.kittytune.data.lyrics.parsers.TTMLParser
 import com.mpatric.mp3agic.Mp3File
 import org.yaml.snakeyaml.Yaml
 import java.io.File
@@ -8,8 +10,11 @@ import java.util.regex.Pattern
 data class LyricWord(
     val text: String,
     val startTime: Long,
-    val endTime: Long
-)
+    val endTime: Long,
+    val isBackground: Boolean = false
+) {
+    val word: String get() = text
+}
 
 enum class LyricSinger {
     DEFAULT,
@@ -25,14 +30,183 @@ data class LyricLine(
     val words: List<LyricWord> = emptyList(),
     val translation: String? = null,
     val romanization: String? = null,
-    val singer: LyricSinger? = LyricSinger.DEFAULT
+    val singer: LyricSinger? = LyricSinger.DEFAULT,
+    val isBackground: Boolean = false,
+    val isInstrumental: Boolean = false,
+    val durationMs: Long = 0L,
+    val agent: String? = null
 )
+
+fun isRtlText(text: String): Boolean {
+    for (ch in text) {
+        when (Character.getDirectionality(ch)) {
+            Character.DIRECTIONALITY_RIGHT_TO_LEFT,
+            Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC,
+            Character.DIRECTIONALITY_RIGHT_TO_LEFT_EMBEDDING,
+            Character.DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE -> return true
+            Character.DIRECTIONALITY_LEFT_TO_RIGHT,
+            Character.DIRECTIONALITY_LEFT_TO_RIGHT_EMBEDDING,
+            Character.DIRECTIONALITY_LEFT_TO_RIGHT_OVERRIDE -> return false
+        }
+    }
+    return false
+}
+
+fun String.toLyricsWrappingUnits(): List<String> {
+    if (isEmpty()) return emptyList()
+
+    val units = mutableListOf<String>()
+    val currentWord = StringBuilder()
+    val characterIterator = java.text.BreakIterator.getCharacterInstance(java.util.Locale.ROOT)
+    characterIterator.setText(this)
+
+    fun flushCurrentWord() {
+        if (currentWord.isNotEmpty()) {
+            units += currentWord.toString()
+            currentWord.clear()
+        }
+    }
+
+    var start = characterIterator.first()
+    var end = characterIterator.next()
+    while (end != java.text.BreakIterator.DONE) {
+        val grapheme = substring(start, end)
+        val codePoint = grapheme.codePointAt(0)
+        when {
+            grapheme.all(Char::isWhitespace) -> {
+                currentWord.append(grapheme)
+                flushCurrentWord()
+            }
+            codePoint.isCjkCodePoint() -> {
+                flushCurrentWord()
+                units += grapheme
+            }
+            else -> {
+                currentWord.append(grapheme)
+            }
+        }
+        start = end
+        end = characterIterator.next()
+    }
+    flushCurrentWord()
+
+    return units
+}
+
+private fun Int.isCjkCodePoint(): Boolean =
+    when (Character.UnicodeScript.of(this)) {
+        Character.UnicodeScript.HAN,
+        Character.UnicodeScript.HANGUL,
+        Character.UnicodeScript.HIRAGANA,
+        Character.UnicodeScript.KATAKANA -> true
+        else -> false
+    }
+
+private val NoSpaceAfterChars: Set<Char> = setOf('(', '[', '{', '«', '‹', '“', '‘')
+
+fun shouldAppendWordSpace(
+    current: String,
+    next: String,
+): Boolean {
+    if (current.isEmpty() || next.isEmpty()) return false
+    val last = current.last()
+    val first = next.first()
+    if (last.isWhitespace() || first.isWhitespace()) return false
+    if (!first.isLetterOrDigit()) return false
+    return last !in NoSpaceAfterChars
+}
+
+fun formatLyricWordContents(
+    lineText: String,
+    words: List<LyricWord>,
+): List<String> {
+    if (words.isEmpty()) return emptyList()
+
+    val decodedWords = words.map { LyricsUtils.decodeHtmlEntities(it.word) }
+
+    if (decodedWords.any { it.endsWith(" ") || it.startsWith(" ") }) {
+        return decodedWords
+    }
+
+    val cleanLine = LyricsUtils.decodeHtmlEntities(lineText).trim()
+
+    if (decodedWords.joinToString("").trim() == cleanLine) {
+        return decodedWords
+    }
+
+    val result = ArrayList<String>(decodedWords.size)
+    var searchIndex = 0
+    for (i in decodedWords.indices) {
+        val word = decodedWords[i]
+        val pos = if (searchIndex < cleanLine.length) cleanLine.indexOf(word, searchIndex) else -1
+        if (pos != -1) {
+            searchIndex = pos + word.length
+            var hasTrailingSpaceInLine = false
+            while (searchIndex < cleanLine.length && cleanLine[searchIndex].isWhitespace()) {
+                hasTrailingSpaceInLine = true
+                searchIndex++
+            }
+            if (hasTrailingSpaceInLine) {
+                result.add("$word ")
+            } else {
+                result.add(word)
+            }
+        } else {
+            if (i < decodedWords.size - 1) {
+                result.add("$word ")
+            } else {
+                result.add(word)
+            }
+        }
+    }
+    return result
+}
 
 object LyricsUtils {
 
     private val LRC_PATTERN = Pattern.compile("\\[(\\d{2}):(\\d{2})\\.(\\d{2,3})\\](.*)")
     
     private val ENHANCED_WORD_PATTERN = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>([^<]*)")
+
+    private val NUMERIC_ENTITY_REGEX = Regex("&#(x)?([0-9a-fA-F]+);")
+
+    fun decodeHtmlEntities(text: String): String {
+        if (!text.contains('&')) return text
+        var out = text
+        if (out.contains("&apos;")) out = out.replace("&apos;", "'")
+        if (out.contains("&quot;")) out = out.replace("&quot;", "\"")
+        if (out.contains("&lt;")) out = out.replace("&lt;", "<")
+        if (out.contains("&gt;")) out = out.replace("&gt;", ">")
+        if (out.contains("&nbsp;")) out = out.replace("&nbsp;", " ")
+        if (out.contains("&copy;")) out = out.replace("&copy;", "©")
+        if (out.contains("&trade;")) out = out.replace("&trade;", "™")
+        if (out.contains("&ndash;")) out = out.replace("&ndash;", "–")
+        if (out.contains("&mdash;")) out = out.replace("&mdash;", "—")
+        if (out.contains("&bull;")) out = out.replace("&bull;", "•")
+        if (out.contains("&hellip;")) out = out.replace("&hellip;", "…")
+
+        if (out.contains("&#")) {
+            out = NUMERIC_ENTITY_REGEX.replace(out) { match ->
+                val isHex = match.groupValues[1].isNotEmpty()
+                val digits = match.groupValues[2]
+                val codePoint = digits.toIntOrNull(if (isHex) 16 else 10)
+                if (codePoint != null && Character.isValidCodePoint(codePoint)) {
+                    String(Character.toChars(codePoint))
+                } else {
+                    match.value
+                }
+            }
+        }
+
+        if (out.contains("&amp;")) {
+            out = out.replace("&amp;", "&")
+            if (out.contains("&#") || out.contains("&quot;") || out.contains("&apos;") || out.contains("&lt;") || out.contains("&gt;")) {
+                return decodeHtmlEntities(out)
+            }
+        }
+
+        return out
+    }
 
     /**
      * Which line is the current one at [positionMs]: the last one that has started.
@@ -83,11 +257,115 @@ object LyricsUtils {
         return target.coerceAtLeast(0L)
     }
 
+    fun insertInstrumentalBreaks(lines: List<LyricLine>): List<LyricLine> {
+        if (lines.isEmpty()) return lines
+        val result = mutableListOf<LyricLine>()
+        if (lines.first().startTime > 5000L) {
+            result.add(
+                LyricLine(
+                    text = "",
+                    startTime = 0L,
+                    endTime = lines.first().startTime,
+                    isInstrumental = true,
+                    durationMs = lines.first().startTime
+                )
+            )
+        }
+        for (i in lines.indices) {
+            val current = lines[i]
+            result.add(current)
+            if (i < lines.size - 1) {
+                val next = lines[i + 1]
+                val gap = next.startTime - current.endTime
+                if (gap >= 4000L) {
+                    result.add(
+                        LyricLine(
+                            text = "",
+                            startTime = current.endTime,
+                            endTime = next.startTime,
+                            isInstrumental = true,
+                            durationMs = gap
+                        )
+                    )
+                }
+            }
+        }
+        return result
+    }
+
     fun parseLyricsContent(content: String, totalDurationMs: Long): List<LyricLine> {
-        return if (content.trim().startsWith("version:")) {
-            parseLyricsFile(content, totalDurationMs)
-        } else {
-            parseLrc(content, totalDurationMs)
+        val trimmed = content.trim()
+        val parsed = when {
+            trimmed.startsWith("<tt") || trimmed.contains("<tt ") || trimmed.contains("<tt:") || trimmed.startsWith("<?xml") -> {
+                parseTtml(trimmed, totalDurationMs)
+            }
+            QRCParser.isQrc(trimmed) -> {
+                parseQrc(trimmed, totalDurationMs)
+            }
+            trimmed.startsWith("version:") -> {
+                parseLyricsFile(content, totalDurationMs)
+            }
+            else -> {
+                parseLrc(content, totalDurationMs)
+            }
+        }
+        return insertInstrumentalBreaks(parsed)
+    }
+
+    fun parseTtml(ttml: String, totalDurationMs: Long): List<LyricLine> {
+        val parsedLines = TTMLParser.parseTTML(ttml)
+        if (parsedLines.isEmpty()) return emptyList()
+        return parsedLines.map { line ->
+            val words = line.words.filter { it.text.isNotEmpty() }.map { word ->
+                LyricWord(
+                    text = word.text,
+                    startTime = (word.startTime * 1000.0).toLong(),
+                    endTime = (word.endTime * 1000.0).toLong(),
+                )
+            }
+            LyricLine(
+                text = line.text,
+                startTime = (line.startTime * 1000.0).toLong(),
+                endTime = (line.endTime * 1000.0).toLong(),
+                words = words,
+                translation = line.providerTranslationText,
+                romanization = line.providerRomanizedText,
+                singer = when (line.agent?.lowercase()?.trim()) {
+                    "v1", "singer1", "1" -> LyricSinger.SINGER_1
+                    "v2", "singer2", "2" -> LyricSinger.SINGER_2
+                    "both", "all", "group", "v1000", "v2000", "3", "v3" -> LyricSinger.BOTH
+                    else -> LyricSinger.DEFAULT
+                },
+                isBackground = line.isBackground,
+                agent = line.agent
+            )
+        }
+    }
+
+    fun parseQrc(qrc: String, totalDurationMs: Long): List<LyricLine> {
+        val parsedLines = QRCParser.parseQrc(qrc)
+        if (parsedLines.isEmpty()) return emptyList()
+        return parsedLines.map { line ->
+            val words = line.words.filter { it.text.isNotEmpty() }.map { word ->
+                LyricWord(
+                    text = word.text,
+                    startTime = (word.startTime * 1000.0).toLong(),
+                    endTime = (word.endTime * 1000.0).toLong(),
+                )
+            }
+            LyricLine(
+                text = line.text,
+                startTime = (line.startTime * 1000.0).toLong(),
+                endTime = (line.endTime * 1000.0).toLong(),
+                words = words,
+                singer = when (line.agent?.lowercase()?.trim()) {
+                    "v1", "singer1", "1" -> LyricSinger.SINGER_1
+                    "v2", "singer2", "2" -> LyricSinger.SINGER_2
+                    "both", "all", "group", "v1000", "v2000", "3", "v3" -> LyricSinger.BOTH
+                    else -> LyricSinger.DEFAULT
+                },
+                agent = line.agent
+            )
         }
     }
 
@@ -146,17 +424,17 @@ object LyricsUtils {
                 var processedText = rawText
                 val lower = rawText.trim().lowercase()
                 when {
-                    lower.startsWith("v1:") || lower.startsWith("[v1]") || lower.startsWith("(v1)") || lower.startsWith("[singer1]") -> {
+                    lower.startsWith("v1:") || lower.startsWith("[v1]") || lower.startsWith("(v1)") || lower.startsWith("[singer1]") || lower.startsWith("(singer1)") || lower.startsWith("[singer 1]") || lower.startsWith("(singer 1)") || lower.startsWith("singer 1:") || lower.startsWith("singer1:") -> {
                         singer = LyricSinger.SINGER_1
-                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v1:|\\[v1\\]|\\(v1\\)|\\[singer1\\])\\s*"), "")
+                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v1:|\\[v1\\]|\\(v1\\)|\\[singer1\\]|\\(singer1\\)|\\[singer 1\\]|\\(singer 1\\)|singer 1:|singer1:)\\s*"), "")
                     }
-                    lower.startsWith("v2:") || lower.startsWith("[v2]") || lower.startsWith("(v2)") || lower.startsWith("[singer2]") -> {
+                    lower.startsWith("v2:") || lower.startsWith("[v2]") || lower.startsWith("(v2)") || lower.startsWith("[singer2]") || lower.startsWith("(singer2)") || lower.startsWith("[singer 2]") || lower.startsWith("(singer 2)") || lower.startsWith("singer 2:") || lower.startsWith("singer2:") -> {
                         singer = LyricSinger.SINGER_2
-                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v2:|\\[v2\\]|\\(v2\\)|\\[singer2\\])\\s*"), "")
+                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v2:|\\[v2\\]|\\(v2\\)|\\[singer2\\]|\\(singer2\\)|\\[singer 2\\]|\\(singer 2\\)|singer 2:|singer2:)\\s*"), "")
                     }
-                    lower.startsWith("v3:") || lower.startsWith("[v3]") || lower.startsWith("(v3)") || lower.startsWith("[both]") || lower.startsWith("[all]") -> {
+                    lower.startsWith("v3:") || lower.startsWith("[v3]") || lower.startsWith("(v3)") || lower.startsWith("[both]") || lower.startsWith("[all]") || lower.startsWith("(both)") || lower.startsWith("(all)") -> {
                         singer = LyricSinger.BOTH
-                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v3:|\\[v3\\]|\\(v3\\)|\\[both\\]|\\[all\\])\\s*"), "")
+                        processedText = processedText.trim().replaceFirst(Regex("^(?i)(v3:|\\[v3\\]|\\(v3\\)|\\[both\\]|\\[all\\]|\\(both\\)|\\(all\\))\\s*"), "")
                     }
                     lower.startsWith("[bg:") && lower.endsWith("]") -> {
                         singer = LyricSinger.SINGER_2

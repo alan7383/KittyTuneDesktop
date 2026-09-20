@@ -239,9 +239,18 @@ fun Sidebar(
             playerViewModel = playerViewModel,
             fullScreen = false,
             collapse = collapse,
-            onImport = { navController.navigate("music_import") },
-            onHistory = { navController.navigate("history") },
-            onUpload = { navController.navigate("upload") },
+            onImport = {
+                playerViewModel.showLyricsSheet = false
+                navController.navigate("music_import")
+            },
+            onHistory = {
+                playerViewModel.showLyricsSheet = false
+                navController.navigate("history")
+            },
+            onUpload = {
+                playerViewModel.showLyricsSheet = false
+                navController.navigate("upload")
+            },
             modifier = Modifier.weight(1f),
         )
 
@@ -296,7 +305,15 @@ private fun SidebarProfileRow(
     TrackSidebarPopup(showMenu || showAboutDialog, libraryViewModel)
 
     if (showAboutDialog) {
-        com.alananasss.kittytune.ui.profile.AboutDialog(onDismiss = { showAboutDialog = false })
+        com.alananasss.kittytune.ui.profile.AboutDialog(
+            onDismiss = { showAboutDialog = false },
+            onCreditsClick = {
+                showAboutDialog = false
+                playerViewModel.isPlayerExpanded = false
+                playerViewModel.showLyricsSheet = false
+                navController.navigate("credits")
+            }
+        )
     }
 
     LaunchedEffect(Unit) {
@@ -407,9 +424,19 @@ private fun ProfileMenu(
             },
         )
         DropdownMenuItem(
+            text = { Text(str("about_credits")) },
+            onClick = {
+                onDismiss()
+                playerViewModel.isPlayerExpanded = false
+                playerViewModel.showLyricsSheet = false
+                navController.navigate("credits")
+            },
+        )
+        DropdownMenuItem(
             text = { Text(str("profile_menu_settings")) },
             onClick = {
                 onDismiss()
+                playerViewModel.showLyricsSheet = false
                 navController.navigate("settings")
             },
         )
@@ -417,6 +444,7 @@ private fun ProfileMenu(
             text = { Text(str("nav_upload")) },
             onClick = {
                 onDismiss()
+                playerViewModel.showLyricsSheet = false
                 navController.navigate("upload")
             },
         )
@@ -424,6 +452,7 @@ private fun ProfileMenu(
             text = { Text(str("nav_profile")) },
             onClick = {
                 onDismiss()
+                playerViewModel.showLyricsSheet = false
                 playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
             },
         )
@@ -506,6 +535,7 @@ fun LibraryPanel(
     TrackSidebarPopup(isAnyDialogOpen, libraryViewModel)
 
     val openEntry: (LibEntry) -> Unit = { entry ->
+        playerViewModel.showLyricsSheet = false
         if (entry.track != null) {
             val tracks = libraryViewModel.uploadedTracks.toList()
             val idx = tracks.indexOfFirst { it.id == entry.track.id }.coerceAtLeast(0)

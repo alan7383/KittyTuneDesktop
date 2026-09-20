@@ -130,6 +130,7 @@ fun MainScreen(
                 destinationId == "upload" -> "upload"
                 destinationId == "recognition" -> "recognition"
                 destinationId == "recognition_history" -> "recognition_history"
+                destinationId == "credits" -> "credits"
                 destinationId.startsWith("edit_track:") -> "edit_track/${destinationId.removePrefix("edit_track:")}"
                 destinationId.startsWith("profile:") -> "profile/${destinationId.removePrefix("profile:")}"
                 // Spotify artist profiles route to the profile screen; the string
@@ -145,10 +146,12 @@ fun MainScreen(
                 showNowPlayingPanel = true
                 playerPrefs.setRightPanelOpen(true)
                 nowPlayingTab = NowPlayingTab.QUEUE
-            } else if (!isSameRoute(navController, targetRoute)) {
+            } else {
                 playerViewModel.isPlayerExpanded = false
                 playerViewModel.showLyricsSheet = false
-                navController.navigate(targetRoute)
+                if (!isSameRoute(navController, targetRoute)) {
+                    navController.navigate(targetRoute)
+                }
             }
             playerViewModel.onNavigationHandled()
         }
@@ -301,14 +304,17 @@ fun MainScreen(
                     fullScreen = true,
                     onImport = {
                         libraryViewModel.isLibraryFullScreen = false
+                        playerViewModel.showLyricsSheet = false
                         navController.navigate("music_import")
                     },
                     onHistory = {
                         libraryViewModel.isLibraryFullScreen = false
+                        playerViewModel.showLyricsSheet = false
                         navController.navigate("history")
                     },
                     onUpload = {
                         libraryViewModel.isLibraryFullScreen = false
+                        playerViewModel.showLyricsSheet = false
                         navController.navigate("upload")
                     },
                     modifier = Modifier.weight(1f).fillMaxSize()
@@ -594,6 +600,11 @@ fun MainScreen(
                                 playerViewModel = playerViewModel
                             )
                         }
+                        composable("credits") {
+                            com.alananasss.kittytune.ui.profile.CreditsScreen(
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
                         composable("appearance_settings") {
                             com.alananasss.kittytune.ui.profile.AppearanceSettingsScreen(
                                 onNavigateToColors = { navController.navigate("color_palette") },
@@ -642,6 +653,26 @@ fun MainScreen(
                         }
                         composable("proxy_settings") {
                             com.alananasss.kittytune.ui.profile.ProxySettingsScreen(
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                        composable("provider_order") {
+                            com.alananasss.kittytune.ui.profile.integrations.ProviderOrderScreen(
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                        composable("qobuz_settings") {
+                            com.alananasss.kittytune.ui.profile.integrations.QobuzSettingsScreen(
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                        composable("tidal_settings") {
+                            com.alananasss.kittytune.ui.profile.integrations.TidalSettingsScreen(
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
+                        composable("deezer_settings") {
+                            com.alananasss.kittytune.ui.profile.integrations.DeezerSettingsScreen(
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
@@ -1103,6 +1134,16 @@ fun MainScreen(
     TrackOptionsOverlays(playerViewModel)
 
     CoverViewerOverlay()
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.BottomEnd
+    ) {
+        com.alananasss.kittytune.ui.player.automix.AutomixDebugOverlay(
+            currentPositionMs = playerViewModel.currentPosition,
+            modifier = Modifier.padding(bottom = 100.dp, end = 20.dp)
+        )
+    }
 
     // The whole window, above everything — the sidebar, the player bar, the lot (issue #33).
     //
