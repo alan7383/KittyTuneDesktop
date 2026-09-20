@@ -526,7 +526,7 @@ fun KaraokeLineText(
             val density = LocalDensity.current
             val availableWidthPx = with(density) { maxWidth.toPx() }
 
-            val textStyle = remember(line is KaraokeLine.AccompanimentKaraokeLine) {
+            val textStyle = remember(normalLineTextStyle, accompanimentLineTextStyle, line is KaraokeLine.AccompanimentKaraokeLine) {
                 val baseStyle =
                     if (line is KaraokeLine.AccompanimentKaraokeLine) accompanimentLineTextStyle
                     else normalLineTextStyle
@@ -545,7 +545,7 @@ fun KaraokeLineText(
                 }
             }
 
-            val initialLayouts by remember(precalculatedLayouts) {
+            val initialLayouts by remember(precalculatedLayouts, textStyle, phoneticTextStyle, spaceWidth) {
                 derivedStateOf {
                     precalculatedLayouts ?: measureSyllablesAndDetermineAnimation(
                         syllables = processedSyllables,
@@ -558,7 +558,7 @@ fun KaraokeLineText(
                 }
             }
 
-            val wrappedLines by remember {
+            val wrappedLines by remember(initialLayouts, availableWidthPx, textStyle) {
                 derivedStateOf {
                     calculateBalancedLines(
                         syllableLayouts = initialLayouts,
