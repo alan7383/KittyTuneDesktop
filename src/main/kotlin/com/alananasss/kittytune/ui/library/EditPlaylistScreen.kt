@@ -215,7 +215,7 @@ fun EditPlaylistScreen(
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showSetTypeDropdown) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor().trackTextInput()
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).trackTextInput()
                         )
                         ExposedDropdownMenu(
                             expanded = showSetTypeDropdown,
@@ -284,7 +284,7 @@ fun EditPlaylistScreen(
                             onValueChange = {},
                             readOnly = true,
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showGenreDropdown) },
-                            modifier = Modifier.fillMaxWidth().menuAnchor().trackTextInput()
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).trackTextInput()
                         )
                         ExposedDropdownMenu(
                             expanded = showGenreDropdown,

@@ -885,7 +885,7 @@ private fun VolumeHoverControl(
                             state = state,
                             // A volume slider fills from the bottom. The default direction puts
                             // the origin at the top, which is what made it read upside down.
-                            reverseDirection = true,
+                            topToBottom = false,
                             modifier = Modifier.height(150.dp),
                         )
                         Spacer(Modifier.height(8.dp))

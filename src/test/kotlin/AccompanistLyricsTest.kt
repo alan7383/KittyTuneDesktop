@@ -141,8 +141,10 @@ class AccompanistLyricsTest {
         assertEquals("Center text", leftLine.content)
     }
 
+    @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
     @Test
     fun testAwesomeAndNonAwesomeBaselineAlignment() {
+        androidx.compose.ui.platform.registerSkikoComposeImplementation()
         val stream = object {}.javaClass.getResourceAsStream("/fonts/google_sans_flex.ttf")
         val bytes = stream!!.readBytes()
         val customFont = androidx.compose.ui.text.platform.Font(identity = "googlesans", data = bytes, weight = androidx.compose.ui.text.font.FontWeight.Bold)
