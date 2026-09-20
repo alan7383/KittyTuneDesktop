@@ -26,9 +26,14 @@ object AppBootstrap {
     @Volatile
     private var done = false
 
+    @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
     fun init() {
         if (done) return
         done = true
+
+        runCatching {
+            androidx.compose.ui.platform.registerSkikoComposeImplementation()
+        }
 
         // Suppress benign Skiko / Compose Multiplatform desktop redrawer race conditions
         // such as "RootNodeOwner is already disposed" during fast scene disposal on AWT event thread.
