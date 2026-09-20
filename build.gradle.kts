@@ -37,7 +37,7 @@ dependencies {
     implementation(project(":shazamkit"))
     implementation(project(":innertube"))
 
-    implementation("io.github.alexzhirkevich:compottie:2.3.0")
+    implementation("io.github.alexzhirkevich:compottie:2.3.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.11.0")
