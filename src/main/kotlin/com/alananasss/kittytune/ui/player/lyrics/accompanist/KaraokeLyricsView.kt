@@ -299,12 +299,12 @@ fun KaraokeLyricsView(
     }
 
     LaunchedEffect(
-        layoutCache,
+        lyrics,
         stableOffsetPx,
     ) {
         androidx.compose.runtime.snapshotFlow { lyricsFocusState.firstIndex }
             .collect { firstIndex ->
-                if (!scrollInCode.value) {
+                if (firstIndex in lyrics.lines.indices && !scrollInCode.value) {
                     val items = listState.layoutInfo.visibleItemsInfo
                     val targetItem = items.firstOrNull { it.index == firstIndex }
                     val scrollOffset =
@@ -312,7 +312,7 @@ fun KaraokeLyricsView(
                     try {
                         scrollInCode.value = true
                         if (scrollOffset != null) {
-                            listState.scrollBy(scrollOffset.toFloat())
+                            listState.scrollBy(scrollOffset)
                         } else {
                             listState.animateScrollToItem(
                                 firstIndex,

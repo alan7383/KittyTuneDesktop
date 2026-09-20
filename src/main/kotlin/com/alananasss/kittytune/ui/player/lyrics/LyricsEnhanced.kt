@@ -58,28 +58,15 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlin.math.abs
-import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 private const val LRC_LEAD_MS = 300L
 private const val WORD_SYNC_LEAD_MS = 0L
-private const val MANUAL_SCROLL_TIMEOUT_MS = 3000L
-private const val MANUAL_SCROLL_DEBOUNCE_MS = 50L
-private const val LYRIC_FOCUS_ANCHOR_RATIO = 0.42f
-private const val LYRIC_LINE_SYNC_TOP_ANCHOR_RATIO = 0.35f
-private const val LYRIC_FOCUS_TOP_GUARD_RATIO = 0.18f
-private const val LYRIC_FOCUS_BOTTOM_GUARD_RATIO = 0.24f
-private const val LYRIC_FOCUS_MIN_SCROLL_PX = 6
-private const val LYRIC_FOCUS_ANIMATED_DISTANCE = 12
 private const val SMOOTH_PLAYBACK_MAX_FORWARD_DRIFT_MS = 80L
 private const val SMOOTH_PLAYBACK_MAX_BACKWARD_DRIFT_MS = 180L
 private const val SMOOTH_PLAYBACK_DRIFT_CORRECTION = 0.55f
-private const val LYRIC_FOCUS_SCROLL_DURATION_MS = 520
 private const val MIN_KARAOKE_SYLLABLE_DURATION_MS = 1
 
 @Composable
@@ -130,32 +117,31 @@ fun LyricsEnhanced(
     val playbackPositionMs = remember(viewModel.currentTrack?.id) {
         mutableLongStateOf(MusicManager.player.currentPosition.coerceAtLeast(0L))
     }
-    var isManualScrolling by remember { mutableStateOf(false) }
-    var isUserTouching by remember { mutableStateOf(false) }
-    var lastManualScrollTime by remember { mutableLongStateOf(0L) }
     val listState = key(lyricsSessionKey) { rememberLazyListState() }
 
     LaunchedEffect(lyricsSessionKey) {
         playbackPositionMs.longValue = MusicManager.player.currentPosition.coerceAtLeast(0L)
-        isManualScrolling = false
-        isUserTouching = false
-        lastManualScrollTime = 0L
     }
 
     // High-precision frame loop tracking smooth playback position with PLL drift correction
     LaunchedEffect(viewModel.currentTrack?.id, lyricsSessionKey, viewModel.effectsState.speed) {
-        var wasSliderActive = false
         var anchorPlayerPositionMs = MusicManager.player.currentPosition.coerceAtLeast(0L)
         var anchorFrameNanos = 0L
         while (isActive) {
             val isSliderActive = viewModel.isScrubbing
-            if (isSliderActive && !wasSliderActive) {
-                isManualScrolling = false
-            }
-            wasSliderActive = isSliderActive
-
-            val rawPosition = (if (isSliderActive) viewModel.currentPosition else MusicManager.player.currentPosition).coerceAtLeast(0L)
             val isPlaying = MusicManager.player.isPlaying
+
+            val rawPosition = if (isSliderActive || !isPlaying) {
+                viewModel.currentPosition.coerceAtLeast(0L)
+            } else {
+                val enginePos = MusicManager.player.currentPosition.coerceAtLeast(0L)
+                val modelPos = viewModel.currentPosition.coerceAtLeast(0L)
+                if (abs(enginePos - modelPos) > 1500L) {
+                    modelPos
+                } else {
+                    enginePos
+                }
+            }
 
             if (isSliderActive || !isPlaying) {
                 anchorPlayerPositionMs = rawPosition
@@ -202,95 +188,6 @@ fun LyricsEnhanced(
         }
     }
 
-    val lineFocusPosition: () -> Int = remember(syncedLyrics) {
-        {
-            syncedLyrics.positionForStableLineFocus(playbackSyncPosition())
-        }
-    }
-
-    val nestedScrollConnection = remember {
-        var lastUserScrollEventMs = 0L
-        object : NestedScrollConnection {
-            private fun markManualScroll() {
-                val now = System.currentTimeMillis()
-                if (now - lastUserScrollEventMs >= MANUAL_SCROLL_DEBOUNCE_MS) {
-                    isManualScrolling = true
-                    lastManualScrollTime = now
-                    lastUserScrollEventMs = now
-                }
-            }
-
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (source == NestedScrollSource.UserInput) {
-                    markManualScroll()
-                }
-                return Offset.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (isManualScrolling) {
-                    lastManualScrollTime = System.currentTimeMillis()
-                }
-                return Velocity.Zero
-            }
-        }
-    }
-
-    LaunchedEffect(isManualScrolling, isUserTouching, lastManualScrollTime) {
-        if (isManualScrolling) {
-            // Keep timeout from elapsing while user is touching screen or list is actively flinging
-            while (isUserTouching || listState.isScrollInProgress) {
-                lastManualScrollTime = System.currentTimeMillis()
-                delay(100L)
-            }
-            while (isActive) {
-                val elapsed = System.currentTimeMillis() - lastManualScrollTime
-                val remaining = MANUAL_SCROLL_TIMEOUT_MS - elapsed
-                if (remaining <= 0) break
-                delay(remaining.coerceAtLeast(10L))
-                if (isUserTouching || listState.isScrollInProgress) {
-                    lastManualScrollTime = System.currentTimeMillis()
-                }
-            }
-            if (!isUserTouching && !listState.isScrollInProgress) {
-                isManualScrolling = false
-            }
-        }
-    }
-
-    // Auto-scroll keeping active lyric in center focus
-    LaunchedEffect(lyricsSessionKey, syncedLyrics, isSynced) {
-        if (!isSynced || syncedLyrics.lines.isEmpty()) return@LaunchedEffect
-        snapshotFlow {
-            listState.layoutInfo.viewportEndOffset > listState.layoutInfo.viewportStartOffset
-        }.first { it }
-
-        var forceNextScroll = true
-        snapshotFlow {
-            if (isManualScrolling) {
-                null
-            } else {
-                syncedLyrics
-                    .getCurrentFirstHighlightLineIndexByTime(lineFocusPosition())
-                    .takeIf { index -> index in syncedLyrics.lines.indices }
-            }
-        }.distinctUntilChanged()
-            .collectLatest { index ->
-                if (index == null) {
-                    forceNextScroll = true
-                    return@collectLatest
-                }
-
-                listState.scrollLyricIntoFocus(
-                    index = index,
-                    animateToNearbyItem = true,
-                    force = forceNextScroll,
-                    alignByItemCenter = isWordSyncedFormat,
-                )
-                forceNextScroll = false
-            }
-    }
-
     val lyricsFontFamily = rememberLyricsFontFamily(viewModel.lyricsFont)
     val normalTextStyle = MaterialTheme.typography.headlineMedium.copy(
         fontSize = lyricsTextSize.sp,
@@ -330,25 +227,7 @@ fun LyricsEnhanced(
 
             else -> {
                 BoxWithConstraints(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    val anyPressed = event.changes.any { it.pressed }
-                                    if (anyPressed) {
-                                        isUserTouching = true
-                                        isManualScrolling = true
-                                        lastManualScrollTime = System.currentTimeMillis()
-                                    } else if (isUserTouching) {
-                                        isUserTouching = false
-                                        lastManualScrollTime = System.currentTimeMillis()
-                                    }
-                                }
-                            }
-                        }
-                        .nestedScroll(nestedScrollConnection)
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     val lyricsViewportOffset = remember(maxHeight) { maxHeight * 0.38f }
 
@@ -359,11 +238,11 @@ fun LyricsEnhanced(
                                 lyrics = syncedLyrics,
                                 currentPosition = playbackSyncPosition,
                                 onLineClicked = { line ->
-                                    if (line.start >= 0) {
-                                        isManualScrolling = false
-                                        isUserTouching = false
-                                        MusicManager.player.seekTo(line.start.toLong())
-                                    }
+                                    val target = line.start.toLong() - viewModel.lyricsOffset
+                                    if (viewModel.duration > 0L && target >= viewModel.duration) return@KaraokeLyricsView
+                                    val finalTarget = target.coerceAtLeast(0L)
+                                    playbackPositionMs.longValue = finalTarget
+                                    viewModel.seekTo(finalTarget)
                                 },
                                 onLinePressed = {},
                                 textColor = textColor,
@@ -384,105 +263,6 @@ fun LyricsEnhanced(
             }
         }
     }
-}
-
-private suspend fun LazyListState.scrollLyricIntoFocus(
-    index: Int,
-    animateToNearbyItem: Boolean,
-    force: Boolean,
-    alignByItemCenter: Boolean
-) {
-    val itemCount = layoutInfo.totalItemsCount
-    if (itemCount == 0) return
-
-    val targetIndex = index.coerceIn(0, itemCount - 1)
-    val viewportStart = layoutInfo.viewportStartOffset
-    val viewportEnd = layoutInfo.viewportEndOffset
-    val viewportHeight = viewportEnd - viewportStart
-    if (viewportHeight <= 0) return
-
-    val anchorRatio = if (alignByItemCenter) {
-        LYRIC_FOCUS_ANCHOR_RATIO
-    } else {
-        LYRIC_LINE_SYNC_TOP_ANCHOR_RATIO
-    }
-    val targetFocusPoint = viewportStart + (viewportHeight * anchorRatio).roundToInt()
-
-    var itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { item -> item.index == targetIndex }
-    if (itemInfo == null) {
-        val distance = abs(targetIndex - firstVisibleItemIndex)
-        if (animateToNearbyItem && distance <= LYRIC_FOCUS_ANIMATED_DISTANCE) {
-            animateScrollToItem(
-                index = targetIndex,
-                scrollOffset = -targetFocusPoint
-            )
-        } else {
-            val preJumpIndex = if (targetIndex > firstVisibleItemIndex) {
-                (targetIndex - 2).coerceAtLeast(0)
-            } else {
-                (targetIndex + 2).coerceAtMost(itemCount - 1)
-            }
-            scrollToItem(preJumpIndex, -targetFocusPoint)
-            withFrameNanos { }
-            animateScrollToItem(
-                index = targetIndex,
-                scrollOffset = -targetFocusPoint
-            )
-        }
-        withFrameNanos { }
-        itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { item -> item.index == targetIndex }
-    }
-
-    itemInfo ?: return
-
-    val itemFocusPoint = if (alignByItemCenter) {
-        itemInfo.offset + itemInfo.size / 2
-    } else {
-        itemInfo.offset
-    }
-    val topGuard = viewportStart + (viewportHeight * LYRIC_FOCUS_TOP_GUARD_RATIO).roundToInt()
-    val bottomGuard = viewportEnd - (viewportHeight * LYRIC_FOCUS_BOTTOM_GUARD_RATIO).roundToInt()
-    if (!force && itemFocusPoint in topGuard..bottomGuard) return
-
-    val scrollDelta = itemFocusPoint - targetFocusPoint
-    if (abs(scrollDelta) > LYRIC_FOCUS_MIN_SCROLL_PX) {
-        animateScrollBy(
-            value = scrollDelta.toFloat(),
-            animationSpec = tween(
-                durationMillis = LYRIC_FOCUS_SCROLL_DURATION_MS,
-                easing = FastOutSlowInEasing
-            )
-        )
-    }
-}
-
-private fun SyncedLyrics.positionForStableLineFocus(time: Int): Int {
-    if (lines.isEmpty()) return time
-    val index = findLastStartedLineIndex(time)
-    if (index < 0) return time
-
-    val line = lines[index]
-    if (time < line.end) return time
-
-    return (line.end - 1).coerceAtLeast(line.start)
-}
-
-private fun SyncedLyrics.findLastStartedLineIndex(time: Int): Int {
-    var low = 0
-    var high = lines.lastIndex
-    var result = -1
-
-    while (low <= high) {
-        val mid = low + (high - low) / 2
-        if (lines[mid].start <= time) {
-            result = mid
-            low = mid + 1
-        } else {
-            high = mid - 1
-        }
-    }
-
-    return result
 }
 
 fun buildSyncedLyrics(
