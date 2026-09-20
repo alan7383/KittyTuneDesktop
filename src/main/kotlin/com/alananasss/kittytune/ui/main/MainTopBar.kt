@@ -51,6 +51,12 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 import com.alananasss.kittytune.ui.common.Tip
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+
 /**
  * Top bar of the content panel: back/forward navigation, centered search field
  * (embedded Home search, same as the Android app), right panel toggle arrow on the right.
@@ -69,142 +75,164 @@ fun MainTopBar(
     val currentEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentEntry?.destination?.route
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        val canGoBack = historyNavigator?.canGoBack ?: (navController.previousBackStackEntry != null)
-        val backInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-        FilledTonalIconButton(
-            shapes = IconButtonDefaults.shapes(),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            enabled = canGoBack,
-            interactionSource = backInteractionSource,
-            onClick = {
-                if (historyNavigator != null) {
-                    historyNavigator.back()
-                } else {
-                    navController.popBackStack()
-                }
-            }
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = str("btn_back"))
-        }
-
-        androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
-
-        val canGoForward = historyNavigator?.canGoForward ?: false
-        val forwardInteractionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-        FilledTonalIconButton(
-            shapes = IconButtonDefaults.shapes(),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            enabled = canGoForward,
-            interactionSource = forwardInteractionSource,
-            onClick = {
-                historyNavigator?.forward()
-            }
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Forward")
-        }
-
-        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-
+        val barWidth = maxWidth
+        val showGraphicEq = barWidth >= 420.dp
         val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-        OutlinedTextField(
-            value = vm.searchQuery,
-            onValueChange = {
-                vm.isSearching = it.isNotBlank()
-                vm.onSearchQueryChanged(it)
-                if (currentRoute != "home" && it.isNotBlank()) {
-                    navController.navigate("home") {
-                        launchSingleTop = true
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // --- Left: Navigation (Back, Forward) ---
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val canGoBack = historyNavigator?.canGoBack ?: (navController.previousBackStackEntry != null)
+                val backInteractionSource = remember { MutableInteractionSource() }
+                FilledTonalIconButton(
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    enabled = canGoBack,
+                    interactionSource = backInteractionSource,
+                    onClick = {
+                        if (historyNavigator != null) {
+                            historyNavigator.back()
+                        } else {
+                            navController.popBackStack()
+                        }
                     }
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = str("btn_back"))
                 }
-            },
-            // The hint is a full sentence and it is longer in some languages than in English,
-            // so it has to be allowed to truncate: left to wrap it makes the field two lines
-            // tall and bends the pill out of shape whenever the bar is tight (issue #33).
-            placeholder = {
-                Text(str("search_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            trailingIcon = {
-                if (vm.searchQuery.isNotBlank()) {
-                    IconButton(
-                        shapes = IconButtonDefaults.shapes(),
-                        onClick = {
+
+                Spacer(Modifier.width(8.dp))
+
+                val canGoForward = historyNavigator?.canGoForward ?: false
+                val forwardInteractionSource = remember { MutableInteractionSource() }
+                FilledTonalIconButton(
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    enabled = canGoForward,
+                    interactionSource = forwardInteractionSource,
+                    onClick = {
+                        historyNavigator?.forward()
+                    }
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Forward")
+                }
+            }
+
+            // --- Center: Search field + GraphicEq ---
+            // Having weight(1f) ensures this section only consumes the available space
+            // between the left navigation buttons and the right toggle button.
+            // It will NEVER push the right toggle button off-screen.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                OutlinedTextField(
+                    value = vm.searchQuery,
+                    onValueChange = {
+                        vm.isSearching = it.isNotBlank()
+                        vm.onSearchQueryChanged(it)
+                        if (currentRoute != "home" && it.isNotBlank()) {
+                            navController.navigate("home") {
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    // The hint is a full sentence and it is longer in some languages than in English,
+                    // so it has to be allowed to truncate: left to wrap it makes the field two lines
+                    // tall and bends the pill out of shape whenever the bar is tight (issue #33).
+                    placeholder = {
+                        Text(str("search_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (vm.searchQuery.isNotBlank()) {
+                            IconButton(
+                                shapes = IconButtonDefaults.shapes(),
+                                onClick = {
+                                    vm.clearSearch()
+                                }
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = null)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = CircleShape,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                    ),
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .widthIn(min = 90.dp, max = 480.dp)
+                        .trackTextInput()
+                        // Escape only. This field is always on the bar, so it has no closed state to return to
+                        // — and a click that took the query with it would clear the search every time somebody
+                        // clicked one of its own results. Escape is the gesture that means "and I am done":
+                        // it empties the field and leaves the results, which is the exit he could not find
+                        // ("you will be able to close it only after returning from the tabs", issue #33).
+                        .escapeDismisses {
                             vm.clearSearch()
+                            vm.isSearching = false
+                            focusManager.clearFocus()
+                        },
+                )
+
+                if (showGraphicEq) {
+                    Spacer(Modifier.width(8.dp))
+                    FilledTonalIconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        onClick = {
+                            if (currentRoute != "recognition") {
+                                navController.navigate("recognition")
+                            }
                         }
                     ) {
-                        Icon(Icons.Filled.Close, contentDescription = null)
+                        Icon(
+                            androidx.compose.material.icons.Icons.Rounded.GraphicEq,
+                            contentDescription = str("pref_bottom_menu_fab_recognition")
+                        )
                     }
                 }
-            },
-            singleLine = true,
-            shape = CircleShape,
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
-            ),
-            // A low minimum: the field would rather be narrow than push the buttons around it
-            // off the bar when the window shrinks or the UI scale goes up.
-            modifier = Modifier
-                .widthIn(min = 160.dp, max = 480.dp)
-                .trackTextInput()
-                // Escape only. This field is always on the bar, so it has no closed state to return to
-                // — and a click that took the query with it would clear the search every time somebody
-                // clicked one of its own results. Escape is the gesture that means "and I am done":
-                // it empties the field and leaves the results, which is the exit he could not find
-                // ("you will be able to close it only after returning from the tabs", issue #33).
-                .escapeDismisses {
-                    vm.clearSearch()
-                    vm.isSearching = false
-                    focusManager.clearFocus()
-                },
-        )
-
-        androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
-
-        FilledTonalIconButton(
-            shapes = IconButtonDefaults.shapes(),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            onClick = {
-                if (currentRoute != "recognition") {
-                    navController.navigate("recognition")
-                }
             }
-        ) {
-            Icon(
-                androidx.compose.material.icons.Icons.Rounded.GraphicEq,
-                contentDescription = str("pref_bottom_menu_fab_recognition")
-            )
-        }
 
-        // Spacer to balance the centered search field
-        androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
-
-        // Permanent icon on the right panel when open to collapse it, and when closed to open it (issue #33).
-        // Located where the avatar used to be, visible on all pages.
-        Tip(if (isRightPanelOpen) str("panel_collapse") else str("panel_expand")) {
-            FilledTonalIconButton(
-                shapes = IconButtonDefaults.shapes(),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                ),
-                onClick = onToggleRightPanel
-            ) {
-                RightPanelToggleIcon(isOpen = isRightPanelOpen)
+            // --- Right: Toggle right panel ---
+            // Permanent icon on the right panel when open to collapse it, and when closed to open it (issue #33).
+            // Pinned at the right end of the outer Row, guaranteed visible and clickable regardless of window size.
+            Tip(if (isRightPanelOpen) str("panel_collapse") else str("panel_expand")) {
+                FilledTonalIconButton(
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    onClick = onToggleRightPanel
+                ) {
+                    RightPanelToggleIcon(isOpen = isRightPanelOpen)
+                }
             }
         }
     }
@@ -279,5 +307,3 @@ fun RightPanelToggleIcon(
         )
     }
 }
-
-

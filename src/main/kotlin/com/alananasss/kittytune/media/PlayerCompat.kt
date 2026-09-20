@@ -8,9 +8,13 @@ import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.AudioEffectsState
 import com.alananasss.kittytune.utils.SignedUrl
+import com.alananasss.kittytune.audio.automix.AutomixManager
+import com.alananasss.kittytune.audio.automix.AutomixPlan
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
@@ -47,17 +51,20 @@ class MediaItem private constructor(
     val mediaMetadata: MediaMetadata,
     val requestMetadata: RequestMetadata,
     val track: Track?,
+    val mimeType: String? = null,
 ) {
     class Builder {
         private var mediaId: String = ""
         private var uri: String? = null
         private var metadata: MediaMetadata = MediaMetadata.Builder().build()
         private var track: Track? = null
+        private var mimeType: String? = null
         fun setUri(v: Any?) = apply { uri = v?.toString() }
         fun setMediaId(v: String) = apply { mediaId = v }
         fun setMediaMetadata(v: MediaMetadata) = apply { metadata = v }
         fun setTrack(v: Track?) = apply { track = v }
-        fun build() = MediaItem(mediaId, uri, metadata, RequestMetadata(uri), track)
+        fun setMimeType(v: String?) = apply { mimeType = v }
+        fun build() = MediaItem(mediaId, uri, metadata, RequestMetadata(uri), track, mimeType)
     }
 }
 
@@ -108,6 +115,74 @@ class Player {
     
     @Volatile var isCrossfadingOut = false
     private var lastEffectsState: AudioEffectsState? = null
+
+    data class PrebufferedTransition(
+        val engine: AudioEngine,
+        val item: MediaItem,
+        val trackId: Long,
+        val plan: AutomixPlan?,
+        val url: String,
+        val headers: Map<String, String>,
+    )
+
+    @Volatile
+    private var prebufferedTransition: PrebufferedTransition? = null
+    private var crossfadeJob: Job? = null
+
+    fun isPrebuffered(trackId: Long): Boolean {
+        val pb = prebufferedTransition ?: return false
+        return pb.trackId == trackId && pb.engine.state != AudioEngine.State.IDLE
+    }
+
+    fun releasePrebuffered() {
+        val pb = prebufferedTransition ?: return
+        prebufferedTransition = null
+        try {
+            pb.engine.stop()
+            pb.engine.release()
+        } catch (_: Exception) {}
+    }
+
+    fun prebufferTransition(item: MediaItem, nextTrack: Track, automixPlan: AutomixPlan? = null) {
+        if (isCrossfadingOut) return
+        if (isPrebuffered(nextTrack.id)) return
+
+        scope.launch {
+            try {
+                val rawUrl = item.uri?.takeIf {
+                    if (it.startsWith("metrofuse-deezer://")) true
+                    else if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it)
+                    else if (it.startsWith("file:")) runCatching { java.io.File(java.net.URI(it)).exists() }.getOrDefault(false)
+                    else java.io.File(it).exists()
+                } ?: withContext(Dispatchers.IO) { StreamResolver.resolveStream(nextTrack) }
+
+                if (rawUrl == null) return@launch
+
+                val url = if (rawUrl.startsWith("metrofuse-deezer://")) {
+                    com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProxy.getPlayableUrlFromDeezerUri(rawUrl)
+                } else {
+                    rawUrl
+                }
+                val headers = buildHeaders(nextTrack)
+
+                val engine = AudioEngine()
+                lastEffectsState?.let { engine.applyEffects(it) }
+
+                if (automixPlan != null && (automixPlan.tempoRatio != 1f || automixPlan.pitchRatio != 1f)) {
+                    engine.setStretcherRatio(automixPlan.tempoRatio, automixPlan.pitchRatio)
+                }
+
+                val startPos = automixPlan?.incomingStartMs ?: 0L
+                engine.setVolume(0f)
+                engine.setMediaItem(url, headers, startPos)
+                engine.prepare()
+
+                prebufferedTransition = PrebufferedTransition(engine, item, nextTrack.id, automixPlan, url, headers)
+            } catch (_: Exception) {
+                // Ignore prebuffering error, fallback to normal load on transition
+            }
+        }
+    }
 
     var playWhenReady: Boolean = false
         set(value) {
@@ -205,6 +280,8 @@ class Player {
     }
 
     fun setMediaItem(item: MediaItem, startPositionMs: Long = 0L) {
+        releasePrebuffered()
+        crossfadeJob?.cancel()
         items.clear()
         items.add(item)
         currentIndex = 0
@@ -212,27 +289,233 @@ class Player {
         listeners.forEach { it.onMediaItemTransition(currentMediaItem, MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) }
     }
 
-    fun crossfadeToMediaItem(item: MediaItem, startPositionMs: Long, crossfadeDurationMs: Long) {
+    fun crossfadeToMediaItem(
+        item: MediaItem,
+        startPositionMs: Long,
+        crossfadeDurationMs: Long,
+        automixPlan: AutomixPlan? = null
+    ) {
         items.clear()
         items.add(item)
         currentIndex = 0
         
-        isCrossfadingOut = false
+        crossfadeJob?.cancel()
+        resolveJob?.cancel()
         
         val oldEngine = activeEngine
-        val newEngine = AudioEngine()
-        
         unbindEngine(oldEngine)
+
+        val targetTrackId = item.track?.id
+        val isAdopted = prebufferedTransition != null && prebufferedTransition?.trackId == targetTrackId
+        val pre = if (isAdopted) prebufferedTransition else null
+        prebufferedTransition = null
+
+        val newEngine = pre?.engine ?: AudioEngine()
+        val effectivePlan = pre?.plan ?: automixPlan
+
         bindEngine(newEngine)
-        
         activeEngine = newEngine
         fadingEngine = oldEngine
-        
-        lastEffectsState?.let { newEngine.applyEffects(it) }
-        
+        isCrossfadingOut = true
+
+        if (effectivePlan != null) {
+            AutomixManager.setIsAutomixing(true)
+        }
+
+        if (!isAdopted) {
+            lastEffectsState?.let { newEngine.applyEffects(it) }
+            if (effectivePlan != null && (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f)) {
+                newEngine.setStretcherRatio(effectivePlan.tempoRatio, effectivePlan.pitchRatio)
+            }
+        }
+
         listeners.forEach { it.onMediaItemTransition(currentMediaItem, MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) }
-        
-        loadCurrent(startPositionMs, true, crossfadeDurationMs)
+
+        val actualStartPos = if (isAdopted) (effectivePlan?.incomingStartMs ?: startPositionMs) else (effectivePlan?.incomingStartMs ?: startPositionMs)
+
+        startCrossfade(
+            newEngine = newEngine,
+            oldEngine = oldEngine,
+            item = item,
+            startPositionMs = actualStartPos,
+            crossfadeDurationMs = crossfadeDurationMs,
+            effectivePlan = effectivePlan,
+            isAdopted = isAdopted,
+            preUrl = pre?.url,
+            preHeaders = pre?.headers
+        )
+    }
+
+    private fun equalPowerIn(edge0: Float, edge1: Float, x: Float): Float {
+        val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+        return kotlin.math.sin(t * (Math.PI / 2.0).toFloat())
+    }
+
+    private fun equalPowerOut(edge0: Float, edge1: Float, x: Float): Float {
+        val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+        return kotlin.math.cos(t * (Math.PI / 2.0).toFloat())
+    }
+
+    private fun startCrossfade(
+        newEngine: AudioEngine,
+        oldEngine: AudioEngine,
+        item: MediaItem,
+        startPositionMs: Long,
+        crossfadeDurationMs: Long,
+        effectivePlan: AutomixPlan?,
+        isAdopted: Boolean,
+        preUrl: String?,
+        preHeaders: Map<String, String>?
+    ) {
+        crossfadeJob = scope.launch {
+            try {
+                if (!isAdopted) {
+                    val rawUrl = item.uri?.takeIf {
+                        if (it.startsWith("metrofuse-deezer://")) true
+                        else if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it)
+                        else if (it.startsWith("file:")) runCatching { java.io.File(java.net.URI(it)).exists() }.getOrDefault(false)
+                        else java.io.File(it).exists()
+                    } ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
+
+                    if (rawUrl == null) {
+                        listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
+                        return@launch
+                    }
+                    val url = if (rawUrl.startsWith("metrofuse-deezer://")) {
+                        com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProxy.getPlayableUrlFromDeezerUri(rawUrl)
+                    } else {
+                        rawUrl
+                    }
+                    val headers = buildHeaders(item.track)
+
+                    val track = item.track
+                    if (track != null) {
+                        val cached = com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(track.id)
+                        if (cached != null) {
+                            newEngine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
+                        } else {
+                            newEngine.clearTrackLoudness()
+                            com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
+                                if (currentMediaItem?.track?.id == track.id) {
+                                    newEngine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                                }
+                            }
+                        }
+                    } else {
+                        newEngine.clearTrackLoudness()
+                    }
+
+                    newEngine.setMediaItem(url, headers, startPositionMs)
+                    newEngine.prepare()
+                }
+
+                val targetVolume = volume
+                newEngine.setVolume(0f)
+                newEngine.setTrackGainDb(trackGainDb)
+
+                if (playWhenReady) newEngine.play()
+
+                if (!isAdopted) {
+                    var waitCount = 0
+                    while (newEngine.state == AudioEngine.State.BUFFERING && waitCount < 50 && isActive) {
+                        delay(100)
+                        waitCount++
+                    }
+                }
+
+                val transitionDuration = effectivePlan?.overlapMs ?: crossfadeDurationMs
+                var remainingMs = oldEngine.durationMs - oldEngine.positionMs
+                if (remainingMs < 0) remainingMs = 0
+
+                val actualCrossfadeMs = if (effectivePlan != null) {
+                    if (oldEngine.isPlaying) {
+                        if (remainingMs > 0 && remainingMs < transitionDuration) remainingMs.coerceAtLeast(1000L)
+                        else transitionDuration
+                    } else 0L
+                } else if (oldEngine.isPlaying && remainingMs > 0 && remainingMs < transitionDuration) {
+                    remainingMs
+                } else if (!oldEngine.isPlaying || remainingMs == 0L) {
+                    0L
+                } else {
+                    transitionDuration
+                }
+
+                val bassDuckingEnabled = PlayerPreferences().getAutomixBassDuckingEnabled()
+
+                if (actualCrossfadeMs <= 0L) {
+                    newEngine.setVolume(targetVolume)
+                    oldEngine.stop()
+                    oldEngine.release()
+                } else {
+                    val steps = (actualCrossfadeMs / 15L).toInt().coerceIn(50, 800)
+                    val delayMs = (actualCrossfadeMs / steps).coerceAtLeast(5L)
+
+                    for (i in 0..steps) {
+                        if (fadingEngine != oldEngine) break
+                        if (!isActive) break
+
+                        while (!newEngine.isPlaying && isActive && newEngine.state == AudioEngine.State.BUFFERING) {
+                            delay(100)
+                        }
+
+                        if (oldEngine.state == AudioEngine.State.ENDED || oldEngine.state == AudioEngine.State.IDLE) {
+                            newEngine.setVolume(targetVolume)
+                            break
+                        }
+
+                        val progress = i.toFloat() / steps
+                        val fadeOut = equalPowerOut(0f, 0.6f, progress)
+                        val fadeIn = equalPowerIn(0.4f, 1f, progress)
+
+                        newEngine.setVolume(targetVolume * fadeIn)
+                        oldEngine.setVolume(targetVolume * fadeOut)
+
+                        if (effectivePlan != null && bassDuckingEnabled) {
+                            oldEngine.setDuckMix(equalPowerIn(0.45f, 1f, progress))
+                            newEngine.setDuckMix(1f - equalPowerIn(0f, 0.55f, progress))
+                        }
+
+                        delay(delayMs)
+                    }
+                }
+            } finally {
+                try {
+                    if (fadingEngine == oldEngine) {
+                        newEngine.setVolume(volume)
+                        oldEngine.setVolume(0f)
+                        oldEngine.stop()
+                        oldEngine.release()
+                        fadingEngine = null
+                    }
+                } catch (_: Exception) {}
+
+                oldEngine.resetDuckMix()
+                newEngine.resetDuckMix()
+
+                if (effectivePlan != null) {
+                    AutomixManager.setIsAutomixing(false)
+                    AutomixManager.clearPlan()
+
+                    if (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f) {
+                        scope.launch {
+                            val rampSteps = 10
+                            val startTempo = effectivePlan.tempoRatio
+                            val startPitch = effectivePlan.pitchRatio
+                            for (step in 1..rampSteps) {
+                                delay(200)
+                                if (!isActive) break
+                                val frac = step.toFloat() / rampSteps
+                                val curTempo = startTempo + frac * (1f - startTempo)
+                                val curPitch = startPitch + frac * (1f - startPitch)
+                                newEngine.setStretcherRatio(curTempo, curPitch)
+                            }
+                            newEngine.setStretcherRatio(1f, 1f)
+                        }
+                    }
+                }
+                isCrossfadingOut = false
+            }
+        }
     }
 
     fun addMediaItem(item: MediaItem) { items.add(item) }
@@ -244,12 +527,18 @@ class Player {
     fun play() { playWhenReady = true }
     fun pause() { playWhenReady = false }
     fun stop() {
+        crossfadeJob?.cancel()
+        resolveJob?.cancel()
+        releasePrebuffered()
         fadingEngine?.stop()
         fadingEngine?.release()
         fadingEngine = null
         activeEngine.stop()
     }
     fun release() {
+        crossfadeJob?.cancel()
+        resolveJob?.cancel()
+        releasePrebuffered()
         fadingEngine?.release()
         activeEngine.release()
     }
@@ -272,15 +561,21 @@ class Player {
         val item = currentMediaItem ?: return
         resolveJob?.cancel()
         resolveJob = scope.launch {
-            // A prefetched item carries the URL it was resolved with; if its CDN signature has
-            // since lapsed, resolving again is far cheaper than handing FFmpeg a certain 403.
-            val url = item.uri?.takeIf {
-                if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it) else java.io.File(it).exists()
+            val rawUrl = item.uri?.takeIf {
+                if (it.startsWith("metrofuse-deezer://")) true
+                else if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it)
+                else if (it.startsWith("file:")) runCatching { java.io.File(java.net.URI(it)).exists() }.getOrDefault(false)
+                else java.io.File(it).exists()
             }
                 ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
-            if (url == null) {
+            if (rawUrl == null) {
                 listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
                 return@launch
+            }
+            val url = if (rawUrl.startsWith("metrofuse-deezer://")) {
+                com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProxy.getPlayableUrlFromDeezerUri(rawUrl)
+            } else {
+                rawUrl
             }
             val headers = buildHeaders(item.track)
             
@@ -301,65 +596,15 @@ class Player {
                 activeEngine.clearTrackLoudness()
             }
 
-            if (isCrossfade) {
-                val oldEngine = fadingEngine
-                activeEngine.setMediaItem(url, headers, startPositionMs)
-                activeEngine.prepare()
-                
-                val targetVolume = volume
-                activeEngine.setVolume(0f)
-                activeEngine.setTrackGainDb(trackGainDb)
-                
-                if (playWhenReady) activeEngine.play()
-                
-                if (oldEngine != null) {
-                    var remainingMs = oldEngine.durationMs - oldEngine.positionMs
-                    if (remainingMs < 0) remainingMs = 0
-                    
-                    val actualCrossfadeMs = if (oldEngine.isPlaying && remainingMs > 0 && remainingMs < crossfadeDurationMs) {
-                        remainingMs
-                    } else if (!oldEngine.isPlaying || remainingMs == 0L) {
-                        0L
-                    } else {
-                        crossfadeDurationMs
-                    }
-
-                    if (actualCrossfadeMs <= 0L) {
-                        activeEngine.setVolume(targetVolume)
-                        oldEngine.stop()
-                        oldEngine.release()
-                        fadingEngine = null
-                    } else {
-                        val steps = 40
-                        val delayMs = actualCrossfadeMs / steps
-                        for (i in 1..steps) {
-                            if (fadingEngine != oldEngine) break // superseded
-                            val ratio = i.toFloat() / steps
-                            activeEngine.setVolume(targetVolume * ratio)
-                            oldEngine.setVolume(targetVolume * (1f - ratio))
-                            delay(delayMs)
-                        }
-                        if (fadingEngine == oldEngine) {
-                            activeEngine.setVolume(targetVolume)
-                            oldEngine.stop()
-                            oldEngine.release()
-                            fadingEngine = null
-                        }
-                    }
-                } else {
-                    activeEngine.setVolume(targetVolume)
-                }
-            } else {
-                fadingEngine?.stop()
-                fadingEngine?.release()
-                fadingEngine = null
-                
-                activeEngine.setVolume(volume)
-                activeEngine.setTrackGainDb(trackGainDb)
-                activeEngine.setMediaItem(url, headers, startPositionMs)
-                activeEngine.prepare()
-                if (playWhenReady) activeEngine.play()
-            }
+            fadingEngine?.stop()
+            fadingEngine?.release()
+            fadingEngine = null
+            
+            activeEngine.setVolume(volume)
+            activeEngine.setTrackGainDb(trackGainDb)
+            activeEngine.setMediaItem(url, headers, startPositionMs)
+            activeEngine.prepare()
+            if (playWhenReady) activeEngine.play()
         }
     }
 

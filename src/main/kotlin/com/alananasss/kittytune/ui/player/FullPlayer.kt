@@ -9,7 +9,12 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import com.alananasss.kittytune.data.local.LyricsUnderCoverPlacement
+import com.alananasss.kittytune.data.local.LyricsDisplayState
+import com.alananasss.kittytune.ui.player.lyrics.PlayerInlineLyrics
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -73,6 +78,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.min
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
+import com.alananasss.kittytune.ui.player.cover.CanvasVideo
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.main.PanelLyrics
 import com.alananasss.kittytune.ui.utils.fadingEdge
@@ -115,6 +122,17 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     val track = viewModel.currentTrack
     var showText by remember { mutableStateOf(true) }
     var showQuickSettings by remember { mutableStateOf(false) }
+
+    val toggleLyricsAction: () -> Unit = {
+        val multiState = viewModel.playerPrefs.getLyricsMultiStateToggle()
+        val underCover = viewModel.playerPrefs.getLyricsUnderCoverEnabled()
+        if (multiState && underCover && viewModel.lyricsLines.isNotEmpty()) {
+            viewModel.toggleInlineLyrics()
+            showText = (viewModel.lyricsDisplayState == LyricsDisplayState.COVER_REPLACED)
+        } else {
+            showText = !showText
+        }
+    }
 
     // Nothing to build a screen around. Leaving rather than drawing an empty sleeve on a grey wall: the
     // lyrics screen underneath is still there and is the better thing to be looking at.
@@ -180,7 +198,9 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             style = viewModel.fullPlayerBgStyle,
             palette = palette,
             drift = drift,
-            artworkUrl = track.fullResArtwork
+            artworkUrl = track.fullResArtwork,
+            animatedVideoUrl = viewModel.currentAnimatedCoverTallUrl ?: viewModel.currentAnimatedCoverUrl,
+            fadeUiEnabled = viewModel.playerPrefs.getAnimatedCoversFadeUiEnabled()
         )
 
         val isPortrait = maxHeight > maxWidth
@@ -227,7 +247,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                                     viewModel = viewModel,
                                     palette = palette,
                                     showText = showText,
-                                    onToggleText = { showText = !showText },
+                                    onToggleText = toggleLyricsAction,
                                 )
                             }
                         }
@@ -245,7 +265,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                             palette = palette,
                             roomToItself = 1f,
                             showText = showText,
-                            onToggleText = { showText = !showText },
+                            onToggleText = toggleLyricsAction,
                         )
                     }
                 }
@@ -277,7 +297,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                         // sleeve grows into the space the words leave rather than sliding across it.
                         roomToItself = 1f - progress,
                         showText = showText,
-                        onToggleText = { showText = !showText },
+                        onToggleText = toggleLyricsAction,
                     )
                 }
 
@@ -357,7 +377,35 @@ private fun FullPlayerBackground(
     palette: FullPlayerPalette,
     drift: Float,
     artworkUrl: String?,
+    animatedVideoUrl: String? = null,
+    fadeUiEnabled: Boolean = false,
 ) {
+    if (fadeUiEnabled && !animatedVideoUrl.isNullOrBlank()) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            CanvasVideo(
+                canvasUrl = animatedVideoUrl,
+                isPlaying = true,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(50.dp)
+                    .graphicsLayer { alpha = 0.55f }
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.Black.copy(alpha = 0.35f),
+                                Color.Black.copy(alpha = 0.65f)
+                            )
+                        )
+                    )
+            )
+        }
+        return
+    }
+
     when (style) {
         FullPlayerBgStyle.APPLE_MUSIC -> {
             FluidArtworkBackground(artworkUrl = artworkUrl, modifier = Modifier.fillMaxSize()) {
@@ -697,9 +745,14 @@ private fun CoverColumn(
         val cap = (COVER_MAX + (COVER_MAX_ALONE - COVER_MAX) * roomToItself) * coverScale
         val side = min(min(maxWidth, maxHeight * 0.56f), cap)
 
+        val lyricsUnderCoverPlacement = remember { viewModel.playerPrefs.getLyricsUnderCoverPlacement() }
+        val showUnderCover = viewModel.isLyricsUnderCoverActive && (!showText || !viewModel.hasLyrics)
+
         Column(horizontalAlignment = Alignment.Start) {
-            AsyncImage(
-                model = track.fullResArtwork,
+            AnimatedArtwork(
+                artworkUrl = track.fullResArtwork,
+                animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
+                isPlaying = viewModel.isPlaying,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
@@ -723,9 +776,39 @@ private fun CoverColumn(
                     },
             )
 
+            if (showUnderCover && lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST) {
+                Spacer(Modifier.height(10.dp))
+                Box(Modifier.width(side)) {
+                    PlayerInlineLyrics(
+                        viewModel = viewModel,
+                        textColor = palette.bright,
+                        onClick = onToggleText,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
             Spacer(Modifier.height(18.dp))
             Box(Modifier.width(side)) {
-                TrackCredit(viewModel = viewModel, palette = palette)
+                AnimatedContent(
+                    targetState = showUnderCover && lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST,
+                    transitionSpec = {
+                        (fadeIn(animationSpec = tween(300)) + slideInVertically { it / 3 })
+                            .togetherWith(fadeOut(animationSpec = tween(200)) + slideOutVertically { -it / 3 })
+                    },
+                    label = "TitleLyricsUnderCover"
+                ) { showLyricsLine ->
+                    if (showLyricsLine) {
+                        PlayerInlineLyrics(
+                            viewModel = viewModel,
+                            textColor = palette.bright,
+                            onClick = onToggleText,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        TrackCredit(viewModel = viewModel, palette = palette)
+                    }
+                }
             }
             Spacer(Modifier.height(12.dp))
             Box(Modifier.width(side)) {
@@ -833,6 +916,11 @@ private fun FullPlayerControls(
     onToggleText: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
+        com.alananasss.kittytune.ui.player.automix.AutomixDebugOverlay(
+            currentPositionMs = viewModel.currentPosition,
+            modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp)
+        )
+
         FullPlayerSeekBar(viewModel, palette)
 
         Spacer(Modifier.height(8.dp))
@@ -880,7 +968,7 @@ private fun FullPlayerControls(
             QuietButton(
                 icon = Icons.Rounded.Lyrics,
                 label = str("player_lyrics"),
-                tint = if (showText) palette.bright else palette.dim,
+                tint = if (showText || viewModel.isLyricsUnderCoverActive) palette.bright else palette.dim,
                 onClick = onToggleText,
             )
         }
@@ -1095,8 +1183,10 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             TimeLabel(com.alananasss.kittytune.utils.makeTimeString(shown), palette)
+            com.alananasss.kittytune.ui.player.automix.AutomixBadge(textColor = palette.bright)
             // Counting down, with the minus the reference shows: "how much is left" without arithmetic.
             TimeLabel("-" + com.alananasss.kittytune.utils.makeTimeString(duration - shown), palette)
         }

@@ -99,6 +99,8 @@ object MusicManager {
         val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
         _contextFlow.value = prefs.getLastContext()
 
+        com.alananasss.kittytune.audio.automix.AutomixManager.init()
+
         // The saved level has to be applied here rather than from the ViewModel: AppBootstrap
         // calls init() before any ViewModel exists, and plenty of code drives playback through
         // MusicManager.player directly, so anything that waits for PlayerViewModel.player to be
@@ -173,6 +175,29 @@ object MusicManager {
     fun setTrackGainDb(db: Float) { player.trackGainDb = db }
     fun getVolume(): Float = player.volume
     fun stop() = player.stop()
+
+    val isCrossfadingOut: Boolean get() = player.isCrossfadingOut
+
+    fun isPrebuffered(trackId: Long): Boolean = player.isPrebuffered(trackId)
+
+    fun releasePrebuffered() = player.releasePrebuffered()
+
+    fun prebufferTransition(
+        item: com.alananasss.kittytune.media.MediaItem,
+        nextTrack: Track,
+        automixPlan: com.alananasss.kittytune.audio.automix.AutomixPlan? = null
+    ) {
+        player.prebufferTransition(item, nextTrack, automixPlan)
+    }
+
+    fun crossfadeToMediaItem(
+        item: com.alananasss.kittytune.media.MediaItem,
+        startPositionMs: Long,
+        crossfadeDurationMs: Long,
+        automixPlan: com.alananasss.kittytune.audio.automix.AutomixPlan? = null
+    ) {
+        player.crossfadeToMediaItem(item, startPositionMs, crossfadeDurationMs, automixPlan)
+    }
 
     fun applyEffects(state: AudioEffectsState) {
         player.applyEffects(state)

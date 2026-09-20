@@ -330,8 +330,27 @@ fun PlaylistDetailScreen(
     val downloadedIds by DownloadManager.downloadedIds.collectAsState()
 
     val isDownloadedView = playlistId.startsWith("downloaded_section:")
+    val isDeezerArtist = playlistId.startsWith("deezer:artist:")
+    val isTidalArtist = playlistId.startsWith("tidal:artist:")
+    val isQobuzArtist = playlistId.startsWith("qobuz:artist:")
+    val isArtistStation = playlistId.startsWith("station_artist:")
+    val isArtistView = isDeezerArtist || isTidalArtist || isQobuzArtist || isArtistStation
 
     val cleanIdStr = playlistId.replace("station_artist:", "")
+        .replace("station_spotify:", "")
+        .replace("spotify:album:", "")
+        .replace("spotify_album:", "")
+        .replace("spotify:playlist:", "")
+        .replace("spotify_playlist:", "")
+        .replace("deezer:album:", "")
+        .replace("deezer:playlist:", "")
+        .replace("deezer:artist:", "")
+        .replace("tidal:album:", "")
+        .replace("tidal:playlist:", "")
+        .replace("tidal:artist:", "")
+        .replace("qobuz:album:", "")
+        .replace("qobuz:playlist:", "")
+        .replace("qobuz:artist:", "")
         .replace("station:", "")
         .replace("liked_by:", "")
         .replace("local_playlist:", "")
@@ -507,25 +526,42 @@ fun PlaylistDetailScreen(
             isUserCreated = false
             return@LaunchedEffect
         }
+        val playerPrefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val currentUserId = playerViewModel.currentUserId.takeIf { it != 0L }
+            ?: playerPrefs.getCachedUserId().takeIf { it != 0L }
+        val currentUsername = playerViewModel.currentUser?.username
+            ?: playerPrefs.getCachedUsername()
+
+        val isOwnedByCurrentAccount = (playlistUser?.id != null && playlistUser?.id != 0L && playlistUser?.id == currentUserId) ||
+            (!currentUsername.isNullOrBlank() && (playlistInDb?.artist?.equals(currentUsername, ignoreCase = true) == true || playlistUser?.username?.equals(currentUsername, ignoreCase = true) == true))
+
+        val isLocalUser = currentIdLong < 0 || (playlistInDb?.isUserCreated == true) || isOwnedByCurrentAccount
+        isLocalPlaylist = isDownloadedView || currentIdLong < 0
+        isUserCreated = isLocalUser
+
         if (playlistInDb != null) {
-            val isOwnedByCurrentAccount = (playlistUser?.id != null && playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
-                (playerViewModel.currentUser != null && (playlistInDb!!.artist == playerViewModel.currentUser?.username || playlistUser?.username == playerViewModel.currentUser?.username))
-            val isLocalUser = currentIdLong < 0 || (playlistInDb!!.isUserCreated && isOwnedByCurrentAccount)
-            isLocalPlaylist = isDownloadedView || currentIdLong < 0
-            isUserCreated = isLocalUser
+            if (isLocalUser && !playlistInDb!!.isUserCreated) {
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    try {
+                        val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+                        dao.updatePlaylist(playlistInDb!!.copy(isUserCreated = true))
+                    } catch (_: Exception) {}
+                }
+            }
             val dbTitle = playlistInDb!!.title
             if (!dbTitle.isNullOrBlank() && dbTitle != str("untitled_track") && dbTitle != str("track_untitled")) {
                 playlistTitle = dbTitle
             }
-            val dbCover = playlistInDb!!.localCoverPath ?: playlistInDb!!.artworkUrl
+            val localCoverFile = java.io.File(com.alananasss.kittytune.core.AppDirs.imageCacheDir, "playlist_cover_${currentIdLong}.jpg")
+            val dbCover = playlistInDb!!.localCoverPath ?: if (localCoverFile.exists()) localCoverFile.absolutePath else playlistInDb!!.artworkUrl
             if (!dbCover.isNullOrBlank()) {
                 playlistCover = dbCover
             }
-        } else {
-            isLocalPlaylist = currentIdLong < 0
-            val isOwnedByCurrentAccount = (playlistUser?.id != null && playlistUser?.id != 0L && playlistUser?.id == playerViewModel.currentUserId) ||
-                (playerViewModel.currentUser != null && playlistUser?.username == playerViewModel.currentUser?.username)
-            isUserCreated = currentIdLong < 0 || isOwnedByCurrentAccount
+        } else if (currentIdLong > 0) {
+            val localCoverFile = java.io.File(com.alananasss.kittytune.core.AppDirs.imageCacheDir, "playlist_cover_${currentIdLong}.jpg")
+            if (localCoverFile.exists() && playlistCover != localCoverFile.absolutePath) {
+                playlistCover = localCoverFile.absolutePath
+            }
         }
     }
 
@@ -657,6 +693,135 @@ fun PlaylistDetailScreen(
                                     newTracks.addAll(artist.topTracks.map { it.toTrack() })
                                 }
                             }
+                        }
+                    }
+                }
+
+                playlistId.startsWith("deezer:") -> {
+                    val isDeezerAlbum = playlistId.startsWith("deezer:album:")
+                    val isDeezerPlaylist = playlistId.startsWith("deezer:playlist:")
+                    val isDeezerArtist = playlistId.startsWith("deezer:artist:")
+
+                    if (isDeezerAlbum) {
+                        val pl = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.getAlbum(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = true
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistUser = pl.user
+                            playlistReleaseDate = pl.releaseDate
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    } else if (isDeezerPlaylist) {
+                        val pl = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.getPlaylist(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = false
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistDescription = pl.description
+                            playlistUser = pl.user
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    } else if (isDeezerArtist) {
+                        val pl = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.getArtist(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = false
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistUser = pl.user
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    }
+                }
+
+                playlistId.startsWith("tidal:") -> {
+                    val isTidalAlbum = playlistId.startsWith("tidal:album:")
+                    val isTidalPlaylist = playlistId.startsWith("tidal:playlist:")
+                    val isTidalArtist = playlistId.startsWith("tidal:artist:")
+
+                    if (isTidalAlbum) {
+                        val pl = com.alananasss.kittytune.data.tidal.TidalSearchRepository.getAlbum(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = true
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistUser = pl.user
+                            playlistReleaseDate = pl.releaseDate
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    } else if (isTidalPlaylist) {
+                        val pl = com.alananasss.kittytune.data.tidal.TidalSearchRepository.getPlaylist(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = false
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistDescription = pl.description
+                            playlistUser = pl.user
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    } else if (isTidalArtist) {
+                        val pl = com.alananasss.kittytune.data.tidal.TidalSearchRepository.getArtist(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = false
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistUser = pl.user
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    }
+                }
+
+                playlistId.startsWith("qobuz:") -> {
+                    val isQobuzAlbum = playlistId.startsWith("qobuz:album:")
+                    val isQobuzPlaylist = playlistId.startsWith("qobuz:playlist:")
+                    val isQobuzArtist = playlistId.startsWith("qobuz:artist:")
+
+                    if (isQobuzAlbum) {
+                        val pl = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getAlbum(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = true
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistUser = pl.user
+                            playlistReleaseDate = pl.releaseDate
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    } else if (isQobuzPlaylist) {
+                        val pl = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getPlaylist(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = false
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistDescription = pl.description
+                            playlistUser = pl.user
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    } else if (isQobuzArtist) {
+                        val pl = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getArtist(cleanIdStr)
+                        if (pl != null) {
+                            isAlbum = false
+                            playlistTitle = pl.title.orEmpty()
+                            playlistCover = pl.artworkUrl
+                            playlistUser = pl.user
+                            playlistPermalinkUrl = pl.permalinkUrl
+                            playlistUrn = pl.urn
+                            newTracks.addAll(pl.tracks ?: emptyList())
                         }
                     }
                 }
@@ -1140,7 +1305,7 @@ fun PlaylistDetailScreen(
                             }
                         } else {
                             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(72.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(if (isArtistView) Icons.Rounded.Person else Icons.Default.MusicNote, null, modifier = Modifier.size(72.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -1160,7 +1325,29 @@ fun PlaylistDetailScreen(
                                 Icon(Icons.Rounded.Lock, null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (playlistUser != null && playlistUser!!.id > 0) {
+                        if (isArtistView) {
+                            val providerBadge = when {
+                                isQobuzArtist -> str("generic_artist") + " • Qobuz"
+                                isDeezerArtist -> str("generic_artist") + " • Deezer"
+                                isTidalArtist -> str("generic_artist") + " • TIDAL"
+                                else -> str("generic_artist")
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                                ) {
+                                    Text(
+                                        text = providerBadge,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        } else if (playlistUser != null && playlistUser!!.id > 0) {
                             val ownerInteraction = remember { MutableInteractionSource() }
                             val ownerHovered by ownerInteraction.collectIsHoveredAsState()
                             Row(
@@ -1213,7 +1400,15 @@ fun PlaylistDetailScreen(
                         }
 
                         val trackCountText = when {
-                            isYoutubeRadio -> str("radio") + " â€¢ YouTube"
+                            isArtistView -> {
+                                val count = tracksToDisplay.size
+                                if (count == 0 && playlistSearchQuery.isNotEmpty()) {
+                                    str("no_tracks_found_filter")
+                                } else {
+                                    str("new_releases_popular_tracks") + " • " + str("playlist_num_tracks", count)
+                                }
+                            }
+                            isYoutubeRadio -> str("radio") + " • YouTube"
                             isLoading && playlistId != "likes" -> "..."
                             else -> {
                                 val count = tracksToDisplay.size
@@ -1260,7 +1455,7 @@ fun PlaylistDetailScreen(
                                     }
                                     dialog.isVisible = true
                                     val file = dialog.files.firstOrNull()
-                                    if (file != null && currentIdLong != 0L) DownloadManager.updatePlaylistCover(currentIdLong, file)
+                                    if (file != null && currentIdLong != 0L) DownloadManager.updatePlaylistCover(currentIdLong, file, title = playlistTitle, artist = playlistUser?.username)
                                 }) {
                                     Icon(Icons.Outlined.Image, str("storage_change_btn"))
                                 }
@@ -1290,7 +1485,8 @@ fun PlaylistDetailScreen(
                                             DownloadManager.importPlaylistToLibrary(
                                                 playlist = targetPlaylist,
                                                 tracks = tracksToDisplay.toList(),
-                                                syncToCloud = !(playlistId.startsWith("spotify") || playlistId.startsWith("station_spotify") || playlistUrn?.startsWith("spotify:") == true || playlistPermalinkUrl?.contains("spotify") == true)
+                                                syncToCloud = !(playlistId.startsWith("spotify") || playlistId.startsWith("station_spotify") || playlistUrn?.startsWith("spotify:") == true || playlistPermalinkUrl?.contains("spotify") == true),
+                                                likePlaylist = true
                                             )
                                         } else {
                                             LikeRepository.togglePlaylistLike(

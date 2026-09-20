@@ -31,6 +31,7 @@ fun KittyTuneTheme(content: @Composable () -> Unit) {
 
     val themeMode = prefs.getThemeMode()
     val dynamicColor = prefs.getDynamicTheme()
+    val trackDynamicColor = prefs.getTrackDynamicTheme()
     val pureBlack = prefs.getPureBlack()
     val keyColor = ThemeState.previewKeyColor ?: prefs.getKeyColor()
     val colorStyle = prefs.getColorStyle()
@@ -53,6 +54,7 @@ fun KittyTuneTheme(content: @Composable () -> Unit) {
     SoundTuneTheme(
         themeMode = themeMode,
         dynamicColor = dynamicColor,
+        trackDynamicColor = trackDynamicColor,
         pureBlack = pureBlack,
         keyColor = keyColor,
         colorStyle = colorStyle,
