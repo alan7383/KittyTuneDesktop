@@ -268,4 +268,210 @@ object LyricsMatcher {
         text = text.replace(Regex("[^\\p{L}\\p{Nd}]+"), " ")
         return text.trim().replace(Regex("\\s+"), " ")
     }
+
+    // --- ArchiveTune-inspired intelligent title detection & FuzzyMatcher ---
+
+    const val DEFAULT_THRESHOLD = 0.85
+
+    private val COMBINING_MARKS_REGEX = Regex("\\p{M}+")
+    private val NON_ALPHANUMERIC_REGEX = Regex("[^\\p{L}\\p{N}]+")
+    private val WHITESPACE_REGEX = Regex("\\s+")
+
+    /**
+     * ArchiveTune NFKD normalization: strips accents, diacritics, and symbols.
+     */
+    fun normalizeFuzzy(value: String): String =
+        Normalizer.normalize(value, Normalizer.Form.NFKD)
+            .lowercase(java.util.Locale.ROOT)
+            .replace(COMBINING_MARKS_REGEX, "")
+            .replace(NON_ALPHANUMERIC_REGEX, " ")
+            .trim()
+            .replace(WHITESPACE_REGEX, " ")
+
+    /**
+     * ArchiveTune Jaro-Winkler string similarity distance (0.0 to 1.0).
+     */
+    fun jaroWinkler(first: String, second: String): Double =
+        jaroWinklerNormalized(normalizeFuzzy(first), normalizeFuzzy(second))
+
+    private const val WINKLER_PREFIX_LIMIT = 4
+    private const val WINKLER_SCALING_FACTOR = 0.1
+    private const val WINKLER_BOOST_THRESHOLD = 0.7
+
+    private fun jaroWinklerNormalized(first: String, second: String): Double {
+        if (first == second) return 1.0
+        if (first.isEmpty() || second.isEmpty()) return 0.0
+
+        val matchDistance = (maxOf(first.length, second.length) / 2 - 1).coerceAtLeast(0)
+        val firstMatches = BooleanArray(first.length)
+        val secondMatches = BooleanArray(second.length)
+        var matches = 0
+
+        first.indices.forEach { firstIndex ->
+            val start = (firstIndex - matchDistance).coerceAtLeast(0)
+            val end = (firstIndex + matchDistance + 1).coerceAtMost(second.length)
+
+            for (secondIndex in start until end) {
+                if (secondMatches[secondIndex] || first[firstIndex] != second[secondIndex]) continue
+                firstMatches[firstIndex] = true
+                secondMatches[secondIndex] = true
+                matches++
+                break
+            }
+        }
+
+        if (matches == 0) return 0.0
+
+        var transpositions = 0
+        var secondIndex = 0
+        first.indices.forEach { firstIndex ->
+            if (!firstMatches[firstIndex]) return@forEach
+            while (!secondMatches[secondIndex]) secondIndex++
+            if (first[firstIndex] != second[secondIndex]) transpositions++
+            secondIndex++
+        }
+
+        val matchesAsDouble = matches.toDouble()
+        val jaro = (
+            (matchesAsDouble / first.length) +
+            (matchesAsDouble / second.length) +
+            ((matchesAsDouble - (transpositions / 2.0)) / matchesAsDouble)
+        ) / 3.0
+
+        if (jaro <= WINKLER_BOOST_THRESHOLD) return jaro
+
+        var prefixLength = 0
+        val maximumPrefixLength = minOf(WINKLER_PREFIX_LIMIT, first.length, second.length)
+        while (prefixLength < maximumPrefixLength && first[prefixLength] == second[prefixLength]) {
+            prefixLength++
+        }
+
+        return jaro + (prefixLength * WINKLER_SCALING_FACTOR * (1.0 - jaro))
+    }
+
+    /**
+     * ArchiveTune & KuGou comprehensive bracket and packaging stripping.
+     * Strips `()`, `[]`, `{}`, `（）`, `「」`, `『』`, `《》`, `〈〉`, `＜＞`, `【】`, `〔〕`, `〖〗`, `［］`.
+     * Also strips trailing feature / producer credits and video packaging tags.
+     */
+    fun cleanNoiseAndBrackets(raw: String): String {
+        var text = raw
+        text = text.replace('–', '-').replace('—', '-')
+        text = text.replace(Regex("""\([^\)]*\)|\[[^\]]*\]|\{[^\}]*\}|（[^）]*）|「[^」]*」|『[^』]*』|《[^》]*》|〈[^〉]*〉|＜[^＞]*＞|【[^】]*】|〔[^〕]*〕|〖[^〗]*〗|［[^］]*］"""), " ")
+        text = text.replace(Regex("""(?i)\s+(w/|feat\.?|ft\.?|featuring|prod\.?|prod\.\s*by|produced\s+by|x(?=\s)).*$"""), " ")
+        text = text.replace(Regex("""(?i)\b(official\s*(video|audio|music\s*video|lyric\s*video|visualizer|visualiser)?|lyric\s*video|audio|visualizer|visualiser|remaster(ed)?|hd|hq|4k|mv|color\s*coded|free\s*dl|download)\b"""), " ")
+        return text.trim().replace(WHITESPACE_REGEX, " ")
+    }
+
+    /**
+     * Cleans an artist name: removes Topic, VEVO, Official, Records, Music, etc.
+     */
+    fun cleanArtist(raw: String): String {
+        var text = raw.trim()
+        text = text.replace(Regex("""(?i)\s*-\s*topic$"""), "")
+        text = text.replace(Regex("""(?i)\s*vevo$"""), "")
+        text = text.replace(Regex("""(?i)\s+(official|records|music|audio)$"""), "")
+        text = text.replace(Regex("""\([^\)]*\)|\[[^\]]*\]"""), "")
+        return text.trim().replace(WHITESPACE_REGEX, " ")
+    }
+
+    /**
+     * Generates intelligent (title, artist) candidate pairs for exact-match providers
+     * (BetterLyrics, BetterLyrics Portato, KuGou, Paxsenix, YouLyPlus, Unison).
+     *
+     * Handles:
+     * - "Artist - Title" and reversed "Title - Artist"
+     * - Delimiters (-, –, —, ~, :, |, /, //)
+     * - Artist inside title ("Not Allowed TV Girl" with artist "TV Girl")
+     * - Multi-bracket and packaging noise removal
+     * - Multi-artist collaborations ("A & B" -> "A")
+     */
+    fun generateCandidatePairs(title: String, artist: String): List<Pair<String, String>> {
+        val pairs = mutableListOf<Pair<String, String>>()
+        val cleanT = cleanNoiseAndBrackets(title)
+        val cleanA = cleanArtist(artist)
+        val rawT = title.trim()
+        val rawA = artist.trim()
+
+        // 1. If title contains delimiters (- / : ~ |)
+        val normalizedTitle = rawT.replace('–', '-').replace('—', '-')
+        val delimiterPattern = Regex("""\s+[-/|~:]\s+""")
+        if (delimiterPattern.containsMatchIn(normalizedTitle) || normalizedTitle.contains(" - ")) {
+            val parts = if (normalizedTitle.contains(" - ")) {
+                normalizedTitle.split(" - ", limit = 2)
+            } else {
+                normalizedTitle.split(delimiterPattern, limit = 2)
+            }
+            if (parts.size == 2) {
+                val part0Clean = cleanNoiseAndBrackets(parts[0])
+                val part1Clean = cleanNoiseAndBrackets(parts[1])
+                val part0Artist = cleanArtist(parts[0])
+                val part1Artist = cleanArtist(parts[1])
+
+                // Standard: "Artist - Title" -> title = part1, artist = part0
+                if (part1Clean.isNotBlank() && part0Artist.isNotBlank()) {
+                    pairs.add(part1Clean to part0Artist)
+                }
+                // Reversed: "Title - Artist" -> title = part0, artist = part1
+                if (part0Clean.isNotBlank() && part1Artist.isNotBlank()) {
+                    pairs.add(part0Clean to part1Artist)
+                }
+                // With raw/clean uploader as artist
+                if (part1Clean.isNotBlank() && cleanA.isNotBlank()) {
+                    pairs.add(part1Clean to cleanA)
+                }
+                if (part0Clean.isNotBlank() && cleanA.isNotBlank()) {
+                    pairs.add(part0Clean to cleanA)
+                }
+            }
+        }
+
+        // 2. If title contains the artist (e.g. "Not Allowed TV Girl" or "TV Girl Not Allowed")
+        if (cleanA.isNotBlank()) {
+            val withoutArtist = cleanT.replace(Regex("(?i)\\b${Regex.escape(cleanA)}\\b"), "")
+                .replace(Regex("""^\s*[-/|~:]+\s*|\s*[-/|~:]+\s*$"""), "")
+                .trim()
+            if (withoutArtist.isNotBlank() && withoutArtist != cleanT) {
+                pairs.add(withoutArtist to cleanA)
+            }
+        }
+
+        // 3. Cleaned title + clean artist
+        if (cleanT.isNotBlank() && cleanA.isNotBlank()) {
+            pairs.add(cleanT to cleanA)
+        }
+
+        // 4. Raw title + raw artist
+        if (rawT.isNotBlank() && rawA.isNotBlank()) {
+            pairs.add(rawT to rawA)
+        }
+
+        // 5. Cleaned title with raw artist
+        if (cleanT.isNotBlank() && rawA.isNotBlank()) {
+            pairs.add(cleanT to rawA)
+        }
+
+        // 6. Multi-artist split for featured or collaborative artists (e.g. "A & B")
+        val multiArtists = cleanA.split(Regex("""(?i)\s*(?:&|and|feat\.?|ft\.?|x|,)\s*"""))
+            .map { it.trim() }
+            .filter { it.length > 1 }
+        if (multiArtists.size > 1) {
+            val primaryArtist = multiArtists.first()
+            if (cleanT.isNotBlank()) {
+                pairs.add(cleanT to primaryArtist)
+            }
+        }
+
+        // 7. Split words if query was entered manually without delimiters ("Not Allowed TV Girl")
+        val words = cleanT.split(WHITESPACE_REGEX)
+        if (words.size >= 2) {
+            pairs.add(words.dropLast(1).joinToString(" ") to words.last())
+            pairs.add(words.first() to words.drop(1).joinToString(" "))
+            if (words.size >= 4) {
+                pairs.add(words.take(2).joinToString(" ") to words.drop(2).joinToString(" "))
+            }
+        }
+
+        return pairs.filter { it.first.isNotBlank() && it.second.isNotBlank() }.distinct()
+    }
 }

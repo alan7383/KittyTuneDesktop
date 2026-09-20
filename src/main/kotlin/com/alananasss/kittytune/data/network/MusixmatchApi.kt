@@ -359,7 +359,7 @@ object MusixmatchClient {
             for (offset in parts.indices) {
                 val idx = (currentPartIdx + offset) % parts.size
                 val snippetClean = parts[idx].snippet.orEmpty().lowercase().replace(Regex("[^\\p{L}\\p{Nd}]+"), "")
-                if (snippetClean.contains(cleaned)) {
+                if (snippetClean.isNotBlank() && (snippetClean.contains(cleaned) || cleaned.contains(snippetClean) || (cleaned.length >= 6 && snippetClean.length >= 6 && (snippetClean.startsWith(cleaned.take(6)) || cleaned.startsWith(snippetClean.take(6)))))) {
                     currentPartIdx = idx
                     return partSingers.getOrElse(idx) { LyricSinger.DEFAULT }
                 }
