@@ -91,8 +91,10 @@ class AudioEngine {
     private val walkman = CassetteWalkmanAudioProcessor()
     private val asmrVocal = AsmrVocalAudioProcessor()
     private val nightDrive = NightDriveAudioProcessor()
+    val automixDuck = com.alananasss.kittytune.audio.automix.AutomixDuckAudioProcessor()
 
     private val chain: List<AudioProcessor> = listOf(
+        automixDuck,
         fx, reverb, eightD, earrape, normalization, mono,
         vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
         superWide, vinylLoFi, phaser, megaphone, robotVocoder, chorus,
@@ -523,6 +525,22 @@ class AudioEngine {
         stretcher.setParameters(state.speed, pitch)
 
         limiter.setCeiling(peakLimiterCeilingFor(state))
+    }
+
+    fun setDuckMix(fraction: Float) {
+        automixDuck.setMix(fraction)
+    }
+
+    fun resetDuckMix() {
+        automixDuck.resetGain()
+    }
+
+    fun setStretcherRatio(tempoRatio: Float, pitchRatio: Float) {
+        val baseSpeed = effects.speed
+        val basePitch = if (effects.isPitchEnabled) baseSpeed else 1f
+        val adjSpeed = (baseSpeed * tempoRatio).coerceIn(0.5f, 2.0f)
+        val adjPitch = (basePitch * pitchRatio).coerceIn(0.5f, 2.0f)
+        stretcher.setParameters(adjSpeed, adjPitch)
     }
 
 

@@ -1,19 +1,26 @@
 plugins {
     kotlin("jvm")
-    @Suppress("DSL_SCOPE_VIOLATION")
-    alias(libs.plugins.kotlin.serialization)
+    kotlin("plugin.serialization")
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
 }
 
+val ktorVersion = "3.5.2"
+val serializationVersion = "1.7.1"
+val coroutinesVersion = "1.11.0"
+
 dependencies {
-    implementation(libs.ktor.client.core)
-    implementation(libs.ktor.client.okhttp)
-    implementation(libs.ktor.client.content.negotiation)
-    implementation(libs.ktor.serialization.json)
-    implementation(libs.ktor.client.encoding)
-    implementation(libs.brotli)
-    testImplementation(libs.junit)
+    implementation("io.ktor:ktor-client-core:$ktorVersion")
+    implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation("io.ktor:ktor-client-encoding:$ktorVersion")
+    implementation("org.brotli:dec:0.1.2")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+
+    testImplementation(kotlin("test"))
 }

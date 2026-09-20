@@ -120,6 +120,15 @@ fun AudioSettingsScreen(
     var crossfadeDuration by remember { mutableStateOf(prefs.getCrossfadeDuration()) }
     var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
 
+    var automixEnabled by remember { mutableStateOf(prefs.getAutomixEnabled()) }
+    var automixOverlapMode by remember { mutableStateOf(prefs.getAutomixOverlapMode()) }
+    var automixTempoMatch by remember { mutableStateOf(prefs.getAutomixTempoMatchEnabled()) }
+    var automixHarmonicMix by remember { mutableStateOf(prefs.getAutomixHarmonicMixEnabled()) }
+    var automixDynamicMix by remember { mutableStateOf(prefs.getAutomixDynamicMixPointsEnabled()) }
+    var automixBassDucking by remember { mutableStateOf(prefs.getAutomixBassDuckingEnabled()) }
+    var automixDebugOverlay by remember { mutableStateOf(prefs.getAutomixDebugOverlayEnabled()) }
+    var showAutomixOverlapDialog by remember { mutableStateOf(false) }
+
     var showNormDialog by remember { mutableStateOf(false) }
     var showNormalizationInfoDialog by remember { mutableStateOf(false) }
     var showFullPlayerBgDialog by remember { mutableStateOf(false) }
@@ -326,6 +335,49 @@ fun AudioSettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showCrossfadeDurationDialog = false }) {
                     Text(str("btn_ok"))
+                }
+            }
+        )
+    }
+
+    if (showAutomixOverlapDialog) {
+        val options = listOf(
+            0 to str(com.alananasss.kittytune.R.string.automix_overlap_auto),
+            1 to str(com.alananasss.kittytune.R.string.automix_overlap_2bars),
+            2 to str(com.alananasss.kittytune.R.string.automix_overlap_4bars),
+            3 to str(com.alananasss.kittytune.R.string.automix_overlap_8bars),
+            4 to str(com.alananasss.kittytune.R.string.automix_overlap_custom)
+        )
+        EscapableAlertDialog(
+            onDismissRequest = { showAutomixOverlapDialog = false },
+            title = { Text(str(com.alananasss.kittytune.R.string.automix_overlap_mode)) },
+            text = {
+                Column {
+                    options.forEach { (mode, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    automixOverlapMode = mode
+                                    prefs.setAutomixOverlapMode(mode)
+                                    showAutomixOverlapDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = automixOverlapMode == mode,
+                                onClick = null
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(label, fontWeight = FontWeight.Normal)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAutomixOverlapDialog = false }) {
+                    Text(str("btn_cancel"))
                 }
             }
         )
@@ -603,6 +655,119 @@ fun AudioSettingsScreen(
                                 subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
                                 onClick = { showCrossfadeDurationDialog = true }
                             )
+                        }
+                    }
+                }
+            }
+
+            Box {
+                val automixOverlapLabel = when (automixOverlapMode) {
+                    1 -> str(com.alananasss.kittytune.R.string.automix_overlap_2bars)
+                    2 -> str(com.alananasss.kittytune.R.string.automix_overlap_4bars)
+                    3 -> str(com.alananasss.kittytune.R.string.automix_overlap_8bars)
+                    4 -> str(com.alananasss.kittytune.R.string.automix_overlap_custom)
+                    else -> str(com.alananasss.kittytune.R.string.automix_overlap_auto)
+                }
+
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                    SettingsGroupTitle(str(com.alananasss.kittytune.R.string.automix))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        val automixBottomRadius by animateDpAsState(
+                            targetValue = if (automixEnabled) 4.dp else 24.dp,
+                            label = "AutomixCornerAnimation"
+                        )
+
+                        SettingsItem(
+                            shape = RoundedCornerShape(
+                                topStart = 24.dp,
+                                topEnd = 24.dp,
+                                bottomStart = automixBottomRadius,
+                                bottomEnd = automixBottomRadius
+                            ),
+                            title = str(com.alananasss.kittytune.R.string.automix),
+                            subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
+                            hasSwitch = true,
+                            switchState = automixEnabled,
+                            onSwitchChange = { 
+                                automixEnabled = it
+                                prefs.setAutomixEnabled(it)
+                            }
+                        )
+
+                        AnimatedVisibility(
+                            visible = automixEnabled,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                SettingsItem(
+                                    shape = RoundedCornerShape(4.dp),
+                                    title = str(com.alananasss.kittytune.R.string.automix_overlap_mode),
+                                    subtitle = automixOverlapLabel,
+                                    onClick = { showAutomixOverlapDialog = true }
+                                )
+                                SettingsItem(
+                                    shape = RoundedCornerShape(4.dp),
+                                    title = str(com.alananasss.kittytune.R.string.automix_tempo_match),
+                                    subtitle = str(com.alananasss.kittytune.R.string.automix_tempo_match_desc),
+                                    hasSwitch = true,
+                                    switchState = automixTempoMatch,
+                                    onSwitchChange = {
+                                        automixTempoMatch = it
+                                        prefs.setAutomixTempoMatchEnabled(it)
+                                    }
+                                )
+                                SettingsItem(
+                                    shape = RoundedCornerShape(4.dp),
+                                    title = str(com.alananasss.kittytune.R.string.automix_harmonic_mix),
+                                    subtitle = str(com.alananasss.kittytune.R.string.automix_harmonic_mix_desc),
+                                    hasSwitch = true,
+                                    switchState = automixHarmonicMix,
+                                    onSwitchChange = {
+                                        automixHarmonicMix = it
+                                        prefs.setAutomixHarmonicMixEnabled(it)
+                                    }
+                                )
+                                SettingsItem(
+                                    shape = RoundedCornerShape(4.dp),
+                                    title = str(com.alananasss.kittytune.R.string.automix_dynamic_mix),
+                                    subtitle = str(com.alananasss.kittytune.R.string.automix_dynamic_mix_desc),
+                                    hasSwitch = true,
+                                    switchState = automixDynamicMix,
+                                    onSwitchChange = {
+                                        automixDynamicMix = it
+                                        prefs.setAutomixDynamicMixPointsEnabled(it)
+                                    }
+                                )
+                                SettingsItem(
+                                    shape = RoundedCornerShape(4.dp),
+                                    title = str(com.alananasss.kittytune.R.string.automix_bass_ducking),
+                                    subtitle = str(com.alananasss.kittytune.R.string.automix_bass_ducking_desc),
+                                    hasSwitch = true,
+                                    switchState = automixBassDucking,
+                                    onSwitchChange = {
+                                        automixBassDucking = it
+                                        prefs.setAutomixBassDuckingEnabled(it)
+                                    }
+                                )
+                                SettingsItem(
+                                    shape = RoundedCornerShape(
+                                        topStart = 4.dp,
+                                        topEnd = 4.dp,
+                                        bottomStart = 24.dp,
+                                        bottomEnd = 24.dp
+                                    ),
+                                    title = str(com.alananasss.kittytune.R.string.automix_debug),
+                                    subtitle = str(com.alananasss.kittytune.R.string.automix_debug_desc),
+                                    hasSwitch = true,
+                                    switchState = automixDebugOverlay,
+                                    onSwitchChange = {
+                                        automixDebugOverlay = it
+                                        prefs.setAutomixDebugOverlayEnabled(it)
+                                    }
+                                )
+                            }
                         }
                     }
                 }

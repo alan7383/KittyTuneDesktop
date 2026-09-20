@@ -30,6 +30,7 @@ object AppDatabase {
     val recognitionHistoryDao: RecognitionHistoryDao by lazy { RecognitionHistoryDao(this) }
     val albumCacheDao: AlbumCacheDao by lazy { AlbumCacheDao(this) }
     val folderDao: FolderDao by lazy { FolderDao(this) }
+    val beatInfoDao: BeatInfoDao by lazy { BeatInfoDao(this) }
 
     fun init() {
         Class.forName("org.sqlite.JDBC")
@@ -78,6 +79,10 @@ object AppDatabase {
             """CREATE TABLE IF NOT EXISTS track_album_cache (
                 trackId INTEGER PRIMARY KEY NOT NULL, albumPlaylistId INTEGER, albumTitle TEXT,
                 resolvedAt INTEGER NOT NULL)""",
+            """CREATE TABLE IF NOT EXISTS beat_info (
+                songId TEXT PRIMARY KEY NOT NULL, bpm REAL NOT NULL, firstBeatOffsetMs INTEGER NOT NULL,
+                confidence REAL NOT NULL, analyzedAt INTEGER NOT NULL, mixInPointMs INTEGER,
+                mixOutPointMs INTEGER, keyPitchClass INTEGER, keyIsMinor INTEGER)""",
             """CREATE TABLE IF NOT EXISTS library_folders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, parentFolderId INTEGER,
                 isPinned INTEGER NOT NULL DEFAULT 0, createdAt INTEGER NOT NULL)""",
