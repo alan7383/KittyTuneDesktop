@@ -88,8 +88,12 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
     }
 }
 
+@OptIn(androidx.compose.ui.InternalComposeUiApi::class)
 fun main() {
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
+    runCatching {
+        androidx.compose.ui.platform.registerSkikoComposeImplementation()
+    }
     AppBootstrap.init()
 
     application {
