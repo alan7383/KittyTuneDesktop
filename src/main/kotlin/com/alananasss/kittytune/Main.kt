@@ -222,7 +222,8 @@ fun main() {
         if (windowState.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen &&
             !com.alananasss.kittytune.core.AppWindowState.fullScreen &&
             !isRestoringFromFullScreen &&
-            !isAppFullScreen
+            !isAppFullScreen &&
+            !com.alananasss.kittytune.data.theme.WindowsFullScreen.isFullScreen
         ) {
             savedPlacement = windowState.placement
             if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating) {
@@ -257,7 +258,9 @@ fun main() {
                         savedFloatingPosition = windowState.position
                     }
                 }
-                windowState.placement = androidx.compose.ui.window.WindowPlacement.Fullscreen
+                if (!com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                    windowState.placement = androidx.compose.ui.window.WindowPlacement.Fullscreen
+                }
             } else if (!wanted && isAppFullScreen) {
                 isAppFullScreen = false
                 isRestoringFromFullScreen = true
@@ -425,31 +428,42 @@ fun main() {
                 val isFS = com.alananasss.kittytune.core.AppWindowState.fullScreen
                 if (isFS) {
                     wasFullScreenInWindow = true
+                    if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                        javax.swing.SwingUtilities.invokeLater {
+                            com.alananasss.kittytune.data.theme.WindowsFullScreen.enter(window)
+                        }
+                    }
                 } else if (wasFullScreenInWindow) {
                     wasFullScreenInWindow = false
-                    runCatching {
-                        val device = window.graphicsConfiguration?.device
-                        if (device?.fullScreenWindow === window) device.fullScreenWindow = null
-                        if (window is java.awt.Frame) {
-                            if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
-                                window.extendedState = java.awt.Frame.MAXIMIZED_BOTH
-                            } else {
-                                window.extendedState = java.awt.Frame.NORMAL
-                                val usable = getUsableDesktopBounds(window.graphicsConfiguration)
-                                val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
-                                val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                                val clamped = clampFloatingBounds(
-                                    savedFloatingSize.width.value.toInt(),
-                                    savedFloatingSize.height.value.toInt(),
-                                    reqX,
-                                    reqY,
-                                    usable
-                                )
-                                javax.swing.SwingUtilities.invokeLater {
-                                    runCatching {
-                                        window.setBounds(clamped.x, clamped.y, clamped.width, clamped.height)
-                                        window.revalidate()
-                                        window.repaint()
+                    val usable = getUsableDesktopBounds(window.graphicsConfiguration)
+                    val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
+                    val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
+                    val clamped = clampFloatingBounds(
+                        savedFloatingSize.width.value.toInt(),
+                        savedFloatingSize.height.value.toInt(),
+                        reqX,
+                        reqY,
+                        usable
+                    )
+                    if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                        javax.swing.SwingUtilities.invokeLater {
+                            com.alananasss.kittytune.data.theme.WindowsFullScreen.exit(window, savedPlacement, clamped)
+                        }
+                    } else {
+                        runCatching {
+                            val device = window.graphicsConfiguration?.device
+                            if (device?.fullScreenWindow === window) device.fullScreenWindow = null
+                            if (window is java.awt.Frame) {
+                                if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                                    window.extendedState = java.awt.Frame.MAXIMIZED_BOTH
+                                } else {
+                                    window.extendedState = java.awt.Frame.NORMAL
+                                    javax.swing.SwingUtilities.invokeLater {
+                                        runCatching {
+                                            window.setBounds(clamped.x, clamped.y, clamped.width, clamped.height)
+                                            window.revalidate()
+                                            window.repaint()
+                                        }
                                     }
                                 }
                             }
