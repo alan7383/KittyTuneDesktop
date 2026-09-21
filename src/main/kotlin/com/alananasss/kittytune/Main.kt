@@ -229,11 +229,11 @@ fun main() {
             if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating) {
                 val curW = windowState.size.width.value.toInt()
                 val curH = windowState.size.height.value.toInt()
-                val screen = runCatching {
-                    java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
-                }.getOrNull()
+                val curX = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
+                val curY = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
+                val screen = getScreenBoundsFor(null, curX, curY)
                 // Ensure we never record temporary/fullscreen dimensions as the user's floating size
-                val isFullScreenDimension = screen != null && curW >= screen.width && curH >= screen.height
+                val isFullScreenDimension = curW >= screen.width && curH >= screen.height
                 if (!isFullScreenDimension && curW > 0 && curH > 0) {
                     savedFloatingSize = windowState.size
                     savedFloatingPosition = windowState.position
@@ -250,10 +250,10 @@ fun main() {
                 if (windowState.placement == androidx.compose.ui.window.WindowPlacement.Floating) {
                     val curW = windowState.size.width.value.toInt()
                     val curH = windowState.size.height.value.toInt()
-                    val screen = runCatching {
-                        java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
-                    }.getOrNull()
-                    if (screen == null || curW < screen.width || curH < screen.height) {
+                    val curX = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
+                    val curY = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
+                    val screen = getScreenBoundsFor(null, curX, curY)
+                    if (curW < screen.width || curH < screen.height) {
                         savedFloatingSize = windowState.size
                         savedFloatingPosition = windowState.position
                     }
@@ -267,9 +267,9 @@ fun main() {
                 val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
                     ?: androidx.compose.ui.window.WindowPlacement.Floating
                 if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
-                    val usable = getUsableDesktopBounds(null)
                     val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                     val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
+                    val usable = getUsableDesktopBounds(null, reqX, reqY)
                     val clamped = clampFloatingBounds(
                         savedFloatingSize.width.value.toInt(),
                         savedFloatingSize.height.value.toInt(),
@@ -435,9 +435,9 @@ fun main() {
                     }
                 } else if (wasFullScreenInWindow) {
                     wasFullScreenInWindow = false
-                    val usable = getUsableDesktopBounds(window.graphicsConfiguration)
                     val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                     val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
+                    val usable = getUsableDesktopBounds(window.graphicsConfiguration, reqX, reqY)
                     val clamped = clampFloatingBounds(
                         savedFloatingSize.width.value.toInt(),
                         savedFloatingSize.height.value.toInt(),
@@ -601,8 +601,36 @@ private fun ThemedWindowBackgroundEffect(window: java.awt.Window) {
     }
 }
 
-private fun getUsableDesktopBounds(gc: java.awt.GraphicsConfiguration?): java.awt.Rectangle {
-    val config = gc ?: runCatching {
+private fun getScreenDeviceForPosition(x: Int?, y: Int?): java.awt.GraphicsDevice? {
+    return runCatching {
+        val ge = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+        val devices = ge.screenDevices
+        if (x != null && y != null) {
+            val pt = java.awt.Point(x, y)
+            devices.firstOrNull { it.defaultConfiguration.bounds.contains(pt) }
+        } else null
+    }.getOrNull()
+}
+
+private fun getScreenBoundsFor(
+    gc: java.awt.GraphicsConfiguration?,
+    x: Int? = null,
+    y: Int? = null,
+): java.awt.Rectangle {
+    if (gc != null) return gc.bounds
+    val dev = getScreenDeviceForPosition(x, y)
+    if (dev != null) return dev.defaultConfiguration.bounds
+    return runCatching {
+        java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds
+    }.getOrNull() ?: java.awt.Rectangle(0, 0, 1920, 1080)
+}
+
+private fun getUsableDesktopBounds(
+    gc: java.awt.GraphicsConfiguration?,
+    x: Int? = null,
+    y: Int? = null,
+): java.awt.Rectangle {
+    val config = gc ?: getScreenDeviceForPosition(x, y)?.defaultConfiguration ?: runCatching {
         java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration
     }.getOrNull()
     val bounds = config?.bounds ?: java.awt.Rectangle(0, 0, 1440, 900)
@@ -617,7 +645,7 @@ private fun getUsableDesktopBounds(gc: java.awt.GraphicsConfiguration?): java.aw
     )
 }
 
-private fun clampFloatingBounds(
+internal fun clampFloatingBounds(
     requestedW: Int,
     requestedH: Int,
     requestedX: Int?,
