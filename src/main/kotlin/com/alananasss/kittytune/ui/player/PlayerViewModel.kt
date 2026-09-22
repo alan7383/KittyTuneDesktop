@@ -1152,6 +1152,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 flushListenSession("TRACK_CHANGE")
                 loadTrimFor(MusicManager.currentTrack?.id)
                 hasPushedRecentlyPlayed = false
+                com.alananasss.kittytune.audio.automix.AutomixManager.setMixBeatsLeft(null)
+                com.alananasss.kittytune.audio.automix.AutomixManager.setIsAutomixing(false)
             }
 
             if (MusicManager.currentTrack?.id == trackId) {
