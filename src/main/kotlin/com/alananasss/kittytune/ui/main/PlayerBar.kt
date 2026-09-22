@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -78,7 +79,7 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
-import com.alananasss.kittytune.ui.player.automix.AutomixBadge
+import com.alananasss.kittytune.ui.player.automix.AutomixTransitionGlow
 import com.alananasss.kittytune.utils.makeTimeString
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -177,6 +178,11 @@ fun PlayerBar(
                 barWidth >= 700.dp -> 240.dp
                 else -> 180.dp
             }
+
+            // Elegant ambient glow & gradient animation during automix countdown and active crossfade
+            AutomixTransitionGlow(
+                modifier = Modifier.fillMaxSize()
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -404,11 +410,6 @@ fun PlayerBar(
                         else Icons.Filled.Repeat,
                         contentDescription = "Repeat",
                         onClick = { vm.toggleRepeatMode() },
-                    )
-
-                    AutomixBadge(
-                        textColor = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 6.dp)
                     )
                 }
 
