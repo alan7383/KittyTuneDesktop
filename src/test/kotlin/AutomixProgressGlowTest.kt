@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * Transport buttons row has 0 layout shift (badge removed from row). Transition feedback is delivered
  * via ambient glow and gradient animation on the bottom PlayerBar panel.
  */
-class AutomixTransitionGlowTest {
+class AutomixProgressGlowTest {
 
     @Test
     fun testBeatCountdownUrgencyProgression() {
