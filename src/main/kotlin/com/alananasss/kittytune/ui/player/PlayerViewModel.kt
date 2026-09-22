@@ -1143,9 +1143,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 return
             }
 
-            if (currentTrack?.id != trackId) {
+            // Capture the change flag before currentTrack is overwritten below so the
+            // AUTO-advance loadLyrics call can use the same boolean without re-comparing.
+            val trackActuallyChanged = currentTrack?.id != trackId
+
+            if (trackActuallyChanged) {
                 // Was a silent reset: whatever had been listened to went missing here.
-flushListenSession("TRACK_CHANGE")
+                flushListenSession("TRACK_CHANGE")
                 loadTrimFor(MusicManager.currentTrack?.id)
                 hasPushedRecentlyPlayed = false
             }
@@ -1171,6 +1175,17 @@ flushListenSession("TRACK_CHANGE")
                     commentCount = 0,
                     source = source
                 )
+            }
+
+            // AUTO transitions are driven entirely by the media engine (prebuffered crossfade,
+            // gapless playback). They bypass playTrackAtIndex, so loadLyrics is never called
+            // for the incoming track through the normal path — leaving all three lyrics views
+            // frozen on the previous track's text until a manual reload.
+            //
+            // loadLyrics cancels the previous job and clears lyricsLines synchronously, so
+            // stale lyrics disappear the moment the track changes, and the new fetch begins.
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && trackActuallyChanged) {
+                currentTrack?.let { loadLyrics(it) }
             }
         }
     }
