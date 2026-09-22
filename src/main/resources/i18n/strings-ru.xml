@@ -2309,6 +2309,7 @@
     <string name="automix_harmonic_mix">Гармоническое сведение</string>
     <string name="automix_harmonic_mix_desc">Подстройка высоты тона (до ±3 полутонов) под музыкальную тональность</string>
     <string name="automix_mix_in">СВЕДЕНИЕ ЧЕРЕЗ %1$d</string>
+    <string name="automix_mix_into">Сведение с %1$s</string>
     <string name="automix_overlap_2bars">2 такта</string>
     <string name="automix_overlap_4bars">4 такта</string>
     <string name="automix_overlap_8bars">8 тактов</string>

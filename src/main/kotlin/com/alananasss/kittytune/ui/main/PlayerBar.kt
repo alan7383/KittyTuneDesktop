@@ -79,10 +79,20 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
-import com.alananasss.kittytune.ui.player.automix.AutomixProgressGlow
 import com.alananasss.kittytune.utils.makeTimeString
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.material.icons.rounded.GraphicEq
+import com.alananasss.kittytune.R
+import com.alananasss.kittytune.audio.automix.AutomixManager
+import com.alananasss.kittytune.core.stringResource
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
@@ -224,22 +234,62 @@ fun PlayerBar(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    ArtistLinkText(
-                                        track = track,
-                                        onArtistClick = { vm.navigateToTrackArtist(it) },
-                                        text = track.user?.username.orEmpty(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-                                    if (track.user?.verified == true) {
-                                        Spacer(Modifier.width(3.dp))
-                                        Icon(
-                                            Icons.Rounded.Verified,
-                                            null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(12.dp)
-                                        )
+
+                                val isAutomixing by AutomixManager.isAutomixing.collectAsState()
+                                val mixBeatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
+                                val isCrossfading = MusicManager.isCrossfadingOut
+                                val isTransitionActive = isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)
+                                val nextTrack = if (vm.repeatMode == RepeatMode.ONE) vm.currentTrack else vm.queue.getOrNull(vm.currentQueueIndex + 1)
+                                val nextTitle = (AutomixManager.automixDebugInfo.value?.inTitle ?: nextTrack?.title)?.takeIf { it.isNotBlank() }
+
+                                AnimatedContent(
+                                    targetState = isTransitionActive && nextTitle != null,
+                                    transitionSpec = {
+                                        (fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 })
+                                            .togetherWith(fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 2 })
+                                    },
+                                    label = "TrackSubtitleTransition"
+                                ) { showTransition ->
+                                    if (showTransition && nextTitle != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.GraphicEq,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.automix_mix_into, nextTitle),
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                ),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    } else {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            ArtistLinkText(
+                                                track = track,
+                                                onArtistClick = { vm.navigateToTrackArtist(it) },
+                                                text = track.user?.username.orEmpty(),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.weight(1f, fill = false)
+                                            )
+                                            if (track.user?.verified == true) {
+                                                Spacer(Modifier.width(3.dp))
+                                                Icon(
+                                                    Icons.Rounded.Verified,
+                                                    null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(12.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -422,46 +472,35 @@ fun PlayerBar(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Box(
+                    PlayerSlider(
+                        value = position.toFloat().coerceIn(0f, duration.toFloat()),
+                        onValueChange = {
+                            scrubbing = true
+                            scrubPosition = it
+                            vm.updateScrubPosition(it.toLong())
+                        },
+                        onValueChangeFinished = {
+                            vm.seekTo(scrubPosition.toLong())
+                            scrubbing = false
+                        },
+                        sliderStyle = sliderStyle,
+                        isPlaying = vm.isPlaying,
+                        valueRange = 0f..duration.toFloat(),
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        AutomixProgressGlow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(24.dp)
-                        )
-                        PlayerSlider(
-                            value = position.toFloat().coerceIn(0f, duration.toFloat()),
-                            onValueChange = {
-                                scrubbing = true
-                                scrubPosition = it
-                                vm.updateScrubPosition(it.toLong())
-                            },
-                            onValueChangeFinished = {
-                                vm.seekTo(scrubPosition.toLong())
-                                scrubbing = false
-                            },
-                            sliderStyle = sliderStyle,
-                            isPlaying = vm.isPlaying,
-                            valueRange = 0f..duration.toFloat(),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .seekWheel(
-                                    positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
-                                    durationMs = { vm.duration },
-                                    stepSeconds = { seekWheelSeconds },
-                                    onSeek = { target ->
-                                        // Straight to the player rather than through the scrub state: a
-                                        // wheel notch is a decision, not a drag in progress.
-                                        scrubbing = false
-                                        vm.seekTo(target)
-                                    },
-                                ),
-                        )
-                    }
+                            .padding(horizontal = 8.dp)
+                            .seekWheel(
+                                positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
+                                durationMs = { vm.duration },
+                                stepSeconds = { seekWheelSeconds },
+                                onSeek = { target ->
+                                    // Straight to the player rather than through the scrub state: a
+                                    // wheel notch is a decision, not a drag in progress.
+                                    scrubbing = false
+                                    vm.seekTo(target)
+                                },
+                            ),
+                    )
                     Text(
                         text = makeTimeString(duration),
                         style = MaterialTheme.typography.labelSmall,

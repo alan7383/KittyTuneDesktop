@@ -1556,6 +1556,7 @@
     <string name="automixing">Automix läuft</string>
     <string name="crossfading">Crossfade läuft</string>
     <string name="automix_mix_in">MIX IN %1$d</string>
+    <string name="automix_mix_into">Mix zu %1$s</string>
     <string name="crossfade_gapless">Titel desselben Albums nicht überblenden</string>
     <string name="crossfade_gapless_desc">Erhält nahtlose Übergänge bei Live-Aufnahmen und durchgehenden Alben</string>
 

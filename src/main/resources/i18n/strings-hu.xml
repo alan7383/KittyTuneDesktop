@@ -2313,6 +2313,7 @@
     <string name="automix_harmonic_mix">Harmonikus keverés</string>
     <string name="automix_harmonic_mix_desc">Hangmagasság-eltolás (akár ±3 félhangig) a zenei hangnem összehangolásához</string>
     <string name="automix_mix_in">KEVERÉS %1$d MÚLVA</string>
+    <string name="automix_mix_into">Keverés ide: %1$s</string>
     <string name="automix_overlap_2bars">2 ütem</string>
     <string name="automix_overlap_4bars">4 ütem</string>
     <string name="automix_overlap_8bars">8 ütem</string>
