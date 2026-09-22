@@ -446,22 +446,37 @@ object LyricsUtils {
                 var cleanText = processedText
                 if (processedText.contains("<")) {
                     val wordMatcher = ENHANCED_WORD_PATTERN.matcher(processedText)
-                    val extractedWords = mutableListOf<LyricWord>()
+                    // First pass: collect all <time>text matches
+                    val patternWords = mutableListOf<LyricWord>()
                     while (wordMatcher.find()) {
                         val wMin = wordMatcher.group(1)?.toLong() ?: 0
                         val wSec = wordMatcher.group(2)?.toLong() ?: 0
                         val wMsStr = wordMatcher.group(3) ?: "00"
                         val wMs = if (wMsStr.length == 2) wMsStr.toLong() * 10 else wMsStr.toLong()
                         val wText = wordMatcher.group(4) ?: ""
-                        
                         val wTime = (wMin * 60 * 1000) + (wSec * 1000) + wMs
-                        extractedWords.add(LyricWord(wText, wTime, 0L))
+                        patternWords.add(LyricWord(wText, wTime, 0L))
                     }
-                    if (extractedWords.isNotEmpty()) {
+                    if (patternWords.isNotEmpty()) {
+                        val extractedWords = mutableListOf<LyricWord>()
+                        // Recover any text that appears before the first <time> tag.
+                        // In the A2-extension LRC format used by sources like SimpMusic /
+                        // Musixmatch richSyncLyrics, the first syllable of a line is written
+                        // directly after the closing ] without its own timestamp prefix:
+                        //   [00:10.12]P<00:10.20>aris is <00:10.80>burning
+                        // Without this recovery, "P" is silently dropped.
+                        val firstTagIndex = processedText.indexOf('<')
+                        if (firstTagIndex > 0) {
+                            val leadingText = processedText.substring(0, firstTagIndex)
+                            if (leadingText.isNotEmpty()) {
+                                extractedWords.add(LyricWord(leadingText, startTime, 0L))
+                            }
+                        }
+                        extractedWords.addAll(patternWords)
                         cleanText = extractedWords.joinToString("") { it.text }.trim()
                         for (i in extractedWords.indices) {
                             val current = extractedWords[i]
-                            val nextTime = if (i < extractedWords.size - 1) extractedWords[i+1].startTime else 0L
+                            val nextTime = if (i < extractedWords.size - 1) extractedWords[i + 1].startTime else 0L
                             words.add(current.copy(endTime = nextTime))
                         }
                     }
