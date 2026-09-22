@@ -79,7 +79,7 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
-import com.alananasss.kittytune.ui.player.automix.AutomixTransitionGlow
+import com.alananasss.kittytune.ui.player.automix.AutomixProgressGlow
 import com.alananasss.kittytune.utils.makeTimeString
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -178,11 +178,6 @@ fun PlayerBar(
                 barWidth >= 700.dp -> 240.dp
                 else -> 180.dp
             }
-
-            // Elegant ambient glow & gradient animation during automix countdown and active crossfade
-            AutomixTransitionGlow(
-                modifier = Modifier.fillMaxSize()
-            )
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
@@ -427,35 +422,46 @@ fun PlayerBar(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    PlayerSlider(
-                        value = position.toFloat().coerceIn(0f, duration.toFloat()),
-                        onValueChange = {
-                            scrubbing = true
-                            scrubPosition = it
-                            vm.updateScrubPosition(it.toLong())
-                        },
-                        onValueChangeFinished = {
-                            vm.seekTo(scrubPosition.toLong())
-                            scrubbing = false
-                        },
-                        sliderStyle = sliderStyle,
-                        isPlaying = vm.isPlaying,
-                        valueRange = 0f..duration.toFloat(),
+                    Box(
                         modifier = Modifier
                             .weight(1f)
-                            .padding(horizontal = 8.dp)
-                            .seekWheel(
-                                positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
-                                durationMs = { vm.duration },
-                                stepSeconds = { seekWheelSeconds },
-                                onSeek = { target ->
-                                    // Straight to the player rather than through the scrub state: a
-                                    // wheel notch is a decision, not a drag in progress.
-                                    scrubbing = false
-                                    vm.seekTo(target)
-                                },
-                            ),
-                    )
+                            .padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AutomixProgressGlow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(24.dp)
+                        )
+                        PlayerSlider(
+                            value = position.toFloat().coerceIn(0f, duration.toFloat()),
+                            onValueChange = {
+                                scrubbing = true
+                                scrubPosition = it
+                                vm.updateScrubPosition(it.toLong())
+                            },
+                            onValueChangeFinished = {
+                                vm.seekTo(scrubPosition.toLong())
+                                scrubbing = false
+                            },
+                            sliderStyle = sliderStyle,
+                            isPlaying = vm.isPlaying,
+                            valueRange = 0f..duration.toFloat(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .seekWheel(
+                                    positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
+                                    durationMs = { vm.duration },
+                                    stepSeconds = { seekWheelSeconds },
+                                    onSeek = { target ->
+                                        // Straight to the player rather than through the scrub state: a
+                                        // wheel notch is a decision, not a drag in progress.
+                                        scrubbing = false
+                                        vm.seekTo(target)
+                                    },
+                                ),
+                        )
+                    }
                     Text(
                         text = makeTimeString(duration),
                         style = MaterialTheme.typography.labelSmall,
