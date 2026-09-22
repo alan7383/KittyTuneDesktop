@@ -2334,6 +2334,7 @@
     <string name="automix_overlap_custom">Durée personnalisée</string>
     <string name="automixing">Automix en cours</string>
     <string name="automix_mix_in">MIX DANS %1$d</string>
+    <string name="automix_mix_into">Mix vers %1$s</string>
     <string name="crossfading">Fondu enchaîné</string>
     <string name="pref_slider_style">Style du curseur</string>
     <string name="pref_slider_style_desc">Personnaliser le style de la barre de progression</string>

@@ -1412,6 +1412,7 @@
     <string name="automixing">Đang hòa âm tự động</string>
     <string name="crossfading">Đang chuyển bài</string>
     <string name="automix_mix_in">CHUYỂN TRONG %1$d</string>
+    <string name="automix_mix_into">Chuyển sang %1$s</string>
     <string name="crossfade_gapless">Không chuyển bài mờ dần giữa các bài trong cùng album</string>
     <string name="crossfade_gapless_desc">Giữ nguyên chuyển tiếp liền mạch giữa các bài hát trong bản thu trực tiếp hoặc album liên tục</string>
     <string name="pref_bottom_menu_title">Thanh điều hướng</string>

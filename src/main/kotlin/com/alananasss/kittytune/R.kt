@@ -28,6 +28,7 @@ object R {
         const val automix_overlap_custom = "automix_overlap_custom"
         const val automixing = "automixing"
         const val automix_mix_in = "automix_mix_in"
+        const val automix_mix_into = "automix_mix_into"
         const val crossfading = "crossfading"
 
         const val app_name = "app_name"
