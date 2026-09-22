@@ -238,9 +238,13 @@ fun PlayerBar(
                                 val isAutomixing by AutomixManager.isAutomixing.collectAsState()
                                 val mixBeatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
                                 val isCrossfading = MusicManager.isCrossfadingOut
-                                val isTransitionActive = isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)
-                                val nextTrack = if (vm.repeatMode == RepeatMode.ONE) vm.currentTrack else vm.queue.getOrNull(vm.currentQueueIndex + 1)
-                                val nextTitle = (AutomixManager.automixDebugInfo.value?.inTitle ?: nextTrack?.title)?.takeIf { it.isNotBlank() }
+                                val remainingMs = if (vm.duration > 0) vm.duration - vm.currentPosition else Long.MAX_VALUE
+                                val isNearingEnd = remainingMs in 0L..20_000L
+                                val isTransitionActive = (isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)) && isNearingEnd
+
+                                val nextTrack = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
+                                val isDifferentTrack = vm.repeatMode == RepeatMode.ONE || (nextTrack != null && nextTrack.id != track.id)
+                                val nextTitle = nextTrack?.title?.trim()?.takeIf { it.isNotEmpty() && isDifferentTrack }
 
                                 AnimatedContent(
                                     targetState = isTransitionActive && nextTitle != null,
