@@ -386,18 +386,43 @@ object AutomixManager {
         }
 
         val inPeriodMs = (60_000f / inBeat.bpm).toDouble()
-        val rawStart = if (prefs.getAutomixDynamicMixPointsEnabled()) {
-            inBeat.mixInPointMs?.takeIf { it > 0 } ?: inBeat.firstBeatOffsetMs
-        } else inBeat.firstBeatOffsetMs
-        val inPhraseMs = inPeriodMs * 8
-        val inK = ceil((rawStart - inBeat.firstBeatOffsetMs) / inPhraseMs).toLong().coerceAtLeast(0)
-        val incomingStart = (inBeat.firstBeatOffsetMs + inK * inPhraseMs).toLong()
+        val startOffsetMode = prefs.getAutomixStartOffsetMode()
+        val incomingStart: Long = when (startOffsetMode) {
+            PlayerPreferences.AUTOMIX_START_OFFSET_BEGINNING -> 0L
+            PlayerPreferences.AUTOMIX_START_OFFSET_CUSTOM -> {
+                val customSec = prefs.getAutomixStartOffsetCustomSec()
+                val targetMs = customSec * 1000L
+                if (targetMs <= 0L) {
+                    0L
+                } else if (inBeat.bpm > 0f) {
+                    val inBarMs = inPeriodMs * 4
+                    val inBars = kotlin.math.round((targetMs - inBeat.firstBeatOffsetMs) / inBarMs).toLong().coerceAtLeast(0)
+                    (inBeat.firstBeatOffsetMs + inBars * inBarMs).toLong().coerceAtLeast(0L)
+                } else {
+                    targetMs
+                }
+            }
+            else -> { // AUTOMIX_START_OFFSET_AUTO
+                val rawStart = if (prefs.getAutomixDynamicMixPointsEnabled()) {
+                    inBeat.mixInPointMs?.takeIf { it > 0 } ?: inBeat.firstBeatOffsetMs
+                } else inBeat.firstBeatOffsetMs
+                val inPhraseMs = inPeriodMs * 8
+                val inK = ceil((rawStart - inBeat.firstBeatOffsetMs) / inPhraseMs).toLong().coerceAtLeast(0)
+                (inBeat.firstBeatOffsetMs + inK * inPhraseMs).toLong()
+            }
+        }
+        val nextDuration = nextTrack.durationMs?.takeIf { it > 5000L }
+        val effectiveIncomingStart = if (nextDuration != null) {
+            incomingStart.coerceIn(0L, nextDuration - 3000L)
+        } else {
+            incomingStart.coerceAtLeast(0L)
+        }
 
         val plan = AutomixPlan(
             currentId = currentId,
             nextId = nextId,
             triggerTimeMs = triggerTime,
-            incomingStartMs = incomingStart,
+            incomingStartMs = effectiveIncomingStart,
             tempoRatio = tempoRatio,
             pitchRatio = pitchRatio,
             overlapMs = effectiveOverlapMs,
