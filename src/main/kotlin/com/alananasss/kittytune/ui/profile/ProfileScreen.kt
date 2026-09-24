@@ -1536,7 +1536,12 @@ fun <T> ProfileHorizontalCarouselRow(
 
 @Composable
 fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
-    Column(modifier = Modifier.width(140.dp).clickable { onClick() }) {
+    Column(
+        modifier = Modifier
+            .width(140.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+    ) {
         AsyncImage(
             model = playlist.fullResArtwork,
             contentDescription = null,
@@ -1573,7 +1578,13 @@ fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
 
 @Composable
 fun ArtistCircle(user: User, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(120.dp).clickable { onClick() }) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(120.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+    ) {
         ArtistAvatar(avatarUrl = user.avatarUrl, modifier = Modifier.size(120.dp).clip(CircleShape))
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
