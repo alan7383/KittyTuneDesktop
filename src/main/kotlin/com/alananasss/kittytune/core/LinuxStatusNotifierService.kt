@@ -1,6 +1,5 @@
 package com.alananasss.kittytune.core
 
-import org.freedesktop.dbus.DBusPath
 import org.freedesktop.dbus.Struct
 import org.freedesktop.dbus.Tuple
 import org.freedesktop.dbus.annotations.DBusInterfaceName
@@ -205,8 +204,8 @@ class LinuxStatusNotifierService(
                 map["WindowId"] = Variant(0, "i")
                 map["IconName"] = Variant(iconName, "s")
                 map["IconThemePath"] = Variant(iconThemePath, "s")
-                map["ItemIsMenu"] = Variant(false, "b")
-                map["Menu"] = Variant(DBusPath("/MenuBar"), "o")
+                // No Menu property — KDE falls back to calling ContextMenu(x, y)
+                // directly on right-click, which opens the custom Compose menu.
             }
             return map
         }
