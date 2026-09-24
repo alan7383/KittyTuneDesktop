@@ -221,9 +221,10 @@ fun AutomixDebugOverlay(
                                 color = Color(0xFF00E5FF)
                             )
                             val overlapS = dbg.overlapMs?.let { "%.1fs".format(it / 1000f) } ?: "auto"
+                            val startStr = dbg.incomingStartMs?.let { "start ${makeTimeString(it)}" }
                             val tempoStr = dbg.tempoRatio?.let { if (it != 1f) "tempo ×%.3f".format(it) else null }
                             val pitchStr = dbg.pitchRatio?.let { if (it != 1f) "pitch ×%.3f".format(it) else null }
-                            val details = listOfNotNull("overlap $overlapS", tempoStr, pitchStr).joinToString(" • ")
+                            val details = listOfNotNull("overlap $overlapS", startStr, tempoStr, pitchStr).joinToString(" • ")
                             if (details.isNotBlank()) {
                                 Text(
                                     text = details,
