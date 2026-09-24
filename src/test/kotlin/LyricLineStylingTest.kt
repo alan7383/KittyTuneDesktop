@@ -112,6 +112,29 @@ class LyricLineStylingTest {
     }
 
     /**
+     * The blur switch is independent per view: the user can turn it off in one place without touching the other.
+     * When off, a focus style keeps its scale and alpha but draws the inactive lines sharp.
+     */
+    @Test
+    fun `blur can be switched off without touching the other treatments`() {
+        val enabled = LyricLineStyling.treatmentFor(LyricsDisplayStyle.SCALE_FOCUS, 2, blurEnabled = true)
+        val disabled = LyricLineStyling.treatmentFor(LyricsDisplayStyle.SCALE_FOCUS, 2, blurEnabled = false)
+
+        assertTrue(enabled.blur > 0.dp)
+        assertEquals(0.dp, disabled.blur)
+        assertEquals(enabled.scale, disabled.scale)
+        assertEquals(enabled.alpha, disabled.alpha)
+    }
+
+    /** The current line is never blurred, switch or not — that is what "inactive lines" means. */
+    @Test
+    fun `the current line stays sharp when blur is on`() {
+        for (style in LyricsDisplayStyle.entries) {
+            assertEquals(0.dp, LyricLineStyling.treatmentFor(style, 0, blurEnabled = true).blur, "style $style")
+        }
+    }
+
+    /**
      * What is still to come stays brighter than what has gone.
      *
      * Not cosmetic: the lines below the current one are the ones being read ahead, and dimming them equally

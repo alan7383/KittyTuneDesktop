@@ -112,13 +112,17 @@ class AccompanistLyricsTest {
             com.alananasss.kittytune.ui.player.lyrics.LyricLine(
                 text = "Center text",
                 startTime = 1000L,
-                endTime = 3000L
+                endTime = 3000L,
+                words = listOf(
+                    com.alananasss.kittytune.ui.player.lyrics.LyricWord("Center", 1000L, 2000L),
+                    com.alananasss.kittytune.ui.player.lyrics.LyricWord(" text", 2000L, 3000L)
+                )
             )
         )
 
         val centerLyrics = com.alananasss.kittytune.ui.player.lyrics.buildSyncedLyrics(
             lines,
-            isWordSynced = false,
+            isWordSynced = true,
             userAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.CENTER
         )
         val centerLine = centerLyrics.lines[0] as KaraokeLine.MainKaraokeLine
@@ -126,7 +130,7 @@ class AccompanistLyricsTest {
 
         val rightLyrics = com.alananasss.kittytune.ui.player.lyrics.buildSyncedLyrics(
             lines,
-            isWordSynced = false,
+            isWordSynced = true,
             userAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT
         )
         val rightLine = rightLyrics.lines[0] as KaraokeLine.MainKaraokeLine
@@ -223,5 +227,59 @@ class AccompanistLyricsTest {
         val canBaseline = canLayout.position.y + canLayout.firstBaseline
         assertEquals(becauseBaseline, canBaseline, 0.001f, "'can' must have the exact same baseline as 'Because'")
     }
+
+    @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
+    @Test
+    fun testActiveScalingLineWrapping() {
+        androidx.compose.ui.platform.registerSkikoComposeImplementation()
+        val density = androidx.compose.ui.unit.Density(1f)
+        val resolver = androidx.compose.ui.text.font.createFontFamilyResolver()
+        val measurer = androidx.compose.ui.text.TextMeasurer(resolver, density, androidx.compose.ui.unit.LayoutDirection.Ltr)
+        val style = com.alananasss.kittytune.ui.theme.Typography.titleMedium.copy(
+            fontSize = androidx.compose.ui.unit.TextUnit(28f, androidx.compose.ui.unit.TextUnitType.Sp)
+        )
+
+        val syllables = listOf(
+            KaraokeSyllable("Твоё ", 0, 500),
+            KaraokeSyllable("сердце ", 500, 1000),
+            KaraokeSyllable("— ", 1000, 1200),
+            KaraokeSyllable("лёд, ", 1200, 1800),
+            KaraokeSyllable("значит ", 1800, 2400),
+            KaraokeSyllable("моё ", 2400, 2800),
+            KaraokeSyllable("сердце ", 2800, 3400),
+            KaraokeSyllable("— ", 3400, 3600),
+            KaraokeSyllable("льдина", 3600, 4200)
+        )
+
+        val layouts = com.alananasss.kittytune.ui.player.lyrics.accompanist.measureSyllablesAndDetermineAnimation(
+            syllables = syllables,
+            textMeasurer = measurer,
+            style = style,
+            phoneticStyle = style,
+            isAccompanimentLine = false,
+            spaceWidth = measurer.measure(" ", style).size.width.toFloat()
+        )
+
+        val availableWidthPx = 400f
+        val activeScale = 1.25f
+        val effectiveWrapWidth = availableWidthPx / activeScale
+
+        val wrappedLines = com.alananasss.kittytune.ui.player.lyrics.accompanist.calculateBalancedLines(
+            syllableLayouts = layouts,
+            availableWidthPx = effectiveWrapWidth,
+            textMeasurer = measurer,
+            style = style
+        )
+
+        // Verify that every wrapped line, when scaled up by activeScale, fits within availableWidthPx
+        for (line in wrappedLines) {
+            val scaledWidth = line.totalWidth * activeScale
+            kotlin.test.assertTrue(
+                scaledWidth <= availableWidthPx + 1f,
+                "Scaled line width ($scaledWidth) must not exceed available width ($availableWidthPx)"
+            )
+        }
+    }
 }
+
 
