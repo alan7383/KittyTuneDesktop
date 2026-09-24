@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.main
 
 import androidx.compose.material3.ButtonDefaults
+import kotlin.math.roundToInt
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
 import com.alananasss.kittytune.ui.player.slider.PlayerSlider
@@ -130,18 +131,24 @@ import kotlinx.coroutines.delay
 private val VOLUME_ICON_SIZE = 20.dp
 
 /** Between the speaker and the track. Enough to separate them, not enough to eat the track. */
-private val VOLUME_ICON_GAP = 10.dp
+private val VOLUME_ICON_GAP = 8.dp
 
-private val VOLUME_ROW_OVERHEAD = VOLUME_ICON_SIZE + VOLUME_ICON_GAP
+/** Gap between the slider track and the volume percentage text. */
+private val VOLUME_TEXT_GAP = 6.dp
+
+/** Fixed width for the volume percentage label (comfortably fits "100%"). */
+private val VOLUME_TEXT_WIDTH = 36.dp
+
+private val VOLUME_ROW_OVERHEAD = VOLUME_ICON_SIZE + VOLUME_ICON_GAP + VOLUME_TEXT_GAP + VOLUME_TEXT_WIDTH
 
 /**
  * Shortest track worth aiming at. With less room than this the bar switches to the vertical hover
  * control rather than showing a sliver.
  */
-private val MIN_VOLUME_SLIDER_WIDTH = 120.dp
+private val MIN_VOLUME_SLIDER_WIDTH = 90.dp
 
 /** And the widest it grows to on a roomy window. */
-private val MAX_VOLUME_SLIDER_WIDTH = 200.dp
+private val MAX_VOLUME_SLIDER_WIDTH = 160.dp
 
 /**
  * Bottom full-width playback bar: track info left, transport + progress center,
@@ -280,7 +287,7 @@ fun PlayerBar(
                                             ArtistLinkText(
                                                 track = track,
                                                 onArtistClick = { vm.navigateToTrackArtist(it) },
-                                                text = track.user?.username.orEmpty(),
+                                                text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                                                 style = MaterialTheme.typography.bodySmall,
                                                 modifier = Modifier.weight(1f, fill = false)
                                             )
@@ -622,19 +629,18 @@ fun PlayerBar(
                                 onValueChange = { vm.updateVolume(it) },
                                 onValueChangeFinished = { vm.persistVolume() },
                                 modifier = Modifier
-                                    // Exactly the room there is, between what is worth showing and
-                                    // what is worth using. Still grows on a wide window, which was
-                                    // the "make it wider" ask in #27, but never past its box.
-                                    //
-                                    // No inner padding here. It used to carry `padding(horizontal = 12.dp)`
-                                    // *inside* a fixed width, so the track was the width minus 24 dp — while
-                                    // [VOLUME_ROW_OVERHEAD] had already subtracted that same 24 dp from the
-                                    // room available. The padding was charged twice and the track lost 24 dp
-                                    // it had been budgeted, which is the truncated slider in the report. The
-                                    // gap to the icon is a Spacer now, so it is paid for exactly once
-                                    // (issue #33).
                                     .width(roomForSlider.coerceAtMost(MAX_VOLUME_SLIDER_WIDTH))
                                     .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
+                            )
+                            Spacer(Modifier.width(VOLUME_TEXT_GAP))
+                            Text(
+                                text = "${(volume * 100).roundToInt()}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier
+                                    .width(VOLUME_TEXT_WIDTH)
+                                    .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
+                                maxLines = 1,
                             )
                         }
                     }
@@ -914,12 +920,6 @@ private fun VolumeHoverControl(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp),
                     ) {
-                        Text(
-                            text = "${(volume * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(10.dp))
                         val state = remember {
                             SliderState(volume, 0, { onVolumeChangeFinished() }, 0f..1f)
                         }
@@ -931,6 +931,12 @@ private fun VolumeHoverControl(
                         LaunchedEffect(state) {
                             snapshotFlow { state.value }.collect { onVolumeChange(it) }
                         }
+                        Text(
+                            text = "${(state.value * 100).roundToInt()}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(10.dp))
                         VerticalSlider(
                             state = state,
                             // A volume slider fills from the bottom. The default direction puts
