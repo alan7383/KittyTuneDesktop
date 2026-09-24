@@ -1,9 +1,11 @@
+import com.alananasss.kittytune.data.local.MiniPlayerStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.lyrics.LyricWord
 import com.alananasss.kittytune.ui.player.mini.resolveActiveChunk
 import com.alananasss.kittytune.ui.player.mini.splitIntoChunks
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class MiniLyricsPlayerTest {
@@ -131,4 +133,122 @@ class MiniLyricsPlayerTest {
         val narrowChunks = splitIntoChunks(text, words, maxChunkChars = 22)
         assertTrue(narrowChunks.size >= 2, "Narrow scaled mini player should split into multiple chunks")
     }
+
+    @Test
+    fun mini_player_display_settings_persistence() {
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val origCover = prefs.getMiniPlayerShowCover()
+        val origPlayback = prefs.getMiniPlayerShowPlaybackControls()
+        val origAdditional = prefs.getMiniPlayerShowAdditionalControls()
+        val origOnHover = prefs.getMiniPlayerControlsOnHover()
+        val origHoverEffect = prefs.getMiniPlayerHoverEffect()
+        val origProgress = prefs.getMiniPlayerShowProgress()
+
+        try {
+            // Defaults should be true
+            assertTrue(prefs.getMiniPlayerShowCover(), "Cover default should be true")
+            assertTrue(prefs.getMiniPlayerShowPlaybackControls(), "Playback controls default should be true")
+            assertTrue(prefs.getMiniPlayerShowAdditionalControls(), "Additional controls default should be true")
+            assertTrue(prefs.getMiniPlayerControlsOnHover(), "Controls on hover default should be true")
+            assertTrue(prefs.getMiniPlayerHoverEffect(), "Hover effect default should be true")
+            assertTrue(prefs.getMiniPlayerShowProgress(), "Progress bar default should be true")
+
+            // Test toggling false
+            prefs.setMiniPlayerShowCover(false)
+            prefs.setMiniPlayerShowPlaybackControls(false)
+            prefs.setMiniPlayerShowAdditionalControls(false)
+            prefs.setMiniPlayerControlsOnHover(false)
+            prefs.setMiniPlayerHoverEffect(false)
+            prefs.setMiniPlayerShowProgress(false)
+
+            assertFalse(prefs.getMiniPlayerShowCover())
+            assertFalse(prefs.getMiniPlayerShowPlaybackControls())
+            assertFalse(prefs.getMiniPlayerShowAdditionalControls())
+            assertFalse(prefs.getMiniPlayerControlsOnHover())
+            assertFalse(prefs.getMiniPlayerHoverEffect())
+            assertFalse(prefs.getMiniPlayerShowProgress())
+
+            // Test toggling back to true
+            prefs.setMiniPlayerShowCover(true)
+            prefs.setMiniPlayerShowPlaybackControls(true)
+            prefs.setMiniPlayerShowAdditionalControls(true)
+            prefs.setMiniPlayerControlsOnHover(true)
+            prefs.setMiniPlayerHoverEffect(true)
+            prefs.setMiniPlayerShowProgress(true)
+
+            assertTrue(prefs.getMiniPlayerShowCover())
+            assertTrue(prefs.getMiniPlayerShowPlaybackControls())
+            assertTrue(prefs.getMiniPlayerShowAdditionalControls())
+            assertTrue(prefs.getMiniPlayerControlsOnHover())
+            assertTrue(prefs.getMiniPlayerHoverEffect())
+            assertTrue(prefs.getMiniPlayerShowProgress())
+        } finally {
+            prefs.setMiniPlayerShowCover(origCover)
+            prefs.setMiniPlayerShowPlaybackControls(origPlayback)
+            prefs.setMiniPlayerShowAdditionalControls(origAdditional)
+            prefs.setMiniPlayerControlsOnHover(origOnHover)
+            prefs.setMiniPlayerHoverEffect(origHoverEffect)
+            prefs.setMiniPlayerShowProgress(origProgress)
+        }
+    }
+
+    @Test
+    fun mini_player_style_and_transparent_bg_preferences_persistence() {
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val origStyle = prefs.getMiniPlayerStyle()
+        val origTransparentBg = prefs.getMiniPlayerTransparentBg()
+
+        try {
+            // Default check
+            assertEquals(MiniPlayerStyle.STANDARD, MiniPlayerStyle.valueOf(PlayerPreferences.DEFAULT_MINI_PLAYER_STYLE))
+
+            // Toggle to elongated
+            prefs.setMiniPlayerStyle(MiniPlayerStyle.ELONGATED)
+            assertEquals(MiniPlayerStyle.ELONGATED, prefs.getMiniPlayerStyle())
+
+            // Toggle to standard
+            prefs.setMiniPlayerStyle(MiniPlayerStyle.STANDARD)
+            assertEquals(MiniPlayerStyle.STANDARD, prefs.getMiniPlayerStyle())
+
+            // Transparent background
+            prefs.setMiniPlayerTransparentBg(true)
+            assertTrue(prefs.getMiniPlayerTransparentBg())
+            prefs.setMiniPlayerTransparentBg(false)
+            assertFalse(prefs.getMiniPlayerTransparentBg())
+        } finally {
+            prefs.setMiniPlayerStyle(origStyle)
+            prefs.setMiniPlayerTransparentBg(origTransparentBg)
+        }
+    }
+
+    @Test
+    fun mini_player_elongated_bounds_persistence_and_clamping() {
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val origX = prefs.getMiniPlayerElongatedX() ?: 100
+        val origY = prefs.getMiniPlayerElongatedY() ?: 100
+        val origW = prefs.getMiniPlayerElongatedWidth()
+        val origH = prefs.getMiniPlayerElongatedHeight()
+
+        try {
+            // Valid elongated bounds
+            prefs.setMiniPlayerElongatedBounds(x = 150, y = 200, width = 650, height = 40)
+            assertEquals(150, prefs.getMiniPlayerElongatedX())
+            assertEquals(200, prefs.getMiniPlayerElongatedY())
+            assertEquals(650, prefs.getMiniPlayerElongatedWidth())
+            assertEquals(40, prefs.getMiniPlayerElongatedHeight())
+
+            // Clamp below minimums (240 min width, 30 min height)
+            prefs.setMiniPlayerElongatedBounds(x = 50, y = 60, width = 100, height = 15)
+            assertEquals(PlayerPreferences.MINI_PLAYER_ELONGATED_MIN_WIDTH, prefs.getMiniPlayerElongatedWidth())
+            assertEquals(PlayerPreferences.MINI_PLAYER_ELONGATED_MIN_HEIGHT, prefs.getMiniPlayerElongatedHeight())
+
+            // Clamp above maximums (1400 max width, 56 max height)
+            prefs.setMiniPlayerElongatedBounds(x = 50, y = 60, width = 2500, height = 120)
+            assertEquals(PlayerPreferences.MINI_PLAYER_ELONGATED_MAX_WIDTH, prefs.getMiniPlayerElongatedWidth())
+            assertEquals(PlayerPreferences.MINI_PLAYER_ELONGATED_MAX_HEIGHT, prefs.getMiniPlayerElongatedHeight())
+        } finally {
+            prefs.setMiniPlayerElongatedBounds(origX, origY, origW, origH)
+        }
+    }
 }
+
