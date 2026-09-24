@@ -52,7 +52,7 @@ fun ArtistLinkText(
     track: Track,
     onArtistClick: ((Track) -> Unit)?,
     modifier: Modifier = Modifier,
-    text: String = track.user?.username?.takeIf { it.isNotBlank() } ?: str("unknown_artist"),
+    text: String = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { str("unknown_artist") },
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     hoverColor: Color = MaterialTheme.colorScheme.onSurface,

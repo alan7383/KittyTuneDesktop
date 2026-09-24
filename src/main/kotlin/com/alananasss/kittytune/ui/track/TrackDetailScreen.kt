@@ -118,7 +118,7 @@ fun TrackDetailScreen(
                                 ArtistLinkText(
                                     track = track,
                                     onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
-                                    text = track.user?.username ?: ""
+                                    text = track.displayArtist.ifBlank { track.user?.username ?: "" }
                                 )
                                 if (track.user?.verified == true) {
                                     Spacer(Modifier.width(4.dp))
