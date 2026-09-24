@@ -1084,6 +1084,8 @@ object R {
         const val ic_logo_tidal = "drawable/ic_logo_tidal.xml"
         const val ic_logo_youtube_music = "drawable/ic_logo_youtube_music.xml"
         const val ic_logo_spotify = "drawable/ic_logo_spotify.xml"
+        const val ic_logo_soundcloud = "drawable/ic_logo_soundcloud.xml"
+        const val ic_soundcloud = "drawable/ic_soundcloud.xml"
     }
     object raw {
         const val rain = "/raw/rain.mp3"

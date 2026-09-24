@@ -42,6 +42,32 @@ class AudioProvidersParityTest {
     }
 
     @Test
+    fun testAudioProviderDrawablesExistAndValidXml() {
+        val providers = AudioProviderOrderItem.entries
+        val expectedDrawables = mapOf(
+            AudioProviderOrderItem.QOBUZ to com.alananasss.kittytune.R.drawable.ic_logo_qobuz,
+            AudioProviderOrderItem.TIDAL to com.alananasss.kittytune.R.drawable.ic_logo_tidal,
+            AudioProviderOrderItem.DEEZER to com.alananasss.kittytune.R.drawable.ic_logo_deezer,
+            AudioProviderOrderItem.YOUTUBE_MUSIC to com.alananasss.kittytune.R.drawable.ic_logo_youtube_music,
+            AudioProviderOrderItem.SOUNDCLOUD to com.alananasss.kittytune.R.drawable.ic_logo_soundcloud,
+        )
+
+        for (provider in providers) {
+            val resPath = expectedDrawables[provider]
+            assertNotNull("Missing expected drawable mapping for provider $provider", resPath)
+            val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(resPath!!)
+            assertNotNull("Resource file $resPath must exist on classpath for provider $provider", stream)
+            val content = stream!!.bufferedReader().readText()
+            assertTrue("Drawable $resPath must be a valid vector tag", content.contains("<vector") && content.contains("</vector>"))
+        }
+
+        // Also verify ic_soundcloud.xml legacy path exists
+        val legacyStream = Thread.currentThread().contextClassLoader.getResourceAsStream("drawable/ic_soundcloud.xml")
+        assertNotNull("Legacy path drawable/ic_soundcloud.xml must exist on classpath", legacyStream)
+        legacyStream!!.close()
+    }
+
+    @Test
     fun testProviderIsrcNormalize() {
         assertEquals("USUM71900001", ProviderIsrc.normalize("US-UM7-19-00001"))
         assertEquals("GBAYE0601477", ProviderIsrc.normalize("gb-aye-06-01477"))

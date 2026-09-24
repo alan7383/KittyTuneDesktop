@@ -35,11 +35,18 @@ fun ProviderOrderScreen(
     onBackClick: () -> Unit
 ) {
     val prefs = remember { PlayerPreferences() }
-    val currentList = remember { mutableStateListOf<AudioProviderOrderItem>() }
+    val currentList = remember {
+        mutableStateListOf<AudioProviderOrderItem>().apply {
+            addAll(prefs.getAudioProviderOrder())
+        }
+    }
 
     LaunchedEffect(Unit) {
-        currentList.clear()
-        currentList.addAll(prefs.getAudioProviderOrder())
+        val loaded = prefs.getAudioProviderOrder()
+        if (currentList != loaded) {
+            currentList.clear()
+            currentList.addAll(loaded)
+        }
     }
 
     fun persistOrder() {
@@ -58,9 +65,11 @@ fun ProviderOrderScreen(
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState,
         onMove = { from, to ->
-            val moved = currentList.removeAt(from.index)
-            currentList.add(to.index, moved)
-            persistOrder()
+            if (from.index in currentList.indices && to.index in currentList.indices) {
+                val moved = currentList.removeAt(from.index)
+                currentList.add(to.index, moved)
+                persistOrder()
+            }
         }
     )
 
@@ -102,7 +111,7 @@ fun ProviderOrderScreen(
                             AudioProviderOrderItem.TIDAL -> Pair("audio_provider_tidal", R.drawable.ic_logo_tidal)
                             AudioProviderOrderItem.DEEZER -> Pair("audio_provider_deezer", R.drawable.ic_logo_deezer)
                             AudioProviderOrderItem.YOUTUBE_MUSIC -> Pair("audio_provider_youtube_music", R.drawable.ic_logo_youtube_music)
-                            AudioProviderOrderItem.SOUNDCLOUD -> Pair("audio_provider_soundcloud", "drawable/ic_soundcloud.xml")
+                            AudioProviderOrderItem.SOUNDCLOUD -> Pair("audio_provider_soundcloud", R.drawable.ic_logo_soundcloud)
                         }
 
                         Row(
@@ -121,12 +130,24 @@ fun ProviderOrderScreen(
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.width(32.dp)
                             )
-                            Icon(
-                                painter = painterResource(iconRes),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            val resourceExists = remember(iconRes) {
+                                Thread.currentThread().contextClassLoader.getResource(iconRes) != null
+                            }
+                            if (resourceExists) {
+                                Icon(
+                                    painter = painterResource(iconRes),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.DragHandle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                             Spacer(modifier = Modifier.width(16.dp))
                             Text(
                                 text = str(nameKey),
