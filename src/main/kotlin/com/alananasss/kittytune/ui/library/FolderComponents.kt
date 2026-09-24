@@ -727,6 +727,25 @@ fun LibraryPlaylistOptionsDialog(
                     onShowDetails(playlist)
                 })
             }
+            if (playlist.isRealAlbum && offerTrackActions) {
+                add(
+                    LibraryPlaylistActionItem(
+                        icon = Icons.Rounded.Favorite,
+                        text = str("menu_like_all_songs"),
+                        tint = primaryColor
+                    ) {
+                        withTracks { list ->
+                            val likedCount = LikeRepository.addLikesBulk(list)
+                            onDismiss()
+                            if (likedCount > 0) {
+                                com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_done", likedCount))
+                            } else {
+                                com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_nothing"))
+                            }
+                        }
+                    }
+                )
+            }
             if (!isInsideFolder) {
                 add(
                     LibraryPlaylistActionItem(
