@@ -970,6 +970,9 @@
     <string name="menu_make_public">Make public</string>
     <string name="menu_move_to_folder">Move to folder</string>
     <string name="menu_move_to_library">Move to library</string>
+    <string name="menu_like_all_songs">Like all songs</string>
+    <string name="toast_like_all_done">Liked %1$d songs</string>
+    <string name="toast_like_all_nothing">No new songs to like</string>
     <string name="menu_pin_folder">Pin folder</string>
     <string name="menu_pin_playlist">Pin playlist</string>
     <string name="menu_play_next">Play next</string>
@@ -991,6 +994,30 @@
     <string name="mini_player_title">Mini Player</string>
     <string name="mini_player_no_track">No track playing</string>
     <string name="mini_player_instrumental">Instrumental</string>
+    <string name="mini_player_pin">Always on top</string>
+    <string name="mini_player_unpin">Don't pin</string>
+    <string name="pref_mini_player_settings">Mini player settings</string>
+    <string name="pref_mini_player_settings_desc">Customize mini player controls, display, and hover interaction</string>
+    <string name="mini_player_settings_title">Mini Player Settings</string>
+    <string name="mini_player_show_cover">Show album cover</string>
+    <string name="mini_player_show_cover_desc">Display artwork thumbnail in the mini player</string>
+    <string name="mini_player_show_playback_controls">Show playback buttons</string>
+    <string name="mini_player_show_playback_controls_desc">Display previous, play/pause, and next buttons</string>
+    <string name="mini_player_show_additional_controls">Show additional controls</string>
+    <string name="mini_player_show_additional_controls_desc">Display favorite button and extra controls</string>
+    <string name="mini_player_controls_on_hover">Show controls on hover only</string>
+    <string name="mini_player_controls_on_hover_desc">Hide controls until mouse cursor hovers over the mini player</string>
+    <string name="mini_player_hover_effect">Adjust display when hovering</string>
+    <string name="mini_player_hover_effect_desc">Subtle translucency when idle, full opacity and focus on hover</string>
+    <string name="mini_player_show_progress">Show progress bar</string>
+    <string name="mini_player_show_progress_desc">Display a thin playback progress bar along the bottom</string>
+    <string name="mini_player_style">Mini player style</string>
+    <string name="mini_player_style_desc">Choose between standard card or compact elongated bar</string>
+    <string name="mini_player_style_standard">Standard card</string>
+    <string name="mini_player_style_elongated">Transparent elongated bar</string>
+    <string name="mini_player_style_elongated_desc">Minimalistic single-line player with transparent background for taskbars and panels</string>
+    <string name="mini_player_transparent_bg">Transparent background</string>
+    <string name="mini_player_transparent_bg_desc">Make the mini player background fully transparent</string>
     <string name="menu_shuffle">Shuffle</string>
     <string name="menu_track_radio">Go to Radio</string>
     <string name="menu_unpin_folder">Unpin folder</string>
@@ -1174,6 +1201,8 @@
     <string name="pref_local_subtitle">Music on this device</string>
     <string name="pref_local_title">Local Files</string>
     <string name="pref_lyrics_align">Alignment</string>
+    <string name="pref_lyrics_align_central">Alignment (central mode)</string>
+    <string name="pref_lyrics_sidebar_align">Alignment (side panel)</string>
     <string name="pref_lyrics_fullscreen_align">Alignment (full screen)</string>
     <string name="pref_lyrics_apple_effect">Smooth fill effect</string>
     <string name="pref_lyrics_apple_effect_sub">Fills letters smoothly instead of jumping from word to word.</string>
@@ -1201,7 +1230,9 @@
     <string name="pref_lyrics_show_button">Show lyrics button</string>
     <string name="pref_lyrics_show_button_sub">Show a quick access button on the player</string>
     <string name="pref_lyrics_size">Size</string>
+    <string name="pref_lyrics_size_central">Size (central mode)</string>
     <string name="pref_lyrics_fullscreen_size">Size (full screen)</string>
+    <string name="pref_lyrics_size_sidebar">Size (side panel)</string>
     <string name="pref_lyrics_subtitle">Display &amp; Source</string>
     <string name="pref_lyrics_title">Lyrics</string>
     <string name="pref_lyrics_translation_lang">Translation language</string>
@@ -1211,6 +1242,8 @@
     <string name="pref_lyrics_word_sync_sub">Highlights lyrics word by word when available.</string>
     <string name="pref_lyrics_duet_title">Duet mode</string>
     <string name="pref_lyrics_duet_desc">Align lyrics according to the singer (left for singer 1, right for singer 2)</string>
+    <string name="menu_disable_duet_lyrics">Disable duet lyrics</string>
+    <string name="menu_enable_duet_lyrics">Enable duet lyrics</string>
     <string name="pref_theme_track_dynamic">Track Dynamic Theme</string>
     <string name="pref_theme_track_dynamic_sub">Match colors with the current playing track cover</string>
     <string name="pref_animated_covers">Animated Covers</string>
@@ -2214,6 +2247,9 @@
     <!-- Lyrics UI and Animation Settings -->
     <string name="pref_lyrics_ui_style">Lyrics Style</string>
     <string name="pref_lyrics_ui_style_title">Lyrics Interface Style</string>
+    <string name="pref_lyrics_ui_style_sidebar">Lyrics Style (Side Panel)</string>
+    <string name="pref_lyrics_ui_style_central">Lyrics Style (Central Mode)</string>
+    <string name="pref_lyrics_ui_style_fullscreen">Lyrics Style (Full Screen)</string>
     <string name="pref_lyrics_ui_style_enhanced">Apple Music</string>
     <string name="pref_lyrics_ui_style_classic">Classic</string>
     <string name="pref_lyrics_font_title">Lyrics Font</string>
@@ -2224,6 +2260,9 @@
     <string name="pref_lyrics_font_app_default_short">Default</string>
     <string name="pref_lyrics_effects_category">Visual Effects &amp; Animations</string>
     <string name="pref_lyrics_line_blur_title">Blurred Inactive Lines</string>
+    <string name="pref_lyrics_central_line_blur_title">Blurred Inactive Lines (Central Mode)</string>
+    <string name="pref_lyrics_sidebar_line_blur_title">Blurred Inactive Lines (Side Panel)</string>
+    <string name="pref_lyrics_fullscreen_line_blur_title">Blurred Inactive Lines (Full Screen)</string>
     <string name="pref_lyrics_line_blur_desc">Blurs lines progressively based on distance from current vocal</string>
     <string name="pref_lyrics_lrc_bounce_title">Line Bounce Effect</string>
     <string name="pref_lyrics_lrc_bounce_desc">Enable spring bounce animation for line-synced lyrics</string>
@@ -2231,6 +2270,15 @@
     <string name="pref_lyrics_glow_factor_title">Glow Intensity</string>
     <string name="pref_lyrics_fill_transition_title">Liquid Fill Smoothness</string>
     <string name="pref_lyrics_line_spacing_title">Line Spacing</string>
+    <string name="pref_lyrics_fullscreen_line_spacing_title">Line Spacing (Fullscreen)</string>
+    <string name="pref_lyrics_active_scale_title">Active Line Text Scaling</string>
+    <string name="pref_lyrics_active_scale_desc">Magnify active singing line for Apple Music focus</string>
+    <string name="pref_lyrics_horizontal_margin_title">Horizontal Margins</string>
+    <string name="pref_lyrics_fullscreen_horizontal_margin_title">Horizontal Margins (Fullscreen)</string>
+    <string name="pref_lyrics_vertical_offset_title">Vertical Position</string>
+    <string name="pref_lyrics_fullscreen_vertical_offset_title">Vertical Position (Fullscreen)</string>
+    <string name="pref_lyrics_reset_typography">Reset Typography to Defaults</string>
+    <string name="pref_lyrics_reset_typography_desc">Restore standard font size, spacing, zoom, margins, and position</string>
     <string name="lyrics_resume_autoscroll">Resume</string>
 
     <!-- Audio Providers & Integrations -->
@@ -2330,6 +2378,12 @@
     <string name="automix_overlap_4bars">4 bars</string>
     <string name="automix_overlap_8bars">8 bars</string>
     <string name="automix_overlap_custom">Custom duration</string>
+    <string name="automix_start_offset">Start Offset</string>
+    <string name="automix_start_offset_desc">Choose where the incoming track begins playback during transition</string>
+    <string name="automix_start_offset_auto">Automatic (Smart intro skip)</string>
+    <string name="automix_start_offset_beginning">Track beginning (0:00)</string>
+    <string name="automix_start_offset_custom">Custom offset</string>
+    <string name="automix_start_offset_custom_value">Offset: %d seconds</string>
     <string name="automixing">Automixing</string>
     <string name="automix_mix_in">MIX IN %1$d</string>
     <string name="automix_mix_into">Mix into %1$s</string>
