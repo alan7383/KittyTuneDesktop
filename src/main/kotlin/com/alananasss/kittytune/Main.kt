@@ -26,7 +26,6 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.Tray
 import coil3.compose.setSingletonImageLoaderFactory
-import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.DesktopBackDispatcher
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.ui.ImageLoaderFactory
@@ -153,17 +152,7 @@ fun main() {
                         exitApplication()
                     },
                     onContextMenu = { x, y ->
-                        com.alananasss.kittytune.core.LinuxTrayMenuHelper.showMenu(
-                            preferredX = x,
-                            preferredY = y,
-                            isMiniPlayerVisible = { playerViewModel.isMiniPlayerVisible },
-                            onShowWindow = { showMainWindow() },
-                            onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
-                            onExit = {
-                                com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
-                                exitApplication()
-                            }
-                        )
+                        com.alananasss.kittytune.ui.tray.TrayMenuState.show(x, y)
                     }
                 )
                 val started = service.start()
@@ -175,20 +164,20 @@ fun main() {
             }
         }
 
+        val trayMenuScope = androidx.compose.runtime.rememberCoroutineScope()
+
         if (trayIcon != null && !useSniTray) {
+            // No AWT PopupMenu (that is the XP-looking system menu) — right-click is hooked to
+            // the custom Compose tray menu below, which matches KittyTune's theme.
             Tray(
                 icon = trayIcon,
                 tooltip = "KittyTune",
                 onAction = { showMainWindow() },
-                menu = {
-                    Item(str("menu_show_window"), onClick = { showMainWindow() })
-                    Item(
-                        if (playerViewModel.isMiniPlayerVisible) str("menu_mini_player_hide") else str("menu_mini_player_show"),
-                        onClick = { playerViewModel.toggleMiniPlayer() }
-                    )
-                    Item(str("menu_exit"), onClick = { com.alananasss.kittytune.core.AppInstance.isShuttingDown = true; exitApplication() })
-                }
             )
+            androidx.compose.runtime.DisposableEffect(trayIcon, useSniTray) {
+                com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope)
+                onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
+            }
         }
 
         // Hoisted so the full player can ask for a real full screen rather than an overlay that covers the
@@ -197,13 +186,13 @@ fun main() {
         //
         // The placement it came from is remembered, so leaving gives a maximised window back to somebody who
         // had one and a floating window back to somebody who did not.
-        val initialUsable = remember { getUsableDesktopBounds(null) }
-        val initialW = minOf(1440, initialUsable.width)
-        val initialH = minOf(900, initialUsable.height)
+        val initialMetrics = remember { getScreenMetricsDp(null) }
+        val initialW = minOf(1440, initialMetrics.usableBoundsDp.width)
+        val initialH = minOf(900, initialMetrics.usableBoundsDp.height)
         val initialSize = remember { DpSize(initialW.dp, initialH.dp) }
         val initialPosition = remember {
-            val posX = initialUsable.x + (initialUsable.width - initialW) / 2
-            val posY = initialUsable.y + (initialUsable.height - initialH) / 2
+            val posX = initialMetrics.usableBoundsDp.x + (initialMetrics.usableBoundsDp.width - initialW) / 2
+            val posY = initialMetrics.usableBoundsDp.y + (initialMetrics.usableBoundsDp.height - initialH) / 2
             androidx.compose.ui.window.WindowPosition(posX.dp, posY.dp)
         }
 
@@ -231,10 +220,9 @@ fun main() {
                 val curH = windowState.size.height.value.toInt()
                 val curX = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                 val curY = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                val screen = getScreenBoundsFor(null, curX, curY)
-                // Ensure we never record temporary/fullscreen dimensions as the user's floating size
-                val isFullScreenDimension = curW >= screen.width && curH >= screen.height
-                if (!isFullScreenDimension && curW > 0 && curH > 0) {
+                val metrics = getScreenMetricsDp(null, curX, curY)
+                val isFullScreenDimension = isFullOrMaximizedDimension(curW, curH, metrics)
+                if (!isFullScreenDimension && curW >= 400 && curH >= 300) {
                     savedFloatingSize = windowState.size
                     savedFloatingPosition = windowState.position
                 }
@@ -252,8 +240,8 @@ fun main() {
                     val curH = windowState.size.height.value.toInt()
                     val curX = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                     val curY = (windowState.position as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                    val screen = getScreenBoundsFor(null, curX, curY)
-                    if (curW < screen.width || curH < screen.height) {
+                    val metrics = getScreenMetricsDp(null, curX, curY)
+                    if (!isFullOrMaximizedDimension(curW, curH, metrics) && curW >= 400 && curH >= 300) {
                         savedFloatingSize = windowState.size
                         savedFloatingPosition = windowState.position
                     }
@@ -264,27 +252,30 @@ fun main() {
             } else if (!wanted && isAppFullScreen) {
                 isAppFullScreen = false
                 isRestoringFromFullScreen = true
-                val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
-                    ?: androidx.compose.ui.window.WindowPlacement.Floating
-                if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
-                    val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
-                    val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                    val usable = getUsableDesktopBounds(null, reqX, reqY)
-                    val clamped = clampFloatingBounds(
-                        savedFloatingSize.width.value.toInt(),
-                        savedFloatingSize.height.value.toInt(),
-                        reqX,
-                        reqY,
-                        usable
-                    )
-                    windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
-                    windowState.size = DpSize(clamped.width.dp, clamped.height.dp)
-                    windowState.position = androidx.compose.ui.window.WindowPosition(clamped.x.dp, clamped.y.dp)
-                } else {
-                    windowState.placement = restorePlacement
+                try {
+                    val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
+                        ?: androidx.compose.ui.window.WindowPlacement.Floating
+                    if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
+                        val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
+                        val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
+                        val metrics = getScreenMetricsDp(null, reqX, reqY)
+                        val clamped = clampFloatingBounds(
+                            savedFloatingSize.width.value.toInt(),
+                            savedFloatingSize.height.value.toInt(),
+                            reqX,
+                            reqY,
+                            metrics.usableBoundsDp
+                        )
+                        windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                        windowState.size = DpSize(clamped.width.dp, clamped.height.dp)
+                        windowState.position = androidx.compose.ui.window.WindowPosition(clamped.x.dp, clamped.y.dp)
+                    } else {
+                        windowState.placement = restorePlacement
+                    }
+                    kotlinx.coroutines.delay(400)
+                } finally {
+                    isRestoringFromFullScreen = false
                 }
-                kotlinx.coroutines.delay(300)
-                isRestoringFromFullScreen = false
             }
         }
 
@@ -435,19 +426,22 @@ fun main() {
                     }
                 } else if (wasFullScreenInWindow) {
                     wasFullScreenInWindow = false
+                    val gc = window.graphicsConfiguration
+                    val scaleX = gc?.defaultTransform?.scaleX?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
+                    val scaleY = gc?.defaultTransform?.scaleY?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
                     val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                     val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                    val usable = getUsableDesktopBounds(window.graphicsConfiguration, reqX, reqY)
-                    val clamped = clampFloatingBounds(
-                        savedFloatingSize.width.value.toInt(),
-                        savedFloatingSize.height.value.toInt(),
-                        reqX,
-                        reqY,
+                    val usable = getUsableDesktopBounds(gc, reqX?.let { (it * scaleX).toInt() }, reqY?.let { (it * scaleY).toInt() })
+                    val clampedPixels = clampFloatingBounds(
+                        (savedFloatingSize.width.value * scaleX).toInt(),
+                        (savedFloatingSize.height.value * scaleY).toInt(),
+                        reqX?.let { (it * scaleX).toInt() },
+                        reqY?.let { (it * scaleY).toInt() },
                         usable
                     )
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         javax.swing.SwingUtilities.invokeLater {
-                            com.alananasss.kittytune.data.theme.WindowsFullScreen.exit(window, savedPlacement, clamped)
+                            com.alananasss.kittytune.data.theme.WindowsFullScreen.exit(window, savedPlacement, clampedPixels)
                         }
                     } else {
                         runCatching {
@@ -460,7 +454,7 @@ fun main() {
                                     window.extendedState = java.awt.Frame.NORMAL
                                     javax.swing.SwingUtilities.invokeLater {
                                         runCatching {
-                                            window.setBounds(clamped.x, clamped.y, clamped.width, clamped.height)
+                                            window.setBounds(clampedPixels.x, clampedPixels.y, clampedPixels.width, clampedPixels.height)
                                             window.revalidate()
                                             window.repaint()
                                         }
@@ -503,6 +497,18 @@ fun main() {
         if (playerViewModel.isMiniPlayerVisible) {
             com.alananasss.kittytune.ui.player.mini.MiniLyricsPlayerWindow(viewModel = playerViewModel)
         }
+
+        // Custom tray context menu — transparent, rounded, themed; lives outside the main window
+        // so it can open next to the tray icon on any OS.
+        com.alananasss.kittytune.ui.tray.ModernTrayMenuHost(
+            isMiniPlayerVisible = playerViewModel.isMiniPlayerVisible,
+            onShowWindow = { showMainWindow() },
+            onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
+            onExit = {
+                com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                exitApplication()
+            },
+        )
     } // End application
 } // End main
 
@@ -607,9 +613,71 @@ private fun getScreenDeviceForPosition(x: Int?, y: Int?): java.awt.GraphicsDevic
         val devices = ge.screenDevices
         if (x != null && y != null) {
             val pt = java.awt.Point(x, y)
-            devices.firstOrNull { it.defaultConfiguration.bounds.contains(pt) }
+            devices.firstOrNull { dev ->
+                val b = dev.defaultConfiguration.bounds
+                if (b.contains(pt)) return@firstOrNull true
+                val sx = dev.defaultConfiguration.defaultTransform.scaleX.toFloat().coerceAtLeast(1f)
+                val sy = dev.defaultConfiguration.defaultTransform.scaleY.toFloat().coerceAtLeast(1f)
+                val scaledPt = java.awt.Point((x * sx).toInt(), (y * sy).toInt())
+                b.contains(scaledPt)
+            }
         } else null
     }.getOrNull()
+}
+
+internal data class ScreenMetricsDp(
+    val screenWidthDp: Int,
+    val screenHeightDp: Int,
+    val usableBoundsDp: java.awt.Rectangle,
+    val scaleX: Float,
+    val scaleY: Float,
+)
+
+internal fun getScreenMetricsDp(
+    gc: java.awt.GraphicsConfiguration?,
+    x: Int? = null,
+    y: Int? = null,
+): ScreenMetricsDp {
+    val config = gc ?: getScreenDeviceForPosition(x, y)?.defaultConfiguration ?: runCatching {
+        java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration
+    }.getOrNull()
+
+    val scaleX = config?.defaultTransform?.scaleX?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
+    val scaleY = config?.defaultTransform?.scaleY?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
+
+    val screenBounds = config?.bounds ?: java.awt.Rectangle(0, 0, 1920, 1080)
+    val insets = config?.let { java.awt.Toolkit.getDefaultToolkit().getScreenInsets(it) } ?: java.awt.Insets(0, 0, 0, 0)
+
+    val usablePixelW = (screenBounds.width - insets.left - insets.right).coerceAtLeast(600)
+    val usablePixelH = (screenBounds.height - insets.top - insets.bottom).coerceAtLeast(400)
+    val usablePixelX = screenBounds.x + insets.left
+    val usablePixelY = screenBounds.y + insets.top
+
+    val screenW_Dp = (screenBounds.width / scaleX).toInt()
+    val screenH_Dp = (screenBounds.height / scaleY).toInt()
+
+    val usableW_Dp = (usablePixelW / scaleX).toInt()
+    val usableH_Dp = (usablePixelH / scaleY).toInt()
+    val usableX_Dp = (usablePixelX / scaleX).toInt()
+    val usableY_Dp = (usablePixelY / scaleY).toInt()
+
+    return ScreenMetricsDp(
+        screenWidthDp = screenW_Dp,
+        screenHeightDp = screenH_Dp,
+        usableBoundsDp = java.awt.Rectangle(usableX_Dp, usableY_Dp, usableW_Dp, usableH_Dp),
+        scaleX = scaleX,
+        scaleY = scaleY,
+    )
+}
+
+internal fun isFullOrMaximizedDimension(
+    curW: Int,
+    curH: Int,
+    metrics: ScreenMetricsDp,
+): Boolean {
+    val isNearScreen = curW >= metrics.screenWidthDp - 24 && curH >= metrics.screenHeightDp - 24
+    val isNearUsable = curW >= metrics.usableBoundsDp.width - 24 && curH >= metrics.usableBoundsDp.height - 24
+    return isNearScreen || isNearUsable
 }
 
 private fun getScreenBoundsFor(

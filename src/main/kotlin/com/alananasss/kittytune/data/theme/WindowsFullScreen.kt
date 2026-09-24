@@ -123,7 +123,7 @@ object WindowsFullScreen {
                 if (window is Frame) {
                     window.extendedState = Frame.NORMAL
                 }
-                val targetBounds = fallbackBounds ?: savedBounds ?: window.bounds
+                val targetBounds = savedBounds ?: fallbackBounds ?: window.bounds
                 User32.INSTANCE.SetWindowPos(
                     hwnd,
                     WinDef.HWND(Pointer.NULL),
@@ -142,6 +142,8 @@ object WindowsFullScreen {
             window.revalidate()
             window.repaint()
             isFullScreen = false
+            savedBounds = null
+            wasMaximized = false
             true
         }.getOrElse { false }
     }
