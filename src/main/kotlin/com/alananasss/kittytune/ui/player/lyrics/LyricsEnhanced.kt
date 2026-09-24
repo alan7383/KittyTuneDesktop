@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alananasss.kittytune.core.str
@@ -76,17 +77,33 @@ fun LyricsEnhanced(
     textColorOverride: Color? = null,
     lyricsLineBlurOverride: Boolean? = null,
     fontSizeOverride: Float? = null,
-    isFullScreen: Boolean = false
+    lineSpacingOverride: Dp? = null,
+    isFullScreen: Boolean = false,
+    isSidebar: Boolean = false
 ) {
     val lines = viewModel.lyricsLines
     val isSynced = lines.any { it.startTime > 0 }
     val isWordSyncedFormat = isSynced && viewModel.isWordSyncEnabled && lines.any { it.words.isNotEmpty() }
-    val isDuetActive = viewModel.isDuetViewEnabled
+    val isDuetActive = viewModel.isDuetActiveForTrack(viewModel.currentTrack)
 
-    val lyricsLineBlurPreference = viewModel.lyricsLineBlurEnabled
-    val lyricsLineBlur = lyricsLineBlurOverride ?: lyricsLineBlurPreference
+    val lyricsLineBlur = lyricsLineBlurOverride ?: when {
+        isFullScreen -> viewModel.lyricsFullScreenLineBlurEnabled
+        isSidebar -> viewModel.lyricsSidebarLineBlurEnabled
+        else -> viewModel.lyricsLineBlurEnabled
+    }
     val lyricsTextSize = fontSizeOverride ?: if (isFullScreen) viewModel.lyricsFullScreenFontSize else viewModel.lyricsFontSize
-    val lyricsLineSpacing = viewModel.lyricsLineSpacing
+    val defaultSpacing = if (isFullScreen) (lyricsTextSize * 0.34f) else (lyricsTextSize * 0.22f)
+    val lyricsLineSpacingDp = when {
+        lineSpacingOverride != null -> lineSpacingOverride
+        isFullScreen && viewModel.lyricsFullScreenLineSpacing > 0f -> viewModel.lyricsFullScreenLineSpacing.dp
+        !isFullScreen && viewModel.lyricsLineSpacing > 0f -> viewModel.lyricsLineSpacing.dp
+        else -> defaultSpacing.dp
+    }
+    val lyricsHorizontalMargin = if (isFullScreen) viewModel.lyricsFullScreenHorizontalMargin else viewModel.lyricsHorizontalMargin
+    val lyricsHorizontalMarginDp = if (lyricsHorizontalMargin > 0f) lyricsHorizontalMargin.dp else (if (isFullScreen) 0.dp else 16.dp)
+    val lyricsVerticalOffsetFraction = if (isFullScreen) viewModel.lyricsFullScreenVerticalOffset else viewModel.lyricsVerticalOffset
+    val configuredScale = if (isFullScreen) viewModel.lyricsFullScreenActiveScale else viewModel.lyricsActiveScale
+    val lyricsActiveScale = if (isFullScreen && configuredScale <= 1.01f) 1.08f else configuredScale
 
     val textColor = textColorOverride ?: MaterialTheme.colorScheme.onSurface
 
@@ -107,7 +124,11 @@ fun LyricsEnhanced(
         (viewModel.currentTrack?.id ?: "") to lines.map { it.startTime }
     }
 
-    val userAlignment = if (isFullScreen) viewModel.lyricsFullScreenAlignment else viewModel.lyricsAlignment
+    val userAlignment = when {
+        isFullScreen -> viewModel.lyricsFullScreenAlignment
+        isSidebar -> viewModel.lyricsSidebarAlignment
+        else -> viewModel.lyricsAlignment
+    }
 
     val syncedLyrics = remember(lines.toList(), isWordSyncedFormat, isDuetActive, userAlignment) {
         buildSyncedLyrics(lines, isWordSyncedFormat, isDuetActive, userAlignment)
@@ -191,15 +212,18 @@ fun LyricsEnhanced(
     val lyricsFontFamily = rememberLyricsFontFamily(viewModel.lyricsFont)
     val normalTextStyle = MaterialTheme.typography.headlineMedium.copy(
         fontSize = lyricsTextSize.sp,
+        lineHeight = (lyricsTextSize * 1.30f).sp,
         fontWeight = FontWeight.Bold,
         fontFamily = lyricsFontFamily
     )
     val accompanimentTextStyle = MaterialTheme.typography.titleLarge.copy(
         fontSize = (lyricsTextSize * 0.82f).sp,
+        lineHeight = (lyricsTextSize * 0.82f * 1.30f).sp,
         fontFamily = lyricsFontFamily
     )
     val phoneticTextStyle = MaterialTheme.typography.bodyMedium.copy(
         fontSize = (lyricsTextSize * 0.55f).sp,
+        lineHeight = (lyricsTextSize * 0.55f * 1.30f).sp,
         fontWeight = FontWeight.Normal,
         fontFamily = lyricsFontFamily
     )
@@ -229,7 +253,7 @@ fun LyricsEnhanced(
                 BoxWithConstraints(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    val lyricsViewportOffset = remember(maxHeight) { maxHeight * 0.38f }
+                    val lyricsViewportOffset = remember(maxHeight, lyricsVerticalOffsetFraction) { maxHeight * lyricsVerticalOffsetFraction }
 
                     CompositionLocalProvider(LocalLayoutDirection provides lyricsLayoutDirection) {
                         key(
@@ -241,11 +265,16 @@ fun LyricsEnhanced(
                             userAlignment,
                             lyricsFontFamily,
                             lyricsTextSize,
-                            lyricsLineBlur
+                            lyricsLineBlur,
+                            lyricsLineSpacingDp,
+                            lyricsHorizontalMarginDp,
+                            lyricsVerticalOffsetFraction,
+                            lyricsActiveScale
                         ) {
                             KaraokeLyricsView(
                                 listState = listState,
                                 lyrics = syncedLyrics,
+                                userAlignment = userAlignment,
                                 currentPosition = playbackSyncPosition,
                                 onLineClicked = { line ->
                                     val target = line.start.toLong() - viewModel.lyricsOffset
@@ -266,6 +295,11 @@ fun LyricsEnhanced(
                                 offset = lyricsViewportOffset,
                                 keepAliveZone = 72.dp,
                                 isScrubbing = viewModel.isScrubbing,
+                                lrcBounceEnabled = viewModel.lyricsLrcBounceEnabled,
+                                bounceFactor = viewModel.lyricsBounceFactor,
+                                lineSpacing = lyricsLineSpacingDp,
+                                horizontalMargin = lyricsHorizontalMarginDp,
+                                activeScale = lyricsActiveScale,
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -404,7 +438,7 @@ fun buildSyncedLyrics(
                 (entry.startTime + 4000L).toInt()
             }
 
-            if (!entry.romanization.isNullOrBlank() || alignment != KaraokeAlignment.Start) {
+            if (!entry.romanization.isNullOrBlank()) {
                 val syllables = buildWrappingKaraokeSyllables(
                     content = cleanText,
                     romanizedText = entry.romanization.orEmpty(),
@@ -419,6 +453,24 @@ fun buildSyncedLyrics(
                         start = entry.startTime.toInt(),
                         end = lineEnd,
                         phonetic = entry.romanization?.takeIf { it.isNotBlank() }
+                    )
+                )
+            } else if (isDuetEnabled && effectiveSinger == LyricSinger.SINGER_2) {
+                val syllables = listOf(
+                    KaraokeSyllable(
+                        content = cleanText,
+                        start = entry.startTime.toInt(),
+                        end = lineEnd,
+                        phonetic = null
+                    )
+                )
+                lines.add(
+                    KaraokeLine.MainKaraokeLine(
+                        syllables = syllables,
+                        translation = cleanTranslation,
+                        alignment = KaraokeAlignment.End,
+                        start = entry.startTime.toInt(),
+                        end = lineEnd
                     )
                 )
             } else {
@@ -458,14 +510,11 @@ private fun buildWrappingKaraokeSyllables(
         }
     }
 
-    val duration = (end - start).coerceAtLeast(contentUnits.size)
     return contentUnits.mapIndexed { index, unit ->
-        val unitStart = start + (duration.toLong() * index / contentUnits.size).toInt()
-        val unitEnd = start + (duration.toLong() * (index + 1) / contentUnits.size).toInt()
         KaraokeSyllable(
             content = unit,
-            start = unitStart,
-            end = unitEnd.coerceAtLeast(unitStart + MIN_KARAOKE_SYLLABLE_DURATION_MS),
+            start = start,
+            end = end,
             phonetic = phoneticsByUnit[index]
         )
     }

@@ -6,6 +6,7 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -136,7 +137,13 @@ fun KaraokeLyricsView(
     keepAliveZone: Dp = 100.dp,
     blurDelta: Float = 3f,
     isScrubbing: Boolean = false,
-    showDebugRectangles: Boolean = false
+    showDebugRectangles: Boolean = false,
+    userAlignment: com.alananasss.kittytune.data.local.LyricsAlignment = com.alananasss.kittytune.data.local.LyricsAlignment.LEFT,
+    lrcBounceEnabled: Boolean = true,
+    bounceFactor: Float = 1f,
+    lineSpacing: Dp = 0.dp,
+    horizontalMargin: Dp = 0.dp,
+    activeScale: Float = 1.00f
 ) {
     val density = LocalDensity.current
     val stableNormalTextStyle = remember(normalLineTextStyle) { normalLineTextStyle }
@@ -309,7 +316,6 @@ fun KaraokeLyricsView(
     LaunchedEffect(
         lyrics,
         stableOffsetPx,
-        isScrubbing,
     ) {
         androidx.compose.runtime.snapshotFlow {
             lyricsFocusState.firstIndex to isScrubbing
@@ -323,7 +329,7 @@ fun KaraokeLyricsView(
                 val items = listState.layoutInfo.visibleItemsInfo
                 val targetItem = items.firstOrNull { it.index == firstIndex }
                 val isRapidClick = timeDelta < 280L
-                val isLargeJump = targetItem == null || indexDelta > 2
+                val isLargeJump = indexDelta > 3
                 val shouldSnap = scrubbing || isRapidClick || isLargeJump
 
                 lastScrollTime = now
@@ -341,6 +347,8 @@ fun KaraokeLyricsView(
                         if (kotlin.math.abs(scrollOffset) > 1) {
                             listState.scrollBy(scrollOffset.toFloat())
                         }
+                    } else if (!isLargeJump && !scrubbing && !isRapidClick) {
+                        listState.animateScrollToItem(firstIndex, (-stableOffsetPx - keepAliveZonePx).toInt())
                     } else {
                         listState.scrollToItem(firstIndex)
                         val refreshed = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == firstIndex }
@@ -402,7 +410,8 @@ fun KaraokeLyricsView(
                                 placeable.place(0, -(keepAliveZone.roundToPx()))
                             }
                         },
-                    contentPadding = PaddingValues(vertical = stableOffset + keepAliveZone)
+                    contentPadding = PaddingValues(horizontal = horizontalMargin, vertical = stableOffset + keepAliveZone),
+                    verticalArrangement = Arrangement.spacedBy(lineSpacing)
                 ) {
                     itemsIndexed(
                         items = lyrics.lines,
@@ -417,15 +426,28 @@ fun KaraokeLyricsView(
 
                                 else -> false
                             }
+                        val isLineCenterAligned = when (line) {
+                            is KaraokeLine -> {
+                                remember(line.alignment) { line.alignment == KaraokeAlignment.Unspecified }
+                            }
+                            is SyncedLine -> {
+                                remember(userAlignment) { userAlignment == com.alananasss.kittytune.data.local.LyricsAlignment.CENTER }
+                            }
+                            else -> false
+                        }
                         val isLineRightAligned = when (line) {
                             is KaraokeLine -> {
                                 remember(line.alignment) { line.alignment == KaraokeAlignment.End }
                             }
-
+                            is SyncedLine -> {
+                                remember(userAlignment) { userAlignment == com.alananasss.kittytune.data.local.LyricsAlignment.RIGHT }
+                            }
                             else -> false
                         }
-                        val isVisualRightAligned = remember(isLineRightAligned, isLineRtl) {
-                            if (isLineRightAligned) !isLineRtl
+                        val isVisualCenterAligned = isLineCenterAligned
+                        val isVisualRightAligned = remember(isLineRightAligned, isVisualCenterAligned, isLineRtl) {
+                            if (isVisualCenterAligned) false
+                            else if (isLineRightAligned) !isLineRtl
                             else isLineRtl
                         }
 
@@ -443,6 +465,12 @@ fun KaraokeLyricsView(
                             }
                         }
 
+                        val itemHorizontalAlignment = when {
+                            isVisualCenterAligned -> Alignment.CenterHorizontally
+                            isVisualRightAligned -> Alignment.End
+                            else -> Alignment.Start
+                        }
+
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -452,7 +480,7 @@ fun KaraokeLyricsView(
                                     isManualScrolling,
                                     stiffness = dynamicStiffness
                                 ),
-                            horizontalAlignment = if (isVisualRightAligned) Alignment.End else Alignment.Start
+                            horizontalAlignment = itemHorizontalAlignment
                         ) {
                             val animDuration = 600
 
@@ -466,6 +494,7 @@ fun KaraokeLyricsView(
                                     alignment = when (val line = previousLine ?: firstLine) {
                                         is KaraokeLine -> line.alignment
                                         is SyncedLine -> when {
+                                            isVisualCenterAligned -> KaraokeAlignment.Unspecified
                                             isVisualRightAligned -> KaraokeAlignment.End
                                             line.content.isRtl() -> KaraokeAlignment.End
                                             else -> KaraokeAlignment.Start
@@ -496,11 +525,12 @@ fun KaraokeLyricsView(
                                         LyricsLineItem(
                                             isFocused = isCurrentFocusLine,
                                             isRightAligned = isVisualRightAligned,
-                                            isCenterAligned = false,
+                                            isCenterAligned = isVisualCenterAligned,
                                             onLineClicked = { onLineClicked(line) },
                                             onLinePressed = { onLinePressed(line) },
                                             blurRadius = { blurRadiusState.value },
                                             blendMode = stableBlendMode,
+                                            activeScale = activeScale,
                                         ) {
                                             KaraokeLineText(
                                                 line = line,
@@ -513,7 +543,8 @@ fun KaraokeLyricsView(
                                                 showDebugRectangles = showDebugRectangles,
                                                 showTranslation = showTranslation,
                                                 showPhonetic = showPhonetic,
-                                                precalculatedLayouts = layoutCache[index]
+                                                precalculatedLayouts = layoutCache[index],
+                                                activeScale = activeScale
                                             )
                                         }
                                     }
@@ -524,20 +555,22 @@ fun KaraokeLyricsView(
                                     LyricsLineItem(
                                         isFocused = isCurrentFocusLine,
                                         isRightAligned = isVisualRightAligned,
-                                        isCenterAligned = false,
+                                        isCenterAligned = isVisualCenterAligned,
                                         onLineClicked = { onLineClicked(line) },
                                         onLinePressed = { onLinePressed(line) },
                                         blurRadius = { blurRadiusState.value },
                                         blendMode = stableBlendMode,
+                                        activeScale = activeScale,
                                     ) {
                                         SyncedLineText(
                                             line = line,
                                             isLineRtl = isLineRtl,
                                             isRightAligned = isVisualRightAligned,
-                                            isCenterAligned = false,
+                                            isCenterAligned = isVisualCenterAligned,
                                             textStyle = stableNormalTextStyle.copy(lineHeight = 1.2.em),
                                             textColor = textColor,
                                             showTranslation = showTranslation,
+                                            activeScale = activeScale,
                                         )
                                     }
                                 }
