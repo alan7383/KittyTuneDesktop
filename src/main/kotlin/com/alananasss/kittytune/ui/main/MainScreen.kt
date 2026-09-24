@@ -58,6 +58,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.alananasss.kittytune.ui.common.clearFocusOnEmptyClick
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -281,6 +282,7 @@ fun MainScreen(
     }
 
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     // The mouse's side buttons, on the root so they work wherever the pointer happens to be.
     val historyNavigator = rememberHistoryNavigator(navController, playerViewModel)
@@ -289,6 +291,7 @@ fun MainScreen(
         modifier = Modifier
             .fillMaxSize()
             .mouseHistoryButtons(historyNavigator)
+            .clearFocusOnEmptyClick(focusManager)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .padding(PANEL_GUTTER.dp)
     ) {

@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.main
 
 import com.alananasss.kittytune.ui.common.escapeDismisses
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.material3.ButtonDefaults
 
 import androidx.compose.foundation.layout.Row
@@ -147,11 +148,13 @@ fun MainTopBar(
                 OutlinedTextField(
                     value = vm.searchQuery,
                     onValueChange = {
-                        vm.isSearching = it.isNotBlank()
                         vm.onSearchQueryChanged(it)
-                        if (currentRoute != "home" && it.isNotBlank()) {
-                            navController.navigate("home") {
-                                launchSingleTop = true
+                        if (it.isNotBlank()) {
+                            vm.isSearching = true
+                            if (currentRoute != "home") {
+                                navController.navigate("home") {
+                                    launchSingleTop = true
+                                }
                             }
                         }
                     },
@@ -168,6 +171,8 @@ fun MainTopBar(
                                 shapes = IconButtonDefaults.shapes(),
                                 onClick = {
                                     vm.clearSearch()
+                                    vm.isSearching = false
+                                    focusManager.clearFocus()
                                 }
                             ) {
                                 Icon(Icons.Filled.Close, contentDescription = null)
@@ -185,11 +190,20 @@ fun MainTopBar(
                         .weight(1f, fill = false)
                         .widthIn(min = 90.dp, max = 480.dp)
                         .trackTextInput()
-                        // Escape only. This field is always on the bar, so it has no closed state to return to
-                        // — and a click that took the query with it would clear the search every time somebody
-                        // clicked one of its own results. Escape is the gesture that means "and I am done":
-                        // it empties the field and leaves the results, which is the exit he could not find
-                        // ("you will be able to close it only after returning from the tabs", issue #33).
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused) {
+                                vm.isSearching = true
+                                if (currentRoute != "home") {
+                                    navController.navigate("home") {
+                                        launchSingleTop = true
+                                    }
+                                }
+                            } else {
+                                if (vm.searchQuery.isBlank()) {
+                                    vm.isSearching = false
+                                }
+                            }
+                        }
                         .escapeDismisses {
                             vm.clearSearch()
                             vm.isSearching = false
