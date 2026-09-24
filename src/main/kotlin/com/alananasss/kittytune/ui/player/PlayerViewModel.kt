@@ -148,6 +148,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun saveMiniPlayerBounds(x: Int, y: Int, width: Int) {
         playerPrefs.setMiniPlayerBounds(x, y, width)
     }
+
+    fun saveMiniPlayerElongatedBounds(x: Int, y: Int, width: Int, height: Int) {
+        playerPrefs.setMiniPlayerElongatedBounds(x, y, width, height)
+    }
     var backgroundColor by mutableStateOf(Color(0xFF1E1E1E))
     var currentAnimatedCoverUrl by mutableStateOf<String?>(null)
     var currentAnimatedCoverTallUrl by mutableStateOf<String?>(null)
@@ -359,13 +363,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setLyricsDuetViewEnabled(enabled)
     }
 
+    var duetBlacklist by mutableStateOf(playerPrefs.getLyricsDuetBlacklist())
+
+    fun isTrackDuetBlacklisted(trackId: Long): Boolean = duetBlacklist.contains(trackId.toString())
+
+    fun toggleTrackDuetBlacklist(trackId: Long) {
+        val currentlyBlacklisted = isTrackDuetBlacklisted(trackId)
+        playerPrefs.setTrackDuetBlacklisted(trackId, !currentlyBlacklisted)
+        duetBlacklist = playerPrefs.getLyricsDuetBlacklist()
+    }
+
+    fun isDuetActiveForTrack(track: Track?): Boolean =
+        isDuetViewEnabled && (track == null || !isTrackDuetBlacklisted(track.id))
+
     var lyricsUiStyle by mutableStateOf(playerPrefs.getLyricsUiStyle())
+        private set
+    var lyricsFullScreenUiStyle by mutableStateOf(playerPrefs.getLyricsFullScreenUiStyle())
+        private set
+    var lyricsSidebarUiStyle by mutableStateOf(playerPrefs.getLyricsSidebarUiStyle())
         private set
     var lyricsFont by mutableStateOf(playerPrefs.getLyricsFont())
         private set
     var playerSliderStyle by mutableStateOf(playerPrefs.getPlayerSliderStyle())
         private set
     var lyricsLineBlurEnabled by mutableStateOf(playerPrefs.getLyricsLineBlurEnabled())
+        private set
+    var lyricsFullScreenLineBlurEnabled by mutableStateOf(playerPrefs.getLyricsFullScreenLineBlurEnabled())
+        private set
+    var lyricsSidebarLineBlurEnabled by mutableStateOf(playerPrefs.getLyricsSidebarLineBlurEnabled())
         private set
     var lyricsLrcBounceEnabled by mutableStateOf(playerPrefs.getLyricsLrcBounceEnabled())
         private set
@@ -377,10 +402,42 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var lyricsLineSpacing by mutableFloatStateOf(playerPrefs.getLyricsLineSpacing())
         private set
+    var lyricsFullScreenLineSpacing by mutableFloatStateOf(playerPrefs.getLyricsFullScreenLineSpacing())
+        private set
+    var lyricsSidebarLineSpacing by mutableFloatStateOf(playerPrefs.getLyricsSidebarLineSpacing())
+        private set
+    var lyricsActiveScale by mutableFloatStateOf(playerPrefs.getLyricsActiveScale())
+        private set
+    var lyricsFullScreenActiveScale by mutableFloatStateOf(playerPrefs.getLyricsFullScreenActiveScale())
+        private set
+    var lyricsSidebarActiveScale by mutableFloatStateOf(playerPrefs.getLyricsSidebarActiveScale())
+        private set
+    var lyricsHorizontalMargin by mutableFloatStateOf(playerPrefs.getLyricsHorizontalMargin())
+        private set
+    var lyricsFullScreenHorizontalMargin by mutableFloatStateOf(playerPrefs.getLyricsFullScreenHorizontalMargin())
+        private set
+    var lyricsSidebarHorizontalMargin by mutableFloatStateOf(playerPrefs.getLyricsSidebarHorizontalMargin())
+        private set
+    var lyricsVerticalOffset by mutableFloatStateOf(playerPrefs.getLyricsVerticalOffset())
+        private set
+    var lyricsFullScreenVerticalOffset by mutableFloatStateOf(playerPrefs.getLyricsFullScreenVerticalOffset())
+        private set
+    var lyricsSidebarVerticalOffset by mutableFloatStateOf(playerPrefs.getLyricsSidebarVerticalOffset())
+        private set
 
     fun updateLyricsUiStyle(style: com.alananasss.kittytune.data.local.LyricsUiStyle) {
         lyricsUiStyle = style
         playerPrefs.setLyricsUiStyle(style)
+    }
+
+    fun updateLyricsFullScreenUiStyle(style: com.alananasss.kittytune.data.local.LyricsUiStyle) {
+        lyricsFullScreenUiStyle = style
+        playerPrefs.setLyricsFullScreenUiStyle(style)
+    }
+
+    fun updateLyricsSidebarUiStyle(style: com.alananasss.kittytune.data.local.LyricsUiStyle) {
+        lyricsSidebarUiStyle = style
+        playerPrefs.setLyricsSidebarUiStyle(style)
     }
 
     fun updateLyricsFont(font: com.alananasss.kittytune.data.local.LyricsFont) {
@@ -396,6 +453,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateLyricsLineBlurEnabled(enabled: Boolean) {
         lyricsLineBlurEnabled = enabled
         playerPrefs.setLyricsLineBlurEnabled(enabled)
+    }
+
+    fun updateLyricsFullScreenLineBlurEnabled(enabled: Boolean) {
+        lyricsFullScreenLineBlurEnabled = enabled
+        playerPrefs.setLyricsFullScreenLineBlurEnabled(enabled)
+    }
+
+    fun updateLyricsSidebarLineBlurEnabled(enabled: Boolean) {
+        lyricsSidebarLineBlurEnabled = enabled
+        playerPrefs.setLyricsSidebarLineBlurEnabled(enabled)
     }
 
     fun updateLyricsLrcBounceEnabled(enabled: Boolean) {
@@ -419,8 +486,107 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun updateLyricsLineSpacing(spacing: Float) {
-        lyricsLineSpacing = spacing
-        playerPrefs.setLyricsLineSpacing(spacing)
+        val clamped = spacing.coerceIn(0f, 48f)
+        lyricsLineSpacing = clamped
+        playerPrefs.setLyricsLineSpacing(clamped)
+    }
+
+    fun updateLyricsFullScreenLineSpacing(spacing: Float) {
+        val clamped = spacing.coerceIn(0f, 64f)
+        lyricsFullScreenLineSpacing = clamped
+        playerPrefs.setLyricsFullScreenLineSpacing(clamped)
+    }
+
+    fun updateLyricsSidebarLineSpacing(spacing: Float) {
+        val clamped = spacing.coerceIn(0f, 48f)
+        lyricsSidebarLineSpacing = clamped
+        playerPrefs.setLyricsSidebarLineSpacing(clamped)
+    }
+
+    fun updateLyricsActiveScale(scale: Float) {
+        val clamped = scale.coerceIn(1.00f, 1.30f)
+        lyricsActiveScale = clamped
+        playerPrefs.setLyricsActiveScale(clamped)
+    }
+
+    fun updateLyricsFullScreenActiveScale(scale: Float) {
+        val clamped = scale.coerceIn(1.00f, 1.30f)
+        lyricsFullScreenActiveScale = clamped
+        playerPrefs.setLyricsFullScreenActiveScale(clamped)
+    }
+
+    fun updateLyricsSidebarActiveScale(scale: Float) {
+        val clamped = scale.coerceIn(1.00f, 1.30f)
+        lyricsSidebarActiveScale = clamped
+        playerPrefs.setLyricsSidebarActiveScale(clamped)
+    }
+
+    fun updateLyricsHorizontalMargin(margin: Float) {
+        val clamped = margin.coerceIn(0f, 64f)
+        lyricsHorizontalMargin = clamped
+        playerPrefs.setLyricsHorizontalMargin(clamped)
+    }
+
+    fun updateLyricsFullScreenHorizontalMargin(margin: Float) {
+        val clamped = margin.coerceIn(0f, 160f)
+        lyricsFullScreenHorizontalMargin = clamped
+        playerPrefs.setLyricsFullScreenHorizontalMargin(clamped)
+    }
+
+    fun updateLyricsSidebarHorizontalMargin(margin: Float) {
+        val clamped = margin.coerceIn(0f, 64f)
+        lyricsSidebarHorizontalMargin = clamped
+        playerPrefs.setLyricsSidebarHorizontalMargin(clamped)
+    }
+
+    fun updateLyricsVerticalOffset(offset: Float) {
+        val clamped = offset.coerceIn(0.20f, 0.60f)
+        lyricsVerticalOffset = clamped
+        playerPrefs.setLyricsVerticalOffset(clamped)
+    }
+
+    fun updateLyricsFullScreenVerticalOffset(offset: Float) {
+        val clamped = offset.coerceIn(0.20f, 0.60f)
+        lyricsFullScreenVerticalOffset = clamped
+        playerPrefs.setLyricsFullScreenVerticalOffset(clamped)
+    }
+
+    fun updateLyricsSidebarVerticalOffset(offset: Float) {
+        val clamped = offset.coerceIn(0.20f, 0.60f)
+        lyricsSidebarVerticalOffset = clamped
+        playerPrefs.setLyricsSidebarVerticalOffset(clamped)
+    }
+
+    fun resetLyricsTypography(isFullScreen: Boolean, isSidebar: Boolean = false) {
+        when {
+            isFullScreen -> {
+                updateLyricsFullScreenFontSize(42f)
+                updateLyricsFullScreenLineSpacing(0f)
+                updateLyricsFullScreenHorizontalMargin(0f)
+                updateLyricsFullScreenVerticalOffset(0.38f)
+                updateLyricsFullScreenActiveScale(1.00f)
+            }
+            isSidebar -> {
+                updateLyricsSidebarFontSize(22f)
+                updateLyricsSidebarLineSpacing(0f)
+                updateLyricsSidebarHorizontalMargin(0f)
+                updateLyricsSidebarVerticalOffset(0.38f)
+                updateLyricsSidebarActiveScale(1.00f)
+            }
+            else -> {
+                updateLyricsFontSize(42f)
+                updateLyricsLineSpacing(0f)
+                updateLyricsHorizontalMargin(0f)
+                updateLyricsVerticalOffset(0.38f)
+                updateLyricsActiveScale(1.00f)
+            }
+        }
+    }
+
+    fun resetAllLyricsTypography() {
+        resetLyricsTypography(isFullScreen = false, isSidebar = false)
+        resetLyricsTypography(isFullScreen = true, isSidebar = false)
+        resetLyricsTypography(isFullScreen = false, isSidebar = true)
     }
 
     var isRomanizationEnabled by mutableStateOf(playerPrefs.getLyricsRomanizationEnabled())
@@ -617,12 +783,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
     var lyricsFullScreenFontSize by mutableFloatStateOf(playerPrefs.getLyricsFullScreenFontSize())
+    var lyricsSidebarFontSize by mutableFloatStateOf(playerPrefs.getLyricsSidebarFontSize())
     var lyricsAlignment by mutableStateOf(playerPrefs.getLyricsAlignment())
     var lyricsFullScreenAlignment by mutableStateOf(playerPrefs.getLyricsFullScreenAlignment())
+    var lyricsSidebarAlignment by mutableStateOf(playerPrefs.getLyricsSidebarAlignment())
 
     /** How the line being sung is set apart. See [LyricsDisplayStyle]. */
     var lyricsDisplayStyle by mutableStateOf(playerPrefs.getLyricsDisplayStyle())
     var lyricsFullScreenDisplayStyle by mutableStateOf(playerPrefs.getLyricsFullScreenDisplayStyle())
+    var lyricsSidebarDisplayStyle by mutableStateOf(playerPrefs.getLyricsSidebarDisplayStyle())
 
     var lyricsMode by mutableStateOf(LyricsMode.SYNCED)
     var rawPlainLyrics by mutableStateOf<String?>(null)
@@ -1636,6 +1805,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setLyricsFullScreenFontSize(size)
     }
 
+    fun updateLyricsSidebarFontSize(size: Float) {
+        lyricsSidebarFontSize = size
+        playerPrefs.setLyricsSidebarFontSize(size)
+    }
+
     fun updateLyricsAlignment(alignment: LyricsAlignment) {
         lyricsAlignment = alignment
         playerPrefs.setLyricsAlignment(alignment)
@@ -1646,6 +1820,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setLyricsFullScreenAlignment(alignment)
     }
 
+    fun updateLyricsSidebarAlignment(alignment: LyricsAlignment) {
+        lyricsSidebarAlignment = alignment
+        playerPrefs.setLyricsSidebarAlignment(alignment)
+    }
+
     fun updateLyricsDisplayStyle(style: LyricsDisplayStyle) {
         lyricsDisplayStyle = style
         playerPrefs.setLyricsDisplayStyle(style)
@@ -1654,6 +1833,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateLyricsFullScreenDisplayStyle(style: LyricsDisplayStyle) {
         lyricsFullScreenDisplayStyle = style
         playerPrefs.setLyricsFullScreenDisplayStyle(style)
+    }
+
+    fun updateLyricsSidebarDisplayStyle(style: LyricsDisplayStyle) {
+        lyricsSidebarDisplayStyle = style
+        playerPrefs.setLyricsSidebarDisplayStyle(style)
     }
 
 
@@ -1701,7 +1885,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         return Pair(parsedArtist, ultraCleanTitle.ifBlank { parsedTitle })
     }
 
-    private fun generateSearchQueries(title: String, uploader: String): List<String> {
+    private fun generateSearchQueries(title: String, uploader: String, rawUploader: String? = null): List<String> {
         val queries = mutableSetOf<String>()
 
         val cleanArtist = uploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
@@ -1726,6 +1910,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (ultraCleanTitle.isNotBlank()) queries.add(ultraCleanTitle)
         if (parsedTitle.isNotBlank()) queries.add(parsedTitle)
         queries.add(cleanTitle)
+
+        if (!rawUploader.isNullOrBlank()) {
+            val cleanRaw = rawUploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
+            if (cleanRaw.isNotBlank() && cleanRaw != cleanArtist && cleanRaw != parsedArtist) {
+                if (ultraCleanTitle.isNotBlank()) queries.add("$ultraCleanTitle $cleanRaw")
+                if (parsedTitle.isNotBlank()) queries.add("$parsedTitle $cleanRaw")
+            }
+        }
 
         return queries.filter { it.length > 2 }.toList()
     }
@@ -1812,8 +2004,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         isSearchingLyrics = false
         rawPlainLyrics = null
 
-        val queries = generateSearchQueries(track.title ?: "", track.user?.username ?: "")
-        manualSearchQuery = queries.firstOrNull() ?: ""
+        val effectiveArtist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+        val queries = generateSearchQueries(track.title ?: "", effectiveArtist, track.user?.username)
+        val (parsedArtist, parsedTitle) = parseArtistAndTitle(track.title ?: "", effectiveArtist)
+        manualSearchQuery = if (parsedTitle.isNotBlank() && parsedArtist.isNotBlank()) "$parsedTitle $parsedArtist" else (queries.firstOrNull() ?: "")
 
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
             // A previously chosen manual search result wins over automatic matching.
@@ -1914,7 +2108,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         lyricsPrefetchJob?.cancel()
         lyricsPrefetchJob = viewModelScope.launch(Dispatchers.IO) {
-            val queries = generateSearchQueries(next.title ?: "", next.user?.username ?: "")
+            val effectiveArtist = next.displayArtist.ifBlank { next.user?.username.orEmpty() }
+            val queries = generateSearchQueries(next.title ?: "", effectiveArtist, next.user?.username)
             val payload = runCatching { resolveLyrics(next, queries, variant) }.getOrNull()
             if (!isActive) return@launch
             LyricsCache.put(
@@ -1982,17 +2177,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         variant: LyricsVariant,
     ): LyricsPayload? = coroutineScope {
         PaxsenixClient.setApiKey(playerPrefs.getPaxsenixApiKey())
-        val (parsedArtist, parsedTitle) = parseArtistAndTitle(track.title ?: "", track.user?.username ?: "")
+        val effectiveArtist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+        val (parsedArtist, parsedTitle) = parseArtistAndTitle(track.title ?: "", effectiveArtist)
         val target = LyricsMatcher.Target(
             title = parsedTitle.ifBlank { track.title ?: "" },
-            artist = parsedArtist.ifBlank { track.user?.username ?: "" },
+            artist = parsedArtist.ifBlank { effectiveArtist },
             durationMs = track.durationMs ?: 0L,
             alternativeTitles = listOfNotNull(track.title, parsedTitle, track.title?.let { cleanTitleNoise(it) }).filter { it.isNotBlank() }.distinct(),
             alternativeArtists = listOfNotNull(
-                track.user?.username,
+                track.displayArtist,
                 parsedArtist,
                 track.publisherMetadata?.artist,
-                track.displayArtist,
+                track.user?.username,
             ).filter { it.isNotBlank() }.distinct(),
         )
         val trackDurationMs = track.durationMs ?: 0L
@@ -2385,7 +2581,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     else -> {
                         val p = LyricsProviders.all[pref]
                         if (p != null) {
-                            val trackArtist = currentTrack?.user?.username?.trim().orEmpty()
+                            val trackArtist = currentTrack?.displayArtist?.ifBlank { currentTrack?.user?.username.orEmpty() }?.trim().orEmpty()
                             val trackDuration = ((currentTrack?.durationMs ?: 0L) / 1000L).toInt()
                             val trackAlbum = currentTrack?.publisherMetadata?.albumTitle
 
@@ -5076,7 +5272,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         val metadataBuilder = MediaMetadata.Builder()
             .setTitle(track.title ?: str("untitled_track"))
-            .setArtist(track.user?.username ?: str("unknown_artist"))
+            .setArtist(track.displayArtist.ifBlank { track.user?.username ?: str("unknown_artist") })
             .setArtworkUri(track.fullResArtwork)
 
         if (bitmap != null) {
