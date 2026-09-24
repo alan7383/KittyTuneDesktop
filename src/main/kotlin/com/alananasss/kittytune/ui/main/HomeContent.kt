@@ -633,7 +633,7 @@ fun MediaCard(
     androidx.compose.material3.TextButton(
         onClick = onClick,
         interactionSource = interactionSource,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
             containerColor = if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onSurface
@@ -3046,7 +3046,7 @@ private fun MixOptionsDialog(
                     value = artist,
                     onValueChange = { artist = it },
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(12.dp),
                     placeholder = { Text(str("mix_artist_hint")) },
                     // Where the "Start mixing" button used to sit beside the field, at half the width of the one
                     // on the card and doing the same thing. Enter does it too, which is what a text field implies.
@@ -3081,7 +3081,7 @@ private fun MixOptionsDialog(
                     value = genreQuery,
                     onValueChange = { genreQuery = it },
                     singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(12.dp),
                     placeholder = { Text(str("mix_genre_search_hint")) },
                     leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                     trailingIcon = {
