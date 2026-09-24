@@ -192,6 +192,77 @@ object LikeRepository {
         }
     }
 
+    /** One bulk-like network pass at a time, so two rapid "Like all" clicks cannot double-send. */
+    private val bulkLikeInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Same batch size and pacing the guest-transfer path has always used successfully. */
+    private const val BULK_LIKE_BATCH_SIZE = 25
+    private const val BULK_LIKE_BATCH_DELAY_MS = 350L
+    private const val BULK_LIKE_RATE_LIMIT_WAIT_MS = 2_000L
+
+    /**
+     * Likes every track in [tracks] in one pass: a single local update and disk write, then the
+     * SoundCloud call batched 25-per-POST with a pause between batches — never one request per
+     * track, so a whole album cannot look like a burst. Returns how many tracks were newly liked.
+     */
+    fun addLikesBulk(tracks: List<Track>): Int {
+        val toLike = tracks.filter { !isTrackLiked(it.id) }
+        if (toLike.isEmpty()) return 0
+
+        val now = System.currentTimeMillis()
+        toLike.forEach { removeFromBlacklist(it.id) }
+        _likedTracks.update { current ->
+            val byId = current.associateBy { it.id }.toMutableMap()
+            for (track in toLike) {
+                val safeSource = (track.source as? String) ?: "soundcloud"
+                byId[track.id] = track.copy(isLiked = true, source = safeSource, likedAt = now)
+            }
+            byId.values.sortedByDescending { it.likedAt ?: 0L }
+        }
+        scheduleSave()
+        toLike.forEach { com.alananasss.kittytune.data.sync.SyncLikes.record(it.id, liked = true, track = it) }
+
+        val soundCloudLikeable = toLike.filter { track ->
+            track.id > 0 &&
+                track.source != "spotify" &&
+                track.user?.urn?.startsWith("spotify") != true &&
+                track.permalinkUrl?.contains("spotify") != true
+        }
+        if (soundCloudLikeable.isEmpty()) return toLike.size
+
+        scope.launch {
+            if (!playerPrefs.getSyncLikesEnabled()) return@launch
+            if (tokenManager.isGuestMode()) return@launch
+            val token = tokenManager.getAccessToken()
+            if (token.isNullOrEmpty()) return@launch
+            if (!bulkLikeInFlight.compareAndSet(false, true)) return@launch
+            try {
+                for (batch in soundCloudLikeable.chunked(BULK_LIKE_BATCH_SIZE)) {
+                    val payload = TrackLikeRequest(
+                        likes = batch.map { TrackLikeItem("soundcloud:tracks:${it.id}") }
+                    )
+                    try {
+                        var response = api.likeTrack(payload)
+                        if (response.code() == 401) {
+                            SessionManager.requestSessionRefresh(force = true)
+                        }
+                        if (response.code() == 429) {
+                            delay(BULK_LIKE_RATE_LIMIT_WAIT_MS)
+                            response = api.likeTrack(payload)
+                            if (response.code() == 429) break
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                    delay(BULK_LIKE_BATCH_DELAY_MS)
+                }
+            } finally {
+                bulkLikeInFlight.set(false)
+            }
+        }
+        return toLike.size
+    }
+
     fun removeLike(trackId: Long) {
         val targetTrack = _likedTracks.value.find { it.id == trackId }
         val isSpotify = targetTrack?.source == "spotify" || targetTrack?.user?.urn?.startsWith("spotify") == true

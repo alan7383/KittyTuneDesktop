@@ -1561,6 +1561,22 @@ fun PlaylistDetailScreen(
                                             onClick = { playerViewModel.prepareBulkAdd(tracksToDisplay.toList()); showOptionsMenu = false }
                                         )
                                     }
+                                    if (isAlbum && tracksToDisplay.isNotEmpty() && !isYoutubeRadio) {
+                                        DropdownMenuItem(
+                                            text = { Text(str("menu_like_all_songs")) },
+                                            leadingIcon = { Icon(Icons.Rounded.Favorite, null) },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                val likedCount =
+                                                    com.alananasss.kittytune.data.LikeRepository.addLikesBulk(tracksToDisplay.toList())
+                                                if (likedCount > 0) {
+                                                    com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_done", likedCount))
+                                                } else {
+                                                    com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_nothing"))
+                                                }
+                                            }
+                                        )
+                                    }
                                     val isSystemPlaylist = playlistId.startsWith("system_playlist:")
                                     if (!isLocalPlaylist && (currentIdLong > 0 || isSystemPlaylist) && !isYoutubeRadio &&
                                         !playlistId.startsWith("station") && playlistId != "likes" &&
@@ -1910,7 +1926,12 @@ fun PlaylistDetailScreen(
 
 @Composable
 fun PlaylistSquareCard(playlist: Playlist, onClick: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+    ) {
         AsyncImage(
             model = playlist.fullResArtwork,
             contentDescription = null,
