@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.round
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-private const val MAX_SPRING_DISPLACEMENT_PX = 80
+private const val MAX_SPRING_DISPLACEMENT_PX = 600
 
 class CustomSpringPlacementModifierNode(
     var lookaheadScope: LookaheadScope,

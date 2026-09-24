@@ -33,10 +33,12 @@ fun LyricsLineItem(
     inactiveAlpha: Float = 0.4f,
     blendMode: BlendMode = BlendMode.SrcOver,
     isInteractive: Boolean = true,
+    activeScale: Float = 1.00f,
     content: @Composable () -> Unit
 ) {
+    val inactiveScale = if (activeScale <= 1.02f) 0.98f else (activeScale * 0.92f).coerceAtMost(1.0f)
     val scaleState by animateFloatAsState(
-        targetValue = if (isFocused) 1f else 0.98f,
+        targetValue = if (isFocused) activeScale else inactiveScale,
         animationSpec = if (isFocused) {
             tween(durationMillis = 600, easing = LinearOutSlowInEasing)
         } else {
@@ -84,7 +86,6 @@ fun LyricsLineItem(
                     )
                 else Modifier
             )
-
     ) {
         content()
     }
