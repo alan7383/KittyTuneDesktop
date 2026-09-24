@@ -21,6 +21,8 @@ import com.alananasss.kittytune.data.lyrics.clients.PaxsenixClient
 
 enum class AppThemeMode { SYSTEM, LIGHT, DARK }
 enum class StartDestination { HOME, LIBRARY }
+enum class MiniPlayerStyle { STANDARD, ELONGATED }
+enum class LyricsScreenContext { MAIN, FULLSCREEN, SIDEBAR }
 
 /**
  * Which half the info panel opens on: the comments, the lyrics, or whichever was last chosen
@@ -117,6 +119,25 @@ class PlayerPreferences {
         const val MINI_PLAYER_MAX_WIDTH = 1000
         const val MINI_PLAYER_MIN_HEIGHT = 68
         const val MINI_PLAYER_MAX_HEIGHT = 120
+        private const val KEY_MINI_PLAYER_SHOW_COVER = "mini_player_show_cover"
+        private const val KEY_MINI_PLAYER_SHOW_PLAYBACK_CONTROLS = "mini_player_show_playback_controls"
+        private const val KEY_MINI_PLAYER_SHOW_ADDITIONAL_CONTROLS = "mini_player_show_additional_controls"
+        private const val KEY_MINI_PLAYER_CONTROLS_ON_HOVER = "mini_player_controls_on_hover"
+        private const val KEY_MINI_PLAYER_HOVER_EFFECT = "mini_player_hover_effect"
+        private const val KEY_MINI_PLAYER_SHOW_PROGRESS = "mini_player_show_progress"
+        private const val KEY_MINI_PLAYER_STYLE = "mini_player_style"
+        const val DEFAULT_MINI_PLAYER_STYLE = "STANDARD"
+        private const val KEY_MINI_PLAYER_TRANSPARENT_BG = "mini_player_transparent_bg"
+        private const val KEY_MINI_PLAYER_ELONGATED_X = "mini_player_elongated_pos_x"
+        private const val KEY_MINI_PLAYER_ELONGATED_Y = "mini_player_elongated_pos_y"
+        private const val KEY_MINI_PLAYER_ELONGATED_WIDTH = "mini_player_elongated_width"
+        private const val KEY_MINI_PLAYER_ELONGATED_HEIGHT = "mini_player_elongated_height"
+        const val MINI_PLAYER_ELONGATED_MIN_WIDTH = 240
+        const val MINI_PLAYER_ELONGATED_MAX_WIDTH = 1400
+        const val MINI_PLAYER_ELONGATED_MIN_HEIGHT = 30
+        const val MINI_PLAYER_ELONGATED_MAX_HEIGHT = 56
+        const val MINI_PLAYER_ELONGATED_DEFAULT_HEIGHT = 38
+        const val MINI_PLAYER_ELONGATED_DEFAULT_WIDTH = 500
         private const val KEY_FULL_PLAYER_BG_STYLE = "full_player_bg_style"
 
         /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
@@ -201,12 +222,16 @@ class PlayerPreferences {
         private const val KEY_LYRICS_PREFER_LOCAL = "lyrics_prefer_local"
         private const val KEY_LYRICS_ALIGNMENT = "lyrics_alignment"
         private const val KEY_LYRICS_FULLSCREEN_ALIGNMENT = "lyrics_fullscreen_alignment"
+        private const val KEY_LYRICS_SIDEBAR_ALIGNMENT = "lyrics_sidebar_alignment"
         private const val KEY_LYRICS_DISPLAY_STYLE = "lyrics_display_style"
         private const val KEY_LYRICS_FULLSCREEN_DISPLAY_STYLE = "lyrics_fullscreen_display_style"
+        private const val KEY_LYRICS_SIDEBAR_DISPLAY_STYLE = "lyrics_sidebar_display_style"
         private const val KEY_LYRICS_FONT_SIZE = "lyrics_font_size"
         private const val KEY_LYRICS_FULLSCREEN_FONT_SIZE = "lyrics_fullscreen_font_size"
+        private const val KEY_LYRICS_SIDEBAR_FONT_SIZE = "lyrics_sidebar_font_size"
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
         private const val KEY_LYRICS_DUET_VIEW = "lyrics_duet_view"
+        private const val KEY_LYRICS_DUET_BLACKLIST = "lyrics_duet_blacklist"
         private const val KEY_LYRICS_UNDER_COVER_ENABLED = "lyrics_under_cover_enabled"
         private const val KEY_LYRICS_MULTI_STATE_TOGGLE = "lyrics_multi_state_toggle"
         private const val KEY_LYRICS_UNDER_COVER_PLACEMENT = "lyrics_under_cover_placement"
@@ -214,14 +239,29 @@ class PlayerPreferences {
 
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
         private const val KEY_LYRICS_UI_STYLE = "lyrics_ui_style"
+        private const val KEY_LYRICS_FULLSCREEN_UI_STYLE = "lyrics_fullscreen_ui_style"
+        private const val KEY_LYRICS_SIDEBAR_UI_STYLE = "lyrics_sidebar_ui_style"
         private const val KEY_LYRICS_FONT = "lyrics_font"
         const val KEY_PLAYER_SLIDER_STYLE = "player_slider_style"
         private const val KEY_LYRICS_LINE_BLUR = "lyrics_line_blur_enabled"
+        private const val KEY_LYRICS_FULLSCREEN_LINE_BLUR = "lyrics_fullscreen_line_blur_enabled"
+        private const val KEY_LYRICS_SIDEBAR_LINE_BLUR = "lyrics_sidebar_line_blur_enabled"
         private const val KEY_LYRICS_LRC_BOUNCE_ENABLED = "lyrics_lrc_bounce_enabled"
         private const val KEY_LYRICS_BOUNCE_FACTOR = "lyrics_bounce_factor"
         private const val KEY_LYRICS_GLOW_FACTOR = "lyrics_glow_factor"
         private const val KEY_LYRICS_FILL_TRANSITION_WIDTH = "lyrics_fill_transition_width"
         private const val KEY_LYRICS_LINE_SPACING = "lyrics_line_spacing"
+        private const val KEY_LYRICS_FULLSCREEN_LINE_SPACING = "lyrics_fullscreen_line_spacing"
+        private const val KEY_LYRICS_SIDEBAR_LINE_SPACING = "lyrics_sidebar_line_spacing"
+        private const val KEY_LYRICS_ACTIVE_SCALE = "lyrics_active_scale"
+        private const val KEY_LYRICS_FULLSCREEN_ACTIVE_SCALE = "lyrics_fullscreen_active_scale"
+        private const val KEY_LYRICS_SIDEBAR_ACTIVE_SCALE = "lyrics_sidebar_active_scale"
+        private const val KEY_LYRICS_HORIZONTAL_MARGIN = "lyrics_horizontal_margin"
+        private const val KEY_LYRICS_FULLSCREEN_HORIZONTAL_MARGIN = "lyrics_fullscreen_horizontal_margin"
+        private const val KEY_LYRICS_SIDEBAR_HORIZONTAL_MARGIN = "lyrics_sidebar_horizontal_margin"
+        private const val KEY_LYRICS_VERTICAL_OFFSET = "lyrics_vertical_offset"
+        private const val KEY_LYRICS_FULLSCREEN_VERTICAL_OFFSET = "lyrics_fullscreen_vertical_offset"
+        private const val KEY_LYRICS_SIDEBAR_VERTICAL_OFFSET = "lyrics_sidebar_vertical_offset"
         private const val KEY_LYRICS_TRANSLATION_ENABLED = "lyrics_translation_enabled"
         private const val KEY_LYRICS_TRANSLATION_LANG = "lyrics_translation_lang"
         private const val KEY_APP_LANGUAGE = "app_language_code"
@@ -258,6 +298,11 @@ class PlayerPreferences {
         private const val KEY_AUTOMIX_DYNAMIC_MIX_POINTS = "automix_dynamic_mix_points"
         private const val KEY_AUTOMIX_BASS_DUCKING = "automix_bass_ducking"
         private const val KEY_AUTOMIX_OVERLAP_MODE = "automix_overlap_mode"
+        const val AUTOMIX_START_OFFSET_AUTO = 0
+        const val AUTOMIX_START_OFFSET_BEGINNING = 1
+        const val AUTOMIX_START_OFFSET_CUSTOM = 2
+        private const val KEY_AUTOMIX_START_OFFSET_MODE = "automix_start_offset_mode"
+        private const val KEY_AUTOMIX_START_OFFSET_CUSTOM_SEC = "automix_start_offset_custom_sec"
         private const val KEY_KEY_COLOR = "key_color"
         private const val KEY_COLOR_STYLE = "color_style"
         private const val KEY_COLOR_SPEC = "color_spec"
@@ -355,6 +400,12 @@ class PlayerPreferences {
     fun getAutomixOverlapMode(): Int = Prefs.getInt(KEY_AUTOMIX_OVERLAP_MODE, 0)
     fun setAutomixOverlapMode(mode: Int) = Prefs.putInt(KEY_AUTOMIX_OVERLAP_MODE, mode)
 
+    fun getAutomixStartOffsetMode(): Int = Prefs.getInt(KEY_AUTOMIX_START_OFFSET_MODE, AUTOMIX_START_OFFSET_AUTO)
+    fun setAutomixStartOffsetMode(mode: Int) = Prefs.putInt(KEY_AUTOMIX_START_OFFSET_MODE, mode)
+
+    fun getAutomixStartOffsetCustomSec(): Int = Prefs.getInt(KEY_AUTOMIX_START_OFFSET_CUSTOM_SEC, 10)
+    fun setAutomixStartOffsetCustomSec(seconds: Int) = Prefs.putInt(KEY_AUTOMIX_START_OFFSET_CUSTOM_SEC, seconds.coerceIn(0, 60))
+
     fun getCustomFontEnabled() = Prefs.getBoolean(KEY_CUSTOM_FONT_ENABLED, true)
     fun setCustomFontEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_CUSTOM_FONT_ENABLED, enabled)
 
@@ -442,6 +493,12 @@ class PlayerPreferences {
     }
     fun setLyricsFullScreenAlignment(align: LyricsAlignment) = Prefs.putString(KEY_LYRICS_FULLSCREEN_ALIGNMENT, align.name)
 
+    fun getLyricsSidebarAlignment(): LyricsAlignment {
+        val name = Prefs.getString(KEY_LYRICS_SIDEBAR_ALIGNMENT, LyricsAlignment.LEFT.name)
+        return try { LyricsAlignment.valueOf(name ?: LyricsAlignment.LEFT.name) } catch (_: Exception) { LyricsAlignment.LEFT }
+    }
+    fun setLyricsSidebarAlignment(align: LyricsAlignment) = Prefs.putString(KEY_LYRICS_SIDEBAR_ALIGNMENT, align.name)
+
     fun getLyricsDisplayStyle(): LyricsDisplayStyle {
         val name = Prefs.getString(KEY_LYRICS_DISPLAY_STYLE, LyricsDisplayStyle.STANDARD.name)
         return LyricsDisplayStyle.entries.find { it.name == name } ?: LyricsDisplayStyle.STANDARD
@@ -458,8 +515,29 @@ class PlayerPreferences {
     fun setLyricsFullScreenDisplayStyle(style: LyricsDisplayStyle) =
         Prefs.putString(KEY_LYRICS_FULLSCREEN_DISPLAY_STYLE, style.name)
 
+    fun getLyricsSidebarDisplayStyle(): LyricsDisplayStyle {
+        val name = Prefs.getString(KEY_LYRICS_SIDEBAR_DISPLAY_STYLE, LyricsDisplayStyle.STANDARD.name)
+        return LyricsDisplayStyle.entries.find { it.name == name } ?: LyricsDisplayStyle.STANDARD
+    }
+
+    fun setLyricsSidebarDisplayStyle(style: LyricsDisplayStyle) =
+        Prefs.putString(KEY_LYRICS_SIDEBAR_DISPLAY_STYLE, style.name)
+
     fun getLyricsDuetViewEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_DUET_VIEW, true)
     fun setLyricsDuetViewEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_DUET_VIEW, enabled)
+
+    fun getLyricsDuetBlacklist(): Set<String> = Prefs.getStringSet(KEY_LYRICS_DUET_BLACKLIST, emptySet())
+    fun setLyricsDuetBlacklist(blacklist: Set<String>) = Prefs.putStringSet(KEY_LYRICS_DUET_BLACKLIST, blacklist)
+    fun isTrackDuetBlacklisted(trackId: Long): Boolean = getLyricsDuetBlacklist().contains(trackId.toString())
+    fun setTrackDuetBlacklisted(trackId: Long, blacklisted: Boolean) {
+        val current = getLyricsDuetBlacklist().toMutableSet()
+        if (blacklisted) {
+            current.add(trackId.toString())
+        } else {
+            current.remove(trackId.toString())
+        }
+        setLyricsDuetBlacklist(current)
+    }
 
     fun getLyricsUnderCoverEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, false)
     fun setLyricsUnderCoverEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, enabled)
@@ -514,8 +592,12 @@ class PlayerPreferences {
     fun getLyricsFontSize(): Float = Prefs.getFloat(KEY_LYRICS_FONT_SIZE, 42f)
     fun setLyricsFontSize(size: Float) = Prefs.putFloat(KEY_LYRICS_FONT_SIZE, size)
 
-    fun getLyricsFullScreenFontSize(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_FONT_SIZE, 34f)
+    fun getLyricsFullScreenFontSize(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_FONT_SIZE, 42f)
     fun setLyricsFullScreenFontSize(size: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_FONT_SIZE, size)
+
+    fun getLyricsSidebarFontSize(): Float =
+        Prefs.getFloat(KEY_LYRICS_SIDEBAR_FONT_SIZE, 22f)
+    fun setLyricsSidebarFontSize(size: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_FONT_SIZE, size)
 
     fun getLocalMediaEnabled(): Boolean = Prefs.getBoolean(KEY_LOCAL_MEDIA_ENABLED, false)
     fun setLocalMediaEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LOCAL_MEDIA_ENABLED, enabled)
@@ -624,6 +706,57 @@ class PlayerPreferences {
         setMiniPlayerBounds(x, y, width, getMiniPlayerHeight())
     }
 
+    fun getMiniPlayerShowCover(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_SHOW_COVER, true)
+    fun setMiniPlayerShowCover(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_SHOW_COVER, show)
+    fun miniPlayerShowCoverFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_SHOW_COVER, true)
+
+    fun getMiniPlayerShowPlaybackControls(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_SHOW_PLAYBACK_CONTROLS, true)
+    fun setMiniPlayerShowPlaybackControls(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_SHOW_PLAYBACK_CONTROLS, show)
+    fun miniPlayerShowPlaybackControlsFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_SHOW_PLAYBACK_CONTROLS, true)
+
+    fun getMiniPlayerShowAdditionalControls(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_SHOW_ADDITIONAL_CONTROLS, true)
+    fun setMiniPlayerShowAdditionalControls(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_SHOW_ADDITIONAL_CONTROLS, show)
+    fun miniPlayerShowAdditionalControlsFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_SHOW_ADDITIONAL_CONTROLS, true)
+
+    fun getMiniPlayerControlsOnHover(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_CONTROLS_ON_HOVER, true)
+    fun setMiniPlayerControlsOnHover(onHover: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_CONTROLS_ON_HOVER, onHover)
+    fun miniPlayerControlsOnHoverFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_CONTROLS_ON_HOVER, true)
+
+    fun getMiniPlayerHoverEffect(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_HOVER_EFFECT, true)
+    fun setMiniPlayerHoverEffect(enabled: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_HOVER_EFFECT, enabled)
+    fun miniPlayerHoverEffectFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_HOVER_EFFECT, true)
+
+    fun getMiniPlayerShowProgress(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, true)
+    fun setMiniPlayerShowProgress(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, show)
+    fun miniPlayerShowProgressFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_SHOW_PROGRESS, true)
+
+    fun getMiniPlayerStyle(): MiniPlayerStyle {
+        val name = Prefs.getString(KEY_MINI_PLAYER_STYLE, MiniPlayerStyle.STANDARD.name)
+        return try {
+            MiniPlayerStyle.valueOf(name ?: MiniPlayerStyle.STANDARD.name)
+        } catch (_: Exception) {
+            MiniPlayerStyle.STANDARD
+        }
+    }
+    fun setMiniPlayerStyle(style: MiniPlayerStyle) = Prefs.putString(KEY_MINI_PLAYER_STYLE, style.name)
+    fun miniPlayerStyleFlow(): Flow<MiniPlayerStyle> = Prefs.flow.map { getMiniPlayerStyle() }
+
+    fun getMiniPlayerTransparentBg(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_TRANSPARENT_BG, false)
+    fun setMiniPlayerTransparentBg(transparent: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_TRANSPARENT_BG, transparent)
+    fun miniPlayerTransparentBgFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_TRANSPARENT_BG, false)
+
+    fun getMiniPlayerElongatedX(): Int? = Prefs.getInt(KEY_MINI_PLAYER_ELONGATED_X, -1).takeIf { it >= 0 }
+    fun getMiniPlayerElongatedY(): Int? = Prefs.getInt(KEY_MINI_PLAYER_ELONGATED_Y, -1).takeIf { it >= 0 }
+    fun getMiniPlayerElongatedWidth(): Int = Prefs.getInt(KEY_MINI_PLAYER_ELONGATED_WIDTH, MINI_PLAYER_ELONGATED_DEFAULT_WIDTH).coerceIn(MINI_PLAYER_ELONGATED_MIN_WIDTH, MINI_PLAYER_ELONGATED_MAX_WIDTH)
+    fun getMiniPlayerElongatedHeight(): Int = Prefs.getInt(KEY_MINI_PLAYER_ELONGATED_HEIGHT, MINI_PLAYER_ELONGATED_DEFAULT_HEIGHT).coerceIn(MINI_PLAYER_ELONGATED_MIN_HEIGHT, MINI_PLAYER_ELONGATED_MAX_HEIGHT)
+
+    fun setMiniPlayerElongatedBounds(x: Int, y: Int, width: Int, height: Int) {
+        Prefs.putInt(KEY_MINI_PLAYER_ELONGATED_X, x)
+        Prefs.putInt(KEY_MINI_PLAYER_ELONGATED_Y, y)
+        Prefs.putInt(KEY_MINI_PLAYER_ELONGATED_WIDTH, width.coerceIn(MINI_PLAYER_ELONGATED_MIN_WIDTH, MINI_PLAYER_ELONGATED_MAX_WIDTH))
+        Prefs.putInt(KEY_MINI_PLAYER_ELONGATED_HEIGHT, height.coerceIn(MINI_PLAYER_ELONGATED_MIN_HEIGHT, MINI_PLAYER_ELONGATED_MAX_HEIGHT))
+    }
+
         fun getFullPlayerBgStyle(): FullPlayerBgStyle {
         val name = Prefs.getString(KEY_FULL_PLAYER_BG_STYLE, FullPlayerBgStyle.APPLE_MUSIC.name)
         // "ORBS" is what this style was called when it drew radial lights instead of the sleeve. Anyone who
@@ -722,6 +855,26 @@ class PlayerPreferences {
     }
     fun setLyricsUiStyle(style: LyricsUiStyle) = Prefs.putString(KEY_LYRICS_UI_STYLE, style.name)
 
+    fun getLyricsFullScreenUiStyle(): LyricsUiStyle {
+        val name = Prefs.getString(KEY_LYRICS_FULLSCREEN_UI_STYLE, LyricsUiStyle.ENHANCED.name)
+        return try {
+            LyricsUiStyle.valueOf(name ?: LyricsUiStyle.ENHANCED.name)
+        } catch (_: Exception) {
+            LyricsUiStyle.ENHANCED
+        }
+    }
+    fun setLyricsFullScreenUiStyle(style: LyricsUiStyle) = Prefs.putString(KEY_LYRICS_FULLSCREEN_UI_STYLE, style.name)
+
+    fun getLyricsSidebarUiStyle(): LyricsUiStyle {
+        val name = Prefs.getString(KEY_LYRICS_SIDEBAR_UI_STYLE, LyricsUiStyle.CLASSIC.name)
+        return try {
+            LyricsUiStyle.valueOf(name ?: LyricsUiStyle.CLASSIC.name)
+        } catch (_: Exception) {
+            LyricsUiStyle.CLASSIC
+        }
+    }
+    fun setLyricsSidebarUiStyle(style: LyricsUiStyle) = Prefs.putString(KEY_LYRICS_SIDEBAR_UI_STYLE, style.name)
+
     fun getLyricsFont(): LyricsFont {
         val name = Prefs.getString(KEY_LYRICS_FONT, LyricsFont.APPLE.name)
         return try {
@@ -753,6 +906,14 @@ class PlayerPreferences {
     fun getLyricsLineBlurEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_LINE_BLUR, true)
     fun setLyricsLineBlurEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_LINE_BLUR, enabled)
 
+    fun getLyricsFullScreenLineBlurEnabled(): Boolean =
+        Prefs.getBoolean(KEY_LYRICS_FULLSCREEN_LINE_BLUR, true)
+    fun setLyricsFullScreenLineBlurEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_FULLSCREEN_LINE_BLUR, enabled)
+
+    fun getLyricsSidebarLineBlurEnabled(): Boolean =
+        Prefs.getBoolean(KEY_LYRICS_SIDEBAR_LINE_BLUR, true)
+    fun setLyricsSidebarLineBlurEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_SIDEBAR_LINE_BLUR, enabled)
+
     fun getLyricsLrcBounceEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, true)
     fun setLyricsLrcBounceEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, enabled)
 
@@ -765,8 +926,41 @@ class PlayerPreferences {
     fun getLyricsFillTransitionWidth(): Float = Prefs.getFloat(KEY_LYRICS_FILL_TRANSITION_WIDTH, 8.0f)
     fun setLyricsFillTransitionWidth(width: Float) = Prefs.putFloat(KEY_LYRICS_FILL_TRANSITION_WIDTH, width)
 
-    fun getLyricsLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_LINE_SPACING, 24.0f)
-    fun setLyricsLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_LINE_SPACING, spacing)
+    fun getLyricsLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_LINE_SPACING, 0.0f).coerceIn(0f, 48f)
+    fun setLyricsLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_LINE_SPACING, spacing.coerceIn(0f, 48f))
+
+    fun getLyricsFullScreenLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_LINE_SPACING, 0.0f).coerceIn(0f, 64f)
+    fun setLyricsFullScreenLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_LINE_SPACING, spacing.coerceIn(0f, 64f))
+
+    fun getLyricsSidebarLineSpacing(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_LINE_SPACING, 0.0f).coerceIn(0f, 32f)
+    fun setLyricsSidebarLineSpacing(spacing: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_LINE_SPACING, spacing.coerceIn(0f, 32f))
+
+    fun getLyricsActiveScale(): Float = Prefs.getFloat(KEY_LYRICS_ACTIVE_SCALE, 1.00f).coerceIn(1.00f, 1.30f)
+    fun setLyricsActiveScale(scale: Float) = Prefs.putFloat(KEY_LYRICS_ACTIVE_SCALE, scale.coerceIn(1.00f, 1.30f))
+
+    fun getLyricsFullScreenActiveScale(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_ACTIVE_SCALE, 1.00f).coerceIn(1.00f, 1.30f)
+    fun setLyricsFullScreenActiveScale(scale: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_ACTIVE_SCALE, scale.coerceIn(1.00f, 1.30f))
+
+    fun getLyricsSidebarActiveScale(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_ACTIVE_SCALE, 1.00f).coerceIn(1.00f, 1.30f)
+    fun setLyricsSidebarActiveScale(scale: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_ACTIVE_SCALE, scale.coerceIn(1.00f, 1.30f))
+
+    fun getLyricsHorizontalMargin(): Float = Prefs.getFloat(KEY_LYRICS_HORIZONTAL_MARGIN, 0.0f).coerceIn(0f, 64f)
+    fun setLyricsHorizontalMargin(margin: Float) = Prefs.putFloat(KEY_LYRICS_HORIZONTAL_MARGIN, margin.coerceIn(0f, 64f))
+
+    fun getLyricsFullScreenHorizontalMargin(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_HORIZONTAL_MARGIN, 0.0f).coerceIn(0f, 160f)
+    fun setLyricsFullScreenHorizontalMargin(margin: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_HORIZONTAL_MARGIN, margin.coerceIn(0f, 160f))
+
+    fun getLyricsSidebarHorizontalMargin(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_HORIZONTAL_MARGIN, 0.0f).coerceIn(0f, 48f)
+    fun setLyricsSidebarHorizontalMargin(margin: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_HORIZONTAL_MARGIN, margin.coerceIn(0f, 48f))
+
+    fun getLyricsVerticalOffset(): Float = Prefs.getFloat(KEY_LYRICS_VERTICAL_OFFSET, 0.38f).coerceIn(0.20f, 0.60f)
+    fun setLyricsVerticalOffset(offset: Float) = Prefs.putFloat(KEY_LYRICS_VERTICAL_OFFSET, offset.coerceIn(0.20f, 0.60f))
+
+    fun getLyricsFullScreenVerticalOffset(): Float = Prefs.getFloat(KEY_LYRICS_FULLSCREEN_VERTICAL_OFFSET, 0.38f).coerceIn(0.20f, 0.60f)
+    fun setLyricsFullScreenVerticalOffset(offset: Float) = Prefs.putFloat(KEY_LYRICS_FULLSCREEN_VERTICAL_OFFSET, offset.coerceIn(0.20f, 0.60f))
+
+    fun getLyricsSidebarVerticalOffset(): Float = Prefs.getFloat(KEY_LYRICS_SIDEBAR_VERTICAL_OFFSET, 0.38f).coerceIn(0.20f, 0.60f)
+    fun setLyricsSidebarVerticalOffset(offset: Float) = Prefs.putFloat(KEY_LYRICS_SIDEBAR_VERTICAL_OFFSET, offset.coerceIn(0.20f, 0.60f))
 
 
     fun getLyricsWordSyncEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_WORD_SYNC, true)
