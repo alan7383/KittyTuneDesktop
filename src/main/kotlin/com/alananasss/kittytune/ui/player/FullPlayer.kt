@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.player
 
+import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -42,7 +43,9 @@ import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Lyrics
+import com.alananasss.kittytune.ui.player.lyrics.SearchLyricsDialog
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -152,11 +155,24 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
         )
     }
 
+    if (viewModel.isSearchingLyrics) {
+        SearchLyricsDialog(
+            viewModel = viewModel,
+            onDismiss = { viewModel.isSearchingLyrics = false },
+        )
+    }
+
     // Escape and the mouse's back button leave, through the app's own back stack so this takes precedence
     // over whatever registered before it and gives way to a dialog opened on top. A full-window view whose
     // only exit is a dim glyph in a corner is a trap, and being trapped in a view is the complaint that
     // produced the search-field fix a few commits ago (issue #33).
-    com.alananasss.kittytune.core.BackHandler(onBack = onExitFullScreen)
+    com.alananasss.kittytune.core.BackHandler(onBack = {
+        if (viewModel.isSearchingLyrics) {
+            viewModel.isSearchingLyrics = false
+        } else {
+            onExitFullScreen()
+        }
+    })
 
     // And the window itself goes full screen, rather than this covering it. Tied to being composed rather
     // than to the flag, so every way out of here — the button, Escape, the mouse, or the track ending and
@@ -319,7 +335,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                             Modifier
                                 .requiredWidth(fullLyricsWidth)
                                 .fillMaxHeight()
-                                .padding(vertical = 24.dp)
+                                .padding(start = 16.dp, end = 40.dp, top = 24.dp, bottom = 24.dp)
                         ) {
                             LyricsOnCoverColour(viewModel, palette)
                         }
@@ -336,6 +352,12 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            QuietButton(
+                icon = Icons.Rounded.Search,
+                label = str("lyrics_manual_search"),
+                tint = if (viewModel.isSearchingLyrics) palette.bright else palette.dim,
+                onClick = { viewModel.isSearchingLyrics = true },
+            )
             QuietButton(
                 icon = Icons.Rounded.Tune,
                 label = str("pref_lyrics_title"),
@@ -743,7 +765,9 @@ private fun CoverColumn(
         // The cap rises as the words leave, and incorporates user cover zoom factor
         val coverScale = viewModel.fullPlayerCoverScale
         val cap = (COVER_MAX + (COVER_MAX_ALONE - COVER_MAX) * roomToItself) * coverScale
-        val side = min(min(maxWidth, maxHeight * 0.56f), cap)
+        val maxCoverHeight = maxOf(maxHeight - 210.dp, maxHeight * 0.54f)
+        val side = min(min(maxWidth, maxCoverHeight), cap)
+        val controlsWidth = maxOf(side, min(maxWidth, 400.dp))
 
         val lyricsUnderCoverPlacement = remember { viewModel.playerPrefs.getLyricsUnderCoverPlacement() }
         val showUnderCover = viewModel.isLyricsUnderCoverActive && (!showText || !viewModel.hasLyrics)
@@ -778,7 +802,7 @@ private fun CoverColumn(
 
             if (showUnderCover && lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST) {
                 Spacer(Modifier.height(10.dp))
-                Box(Modifier.width(side)) {
+                Box(Modifier.width(controlsWidth)) {
                     PlayerInlineLyrics(
                         viewModel = viewModel,
                         textColor = palette.bright,
@@ -789,7 +813,7 @@ private fun CoverColumn(
             }
 
             Spacer(Modifier.height(18.dp))
-            Box(Modifier.width(side)) {
+            Box(Modifier.width(controlsWidth)) {
                 AnimatedContent(
                     targetState = showUnderCover && lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST,
                     transitionSpec = {
@@ -811,7 +835,7 @@ private fun CoverColumn(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Box(Modifier.width(side)) {
+            Box(Modifier.width(controlsWidth)) {
                 FullPlayerControls(
                     viewModel = viewModel,
                     palette = palette,
@@ -826,14 +850,14 @@ private fun CoverColumn(
 /**
  * Wide enough to be the subject on a laptop, small enough that a 4K window does not turn it into a poster.
  */
-private val COVER_MAX = 420.dp
+private val COVER_MAX = 480.dp
 
 /**
  * And what it may reach once it is the only thing on screen.
  *
  * Not the whole window: a sleeve at 640 dp on a 4K display is a poster, and the screen is still a player.
  */
-private val COVER_MAX_ALONE = 560.dp
+private val COVER_MAX_ALONE = 620.dp
 
 /**
  * What is playing, and the two things you do to it from here (issue #33).
@@ -868,7 +892,7 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
                 // Artist and album on one line, separated by an em dash, which is how the reference reads and
                 // is one line instead of two for something nobody needs two lines of.
                 text = listOfNotNull(
-                    track.user?.username?.takeIf { it.isNotBlank() },
+                    track.displayArtist.takeIf { it.isNotBlank() } ?: track.user?.username?.takeIf { it.isNotBlank() },
                     track.publisherMetadata?.albumTitle?.takeIf { it.isNotBlank() },
                 ).joinToString(" — "),
                 style = MaterialTheme.typography.bodyMedium,
@@ -984,7 +1008,6 @@ private fun FullPlayerVolumeBar(
     palette: FullPlayerPalette,
 ) {
     val vol = viewModel.volume.coerceIn(0f, 1f)
-    val volPercent = (vol * 100).toInt()
 
     Row(
         modifier = Modifier
@@ -1023,6 +1046,7 @@ private fun FullPlayerVolumeBar(
         var scrubVolFraction by remember { mutableFloatStateOf(vol) }
 
         val activeFraction = if (scrubbingVolume) scrubVolFraction else vol
+        val volPercent = (activeFraction * 100).roundToInt()
 
         Box(
             modifier = Modifier
