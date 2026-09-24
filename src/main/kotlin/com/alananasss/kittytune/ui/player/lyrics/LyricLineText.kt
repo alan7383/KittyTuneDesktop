@@ -82,11 +82,13 @@ internal object LyricLineStyling {
      * @param focusBlur how much to blur the rest under [LyricsDisplayStyle.FOCUS]. A parameter because it
      *   is the one part of the treatment that cannot be shared blindly: the radius that reads as soft focus
      *   behind a 42 sp headline erases a 16 sp line in a panel.
+     * @param blurEnabled whether to apply blur effect for FOCUS/SCALE_FOCUS styles (when false, blur is 0).
      */
     fun treatmentFor(
         style: LyricsDisplayStyle,
         distance: Int,
         focusBlur: Dp = 2.dp,
+        blurEnabled: Boolean = true,
     ): LyricLineTreatment {
         val isActive = distance == 0
         val hasScale = style == LyricsDisplayStyle.SCALE || style == LyricsDisplayStyle.SCALE_FOCUS
@@ -105,7 +107,7 @@ internal object LyricLineStyling {
             distance < 0 -> PAST_ALPHA
             else -> UPCOMING_ALPHA
         }
-        val blur = if (!isActive && hasFocus) focusBlur else 0.dp
+        val blur = if (!isActive && hasFocus && blurEnabled) focusBlur else 0.dp
         return LyricLineTreatment(scale = scale, alpha = alpha, blur = blur)
     }
 }

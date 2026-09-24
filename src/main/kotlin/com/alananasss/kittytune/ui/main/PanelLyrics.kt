@@ -16,7 +16,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
@@ -79,18 +83,21 @@ fun PanelLyrics(
     style: PanelLyricsStyle = PanelLyricsStyle.Panel,
 ) {
     val lines = vm.lyricsLines
-    val effectiveFontSize = if (style.isFullScreen) vm.lyricsFullScreenFontSize else vm.lyricsFontSize
+    val effectiveFontSize = if (style.isFullScreen) vm.lyricsFullScreenFontSize else vm.lyricsSidebarFontSize
     val textColor = MaterialTheme.colorScheme.onSurface
     when {
         lines.isNotEmpty() -> {
-            when (vm.lyricsUiStyle) {
+            val effectiveUiStyle = if (style.isFullScreen) vm.lyricsFullScreenUiStyle else vm.lyricsSidebarUiStyle
+            when (effectiveUiStyle) {
                 com.alananasss.kittytune.data.local.LyricsUiStyle.ENHANCED -> {
                     com.alananasss.kittytune.ui.player.lyrics.LyricsEnhanced(
                         viewModel = vm,
                         modifier = modifier,
                         textColorOverride = textColor,
                         fontSizeOverride = effectiveFontSize,
-                        isFullScreen = style.isFullScreen
+                        lineSpacingOverride = if (style.lineSpacing > 0.dp) style.lineSpacing else null,
+                        isFullScreen = style.isFullScreen,
+                        isSidebar = !style.isFullScreen
                     )
                 }
                 com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC -> {
@@ -99,12 +106,41 @@ fun PanelLyrics(
             }
         }
         !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier, style)
-        else -> Box(modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+        else -> Column(
+            modifier = modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        ) {
             Text(
                 text = str("lyrics_no_data"),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (style.isFullScreen) {
+                Spacer(Modifier.height(16.dp))
+                androidx.compose.material3.Button(
+                    onClick = { vm.isSearchingLyrics = true },
+                    shapes = androidx.compose.material3.ButtonDefaults.shapes(),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+                        contentColor = MaterialTheme.colorScheme.onSurface
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Rounded.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = str("lyrics_manual_search"),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
         }
     }
 }
@@ -228,6 +264,7 @@ private fun PanelLyricLine(
         // Softer than the full screen's: this text is a third of the size, and the radius that reads as
         // depth behind a headline turns a panel line into a smudge.
         focusBlur = if (style.isFullScreen) 3.dp else 1.dp,
+        blurEnabled = if (style.isFullScreen) vm.lyricsFullScreenLineBlurEnabled else vm.lyricsSidebarLineBlurEnabled,
     )
 
     val scale by animateFloatAsState(treatment.scale, tween(260), label = "panelLyricScale")
@@ -240,7 +277,12 @@ private fun PanelLyricLine(
     // heavy block with a heavier bit in it (issue #33).
     val isCompact = style.anchorFraction == 0.50f && !style.isFullScreen
     val lyricsFontFamily = com.alananasss.kittytune.ui.theme.rememberLyricsFontFamily(vm.lyricsFont)
-    val base = (if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium).copy(fontFamily = lyricsFontFamily)
+    val panelSize = (if (style.isFullScreen) vm.lyricsFullScreenFontSize else vm.lyricsSidebarFontSize).sp
+    val base = (if (isCompact) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.titleMedium).copy(
+        fontFamily = lyricsFontFamily,
+        fontSize = panelSize,
+        lineHeight = panelSize * 1.35f,
+    )
     val activeStyle = base.copy(fontWeight = FontWeight.ExtraBold, lineHeight = base.fontSize * 1.35f)
     val inactiveStyle = base.copy(fontWeight = FontWeight.Bold, lineHeight = base.fontSize * 1.35f)
 
@@ -254,7 +296,7 @@ private fun PanelLyricLine(
         else -> Alignment.Start
     }
 
-    val isDuetActive = vm.isDuetViewEnabled
+    val isDuetActive = vm.isDuetActiveForTrack(vm.currentTrack)
     val lineSinger = if (isDuetActive) {
         line.singer?.takeIf { it != LyricSinger.DEFAULT }
             ?: when (line.agent?.trim()?.lowercase()) {
@@ -397,6 +439,14 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
         lastManualScrollMs = { lastUserScrollMs },
     )
 
+    val lyricsFontFamily = com.alananasss.kittytune.ui.theme.rememberLyricsFontFamily(vm.lyricsFont)
+    val panelSize = (if (style.isFullScreen) vm.lyricsFullScreenFontSize else vm.lyricsSidebarFontSize).sp
+    val plainStyle = MaterialTheme.typography.titleMedium.copy(
+        fontFamily = lyricsFontFamily,
+        fontSize = panelSize,
+        lineHeight = panelSize * 1.35f,
+    )
+
     BoxWithConstraints(modifier) {
         val viewportHeight = if (maxHeight.isSpecified && maxHeight.value.isFinite()) maxHeight else 320.dp
 
@@ -418,20 +468,12 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
             ),
         ) {
             items(lines) { line ->
-                // The same type and the same alignment a sung line gets, because "les lyrics qui sont juste en
-                // texte tout seul, c'est vraiment moche" was about exactly this: untimed words were set in
-                // `bodyMedium` and left-aligned whatever the reader had chosen, so a song without timings looked
-                // like a different app from the same song with them. There is no current line to light up — that
-                // is what untimed means — but everything else about how they are set can match (issue #33).
-                //
-                // A blank line in the source stays a blank line: the verse breaks are most of what makes a sheet
-                // readable, and they were the one thing the old version did keep.
                 if (line.isBlank()) {
                     Spacer(Modifier.height(style.lineSpacing * 2))
                 } else {
                     Text(
                         text = line,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = plainStyle,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = alignmentOf(vm, style),
@@ -448,7 +490,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
 /** The reader's chosen alignment, in the one place both halves of this file read it from. */
 @Composable
 private fun alignmentOf(vm: PlayerViewModel, style: PanelLyricsStyle): TextAlign {
-    val align = if (style.isFullScreen) vm.lyricsFullScreenAlignment else vm.lyricsAlignment
+    val align = if (style.isFullScreen) vm.lyricsFullScreenAlignment else vm.lyricsSidebarAlignment
     return when (align) {
         com.alananasss.kittytune.data.local.LyricsAlignment.LEFT -> TextAlign.Start
         com.alananasss.kittytune.data.local.LyricsAlignment.CENTER -> TextAlign.Center

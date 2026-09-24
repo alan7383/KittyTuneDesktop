@@ -13,6 +13,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 
+import androidx.compose.foundation.layout.Box
+
 @Composable
 fun SyncedLineText(
     line: SyncedLine,
@@ -22,8 +24,11 @@ fun SyncedLineText(
     textStyle: TextStyle,
     textColor: Color,
     modifier: Modifier = Modifier,
-    showTranslation: Boolean = true
+    showTranslation: Boolean = true,
+    activeScale: Float = 1.0f
 ) {
+    val scaleFactor = activeScale.coerceAtLeast(1.0f)
+    val widthFraction = (1f / scaleFactor).coerceIn(0.5f, 1f)
     val hAlign = when {
         isRightAligned -> Alignment.End
         isCenterAligned -> Alignment.CenterHorizontally
@@ -36,25 +41,40 @@ fun SyncedLineText(
         isLineRtl -> TextAlign.End
         else -> TextAlign.Start
     }
+    val boxAlignment = when {
+        isRightAligned || isLineRtl -> Alignment.CenterEnd
+        isCenterAligned -> Alignment.Center
+        else -> Alignment.CenterStart
+    }
     Column(
-        modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp, horizontal = 16.dp),
         horizontalAlignment = hAlign
     ) {
-        Text(
-            text = line.content,
-            style = textStyle,
-            color = textColor,
-            textAlign = tAlign
-        )
+        Box(
+            modifier = Modifier.fillMaxWidth(widthFraction),
+            contentAlignment = boxAlignment
+        ) {
+            Text(
+                text = line.content,
+                style = textStyle,
+                color = textColor,
+                textAlign = tAlign
+            )
+        }
         if (showTranslation) {
             line.translation?.let {
-                Text(
-                    text = it,
-                    color = textColor.copy(alpha = 0.6f),
-                    textAlign = tAlign
-                )
+                Box(
+                    modifier = Modifier.fillMaxWidth(widthFraction),
+                    contentAlignment = boxAlignment
+                ) {
+                    Text(
+                        text = it,
+                        color = textColor.copy(alpha = 0.6f),
+                        textAlign = tAlign
+                    )
+                }
             }
         }
     }
