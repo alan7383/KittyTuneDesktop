@@ -357,7 +357,7 @@ object DownloadManager {
                 val localTrack = LocalTrack(
                     id = track.id,
                     title = track.title ?: str("untitled_track"),
-                    artist = track.user?.username ?: str("unknown_artist"),
+                    artist = track.displayArtist.ifBlank { track.user?.username ?: str("unknown_artist") },
                     artworkUrl = track.fullResArtwork,
                     duration = track.durationMs ?: 0L,
                     localAudioPath = "",
@@ -554,7 +554,7 @@ object DownloadManager {
                     val localTrack = LocalTrack(
                         id = track.id,
                         title = track.title ?: str("untitled_track"),
-                        artist = track.user?.username ?: str("unknown_artist"),
+                        artist = track.displayArtist.ifBlank { track.user?.username ?: str("unknown_artist") },
                         artworkUrl = track.fullResArtwork,
                         duration = track.durationMs ?: 0L,
                         localAudioPath = "",
@@ -957,7 +957,7 @@ object DownloadManager {
                         val id3v2Tag = if (mp3file.hasId3v2Tag()) mp3file.id3v2Tag else ID3v24Tag()
                         mp3file.id3v2Tag = id3v2Tag
                         id3v2Tag.title = track.title ?: str("untitled_track")
-                        id3v2Tag.artist = track.user?.username ?: str("unknown_artist")
+                        id3v2Tag.artist = track.displayArtist.ifBlank { track.user?.username ?: str("unknown_artist") }
                         id3v2Tag.album = subFolderName ?: str("app_name")
                         id3v2Tag.comment = str("download_comment")
                         val imageBytes = tempImageFile.readBytes()
@@ -970,7 +970,7 @@ object DownloadManager {
                     tempAudioFile.copyTo(taggedAudioFile, overwrite = true)
                 }
 
-                val cleanArtist = sanitizeFilename(track.user?.username ?: str("generic_artist"))
+                val cleanArtist = sanitizeFilename(track.displayArtist.ifBlank { track.user?.username ?: str("generic_artist") })
                 val cleanTitle = sanitizeFilename(track.title ?: str("generic_title"))
                 val finalFileName = "$cleanArtist - $cleanTitle.$ext"
 
@@ -985,7 +985,7 @@ object DownloadManager {
                 val localTrack = LocalTrack(
                     id = track.id,
                     title = track.title ?: str("untitled_track"),
-                    artist = track.user?.username ?: str("unknown_artist"),
+                    artist = track.displayArtist.ifBlank { track.user?.username ?: str("unknown_artist") },
                     artworkUrl = track.fullResArtwork,
                     duration = track.durationMs ?: 0L,
                     localAudioPath = audioPath,
@@ -1112,7 +1112,7 @@ object DownloadManager {
                     val localTrack = LocalTrack(
                         id = track.id,
                         title = track.title ?: str("untitled_track"),
-                        artist = track.user?.username ?: str("unknown_artist"),
+                        artist = track.displayArtist.ifBlank { track.user?.username ?: str("unknown_artist") },
                         artworkUrl = track.fullResArtwork,
                         duration = track.durationMs ?: 0L,
                         localAudioPath = "",

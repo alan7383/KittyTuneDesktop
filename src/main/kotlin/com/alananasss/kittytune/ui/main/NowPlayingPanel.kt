@@ -454,7 +454,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
                     ArtistLinkText(
                         track = track,
                         onArtistClick = { vm.navigateToTrackArtist(it) },
-                        text = track.user?.username ?: "",
+                        text = track.displayArtist.ifBlank { track.user?.username ?: "" },
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f, fill = false)
                     )
@@ -525,6 +525,7 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
         com.alananasss.kittytune.ui.player.lyrics.QuickLyricsSettingsDialog(
             viewModel = vm,
             isFullScreen = false,
+            isSidebar = true,
             onDismiss = { showQuickSettings = false },
         )
     }

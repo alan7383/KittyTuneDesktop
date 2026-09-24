@@ -208,7 +208,7 @@ class KdeMpris2Service(
         val track = currentTrack
         if (track != null) {
             meta["xesam:title"] = Variant(track.title ?: "Unknown Title", "s")
-            val artist = track.publisherMetadata?.artist ?: track.user?.username ?: "Unknown Artist"
+            val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { "Unknown Artist" }
             meta["xesam:artist"] = Variant(arrayOf(artist), "as")
             val album = track.publisherMetadata?.albumTitle ?: track.publisherMetadata?.releaseTitle
             if (!album.isNullOrBlank()) meta["xesam:album"] = Variant(album, "s")

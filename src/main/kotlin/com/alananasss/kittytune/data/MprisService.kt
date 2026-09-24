@@ -122,7 +122,7 @@ class MprisService(
         val track = currentTrack
         if (track != null) {
             metadata["xesam:title"] = Variant(track.title ?: "Unknown Title", "s")
-            val artist = track.publisherMetadata?.artist ?: track.user?.username ?: "Unknown Artist"
+            val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { "Unknown Artist" }
             metadata["xesam:artist"] = Variant(arrayOf(artist), "as")
             val album = track.publisherMetadata?.albumTitle ?: track.publisherMetadata?.releaseTitle
             if (!album.isNullOrBlank()) {
