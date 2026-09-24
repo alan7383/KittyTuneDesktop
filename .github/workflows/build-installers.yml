@@ -13,14 +13,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '21'
-          cache: 'gradle'
 
       - name: Grant execute permission for gradlew
         run: git update-index --chmod=+x gradlew
@@ -44,7 +43,7 @@ jobs:
         shell: powershell
 
       - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-Windows
           path: dist-win/*
@@ -55,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -80,18 +79,18 @@ jobs:
           cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-${{ steps.get_version.outputs.VERSION }}.dmg
 
       - name: Upload macOS Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-macOS
           path: dist-mac/*
 
   build-linux-x64:
     name: Build Linux x64 Packages (.deb, .rpm, .pkg.tar.zst, .AppImage)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install packaging tools (rpm, fakeroot, zstd)
         run: |
@@ -174,7 +173,7 @@ jobs:
           cp kitty-tune-*-x86_64.pkg.tar.zst dist-linux-x64/ 2>/dev/null || true
 
       - name: Upload Linux x64 Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-Linux-x64
           path: dist-linux-x64/*
@@ -185,7 +184,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install packaging tools (rpm, fakeroot, zstd)
         run: |
@@ -267,7 +266,7 @@ jobs:
           cp kitty-tune-*-aarch64.pkg.tar.zst dist-linux-arm64/ 2>/dev/null || true
 
       - name: Upload Linux ARM64 Packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: KittyTune-Linux-arm64
           path: dist-linux-arm64/*
@@ -275,36 +274,36 @@ jobs:
   release:
     name: Publish Universal GitHub Release
     needs: [build-windows, build-macos, build-linux-x64, build-linux-arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Download Windows Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: KittyTune-Windows
           path: ./release-files
 
       - name: Download macOS Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: KittyTune-macOS
           path: ./release-files
 
       - name: Download Linux x64 Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: KittyTune-Linux-x64
           path: ./release-files
 
       - name: Download Linux ARM64 Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: KittyTune-Linux-arm64
           path: ./release-files
