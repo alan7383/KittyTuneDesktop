@@ -970,6 +970,9 @@
     <string name="menu_make_public">Rendre publique</string>
     <string name="menu_move_to_folder">Déplacer vers le dossier</string>
     <string name="menu_move_to_library">Déplacer vers la bibliothèque</string>
+    <string name="menu_like_all_songs">Liker tous les titres</string>
+    <string name="toast_like_all_done">%1$d titres likés</string>
+    <string name="toast_like_all_nothing">Aucun nouveau titre à liker</string>
     <string name="menu_pin_folder">Épingler le dossier</string>
     <string name="menu_pin_playlist">Épingler la playlist</string>
     <string name="menu_play_next">Lire juste après</string>
@@ -991,6 +994,30 @@
     <string name="mini_player_title">Mini-lecteur</string>
     <string name="mini_player_no_track">Aucun titre en lecture</string>
     <string name="mini_player_instrumental">Instrumental</string>
+    <string name="mini_player_pin">Toujours visible</string>
+    <string name="mini_player_unpin">Ne plus épingler</string>
+    <string name="pref_mini_player_settings">Paramètres du mini-lecteur</string>
+    <string name="pref_mini_player_settings_desc">Personnaliser les contrôles, l\'affichage et l\'interaction au survol</string>
+    <string name="mini_player_settings_title">Paramètres du mini-lecteur</string>
+    <string name="mini_player_show_cover">Afficher la pochette d\'album</string>
+    <string name="mini_player_show_cover_desc">Afficher la miniature de la pochette dans le mini-lecteur</string>
+    <string name="mini_player_show_playback_controls">Afficher les boutons de lecture</string>
+    <string name="mini_player_show_playback_controls_desc">Afficher les boutons précédent, lecture/pause et suivant</string>
+    <string name="mini_player_show_additional_controls">Afficher les contrôles supplémentaires</string>
+    <string name="mini_player_show_additional_controls_desc">Afficher le bouton favori et les contrôles additionnels</string>
+    <string name="mini_player_controls_on_hover">Afficher les contrôles uniquement au survol</string>
+    <string name="mini_player_controls_on_hover_desc">Masquer les contrôles jusqu\'à ce que la souris survole le mini-lecteur</string>
+    <string name="mini_player_hover_effect">Ajuster l\'affichage au survol de la souris</string>
+    <string name="mini_player_hover_effect_desc">Légère translucidité au repos, opacité complète au survol</string>
+    <string name="mini_player_show_progress">Afficher la barre de progression</string>
+    <string name="mini_player_show_progress_desc">Afficher une fine barre de progression en bas du mini-lecteur</string>
+    <string name="mini_player_style">Style du mini-lecteur</string>
+    <string name="mini_player_style_desc">Choisir entre la carte standard ou la barre allongée compacte</string>
+    <string name="mini_player_style_standard">Carte standard</string>
+    <string name="mini_player_style_elongated">Barre allongée transparente</string>
+    <string name="mini_player_style_elongated_desc">Lecteur minimaliste sur une ligne avec fond transparent pour la barre des tâches ou panneaux</string>
+    <string name="mini_player_transparent_bg">Arrière-plan transparent</string>
+    <string name="mini_player_transparent_bg_desc">Rendre l\'arrière-plan du mini-lecteur entièrement transparent</string>
     <string name="menu_shuffle">Mélanger</string>
     <string name="menu_track_radio">Lancer la Radio</string>
     <string name="menu_unpin_folder">Désépingler le dossier</string>
@@ -1174,6 +1201,8 @@
     <string name="pref_local_subtitle">Gérer la musique sur l\'appareil</string>
     <string name="pref_local_title">Fichiers Locaux</string>
     <string name="pref_lyrics_align">Alignement</string>
+    <string name="pref_lyrics_align_central">Alignement (mode central)</string>
+    <string name="pref_lyrics_sidebar_align">Alignement (panneau latéral)</string>
     <string name="pref_lyrics_fullscreen_align">Alignement (plein écran)</string>
     <string name="pref_lyrics_apple_effect">Effet de remplissage fluide</string>
     <string name="pref_lyrics_apple_effect_sub">Remplit les lettres de façon fluide au lieu de sauter d\'un mot à l\'autre.</string>
@@ -1203,7 +1232,9 @@
     <string name="pref_lyrics_show_button">Afficher le bouton paroles</string>
     <string name="pref_lyrics_show_button_sub">Affiche un bouton d\'accès rapide sur le lecteur</string>
     <string name="pref_lyrics_size">Taille</string>
+    <string name="pref_lyrics_size_central">Taille (mode central)</string>
     <string name="pref_lyrics_fullscreen_size">Taille (plein écran)</string>
+    <string name="pref_lyrics_size_sidebar">Taille (panneau latéral)</string>
     <string name="pref_lyrics_subtitle">Affichage et source</string>
     <string name="pref_lyrics_title">Paroles</string>
     <string name="pref_lyrics_translation_lang">Langue de traduction</string>
@@ -1213,6 +1244,8 @@
     <string name="pref_lyrics_word_sync_sub">Surligne les paroles mot par mot quand c\'est disponible.</string>
     <string name="pref_lyrics_duet_title">Mode Duo</string>
     <string name="pref_lyrics_duet_desc">Aligner les paroles selon le chanteur (à gauche pour chanteur 1, à droite pour chanteur 2)</string>
+    <string name="menu_disable_duet_lyrics">Désactiver le mode duo</string>
+    <string name="menu_enable_duet_lyrics">Activer le mode duo</string>
     <string name="pref_theme_track_dynamic">Thème dynamique par morceau</string>
     <string name="pref_theme_track_dynamic_sub">Colorer l\'application d\'après la pochette du morceau en cours</string>
     <string name="pref_animated_covers">Pochettes d\'albums animées</string>
@@ -2216,6 +2249,9 @@
     <!-- Lyrics UI and Animation Settings -->
     <string name="pref_lyrics_ui_style">Style des paroles</string>
     <string name="pref_lyrics_ui_style_title">Style d\'affichage des paroles</string>
+    <string name="pref_lyrics_ui_style_sidebar">Style des paroles (Panneau latéral)</string>
+    <string name="pref_lyrics_ui_style_central">Style des paroles (Mode central)</string>
+    <string name="pref_lyrics_ui_style_fullscreen">Style des paroles (Plein écran)</string>
     <string name="pref_lyrics_ui_style_enhanced">Apple Music</string>
     <string name="pref_lyrics_ui_style_classic">Classique</string>
     <string name="pref_lyrics_font_title">Police des paroles</string>
@@ -2226,13 +2262,26 @@
     <string name="pref_lyrics_font_app_default_short">Défaut</string>
     <string name="pref_lyrics_effects_category">Effets visuels et animations</string>
     <string name="pref_lyrics_line_blur_title">Lignes inactives floutées</string>
+    <string name="pref_lyrics_central_line_blur_title">Lignes inactives floutées (Mode central)</string>
+    <string name="pref_lyrics_sidebar_line_blur_title">Lignes inactives floutées (Panneau latéral)</string>
+    <string name="pref_lyrics_fullscreen_line_blur_title">Lignes inactives floutées (Plein écran)</string>
     <string name="pref_lyrics_line_blur_desc">Floute progressivement les paroles selon la distance avec la ligne chantée</string>
+
     <string name="pref_lyrics_lrc_bounce_title">Effet de rebond des lignes</string>
     <string name="pref_lyrics_lrc_bounce_desc">Active un rebond dynamique lors du changement de ligne synchronisée</string>
     <string name="pref_lyrics_bounce_factor_title">Amplitude du rebond</string>
     <string name="pref_lyrics_glow_factor_title">Intensité de la lueur</string>
     <string name="pref_lyrics_fill_transition_title">Douceur du dégradé liquide</string>
     <string name="pref_lyrics_line_spacing_title">Espacement des lignes</string>
+    <string name="pref_lyrics_fullscreen_line_spacing_title">Espacement des lignes (Plein écran)</string>
+    <string name="pref_lyrics_active_scale_title">Échelle du texte de la ligne active</string>
+    <string name="pref_lyrics_active_scale_desc">Agrandit la ligne en cours de chant pour l\'effet Apple Music</string>
+    <string name="pref_lyrics_horizontal_margin_title">Marges horizontales</string>
+    <string name="pref_lyrics_fullscreen_horizontal_margin_title">Marges horizontales (Plein écran)</string>
+    <string name="pref_lyrics_vertical_offset_title">Position verticale</string>
+    <string name="pref_lyrics_fullscreen_vertical_offset_title">Position verticale (Plein écran)</string>
+    <string name="pref_lyrics_reset_typography">Rétablir les tailles par défaut</string>
+    <string name="pref_lyrics_reset_typography_desc">Rétablir la taille de police, l\'espacement, le zoom, les marges et la position par défaut</string>
     <string name="lyrics_resume_autoscroll">Reprendre</string>
 
     <!-- Sources audio & Intégrations -->
@@ -2332,6 +2381,12 @@
     <string name="automix_overlap_4bars">4 mesures</string>
     <string name="automix_overlap_8bars">8 mesures</string>
     <string name="automix_overlap_custom">Durée personnalisée</string>
+    <string name="automix_start_offset">Décalage de début</string>
+    <string name="automix_start_offset_desc">Choisir où commence la lecture du morceau suivant pendant la transition</string>
+    <string name="automix_start_offset_auto">Automatique (saut d\'intro intelligent)</string>
+    <string name="automix_start_offset_beginning">Début du morceau (0:00)</string>
+    <string name="automix_start_offset_custom">Décalage personnalisé</string>
+    <string name="automix_start_offset_custom_value">Décalage : %d secondes</string>
     <string name="automixing">Automix en cours</string>
     <string name="automix_mix_in">MIX DANS %1$d</string>
     <string name="automix_mix_into">Mix vers %1$s</string>
