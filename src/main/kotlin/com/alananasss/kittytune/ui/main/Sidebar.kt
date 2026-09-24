@@ -2008,6 +2008,8 @@ private fun SidebarNavItem(
     val color = if (selected) MaterialTheme.colorScheme.onSurface
     else MaterialTheme.colorScheme.onSurfaceVariant
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
     // Present in every state so the tree does not change shape part-way through the animation, but only
     // able to open once the label it would be repeating has actually gone.
     Tip(label, enabled = collapse >= 1f) {
@@ -2015,7 +2017,10 @@ private fun SidebarNavItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onClick)
+                .clickable {
+                    focusManager.clearFocus()
+                    onClick()
+                }
                 .padding(start = SidebarMorph.ICON_INSET, end = 8.dp)
                 .padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
