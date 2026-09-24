@@ -60,7 +60,9 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.Radio
+import androidx.compose.material.icons.rounded.RecordVoiceOver
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Verified
@@ -479,6 +481,17 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_details")) { viewModel.openTrackDetails(track) })
             }
             add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track, forceSheet = true) })
+            val isDuetBlacklisted = viewModel.isTrackDuetBlacklisted(track.id)
+            add(
+                MenuOptionItem(
+                    id = "duet_lyrics_blacklist",
+                    icon = if (isDuetBlacklisted) Icons.Rounded.MicOff else Icons.Rounded.RecordVoiceOver,
+                    text = if (isDuetBlacklisted) str("menu_enable_duet_lyrics") else str("menu_disable_duet_lyrics"),
+                    tint = activeColor.takeIf { isDuetBlacklisted },
+                ) {
+                    viewModel.toggleTrackDuetBlacklist(track.id)
+                }
+            )
             add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
 
             // Catalog tracks carry their album id: jump straight to it.
