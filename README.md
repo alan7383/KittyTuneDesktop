@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <code>(ฅ^•⩊•^ฅ) ♪♫ continuous soundcloud vibes for your desktop ♫♪</code><br><br>
+  <img src="scratch/banner_real_kittytune_font.png" alt="KittyTune Desktop Banner"><br><br>
   <strong>A full desktop port of KittyTune Android for Linux, Windows, and macOS.</strong><br>
   SoundCloud-first music streaming with full account & likes sync, YouTube fallback, zero ads, sync lyrics, crossfade, MPRIS, Discord RPC & end4 dotfiles integration.
 </p>
