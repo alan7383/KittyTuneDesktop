@@ -2469,4 +2469,21 @@
     <string name="lyrics_mode_sidebar_sub">Lyrics in the now-playing panel</string>
     <string name="lyrics_content_title">Content</string>
     <string name="settings_cat_sync">Devices</string>
+    <string name="listening_stats_period_week_short">Week</string>
+    <string name="listening_stats_period_month_short">Month</string>
+    <string name="listening_stats_period_year_short">Year</string>
+    <string name="listening_stats_change_week">%1$s on last week</string>
+    <string name="listening_stats_change_month">%1$s on last month</string>
+    <string name="listening_stats_change_year">%1$s on last year</string>
+    <string name="listening_stats_activity">Activity</string>
+    <string name="listening_stats_activity_hint">Point at a bar to see the day</string>
+    <string name="listening_stats_hours">Time of day</string>
+    <string name="listening_stats_peak_hour">Most often around %1$s</string>
+    <string name="listening_stats_show_all">Show all</string>
+    <string name="listening_stats_skips_of">Skipped: %1$d</string>
+    <string name="listening_stats_avg_play">Per listen</string>
+    <string name="listening_stats_avg_play_desc">How long a track plays on average</string>
+    <string name="listening_stats_streak">Days in a row</string>
+    <string name="listening_stats_active_days">Days with music: %1$d</string>
+    <string name="listening_stats_since">%1$s – today</string>
 </resources>

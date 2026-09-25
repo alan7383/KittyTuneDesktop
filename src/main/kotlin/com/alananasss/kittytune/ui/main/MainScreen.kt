@@ -630,15 +630,10 @@ fun MainScreen(
                         composable("listening_stats") {
                             com.alananasss.kittytune.ui.profile.ListeningStatsScreen(
                                 onBackClick = { navController.popBackStack() },
-                                onTrackClick = { top -> playerViewModel.navigateToTrackDetails(top.trackId) },
-                                onArtistClick = { top ->
-                                    // The stats table keeps the name always and the id only
-                                    // sometimes, so resolving by name is the path that always works.
-                                    playerViewModel.resolveAndNavigateToArtist(
-                                        top.artistName,
-                                        top.artistId,
-                                    )
-                                },
+                                onTrackClick = { trackId -> playerViewModel.navigateToTrackDetails(trackId) },
+                                // The stats keep the name always and the id only sometimes, so the name is
+                                // what resolving goes by.
+                                onArtistClick = { name, id -> playerViewModel.resolveAndNavigateToArtist(name, id) },
                             )
                         }
                         composable("sync_settings") {

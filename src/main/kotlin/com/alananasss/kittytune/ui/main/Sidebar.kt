@@ -374,57 +374,63 @@ private fun ProfileMenu(
     navController: NavController,
     onAbout: () -> Unit,
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
         val isGuest = playerViewModel.currentUserId == 0L
-        DropdownMenuItem(
-            text = { Text(if (isGuest) str("profile_menu_login") else str("profile_menu_logout")) },
-            onClick = {
-                onDismiss()
-                com.alananasss.kittytune.data.TokenManager.logout()
-            },
-        )
-        androidx.compose.material3.HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(str("nav_about_support")) },
-            onClick = {
-                onDismiss()
-                onAbout()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("about_credits")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.isPlayerExpanded = false
-                playerViewModel.showLyricsSheet = false
-                navController.navigate("credits")
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("profile_menu_settings")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.showLyricsSheet = false
-                navController.navigate("settings")
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("nav_upload")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.showLyricsSheet = false
-                navController.navigate("upload")
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("nav_profile")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.showLyricsSheet = false
-                playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
-            },
-        )
+        ProfileMenuItem(
+            label = if (isGuest) str("profile_menu_login") else str("profile_menu_logout"),
+            icon = if (isGuest) Icons.AutoMirrored.Rounded.Login else Icons.AutoMirrored.Rounded.Logout,
+            tint = if (isGuest) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        ) {
+            onDismiss()
+            com.alananasss.kittytune.data.TokenManager.logout()
+        }
+        androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 4.dp))
+        ProfileMenuItem(str("nav_about_support"), Icons.Rounded.Info) {
+            onDismiss()
+            onAbout()
+        }
+        ProfileMenuItem(str("about_credits"), Icons.Rounded.Groups) {
+            onDismiss()
+            playerViewModel.isPlayerExpanded = false
+            playerViewModel.showLyricsSheet = false
+            navController.navigate("credits")
+        }
+        ProfileMenuItem(str("profile_menu_settings"), Icons.Rounded.Settings) {
+            onDismiss()
+            playerViewModel.showLyricsSheet = false
+            navController.navigate("settings")
+        }
+        ProfileMenuItem(str("nav_upload"), Icons.Rounded.CloudUpload) {
+            onDismiss()
+            playerViewModel.showLyricsSheet = false
+            navController.navigate("upload")
+        }
+        ProfileMenuItem(str("nav_profile"), Icons.Rounded.AccountCircle) {
+            onDismiss()
+            playerViewModel.showLyricsSheet = false
+            playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
+        }
     }
+}
+
+@Composable
+private fun ProfileMenuItem(
+    label: String,
+    icon: ImageVector,
+    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(
+        text = { Text(label, style = MaterialTheme.typography.labelLarge) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp)) },
+        onClick = onClick,
+        modifier = Modifier.padding(horizontal = 4.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
+    )
 }
 
 
