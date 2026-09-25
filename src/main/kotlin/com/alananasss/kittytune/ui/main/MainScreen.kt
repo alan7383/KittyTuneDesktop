@@ -25,6 +25,9 @@ import androidx.savedstate.read
 import androidx.compose.foundation.layout.*
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+import com.alananasss.kittytune.ui.common.clearance
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -292,6 +295,47 @@ fun MainScreen(
     // The mouse's side buttons, on the root so they work wherever the pointer happens to be.
     val historyNavigator = rememberHistoryNavigator(navController, playerViewModel)
 
+    val playerBarStyle by playerPrefs.playerBarStyleFlow().collectAsState(initial = playerPrefs.getPlayerBarStyle())
+    val isBarFloating = playerBarStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING
+    val barOverlay = remember { com.alananasss.kittytune.ui.common.PlayerBarOverlay() }
+    LaunchedEffect(isBarFloating) { if (!isBarFloating) barOverlay.bounds = null }
+
+    val playerBarModifier = when (playerBarStyle) {
+        com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier.fillMaxWidth()
+        com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> Modifier
+            .fillMaxWidth()
+            .padding(top = PANEL_GUTTER.dp)
+        com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> Modifier
+            .fillMaxWidth()
+            .padding(top = PANEL_GUTTER.dp)
+    }
+    val playerBar: @Composable (Modifier) -> Unit = { barModifier ->
+    PlayerBar(
+        playerViewModel = playerViewModel,
+        onToggleNowPlaying = {
+            val next = !showNowPlayingPanel
+            showNowPlayingPanel = next
+            playerPrefs.setRightPanelOpen(next)
+        },
+        onOpenQueue = {
+            showNowPlayingPanel = true
+            playerPrefs.setRightPanelOpen(true)
+            nowPlayingTab = NowPlayingTab.QUEUE
+        },
+        onOpenLyrics = {
+            playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
+        },
+        // Straight to the big one, which is what he asked for: "I think you can do this when you click
+        // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
+        // lyrics, which has its own way up here (issue #33).
+        onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
+        modifier = barModifier
+    )
+    }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.alananasss.kittytune.ui.common.LocalPlayerBarOverlay provides barOverlay.takeIf { isBarFloating },
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -370,9 +414,13 @@ fun MainScreen(
             // The hover detection wraps both the sidebar and the resize handle with full height so that the cursor
             // can move anywhere on the left panel or cross the handle gap without triggering an unexpected exit.
             // When exiting, a 400 ms grace period prevents jittery collapse when swiping across boundaries.
+            // The sidebar's own rows end above a floating bar; its card still reaches the bottom behind it.
+            val sidebarOverlap = com.alananasss.kittytune.ui.common.rememberPlayerBarOverlap()
+            val sidebarClearance = sidebarOverlap.clearance()
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
+                    .then(sidebarOverlap.modifier)
                     .pointerInput(isHoverExpandEnabled) {
                         if (!isHoverExpandEnabled) return@pointerInput
                         awaitPointerEventScope {
@@ -401,7 +449,7 @@ fun MainScreen(
                         }
                     }
             ) {
-                Row(modifier = Modifier.fillMaxHeight()) {
+                Row(modifier = Modifier.fillMaxHeight().padding(bottom = sidebarClearance)) {
 
             // When hover-expand is active for the collapsed sidebar, hovering expands the panel
             // directly to show the real labels. Tooltips are suppressed so that popup scenes
@@ -1114,40 +1162,25 @@ fun MainScreen(
             }
         }
 
-        val playerBarStyle by playerPrefs.playerBarStyleFlow().collectAsState(initial = playerPrefs.getPlayerBarStyle())
-        val playerBarModifier = when (playerBarStyle) {
-            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 6.dp)
-            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-            com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> Modifier
-                .fillMaxWidth()
-                .padding(top = PANEL_GUTTER.dp)
-        }
+        // Docked styles sit below the panels; the floating one is drawn over them, further down.
+        if (!isBarFloating) playerBar(playerBarModifier)
+    }
 
-        PlayerBar(
-            playerViewModel = playerViewModel,
-            onToggleNowPlaying = {
-                val next = !showNowPlayingPanel
-                showNowPlayingPanel = next
-                playerPrefs.setRightPanelOpen(next)
-            },
-            onOpenQueue = {
-                showNowPlayingPanel = true
-                playerPrefs.setRightPanelOpen(true)
-                nowPlayingTab = NowPlayingTab.QUEUE
-            },
-            onOpenLyrics = {
-                playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
-            },
-            // Straight to the big one, which is what he asked for: "I think you can do this when you click
-            // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
-            // lyrics, which has its own way up here (issue #33).
-            onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
-            modifier = playerBarModifier
-        )
+    if (isBarFloating) {
+        Box(Modifier.fillMaxSize().padding(horizontal = PANEL_GUTTER.dp, vertical = 14.dp), contentAlignment = Alignment.BottomCenter) {
+            playerBar(
+                Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { coordinates ->
+                        val topLeft = coordinates.positionOnScreen()
+                        barOverlay.bounds = androidx.compose.ui.geometry.Rect(
+                            topLeft.x, topLeft.y,
+                            topLeft.x + coordinates.size.width, topLeft.y + coordinates.size.height,
+                        )
+                    },
+            )
+        }
+    }
     }
 
     TrackOptionsOverlays(playerViewModel)

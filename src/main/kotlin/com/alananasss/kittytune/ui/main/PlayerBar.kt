@@ -131,8 +131,8 @@ fun PlayerBar(
             com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
                 .widthIn(max = FLOATING_BAR_MAX_WIDTH)
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .height(80.dp)
+                .padding(horizontal = 24.dp)
+                .height(76.dp)
             else -> Modifier.fillMaxWidth().height(88.dp)
         },
         shape = when (barStyle) {
@@ -140,11 +140,13 @@ fun PlayerBar(
             com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> RoundedCornerShape(28.dp)
             com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> RoundedCornerShape(40.dp)
         },
-        color = if (isFloating) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow,
+        // Floating, it lies over the content: a little see-through, so what scrolls beneath shows, and lifted
+        // by a deep soft shadow and a light edge so it reads as an object above the page.
+        color = if (isFloating) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f) else MaterialTheme.colorScheme.surfaceContainerLow,
         border = if (isFloating) {
-            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
         } else null,
-        shadowElevation = if (isFloating) 10.dp else 0.dp,
+        shadowElevation = if (isFloating) 18.dp else 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val barWidth = maxWidth
