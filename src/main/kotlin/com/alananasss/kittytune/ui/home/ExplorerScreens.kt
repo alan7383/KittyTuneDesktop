@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -456,7 +458,10 @@ fun GenreDetailScreen(
                     item { SectionTitle(str("profile_tab_popular")) }
                     item {
                         val pages = viewModel.popularTracks.chunked(5)
+                        val popularRowState = rememberLazyListState()
                         LazyRow(
+                            state = popularRowState,
+                            modifier = Modifier.horizontalMouseSwipe(popularRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
@@ -504,7 +509,10 @@ fun GenreDetailScreen(
                         }
                     }
                     item {
+                        val officialRowState = rememberLazyListState()
                         LazyRow(
+                            state = officialRowState,
+                            modifier = Modifier.horizontalMouseSwipe(officialRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
@@ -526,7 +534,10 @@ fun GenreDetailScreen(
                         )
                     }
                     item {
+                        val communityRowState = rememberLazyListState()
                         LazyRow(
+                            state = communityRowState,
+                            modifier = Modifier.horizontalMouseSwipe(communityRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
@@ -540,7 +551,10 @@ fun GenreDetailScreen(
                 if (viewModel.albums.isNotEmpty()) {
                     item { SectionTitle(str("profile_tab_albums")) }
                     item {
+                        val albumsRowState = rememberLazyListState()
                         LazyRow(
+                            state = albumsRowState,
+                            modifier = Modifier.horizontalMouseSwipe(albumsRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {

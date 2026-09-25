@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
@@ -1420,35 +1421,7 @@ fun <T> ProfileHorizontalCarouselRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(isScrollable) {
-                        if (!isScrollable) return@pointerInput
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.type == PointerEventType.Scroll) {
-                                    val change = event.changes.firstOrNull()
-                                    if (change != null) {
-                                        val delta = if (change.scrollDelta.x != 0f) change.scrollDelta.x else change.scrollDelta.y
-                                        if (delta != 0f) {
-                                            change.consume()
-                                            coroutineScope.launch {
-                                                listState.scrollBy(delta * 50f)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .pointerInput(isScrollable) {
-                        if (!isScrollable) return@pointerInput
-                        detectHorizontalDragGestures { change, dragAmount ->
-                            change.consume()
-                            coroutineScope.launch {
-                                listState.scrollBy(-dragAmount)
-                            }
-                        }
-                    }
+                    .horizontalMouseSwipe(listState, enabled = isScrollable)
             ) {
                 items(items) { item ->
                     itemContent(item)

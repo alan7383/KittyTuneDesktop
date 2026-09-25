@@ -18,10 +18,25 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @Composable
 fun ScrollableLazyColumn(
@@ -104,5 +119,56 @@ fun ScrollableColumn(
                 adapter = rememberScrollbarAdapter(scrollState = state)
             )
         }
+    }
+}
+
+/**
+ * Enables smooth horizontal mouse swipe / drag scrolling across horizontal containers (issue #56).
+ *
+ * Holding the cursor down on any item and dragging left-to-right or right-to-left scrolls the container.
+ * Quick mouse gestures trigger a physics-based friction fling.
+ * If the user clicks without exceeding pointer slop, child clicks are preserved intact.
+ */
+fun Modifier.horizontalMouseSwipe(
+    state: ScrollableState,
+    enabled: Boolean = true,
+): Modifier = composed {
+    if (!enabled) return@composed this
+    val scope = rememberCoroutineScope()
+    val velocityTracker = remember { VelocityTracker() }
+    var flingJob by remember { mutableStateOf<Job?>(null) }
+
+    this.pointerInput(state) {
+        detectHorizontalDragGestures(
+            onDragStart = { offset ->
+                flingJob?.cancel()
+                velocityTracker.resetTracking()
+                velocityTracker.addPosition(System.currentTimeMillis(), offset)
+            },
+            onDragEnd = {
+                val velocity = velocityTracker.calculateVelocity().x
+                if (abs(velocity) > 100f) {
+                    flingJob = scope.launch {
+                        var currentVelocity = -velocity
+                        val friction = 0.92f
+                        while (abs(currentVelocity) > 15f) {
+                            state.scrollBy(currentVelocity * 0.016f)
+                            currentVelocity *= friction
+                            delay(16)
+                        }
+                    }
+                }
+            },
+            onDragCancel = {
+                flingJob?.cancel()
+            },
+            onHorizontalDrag = { change, dragAmount ->
+                velocityTracker.addPosition(change.uptimeMillis, change.position)
+                change.consume()
+                scope.launch {
+                    state.scrollBy(-dragAmount)
+                }
+            }
+        )
     }
 }
