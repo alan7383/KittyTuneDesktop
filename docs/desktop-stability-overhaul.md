@@ -213,6 +213,11 @@ canonical name, so the end4 integration that looks the player up by that name is
   thumb on hover, jumps to where you click, follows a drag past its ends, and always shows the level as
   a percentage; the wheel still works and the level is saved on release. The code moved out of the
   1,000-line `PlayerBar.kt` into `VolumeControl.kt`.
+- **The volume track follows the seek-bar style** chosen in settings (bar, slim, wavy, squiggly — the
+  wave held still), and the vertical popup used on narrow windows draws the same track instead of a
+  different stock slider.
+- **Sidebar destinations** are inset from the card and 2 dp apart, so the selected pill and a hovered
+  neighbour's highlight no longer touch and read as one shape.
 - **Volume now sounds even across the slider.** It set the amplitude linearly, so 50 % was only −6 dB and
   every usable level was crammed into the bottom sixth. It now uses the cubic curve desktop mixers use
   (50 % ≈ −18 dB). Saved levels are converted once, so nobody's music gets louder or quieter on update.
@@ -256,6 +261,14 @@ snapped on and off.
   They are grouped under Look / Content / Behaviour, the rows are compact with a rounded press state,
   the pane has a fixed height and a visible scrollbar, and the row is the only click target (the switch
   shows the state), so a click can no longer toggle twice.
+- **Tray menu closed as soon as the pointer reached it.** It closed on focus loss, and on Windows focus
+  passes through the taskbar while the pointer travels from the icon to the menu. It now closes on a
+  click outside it (and Escape), like a native menu; Linux keeps focus loss.
+- **Shared floating menu** (`ui/common/FloatingMenuWindow.kt`): a context menu in a window of its own,
+  kept on the screen under the pointer. Compose's `DropdownMenu` is drawn inside its owner window, so the
+  mini player's right-click menu — ten items in a strip a few dozen dp tall — was cut off and could not
+  be scrolled. The mini player menu is now Pin / Mini player settings… / Hide, and the settings open in a
+  window of their own. The tray menu uses the same component.
 - **Mini player progress bar** sat on the bar's bottom border and its ends ran into the rounded
   corners; it is inset clear of them in both styles.
 
