@@ -156,6 +156,7 @@ fun ModernTrayMenuHost(
 
         // Clicking any other window (or the desktop) closes the menu, like a native tray popup.
         DisposableEffect(window) {
+            com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
             val listener = object : WindowAdapter() {
                 override fun windowLostFocus(e: WindowEvent?) {
                     TrayMenuState.hide()

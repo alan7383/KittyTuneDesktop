@@ -1009,6 +1009,8 @@
     <string name="mini_player_controls_on_hover_desc">Masquer les contrôles jusqu\'à ce que la souris survole le mini-lecteur</string>
     <string name="mini_player_hover_effect">Ajuster l\'affichage au survol de la souris</string>
     <string name="mini_player_hover_effect_desc">Légère translucidité au repos, opacité complète au survol</string>
+    <string name="mini_player_hover_illumination">Illumination de l\'arrière-plan au survol</string>
+    <string name="mini_player_hover_illumination_desc">Illuminer l\'arrière-plan du mini-lecteur au survol de la souris</string>
     <string name="mini_player_show_progress">Afficher la barre de progression</string>
     <string name="mini_player_show_progress_desc">Afficher une fine barre de progression en bas du mini-lecteur</string>
     <string name="mini_player_style">Style du mini-lecteur</string>
