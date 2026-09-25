@@ -32,8 +32,12 @@ object ModernTrayMenuHook {
     private var attachedTo: TrayIcon? = null
     private var lastPopupAt = 0L
 
-    fun install(scope: CoroutineScope) {
+    /** Where a right-click goes: the pointer in AWT screen coordinates. */
+    private var onPopup: (Int, Int) -> Unit = { x, y -> TrayMenuState.toggle(x, y) }
+
+    fun install(scope: CoroutineScope, onPopup: (Int, Int) -> Unit = { x, y -> TrayMenuState.toggle(x, y) }) {
         uninstall()
+        this.onPopup = onPopup
         job = scope.launch {
             while (isActive) {
                 val icon = findOurIcon()
@@ -87,7 +91,7 @@ object ModernTrayMenuHook {
                 if (now - lastPopupAt < DEBOUNCE_MS) return
                 lastPopupAt = now
                 val at = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull() ?: return
-                TrayMenuState.toggle(at.x, at.y)
+                onPopup(at.x, at.y)
             }
         }
 

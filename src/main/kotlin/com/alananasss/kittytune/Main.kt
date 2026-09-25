@@ -27,6 +27,7 @@ import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.Tray
 import coil3.compose.setSingletonImageLoaderFactory
 import com.alananasss.kittytune.core.DesktopBackDispatcher
+import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.ui.ImageLoaderFactory
 import com.alananasss.kittytune.ui.login.LoginScreen
@@ -149,6 +150,7 @@ fun main(args: Array<String>) {
 
         val osName = remember { System.getProperty("os.name").lowercase() }
         val isLinux = remember { osName.contains("linux") || osName.contains("nix") }
+        val isWindowsHost = remember { osName.contains("win") }
 
         var useSniTray by remember { mutableStateOf(isLinux) }
 
@@ -181,16 +183,41 @@ fun main(args: Array<String>) {
         val trayMenuScope = androidx.compose.runtime.rememberCoroutineScope()
 
         if (trayIcon != null && !useSniTray) {
-            // No AWT PopupMenu (that is the XP-looking system menu) — right-click is hooked to
-            // the custom Compose tray menu below, which matches KittyTune's theme.
-            Tray(
-                icon = trayIcon,
-                tooltip = "KittyTune",
-                onAction = { showMainWindow() },
-            )
-            androidx.compose.runtime.DisposableEffect(trayIcon, useSniTray) {
-                com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope)
-                onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
+            if (isWindowsHost) {
+                // Windows gets a real Win32 menu (see Win32TrayMenu): dark when the app is, rounded on
+                // Windows 11, and the only kind the hidden-icons flyout stays open around.
+                Tray(
+                    icon = trayIcon,
+                    tooltip = "KittyTune",
+                    onAction = { showMainWindow() },
+                )
+                androidx.compose.runtime.DisposableEffect(trayIcon) {
+                    com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope) { _, _ ->
+                        com.alananasss.kittytune.core.Win32TrayMenu.show(
+                            trayMenuEntries(
+                                playerViewModel = playerViewModel,
+                                onShowWindow = { showMainWindow() },
+                                onExit = {
+                                    com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                                    exitApplication()
+                                },
+                            )
+                        )
+                    }
+                    onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
+                }
+            } else {
+                // No AWT PopupMenu (that is the XP-looking system menu) — right-click is hooked to
+                // the custom Compose tray menu below, which matches KittyTune's theme.
+                Tray(
+                    icon = trayIcon,
+                    tooltip = "KittyTune",
+                    onAction = { showMainWindow() },
+                )
+                androidx.compose.runtime.DisposableEffect(trayIcon, useSniTray) {
+                    com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope)
+                    onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
+                }
             }
         }
 
@@ -513,6 +540,9 @@ fun main(args: Array<String>) {
                     // the live palette — the cover-seeded dynamic theme included — instead of
                     // a colour read once at startup (issue #33).
                     ThemedTitleBarEffect(window)
+                    // The tray's native menu follows the app's light or dark palette.
+                    val menuDark = androidx.compose.material3.MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                    LaunchedEffect(menuDark) { com.alananasss.kittytune.core.Win32TrayMenu.setDark(menuDark) }
                     ThemedWindowBackgroundEffect(window)
                     Surface { AppRouter(playerViewModel = playerViewModel) }
                 }
@@ -774,4 +804,29 @@ internal fun clampFloatingBounds(
     if (y < usable.y) y = usable.y
 
     return java.awt.Rectangle(x, y, w, h)
+}
+
+/** What the tray menu offers, read from the player at the moment it opens. */
+private fun trayMenuEntries(
+    playerViewModel: PlayerViewModel,
+    onShowWindow: () -> Unit,
+    onExit: () -> Unit,
+): List<com.alananasss.kittytune.core.Win32TrayMenu.Entry> {
+    val entry = com.alananasss.kittytune.core.Win32TrayMenu::Entry
+    val separator = com.alananasss.kittytune.core.Win32TrayMenu.Entry.Separator
+    val track = playerViewModel.currentTrack
+    return buildList {
+        if (track != null) {
+            val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+            add(entry(listOfNotNull(track.title, artist.takeIf { it.isNotBlank() }).joinToString(" — "), null, false, false))
+            add(entry(if (playerViewModel.isPlaying) str("action_pause") else str("action_play"), { playerViewModel.togglePlayPause() }, false, false))
+            add(entry(str("player_next"), { playerViewModel.playNext() }, false, false))
+            add(entry(str("player_previous"), { playerViewModel.smartPrevious() }, false, false))
+            add(separator)
+        }
+        add(entry(str("menu_show_window"), onShowWindow, false, false))
+        add(entry(str("menu_mini_player_show"), { playerViewModel.toggleMiniPlayer() }, playerViewModel.isMiniPlayerVisible, false))
+        add(separator)
+        add(entry(str("menu_exit"), onExit, false, false))
+    }
 }

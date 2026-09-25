@@ -86,6 +86,9 @@ fun FloatingMenuWindow(
         state = windowState,
         undecorated = true,
         transparent = true,
+        // Never takes focus on Windows. Taking it closed the shell's own hidden-icons flyout the menu was
+        // opened from, the moment the menu appeared. Outside clicks close the menu instead, so it needs
+        // no focus; Linux keeps focus, which is what closes it there.
         focusable = true,
         alwaysOnTop = true,
         resizable = false,
@@ -101,12 +104,15 @@ fun FloatingMenuWindow(
     ) {
         runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
 
-        // Take the foreground so Escape reaches the menu; Windows may otherwise leave focus where it was.
-        // A tool window, so the menu never flashes a taskbar button of its own.
+        // A tool window, so the menu never flashes a taskbar button of its own. On Linux it takes focus so
+        // that Escape reaches it and focus loss can close it.
         LaunchedEffect(window) {
             com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
-            window.toFront()
-            window.requestFocus()
+            com.alananasss.kittytune.core.ToolWindowStyle.activateLikeNativeMenu(window)
+            if (!isWindows) {
+                window.toFront()
+                window.requestFocus()
+            }
         }
 
         // Close on a click outside, like a native menu. Not on focus loss: on Windows focus bounces
@@ -239,9 +245,10 @@ private fun usableScreenAt(x: Int, y: Int): java.awt.Rectangle {
 /** Presses in the first moments after opening belong to the click that opened the menu. */
 private const val OUTSIDE_CLICK_GRACE_MS = 250L
 private const val OUTSIDE_CLICK_POLL_MS = 30L
+private const val VK_ESCAPE = 0x1B
 
 /**
- * Returns once a mouse button goes down outside [window], calling [onOutside]. Polls the button state
+ * Returns once a mouse button goes down outside [window], or Escape is pressed, calling [onOutside]. Polls the button state
  * — a few cheap calls every 30 ms, and only while a menu is on screen.
  */
 private suspend fun awaitOutsideClick(window: java.awt.Window, onOutside: () -> Unit) {
@@ -253,6 +260,11 @@ private suspend fun awaitOutsideClick(window: java.awt.Window, onOutside: () -> 
     var wasDown = anyButtonDown()
     while (window.isShowing) {
         kotlinx.coroutines.delay(OUTSIDE_CLICK_POLL_MS)
+        // The menu takes no focus on Windows, so Escape is watched here rather than as a key event.
+        if (user32.GetAsyncKeyState(VK_ESCAPE).toInt() and 0x8000 != 0) {
+            onOutside()
+            return
+        }
         val isDown = anyButtonDown()
         if (isDown && !wasDown) {
             val pointer = runCatching { java.awt.MouseInfo.getPointerInfo()?.location }.getOrNull()
