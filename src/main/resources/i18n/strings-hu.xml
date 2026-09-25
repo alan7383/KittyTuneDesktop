@@ -1004,6 +1004,9 @@
     <string name="pref_mini_player_settings">Mini lejátszó beállításai</string>
     <string name="pref_mini_player_settings_desc">Vezérlők, megjelenítés és rámutatás testreszabása</string>
     <string name="mini_player_settings_title">Mini lejátszó beállításai</string>
+    <string name="mini_player_section_look">Megjelenés</string>
+    <string name="mini_player_section_content">Tartalom</string>
+    <string name="mini_player_section_behaviour">Viselkedés</string>
     <string name="mini_player_show_cover">Albumborító megjelenítése</string>
     <string name="mini_player_show_cover_desc">Borítókép megjelenítése a mini lejátszóban</string>
     <string name="mini_player_show_playback_controls">Lejátszás gombok megjelenítése</string>

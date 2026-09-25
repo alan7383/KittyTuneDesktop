@@ -1000,6 +1000,9 @@
     <string name="pref_mini_player_settings">Paramètres du mini-lecteur</string>
     <string name="pref_mini_player_settings_desc">Personnaliser les contrôles, l\'affichage et l\'interaction au survol</string>
     <string name="mini_player_settings_title">Paramètres du mini-lecteur</string>
+    <string name="mini_player_section_look">Apparence</string>
+    <string name="mini_player_section_content">Contenu</string>
+    <string name="mini_player_section_behaviour">Comportement</string>
     <string name="mini_player_show_cover">Afficher la pochette d\'album</string>
     <string name="mini_player_show_cover_desc">Afficher la miniature de la pochette dans le mini-lecteur</string>
     <string name="mini_player_show_playback_controls">Afficher les boutons de lecture</string>

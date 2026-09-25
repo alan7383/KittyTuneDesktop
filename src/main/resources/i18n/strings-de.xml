@@ -2713,6 +2713,9 @@
     <string name="pref_mini_player_settings">Mini-Player-Einstellungen</string>
     <string name="pref_mini_player_settings_desc">Steuerelemente, Anzeige und Hover-Interaktion des Mini-Players anpassen</string>
     <string name="mini_player_settings_title">Mini-Player-Einstellungen</string>
+    <string name="mini_player_section_look">Aussehen</string>
+    <string name="mini_player_section_content">Inhalt</string>
+    <string name="mini_player_section_behaviour">Verhalten</string>
     <string name="mini_player_show_cover">Albumcover anzeigen</string>
     <string name="mini_player_show_cover_desc">Miniaturansicht des Covers im Mini-Player anzeigen</string>
     <string name="mini_player_show_playback_controls">Wiedergabeschaltflächen anzeigen</string>

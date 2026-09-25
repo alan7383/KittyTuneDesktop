@@ -246,6 +246,19 @@ snapped on and off.
   with a mouse it only added a 24 dp gap between the rows of moods. Disabled inside the card, chips get
   a 10 dp corner, and the card's section spacing is a little tighter.
 
+## Tray menu and mini player
+
+- **Tray menu redesigned.** Upstream's replacement for the system menu was a 248 dp grey panel with
+  large padding that matched neither the app nor the OS. It is now a compact card in the app's own
+  surface colours: what is playing (cover, title, artist) with previous / play-pause / next on top,
+  then the app actions as 36 dp rows with label-sized text, ripple and eased hover.
+- **Mini player settings** were eight described switches in a dialog that scrolled with no scrollbar.
+  They are grouped under Look / Content / Behaviour, the rows are compact with a rounded press state,
+  the pane has a fixed height and a visible scrollbar, and the row is the only click target (the switch
+  shows the state), so a click can no longer toggle twice.
+- **Mini player progress bar** sat on the bar's bottom border and its ends ran into the rounded
+  corners; it is inset clear of them in both styles.
+
 ## Localisation
 
 - The home screen's listening-time card showed a hard-coded English "11 min" in every language; it

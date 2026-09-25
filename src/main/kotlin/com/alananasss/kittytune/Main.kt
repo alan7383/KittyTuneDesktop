@@ -527,9 +527,20 @@ fun main(args: Array<String>) {
         // Custom tray context menu — transparent, rounded, themed; lives outside the main window
         // so it can open next to the tray icon on any OS.
         com.alananasss.kittytune.ui.tray.ModernTrayMenuHost(
+            nowPlaying = playerViewModel.currentTrack?.let { track ->
+                com.alananasss.kittytune.ui.tray.TrayNowPlaying(
+                    title = track.title,
+                    artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
+                    artworkUrl = track.fullResArtwork,
+                    isPlaying = playerViewModel.isPlaying,
+                )
+            },
             isMiniPlayerVisible = playerViewModel.isMiniPlayerVisible,
             onShowWindow = { showMainWindow() },
             onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
+            onPlayPause = { playerViewModel.togglePlayPause() },
+            onNext = { playerViewModel.playNext() },
+            onPrevious = { playerViewModel.smartPrevious() },
             onExit = {
                 com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
                 exitApplication()

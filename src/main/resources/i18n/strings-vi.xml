@@ -2549,6 +2549,9 @@
     <string name="pref_mini_player_settings">Cài đặt trình phát thu nhỏ</string>
     <string name="pref_mini_player_settings_desc">Tùy chỉnh nút điều khiển, hiển thị và tương tác khi di chuột</string>
     <string name="mini_player_settings_title">Cài đặt trình phát thu nhỏ</string>
+    <string name="mini_player_section_look">Giao diện</string>
+    <string name="mini_player_section_content">Nội dung</string>
+    <string name="mini_player_section_behaviour">Hành vi</string>
     <string name="mini_player_show_cover">Hiện ảnh bìa album</string>
     <string name="mini_player_show_cover_desc">Hiển thị hình thu nhỏ ảnh bìa trong trình phát thu nhỏ</string>
     <string name="mini_player_show_playback_controls">Hiện các nút điều khiển phát</string>
