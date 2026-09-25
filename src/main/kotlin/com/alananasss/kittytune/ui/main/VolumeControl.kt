@@ -255,7 +255,7 @@ private fun volumeIcon(volume: Float): ImageVector = when {
     else -> Icons.AutoMirrored.Filled.VolumeUp
 }
 
-private fun volumePercentLabel(volume: Float): String = "${(volume * 100).roundToInt()}%"
+internal fun volumePercentLabel(volume: Float): String = "${(volume * 100).roundToInt()}%"
 
 /**
  * Scroll wheel over any volume control raises or lowers it, in 5% steps. Wheel deltas are

@@ -139,6 +139,7 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import androidx.compose.ui.graphics.graphicsLayer
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
@@ -466,6 +467,7 @@ private fun QuickTile(
 
     Row(
         modifier = modifier
+            .pressScale(interaction, pressedScale = 0.98f)
             .height(56.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
@@ -600,6 +602,7 @@ fun MediaCard(
         contentPadding = PaddingValues(6.dp),
         modifier = Modifier
             .width(160.dp)
+            .pressScale(interactionSource)
             .let { m ->
                 if (onRightClick != null) {
                     m.onClick(
@@ -2606,7 +2609,7 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
         Column(
             // The artists row arrives after the card does; grow into it rather than jump.
             modifier = Modifier.animateContentSize().padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(
@@ -2639,24 +2642,35 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
 
             // Every mood at once. They used to sit in a 140 dp list that scrolled without a scrollbar,
             // so four of the seven were never found.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            // Without the phone-sized 48 dp touch target Material adds to every chip: with a mouse it was
+            // only an invisible margin, and it is what left a 24 dp gap between the rows.
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.material3.LocalMinimumInteractiveComponentSize provides androidx.compose.ui.unit.Dp.Unspecified,
             ) {
-                stations.forEachIndexed { index, station ->
-                    FilterChip(
-                        selected = index == selectedStationIndex,
-                        onClick = { selectedStationIndex = index },
-                        label = { Text(station.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        leadingIcon = {
-                            Icon(
-                                station.icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(FilterChipDefaults.IconSize),
-                            )
-                        },
-                    )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    stations.forEachIndexed { index, station ->
+                        val chipInteraction = remember { MutableInteractionSource() }
+                        FilterChip(
+                            selected = index == selectedStationIndex,
+                            onClick = { selectedStationIndex = index },
+                            interactionSource = chipInteraction,
+                            modifier = Modifier.pressScale(chipInteraction),
+                            shape = RoundedCornerShape(10.dp),
+                            label = { Text(station.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon = {
+                                Icon(
+                                    station.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                )
+                            },
+                        )
+                    }
                 }
+
             }
 
             basis?.takeIf { it.topArtists.isNotEmpty() }?.let { MixBasisRow(it) }

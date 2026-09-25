@@ -230,6 +230,22 @@ canonical name, so the end4 integration that looks the player up by that name is
 - **Local files showed a row of SoundCloud counters stuck at zero** (plays, likes, reposts,
   comments) in the track info panel. Hidden for local tracks.
 
+## Press and hover feedback
+
+The app often did not answer a click: several surfaces had `indication = null` and hover fills that
+snapped on and off.
+
+- New `Modifier.pressScale(interactionSource)` (`ui/common/PressFeedback.kt`): the element gives a
+  little while pressed and springs back, the response Material 3 Expressive gives its buttons. Used on
+  home cards and tiles, the mix mood chips, feed cards and sidebar destinations.
+- Feed cards, the track-options artist rows and the new tray menu items get a ripple on press.
+- Hover fills on home tiles and cards, feed cards and menu rows ease in and out (120 ms).
+- **Sidebar**: the current destination sits on Material's secondary-container indicator pill,
+  animated, instead of being marked only by bold text.
+- **Mix card spacing**: Material gives every chip an invisible 48 dp touch target meant for fingers;
+  with a mouse it only added a 24 dp gap between the rows of moods. Disabled inside the card, chips get
+  a 10 dp corner, and the card's section spacing is a little tighter.
+
 ## Localisation
 
 - The home screen's listening-time card showed a hard-coded English "11 min" in every language; it
@@ -240,11 +256,30 @@ canonical name, so the end4 integration that looks the player up by that name is
 - `--enable-final-field-mutation` was added for JDK ≥ 25, but the option only exists from JDK 26.
   **An app packaged with JDK 25 refused to start at all** ("Unrecognized option"). Now gated on 26.
 
+## Rebased onto upstream 1.3.8 — and fixes to what it added
+
+This branch sits on top of `v1.3.8` (21 upstream commits). Conflicts were resolved keeping both sides:
+
+- `MprisService`: upstream's `displayArtist` fix moved into the merged service.
+- Leaving full screen: upstream's rework (HiDPI metrics, `try/finally`) kept, plus the Windows early exit
+  — the double restore this branch removed was still present upstream.
+- Volume: upstream added a percentage beside the stock slider; the new `VolumeControl` covers it.
+
+Reviewing the new upstream code:
+
+- **"Like all songs" could silently lose likes.** A second bulk like started while one was sending was
+  dropped outright — its tracks showed as liked locally but never reached SoundCloud. Passes now queue
+  behind a `Mutex`. A batch that hit 401 refreshed the session but was not re-sent; it is now.
+- **Tray menu**: took no focus on open on Windows, so clicking elsewhere did not close it and Escape
+  did not reach it — it now takes the foreground when shown. Its items had no press feedback.
+- `VolumePercentageDisplayTest` searched `PlayerBar.kt`'s source for constant names; it now tests the
+  label function itself.
+
 ## Tests
 
 - New: `VolumeCurveTest` (curve and lossless migration), `WindowsFullScreenTest.borderlessFullScreenSurvivesFocusLossAndRestoresBounds` (real window,
   Windows only) and `LanguageDetectionTest` (low-accuracy mode still tells ru / en / fr apart).
 - `LinuxStatusNotifierLiveTest` now skips itself off Linux instead of failing — it needs a session bus.
-- Full suite on Windows: 474 tests. The only failures are `VolumeNormalizationTest` (7), which need the
+- Full suite on Windows: 519 tests. The only failures are `VolumeNormalizationTest` (7), which need the
   native DSP library; the repo ships the `.so` only and the `.dll` is built by CI on `windows-latest`
   (`compileNativeDSP` needs g++). Unrelated to this branch.
