@@ -58,6 +58,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
 
+import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -2004,8 +2005,21 @@ private fun SidebarNavItem(
     collapse: Float = 0f,
     onClick: () -> Unit,
 ) {
-    val color = if (selected) MaterialTheme.colorScheme.onSurface
-    else MaterialTheme.colorScheme.onSurfaceVariant
+    // Material's navigation indicator: the current destination sits on a secondary-container pill,
+    // eased in and out, instead of being told apart only by bold text.
+    val indicator by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "navIndicator",
+    )
+    val color by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "navContent",
+    )
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
@@ -2015,8 +2029,10 @@ private fun SidebarNavItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                .pressScale(interaction, pressedScale = 0.97f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(indicator)
+                .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
                     focusManager.clearFocus()
                     onClick()
                 }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
+import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -231,12 +232,17 @@ private fun TrackFeedItem(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+        color = androidx.compose.animation.animateColorAsState(
+            if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+            animationSpec = androidx.compose.animation.core.tween(120),
+            label = "feedCardHover",
+        ).value,
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
             .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary), onClick = onRightClick)
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+            .pressScale(interactionSource, pressedScale = 0.98f)
+            .clickable(interactionSource = interactionSource, indication = androidx.compose.material3.ripple(), onClick = onClick),
     ) {
         Column(Modifier.padding(12.dp)) {
             // Reposter info row (if repost)
@@ -360,12 +366,17 @@ private fun PlaylistFeedItem(
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+        color = androidx.compose.animation.animateColorAsState(
+            if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+            animationSpec = androidx.compose.animation.core.tween(120),
+            label = "feedCardHover",
+        ).value,
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
             .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary), onClick = onRightClick)
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+            .pressScale(interactionSource, pressedScale = 0.98f)
+            .clickable(interactionSource = interactionSource, indication = androidx.compose.material3.ripple(), onClick = onClick),
     ) {
         Column(Modifier.padding(12.dp)) {
             if (isRepost && reposter != null) {

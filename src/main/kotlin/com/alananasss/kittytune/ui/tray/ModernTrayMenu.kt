@@ -154,6 +154,13 @@ fun ModernTrayMenuHost(
             window.background = java.awt.Color(0, 0, 0, 0)
         }
 
+        // Take the foreground on open. Without it Windows may leave focus where it was, and then the
+        // menu never loses focus either: a click elsewhere did not close it and Escape did not reach it.
+        androidx.compose.runtime.LaunchedEffect(window) {
+            window.toFront()
+            window.requestFocus()
+        }
+
         // Clicking any other window (or the desktop) closes the menu, like a native tray popup.
         DisposableEffect(window) {
             val listener = object : WindowAdapter() {
@@ -266,7 +273,9 @@ private fun TrayMenuItem(
             .background(container)
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
+                // A pressed state, not only a hover one: a menu item that does not react to the press
+                // itself feels like it missed the click.
+                indication = androidx.compose.material3.ripple(),
                 onClick = onClick,
             )
             .onPointerEvent(PointerEventType.Enter) { hovered = true }
