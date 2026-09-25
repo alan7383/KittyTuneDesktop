@@ -88,6 +88,7 @@ fun SettingsItem(
     title: String,
     subtitle: String? = null,
     trailingText: String? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
     icon: ImageVector? = null,
     iconPainter: androidx.compose.ui.graphics.painter.Painter? = null,
     iconRes: String? = null,
@@ -221,6 +222,8 @@ fun SettingsItem(
                         uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     )
                 )
+            } else if (trailingContent != null) {
+                trailingContent()
             } else if (onClick != null) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,

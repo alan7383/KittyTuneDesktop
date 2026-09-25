@@ -59,8 +59,7 @@ fun AppearanceSettingsScreen(
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
 
     var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
-    var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme()) }
-    var trackDynamicTheme by remember { mutableStateOf(prefs.getTrackDynamicTheme()) }
+    var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme() && prefs.getTrackDynamicTheme()) }
     var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
     var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
@@ -72,7 +71,6 @@ fun AppearanceSettingsScreen(
     val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
-    var appLanguage by remember { mutableStateOf(prefs.getAppLanguage()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
     var customFontEnabled by remember { mutableStateOf(prefs.getCustomFontEnabled()) }
     var sidebarHoverExpand by remember { mutableStateOf(prefs.isSidebarHoverExpandEnabled()) }
@@ -81,7 +79,6 @@ fun AppearanceSettingsScreen(
     var showSliderStyleDialog by remember { mutableStateOf(false) }
     var showInfoHalfDialog by remember { mutableStateOf(false) }
     var infoPanelHalf by remember { mutableStateOf(prefs.getInfoPanelHalf()) }
-    var showLanguageDialog by remember { mutableStateOf(false) }
     var showFontConfigDialog by remember { mutableStateOf(false) }
 
     if (showSliderStyleDialog) {
@@ -151,59 +148,7 @@ fun AppearanceSettingsScreen(
         )
     }
 
-    if (showLanguageDialog) {
-        AlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(str("pref_language")) },
-            text = {
-                Column {
-                    LanguageRadioButton(str("theme_system"), AppLanguage.SYSTEM, appLanguage) {
-                        prefs.setAppLanguage(it)
-                        appLanguage = it
-                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
-                        showLanguageDialog = false
-                    }
-                    LanguageRadioButton(str("lang_french"), AppLanguage.FRENCH, appLanguage) {
-                        prefs.setAppLanguage(it)
-                        appLanguage = it
-                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
-                        showLanguageDialog = false
-                    }
-                    LanguageRadioButton(str("lang_english"), AppLanguage.ENGLISH, appLanguage) {
-                        prefs.setAppLanguage(it)
-                        appLanguage = it
-                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
-                        showLanguageDialog = false
-                    }
-                    LanguageRadioButton(str("lang_german"), AppLanguage.GERMAN, appLanguage) {
-                        prefs.setAppLanguage(it)
-                        appLanguage = it
-                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
-                        showLanguageDialog = false
-                    }
-                    LanguageRadioButton(str("lang_hungarian"), AppLanguage.HUNGARIAN, appLanguage) {
-                        prefs.setAppLanguage(it)
-                        appLanguage = it
-                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
-                        showLanguageDialog = false
-                    }
-                    LanguageRadioButton(str("lang_russian"), AppLanguage.RUSSIAN, appLanguage) {
-                        prefs.setAppLanguage(it)
-                        appLanguage = it
-                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
-                        showLanguageDialog = false
-                    }
-                    LanguageRadioButton(str("lang_vietnamese"), AppLanguage.VIETNAMESE, appLanguage) {
-                        prefs.setAppLanguage(it)
-                        appLanguage = it
-                        com.alananasss.kittytune.core.Strings.appLanguage = it.code
-                        showLanguageDialog = false
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showLanguageDialog = false }) { Text(str("btn_cancel")) } }
-        )
-    }
+
 
     if (showCustomizeDialog) {
         CustomizeButtonsDialog(prefs = prefs, onDismiss = { showCustomizeDialog = false })
@@ -339,26 +284,12 @@ fun AppearanceSettingsScreen(
                         val isTitleBarRowVisible = remember {
                             System.getProperty("os.name").lowercase().contains("win")
                         }
-                        val titleBarIndex = if (isPureBlackVisible) 8 else 7
+                        val titleBarIndex = if (isPureBlackVisible) 6 else 5
                         val customizeIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
                         val totalVisibleItems = customizeIndex + 1
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 0),
-                            title = str("pref_language"),
-                            subtitle = when (appLanguage) {
-                                AppLanguage.SYSTEM -> str("theme_system")
-                                AppLanguage.FRENCH -> str("lang_french")
-                                AppLanguage.ENGLISH -> str("lang_english")
-                                AppLanguage.GERMAN -> str("lang_german")
-                                AppLanguage.HUNGARIAN -> str("lang_hungarian")
-                                AppLanguage.RUSSIAN -> str("lang_russian")
-                                AppLanguage.VIETNAMESE -> str("lang_vietnamese")
-                            },
-                            onClick = { showLanguageDialog = true }
-                        )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 1),
+                            shape = getSettingsShape(totalVisibleItems, 0),
                             title = str("pref_dynamic_theme"),
                             subtitle = str("pref_dynamic_theme_sub"),
                             hasSwitch = true,
@@ -366,23 +297,12 @@ fun AppearanceSettingsScreen(
                             onSwitchChange = {
                                 dynamicTheme = it
                                 prefs.setDynamicTheme(it)
-                            }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 2),
-                            title = str("pref_theme_track_dynamic"),
-                            subtitle = str("pref_theme_track_dynamic_sub"),
-                            hasSwitch = true,
-                            switchState = trackDynamicTheme,
-                            onSwitchChange = {
-                                trackDynamicTheme = it
                                 prefs.setTrackDynamicTheme(it)
                             }
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 3),
+                            shape = getSettingsShape(totalVisibleItems, 1),
                             title = str("pref_vertical_volume_slider"),
                             subtitle = str("pref_vertical_volume_slider_sub"),
                             hasSwitch = true,
@@ -394,7 +314,7 @@ fun AppearanceSettingsScreen(
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 4),
+                            shape = getSettingsShape(totalVisibleItems, 2),
                             title = str("pref_slider_style", "Style du curseur"),
                             subtitle = when (sliderStyle) {
                                 PlayerSliderStyle.BAR -> str("slider_style_bar", "Bar")
@@ -406,14 +326,14 @@ fun AppearanceSettingsScreen(
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 5),
+                            shape = getSettingsShape(totalVisibleItems, 3),
                             title = str("pref_app_icon"),
                             subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.label ?: "Default",
                             onClick = { showIconDialog = true }
                         )
 
                         SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 6),
+                            shape = getSettingsShape(totalVisibleItems, 4),
                             title = str("pref_colors"),
                             subtitle = str("pref_colors_subtitle"),
                             onClick = onNavigateToColors
@@ -425,7 +345,7 @@ fun AppearanceSettingsScreen(
                             exit = shrinkVertically() + fadeOut()
                         ) {
                             SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 7),
+                                shape = getSettingsShape(totalVisibleItems, 5),
                                 title = str("pref_pure_black"),
                                 hasSwitch = true,
                                 switchState = pureBlack,
@@ -723,21 +643,6 @@ fun StartDestRadioButton(text: String,
     }
 }
 
-@Composable
-fun LanguageRadioButton(text: String,
-    lang: AppLanguage,
-    selected: AppLanguage,
-    onSelect: (AppLanguage) -> Unit
-) {
-    Row(
-        Modifier.fillMaxWidth().clickable { onSelect(lang) }.padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = (lang == selected), onClick = null)
-        Spacer(Modifier.width(8.dp))
-        Text(text)
-    }
-}
 
 /**
  * Decodes an app-icon variant into a painter, or returns null when the bitmap is not in this
