@@ -193,47 +193,78 @@ No heavy web wrappers or Electron bloat here. Just a fast, lightweight JVM clien
 
 ### # download & installation
 
-pre-built binaries for linux, windows, and macos are available on the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases).
+pre-built binaries for linux, windows, and macos are available on the [**releases page**](https://github.com/alan7383/KittyTuneDesktop/releases).
+
+| Platform / Distribution | Method | Command / Package |
+| :--- | :--- | :--- |
+| **Arch Linux** | [AUR (`kitty-tune-bin`)](https://aur.archlinux.org/packages/kitty-tune-bin) | `yay -S kitty-tune-bin` |
+| **Arch Linux** | Pacman package | `sudo pacman -U kitty-tune-*.pkg.tar.zst` |
+| **Debian / Ubuntu / Mint** | Debian package (`.deb`) | `sudo apt install ./kitty-tune_*_amd64.deb` |
+| **Fedora / RHEL / openSUSE** | RPM package (`.rpm`) | `sudo dnf install ./kitty-tune-*.rpm` |
+| **Universal Linux** | Standalone AppImage | `chmod +x KittyTune-*.AppImage && ./KittyTune-*.AppImage` |
+| **Windows & macOS** | Installer / DMG *(Experimental)* | [GitHub Releases](https://github.com/alan7383/KittyTuneDesktop/releases) |
+
+<br>
 
 #### **arch linux**
 
-* **aur (community package)**:
-  the [`kitty-tune-bin`](https://aur.archlinux.org/packages/kitty-tune-bin) package on the AUR is maintained by community member [@Felitendo](https://github.com/Felitendo).
-  ```bash
-  yay -S kitty-tune-bin
-  # or with paru:
-  paru -S kitty-tune-bin
-  ```
-  > [!NOTE]
-  > The AUR package is maintained independently by Felitendo. As with any AUR helper installation, you should inspect the `PKGBUILD` before installing.
+##### **option 1: aur (recommended)**
+the package [**`kitty-tune-bin`**](https://aur.archlinux.org/packages/kitty-tune-bin) is available on the Arch User Repository (AUR), maintained by [@Felitendo](https://github.com/Felitendo).
 
-* **official release package (.pkg.tar.zst)**:
-  download the latest package directly from [releases](https://github.com/alan7383/KittyTuneDesktop/releases) and install via pacman:
-  ```bash
-  sudo pacman -U kitty-tune-*.pkg.tar.zst
-  ```
+install with **yay**:
+```bash
+yay -S kitty-tune-bin
+```
 
-#### **debian / ubuntu / linux mint (.deb)**
-download the `.deb` file from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases) and install via apt:
+or with **paru**:
+```bash
+paru -S kitty-tune-bin
+```
+
+> [!NOTE]
+> The AUR package is maintained independently by Felitendo. As with any AUR package, you can inspect the [`PKGBUILD`](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=kitty-tune-bin) before installing.
+
+##### **option 2: official pacman package (`.pkg.tar.zst`)**
+download the latest `.pkg.tar.zst` archive directly from [**releases**](https://github.com/alan7383/KittyTuneDesktop/releases) and install via `pacman`:
+
+```bash
+sudo pacman -U kitty-tune-*.pkg.tar.zst
+```
+
+---
+
+#### **debian / ubuntu / linux mint (`.deb`)**
+download the `.deb` file from the [**releases page**](https://github.com/alan7383/KittyTuneDesktop/releases) and install via `apt`:
+
 ```bash
 sudo apt install ./kitty-tune_*_amd64.deb
 ```
 
-#### **fedora / opensuse / rhel (.rpm)**
-download the `.rpm` file from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases) and install via dnf:
+---
+
+#### **fedora / opensuse / rhel (`.rpm`)**
+download the `.rpm` file from the [**releases page**](https://github.com/alan7383/KittyTuneDesktop/releases) and install via `dnf`:
+
 ```bash
 sudo dnf install ./kitty-tune-*.rpm
 ```
 
-#### **universal portable linux (.AppImage)**
-download the standalone `.AppImage` from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases):
+---
+
+#### **universal portable linux (`.AppImage`)**
+download the standalone `.AppImage` from the [**releases page**](https://github.com/alan7383/KittyTuneDesktop/releases):
+
 ```bash
 chmod +x KittyTune-*.AppImage
 ./KittyTune-*.AppImage
 ```
 
+---
+
 #### **windows & macos (experimental)**
-grab the windows installer (`.msi`), portable archive (`.zip`), or macos disk image (`.dmg`) from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases).
+grab pre-compiled installers directly from the [**releases page**](https://github.com/alan7383/KittyTuneDesktop/releases):
+* **windows**: installer (`.msi`) or portable archive (`.zip`)
+* **macos**: disk image (`.dmg`)
 
 ---
 
@@ -280,7 +311,7 @@ most desktop music clients are heavy electron apps that gobble up gigabytes of R
 ### * credits & license
 
 * based on KittyTune for Android.
-* built with [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform), [MaterialKolor](https://github.com/aj-alt/MaterialKolor), and [FFmpeg](https://ffmpeg.org/).
+* built with [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform), [MaterialKolor](https://github.com/jordond/MaterialKolor), and [FFmpeg](https://ffmpeg.org/).
 
 licensed under the **MIT License**.
 
