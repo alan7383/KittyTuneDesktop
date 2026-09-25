@@ -213,6 +213,14 @@ class PlayerPreferences {
         val SIDEBAR_NAV_ITEMS =
             listOf(SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC)
 
+        // Optional destinations the sidebar can carry; off until someone switches them on.
+        const val SIDEBAR_NAV_STATS = "stats"
+        const val SIDEBAR_NAV_HISTORY = "history"
+        const val SIDEBAR_NAV_SETTINGS = "settings"
+        val SIDEBAR_NAV_EXTRAS = listOf(SIDEBAR_NAV_STATS, SIDEBAR_NAV_HISTORY, SIDEBAR_NAV_SETTINGS)
+
+        private const val KEY_SIDEBAR_NAV_LAYOUT = "sidebar_nav_layout"
+
         private const val KEY_LIBRARY_BUTTONS_HIDDEN = "library_buttons_hidden"
 
         const val LIBRARY_BUTTON_CREATE = "create"
@@ -1122,6 +1130,24 @@ class PlayerPreferences {
     fun setHiddenSidebarNav(items: Set<String>) =
         Prefs.putString(KEY_SIDEBAR_NAV_HIDDEN, items.joinToString(","))
 
+    /**
+     * The sidebar's rows below Home, in order, each shown or hidden. Stored as `key` or `!key` per row.
+     *
+     * Rows missing from what was stored — every row, before this setting existed, and any row added by a
+     * later version — are appended: the original four follow the older hidden set, the optional ones start off.
+     */
+    fun getSidebarNavLayout(): List<SidebarNavEntry> =
+        parseSidebarNavLayout(Prefs.getString(KEY_SIDEBAR_NAV_LAYOUT, null), getHiddenSidebarNav())
+
+    fun setSidebarNavLayout(entries: List<SidebarNavEntry>) =
+        Prefs.putString(
+            KEY_SIDEBAR_NAV_LAYOUT,
+            entries.joinToString(",") { if (it.isVisible) it.key else "!${it.key}" },
+        )
+
+    fun sidebarNavLayoutFlow(): Flow<List<SidebarNavEntry>> =
+        Prefs.stringFlow(KEY_SIDEBAR_NAV_LAYOUT, null).map { parseSidebarNavLayout(it, getHiddenSidebarNav()) }
+
     fun hiddenSidebarNavFlow(): Flow<Set<String>> =
         Prefs.stringFlow(KEY_SIDEBAR_NAV_HIDDEN, null).map { raw ->
             raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
@@ -1524,3 +1550,18 @@ class PlayerPreferences {
 const val RIGHT_PANEL_MIN_WIDTH = 280f
 const val RIGHT_PANEL_MAX_WIDTH = 440f
 const val RIGHT_PANEL_DEFAULT_WIDTH = 340f
+
+/** One row of the sidebar's navigation: which destination, and whether it is shown. */
+data class SidebarNavEntry(val key: String, val isVisible: Boolean)
+
+internal fun parseSidebarNavLayout(raw: String?, legacyHidden: Set<String>): List<SidebarNavEntry> {
+    val known = PlayerPreferences.SIDEBAR_NAV_ITEMS + PlayerPreferences.SIDEBAR_NAV_EXTRAS
+    val stored = raw.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { token ->
+        val key = token.removePrefix("!")
+        if (key in known) SidebarNavEntry(key, isVisible = !token.startsWith("!")) else null
+    }.distinctBy { it.key }
+    val missing = known.filter { key -> stored.none { it.key == key } }.map { key ->
+        SidebarNavEntry(key, isVisible = key in PlayerPreferences.SIDEBAR_NAV_ITEMS && key !in legacyHidden)
+    }
+    return stored + missing
+}

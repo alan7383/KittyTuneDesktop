@@ -1,7 +1,20 @@
 package com.alananasss.kittytune.ui.profile
 
 import com.alananasss.kittytune.core.trackTextInput
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -10,12 +23,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
@@ -24,27 +40,23 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
-import com.alananasss.kittytune.ui.common.SettingsScaffold
+import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.layout
+
+/** Material's emphasized-decelerate curve: arrives quickly and settles. */
+private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+private const val PAGE_MS = 300
+
+/** Below this width the category list shrinks to icons with their labels underneath. */
+private val WIDE_LAYOUT = 760.dp
+
 /**
- * Settings, divided into categories instead of stacked into one page (issue #33).
+ * Settings as two panes: the categories on the left, the chosen one on the right.
  *
- * "I also think you can make settings with tabs, not all together as it is now, but on top there will be category
- * tabs where everything is divided, that is, Appearance, Audio & Playback, Lyrics, and so on."
- *
- * Every category already existed as its own composable — the page merely embedded all nine of them one after
- * another, so it was about ten screens tall and finding the lyrics display style meant scrolling past the whole of
- * appearance and audio. That is not a small annoyance: the same reporter asked for the lyrics "scale and focus"
- * modes in the same breath, and those have shipped for two releases. A setting nobody can find has not shipped.
- *
- * So the sections are the same sections, and only the navigation between them changed. Nothing was renamed and
- * nothing was dropped: the three thin ones that are a single row leading to a screen of their own — import, sync,
- * proxy — keep that row, and [SettingsSection.SOURCES] is the one grouping, because "where music comes from" is
- * one question and it was being asked in three places.
- *
- * Each tab keeps its own scroll position, so leaving Audio half-way down and coming back lands where you were
- * rather than at wherever the last tab happened to sit.
+ * Categories that hold more than one screenful — Interface above all — open sub-pages inside the right pane
+ * rather than new screens, so the list of categories stays where it is and a back arrow (or Escape, or the
+ * mouse's back button) walks back out. Moving deeper slides the page along the horizontal axis; switching
+ * category fades through, which is Material's split between "going into" and "going somewhere else".
  */
 @Composable
 fun SettingsScreen(
@@ -52,134 +64,280 @@ fun SettingsScreen(
     onBackClick: (() -> Unit)? = null,
     playerViewModel: PlayerViewModel
 ) {
-    val sections = SettingsSection.entries
-    var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
-    val index = selected.coerceIn(sections.indices)
-    val scrollStates = sections.map { androidx.compose.foundation.rememberScrollState() }
+    var category by rememberSaveable { mutableStateOf(SettingsCategory.INTERFACE) }
+    val stack = remember { mutableStateListOf<SettingsSubPage>() }
+    val location = SettingsLocation(category, stack.lastOrNull(), stack.size)
 
-    SettingsScaffold(
-        title = str("settings_title"),
-        onBackClick = onBackClick,
-        actions = {
-            IconButton(onClick = { navController.navigate("credits") }) {
-                Icon(
-                    imageVector = Icons.Rounded.Groups,
-                    contentDescription = str("about_credits"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    ) { innerPadding ->
-        Column(Modifier.fillMaxSize().padding(top = innerPadding.calculateTopPadding())) {
-            SettingsTabs(sections = sections, selectedIndex = index, onSelect = { selected = it })
+    com.alananasss.kittytune.core.BackHandler(enabled = stack.isNotEmpty()) { stack.removeLastOrNull() }
 
-            com.alananasss.kittytune.ui.common.ScrollableColumn(
-                modifier = Modifier.fillMaxSize(),
-                state = scrollStates[index],
-                contentPadding = PaddingValues(top = 12.dp, bottom = 80.dp),
-            ) {
-                when (sections[index]) {
-                    SettingsSection.APPEARANCE -> AppearanceSettingsScreen(
-                        onNavigateToColors = { navController.navigate("color_palette") },
-                        onBackClick = null,
-                    )
-
-                    SettingsSection.AUDIO -> AudioSettingsScreen(
-                        onBackClick = null,
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val isWide = maxWidth >= WIDE_LAYOUT
+        Row(Modifier.fillMaxSize().padding(start = 12.dp, top = 12.dp, bottom = 12.dp)) {
+            CategoryList(
+                selected = category,
+                isWide = isWide,
+                onSelect = {
+                    category = it
+                    stack.clear()
+                },
+                onCredits = { navController.navigate("credits") },
+            )
+            Spacer(Modifier.width(8.dp))
+            AnimatedContent(
+                targetState = location,
+                transitionSpec = {
+                    if (initialState.category == targetState.category) {
+                        val forward = targetState.depth > initialState.depth
+                        val slide = { full: Int -> (full * 0.12f).toInt() }
+                        (slideInHorizontally(tween(PAGE_MS, easing = EmphasizedDecelerate)) { if (forward) slide(it) else -slide(it) } +
+                            fadeIn(tween(PAGE_MS / 2, delayMillis = PAGE_MS / 6))) togetherWith
+                            (slideOutHorizontally(tween(PAGE_MS, easing = EmphasizedDecelerate)) { if (forward) -slide(it) else slide(it) } +
+                                fadeOut(tween(PAGE_MS / 3)))
+                    } else {
+                        (fadeIn(tween(210, delayMillis = 90)) + scaleIn(tween(210, delayMillis = 90), initialScale = 0.96f)) togetherWith
+                            fadeOut(tween(90))
+                    }
+                },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                label = "settingsPage",
+            ) { shown ->
+                SettingsPane(
+                    title = str(shown.subPage?.titleKey ?: shown.category.titleKey),
+                    onBack = if (shown.subPage != null) ({ stack.removeLastOrNull(); Unit }) else onBackClick,
+                ) {
+                    SettingsPageContent(
+                        location = shown,
+                        navController = navController,
                         playerViewModel = playerViewModel,
+                        onOpen = { stack.add(it) },
                     )
-
-                    SettingsSection.LYRICS -> LyricsSettingsScreen(
-                        onBackClick = null,
-                        playerViewModel = playerViewModel,
-                    )
-
-                    SettingsSection.SOURCES -> SourcesSection(navController)
-
-                    SettingsSection.SYNC -> SyncSection(navController)
-
-                    SettingsSection.DISCORD -> DiscordSettingsScreen(
-                        onBackClick = null,
-                        onNavigateToLogin = { navController.navigate("discord_login") },
-                        playerViewModel = playerViewModel,
-                    )
-
-                    SettingsSection.STORAGE -> StorageSettingsScreen()
-
-                    SettingsSection.NETWORK -> NetworkSection(navController)
                 }
             }
         }
     }
 }
 
-/** The categories, in the order they are worth opening. Each one names itself from the strings it already had. */
-private enum class SettingsSection(val titleKey: String, val icon: ImageVector) {
-    APPEARANCE("pref_appearance_title", Icons.Rounded.Palette),
-    AUDIO("pref_audio_title", Icons.Rounded.GraphicEq),
-    LYRICS("pref_lyrics_title", Icons.Rounded.TextSnippet),
+/** Where settings are: a category, and the sub-page opened inside it, if any. */
+private data class SettingsLocation(val category: SettingsCategory, val subPage: SettingsSubPage?, val depth: Int)
+
+/** The categories, in the order they are worth opening. */
+private enum class SettingsCategory(val titleKey: String, val icon: ImageVector) {
+    INTERFACE("settings_cat_interface", Icons.Rounded.Palette),
+    AUDIO("settings_cat_audio", Icons.Rounded.GraphicEq),
     SOURCES("settings_tab_sources", Icons.Rounded.ImportExport),
-    SYNC("sync_title", Icons.Rounded.Sync),
-    DISCORD("pref_discord_title", Icons.Rounded.Forum),
     STORAGE("pref_storage_title", Icons.Rounded.Storage),
+    SYNC("settings_cat_sync", Icons.Rounded.Devices),
     NETWORK("pref_proxy_title", Icons.Rounded.Dns),
+    MISC("settings_cat_misc", Icons.Rounded.Tune),
+}
+
+/** Pages opened inside a category. */
+private enum class SettingsSubPage(val titleKey: String, val subtitleKey: String? = null, val icon: ImageVector? = null) {
+    THEMES("settings_page_themes", "settings_page_themes_sub", Icons.Rounded.ColorLens),
+    PLAYER("settings_page_player", "settings_page_player_sub", Icons.Rounded.PlayCircle),
+    LEFT_PANEL("settings_page_left_panel", "settings_page_left_panel_sub", Icons.Rounded.ViewSidebar),
+    RIGHT_PANEL("settings_page_right_panel", "settings_page_right_panel_sub", Icons.Rounded.ViewQuilt),
+    LYRICS("pref_lyrics_title", "settings_page_lyrics_sub", Icons.Rounded.Lyrics),
+    MINI_PLAYER("mini_player_settings_title", "settings_page_mini_player_sub", Icons.Rounded.PictureInPicture),
+    CUSTOM_THEME("pref_custom_theme"),
+    LYRICS_FULLSCREEN("lyrics_mode_fullscreen"),
+    LYRICS_CENTRAL("lyrics_mode_central"),
+    LYRICS_SIDEBAR("lyrics_mode_sidebar"),
+}
+
+private val interfacePages = listOf(
+    SettingsSubPage.THEMES,
+    SettingsSubPage.PLAYER,
+    SettingsSubPage.LEFT_PANEL,
+    SettingsSubPage.RIGHT_PANEL,
+    SettingsSubPage.LYRICS,
+    SettingsSubPage.MINI_PLAYER,
+)
+
+@Composable
+private fun SettingsPageContent(
+    location: SettingsLocation,
+    navController: NavController,
+    playerViewModel: PlayerViewModel,
+    onOpen: (SettingsSubPage) -> Unit,
+) {
+    when (location.subPage) {
+        null -> when (location.category) {
+            SettingsCategory.INTERFACE -> SettingsGroup(
+                items = interfacePages.map { page ->
+                    { shape ->
+                        SettingsItem(
+                            shape = shape,
+                            title = str(page.titleKey),
+                            subtitle = page.subtitleKey?.let { str(it) },
+                            icon = page.icon,
+                            onClick = { onOpen(page) },
+                        )
+                    }
+                },
+            )
+            SettingsCategory.AUDIO -> AudioSettingsScreen(onBackClick = null, playerViewModel = playerViewModel)
+            SettingsCategory.SOURCES -> {
+                SourcesSection(navController)
+                LyricsSettingsScreen(playerViewModel = playerViewModel, page = LyricsSettingsPage.SOURCES)
+            }
+            SettingsCategory.STORAGE -> StorageSettingsScreen()
+            SettingsCategory.SYNC -> SyncSection(navController)
+            SettingsCategory.NETWORK -> NetworkSection(navController)
+            SettingsCategory.MISC -> MiscSettingsPage(navController, playerViewModel)
+        }
+        SettingsSubPage.THEMES -> ThemesSettingsPage(onOpenCustomTheme = { onOpen(SettingsSubPage.CUSTOM_THEME) })
+        SettingsSubPage.CUSTOM_THEME -> ColorPaletteContent()
+        SettingsSubPage.PLAYER -> PlayerDesignSettingsPage()
+        SettingsSubPage.LEFT_PANEL -> LeftPanelSettingsPage()
+        SettingsSubPage.RIGHT_PANEL -> RightPanelSettingsPage()
+        SettingsSubPage.MINI_PLAYER -> MiniPlayerSettingsPage()
+        SettingsSubPage.LYRICS -> LyricsSettingsScreen(
+            playerViewModel = playerViewModel,
+            page = LyricsSettingsPage.OVERVIEW,
+            onOpenPage = { page ->
+                when (page) {
+                    LyricsSettingsPage.FULLSCREEN -> onOpen(SettingsSubPage.LYRICS_FULLSCREEN)
+                    LyricsSettingsPage.CENTRAL -> onOpen(SettingsSubPage.LYRICS_CENTRAL)
+                    LyricsSettingsPage.SIDEBAR -> onOpen(SettingsSubPage.LYRICS_SIDEBAR)
+                    else -> Unit
+                }
+            },
+        )
+        SettingsSubPage.LYRICS_FULLSCREEN -> LyricsSettingsScreen(playerViewModel = playerViewModel, page = LyricsSettingsPage.FULLSCREEN)
+        SettingsSubPage.LYRICS_CENTRAL -> LyricsSettingsScreen(playerViewModel = playerViewModel, page = LyricsSettingsPage.CENTRAL)
+        SettingsSubPage.LYRICS_SIDEBAR -> LyricsSettingsScreen(playerViewModel = playerViewModel, page = LyricsSettingsPage.SIDEBAR)
+    }
+}
+
+/** The right pane: a title row, with a back arrow on sub-pages, over the page's own scrolling content. */
+@Composable
+private fun SettingsPane(title: String, onBack: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(start = if (onBack != null) 4.dp else 20.dp, end = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+                }
+                Spacer(Modifier.width(4.dp))
+            }
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        com.alananasss.kittytune.ui.common.ScrollableColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = rememberScrollState(),
+            contentPadding = PaddingValues(bottom = 80.dp),
+            content = content,
+        )
+    }
 }
 
 /**
- * The category switcher.
- *
- * A real Material 3 [ButtonGroup] rather than a tab row, which buys three things a `SecondaryScrollableTabRow`
- * cannot:
- *
- *  - **Overflow instead of sideways scrolling.** Eight categories do not fit a narrow window, and a tab strip's
- *    answer is to scroll horizontally — which nobody discovers unless they already suspect it is there. The button
- *    group measures its children and moves whatever will not fit into a dropdown behind one trailing button, so
- *    every category stays reachable *and* visibly so at any window width.
- *  - **Labels at their real width.** The app's own [com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup]
- *    divides the row evenly, which for eight items is eight truncated words. Items here are unweighted, so each
- *    button is as wide as its own label and "Audio & Playback" survives in all four translations.
- *  - **The expressive press.** Pressing a category grows it and compresses its neighbours, which is the
- *    interaction the app's other segmented controls already have and a tab row has nothing like.
+ * The categories. Wide, a list of labelled rows on Material's navigation-drawer pill; narrow, a rail of icons
+ * with their labels underneath, so every category stays one click away at any window width.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SettingsTabs(
-    sections: List<SettingsSection>,
-    selectedIndex: Int,
-    onSelect: (Int) -> Unit,
+private fun CategoryList(
+    selected: SettingsCategory,
+    isWide: Boolean,
+    onSelect: (SettingsCategory) -> Unit,
+    onCredits: () -> Unit,
 ) {
-    // Guard against zero/tiny-width constraints that arrive during AnimatedContent exit
-    // transitions.  ButtonGroup's internal measure policy subtracts spacing and overflow-
-    // indicator width from the incoming maxWidth *before* calling Constraints.copy, so even
-    // a clamped-to-1-px value goes negative and violates Constraints invariants.  When the
-    // container is that narrow, the content is being cross-faded out and is invisible anyway,
-    // so we can safely skip measurement and place nothing.
-    ButtonGroup(
-        overflowIndicator = { menuState -> ButtonGroupDefaults.OverflowIndicator(menuState) },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
-            .layout { measurable, constraints ->
-                // fillMaxWidth() pins minWidth == maxWidth.  ButtonGroup's measure policy then
-                // subtracts overflow-indicator + inter-item spacing from maxWidth *without*
-                // touching minWidth, so minWidth > maxWidth → IllegalArgumentException.
-                // Relaxing minWidth to 0 keeps the layout full-width (ButtonGroup still
-                // receives the original maxWidth) while letting its internal copy() succeed.
-                val placeable = measurable.measure(
-                    constraints.copy(minWidth = 0, minHeight = 0)
-                )
-                layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
-            },
+    Column(
+        Modifier.width(if (isWide) 240.dp else 92.dp).fillMaxHeight(),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        sections.forEachIndexed { position, section ->
-            toggleableItem(
-                checked = position == selectedIndex,
-                label = str(section.titleKey),
-                // The group hands the overflow menu `!checked`, which for a switcher is meaningless — pressing a
-                // category selects it, and pressing the selected one again is not a request to select nothing.
-                onCheckedChange = { onSelect(position) },
-                icon = {
-                    Icon(section.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                },
+        if (isWide) {
+            Text(
+                str("settings_title"),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 18.dp),
             )
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
+        SettingsCategory.entries.forEach { entry ->
+            CategoryItem(
+                label = str(entry.titleKey),
+                icon = entry.icon,
+                isSelected = entry == selected,
+                isWide = isWide,
+                onClick = { onSelect(entry) },
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        CategoryItem(
+            label = str("about_credits"),
+            icon = Icons.Rounded.Groups,
+            isSelected = false,
+            isWide = isWide,
+            onClick = onCredits,
+        )
+    }
+}
+
+@Composable
+private fun CategoryItem(
+    label: String,
+    icon: ImageVector,
+    isSelected: Boolean,
+    isWide: Boolean,
+    onClick: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val container by animateColorAsState(
+        if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
+        label = "categoryPill",
+    )
+    val content = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(if (isWide) 28.dp else 16.dp),
+        color = container,
+        contentColor = content,
+        interactionSource = interaction,
+        modifier = Modifier.fillMaxWidth().pressScale(interaction),
+    ) {
+        if (isWide) {
+            Row(
+                Modifier.height(52.dp).padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            Column(
+                Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

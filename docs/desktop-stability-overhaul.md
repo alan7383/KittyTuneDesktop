@@ -271,6 +271,48 @@ snapped on and off.
   window of their own. The tray menu uses the same component.
 - **Mini player progress bar** sat on the bar's bottom border and its ends ran into the rounded
   corners; it is inset clear of them in both styles.
+- **Tray menu on Windows is a real Win32 menu** (`core/Win32TrayMenu.kt`). Windows 11's hidden-icons
+  flyout closes as soon as the pointer leaves it unless a *native* menu is open: every Compose window
+  (whatever its focus, owner or style) made the flyout — and with it the menu — vanish on hover. AWT's
+  `PopupMenu` kept it open but Java draws its items, so they stayed light and square. The menu is now
+  built with `CreatePopupMenu` / `TrackPopupMenuEx` on a thread with its own message loop; Windows draws
+  it dark (uxtheme's preferred app mode), rounded and animated, and the flyout stays open. Linux keeps
+  the Compose menu. The tray click handler also toggled twice (press and release); it toggles once.
+- **Mini player is a tool window**: no taskbar button and no Java icon (`WS_EX_TOOLWINDOW`,
+  `core/ToolWindowStyle.kt`). Its corners were square because a clipped shadow was drawn around a
+  transparent window — the shadow is gone; the white dot at the right end was Material's progress stop
+  indicator, now off. The settings window opens and closes with the app's dialog motion (fade + scale on
+  the emphasized-decelerate curve).
+
+## Settings, reorganised
+
+Settings were eight tabs in a button group, and Appearance alone was a screen of unrelated switches
+("Dynamic theme" and "Dynamic theme from the track" side by side, the language at the top, the mini
+player hidden behind a dialog). They are now two panes — categories on the left, the chosen one on the
+right — with sub-pages opened inside the right pane (back arrow, Escape or the mouse's back button walk
+out). Going deeper slides along the horizontal axis, switching category fades through. Below 760 dp the
+category list becomes a rail of icons with labels.
+
+- **Interface**: Themes, Player design, Left panel, Right panel, Lyrics, Mini player.
+  - *Themes*: one "Dynamic theme" switch (the two old ones set together); system / light / dark; seven
+    ready-made palettes previewed as real generated schemes (the named ones use the tonal-spot style —
+    the default expressive style rotates the hue, so "Forest" came out red); "Create your own theme"
+    (the old palette screen without the phone mock-up — the whole app recolours live, which previews it
+    better); title bar, zoom, font, icon.
+  - *Player design*: slider style (seek bar and volume share it), vertical volume, a switch per player
+    bar button, covers, and the track/playlist menu tiles.
+  - *Left panel*: hover expand; the rows below Home **reordered by dragging and switched on/off**,
+    including new optional rows — listening stats, history, settings (`sidebar_nav_layout`, migrated
+    from the old hidden set; `SidebarDestinations` is the one catalogue both sides use); library
+    buttons and tiles with custom icons, inline instead of in a dialog.
+  - *Right panel*: the panel's tabs (the last one cannot be switched off) and the half it opens on.
+  - *Lyrics*: common options, plus a page each for the full-screen, central and side-panel views with
+    plain titles, instead of one list of "Alignment (side panel) / Alignment (central) / …".
+  - *Mini player*: the same grouped settings as the mini player's own window.
+- **Audio**, **Sources** (audio providers, import, Yandex token, local files, and now the lyrics
+  providers), **Storage**, **Devices** (sync), **Proxy**.
+- **Other**: language, start screen, auto-update, Discord.
+- One switch style everywhere (`SettingsSwitch`); a switch that cannot be changed still shows its state.
 
 ## Localisation
 
@@ -303,9 +345,9 @@ Reviewing the new upstream code:
 
 ## Tests
 
-- New: `VolumeCurveTest` (curve and lossless migration), `WindowsFullScreenTest.borderlessFullScreenSurvivesFocusLossAndRestoresBounds` (real window,
+- New: `SidebarNavLayoutTest` (sidebar order/visibility parsing and migration), `VolumeCurveTest` (curve and lossless migration), `WindowsFullScreenTest.borderlessFullScreenSurvivesFocusLossAndRestoresBounds` (real window,
   Windows only) and `LanguageDetectionTest` (low-accuracy mode still tells ru / en / fr apart).
 - `LinuxStatusNotifierLiveTest` now skips itself off Linux instead of failing — it needs a session bus.
-- Full suite on Windows: 519 tests. The only failures are `VolumeNormalizationTest` (7), which need the
+- Full suite on Windows: 522 tests. The only failures are `VolumeNormalizationTest` (7), which need the
   native DSP library; the repo ships the `.so` only and the `.dll` is built by CI on `windows-latest`
   (`compileNativeDSP` needs g++). Unrelated to this branch.
