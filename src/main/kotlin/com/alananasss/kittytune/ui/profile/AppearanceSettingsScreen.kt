@@ -1148,14 +1148,19 @@ fun MiniPlayerSettingsDialog(
     val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
     val scheme = MaterialTheme.colorScheme
 
+    // Eight settings, each with a description, in a dialog that scrolled with no scrollbar: nothing said
+    // there was more below, and the wheel moved a long undivided list. Now grouped, compact, and in a
+    // fixed-height pane whose scrollbar shows where you are.
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(str("mini_player_settings_title")) },
         text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            com.alananasss.kittytune.ui.common.ScrollableColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp),
+                contentPadding = PaddingValues(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
+                MiniPlayerSectionTitle(str("mini_player_section_look"))
                 MiniPlayerSwitchRow(
                     title = str("mini_player_style_elongated"),
                     subtitle = str("mini_player_style_elongated_desc"),
@@ -1173,10 +1178,8 @@ fun MiniPlayerSettingsDialog(
                     checked = transparentBg,
                     onCheckedChange = { prefs.setMiniPlayerTransparentBg(it) }
                 )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = scheme.outlineVariant.copy(alpha = 0.5f)
-                )
+
+                MiniPlayerSectionTitle(str("mini_player_section_content"))
                 MiniPlayerSwitchRow(
                     title = str("mini_player_show_cover"),
                     subtitle = str("mini_player_show_cover_desc"),
@@ -1195,10 +1198,14 @@ fun MiniPlayerSettingsDialog(
                     checked = showAdditional,
                     onCheckedChange = { prefs.setMiniPlayerShowAdditionalControls(it) }
                 )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = scheme.outlineVariant.copy(alpha = 0.5f)
+                MiniPlayerSwitchRow(
+                    title = str("mini_player_show_progress"),
+                    subtitle = str("mini_player_show_progress_desc"),
+                    checked = showProgress,
+                    onCheckedChange = { prefs.setMiniPlayerShowProgress(it) }
                 )
+
+                MiniPlayerSectionTitle(str("mini_player_section_behaviour"))
                 MiniPlayerSwitchRow(
                     title = str("mini_player_controls_on_hover"),
                     subtitle = str("mini_player_controls_on_hover_desc"),
@@ -1211,15 +1218,19 @@ fun MiniPlayerSettingsDialog(
                     checked = hoverEffect,
                     onCheckedChange = { prefs.setMiniPlayerHoverEffect(it) }
                 )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_progress"),
-                    subtitle = str("mini_player_show_progress_desc"),
-                    checked = showProgress,
-                    onCheckedChange = { prefs.setMiniPlayerShowProgress(it) }
-                )
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } }
+    )
+}
+
+@Composable
+private fun MiniPlayerSectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp),
     )
 }
 
@@ -1233,23 +1244,24 @@ private fun MiniPlayerSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(Modifier.width(12.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
+        // The row is the target; the switch only shows the state, so one click never toggles twice.
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

@@ -1000,6 +1000,9 @@
     <string name="pref_mini_player_settings">Mini player settings</string>
     <string name="pref_mini_player_settings_desc">Customize mini player controls, display, and hover interaction</string>
     <string name="mini_player_settings_title">Mini Player Settings</string>
+    <string name="mini_player_section_look">Look</string>
+    <string name="mini_player_section_content">Content</string>
+    <string name="mini_player_section_behaviour">Behaviour</string>
     <string name="mini_player_show_cover">Show album cover</string>
     <string name="mini_player_show_cover_desc">Display artwork thumbnail in the mini player</string>
     <string name="mini_player_show_playback_controls">Show playback buttons</string>

@@ -1063,7 +1063,8 @@ private fun MiniLyricsContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp)
+                    // Clear of the 22 dp corners, for the same reason as the elongated bar's.
+                    .padding(start = 24.dp, end = 24.dp, bottom = 6.dp)
                     .height(2.5.dp)
                     .clip(RoundedCornerShape(1.dp)),
                 color = MaterialTheme.colorScheme.primary,
@@ -1296,7 +1297,9 @@ private fun MiniLyricsElongatedContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp)
+                    // Inset past the 10 dp corners and lifted off the edge: laid on the border itself,
+                    // its ends ran into the rounding and it read as a line sticking out of the bar.
+                    .padding(start = 14.dp, end = 14.dp, bottom = 3.dp)
                     .height(2.dp)
                     .clip(RoundedCornerShape(1.dp)),
                 color = MaterialTheme.colorScheme.primary,

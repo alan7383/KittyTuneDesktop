@@ -1000,6 +1000,9 @@
     <string name="pref_mini_player_settings">Настройки мини-плеера</string>
     <string name="pref_mini_player_settings_desc">Настройка элементов управления, отображения и наведения мыши</string>
     <string name="mini_player_settings_title">Настройки мини-плеера</string>
+    <string name="mini_player_section_look">Вид</string>
+    <string name="mini_player_section_content">Содержимое</string>
+    <string name="mini_player_section_behaviour">Поведение</string>
     <string name="mini_player_show_cover">Показывать обложку альбома</string>
     <string name="mini_player_show_cover_desc">Отображать миниатюру обложки в мини-плеере</string>
     <string name="mini_player_show_playback_controls">Показывать кнопки воспроизведения</string>
