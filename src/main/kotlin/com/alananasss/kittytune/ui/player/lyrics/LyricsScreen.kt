@@ -188,7 +188,7 @@ import kotlin.math.roundToInt
                                                 ArtistLinkText(
                                                     track = currentTrack,
                                                     onArtistClick = { viewModel.navigateToTrackArtist(it) },
-                                                    text = currentTrack.user?.username ?: "",
+                                                    text = currentTrack.displayArtist.ifBlank { currentTrack.user?.username.orEmpty() },
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     hoverColor = MaterialTheme.colorScheme.onSurface,

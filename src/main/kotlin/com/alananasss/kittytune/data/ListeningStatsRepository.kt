@@ -92,13 +92,15 @@ object ListeningStatsRepository {
     ) {
         val write: suspend () -> Unit = {
             val timestamp = System.currentTimeMillis()
+            val effectiveArtist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { "Unknown" }
+            val primaryArtist = track.artists?.firstOrNull()
             val payload = ListenPayload(
                 trackId = track.id,
                 trackTitle = track.title ?: "Unknown",
-                artistName = track.user?.username ?: "Unknown",
+                artistName = effectiveArtist,
                 artistId = track.user?.id,
-                artistPermalink = track.user?.permalinkUrl,
-                artistAvatarUrl = track.user?.avatarUrl,
+                artistPermalink = primaryArtist?.id ?: track.user?.permalinkUrl,
+                artistAvatarUrl = primaryArtist?.avatarUrl ?: track.user?.avatarUrl,
                 artworkUrl = track.fullResArtwork,
                 source = track.source ?: "soundcloud",
                 eventType = eventType,

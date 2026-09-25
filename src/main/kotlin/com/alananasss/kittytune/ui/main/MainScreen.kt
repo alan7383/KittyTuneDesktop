@@ -639,12 +639,16 @@ fun MainScreen(
                                 onBackClick = { navController.popBackStack() },
                                 onTrackClick = { top -> playerViewModel.navigateToTrackDetails(top.trackId) },
                                 onArtistClick = { top ->
-                                    // The stats table keeps the name always and the id only
-                                    // sometimes, so resolving by name is the path that always works.
-                                    playerViewModel.resolveAndNavigateToArtist(
-                                        top.artistName,
-                                        top.artistId,
-                                    )
+                                    if (top.source == "spotify" && !top.artistPermalink.isNullOrBlank()) {
+                                        playerViewModel.navigateToSpotifyArtist(
+                                            top.artistPermalink.removePrefix("spotify:artist:")
+                                        )
+                                    } else {
+                                        playerViewModel.resolveAndNavigateToArtist(
+                                            top.artistName,
+                                            top.artistId,
+                                        )
+                                    }
                                 },
                             )
                         }
