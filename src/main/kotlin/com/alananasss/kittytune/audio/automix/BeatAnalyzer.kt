@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.audio.automix
 
 import com.alananasss.kittytune.utils.Logger
+import com.alananasss.kittytune.audio.releaseQuietly
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.Frame
 import org.bytedeco.javacv.FrameGrabber
@@ -94,19 +95,7 @@ object BeatAnalyzer {
             val windowStartMs = if (totalDurationMs > 36_000L) max(0L, totalDurationMs / 2 - 9_000L) else 0L
             if (shouldCancel()) return null
             val midPcm = try {
-                val inStream = adapter.getInputStream(windowStartMs)
-                val grabber = FFmpegFrameGrabber(inStream).apply {
-                    format = "mp4"
-                    setOption("probesize", "32768")
-                    setOption("analyzeduration", "0")
-                    sampleRate = 44100
-                    audioChannels = 1
-                    sampleMode = FrameGrabber.SampleMode.FLOAT
-                }
-                grabber.start()
-                val p = decodeMono(grabber, WINDOW_US, shouldCancel, actualStartUs = windowStartMs * 1000L)
-                try { grabber.stop(); grabber.release() } catch (_: Exception) {}
-                p
+                decodeHlsWindow(adapter, windowStartMs, WINDOW_US, shouldCancel)
             } catch (e: Exception) {
                 Logger.w(TAG, "Failed decoding HLS middle window: ${e.message}")
                 null
@@ -145,18 +134,7 @@ object BeatAnalyzer {
             var mixInPointMs: Long? = null
             if (totalDurationMs > 16_000L && !shouldCancel()) {
                 try {
-                    val inStream = adapter.getInputStream(0L)
-                    val grabber = FFmpegFrameGrabber(inStream).apply {
-                        format = "mp4"
-                        setOption("probesize", "32768")
-                        setOption("analyzeduration", "0")
-                        sampleRate = 44100
-                        audioChannels = 1
-                        sampleMode = FrameGrabber.SampleMode.FLOAT
-                    }
-                    grabber.start()
-                    val headPcm = decodeMono(grabber, HEAD_WINDOW_US, shouldCancel, actualStartUs = 0L)
-                    try { grabber.stop(); grabber.release() } catch (_: Exception) {}
+                    val headPcm = decodeHlsWindow(adapter, 0L, HEAD_WINDOW_US, shouldCancel)
                     if (headPcm != null) {
                         mixInPointMs = detectMixIn(
                             energyEnvelope(headPcm.samples, headPcm.sampleRate),
@@ -171,18 +149,7 @@ object BeatAnalyzer {
             if (totalDurationMs > 45_000L && !shouldCancel()) {
                 val tailStartMs = max(0L, totalDurationMs - 24_000L)
                 try {
-                    val inStream = adapter.getInputStream(tailStartMs)
-                    val grabber = FFmpegFrameGrabber(inStream).apply {
-                        format = "mp4"
-                        setOption("probesize", "32768")
-                        setOption("analyzeduration", "0")
-                        sampleRate = 44100
-                        audioChannels = 1
-                        sampleMode = FrameGrabber.SampleMode.FLOAT
-                    }
-                    grabber.start()
-                    val tailPcm = decodeMono(grabber, TAIL_WINDOW_US, shouldCancel, actualStartUs = tailStartMs * 1000L)
-                    try { grabber.stop(); grabber.release() } catch (_: Exception) {}
+                    val tailPcm = decodeHlsWindow(adapter, tailStartMs, TAIL_WINDOW_US, shouldCancel)
                     if (tailPcm != null) {
                         mixOutPointMs = detectMixOut(
                             energyEnvelope(tailPcm.samples, tailPcm.sampleRate),
@@ -307,10 +274,34 @@ object BeatAnalyzer {
             Logger.w(TAG, "Beat analysis failed: ${e.message}")
             return null
         } finally {
-            try {
-                grabber?.stop()
-                grabber?.release()
-            } catch (_: Exception) {}
+            grabber?.releaseQuietly()
+        }
+    }
+
+    /**
+     * Decodes one window of an HLS stream. The grabber is released however decoding ends: its
+     * demuxer and codec contexts live in native memory that no garbage collection will ever free,
+     * so one skipped release on a network error is a permanent leak, and this runs for every track.
+     */
+    private fun decodeHlsWindow(
+        adapter: com.alananasss.kittytune.audio.HlsStreamAdapter,
+        startMs: Long,
+        windowUs: Long,
+        shouldCancel: () -> Boolean,
+    ): MonoPcm? {
+        val grabber = FFmpegFrameGrabber(adapter.getInputStream(startMs)).apply {
+            format = "mp4"
+            setOption("probesize", "32768")
+            setOption("analyzeduration", "0")
+            sampleRate = 44100
+            audioChannels = 1
+            sampleMode = FrameGrabber.SampleMode.FLOAT
+        }
+        return try {
+            grabber.start()
+            decodeMono(grabber, windowUs, shouldCancel, actualStartUs = startMs * 1000L)
+        } finally {
+            grabber.releaseQuietly()
         }
     }
 

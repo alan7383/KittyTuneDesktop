@@ -32,7 +32,6 @@ import com.alananasss.kittytune.utils.Logger
     import kotlinx.coroutines.flow.first
     import kotlinx.coroutines.launch
     import kotlinx.coroutines.withContext
-    import okhttp3.OkHttpClient
     import okhttp3.Request
     import java.net.URLDecoder
     import java.util.Locale
@@ -255,12 +254,11 @@ import com.alananasss.kittytune.utils.Logger
 
         private suspend fun unshortenUrl(shortUrl: String): String = withContext(Dispatchers.IO) {
             try {
-                val client = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(
-                    OkHttpClient.Builder().followRedirects(true).followSslRedirects(true)
-                ).build()
+                // The shared client already follows redirects; the response is closed so its
+                // pooled connection goes back instead of leaking.
+                val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
                 val request = Request.Builder().url(shortUrl).head().build()
-                val response = client.newCall(request).execute()
-                response.request.url.toString()
+                client.newCall(request).execute().use { response -> response.request.url.toString() }
             } catch (e: Exception) {
                 shortUrl
             }

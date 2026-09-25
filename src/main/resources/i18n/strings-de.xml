@@ -1523,6 +1523,7 @@
     <string name="listening_stats_empty_desc">Fang an zu hören, um hier deine Statistiken zu sehen!</string>
 
     <string name="listening_stats_duration_zero">Keine Daten</string>
+    <string name="listening_stats_duration_min">%1$d Min.</string>
     <string name="listening_stats_duration_days_hrs">%1$d T. %2$d Std.</string>
     <string name="listening_stats_duration_hr_min">%1$d Std. %2$d Min.</string>
     <string name="listening_stats_duration_min_sec">%1$d Min. %2$d Sek.</string>

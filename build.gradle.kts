@@ -121,7 +121,8 @@ compose.desktop {
         // one would refuse to start on an option it does not know.
         val buildJdk = JavaVersion.current().majorVersion.toIntOrNull() ?: 0
         if (buildJdk >= 24) jvmArgs += "--enable-native-access=ALL-UNNAMED"
-        if (buildJdk >= 25) jvmArgs += "--enable-final-field-mutation=ALL-UNNAMED"
+        // JEP 500's option only exists from JDK 26; a JDK 25 launcher refuses to start on it.
+        if (buildJdk >= 26) jvmArgs += "--enable-final-field-mutation=ALL-UNNAMED"
         // jffi, pulled in by the D-Bus transport, reaches into sun.misc.Unsafe for memory
         // access. Nothing we can fix from here — the flag is the JDK's own way to say "known,
         // stop printing it", and it also keeps that code working once the default flips to
@@ -186,6 +187,11 @@ compose.desktop {
         // Thousands of tracks repeat the same artist names, genres and CDN prefixes. Deduplicating
         // those strings costs a background pass and gives back real memory here.
         jvmArgs += "-XX:+UseStringDeduplication"
+        // Skia's GPU resource cache defaults to 256 MB of textures and render targets, which it fills
+        // and keeps. Everything this app draws is covers and flat UI, re-uploaded in microseconds from
+        // the decoded copies Coil already holds, so a quarter of that is plenty. Measured over six
+        // minutes of track changes: steady state ~710 MB instead of ~760 MB private memory.
+        jvmArgs += "-Dskiko.gpu.resourceCacheLimit=67108864"
 
         /**
          * Where the memory actually goes, on demand: `./gradlew packageReleaseMsi -PmemDiag`.
@@ -243,7 +249,24 @@ compose.desktop {
                 "jdk.security.auth"
             )
 
+            // "Open with KittyTune" and the music entry in the OS's default-apps settings. Neither
+            // Windows nor the Linux desktops hand over an existing default without the user saying
+            // so; this only makes KittyTune one of the choices. Files arrive as main() arguments.
+            val audioFileTypes = mapOf(
+                "mp3" to "audio/mpeg",
+                "flac" to "audio/flac",
+                "m4a" to "audio/mp4",
+                "aac" to "audio/aac",
+                "ogg" to "audio/ogg",
+                "opus" to "audio/opus",
+                "wav" to "audio/wav",
+                "wma" to "audio/x-ms-wma",
+            )
+
             windows {
+                audioFileTypes.forEach { (extension, mimeType) ->
+                    fileAssociation(mimeType, extension, "Audio file (.$extension)", project.file("src/main/resources/icons/kittytune.ico"))
+                }
                 shortcut = true
                 menu = true
                 dirChooser = true
@@ -253,6 +276,9 @@ compose.desktop {
             }
 
             linux {
+                audioFileTypes.forEach { (extension, mimeType) ->
+                    fileAssociation(mimeType, extension, "Audio file (.$extension)", project.file("src/main/resources/icons/kittytune_linux.png"))
+                }
                 shortcut = true
                 menuGroup = "AudioVideo"
                 appCategory = "AudioVideo"

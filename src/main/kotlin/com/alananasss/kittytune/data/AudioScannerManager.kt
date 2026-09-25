@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.audio.NormalizationAudioProcessor
+import com.alananasss.kittytune.audio.releaseQuietly
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.Frame
 import org.bytedeco.javacv.FrameGrabber
@@ -105,10 +106,7 @@ object AudioScannerManager {
             if (analyzer != 0L) {
                 try { nativeDestroyAnalyzer(analyzer) } catch (_: Throwable) {}
             }
-            try {
-                grabber?.stop()
-                grabber?.release()
-            } catch (_: Throwable) {}
+            grabber?.releaseQuietly()
         }
     }
 }

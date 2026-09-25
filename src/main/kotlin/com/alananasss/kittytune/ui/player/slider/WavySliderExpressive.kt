@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.times
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -81,6 +82,9 @@ fun WavySliderExpressive(
     semanticsProgressStep: Float = 0.01f
 ) {
     val density = LocalDensity.current
+    // Nobody can see the window: stop the wave and the per-frame smoothing, which would otherwise keep
+    // the whole window repainting at 60 fps for as long as music plays.
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
     val strokeWidthPx = with(density) { strokeWidth.toPx() }
     val thumbRadiusPx = with(density) { thumbRadius.toPx() }
     val trackEdgePaddingPx = with(density) { trackEdgePadding.coerceAtLeast(0.dp).toPx() }
@@ -149,56 +153,41 @@ fun WavySliderExpressive(
         }
     }
 
-    val renderedNormalizedProgress = remember {
-        val initialVal = value()
-        val initialNorm = if (valueRange.endInclusive == valueRange.start) 0f
-        else ((initialVal - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
-        mutableFloatStateOf(initialNorm)
-    }
+    // What is drawn, and how far the wave has travelled. Both move on one 30 fps tick driven by
+    // `delay`, which — unlike awaiting frames — does not itself ask for any. The previous version ran
+    // Material's wave animation and a per-frame glide, each requesting every frame: the whole window
+    // was re-rendered at 60 fps for as long as music played, about a quarter of a CPU core.
+    val renderedNormalizedProgress = remember { mutableFloatStateOf(normalizedValueState.value) }
+    val wavePhasePx = remember { mutableFloatStateOf(0f) }
+    val wavelengthPx = with(density) { wavelength.toPx() }.coerceAtLeast(1f)
+    val waveSpeedPx = with(density) { waveSpeed.toPx() }
 
-    LaunchedEffect(valueRange) {
-        renderedNormalizedProgress.floatValue = normalizedValueState.value
-    }
-    var lastProgressUpdateNanos by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(isInteracting, enabled) {
+    // Jumps land at once: a seek, a new track, a drag, or anything while the glide is not running.
+    val isGliding = isSeen && isPlaying && enabled && !isInteracting
+    LaunchedEffect(isGliding, valueRange) {
         snapshotFlow { normalizedValueState.value }.collect { target ->
-            if (!enabled || isInteracting) {
+            val current = renderedNormalizedProgress.floatValue
+            if (!isGliding || target == 0f || abs(current - target) > 0.08f) {
                 renderedNormalizedProgress.floatValue = target
-                lastProgressUpdateNanos = System.nanoTime()
-                return@collect
             }
-
-            val start = renderedNormalizedProgress.floatValue
-            if (target == 0f || abs(start - target) > 0.08f) {
-                renderedNormalizedProgress.floatValue = target
-                lastProgressUpdateNanos = System.nanoTime()
-                return@collect
-            }
-
-            val nowNanos = System.nanoTime()
-            val intervalMs = if (lastProgressUpdateNanos == 0L) {
-                180L
-            } else {
-                ((nowNanos - lastProgressUpdateNanos) / 1_000_000L).coerceIn(1L, 250L)
-            }
-            lastProgressUpdateNanos = nowNanos
-
-            if (abs(start - target) <= 0.0001f) {
-                renderedNormalizedProgress.floatValue = target
-                return@collect
-            }
-
-            val durationNanos = (intervalMs * 900_000L).coerceAtLeast(1_000_000L)
-            var startFrameNanos = 0L
-            while (isActive) {
-                val frameNanos = withFrameNanos { it }
-                if (startFrameNanos == 0L) startFrameNanos = frameNanos
-                val elapsedNanos = (frameNanos - startFrameNanos).coerceAtLeast(0L)
-                val fraction = (elapsedNanos.toDouble() / durationNanos.toDouble()).toFloat().coerceIn(0f, 1f)
-                renderedNormalizedProgress.floatValue = start + (target - start) * fraction
-                if (fraction >= 1f) break
-            }
-            renderedNormalizedProgress.floatValue = target
+        }
+    }
+    LaunchedEffect(isGliding, wavelengthPx, waveSpeedPx) {
+        if (!isGliding) return@LaunchedEffect
+        var last = System.nanoTime()
+        while (isActive) {
+            delay(WAVE_TICK_MS)
+            val now = System.nanoTime()
+            val seconds = (now - last) / 1_000_000_000f
+            last = now
+            wavePhasePx.floatValue = (wavePhasePx.floatValue + waveSpeedPx * seconds) % wavelengthPx
+            // Position updates arrive about every 250 ms; closing the gap over that span keeps the
+            // thumb moving steadily instead of stepping four times a second.
+            val target = normalizedValueState.value
+            val current = renderedNormalizedProgress.floatValue
+            renderedNormalizedProgress.floatValue =
+                if (abs(target - current) < 0.0005f) target
+                else current + (target - current) * (seconds / 0.25f).coerceAtMost(1f)
         }
     }
 
@@ -229,26 +218,7 @@ fun WavySliderExpressive(
             },
         contentAlignment = Alignment.Center
     ) {
-        if (isVisible) {
-            LinearWavyProgressIndicator(
-                progress = { renderedNormalizedProgress.floatValue },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = trackEdgePadding.coerceAtLeast(0.dp))
-                    .clearAndSetSemantics { },
-                color = activeTrackColor,
-                trackColor = inactiveTrackColor,
-                stroke = stroke,
-                trackStroke = stroke,
-                gapSize = 2f * dynamicGapSize.value * (1.0f + 0.1573f * animatedAmplitude * animatedAmplitude),
-                stopSize = 3.dp,
-                amplitude = { progress -> if (progress > 0f) animatedAmplitude else 0f },
-                wavelength = wavelength,
-                waveSpeed = waveSpeed
-            )
-        } else {
-            Spacer(modifier = Modifier.fillMaxWidth().height(containerHeight))
-        }
+        Spacer(modifier = Modifier.fillMaxWidth().height(containerHeight))
 
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (!isVisible) return@Canvas
@@ -269,6 +239,36 @@ fun WavySliderExpressive(
             val minThumbCenter = (currentWidth / 2f).coerceAtMost(size.width / 2f)
             val maxThumbCenter = (size.width - currentWidth / 2f).coerceAtLeast(minThumbCenter)
             val thumbX = rawThumbX.coerceIn(minThumbCenter, maxThumbCenter)
+
+            // The track: a wave up to the thumb, a gap either side of it, then a flat line with a
+            // stop dot at the end. Read here, in drawing, so ticks repaint without recomposing.
+            val halfGap = with(density) { dynamicGapSize.value.toPx() } *
+                (1.0f + 0.1573f * animatedAmplitude * animatedAmplitude)
+            val amplitudePx = with(density) { waveAmplitudeWhenPlaying.toPx() } * animatedAmplitude
+            val activeEnd = (thumbX - halfGap).coerceAtLeast(trackStart)
+            val inactiveStart = (thumbX + halfGap).coerceAtMost(trackEnd)
+            if (activeEnd > trackStart) {
+                val wave = androidx.compose.ui.graphics.Path()
+                var x = trackStart
+                val phase = wavePhasePx.floatValue
+                val k = (2.0 * Math.PI / wavelengthPx).toFloat()
+                wave.moveTo(x, thumbY + amplitudePx * kotlin.math.sin(k * (x - phase)))
+                while (x < activeEnd) {
+                    x = (x + WAVE_STEP_PX).coerceAtMost(activeEnd)
+                    wave.lineTo(x, thumbY + amplitudePx * kotlin.math.sin(k * (x - phase)))
+                }
+                drawPath(wave, activeTrackColor, style = stroke)
+            }
+            if (inactiveStart < trackEnd) {
+                drawLine(
+                    color = inactiveTrackColor,
+                    start = Offset(inactiveStart, thumbY),
+                    end = Offset(trackEnd, thumbY),
+                    strokeWidth = strokeWidthPx,
+                    cap = StrokeCap.Round,
+                )
+                drawCircle(activeTrackColor, with(density) { 1.5.dp.toPx() }, Offset(trackEnd, thumbY))
+            }
 
             drawRoundRect(
                 color = thumbColor,
@@ -353,3 +353,9 @@ fun WavySliderExpressive(
         )
     }
 }
+
+/** 30 fps: at this much motion the wave reads as smooth, for half the frames of the display rate. */
+private const val WAVE_TICK_MS = 33L
+
+/** Horizontal resolution of the drawn wave. */
+private const val WAVE_STEP_PX = 2f

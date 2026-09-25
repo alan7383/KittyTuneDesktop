@@ -888,6 +888,7 @@
     <string name="listening_stats_duration_min_sec">%1$d мин %2$d с</string>
     <string name="listening_stats_duration_sec">%1$d с</string>
     <string name="listening_stats_duration_zero">Нет данных</string>
+    <string name="listening_stats_duration_min">%1$d мин.</string>
     <string name="listening_stats_empty_desc">Начните слушать музыку, чтобы увидеть здесь свою статистику!</string>
     <string name="listening_stats_empty_title">Пока нет статистики</string>
     <string name="listening_stats_habits">Привычки прослушивания</string>

@@ -344,14 +344,14 @@ private fun SidebarProfileRow(
                         AsyncImage(
                             model = avatarUrl,
                             contentDescription = null,
-                            error = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
-                            fallback = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
+                            error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
+                            fallback = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.size(SidebarMorph.ICON_SIZE).clip(CircleShape),
                         )
                     } else {
                         androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
+                            painter = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.size(SidebarMorph.ICON_SIZE).clip(CircleShape),
@@ -459,7 +459,6 @@ private fun ProfileMenu(
     }
 }
 
-private const val DEFAULT_AVATAR = "drawable/ic_default_user_artwork_placeholder_round.xml"
 
 /** Left/right click handling shared by all library entry composables. */
 @OptIn(ExperimentalFoundationApi::class)

@@ -380,10 +380,14 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        StatItem(Icons.Rounded.PlayArrow, displayTrack.playbackCount, onClick = null)
-                        StatItem(Icons.Rounded.Favorite, displayTrack.likesCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 0) })
-                        StatItem(Icons.Rounded.Repeat, displayTrack.repostsCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 1) })
-                        StatItem(Icons.Rounded.Comment, displayTrack.commentCount, onClick = null)
+                        // Local files (negative ids) have no plays, likes or reposts to show — a row
+                        // of zeros only looked broken.
+                        if (displayTrack.id > 0) {
+                            StatItem(Icons.Rounded.PlayArrow, displayTrack.playbackCount, onClick = null)
+                            StatItem(Icons.Rounded.Favorite, displayTrack.likesCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 0) })
+                            StatItem(Icons.Rounded.Repeat, displayTrack.repostsCount, onClick = { vm.navigateToTrackDetails(displayTrack.id, 1) })
+                            StatItem(Icons.Rounded.Comment, displayTrack.commentCount, onClick = null)
+                        }
                         Spacer(modifier = Modifier.weight(1f))
                         IconButton(
 

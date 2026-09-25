@@ -678,13 +678,13 @@ fun ArtistAvatar(modifier: Modifier = Modifier, avatarUrl: String?) {
                 model = avatarUrl.getHighResAvatarUrl() ?: avatarUrl,
                 contentDescription = str("profile_avatar"),
                 contentScale = ContentScale.Crop,
-                error = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
-                fallback = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
+                error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
+                fallback = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                 modifier = Modifier.fillMaxSize()
             )
         } else {
             androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
+                painter = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                 contentDescription = str("profile_avatar"),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

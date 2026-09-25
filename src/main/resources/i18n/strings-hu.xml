@@ -892,6 +892,7 @@
     <string name="listening_stats_duration_min_sec">%1$dp %2$dmp</string>
     <string name="listening_stats_duration_sec">%1$dmp</string>
     <string name="listening_stats_duration_zero">Nincs adat</string>
+    <string name="listening_stats_duration_min">%1$d perc</string>
     <string name="listening_stats_empty_desc">Kezdj el zenét hallgatni, hogy itt lássad a statisztikáidat!</string>
     <string name="listening_stats_empty_title">Még nincsenek statisztikák</string>
     <string name="listening_stats_habits">Hallgatási szokások</string>

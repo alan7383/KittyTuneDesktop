@@ -197,11 +197,15 @@ class Player {
     val duration: Long get() = activeEngine.durationMs
     val isLoading: Boolean get() = activeEngine.state == AudioEngine.State.BUFFERING
 
+    /** The slider's position, 0..1. Engines are given [volumeAmplitude], never this directly. */
     var volume: Float = 1f
         set(value) {
             field = value
-            activeEngine.setVolume(value)
+            activeEngine.setVolume(volumeAmplitude)
         }
+
+    private val volumeAmplitude: Float
+        get() = com.alananasss.kittytune.audio.VolumeCurve.sliderToAmplitude(volume)
 
     /**
      * The current track's own trim, in dB. Re-applied whenever playback moves to an engine, since
@@ -409,7 +413,7 @@ class Player {
                     newEngine.prepare()
                 }
 
-                val targetVolume = volume
+                val targetVolume = volumeAmplitude
                 newEngine.setVolume(0f)
                 newEngine.setTrackGainDb(trackGainDb)
 
@@ -481,7 +485,7 @@ class Player {
             } finally {
                 try {
                     if (fadingEngine == oldEngine) {
-                        newEngine.setVolume(volume)
+                        newEngine.setVolume(volumeAmplitude)
                         oldEngine.setVolume(0f)
                         oldEngine.stop()
                         oldEngine.release()
@@ -600,7 +604,7 @@ class Player {
             fadingEngine?.release()
             fadingEngine = null
             
-            activeEngine.setVolume(volume)
+            activeEngine.setVolume(volumeAmplitude)
             activeEngine.setTrackGainDb(trackGainDb)
             activeEngine.setMediaItem(url, headers, startPositionMs)
             activeEngine.prepare()

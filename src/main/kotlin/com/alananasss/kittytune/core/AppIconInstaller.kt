@@ -137,24 +137,7 @@ object AppIconInstaller {
      * name on every switch. User desktop files shadow system ones per XDG spec.
      */
     private fun overrideDesktopFile(variantKey: String) {
-        val dataDirs = listOf(
-            File("/usr/share/applications"),
-            File("/usr/local/share/applications"),
-            File(System.getProperty("user.home"), ".local/share/applications")
-        ) + (System.getenv("XDG_DATA_DIRS") ?: "")
-            .split(":").filter { it.isNotBlank() }
-            .map { File(it, "applications") }
-
-        val systemDesktop = dataDirs
-            .filter { it.isDirectory }
-            .flatMap { dir -> dir.listFiles { f -> f.isFile && f.extension == "desktop" }?.toList() ?: emptyList() }
-            .filter { it.name.contains("kitty", ignoreCase = true) && it.name.contains("tune", ignoreCase = true) }
-            .firstOrNull { df ->
-                val txt = runCatching { df.readText() }.getOrDefault("")
-                // Skip our own auth-handler stubs (NoDisplay=true).
-                !txt.contains("NoDisplay=true") &&
-                    (txt.contains("Name=KittyTune") || txt.contains("itty-tune", ignoreCase = true))
-            } ?: run {
+        val systemDesktop = findInstalledDesktopFile() ?: run {
             println("[AppIconInstaller] No system .desktop found; skipping override")
             return
         }
@@ -179,6 +162,31 @@ object AppIconInstaller {
         }
 
         userDesktop.writeText(rewritten.joinToString("\n") + "\n")
+    }
+
+    /**
+     * The KittyTune launcher entry the package installed, wherever the package manager put it —
+     * deb, rpm and AUR builds name it differently. Our own auth-handler stubs are skipped.
+     */
+    internal fun findInstalledDesktopFile(): File? {
+        val dataDirs = listOf(
+            File("/usr/share/applications"),
+            File("/usr/local/share/applications"),
+            File(System.getProperty("user.home"), ".local/share/applications")
+        ) + (System.getenv("XDG_DATA_DIRS") ?: "")
+            .split(":").filter { it.isNotBlank() }
+            .map { File(it, "applications") }
+
+        return dataDirs
+            .filter { it.isDirectory }
+            .flatMap { dir -> dir.listFiles { f -> f.isFile && f.extension == "desktop" }?.toList() ?: emptyList() }
+            .filter { it.name.contains("kitty", ignoreCase = true) && it.name.contains("tune", ignoreCase = true) }
+            .firstOrNull { df ->
+                val txt = runCatching { df.readText() }.getOrDefault("")
+                // Skip our own auth-handler stubs (NoDisplay=true).
+                !txt.contains("NoDisplay=true") &&
+                    (txt.contains("Name=KittyTune") || txt.contains("itty-tune", ignoreCase = true))
+            }
     }
 
     /** XDG desktop directory (handles localized names like ~/Bureau), fallback ~/Desktop. */

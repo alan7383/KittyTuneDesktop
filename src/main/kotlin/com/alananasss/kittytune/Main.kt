@@ -88,8 +88,11 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
 }
 
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
-fun main() {
+fun main(args: Array<String>) {
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
+    // Before anything heavy loads: a second launch only has to wake the first one up.
+    // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
+    if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
     runCatching {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
     }
@@ -131,6 +134,17 @@ fun main() {
                     w.requestFocus()
                 }
             }
+        }
+
+        LaunchedEffect(Unit) {
+            com.alananasss.kittytune.core.OpenFileRequests.requests.collect { files ->
+                playerViewModel.playLocalFiles(files)
+            }
+        }
+
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            com.alananasss.kittytune.core.MainWindowRaiser.handler = { showMainWindow() }
+            onDispose { com.alananasss.kittytune.core.MainWindowRaiser.handler = null }
         }
 
         val osName = remember { System.getProperty("os.name").lowercase() }
@@ -253,6 +267,13 @@ fun main() {
                 isAppFullScreen = false
                 isRestoringFromFullScreen = true
                 try {
+                    // On Windows the window never left Compose's placement; WindowsFullScreen.exit restores
+                    // it natively from inside the window. Restoring here as well raced that restore and
+                    // left the frame at whichever size landed last.
+                    if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                        kotlinx.coroutines.delay(300)
+                        return@LaunchedEffect
+                    }
                     val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
                         ?: androidx.compose.ui.window.WindowPlacement.Floating
                     if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
@@ -481,7 +502,12 @@ fun main() {
                 fontScale = currentDensity.fontScale * uiScale
             )
 
-            CompositionLocalProvider(LocalDensity provides customDensity) {
+            val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
+
+            CompositionLocalProvider(
+                LocalDensity provides customDensity,
+                com.alananasss.kittytune.core.LocalWindowSeen provides windowSeen,
+            ) {
                 KittyTuneTheme {
                     // Inside the theme, so the title bar and underlying window canvas track
                     // the live palette — the cover-seeded dynamic theme included — instead of
