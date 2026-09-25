@@ -67,7 +67,7 @@ fun PlayerDesignScreen(
     var seekWheelSeconds by remember { mutableFloatStateOf(prefs.getSeekWheelSeconds()) }
 
     SettingsScaffold(
-        title = str("pref_player_design", "Design du lecteur"),
+        title = str("pref_player_design"),
         onBackClick = onBackClick
     ) { innerPadding ->
         ScrollableColumn(
@@ -195,14 +195,14 @@ private fun PlayerLivePreviewCard(
             ) {
                 Column {
                     Text(
-                        text = str("player_preview_title", "Aperçu en temps réel"),
+                        text = str("player_preview_title"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = str("player_preview_sub", "Voyez vos changements immédiatement appliqués"),
+                        text = str("player_preview_sub"),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -213,9 +213,9 @@ private fun PlayerLivePreviewCard(
                 ) {
                     Text(
                         text = when (playerBarStyle) {
-                            PlayerBarStyle.FLOATING -> str("player_shape_floating", "Flottant")
-                            PlayerBarStyle.ROUNDED -> str("player_shape_rounded", "Arrondi")
-                            PlayerBarStyle.DEFAULT -> str("player_shape_default", "Standard")
+                            PlayerBarStyle.FLOATING -> str("player_shape_floating")
+                            PlayerBarStyle.ROUNDED -> str("player_shape_rounded")
+                            PlayerBarStyle.DEFAULT -> str("player_shape_default")
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
@@ -478,14 +478,14 @@ private fun PlayerShapeSection(
         ) {
             Column {
                 Text(
-                    text = str("player_shape_title", "Forme du lecteur"),
+                    text = str("player_shape_title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = str("player_shape_desc", "Personnalisez la silhouette et l'intégration du lecteur au bas de la fenêtre"),
+                    text = str("player_shape_desc"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -496,8 +496,8 @@ private fun PlayerShapeSection(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ShapeOptionCard(
-                    title = str("player_shape_default", "Standard"),
-                    subtitle = str("player_shape_default_desc", "Coins arrondis 12dp alignés aux panneaux"),
+                    title = str("player_shape_default"),
+                    subtitle = str("player_shape_default_desc"),
                     icon = Icons.Rounded.Splitscreen,
                     isSelected = currentStyle == PlayerBarStyle.DEFAULT,
                     modifier = Modifier.weight(1f),
@@ -505,8 +505,8 @@ private fun PlayerShapeSection(
                 )
 
                 ShapeOptionCard(
-                    title = str("player_shape_rounded", "Arrondi"),
-                    subtitle = str("player_shape_rounded_desc", "Bords adoucis modernes (20dp)"),
+                    title = str("player_shape_rounded"),
+                    subtitle = str("player_shape_rounded_desc"),
                     icon = Icons.Rounded.RoundedCorner,
                     isSelected = currentStyle == PlayerBarStyle.ROUNDED,
                     modifier = Modifier.weight(1f),
@@ -514,8 +514,8 @@ private fun PlayerShapeSection(
                 )
 
                 ShapeOptionCard(
-                    title = str("player_shape_floating", "Flottant"),
-                    subtitle = str("player_shape_floating_desc", "Dock flottant avec marges aérées (24dp)"),
+                    title = str("player_shape_floating"),
+                    subtitle = str("player_shape_floating_desc"),
                     icon = Icons.Rounded.Layers,
                     isSelected = currentStyle == PlayerBarStyle.FLOATING,
                     modifier = Modifier.weight(1f),
@@ -627,14 +627,14 @@ private fun PlayerSlidersSection(
             // Track Progress Sliders
             Column {
                 Text(
-                    text = str("pref_slider_style", "Style du curseur de lecture"),
+                    text = str("pref_slider_style"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = str("pref_slider_style_desc", "Personnalisez l'animation et le style de la barre de progression"),
+                    text = str("pref_slider_style_desc"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -645,7 +645,7 @@ private fun PlayerSlidersSection(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 SliderStyleCard(
-                    title = str("slider_style_bar", "Bar"),
+                    title = str("slider_style_bar"),
                     style = PlayerSliderStyle.BAR,
                     isSelected = sliderStyle == PlayerSliderStyle.BAR,
                     modifier = Modifier.weight(1f),
@@ -653,7 +653,7 @@ private fun PlayerSlidersSection(
                 )
 
                 SliderStyleCard(
-                    title = str("slider_style_wavy", "Wavy"),
+                    title = str("slider_style_wavy"),
                     style = PlayerSliderStyle.WAVY,
                     isSelected = sliderStyle == PlayerSliderStyle.WAVY,
                     modifier = Modifier.weight(1f),
@@ -661,7 +661,7 @@ private fun PlayerSlidersSection(
                 )
 
                 SliderStyleCard(
-                    title = str("slider_style_slim", "Slim"),
+                    title = str("slider_style_slim"),
                     style = PlayerSliderStyle.SLIM,
                     isSelected = sliderStyle == PlayerSliderStyle.SLIM,
                     modifier = Modifier.weight(1f),
@@ -669,7 +669,7 @@ private fun PlayerSlidersSection(
                 )
 
                 SliderStyleCard(
-                    title = str("slider_style_squiggly", "Squiggly"),
+                    title = str("slider_style_squiggly"),
                     style = PlayerSliderStyle.SQUIGGLY,
                     isSelected = sliderStyle == PlayerSliderStyle.SQUIGGLY,
                     modifier = Modifier.weight(1f),
@@ -687,7 +687,7 @@ private fun PlayerSlidersSection(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = str("pref_volume_slider_title", "Curseur de volume"),
+                        text = str("pref_volume_slider_title"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -695,9 +695,9 @@ private fun PlayerSlidersSection(
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = if (verticalVolumeSlider) {
-                            str("pref_vertical_volume_slider_sub", "Afficher le curseur de volume verticalement au survol de l'icône")
+                            str("pref_vertical_volume_slider_sub")
                         } else {
-                            str("pref_horizontal_volume_slider_sub", "Curseur de volume horizontal intégré directement dans le lecteur")
+                            str("pref_horizontal_volume_slider_sub")
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -716,7 +716,7 @@ private fun PlayerSlidersSection(
                     FilterChip(
                         selected = !verticalVolumeSlider,
                         onClick = { onVolumeOrientationChanged(false) },
-                        label = { Text(str("volume_horizontal", "Horizontal")) },
+                        label = { Text(str("volume_horizontal")) },
                         leadingIcon = {
                             Icon(Icons.Rounded.LinearScale, contentDescription = null, modifier = Modifier.size(16.dp))
                         },
@@ -728,7 +728,7 @@ private fun PlayerSlidersSection(
                     FilterChip(
                         selected = verticalVolumeSlider,
                         onClick = { onVolumeOrientationChanged(true) },
-                        label = { Text(str("volume_vertical", "Vertical")) },
+                        label = { Text(str("volume_vertical")) },
                         leadingIcon = {
                             Icon(Icons.Rounded.Height, contentDescription = null, modifier = Modifier.size(16.dp))
                         },
@@ -821,50 +821,50 @@ private fun PlayerButtonsSection(
     val items = listOf(
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE,
-            label = str("player_button_like", "Bouton J'aime"),
-            desc = str("player_button_like_desc", "Affiche le cœur à côté de la pochette pour aimer le morceau"),
+            label = str("player_button_like"),
+            desc = str("player_button_like_desc"),
             icon = Icons.Filled.Favorite,
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS,
-            label = str("player_button_lyrics", "Bouton Paroles"),
-            desc = str("player_button_lyrics_desc", "Ouvre instantanément les paroles synchronisées"),
+            label = str("player_button_lyrics"),
+            desc = str("player_button_lyrics_desc"),
             icon = Icons.Rounded.TextSnippet,
             enabled = showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER,
-            label = str("mini_player_title", "Mini-lecteur"),
-            desc = str("player_button_miniplayer_desc", "Basculer vers la fenêtre flottante Picture-in-Picture"),
+            label = str("mini_player_title"),
+            desc = str("player_button_miniplayer_desc"),
             icon = Icons.Rounded.PictureInPictureAlt,
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL,
-            label = str("player_button_panel", "Panneau de lecture"),
-            desc = str("player_button_panel_desc", "Ouvre le volet latéral avec détails, paroles et effets"),
+            label = str("player_button_panel"),
+            desc = str("player_button_panel_desc"),
             icon = Icons.Outlined.Tune,
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE,
-            label = str("player_button_queue", "File d'attente"),
-            desc = str("player_button_queue_desc", "Accès direct à la liste des morceaux suivants"),
+            label = str("player_button_queue"),
+            desc = str("player_button_queue_desc"),
             icon = Icons.Outlined.QueueMusic,
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE,
-            label = str("player_button_shuffle", "Lecture aléatoire"),
-            desc = str("player_button_shuffle_desc", "Activer ou désactiver le mélange des titres"),
+            label = str("player_button_shuffle"),
+            desc = str("player_button_shuffle_desc"),
             icon = Icons.Filled.Shuffle,
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT,
-            label = str("player_button_repeat", "Répétition"),
-            desc = str("player_button_repeat_desc", "Répéter un morceau ou la liste de lecture"),
+            label = str("player_button_repeat"),
+            desc = str("player_button_repeat_desc"),
             icon = Icons.Filled.Repeat,
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons
         ),
@@ -881,14 +881,14 @@ private fun PlayerButtonsSection(
         ) {
             Column {
                 Text(
-                    text = str("player_buttons_title", "Boutons du lecteur"),
+                    text = str("player_buttons_title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = str("player_buttons_desc", "Affichez ou masquez les boutons du lecteur selon vos envies"),
+                    text = str("player_buttons_desc"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1000,14 +1000,14 @@ private fun PlayerAdvancedSection(
         ) {
             Column {
                 Text(
-                    text = str("player_advanced_title", "Contrôles avancés"),
+                    text = str("player_advanced_title"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = str("player_advanced_desc", "Sensibilité du défilement avec la molette de la souris"),
+                    text = str("player_advanced_desc"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1026,7 +1026,7 @@ private fun PlayerAdvancedSection(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = str("pref_seek_wheel", "Saut par cran de molette"),
+                        text = str("pref_seek_wheel"),
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )

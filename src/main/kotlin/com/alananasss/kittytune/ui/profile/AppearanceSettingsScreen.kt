@@ -298,8 +298,8 @@ fun AppearanceSettingsScreen(
 
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 2),
-                            title = str("pref_player_design", "Design du lecteur"),
-                            subtitle = str("pref_player_design_sub", "Forme, curseurs de lecture et volume, boutons visibles"),
+                            title = str("pref_player_design"),
+                            subtitle = str("pref_player_design_sub"),
                             onClick = onNavigateToPlayerDesign
                         )
 
