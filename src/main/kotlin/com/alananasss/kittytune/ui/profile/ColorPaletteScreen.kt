@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.alananasss.kittytune.data.local.AppThemeMode
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.ui.common.ScrollableColumn
 import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.theme.MaterialKolorColorSpecOptions
@@ -144,52 +145,26 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
         title = str("color_palette_screen_title"),
         onBackClick = onBackClick
     ) { innerPadding ->
-        Row(
+        ScrollableColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Left Column: Preview
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState()),
+                    .fillMaxWidth()
+                    .widthIn(max = 840.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Spacer(Modifier.height(4.dp))
-
-                ThemePreviewCard(
-                    keyColor = currentKeyColor,
-                    isDark = isDark,
-                    pureBlack = pureBlack,
-                    dynamicColor = dynamicTheme,
-                    colorStyle = colorStyle,
-                    colorSpec = colorSpec,
-                    modifier = Modifier.padding(start = 16.dp, end = 8.dp)
-                )
-                
-                Spacer(Modifier.height(140.dp))
-            }
-
-            // Right Column: Controls
-            Column(
-                modifier = Modifier
-                    .weight(1.5f)
-                    .fillMaxHeight()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Spacer(Modifier.height(4.dp))
-
                 SystemAccentCard(
                     colorStyle = colorStyle,
                     onStyleSelected = {
                         colorStyle = it
                         prefs.setColorStyle(it)
                     },
-                    modifier = Modifier.padding(start = 8.dp, end = 16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 SeedPaletteCard(
@@ -199,7 +174,7 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
                     dynamicColor = dynamicTheme,
                     colorStyle = colorStyle,
                     colorSpec = colorSpec,
-                    modifier = Modifier.padding(start = 8.dp, end = 16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) { seed ->
                     haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
                     currentKeyColor = seed
@@ -213,7 +188,7 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
                     dynamicColor = dynamicTheme,
                     colorStyle = colorStyle,
                     colorSpec = colorSpec,
-                    modifier = Modifier.padding(start = 8.dp, end = 16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     onSeedChangedRealtime = { seed ->
                         currentKeyColor = seed
                         com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor = seed
@@ -227,7 +202,7 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
                 ColorGenerationCard(
                     colorStyle = colorStyle,
                     colorSpec = colorSpec,
-                    modifier = Modifier.padding(start = 8.dp, end = 16.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     onStyleSelected = {
                         colorStyle = it
                         prefs.setColorStyle(it)
@@ -238,7 +213,7 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
                     }
                 )
 
-                Spacer(Modifier.height(140.dp))
+                Spacer(Modifier.height(80.dp))
             }
         }
     }
@@ -665,112 +640,6 @@ fun SettingsDropdownRow(
     }
 }
 
-@Composable
-private fun ThemePreviewCard(
-    keyColor: Int,
-    isDark: Boolean,
-    pureBlack: Boolean,
-    dynamicColor: Boolean,
-    colorStyle: String,
-    colorSpec: String,
-    modifier: Modifier = Modifier.fillMaxWidth()
-) {
-    val previewScheme = rememberSoundTuneColorScheme(
-        useDarkTheme = isDark,
-        dynamicColor = dynamicColor,
-        pureBlack = pureBlack,
-        keyColor = keyColor,
-        colorStyle = colorStyle,
-        colorSpec = colorSpec
-    )
-
-    val animatedBg by animateColorAsState(targetValue = previewScheme.background, label = "bg")
-    val animatedOnSurface by animateColorAsState(targetValue = previewScheme.onSurface, label = "onSurface")
-    val animatedPrimary by animateColorAsState(targetValue = previewScheme.primary, label = "primary")
-    val animatedPrimaryContainer by animateColorAsState(targetValue = previewScheme.primaryContainer, label = "primaryContainer")
-    val animatedSecondaryContainer by animateColorAsState(targetValue = previewScheme.secondaryContainer, label = "secondaryContainer")
-    val animatedOnSecondaryContainer by animateColorAsState(targetValue = previewScheme.onSecondaryContainer, label = "onSecondaryContainer")
-    val animatedSurfaceContainer by animateColorAsState(targetValue = previewScheme.surfaceContainer, label = "surfaceContainer")
-    val animatedSurfaceContainerHigh by animateColorAsState(targetValue = previewScheme.surfaceContainerHigh, label = "surfaceContainerHigh")
-    val animatedOnSurfaceVariant by animateColorAsState(targetValue = previewScheme.onSurfaceVariant, label = "onSurfaceVariant")
-    Box(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            modifier = Modifier
-                .width(200.dp)
-                .aspectRatio(0.46f),
-            color = animatedBg,
-            shape = RoundedCornerShape(32.dp),
-            border = BorderStroke(4.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(animatedPrimary))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(modifier = Modifier.height(14.dp).width(80.dp).clip(RoundedCornerShape(4.dp)).background(animatedOnSurface))
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    repeat(3) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(animatedSurfaceContainerHigh))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Box(modifier = Modifier.height(12.dp).width(100.dp).clip(RoundedCornerShape(4.dp)).background(animatedOnSurface))
-                                Box(modifier = Modifier.height(10.dp).width(60.dp).clip(RoundedCornerShape(4.dp)).background(animatedOnSurface.copy(alpha = 0.6f)))
-                            }
-                        }
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    color = animatedSecondaryContainer
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(12.dp)).background(animatedPrimaryContainer))
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(modifier = Modifier.height(10.dp).width(60.dp).clip(RoundedCornerShape(4.dp)).background(animatedOnSecondaryContainer))
-                            Box(modifier = Modifier.height(8.dp).width(40.dp).clip(RoundedCornerShape(4.dp)).background(animatedOnSecondaryContainer.copy(alpha = 0.6f)))
-                        }
-                        Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(animatedOnSecondaryContainer))
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = animatedSurfaceContainer
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(modifier = Modifier.width(48.dp).height(24.dp).clip(RoundedCornerShape(12.dp)).background(animatedSecondaryContainer))
-                        Box(modifier = Modifier.size(20.dp).clip(CircleShape).background(animatedOnSurfaceVariant))
-                        Box(modifier = Modifier.size(20.dp).clip(CircleShape).background(animatedOnSurfaceVariant))
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun ColorButtonMaterial(

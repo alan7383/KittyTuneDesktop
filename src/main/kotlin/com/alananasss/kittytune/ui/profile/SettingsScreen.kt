@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.navigation.NavController
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.AppLanguage
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
 import com.alananasss.kittytune.ui.common.SettingsGroup
@@ -112,6 +114,8 @@ fun SettingsScreen(
                     SettingsSection.STORAGE -> StorageSettingsScreen()
 
                     SettingsSection.NETWORK -> NetworkSection(navController)
+
+                    SettingsSection.LANGUAGE -> LanguageSection()
                 }
             }
         }
@@ -128,6 +132,7 @@ private enum class SettingsSection(val titleKey: String, val icon: ImageVector) 
     DISCORD("pref_discord_title", Icons.Rounded.Forum),
     STORAGE("pref_storage_title", Icons.Rounded.Storage),
     NETWORK("pref_proxy_title", Icons.Rounded.Dns),
+    LANGUAGE("pref_language", Icons.Rounded.Language),
 }
 
 /**
@@ -507,3 +512,53 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
         }
     }
 }
+
+/**
+ * Dedicated language settings section (issue #56).
+ * Placed at the end of the settings tabs so it does not clutter everyday appearance settings.
+ */
+@Composable
+private fun LanguageSection() {
+    val prefs = remember { PlayerPreferences() }
+    var currentLang by remember { mutableStateOf(prefs.getAppLanguage()) }
+
+    val languages = listOf(
+        Triple(AppLanguage.SYSTEM, str("theme_system"), str("pref_language_sub")),
+        Triple(AppLanguage.ENGLISH, "English", str("lang_english")),
+        Triple(AppLanguage.FRENCH, "Français", str("lang_french")),
+        Triple(AppLanguage.GERMAN, "Deutsch", str("lang_german")),
+        Triple(AppLanguage.HUNGARIAN, "Magyar", str("lang_hungarian")),
+        Triple(AppLanguage.RUSSIAN, "Русский", str("lang_russian")),
+        Triple(AppLanguage.VIETNAMESE, "Tiếng Việt", str("lang_vietnamese")),
+    )
+
+    SettingsGroup(
+        title = str("pref_language"),
+        items = languages.map { (lang, nativeName, localizedName) ->
+            { shape ->
+                val isSelected = currentLang == lang
+                SettingsItem(
+                    shape = shape,
+                    title = nativeName,
+                    subtitle = if (nativeName != localizedName) localizedName else null,
+                    trailingContent = {
+                        RadioButton(
+                            selected = isSelected,
+                            onClick = null,
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = MaterialTheme.colorScheme.primary,
+                                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                    },
+                    onClick = {
+                        prefs.setAppLanguage(lang)
+                        currentLang = lang
+                        com.alananasss.kittytune.core.Strings.appLanguage = lang.code
+                    }
+                )
+            }
+        }
+    )
+}
+
