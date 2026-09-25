@@ -2919,4 +2919,21 @@
     <string name="lyrics_mode_sidebar_sub">Lời bài hát trong bảng đang phát</string>
     <string name="lyrics_content_title">Nội dung</string>
     <string name="settings_cat_sync">Thiết bị</string>
+    <string name="listening_stats_period_week_short">Tuần</string>
+    <string name="listening_stats_period_month_short">Tháng</string>
+    <string name="listening_stats_period_year_short">Năm</string>
+    <string name="listening_stats_change_week">%1$s so với tuần trước</string>
+    <string name="listening_stats_change_month">%1$s so với tháng trước</string>
+    <string name="listening_stats_change_year">%1$s so với năm trước</string>
+    <string name="listening_stats_activity">Hoạt động</string>
+    <string name="listening_stats_activity_hint">Di chuột lên cột để xem ngày</string>
+    <string name="listening_stats_hours">Thời điểm trong ngày</string>
+    <string name="listening_stats_peak_hour">Thường nhất khoảng %1$s</string>
+    <string name="listening_stats_show_all">Xem tất cả</string>
+    <string name="listening_stats_skips_of">Đã bỏ qua: %1$d</string>
+    <string name="listening_stats_avg_play">Mỗi lượt nghe</string>
+    <string name="listening_stats_avg_play_desc">Thời lượng nghe trung bình</string>
+    <string name="listening_stats_streak">Ngày liên tiếp</string>
+    <string name="listening_stats_active_days">Số ngày nghe nhạc: %1$d</string>
+    <string name="listening_stats_since">%1$s – hôm nay</string>
 </resources>
