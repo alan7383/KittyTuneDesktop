@@ -419,10 +419,13 @@ fun main() {
             // a second lever on the same window, so this releases that too rather than guessing which of the
             // two is holding it (issue #33).
             var wasFullScreenInWindow by remember { mutableStateOf(false) }
+            var wasAlwaysOnTop by remember { mutableStateOf(false) }
             androidx.compose.runtime.LaunchedEffect(com.alananasss.kittytune.core.AppWindowState.fullScreen) {
                 val isFS = com.alananasss.kittytune.core.AppWindowState.fullScreen
                 if (isFS) {
                     wasFullScreenInWindow = true
+                    wasAlwaysOnTop = window.isAlwaysOnTop
+                    runCatching { window.isAlwaysOnTop = true }
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         javax.swing.SwingUtilities.invokeLater {
                             com.alananasss.kittytune.data.theme.WindowsFullScreen.enter(window)
@@ -430,6 +433,7 @@ fun main() {
                     }
                 } else if (wasFullScreenInWindow) {
                     wasFullScreenInWindow = false
+                    runCatching { window.isAlwaysOnTop = wasAlwaysOnTop }
                     val gc = window.graphicsConfiguration
                     val scaleX = gc?.defaultTransform?.scaleX?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
                     val scaleY = gc?.defaultTransform?.scaleY?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f

@@ -56,12 +56,22 @@ class WindowsFullScreenIntegrationTest {
             assertEquals(800, initialBounds.width)
             assertEquals(600, initialBounds.height)
 
+            val hwnd = WindowsFullScreen.handleOf(currentFrame)!!
+
+            val initialStyle = com.sun.jna.platform.win32.User32.INSTANCE.GetWindowLong(hwnd, com.sun.jna.platform.win32.WinUser.GWL_STYLE)
+
             // 1. Enter fullscreen
             SwingUtilities.invokeAndWait {
                 val entered = WindowsFullScreen.enter(currentFrame)
                 assertTrue("Entering fullscreen should succeed", entered)
             }
             assertTrue("WindowsFullScreen.isFullScreen should be true", WindowsFullScreen.isFullScreen)
+
+            // Verify native Win32 window styles in fullscreen
+            val fsStyle = com.sun.jna.platform.win32.User32.INSTANCE.GetWindowLong(hwnd, com.sun.jna.platform.win32.WinUser.GWL_STYLE)
+            assertTrue("WS_POPUP must be set in fullscreen mode", (fsStyle and com.sun.jna.platform.win32.WinUser.WS_POPUP) != 0)
+            assertEquals("WS_CAPTION must be stripped", 0, fsStyle and com.sun.jna.platform.win32.WinUser.WS_CAPTION)
+            assertEquals("WS_THICKFRAME must be stripped", 0, fsStyle and com.sun.jna.platform.win32.WinUser.WS_THICKFRAME)
 
             // 2. Exit fullscreen to floating
             val fallback = Rectangle(150, 120, 800, 600)
@@ -70,6 +80,9 @@ class WindowsFullScreenIntegrationTest {
                 assertTrue("Exiting fullscreen should succeed", exited)
             }
             assertFalse("WindowsFullScreen.isFullScreen should be false after exit", WindowsFullScreen.isFullScreen)
+
+            val exitedStyle = com.sun.jna.platform.win32.User32.INSTANCE.GetWindowLong(hwnd, com.sun.jna.platform.win32.WinUser.GWL_STYLE)
+            assertEquals("Style after exit must match original pre-fullscreen style", initialStyle, exitedStyle)
 
             // Bounds must match original pre-fullscreen dimensions
             assertEquals("Restored width must equal pre-fullscreen width", 800, currentFrame.bounds.width)
