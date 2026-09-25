@@ -64,6 +64,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -602,22 +603,32 @@ fun LibraryPanel(
                 onUpload = onUpload,
             )
 
-            if (collapse < 1f) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = ((1f - collapse) * 44f).dp)
-                        .receded(collapse)
-                ) {
-                    LibrarySearchRow(libraryViewModel)
+            // One slot for both: the search row recedes in it and the rail's actions arrive in it. They
+            // used to be stacked — the search row shrank to nothing while the actions appeared at full
+            // height in a single frame part-way through, so every entry below slid up and then jumped
+            // down. With the slot's height moving only between the two rows' own heights, the entries
+            // hardly move at all.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(
+                        if (fullScreen) SEARCH_ROW_HEIGHT
+                        else androidx.compose.ui.unit.lerp(SEARCH_ROW_HEIGHT, RAIL_ACTIONS_HEIGHT, collapse)
+                    )
+                    .clipToBounds()
+            ) {
+                if (collapse < 1f) {
+                    Box(Modifier.fillMaxWidth().receded(collapse)) {
+                        LibrarySearchRow(libraryViewModel)
+                    }
                 }
-            }
-            if (!fullScreen && collapse > 0f) {
-                RailActions(
-                    collapse = collapse,
-                    onCreate = { showCreatePlaylistDialog = true },
-                    onHistory = onHistory,
-                )
+                if (!fullScreen && collapse > 0f) {
+                    RailActions(
+                        collapse = collapse,
+                        onCreate = { showCreatePlaylistDialog = true },
+                        onHistory = onHistory,
+                    )
+                }
             }
 
             LibraryContent(
@@ -1997,6 +2008,10 @@ private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> 
  * @param collapse 0 when the panel is open, 1 when it is a rail, and every value in between while it
  *   travels.
  */
+/** Heights of the two rows that share the slot above the library list. */
+private val SEARCH_ROW_HEIGHT = 44.dp
+private val RAIL_ACTIONS_HEIGHT = 40.dp
+
 /** How far a destination's highlight sits in from the card's edges. */
 private val NAV_ITEM_INSET = 6.dp
 
