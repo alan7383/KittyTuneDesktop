@@ -102,7 +102,9 @@ fun FloatingMenuWindow(
         runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
 
         // Take the foreground so Escape reaches the menu; Windows may otherwise leave focus where it was.
+        // A tool window, so the menu never flashes a taskbar button of its own.
         LaunchedEffect(window) {
+            com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
             window.toFront()
             window.requestFocus()
         }

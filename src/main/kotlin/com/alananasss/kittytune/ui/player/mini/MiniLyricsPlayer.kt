@@ -305,6 +305,11 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
             }
         }
 
+        // A floating tool, not another app: no taskbar button (with Java's icon) and no Alt+Tab entry.
+        LaunchedEffect(window) {
+            com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
+        }
+
         DisposableEffect(window, isElongated) {
             runCatching {
                 window.background = java.awt.Color(0, 0, 0, 0)
@@ -375,7 +380,10 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                 }
 
                 val surfaceShape = if (isElongated) RoundedCornerShape(10.dp) else RoundedCornerShape(22.dp)
-                val shadowElevation = if (transparentBg) 0.dp else if (isElongated) 4.dp else 8.dp
+                // No shadow. The card fills its window, so a shadow had nowhere to fall: it was cut off at the
+                // window's rectangle, which read as square corners behind the rounded card, and it showed
+                // through the translucent surface. The border does the separating instead.
+                val shadowElevation = 0.dp
 
                 WindowDraggableArea {
                     Surface(
@@ -824,6 +832,10 @@ private fun MiniLyricsContent(
                     .height(2.5.dp)
                     .clip(RoundedCornerShape(1.dp)),
                 color = MaterialTheme.colorScheme.primary,
+                // A hairline needs neither Material's gap nor its stop dot, which sat at the right end as
+                // a stray white point.
+                gapSize = 0.dp,
+                drawStopIndicator = {},
                 trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
             )
         }
@@ -1059,6 +1071,10 @@ private fun MiniLyricsElongatedContent(
                     .height(2.dp)
                     .clip(RoundedCornerShape(1.dp)),
                 color = MaterialTheme.colorScheme.primary,
+                // A hairline needs neither Material's gap nor its stop dot, which sat at the right end as
+                // a stray white point.
+                gapSize = 0.dp,
+                drawStopIndicator = {},
                 trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (transparentBg) 0.25f else 0.4f),
             )
         }
