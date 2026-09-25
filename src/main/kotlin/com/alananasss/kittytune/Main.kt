@@ -207,9 +207,8 @@ fun main() {
 
         var isAppFullScreen by remember { mutableStateOf(false) }
 
-        // Track user's chosen placement and floating dimensions whenever not in fullscreen
-        if (windowState.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen &&
-            !com.alananasss.kittytune.core.AppWindowState.fullScreen &&
+        // Track user's chosen placement and floating dimensions whenever not in lyrics fullscreen
+        if (!com.alananasss.kittytune.core.AppWindowState.fullScreen &&
             !isRestoringFromFullScreen &&
             !isAppFullScreen &&
             !com.alananasss.kittytune.data.theme.WindowsFullScreen.isFullScreen
@@ -253,8 +252,7 @@ fun main() {
                 isAppFullScreen = false
                 isRestoringFromFullScreen = true
                 try {
-                    val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
-                        ?: androidx.compose.ui.window.WindowPlacement.Floating
+                    val restorePlacement = savedPlacement
                     if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
                         val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                         val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
@@ -269,6 +267,12 @@ fun main() {
                         windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
                         windowState.size = DpSize(clamped.width.dp, clamped.height.dp)
                         windowState.position = androidx.compose.ui.window.WindowPosition(clamped.x.dp, clamped.y.dp)
+                    } else if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                        // Workaround for Compose Multiplatform bug: transitioning directly from Fullscreen to
+                        // Maximized fails to reset isFullscreen in ComposeWindow. Sizing through Floating clears it first.
+                        windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                        kotlinx.coroutines.delay(50)
+                        windowState.placement = androidx.compose.ui.window.WindowPlacement.Maximized
                     } else {
                         windowState.placement = restorePlacement
                     }
@@ -445,19 +449,27 @@ fun main() {
                         }
                     } else {
                         runCatching {
-                            val device = window.graphicsConfiguration?.device
-                            if (device?.fullScreenWindow === window) device.fullScreenWindow = null
-                            if (window is java.awt.Frame) {
-                                if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
-                                    window.extendedState = java.awt.Frame.MAXIMIZED_BOTH
-                                } else {
-                                    window.extendedState = java.awt.Frame.NORMAL
-                                    javax.swing.SwingUtilities.invokeLater {
-                                        runCatching {
-                                            window.setBounds(clampedPixels.x, clampedPixels.y, clampedPixels.width, clampedPixels.height)
-                                            window.revalidate()
-                                            window.repaint()
-                                        }
+                            if (savedPlacement != androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                                val device = window.graphicsConfiguration?.device
+                                if (device?.fullScreenWindow === window) device.fullScreenWindow = null
+                            }
+                            if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                                // Reset isFullscreen in ComposeWindow by transitioning through Floating before Maximized
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Maximized
+                                window.extendedState = java.awt.Frame.MAXIMIZED_BOTH
+                                window.revalidate()
+                                window.repaint()
+                            } else if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Fullscreen
+                            } else {
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                                window.extendedState = java.awt.Frame.NORMAL
+                                javax.swing.SwingUtilities.invokeLater {
+                                    runCatching {
+                                        window.setBounds(clampedPixels.x, clampedPixels.y, clampedPixels.width, clampedPixels.height)
+                                        window.revalidate()
+                                        window.repaint()
                                     }
                                 }
                             }
@@ -495,7 +507,11 @@ fun main() {
         } // End CompositionLocalProvider
 
         if (playerViewModel.isMiniPlayerVisible) {
-            com.alananasss.kittytune.ui.player.mini.MiniLyricsPlayerWindow(viewModel = playerViewModel)
+            com.alananasss.kittytune.ui.player.mini.MiniLyricsPlayerWindow(
+                viewModel = playerViewModel,
+                isAppFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen,
+                onOpenMainWindow = { showMainWindow() },
+            )
         }
 
         // Custom tray context menu — transparent, rounded, themed; lives outside the main window

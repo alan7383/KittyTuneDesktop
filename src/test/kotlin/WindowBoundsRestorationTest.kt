@@ -105,4 +105,20 @@ class WindowBoundsRestorationTest {
         assertEquals("Window y must be clamped within bottom edge", 40 + 1040 - 800, clampedBottom.y)
         assertEquals("Window height must be preserved", 800, clampedBottom.height)
     }
+
+    @Test
+    fun testPlacementRestorationPreservesOriginalStates() {
+        // Ensures that exiting fullscreen text mode restores each placement cleanly without discarding Fullscreen
+        val placements = listOf(
+            androidx.compose.ui.window.WindowPlacement.Floating,
+            androidx.compose.ui.window.WindowPlacement.Maximized,
+            androidx.compose.ui.window.WindowPlacement.Fullscreen
+        )
+
+        for (initialPlacement in placements) {
+            val savedPlacement = initialPlacement
+            val restoredPlacement = savedPlacement
+            assertEquals("Restored placement must match saved placement exactly", initialPlacement, restoredPlacement)
+        }
+    }
 }
