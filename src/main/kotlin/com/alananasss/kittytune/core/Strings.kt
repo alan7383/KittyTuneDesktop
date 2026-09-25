@@ -105,6 +105,9 @@ object Strings {
     /** Equivalent of stringResource(R.string.key, args...) with Android positional format support. */
     fun get(key: String, vararg args: Any?): String {
         val pattern = get(key)
+        if (pattern == key && args.size == 1 && args[0] is String && !key.contains("%")) {
+            return args[0] as String
+        }
         return try {
             // Android uses java.util.Formatter syntax — same on JVM.
             String.format(pattern, *args)

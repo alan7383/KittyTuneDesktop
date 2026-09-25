@@ -42,7 +42,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.window.WindowDraggableArea
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
@@ -57,6 +60,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
@@ -120,6 +124,78 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import java.awt.Cursor
 
+private class WindowDragHandler(
+    private val window: java.awt.Window,
+    private val onDragStart: () -> Unit,
+    private val onDragEnd: () -> Unit,
+) {
+    private var dragStartMouseX = 0
+    private var dragStartMouseY = 0
+    private var windowStartX = 0
+    private var windowStartY = 0
+    private var isDraggingInternal = false
+
+    private val dragMotionListener = object : java.awt.event.MouseMotionAdapter() {
+        override fun mouseDragged(e: java.awt.event.MouseEvent) {
+            val dx = e.xOnScreen - dragStartMouseX
+            val dy = e.yOnScreen - dragStartMouseY
+            val newX = windowStartX + dx
+            val newY = windowStartY + dy
+            if (window.x != newX || window.y != newY) {
+                window.setLocation(newX, newY)
+            }
+        }
+    }
+
+    private val dragMouseListener = object : java.awt.event.MouseAdapter() {
+        override fun mouseReleased(e: java.awt.event.MouseEvent) {
+            if (e.button == java.awt.event.MouseEvent.BUTTON1 && isDraggingInternal) {
+                stopDrag()
+            }
+        }
+    }
+
+    private val focusListener = object : java.awt.event.WindowFocusListener {
+        override fun windowGainedFocus(e: java.awt.event.WindowEvent) {}
+        override fun windowLostFocus(e: java.awt.event.WindowEvent) {
+            if (isDraggingInternal) {
+                stopDrag()
+            }
+        }
+    }
+
+    fun startDrag(xRoot: Int, yRoot: Int) {
+        if (isDraggingInternal) return
+        isDraggingInternal = true
+        dragStartMouseX = xRoot
+        dragStartMouseY = yRoot
+        windowStartX = window.x
+        windowStartY = window.y
+        onDragStart()
+
+        window.addMouseListener(dragMouseListener)
+        window.addWindowFocusListener(focusListener)
+
+        val nativeStarted = com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
+        if (!nativeStarted) {
+            window.addMouseMotionListener(dragMotionListener)
+        }
+    }
+
+    fun stopDrag() {
+        if (!isDraggingInternal) return
+        isDraggingInternal = false
+        window.removeMouseListener(dragMouseListener)
+        window.removeMouseMotionListener(dragMotionListener)
+        window.removeWindowFocusListener(focusListener)
+        onDragEnd()
+    }
+
+    fun cleanup() {
+        stopDrag()
+    }
+}
+
 /**
  * A floating mini-player for lyrics that stays on top of windows.
  *
@@ -129,7 +205,11 @@ import java.awt.Cursor
  * and smoothly advances to show the next part of the line as playback progresses through it.
  */
 @Composable
-fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
+fun MiniLyricsPlayerWindow(
+    viewModel: PlayerViewModel,
+    isAppFullScreen: Boolean = false,
+    onOpenMainWindow: () -> Unit = {},
+) {
     val prefs = remember { PlayerPreferences() }
     val miniPlayerStyle by prefs.miniPlayerStyleFlow().collectAsState(initial = prefs.getMiniPlayerStyle())
     val transparentBg by prefs.miniPlayerTransparentBgFlow().collectAsState(initial = prefs.getMiniPlayerTransparentBg())
@@ -167,8 +247,12 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
     )
 
     var isPinned by remember { mutableStateOf(true) }
+    var isDragging by remember { mutableStateOf(false) }
 
-    LaunchedEffect(windowState.position, windowState.size, isElongated) {
+    // Debounced, and never mid-drag: a drag moves the window a hundred times a second.
+    LaunchedEffect(windowState.position, windowState.size, isElongated, isDragging) {
+        if (isDragging) return@LaunchedEffect
+        kotlinx.coroutines.delay(400)
         val pos = windowState.position
         if (pos.isSpecified) {
             val x = pos.x.value.toInt()
@@ -200,9 +284,13 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
         viewModel.toggleMiniPlayer(false)
     }
 
+    // Out of the way while the app is full screen, like any overlay.
+    val isFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen
+
     Window(
         onCloseRequest = closeMiniPlayer,
         state = windowState,
+        visible = !isFullScreen,
         alwaysOnTop = isPinned,
         undecorated = true,
         transparent = true,
@@ -306,8 +394,27 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
         }
 
         // A floating tool, not another app: no taskbar button (with Java's icon) and no Alt+Tab entry.
-        LaunchedEffect(window) {
-            com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
+        // Windows needs the restyle; KDE and GNOME need the skip hints, sent again after every remap.
+        LaunchedEffect(window, isFullScreen) {
+            if (isFullScreen) return@LaunchedEffect
+            if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
+            } else {
+                com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
+            }
+        }
+
+        // Moved by the window manager itself where it can (smooth at the monitor's refresh rate), by hand otherwise.
+        val dragHandler = remember(window) {
+            WindowDragHandler(
+                window = window,
+                onDragStart = { isDragging = true },
+                onDragEnd = {
+                    isDragging = false
+                    saveCurrentBounds()
+                    com.alananasss.kittytune.core.Prefs.flush()
+                }
+            )
         }
 
         DisposableEffect(window, isElongated) {
@@ -324,14 +431,14 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                     if (window.width != clampedW || window.height != clampedH) {
                         window.setSize(clampedW, clampedH)
                     }
-                    saveCurrentBounds()
                 }
                 override fun componentMoved(e: java.awt.event.ComponentEvent) {
-                    saveCurrentBounds()
+                    if (!isDragging) saveCurrentBounds()
                 }
             }
             window.addComponentListener(listener)
             onDispose {
+                dragHandler.cleanup()
                 window.removeComponentListener(listener)
                 saveCurrentBounds()
                 com.alananasss.kittytune.core.Prefs.flush(force = true)
@@ -346,16 +453,19 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                 val showAdditional = remember(prefsSnapshot) { prefs.getMiniPlayerShowAdditionalControls() }
                 val controlsOnHover = remember(prefsSnapshot) { prefs.getMiniPlayerControlsOnHover() }
                 val hoverEffect = remember(prefsSnapshot) { prefs.getMiniPlayerHoverEffect() }
+                val hoverIllumination = remember(prefsSnapshot) { prefs.getMiniPlayerHoverIllumination() }
                 val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
 
                 val windowInteractionSource = remember { MutableInteractionSource() }
                 val isWindowHovered by windowInteractionSource.collectIsHoveredAsState()
+                val isEffectivelyHovered = isWindowHovered || isDragging
 
                 val surfaceAlpha by animateFloatAsState(
                     targetValue = when {
-                        transparentBg && !isWindowHovered -> 0.0f
-                        transparentBg && isWindowHovered -> 0.35f
-                        !hoverEffect || isWindowHovered -> 0.96f
+                        transparentBg && (!hoverIllumination || !isEffectivelyHovered) -> 0.0f
+                        transparentBg -> 0.35f
+                        !hoverIllumination -> if (hoverEffect) 0.82f else 0.96f
+                        !hoverEffect || isEffectivelyHovered -> 0.96f
                         else -> 0.82f
                     },
                     animationSpec = tween(200)
@@ -368,8 +478,8 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                 }
 
                 val surfaceBorder = when {
-                    transparentBg && !isWindowHovered -> null
-                    transparentBg && isWindowHovered -> androidx.compose.foundation.BorderStroke(
+                    transparentBg && (!isEffectivelyHovered || !hoverIllumination) -> null
+                    transparentBg -> androidx.compose.foundation.BorderStroke(
                         1.dp,
                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                     )
@@ -385,7 +495,7 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                 // through the translucent surface. The border does the separating instead.
                 val shadowElevation = 0.dp
 
-                WindowDraggableArea {
+                Box(Modifier.fillMaxSize()) {
                     Surface(
                         shape = surfaceShape,
                         color = surfaceColor,
@@ -395,17 +505,22 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                             .fillMaxSize()
                             .hoverable(windowInteractionSource)
                             .pointerInput(Unit) {
-                                detectDragGestures(
-                                    onDragEnd = { saveCurrentBounds() },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        val currentLoc = window.location
-                                        window.setLocation(
-                                            currentLoc.x + dragAmount.x.toInt(),
-                                            currentLoc.y + dragAmount.y.toInt()
-                                        )
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = true)
+                                    if (down.type == PointerType.Mouse && currentEvent.buttons.isPrimaryPressed) {
+                                        val awtEvent = currentEvent.nativeEvent as? java.awt.event.MouseEvent
+                                        val xRoot = awtEvent?.xOnScreen ?: (window.x + down.position.x.toInt())
+                                        val yRoot = awtEvent?.yOnScreen ?: (window.y + down.position.y.toInt())
+                                        dragHandler.startDrag(xRoot, yRoot)
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            if (event.changes.all { !it.pressed }) {
+                                                dragHandler.stopDrag()
+                                                break
+                                            }
+                                        }
                                     }
-                                )
+                                }
                             }
                     ) {
                         // Context menu state: opened by right-click anywhere on the mini player
@@ -436,6 +551,7 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                     controlsOnHover = controlsOnHover,
                                     showProgress = showProgress,
                                     transparentBg = transparentBg,
+                                    isDragging = isDragging,
                                 )
                             } else {
                                 MiniLyricsContent(
@@ -447,6 +563,7 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                     controlsOnHover = controlsOnHover,
                                     showProgress = showProgress,
                                     transparentBg = transparentBg,
+                                    isDragging = isDragging,
                                 )
                             }
 
@@ -459,10 +576,18 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                     anchorYDp = window.y + contextMenuOffset.y.value,
                                     contentHeight = com.alananasss.kittytune.ui.common.FLOATING_MENU_PADDING +
                                         com.alananasss.kittytune.ui.common.FLOATING_MENU_DIVIDER +
-                                        com.alananasss.kittytune.ui.common.FLOATING_MENU_ITEM_HEIGHT * 3,
+                                        com.alananasss.kittytune.ui.common.FLOATING_MENU_ITEM_HEIGHT * 4,
                                     contentWidth = 240.dp,
                                     onDismiss = { contextMenuVisible = false },
                                 ) {
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.OpenInNew,
+                                        text = str("menu_show_window"),
+                                        onClick = {
+                                            contextMenuVisible = false
+                                            onOpenMainWindow()
+                                        },
+                                    )
                                     com.alananasss.kittytune.ui.common.FloatingMenuItem(
                                         icon = Icons.Rounded.PushPin,
                                         text = if (isPinned) str("mini_player_unpin") else str("mini_player_pin"),
@@ -505,6 +630,9 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                     .fillMaxHeight()
                                     .width(6.dp)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
+                                    .pointerInput(Unit) {
+                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
+                                    }
                                     .pointerInput(minWidthPx, maxWidthPx) {
                                         detectDragGestures(
                                             onDragEnd = { saveCurrentBounds() },
@@ -524,6 +652,9 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                     .fillMaxWidth()
                                     .height(6.dp)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.S_RESIZE_CURSOR)))
+                                    .pointerInput(Unit) {
+                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
+                                    }
                                     .pointerInput(minHeightPx, maxHeightPx) {
                                         detectDragGestures(
                                             onDragEnd = { saveCurrentBounds() },
@@ -548,6 +679,9 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                     .size(if (isElongated) 14.dp else 20.dp)
                                     .hoverable(gripInteraction)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)))
+                                    .pointerInput(Unit) {
+                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
+                                    }
                                     .pointerInput(minWidthPx, maxWidthPx, minHeightPx, maxHeightPx) {
                                         detectDragGestures(
                                             onDragEnd = {
@@ -611,6 +745,7 @@ private fun MiniLyricsContent(
     controlsOnHover: Boolean = true,
     showProgress: Boolean = true,
     transparentBg: Boolean = false,
+    isDragging: Boolean = false,
 ) {
     val track = viewModel.currentTrack
     val isPlaying = viewModel.isPlaying
@@ -634,7 +769,7 @@ private fun MiniLyricsContent(
     val vPadding = (windowHeight.value * 0.12f).coerceIn(6f, 14f).dp
     val artSize = (windowHeight.value - 38f).coerceIn(36f, 60f).dp
 
-    val controlsVisible = !controlsOnHover || isHovered || track == null
+    val controlsVisible = !controlsOnHover || isHovered || isDragging || track == null
 
     val textShadow = remember(transparentBg) {
         if (transparentBg) {
@@ -856,6 +991,7 @@ private fun MiniLyricsElongatedContent(
     controlsOnHover: Boolean = true,
     showProgress: Boolean = true,
     transparentBg: Boolean = false,
+    isDragging: Boolean = false,
 ) {
     val track = viewModel.currentTrack
     val isPlaying = viewModel.isPlaying
@@ -876,7 +1012,7 @@ private fun MiniLyricsElongatedContent(
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
 
-    val controlsVisible = !controlsOnHover || isHovered || track == null
+    val controlsVisible = !controlsOnHover || isHovered || isDragging || track == null
 
     val textShadow = remember(transparentBg) {
         if (transparentBg) {

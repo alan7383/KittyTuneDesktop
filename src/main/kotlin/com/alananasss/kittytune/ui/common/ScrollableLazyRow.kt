@@ -81,7 +81,9 @@ fun ScrollableLazyRow(
             state = state,
             contentPadding = contentPadding,
             horizontalArrangement = horizontalArrangement,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalMouseSwipe(state),
             content = content,
         )
 

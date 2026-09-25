@@ -578,8 +578,8 @@ fun HistoryTrackRow(
                     ArtistLinkText(
                         track = track,
                         onArtistClick = onArtistClick,
-                        text = track.user?.username?.takeIf { it.isNotBlank() }
-                            ?: str("history_unknown_artist"),
+                        text = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+                            .ifBlank { str("history_unknown_artist") },
                         modifier = Modifier.weight(1f, fill = false)
                     )
 

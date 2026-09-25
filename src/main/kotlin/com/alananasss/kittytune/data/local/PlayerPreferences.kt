@@ -38,9 +38,6 @@ enum class LyricsUiStyle { ENHANCED, CLASSIC }
 enum class LyricsFont { APPLE, APP_DEFAULT }
 enum class PlayerSliderStyle { BAR, WAVY, SLIM, SQUIGGLY }
 
-/** The player bar's shape: the flat panel it has always been, a softer rounded one, or a floating pill. */
-enum class PlayerBarStyle { PANEL, ROUNDED, FLOATING }
-
 /**
  * How much the lyrics views set the line being sung apart from the rest (issue #33).
  *
@@ -63,6 +60,8 @@ enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
  * [PlayerPreferences.getFullPlayerBgStyle] for what happens to a saved `ORBS`.
  */
 enum class FullPlayerBgStyle { APPLE_MUSIC, BLUR, GRADIENT, PURE_BLACK }
+
+enum class PlayerBarStyle { DEFAULT, ROUNDED, FLOATING }
 
 enum class AppLanguage(val code: String) {
     SYSTEM("system"),
@@ -127,6 +126,7 @@ class PlayerPreferences {
         private const val KEY_MINI_PLAYER_SHOW_ADDITIONAL_CONTROLS = "mini_player_show_additional_controls"
         private const val KEY_MINI_PLAYER_CONTROLS_ON_HOVER = "mini_player_controls_on_hover"
         private const val KEY_MINI_PLAYER_HOVER_EFFECT = "mini_player_hover_effect"
+        private const val KEY_MINI_PLAYER_HOVER_ILLUMINATION = "mini_player_hover_illumination"
         private const val KEY_MINI_PLAYER_SHOW_PROGRESS = "mini_player_show_progress"
         private const val KEY_MINI_PLAYER_STYLE = "mini_player_style"
         const val DEFAULT_MINI_PLAYER_STYLE = "STANDARD"
@@ -159,13 +159,26 @@ class PlayerPreferences {
         private const val KEY_LOCAL_MEDIA_ENABLED = "local_media_enabled"
         private const val KEY_LOCAL_MEDIA_URIS_SET = "local_media_uris_set_v2"
         private const val KEY_PLAYER_BAR_BUTTONS = "player_bar_buttons"
+        private const val KEY_PLAYER_BAR_STYLE = "player_bar_style"
 
         const val PLAYER_BAR_BUTTON_LIKE = "like"
         const val PLAYER_BAR_BUTTON_PANEL = "panel"
         const val PLAYER_BAR_BUTTON_QUEUE = "queue"
+        const val PLAYER_BAR_BUTTON_LYRICS = "lyrics"
+        const val PLAYER_BAR_BUTTON_MINIPLAYER = "miniplayer"
+        const val PLAYER_BAR_BUTTON_SHUFFLE = "shuffle"
+        const val PLAYER_BAR_BUTTON_REPEAT = "repeat"
 
         val PLAYER_BAR_BUTTONS_DEFAULT =
-            setOf(PLAYER_BAR_BUTTON_LIKE, PLAYER_BAR_BUTTON_PANEL, PLAYER_BAR_BUTTON_QUEUE)
+            setOf(
+                PLAYER_BAR_BUTTON_LIKE,
+                PLAYER_BAR_BUTTON_PANEL,
+                PLAYER_BAR_BUTTON_QUEUE,
+                PLAYER_BAR_BUTTON_LYRICS,
+                PLAYER_BAR_BUTTON_MINIPLAYER,
+                PLAYER_BAR_BUTTON_SHUFFLE,
+                PLAYER_BAR_BUTTON_REPEAT,
+            )
 
         const val SEEK_WHEEL_SECONDS_MIN = 1f
         const val SEEK_WHEEL_SECONDS_MAX = 60f
@@ -753,6 +766,10 @@ class PlayerPreferences {
     fun setMiniPlayerHoverEffect(enabled: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_HOVER_EFFECT, enabled)
     fun miniPlayerHoverEffectFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_HOVER_EFFECT, true)
 
+    fun getMiniPlayerHoverIllumination(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_HOVER_ILLUMINATION, true)
+    fun setMiniPlayerHoverIllumination(enabled: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_HOVER_ILLUMINATION, enabled)
+    fun miniPlayerHoverIlluminationFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_HOVER_ILLUMINATION, true)
+
     fun getMiniPlayerShowProgress(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, true)
     fun setMiniPlayerShowProgress(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, show)
     fun miniPlayerShowProgressFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_SHOW_PROGRESS, true)
@@ -920,10 +937,6 @@ class PlayerPreferences {
             PlayerSliderStyle.WAVY
         }
     }
-    fun getPlayerBarStyle(): PlayerBarStyle =
-        runCatching { PlayerBarStyle.valueOf(Prefs.getString("player_bar_style", null) ?: "") }.getOrDefault(PlayerBarStyle.PANEL)
-    fun setPlayerBarStyle(style: PlayerBarStyle) = Prefs.putString("player_bar_style", style.name)
-
     fun playerSliderStyleFlow(): Flow<PlayerSliderStyle> =
         Prefs.stringFlow(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name).map { name ->
             try {
@@ -1019,11 +1032,46 @@ class PlayerPreferences {
      */
     fun getPlayerBarButtons(): Set<String> {
         val raw = Prefs.getString(KEY_PLAYER_BAR_BUTTONS, null) ?: return PLAYER_BAR_BUTTONS_DEFAULT
-        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        val saved = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        val hasNewKeys = saved.any {
+            it == PLAYER_BAR_BUTTON_LYRICS || it == PLAYER_BAR_BUTTON_MINIPLAYER ||
+                it == PLAYER_BAR_BUTTON_SHUFFLE || it == PLAYER_BAR_BUTTON_REPEAT
+        }
+        return if (!hasNewKeys) {
+            saved + setOf(
+                PLAYER_BAR_BUTTON_LYRICS,
+                PLAYER_BAR_BUTTON_MINIPLAYER,
+                PLAYER_BAR_BUTTON_SHUFFLE,
+                PLAYER_BAR_BUTTON_REPEAT,
+            )
+        } else {
+            saved
+        }
     }
 
     fun setPlayerBarButtons(buttons: Set<String>) =
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
+
+    fun getPlayerBarStyle(): PlayerBarStyle {
+        val raw = Prefs.getString(KEY_PLAYER_BAR_STYLE, PlayerBarStyle.DEFAULT.name)
+        return try {
+            PlayerBarStyle.valueOf(raw ?: PlayerBarStyle.DEFAULT.name)
+        } catch (_: Exception) {
+            PlayerBarStyle.DEFAULT
+        }
+    }
+
+    fun setPlayerBarStyle(style: PlayerBarStyle) =
+        Prefs.putString(KEY_PLAYER_BAR_STYLE, style.name)
+
+    fun playerBarStyleFlow(): Flow<PlayerBarStyle> =
+        Prefs.stringFlow(KEY_PLAYER_BAR_STYLE, PlayerBarStyle.DEFAULT.name).map { raw ->
+            try {
+                PlayerBarStyle.valueOf(raw ?: PlayerBarStyle.DEFAULT.name)
+            } catch (_: Exception) {
+                PlayerBarStyle.DEFAULT
+            }
+        }
 
     /**
      * The order of the tiles in an options menu, and which of them are hidden (issue #33).

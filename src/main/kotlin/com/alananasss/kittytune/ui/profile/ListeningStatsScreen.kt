@@ -73,7 +73,7 @@ private const val TOP_SHOWN = 5
 fun ListeningStatsScreen(
     onBackClick: () -> Unit,
     onTrackClick: (trackId: Long) -> Unit,
-    onArtistClick: (name: String, artistId: Long?) -> Unit,
+    onArtistClick: (ReportArtist) -> Unit,
 ) {
     // Built through an explicit initializer: the default factory route throws on desktop (issue #33).
     val viewModel: ListeningStatsViewModel = viewModel { ListeningStatsViewModel() }
@@ -171,7 +171,7 @@ private fun StatsBody(
     period: ReportPeriod,
     onOpen: (StatsList) -> Unit,
     onTrackClick: (Long) -> Unit,
-    onArtistClick: (String, Long?) -> Unit,
+    onArtistClick: (ReportArtist) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 760.dp
@@ -217,7 +217,7 @@ private fun StatsBody(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             report.topArtists.take(6).forEachIndexed { index, artist ->
-                                ArtistTile(index + 1, artist, Modifier.weight(1f)) { onArtistClick(artist.name, artist.artistId) }
+                                ArtistTile(index + 1, artist, Modifier.weight(1f)) { onArtistClick(artist) }
                             }
                             repeat((6 - report.topArtists.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                         }
@@ -612,13 +612,13 @@ private fun TracksDialog(tracks: List<ReportTrack>, onTrackClick: (Long) -> Unit
 }
 
 @Composable
-private fun ArtistsDialog(artists: List<ReportArtist>, onArtistClick: (String, Long?) -> Unit, onDismiss: () -> Unit) {
+private fun ArtistsDialog(artists: List<ReportArtist>, onArtistClick: (ReportArtist) -> Unit, onDismiss: () -> Unit) {
     ListDialog(str("listening_stats_all_artists"), artists.size, onDismiss) {
         LazyColumn {
             itemsIndexed(artists) { index, artist ->
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
-                        .clickable { onDismiss(); onArtistClick(artist.name, artist.artistId) }
+                        .clickable { onDismiss(); onArtistClick(artist) }
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {

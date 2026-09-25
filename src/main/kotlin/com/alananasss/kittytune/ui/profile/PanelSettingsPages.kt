@@ -380,6 +380,7 @@ private fun MiniPlayerSettingsItems(prefs: PlayerPreferences) {
     val showAdditional = remember(prefsSnapshot) { prefs.getMiniPlayerShowAdditionalControls() }
     val controlsOnHover = remember(prefsSnapshot) { prefs.getMiniPlayerControlsOnHover() }
     val hoverEffect = remember(prefsSnapshot) { prefs.getMiniPlayerHoverEffect() }
+    val hoverIllumination = remember(prefsSnapshot) { prefs.getMiniPlayerHoverIllumination() }
     val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
 
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -393,6 +394,9 @@ private fun MiniPlayerSettingsItems(prefs: PlayerPreferences) {
         }
         SwitchRow(str("mini_player_transparent_bg"), transparentBg, str("mini_player_transparent_bg_desc")) {
             prefs.setMiniPlayerTransparentBg(!transparentBg)
+        }
+        SwitchRow(str("mini_player_hover_illumination"), hoverIllumination, str("mini_player_hover_illumination_desc")) {
+            prefs.setMiniPlayerHoverIllumination(!hoverIllumination)
         }
 
         MiniPlayerSectionTitle(str("mini_player_section_content"))

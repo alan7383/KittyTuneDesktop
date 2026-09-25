@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -2067,7 +2068,7 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel) {
                 ArtistLinkText(
                     track = track,
                     onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
-                    text = track.user?.username ?: "",
+                    text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f, fill = false)
                 )

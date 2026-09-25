@@ -430,7 +430,21 @@ class DownloadDao(private val db: AppDatabase) {
             FROM listening_stats WHERE timestamp >= ?$bound
         """.trimIndent()
         val args: Array<Any?> = if (until == null) arrayOf(since) else arrayOf(since, until)
-        return db.queryOne(sql, *args, mapper = ::statsSnapshot) ?: StatsSnapshot()
+        val snapshot = db.queryOne(sql, *args, mapper = ::statsSnapshot) ?: StatsSnapshot()
+
+        val distinctArtistsRaw: List<String> = db.query(
+            "SELECT DISTINCT artistName FROM listening_stats WHERE timestamp >= ?$bound AND $playRule",
+            *args,
+            mapper = { rs -> rs.getString(1) }
+        )
+        val calculatedUniqueArtists = distinctArtistsRaw
+            .flatMap { splitArtistNames(it) }
+            .map { it.trim().lowercase() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .size
+
+        return snapshot.copy(uniqueArtists = calculatedUniqueArtists)
     }
 
     /**
@@ -463,20 +477,26 @@ class DownloadDao(private val db: AppDatabase) {
         since, limit, mapper = ::topTrack,
     )
 
-    suspend fun getTopArtistsAfter(since: Long, limit: Int = 10): List<TopArtistResult> = db.query(
-        "SELECT artistName, MAX(artistAvatarUrl) as artworkUrl, MAX(artistId) as artistId, MAX(artistPermalink) as artistPermalink, MAX(source) as source, COUNT(*) as playCount, SUM(listenDurationMs) as totalListenMs FROM listening_stats WHERE timestamp >= ? AND $playRule GROUP BY artistName ORDER BY totalListenMs DESC LIMIT ?",
-        since, limit, mapper = ::topArtist,
-    )
+    suspend fun getTopArtistsAfter(since: Long, limit: Int = 10): List<TopArtistResult> {
+        val raw = db.query(
+            "SELECT artistName, MAX(artistAvatarUrl) as artworkUrl, MAX(artistId) as artistId, MAX(artistPermalink) as artistPermalink, MAX(source) as source, COUNT(*) as playCount, SUM(listenDurationMs) as totalListenMs FROM listening_stats WHERE timestamp >= ? AND $playRule GROUP BY artistName",
+            since, mapper = ::topArtist,
+        )
+        return aggregateAndSplitTopArtists(raw, limit)
+    }
 
     suspend fun getTopTracksBetween(since: Long, until: Long, limit: Int = 1): List<TopTrackResult> = db.query(
         "SELECT trackId, trackTitle, artistName, MAX(artworkUrl) as artworkUrl, MAX(source) as source, COUNT(*) as playCount, SUM(listenDurationMs) as totalListenMs FROM listening_stats WHERE timestamp >= ? AND timestamp < ? AND $playRule GROUP BY trackId ORDER BY totalListenMs DESC LIMIT ?",
         since, until, limit, mapper = ::topTrack,
     )
 
-    suspend fun getTopArtistsBetween(since: Long, until: Long, limit: Int = 1): List<TopArtistResult> = db.query(
-        "SELECT artistName, MAX(artistAvatarUrl) as artworkUrl, MAX(artistId) as artistId, MAX(artistPermalink) as artistPermalink, MAX(source) as source, COUNT(*) as playCount, SUM(listenDurationMs) as totalListenMs FROM listening_stats WHERE timestamp >= ? AND timestamp < ? AND $playRule GROUP BY artistName ORDER BY totalListenMs DESC LIMIT ?",
-        since, until, limit, mapper = ::topArtist,
-    )
+    suspend fun getTopArtistsBetween(since: Long, until: Long, limit: Int = 1): List<TopArtistResult> {
+        val raw = db.query(
+            "SELECT artistName, MAX(artistAvatarUrl) as artworkUrl, MAX(artistId) as artistId, MAX(artistPermalink) as artistPermalink, MAX(source) as source, COUNT(*) as playCount, SUM(listenDurationMs) as totalListenMs FROM listening_stats WHERE timestamp >= ? AND timestamp < ? AND $playRule GROUP BY artistName",
+            since, until, mapper = ::topArtist,
+        )
+        return aggregateAndSplitTopArtists(raw, limit)
+    }
 
     suspend fun getTotalListenTimeAfter(since: Long): Long =
         db.scalarLong("SELECT COALESCE(SUM(listenDurationMs), 0) FROM listening_stats WHERE timestamp >= ?", since)
@@ -541,7 +561,121 @@ class DownloadDao(private val db: AppDatabase) {
     suspend fun deleteLyricsOffset(trackId: Long) =
         db.exec("DELETE FROM lyrics_offset WHERE trackId = ?", trackId)
 
-    private companion object {
+    companion object {
+        private val PRESERVED_ARTISTS_WITH_COMMA = listOf(
+            "Tyler, The Creator",
+            "Crosby, Stills, Nash & Young",
+            "Crosby, Stills & Nash",
+            "Emerson, Lake & Palmer",
+            "Blood, Sweat & Tears"
+        )
+
+        private val PRESERVED_ARTISTS_WITH_AMP = setOf(
+            "earth, wind & fire",
+            "crosby, stills, nash & young",
+            "crosby, stills & nash",
+            "emerson, lake & palmer",
+            "blood, sweat & tears",
+            "simon & garfunkel",
+            "hall & oates",
+            "brooks & dunn",
+            "above & beyond",
+            "iron & wine",
+            "florence + the machine",
+            "florence and the machine",
+            "tom petty and the heartbreakers",
+            "bob marley & the wailers",
+            "joan jett & the blackhearts",
+            "kc and the sunshine band",
+            "huey lewis & the news"
+        )
+
+        fun splitArtistNames(raw: String): List<String> {
+            val trimmed = raw.trim()
+            if (trimmed.isBlank()) return emptyList()
+
+            val lower = trimmed.lowercase()
+            if (PRESERVED_ARTISTS_WITH_AMP.contains(lower)) {
+                return listOf(trimmed)
+            }
+
+            var protectedStr = trimmed
+            val replacements = mutableListOf<Pair<String, String>>()
+            for (preserved in PRESERVED_ARTISTS_WITH_COMMA) {
+                if (protectedStr.contains(preserved, ignoreCase = true)) {
+                    val placeholder = "__PRESERVED_${replacements.size}__"
+                    replacements.add(placeholder to preserved)
+                    protectedStr = protectedStr.replace(Regex(Regex.escape(preserved), RegexOption.IGNORE_CASE), placeholder)
+                }
+            }
+
+            val parts = protectedStr.split(Regex(""",\s*|\s+&\s+|\s+(?:feat\.?|ft\.?)\s+""", RegexOption.IGNORE_CASE))
+            return parts.mapNotNull { part ->
+                var restored = part.trim()
+                for ((ph, original) in replacements) {
+                    restored = restored.replace(ph, original)
+                }
+                restored.takeIf { it.isNotBlank() }
+            }
+        }
+
+        fun aggregateAndSplitTopArtists(raw: List<TopArtistResult>, limit: Int): List<TopArtistResult> {
+            if (raw.isEmpty()) return emptyList()
+
+            class ArtistAcc(
+                var displayName: String,
+                var artworkUrl: String? = null,
+                var artistId: Long? = null,
+                var artistPermalink: String? = null,
+                var source: String? = null,
+                var playCount: Int = 0,
+                var totalListenMs: Long = 0L,
+            )
+
+            val accMap = linkedMapOf<String, ArtistAcc>()
+
+            for (item in raw) {
+                val names = splitArtistNames(item.artistName)
+                val isMulti = names.size > 1
+                for (name in names) {
+                    val key = name.lowercase()
+                    val acc = accMap.getOrPut(key) {
+                        ArtistAcc(displayName = name)
+                    }
+                    acc.playCount += item.playCount
+                    acc.totalListenMs += item.totalListenMs
+
+                    if (!isMulti) {
+                        if (!item.artworkUrl.isNullOrBlank()) acc.artworkUrl = item.artworkUrl
+                        if (item.artistId != null && item.artistId > 0) acc.artistId = item.artistId
+                        if (!item.artistPermalink.isNullOrBlank()) acc.artistPermalink = item.artistPermalink
+                        if (!item.source.isNullOrBlank()) acc.source = item.source
+                        acc.displayName = name
+                    } else {
+                        if (acc.artworkUrl == null && !item.artworkUrl.isNullOrBlank()) acc.artworkUrl = item.artworkUrl
+                        if (acc.artistId == null && item.artistId != null && item.artistId > 0) acc.artistId = item.artistId
+                        if (acc.artistPermalink == null && !item.artistPermalink.isNullOrBlank()) acc.artistPermalink = item.artistPermalink
+                        if (acc.source == null && !item.source.isNullOrBlank()) acc.source = item.source
+                    }
+                }
+            }
+
+            return accMap.values
+                .sortedWith(compareByDescending<ArtistAcc> { it.totalListenMs }.thenByDescending { it.playCount })
+                .take(limit)
+                .map {
+                    TopArtistResult(
+                        artistName = it.displayName,
+                        artworkUrl = it.artworkUrl,
+                        artistId = it.artistId,
+                        artistPermalink = it.artistPermalink,
+                        source = it.source,
+                        playCount = it.playCount,
+                        totalListenMs = it.totalListenMs
+                    )
+                }
+        }
+
         const val INSERT_STATS_EVENT =
             "INSERT OR IGNORE INTO listening_stats(trackId,trackTitle,artistName,artistId," +
                 "artistPermalink,artistAvatarUrl,artworkUrl,source,eventType,listenDurationMs," +

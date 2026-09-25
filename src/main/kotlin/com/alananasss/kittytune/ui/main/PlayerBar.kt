@@ -98,6 +98,9 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
  * lyrics/effects/queue/volume right — mirrors the reference player bar.
  */
 
+/** How wide the floating bar grows: past this it stops reading as an object and becomes a strip again. */
+private val FLOATING_BAR_MAX_WIDTH = 1180.dp
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerBar(
@@ -118,25 +121,30 @@ fun PlayerBar(
     val visibleButtons = rememberPlayerBarButtons()
     val showLyricsButton = rememberShowLyricsButton()
     val barStyle = rememberPlayerBarStyle()
+    val isFloating = barStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING
 
     Box(modifier, contentAlignment = Alignment.Center) {
     Surface(
         modifier = when (barStyle) {
-            // Floats clear of the window's edges, like a dock.
-            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING ->
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp).height(84.dp)
+            // A pill that floats clear of the window's edges, like a dock: centred, capped in width so it
+            // reads as an object rather than a strip, lifted by a soft shadow and a hairline edge.
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
+                .widthIn(max = FLOATING_BAR_MAX_WIDTH)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .height(80.dp)
             else -> Modifier.fillMaxWidth().height(88.dp)
         },
         shape = when (barStyle) {
-            com.alananasss.kittytune.data.local.PlayerBarStyle.PANEL -> PanelShape
-            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
-            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> androidx.compose.foundation.shape.RoundedCornerShape(42.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> PanelShape
+            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> RoundedCornerShape(28.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> RoundedCornerShape(40.dp)
         },
-        color = when (barStyle) {
-            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> MaterialTheme.colorScheme.surfaceContainerHigh
-            else -> MaterialTheme.colorScheme.surfaceContainerLow
-        },
-        shadowElevation = if (barStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING) 6.dp else 0.dp,
+        color = if (isFloating) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow,
+        border = if (isFloating) {
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+        } else null,
+        shadowElevation = if (isFloating) 10.dp else 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val barWidth = maxWidth
@@ -155,7 +163,7 @@ fun PlayerBar(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = if (isFloating) 18.dp else 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // --- left: artwork + title/artist + like -----------------------------------
@@ -187,8 +195,8 @@ fun PlayerBar(
                                 isPlaying = vm.isPlaying,
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(if (isVeryCompact) 48.dp else 56.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
+                                    .size(if (isVeryCompact) 48.dp else if (isFloating) 52.dp else 56.dp)
+                                    .clip(RoundedCornerShape(if (isFloating) 26.dp else 8.dp)),
                             )
                             Spacer(Modifier.width(if (isVeryCompact) 8.dp else 12.dp))
                             Column(Modifier.weight(1f, fill = false).widthIn(max = if (isCompact) 160.dp else 220.dp)) {
@@ -307,15 +315,15 @@ fun PlayerBar(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Active pill background makes on/off state obvious at a glance.
-                    ExpressiveToggleButton(
-                        selected = vm.shuffleEnabled,
-                        icon = Icons.Filled.Shuffle,
-                        contentDescription = "Shuffle",
-                        onClick = { vm.toggleShuffle() },
-                    )
-
-                    Spacer(Modifier.width(6.dp))
+                    if (PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons) {
+                        ExpressiveToggleButton(
+                            selected = vm.shuffleEnabled,
+                            icon = Icons.Filled.Shuffle,
+                            contentDescription = "Shuffle",
+                            onClick = { vm.toggleShuffle() },
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
 
                     val backInteractionSource = remember { MutableInteractionSource() }
                     val nextInteractionSource = remember { MutableInteractionSource() }
@@ -422,15 +430,16 @@ fun PlayerBar(
                         Icon(Icons.Filled.SkipNext, null, modifier = Modifier.size(22.dp))
                     }
 
-                    Spacer(Modifier.width(6.dp))
-
-                    ExpressiveToggleButton(
-                        selected = vm.repeatMode != RepeatMode.NONE,
-                        icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
-                        else Icons.Filled.Repeat,
-                        contentDescription = "Repeat",
-                        onClick = { vm.toggleRepeatMode() },
-                    )
+                    if (PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons) {
+                        Spacer(Modifier.width(6.dp))
+                        ExpressiveToggleButton(
+                            selected = vm.repeatMode != RepeatMode.NONE,
+                            icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
+                            else Icons.Filled.Repeat,
+                            contentDescription = "Repeat",
+                            onClick = { vm.toggleRepeatMode() },
+                        )
+                    }
                 }
 
                 PlaybackProgressRow(vm)
@@ -444,7 +453,7 @@ fun PlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
-                if (showLyricsButton) {
+                if (showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons) {
                     IconButton(
                         shapes = IconButtonDefaults.shapes(),
                         onClick = onOpenLyrics,
@@ -458,7 +467,7 @@ fun PlayerBar(
                         )
                     }
                 }
-                if (!isVeryCompact) {
+                if (!isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons) {
                     Tip(str("mini_player_title")) {
                         IconButton(
                             shapes = IconButtonDefaults.shapes(),

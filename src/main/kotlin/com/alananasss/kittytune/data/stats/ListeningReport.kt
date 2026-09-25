@@ -32,6 +32,8 @@ data class ReportArtist(
     /** The artist's avatar, or — when they have none but SoundCloud's grey default — their top track's cover. */
     val imageUrl: String?,
     val artistId: Long?,
+    /** SoundCloud profile URL, or `spotify:artist:…` for Spotify artists. */
+    val permalink: String? = null,
     val source: String,
     val plays: Int,
     val listenMs: Long,
@@ -142,16 +144,25 @@ object ListeningReports {
             )
         }.sortedWith(compareByDescending<ReportTrack> { it.listenMs }.thenByDescending { it.plays })
 
-        val artists = playRows.groupBy { it.artistName }.map { (name, rows) ->
-            val avatar = rows.firstNotNullOfOrNull { row -> row.artistAvatarUrl?.takeIf { isRealAvatar(it) } }
-            val cover = tracks.firstOrNull { it.artistName == name }?.artworkUrl
+        // A collaboration counts for each of its artists ("Kai Angel & 9mice" is two people). A row's avatar
+        // and id belong to its first-named artist only, so the others are identified from rows of their own.
+        val credits = playRows.flatMap { row ->
+            val names = com.alananasss.kittytune.data.local.DownloadDao.splitArtistNames(row.artistName).ifEmpty { listOf(row.artistName) }
+            names.mapIndexed { index, name -> Triple(name, row, index == 0) }
+        }
+        val artists = credits.groupBy { it.first.lowercase() }.map { (_, entries) ->
+            val name = entries.first().first
+            val own = entries.filter { it.third }.map { it.second }
+            val avatar = own.firstNotNullOfOrNull { row -> row.artistAvatarUrl?.takeIf { isRealAvatar(it) } }
+            val cover = tracks.firstOrNull { track -> entries.any { it.second.trackId == track.trackId } }?.artworkUrl
             ReportArtist(
                 name = name,
                 imageUrl = avatar ?: cover,
-                artistId = rows.firstNotNullOfOrNull { it.artistId },
-                source = rows.first().source,
-                plays = rows.size,
-                listenMs = rows.sumOf { it.listenDurationMs },
+                artistId = own.firstNotNullOfOrNull { it.artistId },
+                permalink = own.firstNotNullOfOrNull { it.artistPermalink },
+                source = entries.first().second.source,
+                plays = entries.size,
+                listenMs = entries.sumOf { it.second.listenDurationMs },
             )
         }.sortedWith(compareByDescending<ReportArtist> { it.listenMs }.thenByDescending { it.plays })
 

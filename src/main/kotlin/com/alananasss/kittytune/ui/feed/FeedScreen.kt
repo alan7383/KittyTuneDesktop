@@ -168,9 +168,7 @@ private fun FeedItem(
             interactionSource = interactionSource,
             onClick = { playerViewModel.playPlaylist(listOf(track), 0) },
             onArtistClick = {
-                track.user?.id?.let { uid ->
-                    navController.navigate("profile/$uid")
-                }
+                playerViewModel.navigateToTrackArtist(track)
             },
             onReposterClick = {
                 reposter?.id?.let { uid ->
@@ -277,7 +275,7 @@ private fun TrackFeedItem(
                         ArtistLinkText(
                             track = track,
                             onArtistClick = { onArtistClick() },
-                            text = track.user?.username ?: "",
+                            text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.weight(1f, fill = false)

@@ -33,6 +33,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.scrollBy
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.graphicsLayer
@@ -1420,35 +1421,7 @@ fun <T> ProfileHorizontalCarouselRow(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .pointerInput(isScrollable) {
-                        if (!isScrollable) return@pointerInput
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.type == PointerEventType.Scroll) {
-                                    val change = event.changes.firstOrNull()
-                                    if (change != null) {
-                                        val delta = if (change.scrollDelta.x != 0f) change.scrollDelta.x else change.scrollDelta.y
-                                        if (delta != 0f) {
-                                            change.consume()
-                                            coroutineScope.launch {
-                                                listState.scrollBy(delta * 50f)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .pointerInput(isScrollable) {
-                        if (!isScrollable) return@pointerInput
-                        detectHorizontalDragGestures { change, dragAmount ->
-                            change.consume()
-                            coroutineScope.launch {
-                                listState.scrollBy(-dragAmount)
-                            }
-                        }
-                    }
+                    .horizontalMouseSwipe(listState, enabled = isScrollable)
             ) {
                 items(items) { item ->
                     itemContent(item)
@@ -1536,11 +1509,26 @@ fun <T> ProfileHorizontalCarouselRow(
 
 @Composable
 fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val cardBg by animateColorAsState(
+        if (isHovered) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+        else Color.Transparent,
+        label = "profileCardBg"
+    )
+
     Column(
         modifier = Modifier
             .width(140.dp)
             .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() }
+            .background(cardBg)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = androidx.compose.foundation.LocalIndication.current,
+                onClick = onClick
+            )
+            .hoverable(interactionSource)
+            .padding(bottom = 6.dp)
     ) {
         AsyncImage(
             model = playlist.fullResArtwork,
@@ -1554,7 +1542,8 @@ fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
         // Spotify's artist page does not carry a track count for the "Appears on" /
         // "Discovered on" cards, and printing "0 tracks" there was worse than printing
@@ -1570,7 +1559,8 @@ fun ProfileSquareCard(playlist: Playlist, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp)
             )
         }
     }
@@ -1584,10 +1574,14 @@ fun ArtistCircle(user: User, onClick: () -> Unit) {
             .width(120.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() }
+            .padding(bottom = 6.dp)
     ) {
         ArtistAvatar(avatarUrl = user.avatarUrl, modifier = Modifier.size(120.dp).clip(CircleShape))
         Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 6.dp)
+        ) {
             Text(text = user.username ?: str("generic_artist"), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             if (user.verified) {
                 Spacer(Modifier.width(4.dp))
@@ -2015,18 +2009,25 @@ data class ArtistPresetItem(
 fun ArtistPresetCard(preset: ArtistPresetItem) {
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
+    val cardBg by animateColorAsState(
+        if (isHovered) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+        else Color.Transparent,
+        label = "artistPresetCardBg"
+    )
     val artwork = remember(preset.id) { preset.artworkProvider() }
 
     Column(
         modifier = Modifier
             .width(140.dp)
             .clip(RoundedCornerShape(12.dp))
+            .background(cardBg)
             .clickable(
                 interactionSource = interactionSource,
                 indication = androidx.compose.foundation.LocalIndication.current,
                 onClick = preset.onClick
             )
             .hoverable(interactionSource)
+            .padding(bottom = 6.dp)
     ) {
         Box(
             modifier = Modifier
@@ -2080,7 +2081,7 @@ fun ArtistPresetCard(preset: ArtistPresetItem) {
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Icon(
                         preset.icon,
@@ -2088,7 +2089,7 @@ fun ArtistPresetCard(preset: ArtistPresetItem) {
                         tint = Color.White,
                         modifier = Modifier.size(11.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(5.dp))
                     Text(
                         text = preset.badgeLabel,
                         style = MaterialTheme.typography.labelSmall.copy(
@@ -2131,14 +2132,16 @@ fun ArtistPresetCard(preset: ArtistPresetItem) {
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
         Text(
             text = preset.subtitle,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
     }
 }

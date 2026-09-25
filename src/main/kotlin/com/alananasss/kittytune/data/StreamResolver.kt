@@ -500,7 +500,7 @@ object StreamResolver {
     private fun resolveViaNewPipe(track: Track): String? {
         return try {
             val cleanTitle = track.title?.replace(Regex("(?i)(\\[.*?\\]|\\(.*?\\))"), "")?.trim() ?: ""
-            val artistName = track.user?.username ?: ""
+            val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
             val query = "$cleanTitle $artistName audio"
 
             val youtubeService = ServiceList.YouTube

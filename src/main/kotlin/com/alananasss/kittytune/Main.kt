@@ -259,9 +259,8 @@ fun main(args: Array<String>) {
 
         var isAppFullScreen by remember { mutableStateOf(false) }
 
-        // Track user's chosen placement and floating dimensions whenever not in fullscreen
-        if (windowState.placement != androidx.compose.ui.window.WindowPlacement.Fullscreen &&
-            !com.alananasss.kittytune.core.AppWindowState.fullScreen &&
+        // Track user's chosen placement and floating dimensions whenever not in lyrics fullscreen
+        if (!com.alananasss.kittytune.core.AppWindowState.fullScreen &&
             !isRestoringFromFullScreen &&
             !isAppFullScreen &&
             !com.alananasss.kittytune.data.theme.WindowsFullScreen.isFullScreen
@@ -328,6 +327,12 @@ fun main(args: Array<String>) {
                         windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
                         windowState.size = DpSize(clamped.width.dp, clamped.height.dp)
                         windowState.position = androidx.compose.ui.window.WindowPosition(clamped.x.dp, clamped.y.dp)
+                    } else if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                        // Workaround for Compose Multiplatform bug: transitioning directly from Fullscreen to
+                        // Maximized fails to reset isFullscreen in ComposeWindow. Sizing through Floating clears it first.
+                        windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                        kotlinx.coroutines.delay(50)
+                        windowState.placement = androidx.compose.ui.window.WindowPlacement.Maximized
                     } else {
                         windowState.placement = restorePlacement
                     }
@@ -474,10 +479,13 @@ fun main(args: Array<String>) {
             // a second lever on the same window, so this releases that too rather than guessing which of the
             // two is holding it (issue #33).
             var wasFullScreenInWindow by remember { mutableStateOf(false) }
+            var wasAlwaysOnTop by remember { mutableStateOf(false) }
             androidx.compose.runtime.LaunchedEffect(com.alananasss.kittytune.core.AppWindowState.fullScreen) {
                 val isFS = com.alananasss.kittytune.core.AppWindowState.fullScreen
                 if (isFS) {
                     wasFullScreenInWindow = true
+                    wasAlwaysOnTop = window.isAlwaysOnTop
+                    runCatching { window.isAlwaysOnTop = true }
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         javax.swing.SwingUtilities.invokeLater {
                             com.alananasss.kittytune.data.theme.WindowsFullScreen.enter(window)
@@ -485,6 +493,7 @@ fun main(args: Array<String>) {
                     }
                 } else if (wasFullScreenInWindow) {
                     wasFullScreenInWindow = false
+                    runCatching { window.isAlwaysOnTop = wasAlwaysOnTop }
                     val gc = window.graphicsConfiguration
                     val scaleX = gc?.defaultTransform?.scaleX?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
                     val scaleY = gc?.defaultTransform?.scaleY?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
@@ -504,19 +513,27 @@ fun main(args: Array<String>) {
                         }
                     } else {
                         runCatching {
-                            val device = window.graphicsConfiguration?.device
-                            if (device?.fullScreenWindow === window) device.fullScreenWindow = null
-                            if (window is java.awt.Frame) {
-                                if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
-                                    window.extendedState = java.awt.Frame.MAXIMIZED_BOTH
-                                } else {
-                                    window.extendedState = java.awt.Frame.NORMAL
-                                    javax.swing.SwingUtilities.invokeLater {
-                                        runCatching {
-                                            window.setBounds(clampedPixels.x, clampedPixels.y, clampedPixels.width, clampedPixels.height)
-                                            window.revalidate()
-                                            window.repaint()
-                                        }
+                            if (savedPlacement != androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                                val device = window.graphicsConfiguration?.device
+                                if (device?.fullScreenWindow === window) device.fullScreenWindow = null
+                            }
+                            if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                                // Reset isFullscreen in ComposeWindow by transitioning through Floating before Maximized
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Maximized
+                                window.extendedState = java.awt.Frame.MAXIMIZED_BOTH
+                                window.revalidate()
+                                window.repaint()
+                            } else if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Fullscreen) {
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Fullscreen
+                            } else {
+                                window.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                                window.extendedState = java.awt.Frame.NORMAL
+                                javax.swing.SwingUtilities.invokeLater {
+                                    runCatching {
+                                        window.setBounds(clampedPixels.x, clampedPixels.y, clampedPixels.width, clampedPixels.height)
+                                        window.revalidate()
+                                        window.repaint()
                                     }
                                 }
                             }
@@ -562,7 +579,11 @@ fun main(args: Array<String>) {
         } // End CompositionLocalProvider
 
         if (playerViewModel.isMiniPlayerVisible) {
-            com.alananasss.kittytune.ui.player.mini.MiniLyricsPlayerWindow(viewModel = playerViewModel)
+            com.alananasss.kittytune.ui.player.mini.MiniLyricsPlayerWindow(
+                viewModel = playerViewModel,
+                isAppFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen,
+                onOpenMainWindow = { showMainWindow() },
+            )
         }
 
         // Custom tray context menu — transparent, rounded, themed; lives outside the main window
