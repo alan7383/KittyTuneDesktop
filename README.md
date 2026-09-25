@@ -5,128 +5,189 @@
 <h1 align="center">KittyTune Desktop (・∀・)ﾉ</h1>
 
 <p align="center">
-  <a href="https://github.com/alan7383/KittyTuneDesktop/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/alan7383/KittyTuneDesktop?style=for-the-badge&logo=github" alt="License">
-  </a>
   <a href="https://github.com/alan7383/KittyTuneDesktop/releases">
     <img src="https://img.shields.io/github/v/tag/alan7383/KittyTuneDesktop?style=for-the-badge&logo=github&color=orange" alt="Release">
   </a>
-  <img src="https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin Badge">
-  <img src="https://img.shields.io/badge/Compose_Desktop-1.11.1-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose Desktop Badge">
-  <img src="https://img.shields.io/badge/Linux_|_Windows_|_macOS-000000?style=for-the-badge&logo=linux&logoColor=white" alt="Platform Badge">
+  <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin Badge">
+  <img src="https://img.shields.io/badge/Compose_Desktop-1.12.0-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose Desktop Badge">
+  <img src="https://img.shields.io/badge/Linux_(Primary)_|_Win_|_macOS-000000?style=for-the-badge&logo=linux&logoColor=white" alt="Platform Badge">
+  <a href="https://github.com/alan7383/KittyTuneDesktop/blob/master/LICENSE">
+    <img src="https://img.shields.io/github/license/alan7383/KittyTuneDesktop?style=for-the-badge&logo=github" alt="License">
+  </a>
 </p>
 
 <p align="center">
-  <strong>A full desktop port of KittyTune Android for Linux, Windows, and macOS.</strong><br>
-  SoundCloud-first music streaming with full account & likes sync, YouTube fallback, zero ads, sync lyrics, crossfade, MPRIS, Discord RPC & end4 dotfiles integration.
+  <strong>A lightweight, native desktop music player for Linux, Windows, and macOS.</strong><br>
+  SoundCloud-first streaming with full account sync, lossless upgrades (Qobuz, TIDAL, Deezer), Apple-style karaoke lyrics, DJ Automix & a 30+ audio effects studio.
 </p>
 
 ---
 
+> [!NOTE]
+> **linux-first project**: KittyTune Desktop is developed and tested primarily on **Linux**. Builds for **Windows** and **macOS** are provided but are currently **experimental** and may experience rough edges, glitches, or missing platform-specific behaviors. If you encounter bugs on Windows or macOS, please feel free to [open an issue](https://github.com/alan7383/KittyTuneDesktop/issues) or submit a Pull Request! (´･ω･`)
+
+---
 
 ### ~ what is this
 
-KittyTune Desktop is a complete, native desktop port of the KittyTune Android music app. Built from scratch with **Kotlin 2.4.0**, **Compose Multiplatform (Skiko)**, and **Material 3 Expressive**, it brings the mobile experience straight to Linux, Windows, and macOS.
+KittyTune Desktop is a complete, native desktop music player built from scratch with **Kotlin 2.4.20**, **Compose Multiplatform**, and **Material 3 Expressive**, designed primarily for Linux systems.
 
-No heavy web wrappers or Electron bloat here. Just a fast, lightweight JVM client that streams high-quality audio directly from **SoundCloud** (with full account sync for likes, reposts, and playlists), falls back to **YouTube** when needed, renders live karaoke lyrics, shuffles full playlists without web lazy-load traps, and syncs seamlessly with your system colors.
+No heavy web wrappers or Electron bloat here. Just a fast, lightweight JVM client that streams directly from **SoundCloud** (with full account sync for likes, reposts, and playlists), automatically upgrades to **Qobuz (Hi-Res Lossless)**, **TIDAL (FLAC)**, **Deezer**, or **YouTube Music** when available, renders live Apple-style karaoke lyrics, mixes transitions with DJ Automix, and features an integrated 30+ effects audio DSP rack.
 
 ---
 
 ### * features
 
 <details open>
-<summary><b>~ audio streaming & soundcloud sync</b></summary>
+<summary><b>~ soundcloud-first streaming & account sync</b></summary>
 
 * **full soundcloud account sync**: link your account to sync liked tracks, playlists, reposts, and history in real time.
-* **soundcloud-first audio engine**: native SoundCloud playback with seamless YouTube audio fallback whenever a track is missing.
-* **audio crossfade**: smooth transitions between songs with customizable crossfade duration (in seconds).
-* **high-fidelity playback**: FFmpeg & JavaFX Media pipelines with buffer optimization and gapless audio support.
 * **true full-playlist shuffle**: shuffles your entire library or playlist at once — no lazy-load limits or repeated tracks.
+* **zero ads & continuous vibes**: pure audio streaming without banner, audio, or video ads.
 * **search & discovery**: instant search across tracks, artists, albums, and playlists with instant filters.
-* **history & stats**: local playback history, play counts, and listening statistics persistence.
+* **history & listening stats**: local playback history, play counts, and listening statistics persistence.
 </details>
 
 <details>
-<summary><b>> synchronized lyrics & visualizer</b></summary>
+<summary><b>> lossless upgrades & multi-provider engine</b></summary>
 
-* **real-time synchronized lyrics**: word-by-word and line-by-line karaoke tracking via LrcLib and KuGou scrapers.
+* **smart isrc resolver**: automatically resolves tracks to high-fidelity studio sources.
+* **multi-source priority**: customize streaming order between Qobuz (Hi-Res Lossless), TIDAL (FLAC), Deezer (HQ), YouTube Music, and SoundCloud.
+* **automatic fallback**: seamlessly switches to alternative providers if a track is unavailable or region-locked.
+</details>
+
+<details>
+<summary><b>+ synchronized lyrics & apple-style karaoke</b></summary>
+
+* **real-time synchronized lyrics**: syllable-level and word-by-word karaoke tracking powered by LrcLib and KuGou scrapers.
+* **duet singer detection**: automatically identifies multi-artist tracks and displays lyrics split to the left and right sides.
 * **variable font tuning**: customize font weight, width, slant, roundness, optical size, and grade for lyrics typography.
-* **immersive artwork colors**: dynamic UI theme adaptation matching the current track's album cover art.
+* **accompanist animations**: smooth spring rebound animations, blur transitions, and per-track manual sync offset persistence.
 </details>
 
 <details>
-<summary><b>+ desktop integration & media controls</b></summary>
+<summary><b># dj automix & 30+ audio fx studio</b></summary>
 
-* **linux MPRIS D-Bus integration**: native media controls for Waybar, Quickshell, KDE, GNOME, and Linux desktop panels.
-* **windows & macOS media keys**: system media key controls, overlay popups, and hardware hotkeys.
-* **discord rich presence (rpc)**: show off your currently playing music, artist, elapsed time, and album artwork on Discord.
+* **automix dj transitions**: beat and tempo-aware crossfades with customizable transition offsets (Auto, 0:00, or slider) and ambient slider glow.
+* **power eq & dynamics**: bass boost, sub-octaver, tape saturation, vocal boost, vocal remover, and peak limiter normalization.
+* **spatial & ambience fx**: 8d audio, super wide, shimmer reverb, empty mall, stadium, and reverse echo.
+* **lo-fi & vintage filters**: vinyl lo-fi, vintage mp3, walkman, gramophone, chiptune, and robot vocoder.
+* **ambient rain mixer**: overlay adjustable ambient rain sounds directly on top of your audio.
+* **timestretcher engine**: precise speed, pitch, and tempo adjustment without audio degradation.
+</details>
+
+<details>
+<summary><b>* mini-player & expressive desktop ui</b></summary>
+
+* **floating mini-player**: transparent elongated bar or compact floating widget with always-on-top mode, hover actions, and inline lyrics.
+* **expressive material 3**: fluid animated mesh backgrounds adapting to album cover colors, expressive wavy/squiggly progress sliders.
+* **music recognition (shazamkit)**: identify playing songs instantly with integrated Shazam recognition and history tracking.
+</details>
+
+<details>
+<summary><b>= linux integration & media controls</b></summary>
+
+* **linux mpris d-bus integration**: native media controls for Waybar, Quickshell, KDE, GNOME, and Linux desktop panels.
+* **dynamic wallpaper color sync**: seamless color adaptation matching system accent tokens (Matugen / Material You).
+* **discord rich presence (rpc)**: show off your currently playing music, artist, elapsed time, and high-res album artwork on Discord.
+* **modern system tray**: custom themed tray context menu with quick playback toggles and volume control.
 * **customizable global shortcuts**: control playback, volume, and tracks anywhere on your desktop.
 </details>
-
-<details>
-<summary><b># end4 hyprland & material you system theme</b></summary>
-
-* **auto end4 dotfile detection**: automatically senses if [end4's Hyprland dotfiles](https://github.com/end-4/dots-hyprland) are installed on your Linux system.
-* **exclusive end4 theme**: unlocks the dedicated `end4 (Material You)` palette under Settings -> Theme.
-* **live matugen reloading**: reads color tokens from `~/.local/state/quickshell/user/generated/colors.json` and updates application colors in real time when wallpaper changes.
-* **pure amoled mode**: true `#000000` pitch black background toggle for OLED displays.
-</details>
-
----
-
-### > end4 hyprland dotfiles & material you integration
-
-KittyTune Desktop integrates natively with [end4's Hyprland dotfiles](https://github.com/end-4/dots-hyprland).
-
-Since both KittyTune Desktop and end4's `illogical-impulse` environment share **Material 3 (Material You / Monet)** design tokens, your music player stays in perfect visual sync with your system wallpaper.
-
-<p align="center">
-  <img src="images/option-end4-color.png" width="750" style="border-radius: 12px;" alt="end4 Material You palette option">
-  <br><em>exclusive end4 (Material You) color palette option.</em>
-  <br><br>
-  <img src="images/musicpanelmpris.png" width="750" style="border-radius: 12px;" alt="Quickshell MPRIS Integration">
-  <br><em>Quickshell MPRIS media control panel integration.</em>
-</p>
 
 ---
 
 ### + screenshots
 
 <p align="center">
-  <img src="images/homescreen.png" width="750" style="border-radius: 12px;" alt="KittyTune Desktop Home Screen">
-  <br><em>home screen — user library, recommendations, and recent tracks.</em>
+  <img src="images/fullscreen_player.png" width="850" style="border-radius: 12px;" alt="Fullscreen Player">
+  <br><em>fullscreen player — fluid artwork canvas, expressive wavy sliders, and dynamic colors.</em>
 </p>
 
 <br>
 
 <p align="center">
-  <img src="images/lyrics.png" width="750" style="border-radius: 12px;" alt="Synchronized Lyrics View">
-  <br><em>synchronized karaoke lyrics with word-by-word tracking.</em>
+  <img src="images/lyrics_preview.gif" width="850" style="border-radius: 12px;" alt="Apple-Style Synchronized Lyrics">
+  <br><em>synchronized lyrics — real-time karaoke tracking, accompanist animations, and duet singer split.</em>
 </p>
 
 <br>
 
 <p align="center">
-  <img src="images/playlist.png" width="750" style="border-radius: 12px;" alt="Playlist & Album View">
-  <br><em>playlist view — track listings, duration, and batch playback.</em>
+  <img src="images/effects_studio.png" width="850" style="border-radius: 12px;" alt="Audio FX Studio">
+  <br><em>audio fx studio — 30+ modular dsp effects, bass boost, 8d audio, and rain mixer.</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="images/mini_player.png" width="750" style="border-radius: 12px;" alt="Mini Player">
+  <br><em>floating mini-player — transparent elongated bar with hover controls and live lyrics.</em>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="images/homescreen.png" width="850" style="border-radius: 12px;" alt="Home Screen">
+  <br><em>home screen — soundcloud stream, likes, playlists, and user library.</em>
 </p>
 
 ---
 
 ### * keyboard shortcuts
 
+<details>
+<summary><b>> click to view all keyboard shortcuts</b></summary>
+
+<br>
+
+#### **playback & track controls**
+
 | shortcut | action |
 | :--- | :--- |
 | `Spacebar` | play / pause toggle |
-| `N` / `Shift + Right` | next track |
-| `P` / `Shift + Left` | previous track |
-| `L` | toggle like / favorite |
-| `R` | toggle repeat mode |
-| `S` | toggle shuffle mode |
+| `Shift + Right` | play next track |
+| `Shift + Left` | play previous track |
+| `Right` | seek forward (+5 seconds) |
+| `Left` | seek backward (-5 seconds) |
+| `0` ... `9` | seek to percentage (0% to 90% of track) |
+| `Shift + L` | toggle repeat mode |
+| `Shift + S` | toggle shuffle mode |
+| `L` | like / unlike playing track |
+| `R` | repost / un-repost playing track |
+
+#### **volume & audio**
+
+| shortcut | action |
+| :--- | :--- |
 | `Shift + Up` | increase volume |
 | `Shift + Down` | decrease volume |
-| `M` | mute / unmute audio |
-| `Escape` | back / close modal |
+| `M` | mute / unmute volume |
+
+#### **navigation & panels**
+
+| shortcut | action |
+| :--- | :--- |
+| `S` | open search field |
+| `P` | navigate to playing track details |
+| `Q` | toggle next up queue panel |
+| `H` | open keyboard shortcuts modal |
+| `Escape` | close overlay / navigate back |
+| `Mouse Back / Forward` | history back / forward navigation |
+| `G` then `L` | navigate to likes |
+| `G` then `C` | navigate to library |
+| `G` then `H` | navigate to history |
+| `G` then `S` | navigate to feed (stream) |
+| `G` then `P` | navigate to profile |
+
+#### **ui zoom & scaling**
+
+| shortcut | action |
+| :--- | :--- |
+| `Ctrl + +` / `Ctrl + =` | zoom in (increase ui scale) |
+| `Ctrl + -` | zoom out (decrease ui scale) |
+| `Ctrl + 0` | reset ui zoom to 100% |
+
+</details>
 
 ---
 
@@ -134,29 +195,45 @@ Since both KittyTune Desktop and end4's `illogical-impulse` environment share **
 
 pre-built binaries for linux, windows, and macos are available on the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases).
 
-#### **arch linux (aur & pkg)**
-```bash
-sudo pacman -U kitty-tune-1.0.17-1-x86_64.pkg.tar.zst
-```
+#### **arch linux**
+
+* **aur (community package)**:
+  the [`kitty-tune-bin`](https://aur.archlinux.org/packages/kitty-tune-bin) package on the AUR is maintained by community member [@Felitendo](https://github.com/Felitendo).
+  ```bash
+  yay -S kitty-tune-bin
+  # or with paru:
+  paru -S kitty-tune-bin
+  ```
+  > [!NOTE]
+  > The AUR package is maintained independently by Felitendo. As with any AUR helper installation, you should inspect the `PKGBUILD` before installing.
+
+* **official release package (.pkg.tar.zst)**:
+  download the latest package directly from [releases](https://github.com/alan7383/KittyTuneDesktop/releases) and install via pacman:
+  ```bash
+  sudo pacman -U kitty-tune-*.pkg.tar.zst
+  ```
 
 #### **debian / ubuntu / linux mint (.deb)**
+download the `.deb` file from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases) and install via apt:
 ```bash
-sudo apt install ./kitty-tune_1.0.17_amd64.deb
+sudo apt install ./kitty-tune_*_amd64.deb
 ```
 
 #### **fedora / opensuse / rhel (.rpm)**
+download the `.rpm` file from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases) and install via dnf:
 ```bash
-sudo dnf install ./kitty-tune-1.0.17-1.x86_64.rpm
+sudo dnf install ./kitty-tune-*.rpm
 ```
 
 #### **universal portable linux (.AppImage)**
+download the standalone `.AppImage` from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases):
 ```bash
-chmod +x KittyTune-1.0.17-x86_64.AppImage
-./KittyTune-1.0.17-x86_64.AppImage
+chmod +x KittyTune-*.AppImage
+./KittyTune-*.AppImage
 ```
 
-#### **windows & macos**
-grab the windows installer (`.msi`), portable archive (`.zip`), or macos disk image (`.dmg`).
+#### **windows & macos (experimental)**
+grab the windows installer (`.msi`), portable archive (`.zip`), or macos disk image (`.dmg`) from the [releases page](https://github.com/alan7383/KittyTuneDesktop/releases).
 
 ---
 
@@ -186,14 +263,16 @@ most desktop music clients are heavy electron apps that gobble up gigabytes of R
 
 | feature | official soundcloud web | kittytune desktop |
 | :--- | :--- | :--- |
+| **platform focus** | browser | linux-first native desktop client |
 | **true full-playlist shuffle** | no (limited by lazy loading) | yes (instant full shuffle) |
-| **offline music downloads** | no (requires Go+ sub) | yes (free offline cache & local files) |
+| **lossless upgrades (qobuz, tidal, deezer)** | no (128kbps mp3 / 256kbps aac) | yes (automatic isrc hi-res lossless matching) |
 | **ad-free experience** | no (audio/video ads) | yes (100% ad-free) |
-| **synchronized karaoke lyrics** | no | yes (LrcLib & KuGou word/line sync) |
-| **audio crossfade** | no | yes (customizable transition duration) |
-| **youtube audio fallback** | no (stream fails if unavailable) | yes (automatic fallback routing) |
-| **system-wide theme sync** | no (fixed web UI) | yes (end-4 Hyprland / matugen live sync) |
-| **native linux MPRIS D-Bus** | no | yes (full panel & waybar controls) |
+| **apple-style synced lyrics** | no | yes (lrcLib & kugou word/line sync + duet split) |
+| **dj automix & 30+ dsp fx** | no | yes (beat-matched transitions & studio rack) |
+| **floating mini-player** | no | yes (transparent bar with inline lyrics) |
+| **song recognition (shazam)** | no | yes (built-in shazamkit recognition) |
+| **system-wide theme sync** | no (fixed web UI) | yes (live matugen / wallpaper color sync) |
+| **native linux mpris d-bus** | no | yes (full panel & waybar controls) |
 | **discord rich presence (rpc)** | no (needs 3rd party extension) | yes (native discord status & cover art) |
 
 ---
@@ -201,8 +280,7 @@ most desktop music clients are heavy electron apps that gobble up gigabytes of R
 ### * credits & license
 
 * based on KittyTune for Android.
-* material colors powered by [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) and `matugen`.
-* built with [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform) & [MaterialKolor](https://github.com/aj-alt/MaterialKolor).
+* built with [Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform), [MaterialKolor](https://github.com/aj-alt/MaterialKolor), and [FFmpeg](https://ffmpeg.org/).
 
 licensed under the **MIT License**.
 
@@ -214,6 +292,9 @@ thanks to everyone who helps make KittyTune Desktop better:
 
 <a href="https://github.com/dyr00l" title="dyr00l">
   <img src="https://images.weserv.nl/?url=github.com/dyr00l.png&mask=circle&w=64&h=64" width="64" height="64" alt="dyr00l" />
+</a>
+<a href="https://github.com/Felitendo" title="Felitendo">
+  <img src="https://images.weserv.nl/?url=github.com/Felitendo.png&mask=circle&w=64&h=64" width="64" height="64" alt="Felitendo" />
 </a>
 
 ---
