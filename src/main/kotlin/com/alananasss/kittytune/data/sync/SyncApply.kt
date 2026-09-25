@@ -77,8 +77,11 @@ object SyncApply {
         // Collected first and written in one transaction. A first pairing carries hundreds of rows, and
         // one commit each — with autocommit, that is what a loop of single inserts means — turns a moment
         // into a visible pause (issue #33).
+        // Listens from other devices stay in the log while sharing is off, so turning it back on can
+        // restore them (see [reconcile]) instead of losing them.
+        val takeListens = com.alananasss.kittytune.data.local.PlayerPreferences().getSyncListensEnabled()
         val listens = events
-            .filter { it.kind == SyncKinds.LISTEN }
+            .filter { takeListens && it.kind == SyncKinds.LISTEN }
             .mapNotNull { event -> toRow(event) }
 
         val inserted = runCatching { insertRows(listens) }.getOrDefault(0)

@@ -1014,7 +1014,7 @@ object DownloadManager {
     }
 
     /** Remux a plain HLS stream to a local m4a container with FFmpeg (stream copy, no re-encode). */
-    private fun remuxHls(m3u8Url: String, outFile: File, onProgress: (Int) -> Unit) {
+    internal fun remuxHls(m3u8Url: String, outFile: File, onProgress: (Int) -> Unit) {
         // `use` on both: their contexts are native, and an exception mid-copy must not strand them.
         org.bytedeco.javacv.FFmpegFrameGrabber(m3u8Url).use { grabber ->
             grabber.start()
@@ -1036,7 +1036,7 @@ object DownloadManager {
         onProgress(100)
     }
 
-    private suspend fun downloadFileToStream(url: String, outputStream: OutputStream, onProgress: (Int) -> Unit) {
+    internal suspend fun downloadFileToStream(url: String, outputStream: OutputStream, onProgress: (Int) -> Unit) {
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", com.alananasss.kittytune.utils.Config.USER_AGENT)

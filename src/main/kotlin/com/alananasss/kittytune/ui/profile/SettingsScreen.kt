@@ -182,7 +182,7 @@ private fun SettingsPageContent(
                 LyricsSettingsScreen(playerViewModel = playerViewModel, page = LyricsSettingsPage.SOURCES)
             }
             SettingsCategory.STORAGE -> StorageSettingsScreen()
-            SettingsCategory.SYNC -> SyncSection(navController)
+            SettingsCategory.SYNC -> SyncSettingsContent()
             SettingsCategory.NETWORK -> NetworkSection(navController)
             SettingsCategory.MISC -> MiscSettingsPage(navController, playerViewModel)
         }
@@ -473,35 +473,6 @@ private fun SourcesSection(navController: NavController) {
     LocalMediaSettingsScreen(onBackClick = null)
 }
 
-/**
- * Pairing with another device.
- *
- * One row, deliberately: the sync screen behind it is a screen, and this is the entry that makes it reachable
- * without a menu. The subtitle says what is actually happening rather than naming the listener switch, so the
- * state is legible without opening it (issue #33).
- */
-@Composable
-private fun SyncSection(navController: NavController) {
-    SettingsGroup(
-        title = str("sync_title"),
-        items = listOf(
-            { shape ->
-                val devices = com.alananasss.kittytune.data.sync.SyncPeers.all()
-                SettingsItem(
-                    shape = shape,
-                    title = str("sync_title"),
-                    subtitle = if (devices.isEmpty()) {
-                        str("sync_state_not_paired_sub")
-                    } else {
-                        str("sync_state_in_step")
-                    },
-                    onClick = { navController.navigate("sync_settings") }
-                )
-            }
-        )
-    )
-}
-
 /** The proxy, whose own screen is long enough to deserve one and short enough to reach in one row. */
 @Composable
 private fun NetworkSection(navController: NavController) {
@@ -525,6 +496,7 @@ private fun NetworkSection(navController: NavController) {
             }
         )
     )
+    ZapretSection()
 }
 
 @Composable

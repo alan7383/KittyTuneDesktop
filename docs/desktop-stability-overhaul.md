@@ -314,6 +314,68 @@ category list becomes a rail of icons with labels.
 - **Other**: language, start screen, auto-update, Discord.
 - One switch style everywhere (`SettingsSwitch`); a switch that cannot be changed still shows its state.
 
+## Volume that is audible at the bottom
+
+The cubic curve made the lowest fifth of the slider silent: 20 % was -42 dB, 10 % -60 dB, 1 % below the
+line's -80 dB floor. The slider now moves in equal decibel steps over 40 dB (`VolumeCurve.RANGE_DB`):
+1 % is -40 dB — quiet but audible — 20 % is -32 dB, half way -20 dB. Levels saved by older versions keep
+their loudness through the inverse, and a very quiet saved level lands on the first step, not on mute.
+
+## Listening statistics, rebuilt
+
+The screen had broken layout (play counts and times wrapping into "8 / мин / 30 с"), grey placeholder
+avatars for most artists, "1 прослушиваний", tiles that meant nothing ("Replays 0", "Events 27",
+"Average track time — Track length") and a "this week" that was really the last seven days.
+
+- One report per span (`data/stats/ListeningReport.kt`), computed in one pass from the span's listens:
+  **calendar** week (from Monday), month, year, all time, each compared with the span before it
+  ("+23 % on last week").
+- An activity chart (a bar per day, or per month for a year / all time) and a time-of-day chart, both
+  with hover read-outs.
+- Top tracks as a ranked list, top artists as a row of avatars; an artist with only SoundCloud's grey
+  default avatar shows the cover of their most-played track instead.
+- Habits that mean something: share finished, skip rate, time per listen, longest run of days.
+- Counts are shown as "▶ 3", which needs no plural forms in any of the six languages.
+
+## Storage
+
+- **Audio cache** (`data/cache/AudioCache.kt`): a track that counted as a play is saved in the background
+  and plays from disk the next time; bounded by a chosen size (256 MB – 10 GB), least recently played
+  first out; switchable. Downloads are never touched.
+- Sizes of cached audio and covers, each clearable; downloaded music as a list sorted by size with
+  per-track delete; deleting all downloads asks first.
+- **Backups**: create and restore (the existing `BackupManager`, which nothing in the desktop UI called).
+  Backup files are named `KittyTune_Backup_…`.
+
+## Device sync
+
+- What to sync: listening history (new) and likes. With listens off, received ones stay in the log and
+  are restored when it is turned back on.
+- A history of exchanges (`data/sync/SyncHistory.kt`): when, with which device, how many listens and likes
+  came in and went out, or why it failed. The sync page is embedded in the settings' Devices category.
+
+## Zapret
+
+`data/zapret/` and the Proxy category:
+
+- Finds zapret on its own (the folder of a running `winws.exe`; `/opt/zapret` on Linux) or lets the user
+  choose the folder.
+- Checks every service the app uses (SoundCloud, YouTube Music, Spotify, Apple Music, Deezer, TIDAL,
+  Qobuz, lyrics providers, helper APIs, Discord, GitHub) with direct connections, and adds the domains of
+  the blocked ones that zapret's lists do not already cover to `lists/list-general-user.txt`
+  (`ipset/zapret-hosts-user.txt` on Linux) — inside a marked block, so "Remove" takes back exactly what
+  was added. Handles a file without a trailing newline; never leaves the list empty.
+- On first launch this runs once by itself: find zapret, check, add only what is blocked. With no network
+  at all it waits for the next launch instead of listing everything.
+
+## Player bar shape
+
+Panel (as before), Rounded, or Floating (inset, pill-shaped, raised) — in Interface → Player design.
+
+## Account menu
+
+Icons for every item; signing out is drawn in the error colour.
+
 ## Localisation
 
 - The home screen's listening-time card showed a hard-coded English "11 min" in every language; it
@@ -345,9 +407,9 @@ Reviewing the new upstream code:
 
 ## Tests
 
-- New: `SidebarNavLayoutTest` (sidebar order/visibility parsing and migration), `VolumeCurveTest` (curve and lossless migration), `WindowsFullScreenTest.borderlessFullScreenSurvivesFocusLossAndRestoresBounds` (real window,
+- New: `ListeningReportTest`, `ZapretHostListTest`, `SidebarNavLayoutTest` (sidebar order/visibility parsing and migration), `VolumeCurveTest` (curve and lossless migration), `WindowsFullScreenTest.borderlessFullScreenSurvivesFocusLossAndRestoresBounds` (real window,
   Windows only) and `LanguageDetectionTest` (low-accuracy mode still tells ru / en / fr apart).
 - `LinuxStatusNotifierLiveTest` now skips itself off Linux instead of failing — it needs a session bus.
-- Full suite on Windows: 522 tests. The only failures are `VolumeNormalizationTest` (7), which need the
+- Full suite on Windows: 533 tests. The only failures are `VolumeNormalizationTest` (7), which need the
   native DSP library; the repo ships the `.so` only and the `.dll` is built by CI on `windows-latest`
   (`compileNativeDSP` needs g++). Unrelated to this branch.

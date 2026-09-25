@@ -212,6 +212,7 @@ fun PlayerDesignSettingsPage() {
     val sliderStyle by prefs.playerSliderStyleFlow().collectAsState(initial = prefs.getPlayerSliderStyle())
     var verticalVolume by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
     var barButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
+    var barStyle by remember { mutableStateOf(prefs.getPlayerBarStyle()) }
     var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
     var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
@@ -226,6 +227,46 @@ fun PlayerDesignSettingsPage() {
         )
     }
     if (showMenuTilesDialog) MenuTilesDialog(prefs) { showMenuTilesDialog = false }
+
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        SettingsGroupTitle(str("settings_group_bar_shape"))
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Box(Modifier.fillMaxWidth().padding(16.dp)) {
+                com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                    options = PlayerBarStyle.entries,
+                    selectedOption = barStyle,
+                    onOptionSelected = {
+                        barStyle = it
+                        prefs.setPlayerBarStyle(it)
+                    },
+                    fillMaxWidth = true,
+                    iconProvider = { style ->
+                        Icon(
+                            when (style) {
+                                PlayerBarStyle.PANEL -> Icons.Rounded.CropSquare
+                                PlayerBarStyle.ROUNDED -> Icons.Rounded.RoundedCorner
+                                PlayerBarStyle.FLOATING -> Icons.Rounded.CallToAction
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    },
+                    labelProvider = { style ->
+                        Text(
+                            str(
+                                when (style) {
+                                    PlayerBarStyle.PANEL -> "bar_style_panel"
+                                    PlayerBarStyle.ROUNDED -> "bar_style_rounded"
+                                    PlayerBarStyle.FLOATING -> "bar_style_floating"
+                                }
+                            ),
+                            maxLines = 1,
+                        )
+                    },
+                )
+            }
+        }
+    }
 
     SettingsGroup(
         title = str("settings_group_sliders"),
