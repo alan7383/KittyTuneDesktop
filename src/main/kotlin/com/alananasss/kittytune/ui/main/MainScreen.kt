@@ -119,6 +119,11 @@ fun MainScreen(
     val backStackEntry by navController.currentBackStackEntryAsState()
     androidx.compose.runtime.LaunchedEffect(backStackEntry) {
         playerViewModel.showLyricsSheet = false
+        // An empty search left open does not follow you around: leaving home closes it.
+        val route = backStackEntry?.destination?.route
+        if (route != null && route != "home" && homeViewModel.isSearching && homeViewModel.searchQuery.isBlank()) {
+            homeViewModel.clearSearch()
+        }
     }
 
     // Same navigation protocol as the Android MainScreen: PlayerViewModel exposes

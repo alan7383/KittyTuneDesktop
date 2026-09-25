@@ -166,7 +166,7 @@ fun MainTopBar(
                     },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     trailingIcon = {
-                        if (vm.searchQuery.isNotBlank()) {
+                        if (vm.searchQuery.isNotBlank() || vm.isSearching) {
                             IconButton(
                                 shapes = IconButtonDefaults.shapes(),
                                 onClick = {
@@ -198,11 +198,10 @@ fun MainTopBar(
                                         launchSingleTop = true
                                     }
                                 }
-                            } else {
-                                if (vm.searchQuery.isBlank()) {
-                                    vm.isSearching = false
-                                }
                             }
+                            // Losing focus does not close search: picking a source or a filter takes the
+                            // focus, and closing then threw away the very page being set up. The close
+                            // button, Escape, or going somewhere else ends it.
                         }
                         .escapeDismisses {
                             vm.clearSearch()

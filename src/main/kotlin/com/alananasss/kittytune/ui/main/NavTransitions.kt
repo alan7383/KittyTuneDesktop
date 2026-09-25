@@ -68,6 +68,9 @@ private fun sharedAxisIn(forward: Boolean, distance: Int): EnterTransition {
 }
 
 private fun sharedAxisOut(forward: Boolean, distance: Int): ExitTransition {
-    return slideOutHorizontally(tween(DURATION_MS, easing = EmphasizedDecelerate)) { if (forward) -distance else distance } +
+    // Gone as soon as it is invisible. The slide used to run the full length after the fade had finished,
+    // which kept the old screen composed and drawn for 300 ms — two whole screens per frame, which on an
+    // integrated GPU is what made every transition stutter.
+    return slideOutHorizontally(tween(OUTGOING_MS, easing = FastOutLinearInEasing)) { if (forward) -distance / 3 else distance / 3 } +
         fadeOut(tween(OUTGOING_MS, easing = FastOutLinearInEasing))
 }
