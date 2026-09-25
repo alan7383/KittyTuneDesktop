@@ -17,6 +17,7 @@ import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 
 /**
@@ -74,10 +75,12 @@ fun PlayerBarOverlap.clearance(): Dp {
 fun PaddingValues.plusBottom(extra: Dp): PaddingValues {
     if (extra == 0.dp) return this
     val direction = LocalLayoutDirection.current
+    // Some callers hand in custom PaddingValues that go below zero mid-animation (the sidebar's collapse);
+    // the stock constructor rejects that, so each side is clamped.
     return PaddingValues(
-        start = calculateStartPadding(direction),
-        top = calculateTopPadding(),
-        end = calculateEndPadding(direction),
-        bottom = calculateBottomPadding() + extra,
+        start = calculateStartPadding(direction).coerceAtLeast(0.dp),
+        top = calculateTopPadding().coerceAtLeast(0.dp),
+        end = calculateEndPadding(direction).coerceAtLeast(0.dp),
+        bottom = (calculateBottomPadding() + extra).coerceAtLeast(0.dp),
     )
 }
