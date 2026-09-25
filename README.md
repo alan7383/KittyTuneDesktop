@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/logo.png" width="128" alt="KittyTune Desktop Logo">
+  <img src="scratch/banner_real_kittytune_font.png" width="100%" alt="KittyTune Desktop Banner">
 </p>
 
 <h1 align="center">KittyTune Desktop (・∀・)ﾉ</h1>
@@ -17,20 +17,12 @@
 </p>
 
 <p align="center">
-  <img src="scratch/banner_real_kittytune_font.png" alt="KittyTune Desktop Banner"><br><br>
   <strong>A full desktop port of KittyTune Android for Linux, Windows, and macOS.</strong><br>
   SoundCloud-first music streaming with full account & likes sync, YouTube fallback, zero ads, sync lyrics, crossfade, MPRIS, Discord RPC & end4 dotfiles integration.
 </p>
 
 ---
 
-```
-   /\_/\
-  ( o.o )  kittytune desktop
-   > ^ <   lightweight JVM music player for soundcloud + youtube
-```
-
----
 
 ### ~ what is this
 
