@@ -137,6 +137,17 @@ fun main(args: Array<String>) {
             }
         }
 
+        // Zapret, once: find it if it is running, and add the domains of whichever services are blocked.
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val zapret = com.alananasss.kittytune.data.zapret.ZapretManager
+                    if (zapret.folder == null) zapret.detect()?.let { zapret.folder = it }
+                    zapret.autoConfigureOnce()
+                }
+            }
+        }
+
         LaunchedEffect(Unit) {
             com.alananasss.kittytune.core.OpenFileRequests.requests.collect { files ->
                 playerViewModel.playLocalFiles(files)

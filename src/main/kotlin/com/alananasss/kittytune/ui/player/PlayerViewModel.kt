@@ -879,7 +879,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val track = listenSessionTrack
         listenSession = null
         listenSessionTrack = null
-        if (track == null || !playerPrefs.getListeningStatsEnabled()) return
+        if (track == null) return
+        // Heard for real: worth keeping for next time, whether or not statistics are on.
+        if (com.alananasss.kittytune.data.stats.ListenRules.countsAsPlay(session.listenedMs, track.durationMs ?: 0L)) {
+            com.alananasss.kittytune.data.cache.AudioCache.offer(track)
+        }
+        if (!playerPrefs.getListeningStatsEnabled()) return
 
         // Nothing heard at all is not a listen and not a skip — it is a track that was loaded. Recording
         // it would put a row in the table that every aggregate then has to exclude, and would make the

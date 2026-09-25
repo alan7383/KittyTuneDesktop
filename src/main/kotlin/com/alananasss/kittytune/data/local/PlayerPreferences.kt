@@ -38,6 +38,9 @@ enum class LyricsUiStyle { ENHANCED, CLASSIC }
 enum class LyricsFont { APPLE, APP_DEFAULT }
 enum class PlayerSliderStyle { BAR, WAVY, SLIM, SQUIGGLY }
 
+/** The player bar's shape: the flat panel it has always been, a softer rounded one, or a floating pill. */
+enum class PlayerBarStyle { PANEL, ROUNDED, FLOATING }
+
 /**
  * How much the lyrics views set the line being sung apart from the rest (issue #33).
  *
@@ -369,6 +372,10 @@ class PlayerPreferences {
     fun setSyncDisclaimerDismissed(dismissed: Boolean) = Prefs.putBoolean(KEY_SYNC_DISCLAIMER_DISMISSED, dismissed)
 
     fun getSyncLikesEnabled(): Boolean = Prefs.getBoolean(KEY_SYNC_LIKES, true)
+
+    /** Whether listens are shared with paired devices. Off keeps them on this device only. */
+    fun getSyncListensEnabled(): Boolean = Prefs.getBoolean("sync_listens_enabled", true)
+    fun setSyncListensEnabled(enabled: Boolean) = Prefs.putBoolean("sync_listens_enabled", enabled)
     fun setSyncLikesEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SYNC_LIKES, enabled)
 
     fun getHasCompletedSetup(): Boolean = Prefs.getBoolean(KEY_HAS_COMPLETED_SETUP, false)
@@ -913,6 +920,10 @@ class PlayerPreferences {
             PlayerSliderStyle.WAVY
         }
     }
+    fun getPlayerBarStyle(): PlayerBarStyle =
+        runCatching { PlayerBarStyle.valueOf(Prefs.getString("player_bar_style", null) ?: "") }.getOrDefault(PlayerBarStyle.PANEL)
+    fun setPlayerBarStyle(style: PlayerBarStyle) = Prefs.putString("player_bar_style", style.name)
+
     fun playerSliderStyleFlow(): Flow<PlayerSliderStyle> =
         Prefs.stringFlow(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name).map { name ->
             try {

@@ -117,11 +117,26 @@ fun PlayerBar(
     val track = vm.currentTrack
     val visibleButtons = rememberPlayerBarButtons()
     val showLyricsButton = rememberShowLyricsButton()
+    val barStyle = rememberPlayerBarStyle()
 
+    Box(modifier, contentAlignment = Alignment.Center) {
     Surface(
-        modifier = modifier.height(88.dp),
-        shape = PanelShape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = when (barStyle) {
+            // Floats clear of the window's edges, like a dock.
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING ->
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp).height(84.dp)
+            else -> Modifier.fillMaxWidth().height(88.dp)
+        },
+        shape = when (barStyle) {
+            com.alananasss.kittytune.data.local.PlayerBarStyle.PANEL -> PanelShape
+            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> androidx.compose.foundation.shape.RoundedCornerShape(42.dp)
+        },
+        color = when (barStyle) {
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> MaterialTheme.colorScheme.surfaceContainerHigh
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        shadowElevation = if (barStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING) 6.dp else 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val barWidth = maxWidth
@@ -499,6 +514,7 @@ fun PlayerBar(
             }
         }
     }
+    }
 }
 }
 
@@ -667,6 +683,12 @@ private fun Modifier.seekWheel(
 /**
  * Reactive read of which optional player-bar buttons the user keeps; recomposes on pref changes.
  */
+@Composable
+private fun rememberPlayerBarStyle(): com.alananasss.kittytune.data.local.PlayerBarStyle {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { PlayerPreferences().getPlayerBarStyle() }
+}
+
 @Composable
 private fun rememberPlayerBarButtons(): Set<String> {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
