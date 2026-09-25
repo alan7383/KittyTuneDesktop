@@ -174,11 +174,24 @@ fun PlayerBar(
     val track = vm.currentTrack
     val visibleButtons = rememberPlayerBarButtons()
     val showLyricsButton = rememberShowLyricsButton()
+    val playerBarStyle = rememberPlayerBarStyle()
+
+    val barShape = when (playerBarStyle) {
+        com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> RoundedCornerShape(24.dp)
+        com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> RoundedCornerShape(20.dp)
+        com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> PanelShape
+    }
+    val barBorder = if (playerBarStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING) {
+        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+    } else null
+    val barShadow = if (playerBarStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING) 8.dp else 0.dp
 
     Surface(
         modifier = modifier.height(88.dp),
-        shape = PanelShape,
+        shape = barShape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = barBorder,
+        shadowElevation = barShadow,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val barWidth = maxWidth
@@ -343,15 +356,15 @@ fun PlayerBar(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                 ) {
-                    // Active pill background makes on/off state obvious at a glance.
-                    ExpressiveToggleButton(
-                        selected = vm.shuffleEnabled,
-                        icon = Icons.Filled.Shuffle,
-                        contentDescription = "Shuffle",
-                        onClick = { vm.toggleShuffle() },
-                    )
-
-                    Spacer(Modifier.width(6.dp))
+                    if (PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons) {
+                        ExpressiveToggleButton(
+                            selected = vm.shuffleEnabled,
+                            icon = Icons.Filled.Shuffle,
+                            contentDescription = "Shuffle",
+                            onClick = { vm.toggleShuffle() },
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
 
                     val backInteractionSource = remember { MutableInteractionSource() }
                     val nextInteractionSource = remember { MutableInteractionSource() }
@@ -458,15 +471,16 @@ fun PlayerBar(
                         Icon(Icons.Filled.SkipNext, null, modifier = Modifier.size(22.dp))
                     }
 
-                    Spacer(Modifier.width(6.dp))
-
-                    ExpressiveToggleButton(
-                        selected = vm.repeatMode != RepeatMode.NONE,
-                        icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
-                        else Icons.Filled.Repeat,
-                        contentDescription = "Repeat",
-                        onClick = { vm.toggleRepeatMode() },
-                    )
+                    if (PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons) {
+                        Spacer(Modifier.width(6.dp))
+                        ExpressiveToggleButton(
+                            selected = vm.repeatMode != RepeatMode.NONE,
+                            icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
+                            else Icons.Filled.Repeat,
+                            contentDescription = "Repeat",
+                            onClick = { vm.toggleRepeatMode() },
+                        )
+                    }
                 }
 
                 // Progress row
@@ -528,7 +542,7 @@ fun PlayerBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
-                if (showLyricsButton) {
+                if (showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons) {
                     IconButton(
                         shapes = IconButtonDefaults.shapes(),
                         onClick = onOpenLyrics,
@@ -542,7 +556,7 @@ fun PlayerBar(
                         )
                     }
                 }
-                if (!isVeryCompact) {
+                if (!isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons) {
                     Tip(str("mini_player_title")) {
                         IconButton(
                             shapes = IconButtonDefaults.shapes(),
@@ -827,6 +841,17 @@ private fun rememberPlayerSliderStyle(): com.alananasss.kittytune.data.local.Pla
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) {
         com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerSliderStyle()
+    }
+}
+
+/**
+ * Reactive read of the "player bar style" setting; recomposes when the pref changes.
+ */
+@Composable
+private fun rememberPlayerBarStyle(): com.alananasss.kittytune.data.local.PlayerBarStyle {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) {
+        com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerBarStyle()
     }
 }
 

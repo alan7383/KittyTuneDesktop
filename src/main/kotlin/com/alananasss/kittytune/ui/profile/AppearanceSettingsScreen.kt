@@ -53,6 +53,7 @@ import androidx.compose.material.icons.outlined.Image
 @Composable
 fun AppearanceSettingsScreen(
     onNavigateToColors: () -> Unit,
+    onNavigateToPlayerDesign: () -> Unit = {},
     onBackClick: (() -> Unit)? = null
 ) {
     val prefs = remember { PlayerPreferences() }
@@ -65,8 +66,6 @@ fun AppearanceSettingsScreen(
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
     var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
     var showCustomizeDialog by remember { mutableStateOf(false) }
-    var verticalVolumeSlider by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
-    val sliderStyle by prefs.playerSliderStyleFlow().collectAsState(initial = prefs.getPlayerSliderStyle())
     var showIconDialog by remember { mutableStateOf(false) }
     val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
@@ -76,20 +75,9 @@ fun AppearanceSettingsScreen(
     var sidebarHoverExpand by remember { mutableStateOf(prefs.isSidebarHoverExpandEnabled()) }
 
     var showStartDestDialog by remember { mutableStateOf(false) }
-    var showSliderStyleDialog by remember { mutableStateOf(false) }
     var showInfoHalfDialog by remember { mutableStateOf(false) }
     var infoPanelHalf by remember { mutableStateOf(prefs.getInfoPanelHalf()) }
     var showFontConfigDialog by remember { mutableStateOf(false) }
-
-    if (showSliderStyleDialog) {
-        com.alananasss.kittytune.ui.player.slider.SliderStyleDialog(
-            currentStyle = sliderStyle,
-            onStyleSelected = {
-                prefs.setPlayerSliderStyle(it)
-            },
-            onDismiss = { showSliderStyleDialog = false }
-        )
-    }
 
     val isPureBlackVisible = themeMode == AppThemeMode.DARK || (themeMode == AppThemeMode.SYSTEM && systemDark)
 
@@ -284,7 +272,7 @@ fun AppearanceSettingsScreen(
                         val isTitleBarRowVisible = remember {
                             System.getProperty("os.name").lowercase().contains("win")
                         }
-                        val titleBarIndex = if (isPureBlackVisible) 6 else 5
+                        val titleBarIndex = if (isPureBlackVisible) 5 else 4
                         val customizeIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
                         val totalVisibleItems = customizeIndex + 1
 
@@ -303,26 +291,16 @@ fun AppearanceSettingsScreen(
 
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 1),
-                            title = str("pref_vertical_volume_slider"),
-                            subtitle = str("pref_vertical_volume_slider_sub"),
-                            hasSwitch = true,
-                            switchState = verticalVolumeSlider,
-                            onSwitchChange = {
-                                verticalVolumeSlider = it
-                                prefs.setVerticalVolumeSlider(it)
-                            }
+                            title = str("pref_colors"),
+                            subtitle = str("pref_colors_subtitle"),
+                            onClick = onNavigateToColors
                         )
 
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 2),
-                            title = str("pref_slider_style", "Style du curseur"),
-                            subtitle = when (sliderStyle) {
-                                PlayerSliderStyle.BAR -> str("slider_style_bar", "Bar")
-                                PlayerSliderStyle.WAVY -> str("slider_style_wavy", "Wavy")
-                                PlayerSliderStyle.SLIM -> str("slider_style_slim", "Slim")
-                                PlayerSliderStyle.SQUIGGLY -> str("slider_style_squiggly", "Squiggly")
-                            },
-                            onClick = { showSliderStyleDialog = true }
+                            title = str("pref_player_design", "Design du lecteur"),
+                            subtitle = str("pref_player_design_sub", "Forme, curseurs de lecture et volume, boutons visibles"),
+                            onClick = onNavigateToPlayerDesign
                         )
 
                         SettingsItem(
@@ -332,20 +310,13 @@ fun AppearanceSettingsScreen(
                             onClick = { showIconDialog = true }
                         )
 
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 4),
-                            title = str("pref_colors"),
-                            subtitle = str("pref_colors_subtitle"),
-                            onClick = onNavigateToColors
-                        )
-
                         AnimatedVisibility(
                             visible = isPureBlackVisible,
                             enter = expandVertically() + fadeIn(),
                             exit = shrinkVertically() + fadeOut()
                         ) {
                             SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 5),
+                                shape = getSettingsShape(totalVisibleItems, 4),
                                 title = str("pref_pure_black"),
                                 hasSwitch = true,
                                 switchState = pureBlack,
