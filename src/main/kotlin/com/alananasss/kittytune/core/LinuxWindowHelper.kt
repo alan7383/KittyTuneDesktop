@@ -49,6 +49,16 @@ object LinuxWindowHelper {
      * or taskbars. Safe to call on all operating systems.
      */
     fun configureUtilityWindow(window: Window) {
+        if (window is javax.swing.RootPaneContainer) {
+            val root = window.rootPane
+            if (root?.getClientProperty("utility_configured") == true) {
+                if (isWindows) applyWindowsToolWindow(window)
+                else if (isLinux) applyLinuxSkipHints(window)
+                return
+            }
+            root?.putClientProperty("utility_configured", true)
+        }
+
         runCatching {
             window.type = Window.Type.UTILITY
         }
