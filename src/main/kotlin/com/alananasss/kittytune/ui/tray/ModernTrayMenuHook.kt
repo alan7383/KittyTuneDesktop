@@ -66,18 +66,27 @@ object ModernTrayMenuHook {
         runCatching { icon.popupMenu = null }
 
         val mouse = object : MouseAdapter() {
-            override fun mousePressed(e: MouseEvent) = handle(e)
-            override fun mouseReleased(e: MouseEvent) = handle(e)
+            // Exactly one toggle per right-click. Both the press and the release used to toggle, with only
+            // a 300 ms debounce between them, so a click held a little longer opened the menu on the press
+            // and closed it again on the release. The platform says which of the two is the popup trigger
+            // (the release on Windows, the press on macOS); a plain button-3 release is the fallback.
+            private var openedOnPress = false
 
-            private fun handle(e: MouseEvent) {
-                val isPopup = e.isPopupTrigger || e.button == MouseEvent.BUTTON3
-                if (!isPopup) return
+            override fun mousePressed(e: MouseEvent) {
+                openedOnPress = e.isPopupTrigger
+                if (openedOnPress) open()
+            }
+
+            override fun mouseReleased(e: MouseEvent) {
+                if (openedOnPress) return
+                if (e.isPopupTrigger || e.button == MouseEvent.BUTTON3) open()
+            }
+
+            private fun open() {
                 val now = System.currentTimeMillis()
                 if (now - lastPopupAt < DEBOUNCE_MS) return
                 lastPopupAt = now
-
-                val at = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull()
-                    ?: Point(e.xOnScreen, e.yOnScreen)
+                val at = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull() ?: return
                 TrayMenuState.toggle(at.x, at.y)
             }
         }
