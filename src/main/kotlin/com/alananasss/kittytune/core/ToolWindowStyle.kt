@@ -38,4 +38,21 @@ object ToolWindowStyle {
             )
         }
     }
+
+    /**
+     * Brings a tray menu to the foreground the way native tray menus are, so the Windows 11 hidden-icons
+     * flyout it was opened from stays open while it is used.
+     *
+     * Native tray menus call `SetForegroundWindow` on their own window before showing: the flyout then stops
+     * treating the pointer leaving it as a dismissal. A menu that stays in the background is, to the flyout,
+     * the pointer wandering off — so it closed the moment you moved towards the menu. The process that just
+     * received the tray click is allowed to take the foreground, so this is not refused.
+     */
+    fun activateLikeNativeMenu(window: Window) {
+        if (!isWindows || !window.isDisplayable) return
+        runCatching {
+            User32.INSTANCE.SetForegroundWindow(WinDef.HWND(Native.getWindowPointer(window)))
+        }
+    }
+
 }
