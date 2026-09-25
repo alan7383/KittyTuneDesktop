@@ -16,7 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.TextSnippet
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -54,7 +55,7 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun PlayerDesignScreen(
-    playerViewModel: PlayerViewModel,
+    playerViewModel: PlayerViewModel? = null,
     onBackClick: () -> Unit
 ) {
     val prefs = remember { PlayerPreferences() }
@@ -83,17 +84,7 @@ fun PlayerDesignScreen(
                     .widthIn(max = 860.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // 1. Live Interactive Player Preview Card
-                PlayerLivePreviewCard(
-                    playerViewModel = playerViewModel,
-                    playerBarStyle = playerBarStyle,
-                    sliderStyle = sliderStyle,
-                    verticalVolume = verticalVolumeSlider,
-                    visibleButtons = playerBarButtons,
-                    showLyricsButton = showLyricsButton
-                )
-
-                // 2. Forme du lecteur (Player Shape)
+                // 1. Forme du lecteur (Player Shape)
                 PlayerShapeSection(
                     currentStyle = playerBarStyle,
                     onSelect = {
@@ -102,7 +93,7 @@ fun PlayerDesignScreen(
                     }
                 )
 
-                // 3. Curseurs & Progression (Sliders)
+                // 2. Curseurs & Progression (Sliders)
                 PlayerSlidersSection(
                     sliderStyle = sliderStyle,
                     onSliderStyleSelected = {
@@ -116,7 +107,7 @@ fun PlayerDesignScreen(
                     }
                 )
 
-                // 4. Menu des boutons visibles (Player Buttons)
+                // 3. Menu des boutons visibles (Player Buttons)
                 PlayerButtonsSection(
                     visibleButtons = playerBarButtons,
                     showLyricsButton = showLyricsButton,
@@ -131,7 +122,7 @@ fun PlayerDesignScreen(
                     }
                 )
 
-                // 5. Options avancées de contrôle
+                // 4. Options avancées de contrôle
                 PlayerAdvancedSection(
                     seekWheelSeconds = seekWheelSeconds,
                     onSeekWheelChanged = {
@@ -141,319 +132,6 @@ fun PlayerDesignScreen(
                 )
 
                 Spacer(Modifier.height(40.dp))
-            }
-        }
-    }
-}
-
-/**
- * Real-time mini preview of the bottom player bar reflecting chosen shape, sliders & buttons.
- */
-@Composable
-private fun PlayerLivePreviewCard(
-    playerViewModel: PlayerViewModel,
-    playerBarStyle: PlayerBarStyle,
-    sliderStyle: PlayerSliderStyle,
-    verticalVolume: Boolean,
-    visibleButtons: Set<String>,
-    showLyricsButton: Boolean
-) {
-    val track = playerViewModel.currentTrack
-    val title = track?.title ?: "KittyTune Player"
-    val artist = track?.displayArtist?.ifBlank { track.user?.username } ?: "Alan Walker, Au/Ra"
-
-    val shape = when (playerBarStyle) {
-        PlayerBarStyle.FLOATING -> RoundedCornerShape(24.dp)
-        PlayerBarStyle.ROUNDED -> RoundedCornerShape(20.dp)
-        PlayerBarStyle.DEFAULT -> RoundedCornerShape(12.dp)
-    }
-
-    val shadowElevation by animateDpAsState(
-        targetValue = if (playerBarStyle == PlayerBarStyle.FLOATING) 8.dp else 0.dp,
-        label = "previewShadow"
-    )
-
-    val border = if (playerBarStyle == PlayerBarStyle.FLOATING) {
-        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-    } else null
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = str("player_preview_title"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = str("player_preview_sub"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                ) {
-                    Text(
-                        text = when (playerBarStyle) {
-                            PlayerBarStyle.FLOATING -> str("player_shape_floating")
-                            PlayerBarStyle.ROUNDED -> str("player_shape_rounded")
-                            PlayerBarStyle.DEFAULT -> str("player_shape_default")
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            // Simulated Player Bar Dock
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .padding(
-                        horizontal = if (playerBarStyle == PlayerBarStyle.FLOATING) 16.dp else 4.dp,
-                        vertical = if (playerBarStyle == PlayerBarStyle.FLOATING) 12.dp else 4.dp
-                    )
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = shape,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    border = border,
-                    shadowElevation = shadowElevation
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Left: Cover + Title + Like
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                modifier = Modifier.size(46.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer
-                            ) {
-                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Rounded.MusicNote,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f, fill = false)) {
-                                Text(
-                                    text = title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = artist,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {
-                                Spacer(Modifier.width(8.dp))
-                                Icon(
-                                    imageVector = Icons.Filled.Favorite,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        // Center: Controls + Progress Slider
-                        Column(
-                            modifier = Modifier
-                                .weight(1.4f)
-                                .padding(horizontal = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                if (PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons) {
-                                    Icon(
-                                        Icons.Filled.Shuffle,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Filled.SkipPrevious, null, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Filled.Pause, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
-                                    }
-                                }
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Filled.SkipNext, null, modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                                if (PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons) {
-                                    Icon(
-                                        Icons.Filled.Repeat,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            }
-
-                            // Interactive slider preview
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
-                            ) {
-                                Text("1:24", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                PlayerSlider(
-                                    value = 0.38f,
-                                    onValueChange = {},
-                                    onValueChangeFinished = {},
-                                    sliderStyle = sliderStyle,
-                                    isPlaying = true,
-                                    valueRange = 0f..1f,
-                                    modifier = Modifier.weight(1f).padding(horizontal = 6.dp)
-                                )
-                                Text("3:42", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        // Right: Optional Buttons & Volume
-                        Row(
-                            modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            if (showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons) {
-                                Icon(
-                                    imageVector = Icons.Rounded.TextSnippet,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
-                            if (PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons) {
-                                Icon(
-                                    imageVector = Icons.Rounded.PictureInPictureAlt,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
-                            if (PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Tune,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
-                            if (PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons) {
-                                Icon(
-                                    imageVector = Icons.Outlined.QueueMusic,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(Modifier.width(8.dp))
-                            }
-
-                            // Volume
-                            if (verticalVolume) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(32.dp)
-                                ) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.VolumeUp,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            } else {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        Icons.AutoMirrored.Filled.VolumeDown,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    androidx.compose.material3.LinearProgressIndicator(
-                                        progress = { 0.72f },
-                                        modifier = Modifier.width(60.dp).height(4.dp).clip(RoundedCornerShape(2.dp)),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                    )
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("72%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -830,7 +508,7 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS,
             label = str("player_button_lyrics"),
             desc = str("player_button_lyrics_desc"),
-            icon = Icons.Rounded.TextSnippet,
+            icon = Icons.AutoMirrored.Rounded.TextSnippet,
             enabled = showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons
         ),
         ButtonConfigItem(
@@ -851,7 +529,7 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE,
             label = str("player_button_queue"),
             desc = str("player_button_queue_desc"),
-            icon = Icons.Outlined.QueueMusic,
+            icon = Icons.AutoMirrored.Outlined.QueueMusic,
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons
         ),
         ButtonConfigItem(
