@@ -148,6 +148,7 @@ class PlayerPreferences {
         private const val KEY_START_DESTINATION = "start_destination_pref"
         private const val KEY_DYNAMIC_THEME = "dynamic_theme_enabled"
         private const val KEY_PLAYER_VOLUME = "player_volume"
+        private const val KEY_VOLUME_IS_PERCEPTUAL = "player_volume_perceptual"
         private const val KEY_VERTICAL_VOLUME_SLIDER = "vertical_volume_slider"
         private const val KEY_APP_ICON_VARIANT = "app_icon_variant"
         private const val KEY_THEME_MODE = "app_theme_mode"
@@ -637,7 +638,18 @@ class PlayerPreferences {
     fun dynamicThemeFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_DYNAMIC_THEME, true)
 
     // Persisted volume so the app reopens at the level used when it was closed.
-    fun getSavedVolume(): Float = Prefs.getFloat(KEY_PLAYER_VOLUME, 1f)
+    /**
+     * The volume slider's position. Saved values from before the perceptual curve were amplitudes;
+     * they are converted once, so an update does not change how loud anyone's music is.
+     */
+    fun getSavedVolume(): Float {
+        val saved = Prefs.getFloat(KEY_PLAYER_VOLUME, 1f)
+        if (Prefs.getBoolean(KEY_VOLUME_IS_PERCEPTUAL, false)) return saved
+        val migrated = com.alananasss.kittytune.audio.VolumeCurve.amplitudeToSlider(saved)
+        Prefs.putFloat(KEY_PLAYER_VOLUME, migrated)
+        Prefs.putBoolean(KEY_VOLUME_IS_PERCEPTUAL, true)
+        return migrated
+    }
     fun saveVolume(value: Float) = Prefs.putFloat(KEY_PLAYER_VOLUME, value.coerceIn(0f, 1f))
 
     fun getVerticalVolumeSlider(): Boolean = Prefs.getBoolean(KEY_VERTICAL_VOLUME_SLIDER, false)

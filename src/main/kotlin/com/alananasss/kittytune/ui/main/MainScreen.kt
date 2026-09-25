@@ -514,10 +514,15 @@ fun MainScreen(
                                 playerPrefs.setRightPanelOpen(next)
                             }
                         )
+                        val navSlidePx = with(androidx.compose.ui.platform.LocalDensity.current) { NavSlideDistance.roundToPx() }
                         NavHost(
                             navController = navController,
                         startDestination = "home",
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enterTransition = { navEnter(navSlidePx) },
+                        exitTransition = { navExit(navSlidePx) },
+                        popEnterTransition = { navPopEnter(navSlidePx) },
+                        popExitTransition = { navPopExit(navSlidePx) },
                     ) {
                         composable("home") {
                             HomeContent(
@@ -1143,7 +1148,9 @@ fun MainScreen(
         contentAlignment = Alignment.BottomEnd
     ) {
         com.alananasss.kittytune.ui.player.automix.AutomixDebugOverlay(
-            currentPositionMs = playerViewModel.currentPosition,
+            // A lambda, not the value: reading the position here recomposed this whole screen
+            // several times a second for the sake of a debug overlay that is usually hidden.
+            currentPositionMs = { playerViewModel.currentPosition },
             modifier = Modifier.padding(bottom = 100.dp, end = 20.dp)
         )
     }

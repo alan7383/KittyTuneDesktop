@@ -620,11 +620,7 @@ class AudioEngine {
         resumePosMs: Long,
         maxAttempts: Int = Int.MAX_VALUE
     ): Pair<FFmpegFrameGrabber?, String?> {
-        try {
-            oldGrabber?.stop()
-            oldGrabber?.release()
-        } catch (_: Exception) {
-        }
+        oldGrabber?.releaseQuietly()
 
         var currentUrlToTry = url
         var attempt = 0
@@ -638,8 +634,12 @@ class AudioEngine {
                 reResolveUrl(currentUrlToTry)?.let { currentUrlToTry = it }
             }
 
+            // Every attempt that does not hand its grabber back must release it: the contexts are
+            // native, and during an outage this loop runs every couple of seconds for as long as
+            // the network stays down.
+            var newG: FFmpegFrameGrabber? = null
             try {
-                val newG = createGrabber(currentUrlToTry, headers, resumePosMs)
+                newG = createGrabber(currentUrlToTry, headers, resumePosMs)
                 newG.start()
                 val isHls = currentUrlToTry.contains(".m3u8")
                 if (!isHls && resumePosMs > 0) {
@@ -659,6 +659,7 @@ class AudioEngine {
             } catch (e: Exception) {
                 Logger.e("AudioEngine", "Reopen attempt $attempt failed (${e.message}).")
             }
+            newG?.releaseQuietly()
 
             val backoffMs = (attempt * 400L).coerceAtMost(2000L)
             try {
@@ -753,9 +754,9 @@ class AudioEngine {
                     var seekFrame: Frame? = null
                     if (!urlExpired) try {
                         if (isHls) {
-                            grabber?.stop()
-                            grabber?.release()
-                            
+                            grabber?.releaseQuietly()
+                            grabber = null
+
                             grabber = createGrabber(activeUrl, headers, seek)
                             grabber.start()
                             seekFrame = try { grabber.grabSamples() } catch (_: Exception) { null }
@@ -900,10 +901,7 @@ class AudioEngine {
                 onError?.invoke(t)
             }
         } finally {
-            try {
-                grabber?.stop(); grabber?.release()
-            } catch (_: Exception) {
-            }
+            grabber?.releaseQuietly()
             closeLineInstance(localLine)
         }
     }

@@ -94,9 +94,10 @@ fun SquigglySlider(
         }
     }
 
-    // Continuous wave animation loop
-    LaunchedEffect(isPlaying) {
-        if (!isPlaying) return@LaunchedEffect
+    // Continuous wave animation loop, paused while nobody can see the window.
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    LaunchedEffect(isPlaying, isSeen) {
+        if (!isPlaying || !isSeen) return@LaunchedEffect
 
         var lastFrameTime = withFrameMillis { it }
         while (isActive) {

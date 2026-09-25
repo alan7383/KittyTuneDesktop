@@ -12,7 +12,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.asComposeRenderEffect
@@ -471,20 +470,20 @@ fun FluidArtworkBackground(
     }
 
     var seconds by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        var last = 0L
-        var pending = 0f
+    // Stopped while the window cannot be seen (minimised with the full player open, say); the field
+    // resumes from where it was, since `seconds` is kept.
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    LaunchedEffect(isSeen) {
+        if (!isSeen) return@LaunchedEffect
+        // Paced by `delay`, not by awaiting frames: awaiting a frame asks for one, so the old loop had
+        // the whole window rendered at the display rate even though the field only moves thirty times a
+        // second. Now thirty frames a second are all that is asked for.
+        var last = System.nanoTime()
         while (true) {
-            withFrameNanos { now ->
-                if (last != 0L) pending += ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
-                last = now
-            }
-            // The clock ticks with the display, but the state only moves at 30 FPS, and it is the state that
-            // costs a redraw of a full-screen blur.
-            if (pending >= FRAME_SECONDS) {
-                seconds += pending
-                pending = 0f
-            }
+            kotlinx.coroutines.delay((FRAME_SECONDS * 1000).toLong())
+            val now = System.nanoTime()
+            seconds += ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
+            last = now
         }
     }
 

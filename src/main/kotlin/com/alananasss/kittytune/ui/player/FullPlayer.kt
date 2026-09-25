@@ -65,7 +65,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -213,7 +212,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
         FullPlayerBackground(
             style = viewModel.fullPlayerBgStyle,
             palette = palette,
-            drift = drift,
+            drift = { drift.value },
             artworkUrl = track.fullResArtwork,
             animatedVideoUrl = viewModel.currentAnimatedCoverTallUrl ?: viewModel.currentAnimatedCoverUrl,
             fadeUiEnabled = viewModel.playerPrefs.getAnimatedCoversFadeUiEnabled()
@@ -397,7 +396,7 @@ private class FullPlayerPalette(
 private fun FullPlayerBackground(
     style: FullPlayerBgStyle,
     palette: FullPlayerPalette,
-    drift: Float,
+    drift: () -> Float,
     artworkUrl: String?,
     animatedVideoUrl: String? = null,
     fadeUiEnabled: Boolean = false,
@@ -439,7 +438,7 @@ private fun FullPlayerBackground(
                     Modifier
                         .fillMaxSize()
                         .background(palette.base)
-                        .drawBehind { drawMesh(palette, drift) }
+                        .drawBehind { drawMesh(palette, drift()) }
                 )
             }
         }
@@ -598,22 +597,28 @@ private const val BLOB_RADIUS = 0.80f
  * looked at a minute ago.
  */
 @Composable
-private fun rememberMeshDrift(): Float {
-    var elapsedSeconds by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(Unit) {
-        var lastNanos = 0L
+private fun rememberMeshDrift(): androidx.compose.runtime.State<Float> {
+    val drift = remember { mutableFloatStateOf(0f) }
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    // Returned as state and read while drawing, and paced by `delay`: it used to be read at the top of
+    // the screen and advanced by awaiting every frame, so the whole full player recomposed at the display
+    // rate for lights that take twenty-six seconds to go round once.
+    LaunchedEffect(isSeen) {
+        if (!isSeen) return@LaunchedEffect
+        var last = System.nanoTime()
         while (true) {
-            withFrameNanos { now ->
-                if (lastNanos != 0L) {
-                    val dt = ((now - lastNanos) / 1_000_000_000f).coerceIn(0f, 0.1f)
-                    elapsedSeconds += dt
-                }
-                lastNanos = now
-            }
+            kotlinx.coroutines.delay(MESH_TICK_MS)
+            val now = System.nanoTime()
+            val seconds = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
+            last = now
+            drift.floatValue += seconds / (MESH_CYCLE_MS / 1000f)
         }
     }
-    return elapsedSeconds / (MESH_CYCLE_MS / 1000f)
+    return drift
 }
+
+/** At this pace nothing visibly moves between two ticks. */
+private const val MESH_TICK_MS = 33L
 
 private const val MESH_CYCLE_MS = 26_000f
 
@@ -941,7 +946,7 @@ private fun FullPlayerControls(
 ) {
     Column(Modifier.fillMaxWidth()) {
         com.alananasss.kittytune.ui.player.automix.AutomixDebugOverlay(
-            currentPositionMs = viewModel.currentPosition,
+            currentPositionMs = { viewModel.currentPosition },
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 8.dp)
         )
 

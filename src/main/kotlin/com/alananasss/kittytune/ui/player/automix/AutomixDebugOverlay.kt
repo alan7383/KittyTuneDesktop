@@ -46,7 +46,8 @@ import com.alananasss.kittytune.utils.makeTimeString
 
 @Composable
 fun AutomixDebugOverlay(
-    currentPositionMs: Long,
+    /** Read lazily: the position changes several times a second, and only this overlay needs it. */
+    currentPositionMs: () -> Long,
     modifier: Modifier = Modifier,
 ) {
     val isVisible by AutomixManager.isDebugOverlayVisible.collectAsState()
@@ -213,7 +214,7 @@ fun AutomixDebugOverlay(
                                 color = Color(0xFF00E676)
                             )
                         } else if (dbg?.triggerTimeMs != null) {
-                            val remainingS = ((dbg.triggerTimeMs - currentPositionMs) / 1000).coerceAtLeast(0)
+                            val remainingS = ((dbg.triggerTimeMs - currentPositionMs()) / 1000).coerceAtLeast(0)
                             Text(
                                 text = "⚡ Transition in ${remainingS}s (${makeTimeString(dbg.triggerTimeMs)})" +
                                     (beatsLeft?.let { " • $it beats" } ?: ""),

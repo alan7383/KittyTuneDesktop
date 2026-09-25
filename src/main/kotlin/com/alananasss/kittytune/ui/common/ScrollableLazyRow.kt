@@ -34,9 +34,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
@@ -51,9 +48,10 @@ import kotlinx.coroutines.launch
  *
  * - **Arrows**, at each end, shown only while there is something in that direction. Behind a gradient that
  *   fades the row out beneath them, so the button sits on a soft edge instead of on top of a half-cut card.
- * - **The wheel**, translated from vertical to horizontal. Consumed only when the row can actually move that
- *   way; at either end the event is left alone so the page underneath keeps scrolling and the row does not
- *   become a dead patch in the middle of it.
+ * - **Shift + wheel, or a touchpad's sideways swipe.** Compose already scrolls a row with those, animated.
+ *   The plain vertical wheel is left to the page: it used to be turned into sideways motion whenever the
+ *   pointer crossed a row, so scrolling down the home screen stalled on every carousel and the row jumped
+ *   a card at a time instead.
  *
  * The arrow half already existed, written inline and twice over in the home screen. This is that pattern
  * extracted, with the wheel added, so a third caller does not mean a third copy.
@@ -71,7 +69,6 @@ fun ScrollableLazyRow(
     content: LazyListScope.() -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
 
     val canScrollBackward by remember { derivedStateOf { state.canScrollBackward } }
     val canScrollForward by remember { derivedStateOf { state.canScrollForward } }
@@ -84,26 +81,7 @@ fun ScrollableLazyRow(
             state = state,
             contentPadding = contentPadding,
             horizontalArrangement = horizontalArrangement,
-            modifier = Modifier
-                .fillMaxWidth()
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.type != PointerEventType.Scroll) continue
-                            val notches = event.changes.fold(0f) { sum, c -> sum + c.scrollDelta.y }
-                            if (notches == 0f) continue
-                            // Down means right. Only ours if the row can go that way — otherwise the page
-                            // behind it should keep scrolling as usual.
-                            val wanted = notches > 0f
-                            if (wanted && !state.canScrollForward) continue
-                            if (!wanted && !state.canScrollBackward) continue
-                            event.changes.forEach { it.consume() }
-                            val px = with(density) { WHEEL_STEP.toPx() } * notches
-                            scope.launch { state.scrollBy(px) }
-                        }
-                    }
-                },
+            modifier = Modifier.fillMaxWidth(),
             content = content,
         )
 
@@ -172,9 +150,6 @@ private fun androidx.compose.foundation.layout.BoxScope.EdgeArrow(
         }
     }
 }
-
-/** How far one wheel notch moves the row. About a card, so the gesture feels like paging by hand. */
-private val WHEEL_STEP = 90.dp
 
 /** Width of the faded lane an arrow sits in. Wide enough to soften the cut-off card behind it. */
 private val ARROW_LANE = 72.dp

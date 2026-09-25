@@ -65,6 +65,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import com.alananasss.kittytune.domain.isDefaultAvatar
 import com.alananasss.kittytune.domain.getHighResAvatarUrl
@@ -161,19 +163,39 @@ fun HomeContent(
     navController: NavController,
 ) {
     val vm = homeViewModel
-
-    if (vm.isSearching) {
-        SearchResults(vm, playerViewModel, navController)
-        return
+    val mode = when {
+        vm.isSearching -> HomeMode.SEARCH
+        vm.isLoading && vm.homeSections.isEmpty() -> HomeMode.LOADING
+        else -> HomeMode.FEED
     }
 
-    if (vm.isLoading && vm.homeSections.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularWavyProgressIndicator()
+    // The three used to replace one another in a single frame; they cross-fade now.
+    androidx.compose.animation.AnimatedContent(
+        targetState = mode,
+        transitionSpec = {
+            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) togetherWith
+                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(120))
+        },
+        label = "homeMode",
+    ) { shown ->
+        when (shown) {
+            HomeMode.SEARCH -> SearchResults(vm, playerViewModel, navController)
+            HomeMode.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularWavyProgressIndicator()
+            }
+            HomeMode.FEED -> HomeFeed(vm, playerViewModel, navController)
         }
-        return
     }
+}
 
+private enum class HomeMode { SEARCH, LOADING, FEED }
+
+@Composable
+private fun HomeFeed(
+    vm: HomeViewModel,
+    playerViewModel: PlayerViewModel,
+    navController: NavController,
+) {
     val history by vm.historyFlow.collectAsState(initial = emptyList())
 
     val contextHistory = remember(history) {
@@ -376,113 +398,39 @@ fun HomeContent(
                 }
                 Spacer(Modifier.height(12.dp))
                 
-                val listState = rememberLazyListState()
-                val scope = rememberCoroutineScope()
-                
-                Box {
-                    LazyRow(
-                        state = listState,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        items(section.content) { item ->
-                            when (item) {
-                                is Track -> MediaCard(
-                                    title = item.title ?: "",
-                                    subtitle = item.user?.username ?: "",
-                                    artworkUrl = item.fullResArtwork,
-                                    round = false,
-                                    onRightClick = { playerViewModel.showTrackOptions(item) }
-                                ) {
-                                    playerViewModel.playPlaylist(listOf(item), 0)
-                                }
-                                is Playlist -> MediaCard(
-                                    title = item.title ?: "",
-                                    subtitle = item.user?.username ?: "",
-                                    artworkUrl = item.fullResArtwork,
-                                    round = false,
-                                    onRightClick = { playerViewModel.showPlaylistOptions(item) }
-                                ) {
-                                    playerViewModel.navigateToPlaylistId = getStationNavId(item)
-                                }
-                                is User -> MediaCard(
-                                    title = item.username ?: "",
-                                    subtitle = str("lib_artists"),
-                                    artworkUrl = item.avatarUrl,
-                                    round = true,
-                                ) {
-                                    playerViewModel.navigateToPlaylistId = item.profileNavId
-                                }
-                            }
-                        }
-                    }
-                    
-                    val canScrollBackward by remember { derivedStateOf { listState.canScrollBackward } }
-                    val canScrollForward by remember { derivedStateOf { listState.canScrollForward } }
-                    val surfaceColor = MaterialTheme.colorScheme.surface
-                    
-                    val alphaLeft by androidx.compose.animation.core.animateFloatAsState(if (canScrollBackward) 1f else 0f)
-                    val alphaRight by androidx.compose.animation.core.animateFloatAsState(if (canScrollForward) 1f else 0f)
-                    
-                    Box(Modifier.matchParentSize()) {
-                        if (alphaLeft > 0f) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .width(72.dp)
-                                    .align(Alignment.CenterStart)
-                                    .graphicsLayer { alpha = alphaLeft }
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(surfaceColor, Color.Transparent)
-                                        )
-                                    ),
-                                contentAlignment = Alignment.CenterStart
+                // Faded into the panel's own colour: the old copy faded into `surface`, which is not what
+                // this panel is drawn on, so every carousel had a band of the wrong colour at each end.
+                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    items(section.content) { item ->
+                        when (item) {
+                            is Track -> MediaCard(
+                                title = item.title ?: "",
+                                subtitle = item.user?.username ?: "",
+                                artworkUrl = item.fullResArtwork,
+                                round = false,
+                                onRightClick = { playerViewModel.showTrackOptions(item) }
                             ) {
-                                IconButton(onClick = {
-                                        scope.launch {
-                                            val first = listState.firstVisibleItemIndex
-                                            listState.animateScrollToItem(maxOf(0, first - 3))
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .padding(start = 4.dp)
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                ) {
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null)
-                                }
+                                playerViewModel.playPlaylist(listOf(item), 0)
                             }
-                        }
-                        
-                        if (alphaRight > 0f) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .width(72.dp)
-                                    .align(Alignment.CenterEnd)
-                                    .graphicsLayer { alpha = alphaRight }
-                                    .background(
-                                        Brush.horizontalGradient(
-                                            colors = listOf(Color.Transparent, surfaceColor)
-                                        )
-                                    ),
-                                contentAlignment = Alignment.CenterEnd
+                            is Playlist -> MediaCard(
+                                title = item.title ?: "",
+                                subtitle = item.user?.username ?: "",
+                                artworkUrl = item.fullResArtwork,
+                                round = false,
+                                onRightClick = { playerViewModel.showPlaylistOptions(item) }
                             ) {
-                                IconButton(onClick = {
-                                        scope.launch {
-                                            val first = listState.firstVisibleItemIndex
-                                            listState.animateScrollToItem(minOf(section.content.size - 1, first + 3))
-                                        }
-                                    },
-                                    modifier = Modifier
-                                        .padding(end = 4.dp)
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                ) {
-                                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                                }
+                                playerViewModel.navigateToPlaylistId = getStationNavId(item)
+                            }
+                            is User -> MediaCard(
+                                title = item.username ?: "",
+                                subtitle = str("lib_artists"),
+                                artworkUrl = item.avatarUrl,
+                                round = true,
+                            ) {
+                                playerViewModel.navigateToPlaylistId = item.profileNavId
                             }
                         }
                     }
@@ -492,6 +440,9 @@ fun HomeContent(
     }
 }
 
+
+/** Hover highlights ease in and out instead of snapping. */
+private const val HOVER_FADE_MS = 120
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -507,8 +458,11 @@ private fun QuickTile(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val bg = if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest
-             else MaterialTheme.colorScheme.surfaceContainerHigh
+    val bg by androidx.compose.animation.animateColorAsState(
+        if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+        animationSpec = androidx.compose.animation.core.tween(HOVER_FADE_MS),
+        label = "quickTileHover",
+    )
 
     Row(
         modifier = modifier
@@ -629,13 +583,18 @@ fun MediaCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val hoverFill by androidx.compose.animation.animateColorAsState(
+        if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0f),
+        animationSpec = androidx.compose.animation.core.tween(HOVER_FADE_MS),
+        label = "mediaCardHover",
+    )
 
     androidx.compose.material3.TextButton(
         onClick = onClick,
         interactionSource = interactionSource,
         shape = RoundedCornerShape(12.dp),
         colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
-            containerColor = if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            containerColor = hoverFill,
             contentColor = MaterialTheme.colorScheme.onSurface
         ),
         contentPadding = PaddingValues(6.dp),
@@ -654,8 +613,8 @@ fun MediaCard(
             AsyncImage(
                 model = if (round && artworkUrl.isDefaultAvatar()) null else artworkUrl,
                 contentDescription = null,
-                error = if (round) androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml") else null,
-                fallback = if (round) androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml") else null,
+                error = if (round) com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter() else null,
+                fallback = if (round) com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter() else null,
                 modifier = Modifier
                     .size(148.dp)
                     .clip(if (round) CircleShape else RoundedCornerShape(8.dp)),
@@ -2192,8 +2151,8 @@ private fun SearchTopMatchHeroCard(
                     AsyncImage(
                         model = avatarUrl,
                         contentDescription = user.username,
-                        error = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
-                        fallback = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
+                        error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
+                        fallback = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -2340,8 +2299,8 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
         AsyncImage(
             model = if (user.avatarUrl.isDefaultAvatar()) null else user.avatarUrl,
             contentDescription = null,
-            error = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
-            fallback = androidx.compose.ui.res.painterResource("drawable/ic_default_user_artwork_placeholder_round.xml"),
+            error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
+            fallback = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
@@ -2489,57 +2448,22 @@ private data class VibeStation(
     val title: String,
     val subtitle: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val color: Color,
     val recipe: com.alananasss.kittytune.data.mix.MixEngine.Recipe
 )
 
-/**
- * Harmonizes a genre's characteristic hue with the dynamic theme palette.
- *
- * Shifts the hue towards the primary theme seed (Material 3 color harmonization) and calibrates
- * saturation and brightness against the surface contrast level so the station icon badge matches
- * the card background in both light and dark themes instead of using harsh static neon colors.
- */
-private fun harmonizedVibeColor(
-    baseHue: Float,
-    primaryColor: Color,
-    surfaceColor: Color,
-): Color {
-    val hsv = FloatArray(3)
-    val isDark = (surfaceColor.red * 0.299f + surfaceColor.green * 0.587f + surfaceColor.blue * 0.114f) < 0.5f
-    java.awt.Color.RGBtoHSB(
-        (primaryColor.red * 255f).toInt(),
-        (primaryColor.green * 255f).toInt(),
-        (primaryColor.blue * 255f).toInt(),
-        hsv
-    )
-    val primaryHue = hsv[0]
-    val dh = (primaryHue - baseHue).let { if (it > 0.5f) it - 1f else if (it < -0.5f) it + 1f else it }
-    val harmonizedHue = (baseHue + dh * 0.20f + 1f) % 1f
-
-    val saturation = if (isDark) hsv[1].coerceIn(0.45f, 0.75f) else hsv[1].coerceIn(0.60f, 0.85f)
-    val brightness = if (isDark) hsv[2].coerceIn(0.82f, 0.96f) else hsv[2].coerceIn(0.42f, 0.62f)
-
-    val rgb = java.awt.Color.HSBtoRGB(harmonizedHue, saturation, brightness)
-    val r = (rgb shr 16) and 0xFF
-    val g = (rgb shr 8) and 0xFF
-    val b = rgb and 0xFF
-    return Color(r / 255f, g / 255f, b / 255f)
-}
-
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StartMixingCard(playerViewModel: PlayerViewModel) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<MixState>(MixState.Idle) }
     var showOptions by remember { mutableStateOf(false) }
 
-    val colorScheme = MaterialTheme.colorScheme
     val basis by produceState<com.alananasss.kittytune.data.mix.MixEngine.Basis?>(initialValue = null) {
         value = com.alananasss.kittytune.data.mix.MixEngine.basis()
     }
 
     val topArtist = basis?.topArtists?.firstOrNull()
-    val stations = remember(topArtist, colorScheme) {
+    val stations = remember(topArtist) {
         buildList {
             add(
                 VibeStation(
@@ -2547,7 +2471,6 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                     title = str("mix_vibe_my_taste"),
                     subtitle = str("mix_vibe_my_taste_sub"),
                     icon = Icons.Rounded.AutoAwesome,
-                    color = colorScheme.primary,
                     recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.MyTaste
                 )
             )
@@ -2557,7 +2480,6 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                     title = str("mix_vibe_rock"),
                     subtitle = str("mix_vibe_rock_sub"),
                     icon = Icons.Rounded.ElectricBolt,
-                    color = harmonizedVibeColor(0.60f, colorScheme.tertiary, colorScheme.surface),
                     recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("rock")
                 )
             )
@@ -2567,7 +2489,6 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                     title = str("mix_vibe_sad"),
                     subtitle = str("mix_vibe_sad_sub"),
                     icon = Icons.Rounded.WaterDrop,
-                    color = harmonizedVibeColor(0.52f, colorScheme.secondary, colorScheme.surface),
                     recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("sad")
                 )
             )
@@ -2577,7 +2498,6 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                     title = str("mix_vibe_rap"),
                     subtitle = str("mix_vibe_rap_sub"),
                     icon = Icons.Rounded.Mic,
-                    color = harmonizedVibeColor(0.38f, colorScheme.primary, colorScheme.surface),
                     recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("hiphop")
                 )
             )
@@ -2587,7 +2507,6 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                     title = str("mix_vibe_dance"),
                     subtitle = str("mix_vibe_dance_sub"),
                     icon = Icons.Rounded.MusicNote,
-                    color = harmonizedVibeColor(0.12f, colorScheme.tertiary, colorScheme.surface),
                     recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("electronic")
                 )
             )
@@ -2597,7 +2516,6 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                     title = str("mix_vibe_pop"),
                     subtitle = str("mix_vibe_pop_sub"),
                     icon = Icons.Filled.Favorite,
-                    color = harmonizedVibeColor(0.92f, colorScheme.error, colorScheme.surface),
                     recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.InGenre("pop")
                 )
             )
@@ -2606,9 +2524,9 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
                     VibeStation(
                         id = "artist",
                         title = str("mix_vibe_artist", topArtist.artistName),
-                        subtitle = str("mix_title"),
+                        // The chip already names the artist; repeating the card's title said nothing.
+                        subtitle = "",
                         icon = Icons.Rounded.Person,
-                        color = harmonizedVibeColor(0.78f, colorScheme.secondary, colorScheme.surface),
                         recipe = com.alananasss.kittytune.data.mix.MixEngine.Recipe.LikeArtist(topArtist.artistId, topArtist.artistName)
                     )
                 )
@@ -2617,6 +2535,7 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
     }
 
     var selectedStationIndex by remember { mutableStateOf(0) }
+    var playingStationIndex by remember { mutableStateOf<Int?>(null) }
     val currentStation = stations.getOrElse(selectedStationIndex) { stations.first() }
 
     val isMixActive = playerViewModel.isYourMixActive
@@ -2664,169 +2583,127 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
         )
     }
 
-    val accent = MaterialTheme.colorScheme.primary
+    // The button restarts the mix when another mood has been picked since it began; otherwise it
+    // pauses and resumes the one playing.
+    val controlsPlayingMix = isMixActive && (playingStationIndex == null || playingStationIndex == selectedStationIndex)
+    val statusText = when (val current = state) {
+        is MixState.Empty -> current.message
+        is MixState.Done ->
+            if (current.from == null) str("mix_track_count", current.count)
+            else str("mix_done", current.count, current.from)
+        MixState.Building -> str("mix_building")
+        MixState.Idle -> if (isMixActive) {
+            if (isMixPlaying) str("mix_playing") else str("mix_resume")
+        } else str("mix_card_subtitle")
+    }
+    val statusIsNews = state is MixState.Done || (state is MixState.Idle && isMixActive)
+
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Row(
-            modifier = Modifier.padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            // The artists row arrives after the card does; grow into it rather than jump.
+            modifier = Modifier.animateContentSize().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // Left Column: Header, Subtitle, [▶ Enable mix ▶] Button & Tune Icon
-            Column(
-                modifier = Modifier.weight(1.15f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    text = str("mix_title"),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = when (val current = state) {
-                        is MixState.Empty -> current.message
-                        is MixState.Done ->
-                            if (current.from == null) str("mix_track_count", current.count)
-                            else str("mix_done", current.count, current.from)
-                        MixState.Building -> str("mix_building")
-                        MixState.Idle -> if (isMixActive) {
-                            if (isMixPlaying) str("mix_playing") else str("mix_resume")
-                        } else str("mix_card_subtitle")
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = when (state) {
-                        is MixState.Done -> accent
-                        else -> if (isMixActive) accent else MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(Modifier.height(4.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Button(
-                        onClick = {
-                            if (isMixActive) {
-                                playerViewModel.togglePlayPause()
-                            } else {
-                                start(currentStation.recipe)
-                            }
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                        enabled = state !is MixState.Building,
-                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        )
+                    Text(
+                        text = str("mix_title"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = statusText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (statusIsNews) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Tip(str("mix_customise")) {
+                    FilledTonalIconButton(
+                        onClick = { showOptions = true },
+                        shapes = IconButtonDefaults.shapes(),
                     ) {
-                        if (state is MixState.Building) {
-                            CircularWavyProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary)
-                        } else if (isMixActive) {
-                            if (isMixPlaying) {
-                                Icon(Icons.Rounded.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(str("mix_playing"), fontWeight = FontWeight.Bold)
-                            } else {
-                                Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text(str("mix_resume"), fontWeight = FontWeight.Bold)
-                            }
-                        } else {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(str("mix_enable"), fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(6.dp))
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                        }
-                    }
-
-                    Tip(str("mix_customise")) {
-                        FilledTonalIconButton(
-                            onClick = { showOptions = true },
-                            shapes = IconButtonDefaults.shapes(),
-                        ) {
-                            Icon(Icons.Rounded.Tune, contentDescription = str("mix_customise"))
-                        }
+                        Icon(Icons.Rounded.Tune, contentDescription = str("mix_customise"))
                     }
                 }
             }
 
-            // Right Column: Vertical Vibe Stations Selector
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(max = 140.dp)
-                    .verticalScroll(rememberScrollState())
+            // Every mood at once. They used to sit in a 140 dp list that scrolled without a scrollbar,
+            // so four of the seven were never found.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    stations.forEachIndexed { index, station ->
-                        val isSelected = index == selectedStationIndex
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) station.color.copy(alpha = 0.16f) else Color.Transparent,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { selectedStationIndex = index }
-                                .pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor(java.awt.Cursor.HAND_CURSOR)))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(station.color.copy(alpha = if (isSelected) 0.22f else 0.12f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        station.icon,
-                                        contentDescription = null,
-                                        tint = station.color,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = station.title,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) station.color else MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = station.subtitle,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                if (isSelected) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(4.dp)
-                                            .height(20.dp)
-                                            .clip(CircleShape)
-                                            .background(station.color)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                stations.forEachIndexed { index, station ->
+                    FilterChip(
+                        selected = index == selectedStationIndex,
+                        onClick = { selectedStationIndex = index },
+                        label = { Text(station.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = {
+                            Icon(
+                                station.icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(FilterChipDefaults.IconSize),
+                            )
+                        },
+                    )
                 }
+            }
+
+            basis?.takeIf { it.topArtists.isNotEmpty() }?.let { MixBasisRow(it) }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Button(
+                    onClick = {
+                        if (controlsPlayingMix) {
+                            playerViewModel.togglePlayPause()
+                        } else {
+                            playingStationIndex = selectedStationIndex
+                            start(currentStation.recipe)
+                        }
+                    },
+                    shapes = ButtonDefaults.shapes(),
+                    enabled = state !is MixState.Building,
+                ) {
+                    when {
+                        state is MixState.Building -> CircularWavyProgressIndicator(
+                            modifier = Modifier.size(ButtonDefaults.IconSize),
+                            color = androidx.compose.material3.LocalContentColor.current,
+                        )
+                        controlsPlayingMix && isMixPlaying ->
+                            Icon(Icons.Rounded.Pause, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                        else ->
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                    }
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                    Text(
+                        when {
+                            !controlsPlayingMix -> str("mix_enable")
+                            isMixPlaying -> str("mix_playing")
+                            else -> str("mix_resume")
+                        }
+                    )
+                }
+                if (currentStation.subtitle.isNotBlank()) Text(
+                    text = currentStation.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -3334,5 +3211,9 @@ private fun listenedLabel(ms: Long): String {
     val totalMinutes = ms / 60_000
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
-    return if (hours > 0) "${hours} h ${minutes}" else "$totalMinutes min"
+    return if (hours > 0) {
+        str("listening_stats_duration_hr_min", hours, minutes)
+    } else {
+        str("listening_stats_duration_min", totalMinutes)
+    }
 }
