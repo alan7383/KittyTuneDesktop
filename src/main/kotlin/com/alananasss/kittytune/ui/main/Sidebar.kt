@@ -129,8 +129,8 @@ fun Sidebar(
 
     // Whole sections of the app somebody may never open; Home always stays (issue #33).
     val navPrefs = remember { PlayerPreferences() }
-    val hiddenNav by navPrefs.hiddenSidebarNavFlow()
-        .collectAsState(initial = navPrefs.getHiddenSidebarNav())
+    val navLayout by navPrefs.sidebarNavLayoutFlow()
+        .collectAsState(initial = navPrefs.getSidebarNavLayout())
 
     // How far into a collapse the panel is, read from the width it is actually being laid out at rather
     // than from an animation of this file's own. `MainScreen` puts that width on a spring; a second
@@ -179,58 +179,23 @@ fun Sidebar(
                         playerViewModel.showLyricsSheet = false
                     }
                 }
-                if (PlayerPreferences.SIDEBAR_NAV_FEED !in hiddenNav) SidebarNavItem(
-                    label = str("nav_feed"),
-                    selected = currentRoute == "feed",
-                    iconSelected = Icons.Rounded.DynamicFeed,
-                    iconUnselected = Icons.Rounded.DynamicFeed,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "feed") {
-                        navController.navigate("feed") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
-                if (PlayerPreferences.SIDEBAR_NAV_EXPLORE !in hiddenNav) SidebarNavItem(
-                    label = str("explorer_title"),
-                    selected = currentRoute == "genres",
-                    iconSelected = Icons.Filled.Explore,
-                    iconUnselected = Icons.Outlined.Explore,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "genres") {
-                        navController.navigate("genres") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
-                if (PlayerPreferences.SIDEBAR_NAV_RECOGNITION !in hiddenNav) SidebarNavItem(
-                    label = str("pref_bottom_menu_fab_recognition"),
-                    selected = currentRoute == "recognition",
-                    iconSelected = Icons.Rounded.GraphicEq,
-                    iconUnselected = Icons.Rounded.GraphicEq,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "recognition") {
-                        navController.navigate("recognition") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
-                // One click, from anywhere. Sync lived at the bottom of the settings page, which for a
-                // feature whose first problem is being discovered at all was the same as hiding it.
-                if (PlayerPreferences.SIDEBAR_NAV_SYNC !in hiddenNav) SidebarNavItem(
-                    label = str("sync_title"),
-                    selected = currentRoute == "sync_settings",
-                    iconSelected = Icons.Rounded.Devices,
-                    iconUnselected = Icons.Rounded.Devices,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "sync_settings") {
-                        navController.navigate("sync_settings") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
+                // The rest, in the order and with the rows the settings page arranged.
+                navLayout.filter { it.isVisible }.forEach { entry ->
+                    val destination = SidebarDestinations.ALL[entry.key] ?: return@forEach
+                    key(destination.key) {
+                        SidebarNavItem(
+                            label = str(destination.labelKey),
+                            selected = currentRoute == destination.route,
+                            iconSelected = destination.iconSelected,
+                            iconUnselected = destination.iconUnselected,
+                            collapse = collapse,
+                        ) {
+                            if (currentRoute != destination.route) {
+                                navController.navigate(destination.route) { launchSingleTop = true }
+                            } else {
+                                playerViewModel.showLyricsSheet = false
+                            }
+                        }
                     }
                 }
             }

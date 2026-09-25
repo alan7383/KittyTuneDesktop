@@ -613,12 +613,6 @@ fun MainScreen(
                                 onBackClick = null
                             )
                         }
-                        composable("appearance_settings") {
-                            com.alananasss.kittytune.ui.profile.AppearanceSettingsScreen(
-                                onNavigateToColors = { navController.navigate("color_palette") },
-                                onBackClick = { navController.popBackStack() }
-                            )
-                        }
                         composable("color_palette") { 
                             com.alananasss.kittytune.ui.profile.ColorPaletteScreen(
                                 onBackClick = { navController.popBackStack() }
@@ -628,12 +622,6 @@ fun MainScreen(
                             com.alananasss.kittytune.ui.profile.DiscordLoginScreen(
                                 onBackClick = { navController.popBackStack() },
                                 onLoginSuccess = { navController.popBackStack() },
-                                playerViewModel = playerViewModel
-                            )
-                        }
-                        composable("lyrics_settings") {
-                            com.alananasss.kittytune.ui.profile.LyricsSettingsScreen(
-                                onBackClick = { navController.popBackStack() },
                                 playerViewModel = playerViewModel
                             )
                         }
