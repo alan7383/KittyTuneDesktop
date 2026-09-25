@@ -611,6 +611,7 @@ fun MainScreen(
                         composable("appearance_settings") {
                             com.alananasss.kittytune.ui.profile.AppearanceSettingsScreen(
                                 onNavigateToColors = { navController.navigate("color_palette") },
+                                onNavigateToPlayerDesign = { navController.navigate("player_design") },
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
@@ -618,6 +619,12 @@ fun MainScreen(
                             com.alananasss.kittytune.ui.profile.ColorPaletteScreen(
                                 onBackClick = { navController.popBackStack() }
                             ) 
+                        }
+                        composable("player_design") {
+                            com.alananasss.kittytune.ui.profile.PlayerDesignScreen(
+                                playerViewModel = playerViewModel,
+                                onBackClick = { navController.popBackStack() }
+                            )
                         }
                         composable("discord_login") {
                             com.alananasss.kittytune.ui.profile.DiscordLoginScreen(
@@ -1113,6 +1120,19 @@ fun MainScreen(
             }
         }
 
+        val playerBarStyle by playerPrefs.playerBarStyleFlow().collectAsState(initial = playerPrefs.getPlayerBarStyle())
+        val playerBarModifier = when (playerBarStyle) {
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> Modifier
+                .fillMaxWidth()
+                .padding(top = PANEL_GUTTER.dp)
+        }
+
         PlayerBar(
             playerViewModel = playerViewModel,
             onToggleNowPlaying = {
@@ -1132,9 +1152,7 @@ fun MainScreen(
             // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
             // lyrics, which has its own way up here (issue #33).
             onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = PANEL_GUTTER.dp)
+            modifier = playerBarModifier
         )
     }
 

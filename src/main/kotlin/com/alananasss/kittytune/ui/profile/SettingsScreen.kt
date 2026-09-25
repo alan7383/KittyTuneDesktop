@@ -88,6 +88,7 @@ fun SettingsScreen(
                 when (sections[index]) {
                     SettingsSection.APPEARANCE -> AppearanceSettingsScreen(
                         onNavigateToColors = { navController.navigate("color_palette") },
+                        onNavigateToPlayerDesign = { navController.navigate("player_design") },
                         onBackClick = null,
                     )
 
