@@ -57,6 +57,7 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.ViewStream
@@ -402,6 +403,7 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                         // Context menu state: opened by right-click anywhere on the mini player
                         var contextMenuVisible by remember { mutableStateOf(false) }
                         var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
+                        var settingsVisible by remember { mutableStateOf(false) }
 
                         Box(
                             modifier = Modifier
@@ -440,298 +442,52 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                 )
                             }
 
-                            DropdownMenu(
-                                expanded = contextMenuVisible,
-                                onDismissRequest = { contextMenuVisible = false },
-                                offset = contextMenuOffset,
-                            ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (isPinned) str("mini_player_unpin") else str("mini_player_pin"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.PushPin,
-                                            contentDescription = null,
-                                            tint = if (isPinned) MaterialTheme.colorScheme.primary
-                                                   else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    onClick = {
-                                        isPinned = !isPinned
-                                        contextMenuVisible = false
-                                    },
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_style_elongated"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.ViewStream,
-                                            contentDescription = null,
-                                            tint = if (isElongated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (isElongated) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        val newStyle = if (isElongated) MiniPlayerStyle.STANDARD else MiniPlayerStyle.ELONGATED
-                                        prefs.setMiniPlayerStyle(newStyle)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_transparent_bg"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Opacity,
-                                            contentDescription = null,
-                                            tint = if (transparentBg) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (transparentBg) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerTransparentBg(!transparentBg)
-                                    },
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_cover"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Image,
-                                            contentDescription = null,
-                                            tint = if (showCover) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showCover) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowCover(!showCover)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_playback_controls"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.PlayCircle,
-                                            contentDescription = null,
-                                            tint = if (showPlayback) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showPlayback) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowPlaybackControls(!showPlayback)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_additional_controls"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Favorite,
-                                            contentDescription = null,
-                                            tint = if (showAdditional) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showAdditional) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowAdditionalControls(!showAdditional)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_controls_on_hover"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Visibility,
-                                            contentDescription = null,
-                                            tint = if (controlsOnHover) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (controlsOnHover) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerControlsOnHover(!controlsOnHover)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_hover_effect"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.AutoAwesome,
-                                            contentDescription = null,
-                                            tint = if (hoverEffect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (hoverEffect) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerHoverEffect(!hoverEffect)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_progress"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.GraphicEq,
-                                            contentDescription = null,
-                                            tint = if (showProgress) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showProgress) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowProgress(!showProgress)
-                                    },
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("menu_mini_player_hide"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Close,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    onClick = {
-                                        contextMenuVisible = false
-                                        closeMiniPlayer()
-                                    },
-                                )
+                            // Its own window at the pointer: a DropdownMenu is drawn inside the mini player,
+                            // a strip a few dozen dp tall, so the old ten-item menu was cut off at its edge and
+                            // could not be scrolled. The settings themselves open in a window of their own.
+                            if (contextMenuVisible) {
+                                com.alananasss.kittytune.ui.common.FloatingMenuWindow(
+                                    anchorXDp = window.x + contextMenuOffset.x.value,
+                                    anchorYDp = window.y + contextMenuOffset.y.value,
+                                    contentHeight = com.alananasss.kittytune.ui.common.FLOATING_MENU_PADDING +
+                                        com.alananasss.kittytune.ui.common.FLOATING_MENU_DIVIDER +
+                                        com.alananasss.kittytune.ui.common.FLOATING_MENU_ITEM_HEIGHT * 3,
+                                    contentWidth = 240.dp,
+                                    onDismiss = { contextMenuVisible = false },
+                                ) {
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.PushPin,
+                                        text = if (isPinned) str("mini_player_unpin") else str("mini_player_pin"),
+                                        onClick = {
+                                            isPinned = !isPinned
+                                            contextMenuVisible = false
+                                        },
+                                    )
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.Tune,
+                                        text = str("mini_player_settings_title"),
+                                        onClick = {
+                                            contextMenuVisible = false
+                                            settingsVisible = true
+                                        },
+                                    )
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    )
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.Close,
+                                        text = str("menu_mini_player_hide"),
+                                        danger = true,
+                                        onClick = {
+                                            contextMenuVisible = false
+                                            closeMiniPlayer()
+                                        },
+                                    )
+                                }
+                            }
+                            if (settingsVisible) {
+                                MiniPlayerSettingsWindow(onClose = { settingsVisible = false })
                             }
 
                             // Right edge resize handle

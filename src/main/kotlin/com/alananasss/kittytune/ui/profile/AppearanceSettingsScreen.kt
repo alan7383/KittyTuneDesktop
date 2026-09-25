@@ -1137,6 +1137,23 @@ fun MiniPlayerSettingsDialog(
     prefs: PlayerPreferences,
     onDismiss: () -> Unit,
 ) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("mini_player_settings_title")) },
+        text = { MiniPlayerSettingsList(prefs) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } }
+    )
+}
+
+/**
+ * The mini player's settings, grouped, in a fixed-height pane with a visible scrollbar. Shared by the
+ * settings dialog and the window the mini player's own menu opens.
+ *
+ * Eight settings, each with a description, used to sit in a dialog that scrolled with no scrollbar:
+ * nothing said there was more below, and the wheel moved a long undivided list.
+ */
+@Composable
+fun MiniPlayerSettingsList(prefs: PlayerPreferences, modifier: Modifier = Modifier) {
     val prefsSnapshot by Prefs.flow.collectAsState()
     val style = remember(prefsSnapshot) { prefs.getMiniPlayerStyle() }
     val transparentBg = remember(prefsSnapshot) { prefs.getMiniPlayerTransparentBg() }
@@ -1148,80 +1165,70 @@ fun MiniPlayerSettingsDialog(
     val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
     val scheme = MaterialTheme.colorScheme
 
-    // Eight settings, each with a description, in a dialog that scrolled with no scrollbar: nothing said
-    // there was more below, and the wheel moved a long undivided list. Now grouped, compact, and in a
-    // fixed-height pane whose scrollbar shows where you are.
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(str("mini_player_settings_title")) },
-        text = {
-            com.alananasss.kittytune.ui.common.ScrollableColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp),
-                contentPadding = PaddingValues(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                MiniPlayerSectionTitle(str("mini_player_section_look"))
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_style_elongated"),
-                    subtitle = str("mini_player_style_elongated_desc"),
-                    checked = style == MiniPlayerStyle.ELONGATED,
-                    onCheckedChange = { isElongated ->
-                        prefs.setMiniPlayerStyle(
-                            if (isElongated) MiniPlayerStyle.ELONGATED
-                            else MiniPlayerStyle.STANDARD
-                        )
-                    }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_transparent_bg"),
-                    subtitle = str("mini_player_transparent_bg_desc"),
-                    checked = transparentBg,
-                    onCheckedChange = { prefs.setMiniPlayerTransparentBg(it) }
-                )
-
-                MiniPlayerSectionTitle(str("mini_player_section_content"))
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_cover"),
-                    subtitle = str("mini_player_show_cover_desc"),
-                    checked = showCover,
-                    onCheckedChange = { prefs.setMiniPlayerShowCover(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_playback_controls"),
-                    subtitle = str("mini_player_show_playback_controls_desc"),
-                    checked = showPlayback,
-                    onCheckedChange = { prefs.setMiniPlayerShowPlaybackControls(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_additional_controls"),
-                    subtitle = str("mini_player_show_additional_controls_desc"),
-                    checked = showAdditional,
-                    onCheckedChange = { prefs.setMiniPlayerShowAdditionalControls(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_progress"),
-                    subtitle = str("mini_player_show_progress_desc"),
-                    checked = showProgress,
-                    onCheckedChange = { prefs.setMiniPlayerShowProgress(it) }
-                )
-
-                MiniPlayerSectionTitle(str("mini_player_section_behaviour"))
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_controls_on_hover"),
-                    subtitle = str("mini_player_controls_on_hover_desc"),
-                    checked = controlsOnHover,
-                    onCheckedChange = { prefs.setMiniPlayerControlsOnHover(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_hover_effect"),
-                    subtitle = str("mini_player_hover_effect_desc"),
-                    checked = hoverEffect,
-                    onCheckedChange = { prefs.setMiniPlayerHoverEffect(it) }
+    com.alananasss.kittytune.ui.common.ScrollableColumn(
+        modifier = modifier.fillMaxWidth().heightIn(max = 440.dp),
+        contentPadding = PaddingValues(end = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        MiniPlayerSectionTitle(str("mini_player_section_look"))
+        MiniPlayerSwitchRow(
+            title = str("mini_player_style_elongated"),
+            subtitle = str("mini_player_style_elongated_desc"),
+            checked = style == MiniPlayerStyle.ELONGATED,
+            onCheckedChange = { isElongated ->
+                prefs.setMiniPlayerStyle(
+                    if (isElongated) MiniPlayerStyle.ELONGATED
+                    else MiniPlayerStyle.STANDARD
                 )
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } }
-    )
+        )
+        MiniPlayerSwitchRow(
+            title = str("mini_player_transparent_bg"),
+            subtitle = str("mini_player_transparent_bg_desc"),
+            checked = transparentBg,
+            onCheckedChange = { prefs.setMiniPlayerTransparentBg(it) }
+        )
+
+        MiniPlayerSectionTitle(str("mini_player_section_content"))
+        MiniPlayerSwitchRow(
+            title = str("mini_player_show_cover"),
+            subtitle = str("mini_player_show_cover_desc"),
+            checked = showCover,
+            onCheckedChange = { prefs.setMiniPlayerShowCover(it) }
+        )
+        MiniPlayerSwitchRow(
+            title = str("mini_player_show_playback_controls"),
+            subtitle = str("mini_player_show_playback_controls_desc"),
+            checked = showPlayback,
+            onCheckedChange = { prefs.setMiniPlayerShowPlaybackControls(it) }
+        )
+        MiniPlayerSwitchRow(
+            title = str("mini_player_show_additional_controls"),
+            subtitle = str("mini_player_show_additional_controls_desc"),
+            checked = showAdditional,
+            onCheckedChange = { prefs.setMiniPlayerShowAdditionalControls(it) }
+        )
+        MiniPlayerSwitchRow(
+            title = str("mini_player_show_progress"),
+            subtitle = str("mini_player_show_progress_desc"),
+            checked = showProgress,
+            onCheckedChange = { prefs.setMiniPlayerShowProgress(it) }
+        )
+
+        MiniPlayerSectionTitle(str("mini_player_section_behaviour"))
+        MiniPlayerSwitchRow(
+            title = str("mini_player_controls_on_hover"),
+            subtitle = str("mini_player_controls_on_hover_desc"),
+            checked = controlsOnHover,
+            onCheckedChange = { prefs.setMiniPlayerControlsOnHover(it) }
+        )
+        MiniPlayerSwitchRow(
+            title = str("mini_player_hover_effect"),
+            subtitle = str("mini_player_hover_effect_desc"),
+            checked = hoverEffect,
+            onCheckedChange = { prefs.setMiniPlayerHoverEffect(it) }
+        )
+    }
 }
 
 @Composable

@@ -2,6 +2,12 @@ package com.alananasss.kittytune.ui.main
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.alananasss.kittytune.data.local.PlayerSliderStyle
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,10 +35,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalSlider
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -104,13 +108,15 @@ internal fun VolumeControl(
     onVolumeScrolled: (Float) -> Unit,
     onToggleMute: () -> Unit,
 ) {
+    val style = rememberSliderStyle()
     BoxWithConstraints(contentAlignment = Alignment.Center) {
         val roomForTrack = maxWidth - INLINE_OVERHEAD
         if (preferVertical || roomForTrack < MIN_TRACK_WIDTH) {
-            VolumeHoverControl(volume, onVolumeChange, onVolumeChangeFinished, onVolumeScrolled, onToggleMute)
+            VolumeHoverControl(volume, style, onVolumeChange, onVolumeChangeFinished, onVolumeScrolled, onToggleMute)
         } else {
             InlineVolumeControl(
                 volume = volume,
+                style = style,
                 trackWidth = roomForTrack.coerceAtMost(MAX_TRACK_WIDTH),
                 onVolumeChange = onVolumeChange,
                 onVolumeChangeFinished = onVolumeChangeFinished,
@@ -124,6 +130,7 @@ internal fun VolumeControl(
 @Composable
 private fun InlineVolumeControl(
     volume: Float,
+    style: PlayerSliderStyle,
     trackWidth: Dp,
     onVolumeChange: (Float) -> Unit,
     onVolumeChangeFinished: () -> Unit,
@@ -150,6 +157,7 @@ private fun InlineVolumeControl(
         Spacer(Modifier.width(6.dp))
         VolumeTrack(
             volume = volume,
+            style = style,
             onVolumeChange = onVolumeChange,
             onVolumeChangeFinished = onVolumeChangeFinished,
             modifier = Modifier
@@ -169,23 +177,32 @@ private fun InlineVolumeControl(
 }
 
 /**
- * A slim track that thickens and shows its thumb under the pointer. A press anywhere on it jumps
- * there and dragging follows the pointer, even past the ends; the level is saved on release.
+ * The volume track, drawn in the same style as the seek bar the user picked — plain bar, slim, wavy or
+ * squiggly — so the two sliders in the player bar read as one family. Horizontal inline, vertical in the
+ * popup the bar falls back to on narrow windows; both used to be different stock sliders.
+ *
+ * A press anywhere jumps there and dragging follows the pointer, even past the ends; the level is saved
+ * on release. The wave is still — it is the seek bar's motion, not the volume's.
  */
 @Composable
 private fun VolumeTrack(
     volume: Float,
+    style: PlayerSliderStyle,
     onVolumeChange: (Float) -> Unit,
     onVolumeChangeFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    vertical: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
     var isDragging by remember { mutableStateOf(false) }
     val isActive = isHovered || isDragging
 
-    val trackHeight by animateDpAsState(if (isActive) 6.dp else 4.dp, spring(stiffness = 700f), label = "volumeTrack")
-    val thumbRadius by animateDpAsState(if (isActive) 7.dp else 0.dp, spring(stiffness = 700f), label = "volumeThumb")
+    val spec = remember(style) { VolumeTrackSpec.of(style) }
+    val thickness by animateDpAsState(
+        if (isActive) spec.activeThickness else spec.thickness, spring(stiffness = 700f), label = "volumeTrack",
+    )
+    val thumbGrow by animateFloatAsState(if (isActive) 1f else 0f, spring(stiffness = 700f), label = "volumeThumb")
 
     val activeColor = MaterialTheme.colorScheme.primary
     // Material's own inactive-track colour: visible on the bar's container, unlike a surface tone.
@@ -195,7 +212,7 @@ private fun VolumeTrack(
 
     Canvas(
         modifier = modifier
-            .height(28.dp)
+            .then(if (vertical) Modifier.width(28.dp) else Modifier.height(28.dp))
             .hoverable(interaction)
             .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
             .semantics {
@@ -207,16 +224,20 @@ private fun VolumeTrack(
                     true
                 }
             }
-            .pointerInput(Unit) {
-                fun levelAt(x: Float): Float {
+            .pointerInput(vertical) {
+                fun levelAt(position: Offset): Float {
                     val inset = TRACK_INSET.toPx()
-                    return ((x - inset) / (size.width - 2 * inset).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                    return if (vertical) {
+                        (1f - (position.y - inset) / (size.height - 2 * inset).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                    } else {
+                        ((position.x - inset) / (size.width - 2 * inset).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                    }
                 }
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     isDragging = true
                     down.consume()
-                    latestOnChange(levelAt(down.position.x))
+                    latestOnChange(levelAt(down.position))
                     try {
                         while (true) {
                             val event = awaitPointerEvent()
@@ -224,7 +245,7 @@ private fun VolumeTrack(
                             if (!change.pressed) break
                             if (change.position != change.previousPosition) {
                                 change.consume()
-                                latestOnChange(levelAt(change.position.x))
+                                latestOnChange(levelAt(change.position))
                             }
                         }
                     } finally {
@@ -235,18 +256,82 @@ private fun VolumeTrack(
             },
     ) {
         val inset = TRACK_INSET.toPx()
-        val width = (size.width - 2 * inset).coerceAtLeast(0f)
-        val heightPx = trackHeight.toPx()
-        val top = (size.height - heightPx) / 2f
-        val corner = CornerRadius(heightPx / 2f)
-        val filled = width * volume.coerceIn(0f, 1f)
+        val length = ((if (vertical) size.height else size.width) - 2 * inset).coerceAtLeast(0f)
+        val cross = (if (vertical) size.width else size.height) / 2f
+        // Along the track from its start (left, or bottom when vertical), and across it from the centre.
+        fun at(along: Float, across: Float = 0f): Offset =
+            if (vertical) Offset(cross + across, size.height - inset - along)
+            else Offset(inset + along, cross + across)
 
-        drawRoundRect(inactiveColor, Offset(inset, top), Size(width, heightPx), corner)
-        if (filled > 0f) drawRoundRect(activeColor, Offset(inset, top), Size(filled, heightPx), corner)
-        if (thumbRadius > 0.dp) {
-            drawCircle(activeColor, thumbRadius.toPx(), Offset(inset + filled, size.height / 2f))
+        val stroke = thickness.toPx()
+        val filled = length * volume.coerceIn(0f, 1f)
+        val gap = if (spec.gapAroundThumb) spec.thumbLength.toPx() / 2f + 3.dp.toPx() else 0f
+        val activeEnd = (filled - gap).coerceAtLeast(0f)
+        val inactiveStart = (filled + gap).coerceAtMost(length)
+
+        // Inactive part: a straight line from past the thumb to the end.
+        if (inactiveStart < length) {
+            drawLine(inactiveColor, at(inactiveStart), at(length), stroke, StrokeCap.Round)
+        }
+        // Active part: straight, or a still wave for the wavy styles.
+        if (activeEnd > 0f) {
+            if (spec.amplitude == 0.dp) {
+                drawLine(activeColor, at(0f), at(activeEnd), stroke, StrokeCap.Round)
+            } else {
+                val amplitude = spec.amplitude.toPx()
+                val k = (2.0 * Math.PI / spec.wavelength.toPx()).toFloat()
+                val wave = Path()
+                var t = 0f
+                val start = at(0f)
+                wave.moveTo(start.x, start.y)
+                while (t < activeEnd) {
+                    t = (t + 2f).coerceAtMost(activeEnd)
+                    val p = at(t, amplitude * kotlin.math.sin(k * t))
+                    wave.lineTo(p.x, p.y)
+                }
+                drawPath(wave, activeColor, style = Stroke(width = stroke, cap = StrokeCap.Round))
+            }
+        }
+        // Thumb: a bar for the bar style (always shown, as Material draws it), a dot for the others
+        // (shown under the pointer, so the idle track stays quiet).
+        if (spec.gapAroundThumb) {
+            val barLength = spec.thumbLength.toPx() * (1f + 0.2f * thumbGrow)
+            val barWidth = 4.dp.toPx()
+            val centre = at(filled)
+            val topLeft = if (vertical) Offset(centre.x - barLength / 2f, centre.y - barWidth / 2f)
+            else Offset(centre.x - barWidth / 2f, centre.y - barLength / 2f)
+            val barSize = if (vertical) Size(barLength, barWidth) else Size(barWidth, barLength)
+            drawRoundRect(activeColor, topLeft, barSize, CornerRadius(barWidth / 2f))
+        } else if (thumbGrow > 0f) {
+            drawCircle(activeColor, 7.dp.toPx() * thumbGrow, at(filled))
         }
     }
+}
+
+/** How each seek-bar style translates to the volume track. */
+private data class VolumeTrackSpec(
+    val thickness: Dp,
+    val activeThickness: Dp,
+    val amplitude: Dp,
+    val wavelength: Dp,
+    val gapAroundThumb: Boolean,
+    val thumbLength: Dp,
+) {
+    companion object {
+        fun of(style: PlayerSliderStyle) = when (style) {
+            PlayerSliderStyle.BAR -> VolumeTrackSpec(8.dp, 10.dp, 0.dp, 1.dp, gapAroundThumb = true, thumbLength = 20.dp)
+            PlayerSliderStyle.SLIM -> VolumeTrackSpec(4.dp, 6.dp, 0.dp, 1.dp, gapAroundThumb = false, thumbLength = 0.dp)
+            PlayerSliderStyle.WAVY -> VolumeTrackSpec(4.dp, 5.dp, 2.5.dp, 20.dp, gapAroundThumb = false, thumbLength = 0.dp)
+            PlayerSliderStyle.SQUIGGLY -> VolumeTrackSpec(3.dp, 4.dp, 3.dp, 12.dp, gapAroundThumb = false, thumbLength = 0.dp)
+        }
+    }
+}
+
+/** The seek bar style, re-read when preferences change, which is what the volume track follows. */
+@Composable
+private fun rememberSliderStyle(): PlayerSliderStyle {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerSliderStyle() }
 }
 
 private fun volumeIcon(volume: Float): ImageVector = when {
@@ -303,6 +388,7 @@ private fun Modifier.volumeWheel(
 @Composable
 private fun VolumeHoverControl(
     volume: Float,
+    style: PlayerSliderStyle,
     onVolumeChange: (Float) -> Unit,
     onVolumeChangeFinished: () -> Unit,
     onVolumeScrolled: (Float) -> Unit,
@@ -379,22 +465,12 @@ private fun VolumeHoverControl(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(10.dp))
-                        val state = remember {
-                            SliderState(volume, 0, { onVolumeChangeFinished() }, 0f..1f)
-                        }
-                        // Follow changes that did not come from this slider — the mute button,
-                        // the wheel, a keyboard shortcut — instead of only seeding once.
-                        LaunchedEffect(volume) {
-                            if (kotlin.math.abs(state.value - volume) > 0.001f) state.value = volume
-                        }
-                        LaunchedEffect(state) {
-                            snapshotFlow { state.value }.collect { onVolumeChange(it) }
-                        }
-                        VerticalSlider(
-                            state = state,
-                            // A volume slider fills from the bottom. The default direction puts
-                            // the origin at the top, which is what made it read upside down.
-                            topToBottom = false,
+                        VolumeTrack(
+                            volume = volume,
+                            style = style,
+                            onVolumeChange = onVolumeChange,
+                            onVolumeChangeFinished = onVolumeChangeFinished,
+                            vertical = true,
                             modifier = Modifier.height(150.dp),
                         )
                         Spacer(Modifier.height(8.dp))

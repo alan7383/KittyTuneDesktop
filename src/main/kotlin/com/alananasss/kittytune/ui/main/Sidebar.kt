@@ -159,7 +159,8 @@ fun Sidebar(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 SidebarNavItem(
                     label = str("nav_home"),
@@ -1996,6 +1997,9 @@ private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> 
  * @param collapse 0 when the panel is open, 1 when it is a rail, and every value in between while it
  *   travels.
  */
+/** How far a destination's highlight sits in from the card's edges. */
+private val NAV_ITEM_INSET = 6.dp
+
 @Composable
 private fun SidebarNavItem(
     label: String,
@@ -2029,6 +2033,10 @@ private fun SidebarNavItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                // Inset from the card's edges, and (with the 2 dp gap in the column) apart from the
+                // neighbours: flush against each other, the selected pill and a hovered row's highlight
+                // touched and read as one shape spilling onto the next item. The icon keeps its place.
+                .padding(horizontal = NAV_ITEM_INSET)
                 .pressScale(interaction, pressedScale = 0.97f)
                 .clip(RoundedCornerShape(12.dp))
                 .background(indicator)
@@ -2036,7 +2044,7 @@ private fun SidebarNavItem(
                     focusManager.clearFocus()
                     onClick()
                 }
-                .padding(start = SidebarMorph.ICON_INSET, end = 8.dp)
+                .padding(start = SidebarMorph.ICON_INSET - NAV_ITEM_INSET, end = 8.dp)
                 .padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
