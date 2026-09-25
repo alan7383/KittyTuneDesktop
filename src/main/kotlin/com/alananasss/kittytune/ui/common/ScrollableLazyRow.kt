@@ -86,24 +86,7 @@ fun ScrollableLazyRow(
             horizontalArrangement = horizontalArrangement,
             modifier = Modifier
                 .fillMaxWidth()
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            if (event.type != PointerEventType.Scroll) continue
-                            val notches = event.changes.fold(0f) { sum, c -> sum + c.scrollDelta.y }
-                            if (notches == 0f) continue
-                            // Down means right. Only ours if the row can go that way — otherwise the page
-                            // behind it should keep scrolling as usual.
-                            val wanted = notches > 0f
-                            if (wanted && !state.canScrollForward) continue
-                            if (!wanted && !state.canScrollBackward) continue
-                            event.changes.forEach { it.consume() }
-                            val px = with(density) { WHEEL_STEP.toPx() } * notches
-                            scope.launch { state.scrollBy(px) }
-                        }
-                    }
-                },
+                .horizontalMouseSwipe(state),
             content = content,
         )
 

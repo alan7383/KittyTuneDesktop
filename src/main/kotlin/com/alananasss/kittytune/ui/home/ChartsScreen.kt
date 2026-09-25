@@ -11,7 +11,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -314,7 +316,10 @@ fun ChartsScreen(
                         )
                     }
                     item {
+                        val chartPlaylistsRowState = rememberLazyListState()
                         LazyRow(
+                            state = chartPlaylistsRowState,
+                            modifier = Modifier.horizontalMouseSwipe(chartPlaylistsRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -340,7 +345,10 @@ fun ChartsScreen(
                             viewModel.topArtists.chunked(4)
                         }
 
+                        val topArtistsRowState = rememberLazyListState()
                         LazyRow(
+                            state = topArtistsRowState,
+                            modifier = Modifier.horizontalMouseSwipe(topArtistsRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {

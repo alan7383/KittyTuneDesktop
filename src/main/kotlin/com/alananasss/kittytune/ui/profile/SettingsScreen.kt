@@ -25,6 +25,11 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsScaffold
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
 /**
@@ -126,60 +131,71 @@ private enum class SettingsSection(val titleKey: String, val icon: ImageVector) 
 }
 
 /**
- * The category switcher.
+ * The category switcher (issues #33, #56).
  *
- * A real Material 3 [ButtonGroup] rather than a tab row, which buys three things a `SecondaryScrollableTabRow`
- * cannot:
- *
- *  - **Overflow instead of sideways scrolling.** Eight categories do not fit a narrow window, and a tab strip's
- *    answer is to scroll horizontally — which nobody discovers unless they already suspect it is there. The button
- *    group measures its children and moves whatever will not fit into a dropdown behind one trailing button, so
- *    every category stays reachable *and* visibly so at any window width.
- *  - **Labels at their real width.** The app's own [com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup]
- *    divides the row evenly, which for eight items is eight truncated words. Items here are unweighted, so each
- *    button is as wide as its own label and "Audio & Playback" survives in all four translations.
- *  - **The expressive press.** Pressing a category grows it and compresses its neighbours, which is the
- *    interaction the app's other segmented controls already have and a tab row has nothing like.
+ * Instead of overflowing into a dropdown behind a "..." (More) button, the categories form a smooth
+ * horizontally scrollable bar supporting mouse swipe / drag across the whole row.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SettingsTabs(
     sections: List<SettingsSection>,
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
 ) {
-    // Guard against zero/tiny-width constraints that arrive during AnimatedContent exit
-    // transitions.  ButtonGroup's internal measure policy subtracts spacing and overflow-
-    // indicator width from the incoming maxWidth *before* calling Constraints.copy, so even
-    // a clamped-to-1-px value goes negative and violates Constraints invariants.  When the
-    // container is that narrow, the content is being cross-faded out and is invisible anyway,
-    // so we can safely skip measurement and place nothing.
-    ButtonGroup(
-        overflowIndicator = { menuState -> ButtonGroupDefaults.OverflowIndicator(menuState) },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
-            .layout { measurable, constraints ->
-                // fillMaxWidth() pins minWidth == maxWidth.  ButtonGroup's measure policy then
-                // subtracts overflow-indicator + inter-item spacing from maxWidth *without*
-                // touching minWidth, so minWidth > maxWidth → IllegalArgumentException.
-                // Relaxing minWidth to 0 keeps the layout full-width (ButtonGroup still
-                // receives the original maxWidth) while letting its internal copy() succeed.
-                val placeable = measurable.measure(
-                    constraints.copy(minWidth = 0, minHeight = 0)
-                )
-                layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
-            },
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(selectedIndex) {
+        listState.animateScrollToItem(selectedIndex)
+    }
+
+    LazyRow(
+        state = listState,
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalMouseSwipe(listState)
+            .padding(vertical = 4.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        sections.forEachIndexed { position, section ->
-            toggleableItem(
-                checked = position == selectedIndex,
-                label = str(section.titleKey),
-                // The group hands the overflow menu `!checked`, which for a switcher is meaningless — pressing a
-                // category selects it, and pressing the selected one again is not a request to select nothing.
-                onCheckedChange = { onSelect(position) },
-                icon = {
-                    Icon(section.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                },
+        itemsIndexed(sections) { position, section ->
+            val isSelected = position == selectedIndex
+            val containerColor by animateColorAsState(
+                if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+                label = "settingsTabContainer"
             )
+            val contentColor by animateColorAsState(
+                if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                label = "settingsTabContent"
+            )
+
+            Surface(
+                onClick = { onSelect(position) },
+                shape = RoundedCornerShape(12.dp),
+                color = containerColor,
+                contentColor = contentColor,
+                modifier = Modifier.height(40.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = section.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = str(section.titleKey),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1
+                    )
+                }
+            }
         }
     }
 }
