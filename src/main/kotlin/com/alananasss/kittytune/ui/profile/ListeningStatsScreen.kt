@@ -607,7 +607,7 @@ fun ListeningStatsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 items(stats.topArtists) { artist ->
-                                    TopArtistCard(artist, onClick = { if ((artist.source ?: "soundcloud") == "soundcloud") onArtistClick(artist) })
+                                    TopArtistCard(artist, onClick = { onArtistClick(artist) })
                                 }
                             }
                         }
@@ -1336,7 +1336,7 @@ private fun TimelineChunkCard(
                         title = artist.artistName,
                         subtitle = str("listening_stats_play_count", artist.playCount),
                         badgeText = formatDurationMs(artist.totalListenMs),
-                        onClick = { if ((artist.source ?: "soundcloud") == "soundcloud") onArtistClick(artist) },
+                        onClick = { onArtistClick(artist) },
                         isCircularImage = true
                     )
                 }

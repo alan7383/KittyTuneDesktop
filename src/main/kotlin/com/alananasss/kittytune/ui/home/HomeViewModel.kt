@@ -1332,7 +1332,7 @@ import com.alananasss.kittytune.utils.Logger
                                         id = "track:${track.id}",
                                         numericId = track.id,
                                         title = track.title ?: str("history_untitled_track"),
-                                        subtitle = track.user?.username ?: str("history_unknown_artist"),
+                                        subtitle = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { str("history_unknown_artist") },
                                         imageUrl = effectiveArtwork,
                                         type = "TRACK",
                                         isVerified = track.user?.verified == true,

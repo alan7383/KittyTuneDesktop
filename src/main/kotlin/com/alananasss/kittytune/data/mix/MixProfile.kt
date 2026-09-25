@@ -129,7 +129,7 @@ object MixProfile {
 
         for (like in likes) {
             known += like.id
-            val artist = like.user?.username?.normalised().orEmpty()
+            val artist = (like.displayArtist.ifBlank { like.user?.username.orEmpty() }).normalised()
             if (artist.isNotEmpty()) {
                 knownArtists += artist
                 artists.merge(artist, LIKE_WEIGHT, Float::plus)
@@ -199,7 +199,7 @@ object MixRanking {
         val duration = track.durationMs ?: 0L
         if (duration in 1 until MIN_DURATION_MS) return null
 
-        val artist = track.user?.username?.trim()?.lowercase().orEmpty()
+        val artist = (track.displayArtist.ifBlank { track.user?.username.orEmpty() }).trim().lowercase()
         val familiar = artist.isNotEmpty() && artist in taste.knownArtists
 
         val popularity = (track.playbackCount.coerceAtLeast(0) + 1).toDouble()
@@ -312,7 +312,7 @@ object MixRanking {
         val perArtist = HashMap<String, Int>()
 
         while (chosen.size < size && scored.isNotEmpty()) {
-            fun artistOf(track: Track) = track.user?.username?.trim()?.lowercase().orEmpty()
+            fun artistOf(track: Track) = (track.displayArtist.ifBlank { track.user?.username.orEmpty() }).trim().lowercase()
 
             // Two rules, and only one of them bends.
             //
@@ -331,7 +331,7 @@ object MixRanking {
             val (track, _) = scored.removeAt(index)
             chosen += track
 
-            val artist = track.user?.username?.trim()?.lowercase().orEmpty()
+            val artist = artistOf(track)
             perArtist[artist] = (perArtist[artist] ?: 0) + 1
             recentArtists.addLast(artist)
             if (recentArtists.size > ARTIST_GAP) recentArtists.removeFirst()
