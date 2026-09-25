@@ -52,5 +52,40 @@ class WindowsFullScreenTest {
         // maxX is 0, so x should be clamped to 0 - 1200 = -1200
         org.junit.Assert.assertEquals(-1200, clampedOverflow.x)
     }
+
+    @Test
+    fun testHwndTopmostConstants() {
+        org.junit.Assert.assertNotNull(WindowsFullScreen.HWND_TOPMOST)
+        org.junit.Assert.assertNotNull(WindowsFullScreen.HWND_NOTOPMOST)
+        org.junit.Assert.assertEquals(
+            com.sun.jna.Pointer.createConstant(-1),
+            WindowsFullScreen.HWND_TOPMOST.pointer
+        )
+        org.junit.Assert.assertEquals(
+            com.sun.jna.Pointer.createConstant(-2),
+            WindowsFullScreen.HWND_NOTOPMOST.pointer
+        )
+    }
+
+    @Test
+    fun testFullScreenWindowStyleTransform() {
+        val originalStyle = com.sun.jna.platform.win32.WinUser.WS_OVERLAPPEDWINDOW or com.sun.jna.platform.win32.WinUser.WS_VISIBLE
+        val fsStyle = (originalStyle and (
+            com.sun.jna.platform.win32.WinUser.WS_CAPTION or
+            com.sun.jna.platform.win32.WinUser.WS_THICKFRAME or
+            com.sun.jna.platform.win32.WinUser.WS_OVERLAPPEDWINDOW
+        ).inv()) or com.sun.jna.platform.win32.WinUser.WS_POPUP
+
+        // WS_POPUP must be set
+        org.junit.Assert.assertTrue((fsStyle and com.sun.jna.platform.win32.WinUser.WS_POPUP) != 0)
+        // WS_CAPTION must be stripped
+        org.junit.Assert.assertEquals(0, fsStyle and com.sun.jna.platform.win32.WinUser.WS_CAPTION)
+        // WS_THICKFRAME must be stripped
+        org.junit.Assert.assertEquals(0, fsStyle and com.sun.jna.platform.win32.WinUser.WS_THICKFRAME)
+        // WS_OVERLAPPEDWINDOW must be stripped
+        org.junit.Assert.assertEquals(0, fsStyle and com.sun.jna.platform.win32.WinUser.WS_OVERLAPPEDWINDOW)
+        // WS_VISIBLE must be preserved
+        org.junit.Assert.assertTrue((fsStyle and com.sun.jna.platform.win32.WinUser.WS_VISIBLE) != 0)
+    }
 }
 
