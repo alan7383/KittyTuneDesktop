@@ -63,7 +63,17 @@ data class ListeningReport(
     /** Consecutive days with any listening, the longest run inside the span. */
     val longestStreakDays: Int,
     val activeDays: Int,
+    /** Calendar days of the span that have begun, for "per day" averages. */
+    val daysElapsed: Int = 1,
+    /** The weekday with the most listening over the span, or null with none. */
+    val busiestWeekday: DayOfWeek? = null,
 ) {
+    /** Average listening per day of the span so far. */
+    val averagePerDayMs: Long get() = totalListenMs / daysElapsed.coerceAtLeast(1)
+
+    /** Listening in the night (0–6), morning (6–12), afternoon (12–18) and evening (18–24). */
+    val partsOfDay: List<Long> get() = listOf(0..5, 6..11, 12..17, 18..23).map { range -> range.sumOf { hours[it] } }
+
     val hasData: Boolean get() = totalListenMs > 0 || plays > 0
     val skipRate: Float get() = if (plays + skips == 0) 0f else skips.toFloat() / (plays + skips)
     val completionRate: Float get() = if (plays == 0) 0f else completed.toFloat() / plays
@@ -119,6 +129,7 @@ object ListeningReports {
         previousListenMs: Long?,
         zone: ZoneId,
         topLimit: Int = 50,
+        nowMs: Long = System.currentTimeMillis(),
     ): ListeningReport {
         val inWindow = events.filter { it.timestamp >= window.startMs && it.timestamp < window.endMs }
         val playRows = inWindow.filter { ListenRules.countsAsPlay(it.listenDurationMs, it.trackDurationMs) }
@@ -181,6 +192,9 @@ object ListeningReports {
             topArtists = artists.take(topLimit),
             longestStreakDays = longestStreak(perDay.filterValues { it > 0 }.keys),
             activeDays = perDay.count { it.value > 0 },
+            daysElapsed = daysElapsed(window, nowMs, zone),
+            busiestWeekday = perDay.entries.groupBy({ it.key.dayOfWeek }, { it.value })
+                .mapValues { it.value.sum() }.filterValues { it > 0 }.maxByOrNull { it.value }?.key,
         )
     }
 
@@ -210,6 +224,12 @@ object ListeningReports {
                     .toList()
             }
         }
+    }
+
+    private fun daysElapsed(window: ReportWindow, nowMs: Long, zone: ZoneId): Int {
+        val start = Instant.ofEpochMilli(window.startMs).atZone(zone).toLocalDate()
+        val end = Instant.ofEpochMilli(minOf(nowMs, window.endMs - 1)).atZone(zone).toLocalDate()
+        return (java.time.temporal.ChronoUnit.DAYS.between(start, end) + 1).toInt().coerceAtLeast(1)
     }
 
     private fun longestStreak(days: Set<LocalDate>): Int {
