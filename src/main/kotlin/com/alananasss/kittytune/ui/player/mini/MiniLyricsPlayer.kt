@@ -131,18 +131,21 @@ private class WindowDragHandler(
     private val onDragStart: () -> Unit,
     private val onDragEnd: () -> Unit,
 ) {
-    private var dragStartMouseLocation: java.awt.Point? = null
-    private var windowLocationAtDragStart: java.awt.Point? = null
+    private var dragStartMouseX = 0
+    private var dragStartMouseY = 0
+    private var windowStartX = 0
+    private var windowStartY = 0
     private var isDraggingInternal = false
 
     private val dragMotionListener = object : java.awt.event.MouseMotionAdapter() {
         override fun mouseDragged(e: java.awt.event.MouseEvent) {
-            val startMouse = dragStartMouseLocation ?: return
-            val startLoc = windowLocationAtDragStart ?: return
-            val currentMouse = java.awt.MouseInfo.getPointerInfo()?.location ?: return
-            val dx = currentMouse.x - startMouse.x
-            val dy = currentMouse.y - startMouse.y
-            window.setLocation(startLoc.x + dx, startLoc.y + dy)
+            val dx = e.xOnScreen - dragStartMouseX
+            val dy = e.yOnScreen - dragStartMouseY
+            val newX = windowStartX + dx
+            val newY = windowStartY + dy
+            if (window.x != newX || window.y != newY) {
+                window.setLocation(newX, newY)
+            }
         }
     }
 
@@ -163,15 +166,22 @@ private class WindowDragHandler(
         }
     }
 
-    fun startDrag() {
-        val currentMouse = java.awt.MouseInfo.getPointerInfo()?.location ?: return
-        dragStartMouseLocation = currentMouse
-        windowLocationAtDragStart = java.awt.Point(window.x, window.y)
+    fun startDrag(xRoot: Int, yRoot: Int) {
+        if (isDraggingInternal) return
         isDraggingInternal = true
-        window.addMouseListener(dragMouseListener)
-        window.addMouseMotionListener(dragMotionListener)
-        window.addWindowFocusListener(focusListener)
+        dragStartMouseX = xRoot
+        dragStartMouseY = yRoot
+        windowStartX = window.x
+        windowStartY = window.y
         onDragStart()
+
+        window.addMouseListener(dragMouseListener)
+        window.addWindowFocusListener(focusListener)
+
+        val nativeStarted = com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
+        if (!nativeStarted) {
+            window.addMouseMotionListener(dragMotionListener)
+        }
     }
 
     fun stopDrag() {
@@ -239,8 +249,10 @@ fun MiniLyricsPlayerWindow(
     )
 
     var isPinned by remember { mutableStateOf(true) }
+    var isDragging by remember { mutableStateOf(false) }
 
-    LaunchedEffect(windowState.position, windowState.size, isElongated) {
+    LaunchedEffect(windowState.position, windowState.size, isElongated, isDragging) {
+        if (isDragging) return@LaunchedEffect
         kotlinx.coroutines.delay(400)
         val pos = windowState.position
         if (pos.isSpecified) {
@@ -391,7 +403,6 @@ fun MiniLyricsPlayerWindow(
             }
         }
 
-        var isDragging by remember { mutableStateOf(false) }
         val dragHandler = remember(window) {
             WindowDragHandler(
                 window = window,
@@ -417,6 +428,11 @@ fun MiniLyricsPlayerWindow(
                     val clampedH = window.height.coerceIn(minHeightPx, maxHeightPx)
                     if (window.width != clampedW || window.height != clampedH) {
                         window.setSize(clampedW, clampedH)
+                    }
+                }
+                override fun componentMoved(e: java.awt.event.ComponentEvent) {
+                    if (!isDragging) {
+                        saveCurrentBounds()
                     }
                 }
             }
@@ -507,7 +523,17 @@ fun MiniLyricsPlayerWindow(
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = true)
                                     if (down.type == PointerType.Mouse && currentEvent.buttons.isPrimaryPressed) {
-                                        dragHandler.startDrag()
+                                        val awtEvent = currentEvent.nativeEvent as? java.awt.event.MouseEvent
+                                        val xRoot = awtEvent?.xOnScreen ?: (window.x + down.position.x.toInt())
+                                        val yRoot = awtEvent?.yOnScreen ?: (window.y + down.position.y.toInt())
+                                        dragHandler.startDrag(xRoot, yRoot)
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            if (event.changes.all { !it.pressed }) {
+                                                dragHandler.stopDrag()
+                                                break
+                                            }
+                                        }
                                     }
                                 }
                             }

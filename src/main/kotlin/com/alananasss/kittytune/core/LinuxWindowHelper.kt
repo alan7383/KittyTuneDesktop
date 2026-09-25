@@ -182,4 +182,108 @@ object LinuxWindowHelper {
             }
         }
     }
+
+    interface ExtendedX11 : com.sun.jna.Library {
+        fun XUngrabPointer(display: X11.Display, time: NativeLong): Int
+    }
+
+    private val extendedX11: ExtendedX11? by lazy {
+        if (isLinux) {
+            runCatching { Native.load("X11", ExtendedX11::class.java) }.getOrNull()
+        } else null
+    }
+
+    /**
+     * Attempts to initiate a native, hardware-accelerated window drag through the host OS window manager
+     * (EWMH _NET_WM_MOVERESIZE on Linux/KDE/GNOME, WM_SYSCOMMAND on Windows).
+     *
+     * In native drag:
+     * - The host compositor translates the window surface directly at the monitor's native refresh rate (e.g. 144Hz/240Hz).
+     * - The JVM Event Dispatch Thread is NOT flooded with mouse motion events.
+     * - Skiko/Compose does not repeatedly stall on swapBuffers/vsync during drag.
+     *
+     * Returns true if native move was initiated, false if software drag should be used as fallback.
+     */
+    fun startNativeMove(window: Window, xOnScreen: Int, yOnScreen: Int): Boolean {
+        if (isLinux) {
+            return startNativeMoveLinux(window, xOnScreen, yOnScreen)
+        } else if (isWindows) {
+            return startNativeMoveWindows(window)
+        }
+        return false
+    }
+
+    fun startNativeMoveLinux(window: Window, xOnScreen: Int, yOnScreen: Int): Boolean {
+        if (!isLinux) return false
+        return runCatching {
+            if (!window.isDisplayable) return false
+            val windowId = Native.getWindowID(window)
+            if (windowId == 0L) return false
+
+            val x11 = X11.INSTANCE
+            val display = x11.XOpenDisplay(null) ?: return false
+            try {
+                val win = X11.Window(windowId)
+                val root = x11.XDefaultRootWindow(display)
+                val netWmMoveResize = x11.XInternAtom(display, "_NET_WM_MOVERESIZE", false)
+
+                // EWMH requires releasing any active client pointer grab before the WM can take over
+                extendedX11?.XUngrabPointer(display, NativeLong(0))
+
+                val event = X11.XEvent()
+                event.setType(X11.XClientMessageEvent::class.java)
+                event.xclient.type = X11.ClientMessage
+                event.xclient.serial = NativeLong(0)
+                event.xclient.send_event = 1
+                event.xclient.display = display
+                event.xclient.window = win
+                event.xclient.message_type = netWmMoveResize
+                event.xclient.format = 32
+                event.xclient.data.setType(Array<NativeLong>::class.java)
+                val data = arrayOf(
+                    NativeLong(xOnScreen.toLong()),
+                    NativeLong(yOnScreen.toLong()),
+                    NativeLong(8), // 8 = _NET_WM_MOVERESIZE_MOVE
+                    NativeLong(1), // 1 = Button1 (Left click)
+                    NativeLong(1)  // 1 = normal application source
+                )
+                event.xclient.data.l = data
+                event.write()
+
+                val mask = NativeLong((X11.SubstructureRedirectMask or X11.SubstructureNotifyMask).toLong())
+                x11.XSendEvent(display, root, 0, mask, event)
+                x11.XFlush(display)
+                true
+            } finally {
+                x11.XCloseDisplay(display)
+            }
+        }.getOrDefault(false)
+    }
+
+    interface ExtendedUser32 : com.sun.jna.Library {
+        fun ReleaseCapture(): Boolean
+        fun PostMessage(hWnd: WinDef.HWND, msg: Int, wParam: WinDef.WPARAM, lParam: WinDef.LPARAM): Boolean
+    }
+
+    private val extendedUser32: ExtendedUser32? by lazy {
+        if (isWindows) {
+            runCatching { Native.load("user32", ExtendedUser32::class.java) }.getOrNull()
+        } else null
+    }
+
+    fun startNativeMoveWindows(window: Window): Boolean {
+        if (!isWindows) return false
+        return runCatching {
+            if (!window.isDisplayable) return false
+            val hwnd = WinDef.HWND(Native.getWindowPointer(window))
+            if (hwnd.pointer == null || hwnd.pointer == Pointer.NULL) return false
+            extendedUser32?.ReleaseCapture()
+            val WM_SYSCOMMAND = 0x0112
+            val SC_MOVE = 0xF010
+            val HTCAPTION = 0x0002
+            extendedUser32?.PostMessage(hwnd, WM_SYSCOMMAND, WinDef.WPARAM((SC_MOVE or HTCAPTION).toLong()), WinDef.LPARAM(0))
+            true
+        }.getOrDefault(false)
+    }
 }
+
