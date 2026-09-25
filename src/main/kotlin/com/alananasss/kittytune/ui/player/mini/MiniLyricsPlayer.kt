@@ -59,6 +59,9 @@ import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.ViewStream
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.DropdownMenu
@@ -103,8 +106,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.awt.SwingWindow
+import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import coil3.compose.AsyncImage
@@ -128,7 +132,11 @@ import java.awt.Cursor
  * and smoothly advances to show the next part of the line as playback progresses through it.
  */
 @Composable
-fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
+fun MiniLyricsPlayerWindow(
+    viewModel: PlayerViewModel,
+    isAppFullScreen: Boolean = false,
+    onOpenMainWindow: () -> Unit = {},
+) {
     val prefs = remember { PlayerPreferences() }
     val miniPlayerStyle by prefs.miniPlayerStyleFlow().collectAsState(initial = prefs.getMiniPlayerStyle())
     val transparentBg by prefs.miniPlayerTransparentBgFlow().collectAsState(initial = prefs.getMiniPlayerTransparentBg())
@@ -199,15 +207,28 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
         viewModel.toggleMiniPlayer(false)
     }
 
-    Window(
+    val isFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen
+
+    SwingWindow(
         onCloseRequest = closeMiniPlayer,
         state = windowState,
+        visible = !isFullScreen,
         alwaysOnTop = isPinned,
-        undecorated = true,
+        decoration = WindowDecoration.Undecorated(),
         transparent = true,
         resizable = true,
         title = "KittyTune Mini Player",
+        init = { window ->
+            com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
+        },
     ) {
+        DisposableEffect(window, isFullScreen) {
+            if (!isFullScreen) {
+                com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
+            }
+            onDispose {}
+        }
+
         val density = LocalDensity.current
         val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
         val customDensity = remember(density, uiScale) {
@@ -340,6 +361,7 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                 val showAdditional = remember(prefsSnapshot) { prefs.getMiniPlayerShowAdditionalControls() }
                 val controlsOnHover = remember(prefsSnapshot) { prefs.getMiniPlayerControlsOnHover() }
                 val hoverEffect = remember(prefsSnapshot) { prefs.getMiniPlayerHoverEffect() }
+                val hoverIllumination = remember(prefsSnapshot) { prefs.getMiniPlayerHoverIllumination() }
                 val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
 
                 val windowInteractionSource = remember { MutableInteractionSource() }
@@ -347,8 +369,10 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
 
                 val surfaceAlpha by animateFloatAsState(
                     targetValue = when {
+                        transparentBg && !hoverIllumination -> 0.0f
                         transparentBg && !isWindowHovered -> 0.0f
                         transparentBg && isWindowHovered -> 0.35f
+                        !hoverIllumination -> if (hoverEffect) 0.82f else 0.96f
                         !hoverEffect || isWindowHovered -> 0.96f
                         else -> 0.82f
                     },
@@ -362,8 +386,8 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                 }
 
                 val surfaceBorder = when {
-                    transparentBg && !isWindowHovered -> null
-                    transparentBg && isWindowHovered -> androidx.compose.foundation.BorderStroke(
+                    transparentBg && (!isWindowHovered || !hoverIllumination) -> null
+                    transparentBg && isWindowHovered && hoverIllumination -> androidx.compose.foundation.BorderStroke(
                         1.dp,
                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                     )
@@ -402,6 +426,7 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                         // Context menu state: opened by right-click anywhere on the mini player
                         var contextMenuVisible by remember { mutableStateOf(false) }
                         var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
+                        var showSettingsDialog by remember { mutableStateOf(false) }
 
                         Box(
                             modifier = Modifier
@@ -445,6 +470,50 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                 onDismissRequest = { contextMenuVisible = false },
                                 offset = contextMenuOffset,
                             ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            str("menu_show_window"),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.OpenInNew,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    onClick = {
+                                        contextMenuVisible = false
+                                        onOpenMainWindow()
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            str("pref_mini_player_settings"),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Settings,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    onClick = {
+                                        contextMenuVisible = false
+                                        showSettingsDialog = true
+                                    },
+                                )
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                )
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -527,6 +596,35 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                     },
                                     onClick = {
                                         prefs.setMiniPlayerTransparentBg(!transparentBg)
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            str("mini_player_hover_illumination"),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Rounded.LightMode,
+                                            contentDescription = null,
+                                            tint = if (hoverIllumination) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    },
+                                    trailingIcon = {
+                                        if (hoverIllumination) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        prefs.setMiniPlayerHoverIllumination(!hoverIllumination)
                                     },
                                 )
                                 HorizontalDivider(
@@ -731,6 +829,13 @@ fun MiniLyricsPlayerWindow(viewModel: PlayerViewModel) {
                                         contextMenuVisible = false
                                         closeMiniPlayer()
                                     },
+                                )
+                            }
+
+                            if (showSettingsDialog) {
+                                MiniPlayerSettingsDialog(
+                                    prefs = prefs,
+                                    onDismiss = { showSettingsDialog = false }
                                 )
                             }
 

@@ -67,6 +67,7 @@ import com.alananasss.kittytune.ui.common.Slider
         var lyricsUnderCoverPlacement by remember { mutableStateOf(prefs.getLyricsUnderCoverPlacement()) }
         var lyricsUnderCoverAlways by remember { mutableStateOf(prefs.getLyricsUnderCoverAlwaysVisible()) }
         var showPlacementDialog by remember { mutableStateOf(false) }
+        var showMiniPlayerDialog by remember { mutableStateOf(false) }
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showSidebarAlignmentDialog by remember { mutableStateOf(false) }
@@ -1243,6 +1244,13 @@ import com.alananasss.kittytune.ui.common.Slider
             )
         }
 
+        if (showMiniPlayerDialog) {
+            com.alananasss.kittytune.ui.player.mini.MiniPlayerSettingsDialog(
+                prefs = prefs,
+                onDismiss = { showMiniPlayerDialog = false }
+            )
+        }
+
         // --- MAIN SCREEN ---
     
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -1793,6 +1801,23 @@ import com.alananasss.kittytune.ui.common.Slider
                             )
                         }
                     }
+                }
+
+                // MINI PLAYER
+                Box {
+                    SettingsGroup(
+                        title = str("mini_player_title"),
+                        items = listOf(
+                            { shape ->
+                                SettingsItem(
+                                    shape = shape,
+                                    title = str("pref_mini_player_settings"),
+                                    subtitle = str("pref_mini_player_settings_desc"),
+                                    onClick = { showMiniPlayerDialog = true }
+                                )
+                            }
+                        )
+                    )
                 }
             }
         }

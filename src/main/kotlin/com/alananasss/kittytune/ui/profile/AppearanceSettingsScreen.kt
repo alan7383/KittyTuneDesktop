@@ -83,7 +83,6 @@ fun AppearanceSettingsScreen(
     var infoPanelHalf by remember { mutableStateOf(prefs.getInfoPanelHalf()) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showFontConfigDialog by remember { mutableStateOf(false) }
-    var showMiniPlayerDialog by remember { mutableStateOf(false) }
 
     if (showSliderStyleDialog) {
         com.alananasss.kittytune.ui.player.slider.SliderStyleDialog(
@@ -210,9 +209,7 @@ fun AppearanceSettingsScreen(
         CustomizeButtonsDialog(prefs = prefs, onDismiss = { showCustomizeDialog = false })
     }
 
-    if (showMiniPlayerDialog) {
-        MiniPlayerSettingsDialog(prefs = prefs, onDismiss = { showMiniPlayerDialog = false })
-    }
+
 
     if (showIconDialog) {
         AlertDialog(
@@ -344,8 +341,7 @@ fun AppearanceSettingsScreen(
                         }
                         val titleBarIndex = if (isPureBlackVisible) 8 else 7
                         val customizeIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
-                        val miniPlayerIndex = customizeIndex + 1
-                        val totalVisibleItems = miniPlayerIndex + 1
+                        val totalVisibleItems = customizeIndex + 1
                         SettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 0),
                             title = str("pref_language"),
@@ -459,13 +455,6 @@ fun AppearanceSettingsScreen(
                             title = str("pref_customize_buttons"),
                             subtitle = str("pref_customize_buttons_sub"),
                             onClick = { showCustomizeDialog = true }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, miniPlayerIndex),
-                            title = str("pref_mini_player_settings"),
-                            subtitle = str("pref_mini_player_settings_desc"),
-                            onClick = { showMiniPlayerDialog = true }
                         )
                     }
                 }
@@ -1132,124 +1121,5 @@ private fun pickImageFile(title: String): java.io.File? {
     return dialog.files.firstOrNull()
 }
 
-@Composable
-fun MiniPlayerSettingsDialog(
-    prefs: PlayerPreferences,
-    onDismiss: () -> Unit,
-) {
-    val prefsSnapshot by Prefs.flow.collectAsState()
-    val style = remember(prefsSnapshot) { prefs.getMiniPlayerStyle() }
-    val transparentBg = remember(prefsSnapshot) { prefs.getMiniPlayerTransparentBg() }
-    val showCover = remember(prefsSnapshot) { prefs.getMiniPlayerShowCover() }
-    val showPlayback = remember(prefsSnapshot) { prefs.getMiniPlayerShowPlaybackControls() }
-    val showAdditional = remember(prefsSnapshot) { prefs.getMiniPlayerShowAdditionalControls() }
-    val controlsOnHover = remember(prefsSnapshot) { prefs.getMiniPlayerControlsOnHover() }
-    val hoverEffect = remember(prefsSnapshot) { prefs.getMiniPlayerHoverEffect() }
-    val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
-    val scheme = MaterialTheme.colorScheme
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(str("mini_player_settings_title")) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_style_elongated"),
-                    subtitle = str("mini_player_style_elongated_desc"),
-                    checked = style == MiniPlayerStyle.ELONGATED,
-                    onCheckedChange = { isElongated ->
-                        prefs.setMiniPlayerStyle(
-                            if (isElongated) MiniPlayerStyle.ELONGATED
-                            else MiniPlayerStyle.STANDARD
-                        )
-                    }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_transparent_bg"),
-                    subtitle = str("mini_player_transparent_bg_desc"),
-                    checked = transparentBg,
-                    onCheckedChange = { prefs.setMiniPlayerTransparentBg(it) }
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = scheme.outlineVariant.copy(alpha = 0.5f)
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_cover"),
-                    subtitle = str("mini_player_show_cover_desc"),
-                    checked = showCover,
-                    onCheckedChange = { prefs.setMiniPlayerShowCover(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_playback_controls"),
-                    subtitle = str("mini_player_show_playback_controls_desc"),
-                    checked = showPlayback,
-                    onCheckedChange = { prefs.setMiniPlayerShowPlaybackControls(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_additional_controls"),
-                    subtitle = str("mini_player_show_additional_controls_desc"),
-                    checked = showAdditional,
-                    onCheckedChange = { prefs.setMiniPlayerShowAdditionalControls(it) }
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(vertical = 4.dp),
-                    color = scheme.outlineVariant.copy(alpha = 0.5f)
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_controls_on_hover"),
-                    subtitle = str("mini_player_controls_on_hover_desc"),
-                    checked = controlsOnHover,
-                    onCheckedChange = { prefs.setMiniPlayerControlsOnHover(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_hover_effect"),
-                    subtitle = str("mini_player_hover_effect_desc"),
-                    checked = hoverEffect,
-                    onCheckedChange = { prefs.setMiniPlayerHoverEffect(it) }
-                )
-                MiniPlayerSwitchRow(
-                    title = str("mini_player_show_progress"),
-                    subtitle = str("mini_player_show_progress_desc"),
-                    checked = showProgress,
-                    onCheckedChange = { prefs.setMiniPlayerShowProgress(it) }
-                )
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } }
-    )
-}
-
-@Composable
-private fun MiniPlayerSwitchRow(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-        )
-    }
-}
 
