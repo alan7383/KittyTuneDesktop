@@ -8,7 +8,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -127,7 +129,10 @@ fun NewReleasesScreen(
                         )
                     }
                     item {
+                        val playlistsRowState = rememberLazyListState()
                         LazyRow(
+                            state = playlistsRowState,
+                            modifier = Modifier.horizontalMouseSwipe(playlistsRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -155,7 +160,10 @@ fun NewReleasesScreen(
                     // split the list into pages of 5 tracks
                     val pages = viewModel.popularTracks.chunked(5)
                     item {
+                        val popularRowState = rememberLazyListState()
                         LazyRow(
+                            state = popularRowState,
+                            modifier = Modifier.horizontalMouseSwipe(popularRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {

@@ -209,116 +209,14 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
 @Composable
 fun PlayerDesignSettingsPage() {
     val prefs = remember { PlayerPreferences() }
-    val sliderStyle by prefs.playerSliderStyleFlow().collectAsState(initial = prefs.getPlayerSliderStyle())
-    var verticalVolume by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
-    var barButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
-    var barStyle by remember { mutableStateOf(prefs.getPlayerBarStyle()) }
     var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
     var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
-
-    var showSliderStyleDialog by remember { mutableStateOf(false) }
     var showMenuTilesDialog by remember { mutableStateOf(false) }
-    if (showSliderStyleDialog) {
-        com.alananasss.kittytune.ui.player.slider.SliderStyleDialog(
-            currentStyle = sliderStyle,
-            onStyleSelected = { prefs.setPlayerSliderStyle(it) },
-            onDismiss = { showSliderStyleDialog = false },
-        )
-    }
     if (showMenuTilesDialog) MenuTilesDialog(prefs) { showMenuTilesDialog = false }
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        SettingsGroupTitle(str("settings_group_bar_shape"))
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Box(Modifier.fillMaxWidth().padding(16.dp)) {
-                com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
-                    options = PlayerBarStyle.entries,
-                    selectedOption = barStyle,
-                    onOptionSelected = {
-                        barStyle = it
-                        prefs.setPlayerBarStyle(it)
-                    },
-                    fillMaxWidth = true,
-                    iconProvider = { style ->
-                        Icon(
-                            when (style) {
-                                PlayerBarStyle.PANEL -> Icons.Rounded.CropSquare
-                                PlayerBarStyle.ROUNDED -> Icons.Rounded.RoundedCorner
-                                PlayerBarStyle.FLOATING -> Icons.Rounded.CallToAction
-                            },
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                    labelProvider = { style ->
-                        Text(
-                            str(
-                                when (style) {
-                                    PlayerBarStyle.PANEL -> "bar_style_panel"
-                                    PlayerBarStyle.ROUNDED -> "bar_style_rounded"
-                                    PlayerBarStyle.FLOATING -> "bar_style_floating"
-                                }
-                            ),
-                            maxLines = 1,
-                        )
-                    },
-                )
-            }
-        }
-    }
-
-    SettingsGroup(
-        title = str("settings_group_sliders"),
-        items = listOf(
-            { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("pref_slider_style"),
-                    subtitle = "${sliderStyleLabel(sliderStyle)} · ${str("pref_slider_style_sub_volume")}",
-                    icon = Icons.Rounded.LinearScale,
-                    onClick = { showSliderStyleDialog = true },
-                )
-            },
-            { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("pref_volume_vertical"),
-                    subtitle = str("pref_volume_vertical_sub"),
-                    icon = Icons.Rounded.VolumeUp,
-                    hasSwitch = true,
-                    switchState = verticalVolume,
-                    onSwitchChange = {
-                        verticalVolume = it
-                        prefs.setVerticalVolumeSlider(it)
-                    },
-                )
-            },
-        ),
-    )
-
-    SettingsGroup(
-        title = str("settings_group_bar_buttons"),
-        items = listOf(
-            Triple(PlayerPreferences.PLAYER_BAR_BUTTON_LIKE, "player_button_like", Icons.Rounded.FavoriteBorder),
-            Triple(PlayerPreferences.PLAYER_BAR_BUTTON_PANEL, "player_button_panel", Icons.Rounded.ViewSidebar),
-            Triple(PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE, "player_button_queue", Icons.Rounded.QueueMusic),
-        ).map { (key, labelKey, icon) ->
-            { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str(labelKey),
-                    icon = icon,
-                    hasSwitch = true,
-                    switchState = key in barButtons,
-                    onSwitchChange = { shown ->
-                        barButtons = if (shown) barButtons + key else barButtons - key
-                        prefs.setPlayerBarButtons(barButtons)
-                    },
-                )
-            }
-        },
-    )
+    // Shape, sliders, the bar's buttons and the scroll step.
+    PlayerDesignContent(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
 
     SettingsGroup(
         title = str("settings_group_covers"),
@@ -378,13 +276,6 @@ fun PlayerDesignSettingsPage() {
     )
 }
 
-@Composable
-private fun sliderStyleLabel(style: PlayerSliderStyle): String = when (style) {
-    PlayerSliderStyle.BAR -> str("slider_style_bar")
-    PlayerSliderStyle.WAVY -> str("slider_style_wavy")
-    PlayerSliderStyle.SLIM -> str("slider_style_slim")
-    PlayerSliderStyle.SQUIGGLY -> str("slider_style_squiggly")
-}
 
 /**
  * A ready-made palette: a key colour and the style it is generated with. Zero is the app's own seed with its

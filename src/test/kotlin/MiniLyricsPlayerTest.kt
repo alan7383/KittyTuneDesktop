@@ -142,6 +142,7 @@ class MiniLyricsPlayerTest {
         val origAdditional = prefs.getMiniPlayerShowAdditionalControls()
         val origOnHover = prefs.getMiniPlayerControlsOnHover()
         val origHoverEffect = prefs.getMiniPlayerHoverEffect()
+        val origHoverIllumination = prefs.getMiniPlayerHoverIllumination()
         val origProgress = prefs.getMiniPlayerShowProgress()
 
         try {
@@ -151,6 +152,7 @@ class MiniLyricsPlayerTest {
             assertTrue(prefs.getMiniPlayerShowAdditionalControls(), "Additional controls default should be true")
             assertTrue(prefs.getMiniPlayerControlsOnHover(), "Controls on hover default should be true")
             assertTrue(prefs.getMiniPlayerHoverEffect(), "Hover effect default should be true")
+            assertTrue(prefs.getMiniPlayerHoverIllumination(), "Hover illumination default should be true")
             assertTrue(prefs.getMiniPlayerShowProgress(), "Progress bar default should be true")
 
             // Test toggling false
@@ -159,6 +161,7 @@ class MiniLyricsPlayerTest {
             prefs.setMiniPlayerShowAdditionalControls(false)
             prefs.setMiniPlayerControlsOnHover(false)
             prefs.setMiniPlayerHoverEffect(false)
+            prefs.setMiniPlayerHoverIllumination(false)
             prefs.setMiniPlayerShowProgress(false)
 
             assertFalse(prefs.getMiniPlayerShowCover())
@@ -166,6 +169,7 @@ class MiniLyricsPlayerTest {
             assertFalse(prefs.getMiniPlayerShowAdditionalControls())
             assertFalse(prefs.getMiniPlayerControlsOnHover())
             assertFalse(prefs.getMiniPlayerHoverEffect())
+            assertFalse(prefs.getMiniPlayerHoverIllumination())
             assertFalse(prefs.getMiniPlayerShowProgress())
 
             // Test toggling back to true
@@ -174,6 +178,7 @@ class MiniLyricsPlayerTest {
             prefs.setMiniPlayerShowAdditionalControls(true)
             prefs.setMiniPlayerControlsOnHover(true)
             prefs.setMiniPlayerHoverEffect(true)
+            prefs.setMiniPlayerHoverIllumination(true)
             prefs.setMiniPlayerShowProgress(true)
 
             assertTrue(prefs.getMiniPlayerShowCover())
@@ -181,6 +186,7 @@ class MiniLyricsPlayerTest {
             assertTrue(prefs.getMiniPlayerShowAdditionalControls())
             assertTrue(prefs.getMiniPlayerControlsOnHover())
             assertTrue(prefs.getMiniPlayerHoverEffect())
+            assertTrue(prefs.getMiniPlayerHoverIllumination())
             assertTrue(prefs.getMiniPlayerShowProgress())
         } finally {
             prefs.setMiniPlayerShowCover(origCover)
@@ -188,6 +194,7 @@ class MiniLyricsPlayerTest {
             prefs.setMiniPlayerShowAdditionalControls(origAdditional)
             prefs.setMiniPlayerControlsOnHover(origOnHover)
             prefs.setMiniPlayerHoverEffect(origHoverEffect)
+            prefs.setMiniPlayerHoverIllumination(origHoverIllumination)
             prefs.setMiniPlayerShowProgress(origProgress)
         }
     }

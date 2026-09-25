@@ -90,4 +90,41 @@ class LocalizationParityTest {
             Strings.appLanguage = previousLang
         }
     }
+
+    @Test
+    fun testPlayerDesignStringsInAllLanguages() {
+        val previousLang = Strings.appLanguage
+        val playerDesignKeys = listOf(
+            "pref_player_design",
+            "pref_player_design_sub",
+            "player_preview_title",
+            "player_preview_sub",
+            "player_shape_title",
+            "player_shape_desc",
+            "player_shape_default",
+            "player_shape_rounded",
+            "player_shape_floating",
+            "pref_volume_slider_title",
+            "player_buttons_title",
+            "player_button_lyrics",
+            "player_button_shuffle",
+            "player_button_repeat",
+            "player_advanced_title",
+            "pref_seek_wheel"
+        )
+        try {
+            for (lang in languages) {
+                Strings.appLanguage = lang
+                assertEquals(lang, Strings.resolvedLanguage)
+
+                for (key in playerDesignKeys) {
+                    val resolved = str(key)
+                    assertFalse("$key in $lang should not be blank", resolved.isBlank())
+                    assertNotEquals("$key should be localized, not return key in $lang", key, resolved)
+                }
+            }
+        } finally {
+            Strings.appLanguage = previousLang
+        }
+    }
 }

@@ -618,6 +618,12 @@ fun MainScreen(
                                 onBackClick = { navController.popBackStack() }
                             ) 
                         }
+                        composable("player_design") {
+                            com.alananasss.kittytune.ui.profile.PlayerDesignScreen(
+                                playerViewModel = playerViewModel,
+                                onBackClick = { navController.popBackStack() }
+                            )
+                        }
                         composable("discord_login") {
                             com.alananasss.kittytune.ui.profile.DiscordLoginScreen(
                                 onBackClick = { navController.popBackStack() },
@@ -631,9 +637,15 @@ fun MainScreen(
                             com.alananasss.kittytune.ui.profile.ListeningStatsScreen(
                                 onBackClick = { navController.popBackStack() },
                                 onTrackClick = { trackId -> playerViewModel.navigateToTrackDetails(trackId) },
-                                // The stats keep the name always and the id only sometimes, so the name is
-                                // what resolving goes by.
-                                onArtistClick = { name, id -> playerViewModel.resolveAndNavigateToArtist(name, id) },
+                                onArtistClick = { artist ->
+                                    val permalink = artist.permalink
+                                    if (artist.source == "spotify" && !permalink.isNullOrBlank()) {
+                                        playerViewModel.navigateToSpotifyArtist(permalink.removePrefix("spotify:artist:"))
+                                    } else {
+                                        // The stats keep the name always and the id only sometimes.
+                                        playerViewModel.resolveAndNavigateToArtist(artist.name, artist.artistId)
+                                    }
+                                },
                             )
                         }
                         composable("sync_settings") {
@@ -1097,6 +1109,19 @@ fun MainScreen(
             }
         }
 
+        val playerBarStyle by playerPrefs.playerBarStyleFlow().collectAsState(initial = playerPrefs.getPlayerBarStyle())
+        val playerBarModifier = when (playerBarStyle) {
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> Modifier
+                .fillMaxWidth()
+                .padding(top = PANEL_GUTTER.dp)
+        }
+
         PlayerBar(
             playerViewModel = playerViewModel,
             onToggleNowPlaying = {
@@ -1116,9 +1141,7 @@ fun MainScreen(
             // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
             // lyrics, which has its own way up here (issue #33).
             onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = PANEL_GUTTER.dp)
+            modifier = playerBarModifier
         )
     }
 
