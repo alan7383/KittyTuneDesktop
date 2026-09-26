@@ -218,7 +218,10 @@
     <!-- LIBRARY                                                                          -->
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
     <string name="search_library_hint">Lọc trong thư viện</string>
-    <string name="search_playlist_hint">Lọc trong danh sách phát</string>
+    <string name="search_playlist_hint">Tìm kiếm trong danh sách phát</string>
+    <string name="search_settings_hint">Tìm kiếm trong cài đặt…</string>
+    <string name="settings_search_results">Kết quả tìm kiếm</string>
+    <string name="settings_search_no_results">Không tìm thấy cài đặt nào</string>
     <string name="lib_offline_mode">Chế độ ngoại tuyến • Chỉ tệp cục bộ</string>
     <string name="lib_guest_mode">Chế độ khách • Đăng nhập để đồng bộ</string>
     <string name="sort_date_added">Ngày thêm</string>

@@ -1530,7 +1530,10 @@
     <string name="search_libraries_hint">Könyvtárak keresése…</string>
     <string name="search_library_hint">Szűrés a könyvtárban</string>
     <string name="search_no_results">Nincs tal�lat</string>
-    <string name="search_playlist_hint">Szűrés a lejátszási listában</string>
+    <string name="search_playlist_hint">Keresés a lejátszási listában</string>
+    <string name="search_settings_hint">Keresés a beállításokban…</string>
+    <string name="settings_search_results">Keresési eredmények</string>
+    <string name="settings_search_no_results">Nincs találat</string>
     <string name="search_section_genres">Műfajok</string>
     <string name="search_section_moods">Hangulatok és pillanatok</string>
     <string name="search_section_personalized">Neked</string>
