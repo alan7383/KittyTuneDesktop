@@ -42,6 +42,7 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.local.PlayerSliderStyle
 import com.alananasss.kittytune.ui.common.ScrollableColumn
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
+import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -625,15 +626,14 @@ private fun PlayerButtonsSection(
 
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 items.forEachIndexed { index, item ->
-                    ButtonToggleRow(
-                        item = item,
-                        shape = when {
-                            items.size == 1 -> RoundedCornerShape(16.dp)
-                            index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp)
-                            index == items.size - 1 -> RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
-                            else -> RoundedCornerShape(4.dp)
-                        },
-                        onToggle = { onToggle(item.key, it) }
+                    SettingsItem(
+                        shape = groupRowShape(items.size, index),
+                        title = item.label,
+                        subtitle = item.desc,
+                        mark = item.mark,
+                        hasSwitch = true,
+                        switchState = item.enabled,
+                        onSwitchChange = { onToggle(item.key, it) },
                     )
                 }
             }
@@ -657,78 +657,15 @@ private data class ButtonConfigItem(
     val enabled: Boolean
 )
 
-@Composable
-private fun ButtonToggleRow(
-    item: ButtonConfigItem,
-    shape: androidx.compose.ui.graphics.Shape,
-    onToggle: (Boolean) -> Unit
-) {
-    Surface(
-        onClick = { onToggle(!item.enabled) },
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                // The chip and its mark are a tonal pair, primaryContainer with onPrimaryContainer.
-                // It was primary on primaryContainer, which is the same hue at two lightnesses and
-                // left the glyph barely there.
-                color = if (item.enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        painter = item.mark,
-                        contentDescription = null,
-                        tint = if (item.enabled) {
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-
-            Spacer(Modifier.width(14.dp))
-
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = item.label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = item.desc,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(Modifier.width(12.dp))
-
-            // Shown, not handled: the row above is the single click target. A switch with its own
-            // callback inside a clickable row is two toggles for one press — both fire, the state is
-            // written twice with the same value, and the switch looks like it ignored you. Passing
-            // null for the callback and true for `enabled` keeps it looking live, because Material
-            // otherwise derives "enabled" from the callback being present and greys it out.
-            com.alananasss.kittytune.ui.common.SettingsSwitch(
-                checked = item.enabled,
-                onCheckedChange = null,
-                enabled = true,
-            )
-        }
-    }
+/**
+ * The corner treatment for a run of rows inside one card: rounded where the run begins and ends,
+ * tucked where it meets its neighbour.
+ */
+private fun groupRowShape(count: Int, index: Int): androidx.compose.ui.graphics.Shape = when {
+    count == 1 -> RoundedCornerShape(16.dp)
+    index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp)
+    index == count - 1 -> RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+    else -> RoundedCornerShape(4.dp)
 }
 
 /**
@@ -991,15 +928,14 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
             }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 items.forEachIndexed { index, item ->
-                    ButtonToggleRow(
-                        item = item,
-                        shape = when {
-                            items.size == 1 -> RoundedCornerShape(16.dp)
-                            index == 0 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 4.dp, bottomEnd = 4.dp)
-                            index == items.size - 1 -> RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
-                            else -> RoundedCornerShape(4.dp)
-                        },
-                        onToggle = { on ->
+                    SettingsItem(
+                        shape = groupRowShape(items.size, index),
+                        title = item.label,
+                        subtitle = item.desc,
+                        mark = item.mark,
+                        hasSwitch = true,
+                        switchState = item.enabled,
+                        onSwitchChange = { on ->
                             hidden = if (on) hidden - item.key else hidden + item.key
                             prefs.setHiddenMenuTiles(menu, hidden)
                         },
