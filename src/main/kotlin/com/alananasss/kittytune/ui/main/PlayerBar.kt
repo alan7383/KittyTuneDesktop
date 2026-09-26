@@ -471,7 +471,8 @@ fun PlayerBar(
                         Icon(
                             painter = androidx.compose.ui.res.painterResource("icons/lyrics.svg"),
                             contentDescription = "Lyrics",
-                            tint = if (vm.hasLyrics) MaterialTheme.colorScheme.primary
+                            // Lit while the lyrics are open, like any toggle, not whenever a track has them.
+                            tint = if (vm.showLyricsSheet) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                         )

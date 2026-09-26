@@ -493,18 +493,24 @@ private fun QuickTile(
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // The same rule as the sidebar's library tiles: palette colours while the dynamic theme is on.
+        val tilePrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+        val themedTiles by tilePrefs.dynamicThemeFlow().collectAsState(initial = tilePrefs.getDynamicTheme())
         when {
             isLikes -> {
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .background(Brush.linearGradient(listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)))),
+                        .then(
+                            if (themedTiles) Modifier.background(MaterialTheme.colorScheme.primaryContainer)
+                            else Modifier.background(Brush.linearGradient(listOf(Color(0xFF7C4DFF), Color(0xFFB388FF))))
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Filled.Favorite,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = if (themedTiles) MaterialTheme.colorScheme.onPrimaryContainer else Color.White,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -513,13 +519,16 @@ private fun QuickTile(
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .background(Brush.linearGradient(listOf(Color(0xFF00C853), Color(0xFF69F0AE)))),
+                        .then(
+                            if (themedTiles) Modifier.background(MaterialTheme.colorScheme.secondaryContainer)
+                            else Modifier.background(Brush.linearGradient(listOf(Color(0xFF00C853), Color(0xFF69F0AE))))
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.DownloadForOffline,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = if (themedTiles) MaterialTheme.colorScheme.onSecondaryContainer else Color.White,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -528,13 +537,16 @@ private fun QuickTile(
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .background(Brush.linearGradient(listOf(Color(0xFF0091EA), Color(0xFF40C4FF)))),
+                        .then(
+                            if (themedTiles) Modifier.background(MaterialTheme.colorScheme.tertiaryContainer)
+                            else Modifier.background(Brush.linearGradient(listOf(Color(0xFF0091EA), Color(0xFF40C4FF))))
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.FolderOpen,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = if (themedTiles) MaterialTheme.colorScheme.onTertiaryContainer else Color.White,
                         modifier = Modifier.size(26.dp)
                     )
                 }
