@@ -1310,32 +1310,6 @@ import com.alananasss.kittytune.ui.common.Slider
                         add { shape ->
                             SettingsItem(
                                 shape = shape,
-                                title = str("pref_lyrics_show_button"),
-                                subtitle = str("pref_lyrics_show_button_sub"),
-                                hasSwitch = true,
-                                switchState = showLyricsButton,
-                                onSwitchChange = {
-                                    showLyricsButton = it
-                                    prefs.setShowLyricsButtonEnabled(it)
-                                }
-                            )
-                        }
-                        if (showLyricsButton) add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_inline"),
-                                subtitle = str("pref_lyrics_inline_sub"),
-                                hasSwitch = true,
-                                switchState = inlineLyrics,
-                                onSwitchChange = {
-                                    inlineLyrics = it
-                                    prefs.setInlineLyricsEnabled(it)
-                                }
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
                                 title = str("pref_lyrics_under_cover"),
                                 subtitle = str("pref_lyrics_under_cover_sub"),
                                 hasSwitch = true,

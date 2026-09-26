@@ -2618,4 +2618,6 @@
     <string name="font_default">По умолчанию</string>
     <string name="font_add">Добавить свой шрифт</string>
     <string name="font_rejected">Этот файл не шрифт TTF или OTF</string>
+    <string name="volume_style_title">Стиль громкости</string>
+    <string name="volume_style_same">Как у трека</string>
 </resources>

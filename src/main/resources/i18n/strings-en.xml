@@ -2619,4 +2619,6 @@
     <string name="font_default">Default</string>
     <string name="font_add">Add your own font</string>
     <string name="font_rejected">That file isn\'t a TTF or OTF font</string>
+    <string name="volume_style_title">Volume style</string>
+    <string name="volume_style_same">Like seek bar</string>
 </resources>

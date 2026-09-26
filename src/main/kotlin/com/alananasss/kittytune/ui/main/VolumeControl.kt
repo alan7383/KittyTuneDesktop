@@ -103,12 +103,14 @@ private val TRACK_INSET = 7.dp
 internal fun VolumeControl(
     volume: Float,
     preferVertical: Boolean,
+    isPlaying: Boolean,
     onVolumeChange: (Float) -> Unit,
     onVolumeChangeFinished: () -> Unit,
     onVolumeScrolled: (Float) -> Unit,
     onToggleMute: () -> Unit,
 ) {
-    val style = rememberSliderStyle()
+    val style = rememberVolumeStyle()
+    androidx.compose.runtime.CompositionLocalProvider(LocalWaveMoving provides isPlaying) {
     BoxWithConstraints(contentAlignment = Alignment.Center) {
         val roomForTrack = maxWidth - INLINE_OVERHEAD
         if (preferVertical || roomForTrack < MIN_TRACK_WIDTH) {
@@ -125,7 +127,11 @@ internal fun VolumeControl(
             )
         }
     }
+    }
 }
+
+/** Whether the wavy volume track should be moving: only while music plays, like the seek bar. */
+private val LocalWaveMoving = androidx.compose.runtime.compositionLocalOf { false }
 
 @Composable
 private fun InlineVolumeControl(
@@ -202,7 +208,29 @@ private fun VolumeTrack(
     val thickness by animateDpAsState(
         if (isActive) spec.activeThickness else spec.thickness, spring(stiffness = 700f), label = "volumeTrack",
     )
-    val thumbGrow by animateFloatAsState(if (isActive) 1f else 0f, spring(stiffness = 700f), label = "volumeThumb")
+    // The dot jumps a little when grabbed, as the seek bar's does: bouncy while held, settling on release.
+    val thumbGrow by animateFloatAsState(
+        when {
+            isDragging -> 1.3f
+            isActive -> 1f
+            else -> 0f
+        },
+        spring(dampingRatio = 0.45f, stiffness = 500f),
+        label = "volumeThumb",
+    )
+    // The wave moves while music plays and flattens to a line when it stops, in step with the seek bar.
+    val isMoving = LocalWaveMoving.current && com.alananasss.kittytune.core.LocalWindowSeen.current && spec.amplitude > 0.dp
+    val waveScale by animateFloatAsState(if (LocalWaveMoving.current) 1f else 0f, androidx.compose.animation.core.tween(400), label = "volumeWave")
+    val phase = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val waveLengthPx = with(density) { spec.wavelength.toPx() }
+    val waveSpeedPx = with(density) { (spec.wavelength / 2f).toPx() }
+    androidx.compose.runtime.LaunchedEffect(isMoving, waveLengthPx) {
+        while (isMoving) {
+            phase.floatValue = com.alananasss.kittytune.ui.player.slider.wavePhasePx(waveSpeedPx, waveLengthPx)
+            kotlinx.coroutines.delay(33)
+        }
+    }
 
     val activeColor = MaterialTheme.colorScheme.primary
     // Material's own inactive-track colour: visible on the bar's container, unlike a surface tone.
@@ -278,15 +306,16 @@ private fun VolumeTrack(
             if (spec.amplitude == 0.dp) {
                 drawLine(activeColor, at(0f), at(activeEnd), stroke, StrokeCap.Round)
             } else {
-                val amplitude = spec.amplitude.toPx()
+                val amplitude = spec.amplitude.toPx() * waveScale
                 val k = (2.0 * Math.PI / spec.wavelength.toPx()).toFloat()
+                val shift = phase.floatValue
                 val wave = Path()
                 var t = 0f
                 val start = at(0f)
                 wave.moveTo(start.x, start.y)
                 while (t < activeEnd) {
                     t = (t + 2f).coerceAtMost(activeEnd)
-                    val p = at(t, amplitude * kotlin.math.sin(k * t))
+                    val p = at(t, amplitude * kotlin.math.sin(k * (t - shift)))
                     wave.lineTo(p.x, p.y)
                 }
                 drawPath(wave, activeColor, style = Stroke(width = stroke, cap = StrokeCap.Round))
@@ -303,7 +332,7 @@ private fun VolumeTrack(
             val barSize = if (vertical) Size(barLength, barWidth) else Size(barWidth, barLength)
             drawRoundRect(activeColor, topLeft, barSize, CornerRadius(barWidth / 2f))
         } else if (thumbGrow > 0f) {
-            drawCircle(activeColor, 7.dp.toPx() * thumbGrow, at(filled))
+            drawCircle(activeColor, 7.dp.toPx() * thumbGrow.coerceAtLeast(0f), at(filled))
         }
     }
 }
@@ -321,24 +350,24 @@ private data class VolumeTrackSpec(
         fun of(style: PlayerSliderStyle) = when (style) {
             PlayerSliderStyle.BAR -> VolumeTrackSpec(8.dp, 10.dp, 0.dp, 1.dp, gapAroundThumb = true, thumbLength = 20.dp)
             PlayerSliderStyle.SLIM -> VolumeTrackSpec(4.dp, 6.dp, 0.dp, 1.dp, gapAroundThumb = false, thumbLength = 0.dp)
-            PlayerSliderStyle.WAVY -> VolumeTrackSpec(4.dp, 5.dp, 2.5.dp, 20.dp, gapAroundThumb = false, thumbLength = 0.dp)
+            PlayerSliderStyle.WAVY -> VolumeTrackSpec(4.dp, 5.dp, 2.5.dp, androidx.compose.material3.WavyProgressIndicatorDefaults.LinearDeterminateWavelength, gapAroundThumb = false, thumbLength = 0.dp)
             PlayerSliderStyle.SQUIGGLY -> VolumeTrackSpec(3.dp, 4.dp, 3.dp, 12.dp, gapAroundThumb = false, thumbLength = 0.dp)
         }
     }
 }
 
-/** The seek bar style, re-read when preferences change, which is what the volume track follows. */
+/** The volume track's own style if one was picked, the seek bar's otherwise; re-read when preferences change. */
 @Composable
-private fun rememberSliderStyle(): PlayerSliderStyle {
+private fun rememberVolumeStyle(): PlayerSliderStyle {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
-    return remember(prefsSnapshot) { com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerSliderStyle() }
+    return remember(prefsSnapshot) {
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        prefs.getVolumeSliderStyle() ?: prefs.getPlayerSliderStyle()
+    }
 }
 
-private fun volumeIcon(volume: Float): ImageVector = when {
-    volume <= 0.001f -> Icons.AutoMirrored.Filled.VolumeOff
-    volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-    else -> Icons.AutoMirrored.Filled.VolumeUp
-}
+private fun volumeIcon(volume: Float): ImageVector =
+    if (volume <= 0.001f) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp
 
 internal fun volumePercentLabel(volume: Float): String = "${(volume * 100).roundToInt()}%"
 
@@ -504,5 +533,13 @@ private object AboveAnchorCentered : PopupPositionProvider {
             x.coerceIn(0, maxX),
             (anchorBounds.top - popupContentSize.height).coerceAtLeast(0),
         )
+    }
+}
+
+/** A still volume track at 60 %, for the settings' previews. */
+@Composable
+internal fun VolumeTrackPreview(style: PlayerSliderStyle, vertical: Boolean, modifier: Modifier = Modifier) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalWaveMoving provides true) {
+        VolumeTrack(volume = 0.6f, style = style, onVolumeChange = {}, onVolumeChangeFinished = {}, modifier = modifier, vertical = vertical)
     }
 }
