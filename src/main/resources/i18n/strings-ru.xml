@@ -1526,7 +1526,10 @@
     <string name="search_libraries_hint">Поиск в библиотеках…</string>
     <string name="search_library_hint">Фильтр библиотеки</string>
     <string name="search_no_results">Ничего не найдено</string>
-    <string name="search_playlist_hint">Фильтр плейлиста</string>
+    <string name="search_playlist_hint">Поиск по плейлисту</string>
+    <string name="search_settings_hint">Поиск по настройкам…</string>
+    <string name="settings_search_results">Результаты поиска</string>
+    <string name="settings_search_no_results">Ничего не найдено</string>
     <string name="search_section_genres">Жанры</string>
     <string name="search_section_moods">Настроения &amp; моменты</string>
     <string name="search_section_personalized">Для вас</string>

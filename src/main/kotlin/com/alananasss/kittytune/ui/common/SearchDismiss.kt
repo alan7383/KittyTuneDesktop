@@ -87,27 +87,10 @@ fun Modifier.clearFocusOnEmptyClick(focusManager: FocusManager): Modifier = this
                 if (event.button != null && event.button != PointerButton.Primary) continue
                 if (event.changes.any { it.isConsumed }) continue
 
-                val downPos = event.changes.firstOrNull()?.position ?: continue
-                var dragged = false
-
-                while (true) {
-                    val nextEvent = awaitPointerEvent(PointerEventPass.Final)
-                    if (nextEvent.type == PointerEventType.Move) {
-                        val currentPos = nextEvent.changes.firstOrNull()?.position
-                        if (currentPos != null && hypot(currentPos.x - downPos.x, currentPos.y - downPos.y) > 12f) {
-                            dragged = true
-                        }
-                    } else if (nextEvent.type == PointerEventType.Release) {
-                        val change = nextEvent.changes.firstOrNull()
-                        val unconsumed = nextEvent.changes.all { !it.isConsumed }
-                        if (!dragged && change != null && unconsumed && (nextEvent.button == null || nextEvent.button == PointerButton.Primary)) {
-                            focusManager.clearFocus()
-                        }
-                        break
-                    } else if (nextEvent.changes.none { it.pressed }) {
-                        break
-                    }
-                }
+                // Clear focus immediately on Press so that focus transitions (e.g. OutlinedTextField
+                // border width/color animations) execute once cleanly without waiting for Release or
+                // restarting an animation mid-way (which previously caused a double shutdown animation).
+                focusManager.clearFocus()
             }
         }
     }

@@ -1528,7 +1528,10 @@
     <string name="search_libraries_hint">Rechercher des bibliothèques…</string>
     <string name="search_library_hint">Filtrer la bibliothèque</string>
     <string name="search_no_results">Aucun résultat</string>
-    <string name="search_playlist_hint">Filtrer la playlist</string>
+    <string name="search_playlist_hint">Rechercher dans la playlist</string>
+    <string name="search_settings_hint">Rechercher dans les paramètres…</string>
+    <string name="settings_search_results">Résultats de recherche</string>
+    <string name="settings_search_no_results">Aucun paramètre trouvé</string>
     <string name="search_section_genres">Genres</string>
     <string name="search_section_moods">Humeurs et moments</string>
     <string name="search_section_personalized">Pour toi</string>

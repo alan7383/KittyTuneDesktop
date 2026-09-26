@@ -240,7 +240,10 @@
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
 
     <string name="search_library_hint">Bibliothek filtern</string>
-    <string name="search_playlist_hint">Playlist filtern</string>
+    <string name="search_playlist_hint">Playlist durchsuchen</string>
+    <string name="search_settings_hint">Einstellungen durchsuchen…</string>
+    <string name="settings_search_results">Suchergebnisse</string>
+    <string name="settings_search_no_results">Keine Einstellungen gefunden</string>
     <string name="lib_offline_mode">Offline-Modus • Nur lokaler Zugriff</string>
     <string name="lib_guest_mode">Gastmodus • Zum Synchronisieren anmelden</string>
     <string name="sort_date_added">Hinzugefügt am</string>

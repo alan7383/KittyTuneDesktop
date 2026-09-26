@@ -1526,7 +1526,10 @@
     <string name="search_libraries_hint">Search libraries…</string>
     <string name="search_library_hint">Filter library</string>
     <string name="search_no_results">No results found</string>
-    <string name="search_playlist_hint">Filter playlist</string>
+    <string name="search_playlist_hint">Search playlist</string>
+    <string name="search_settings_hint">Search settings…</string>
+    <string name="settings_search_results">Search Results</string>
+    <string name="settings_search_no_results">No settings found</string>
     <string name="search_section_genres">Genres</string>
     <string name="search_section_moods">Moods &amp; moments</string>
     <string name="search_section_personalized">For You</string>

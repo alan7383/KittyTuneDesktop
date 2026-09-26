@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.profile
 
 import com.alananasss.kittytune.core.trackTextInput
+import com.alananasss.kittytune.ui.common.escapeDismisses
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
@@ -15,11 +16,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -65,8 +68,10 @@ fun SettingsScreen(
     playerViewModel: PlayerViewModel
 ) {
     val location = SettingsNavigation.current
+    var searchQuery by rememberSaveable { mutableStateOf("") }
 
-    com.alananasss.kittytune.core.BackHandler(enabled = location.depth > 0) { SettingsNavigation.up() }
+    com.alananasss.kittytune.core.BackHandler(enabled = searchQuery.isNotEmpty()) { searchQuery = "" }
+    com.alananasss.kittytune.core.BackHandler(enabled = searchQuery.isEmpty() && location.depth > 0) { SettingsNavigation.up() }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val isWide = maxWidth >= WIDE_LAYOUT
@@ -74,8 +79,14 @@ fun SettingsScreen(
             CategoryList(
                 selected = location.category,
                 isWide = isWide,
-                onSelect = { SettingsNavigation.go(SettingsPlace(it)) },
-                onCredits = { navController.navigate("credits") },
+                onSelect = {
+                    searchQuery = ""
+                    SettingsNavigation.go(SettingsPlace(it))
+                },
+                onCredits = {
+                    searchQuery = ""
+                    navController.navigate("credits")
+                },
             )
             Spacer(Modifier.width(8.dp))
             AnimatedContent(
@@ -99,13 +110,27 @@ fun SettingsScreen(
                 SettingsPane(
                     title = str(shown.subPage?.titleKey ?: shown.category.titleKey),
                     onBack = if (shown.subPage != null) ({ SettingsNavigation.up() }) else onBackClick,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
                 ) {
-                    SettingsPageContent(
-                        location = shown,
-                        navController = navController,
-                        playerViewModel = playerViewModel,
-                        onOpen = { page -> SettingsNavigation.go(shown.copy(pages = shown.pages + page)) },
-                    )
+                    if (searchQuery.isNotBlank()) {
+                        SettingsSearchResults(
+                            query = searchQuery,
+                            navController = navController,
+                            playerViewModel = playerViewModel,
+                            onNavigateToPlace = { place ->
+                                searchQuery = ""
+                                SettingsNavigation.go(place)
+                            },
+                        )
+                    } else {
+                        SettingsPageContent(
+                            location = shown,
+                            navController = navController,
+                            playerViewModel = playerViewModel,
+                            onOpen = { page -> SettingsNavigation.go(shown.copy(pages = shown.pages + page)) },
+                        )
+                    }
                 }
             }
         }
@@ -202,26 +227,77 @@ private fun SettingsPageContent(
     }
 }
 
-/** The right pane: a title row, with a back arrow on sub-pages, over the page's own scrolling content. */
+/** The right pane: a title row with search field, with a back arrow on sub-pages, over the page's own scrolling content. */
 @Composable
-private fun SettingsPane(title: String, onBack: (() -> Unit)?, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsPane(
+    title: String,
+    onBack: (() -> Unit)?,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(start = if (onBack != null) 4.dp else 20.dp, end = 20.dp),
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 64.dp)
+                .padding(
+                    start = if (onBack != null && searchQuery.isEmpty()) 4.dp else 16.dp,
+                    end = 16.dp,
+                    top = 6.dp,
+                    bottom = 6.dp
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (onBack != null) {
+            if (onBack != null && searchQuery.isEmpty()) {
                 IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
                 }
-                Spacer(Modifier.width(4.dp))
             }
             Text(
-                title,
+                if (searchQuery.isNotBlank()) str("settings_search_results") else title,
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(16.dp))
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                placeholder = {
+                    Text(str("search_settings_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                },
+                leadingIcon = {
+                    Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = {
+                            onSearchQueryChange("")
+                            focusManager.clearFocus()
+                        }) {
+                            Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = CircleShape,
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier
+                    .width(320.dp)
+                    .trackTextInput()
+                    .escapeDismisses {
+                        onSearchQueryChange("")
+                        focusManager.clearFocus()
+                    },
             )
         }
         com.alananasss.kittytune.ui.common.ScrollableColumn(
@@ -230,6 +306,467 @@ private fun SettingsPane(title: String, onBack: (() -> Unit)?, content: @Composa
             contentPadding = PaddingValues(bottom = 80.dp),
             content = content,
         )
+    }
+}
+
+internal data class SettingsSearchItem(
+    val title: String,
+    val subtitle: String? = null,
+    val category: SettingsCategory,
+    val place: SettingsPlace,
+    val icon: ImageVector? = null,
+    val route: String? = null,
+    val keywords: List<String> = emptyList(),
+    val hasSwitch: Boolean = false,
+    val switchState: Boolean = false,
+    val onSwitchChange: ((Boolean) -> Unit)? = null,
+)
+
+@Composable
+private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<SettingsSearchItem> {
+    val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
+    var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
+    var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
+    var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
+    var followsCover by remember { mutableStateOf(prefs.getTrackDynamicTheme()) }
+    var sidebarHoverExpand by remember { mutableStateOf(prefs.isSidebarHoverExpandEnabled()) }
+    var verticalVolume by remember { mutableStateOf(prefs.getVerticalVolumeSlider()) }
+    var showRemainingTime by remember { mutableStateOf(prefs.getShowRemainingTime()) }
+    var crossfade by remember { mutableStateOf(prefs.getCrossfadeEnabled()) }
+    var automix by remember { mutableStateOf(prefs.getAutomixEnabled()) }
+    var autoplay by remember { mutableStateOf(prefs.getAutoplayEnabled()) }
+    var continuousPlayback by remember { mutableStateOf(prefs.getContinuousPlaybackEnabled()) }
+    var persistentQueue by remember { mutableStateOf(prefs.getPersistentQueueEnabled()) }
+    var savePosition by remember { mutableStateOf(prefs.getSavePositionEnabled()) }
+    var youtubeFallback by remember { mutableStateOf(prefs.getYouTubeFallbackEnabled()) }
+    var localMedia by remember { mutableStateOf(prefs.getLocalMediaEnabled()) }
+    var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
+    var discordRpc by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
+
+    return listOf(
+        // INTERFACE - Pages
+        SettingsSearchItem(str("settings_cat_interface"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE), Icons.Rounded.Palette, keywords = listOf("interface", "ui", "look", "appearance", "интерфейс", "внешний вид")),
+        SettingsSearchItem(str("settings_page_themes"), str("settings_page_themes_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)), Icons.Rounded.ColorLens, keywords = listOf("theme", "color", "dark", "light", "palette", "oled", "amoled", "thème", "couleur", "тема", "цвета")),
+        SettingsSearchItem(str("pref_custom_theme"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES, SettingsSubPage.CUSTOM_THEME)), Icons.Rounded.Palette, keywords = listOf("custom theme", "accent", "colors", "personnalisé", "кастомная тема")),
+        SettingsSearchItem(str("settings_page_player"), str("settings_page_player_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)), Icons.Rounded.PlayCircle, keywords = listOf("player", "artwork", "fluid", "blur", "lecteur", "плеер", "дизайн")),
+        SettingsSearchItem(str("settings_page_left_panel"), str("settings_page_left_panel_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LEFT_PANEL)), Icons.Rounded.ViewSidebar, keywords = listOf("sidebar", "left panel", "navigation", "panneau gauche", "боковая панель")),
+        SettingsSearchItem(str("settings_page_right_panel"), str("settings_page_right_panel_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.RIGHT_PANEL)), Icons.Rounded.ViewQuilt, keywords = listOf("right panel", "queue", "info", "panneau droit", "правая панель")),
+        SettingsSearchItem(str("pref_lyrics_title"), str("settings_page_lyrics_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS)), Icons.Rounded.Lyrics, keywords = listOf("lyrics", "words", "karaoke", "paroles", "текст песен", "караоке")),
+        SettingsSearchItem(str("lyrics_mode_fullscreen"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS, SettingsSubPage.LYRICS_FULLSCREEN)), Icons.Rounded.Fullscreen, keywords = listOf("fullscreen", "lyrics", "plein écran", "полноэкранный")),
+        SettingsSearchItem(str("lyrics_mode_central"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS, SettingsSubPage.LYRICS_CENTRAL)), Icons.Rounded.VerticalAlignCenter, keywords = listOf("central", "lyrics", "centre", "центральный")),
+        SettingsSearchItem(str("lyrics_mode_sidebar"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS, SettingsSubPage.LYRICS_SIDEBAR)), Icons.Rounded.ViewSidebar, keywords = listOf("sidebar lyrics", "боковой текст")),
+        SettingsSearchItem(str("mini_player_settings_title"), str("settings_page_mini_player_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.MINI_PLAYER)), Icons.Rounded.PictureInPicture, keywords = listOf("mini player", "pip", "always on top", "мини плеер")),
+
+        // INTERFACE - Direct Options
+        SettingsSearchItem(
+            title = str("pref_animated_artist_profiles"),
+            subtitle = str("pref_animated_artist_profiles_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.AccountCircle,
+            keywords = listOf("artist", "artiste", "artistes", "profile", "profiles", "profil", "profils", "anime", "animé", "animés", "animated", "video", "анимированные профили"),
+            hasSwitch = true,
+            switchState = animatedArtistProfiles,
+            onSwitchChange = {
+                animatedArtistProfiles = it
+                prefs.setAnimatedArtistProfilesEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_animated_covers"),
+            subtitle = str("pref_animated_covers_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.PlayCircle,
+            keywords = listOf("animated cover", "covers animées", "pochette animée", "pochettes animées", "anime", "animé", "animated", "video", "анимированные обложки"),
+            hasSwitch = true,
+            switchState = animatedCovers,
+            onSwitchChange = {
+                animatedCovers = it
+                prefs.setAnimatedCoversEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_animated_covers_fade_ui"),
+            subtitle = str("pref_animated_covers_fade_ui_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.Opacity,
+            keywords = listOf("fade", "fondu", "transparence", "ui", "fade ui"),
+            hasSwitch = true,
+            switchState = animatedCoversFadeUi,
+            onSwitchChange = {
+                animatedCoversFadeUi = it
+                prefs.setAnimatedCoversFadeUiEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_theme_pure_black"),
+            subtitle = str("pref_theme_pure_black_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.Contrast,
+            keywords = listOf("pure black", "noir pur", "oled", "amoled", "dark", "noir", "чистый черный"),
+            hasSwitch = true,
+            switchState = pureBlack,
+            onSwitchChange = {
+                pureBlack = it
+                prefs.setPureBlack(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_dynamic_theme_merged"),
+            subtitle = str("pref_dynamic_theme_merged_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.THEMES)),
+            icon = Icons.Rounded.AutoAwesome,
+            keywords = listOf("dynamic theme", "thème dynamique", "couleurs dynamiques", "palette", "cover color", "динамическая тема"),
+            hasSwitch = true,
+            switchState = followsCover,
+            onSwitchChange = {
+                followsCover = it
+                prefs.setTrackDynamicTheme(it)
+                prefs.setDynamicTheme(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_sidebar_hover_expand"),
+            subtitle = str("pref_sidebar_hover_expand_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LEFT_PANEL)),
+            icon = Icons.Rounded.ViewSidebar,
+            keywords = listOf("sidebar", "hover", "survol", "déplier", "expand", "раскрывать при наведении"),
+            hasSwitch = true,
+            switchState = sidebarHoverExpand,
+            onSwitchChange = {
+                sidebarHoverExpand = it
+                prefs.setSidebarHoverExpandEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_vertical_volume_slider"),
+            subtitle = null,
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)),
+            icon = Icons.Rounded.VolumeUp,
+            keywords = listOf("volume", "vertical", "slider", "curseur", "barre de son", "вертикальный слайдер громкости"),
+            hasSwitch = true,
+            switchState = verticalVolume,
+            onSwitchChange = {
+                verticalVolume = it
+                prefs.setVerticalVolumeSlider(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_show_remaining_time"),
+            subtitle = str("pref_show_remaining_time_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)),
+            icon = Icons.Rounded.Timer,
+            keywords = listOf("remaining", "time", "strip", "duration", "countdown", "restant", "temps restant", "décompte", "оставшееся время", "обратный отсчет"),
+            hasSwitch = true,
+            switchState = showRemainingTime,
+            onSwitchChange = {
+                showRemainingTime = it
+                prefs.setShowRemainingTime(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_screensaver_title"),
+            subtitle = str("pref_screensaver_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS, SettingsSubPage.LYRICS_FULLSCREEN)),
+            icon = Icons.Rounded.DarkMode,
+            keywords = listOf("screensaver", "écran de veille", "veille", "sleep", "dim", "fullscreen", "plein écran", "заставка", "экранная заставка"),
+            hasSwitch = true,
+            switchState = playerViewModel.fullPlayerScreensaverEnabled,
+            onSwitchChange = { playerViewModel.updateFullPlayerScreensaverEnabled(it) },
+        ),
+
+        // AUDIO - Pages & Categories
+        SettingsSearchItem(str("settings_cat_audio"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.GraphicEq, keywords = listOf("audio", "sound", "son", "звук")),
+        SettingsSearchItem(str("settings_cat_playback"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.PlayArrow, keywords = listOf("playback", "autoplay", "queue", "воспроизведение")),
+        SettingsSearchItem(str("pref_quality"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.Tune, keywords = listOf("quality", "bitrate", "high", "low", "flac", "aac", "качество")),
+        SettingsSearchItem(str("pref_audio_device_title"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.Speaker, keywords = listOf("device", "speaker", "output", "устройство", "вывод")),
+        SettingsSearchItem(str("sleep_timer_title"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.Timer, keywords = listOf("timer", "sleep", "таймер сна")),
+        SettingsSearchItem(str("pref_seek_wheel_step"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.FastForward, keywords = listOf("seek", "wheel", "колесико", "перемотка")),
+
+        // AUDIO - Direct Options
+        SettingsSearchItem(
+            title = str("pref_norm_title"),
+            subtitle = str("pref_norm_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.VolumeUp,
+            keywords = listOf("normalization", "volume", "loudness", "gain", "normalisation", "громкость", "нормализация"),
+            hasSwitch = true,
+            switchState = playerViewModel.effectsState.isNormalizationEnabled,
+            onSwitchChange = { playerViewModel.toggleNormalization(it) },
+        ),
+        SettingsSearchItem(
+            title = str("pref_crossfade_title"),
+            subtitle = null,
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.Shuffle,
+            keywords = listOf("crossfade", "fade", "transition", "fondu", "enchaîné", "кроссфейд", "плавный переход"),
+            hasSwitch = true,
+            switchState = crossfade,
+            onSwitchChange = {
+                crossfade = it
+                prefs.setCrossfadeEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str(com.alananasss.kittytune.R.string.automix),
+            subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.AutoAwesome,
+            keywords = listOf("automix", "dj", "tempo", "harmonic", "transition", "mix", "автомикс"),
+            hasSwitch = true,
+            switchState = automix,
+            onSwitchChange = {
+                automix = it
+                prefs.setAutomixEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_autoplay"),
+            subtitle = str("pref_autoplay_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.PlayArrow,
+            keywords = listOf("autoplay", "lecture automatique", "station", "radio", "enchaîner", "автовоспроизведение"),
+            hasSwitch = true,
+            switchState = autoplay,
+            onSwitchChange = {
+                autoplay = it
+                prefs.setAutoplayEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_continuous_playback"),
+            subtitle = str("pref_continuous_playback_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.Repeat,
+            keywords = listOf("continuous", "lecture continue", "suite", "track", "непрерывное воспроизведение"),
+            hasSwitch = true,
+            switchState = continuousPlayback,
+            onSwitchChange = {
+                continuousPlayback = it
+                prefs.setContinuousPlaybackEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_persist_queue"),
+            subtitle = str("pref_persist_queue_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.QueueMusic,
+            keywords = listOf("queue", "persist", "file d'attente", "garder", "sauvegarder", "сохранять очередь"),
+            hasSwitch = true,
+            switchState = persistentQueue,
+            onSwitchChange = {
+                persistentQueue = it
+                prefs.setPersistentQueueEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_queue_preserve_upcoming"),
+            subtitle = str("pref_queue_preserve_upcoming_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.SkipNext,
+            keywords = listOf("queue", "jump", "preserve", "saut", "titres suivants", "file"),
+            hasSwitch = true,
+            switchState = playerViewModel.isQueuePreserveUpcomingEnabled,
+            onSwitchChange = { playerViewModel.toggleQueuePreserveUpcoming(it) },
+        ),
+        SettingsSearchItem(
+            title = str("pref_save_position"),
+            subtitle = str("pref_save_position_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.Save,
+            keywords = listOf("position", "save position", "reprendre", "sauvegarder la position", "сохранять позицию"),
+            hasSwitch = true,
+            switchState = savePosition,
+            onSwitchChange = {
+                savePosition = it
+                prefs.setSavePositionEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_youtube_fallback"),
+            subtitle = str("pref_youtube_fallback_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.SmartDisplay,
+            keywords = listOf("youtube", "fallback", "secours", "alternative", "ютуб"),
+            hasSwitch = true,
+            switchState = youtubeFallback,
+            onSwitchChange = {
+                youtubeFallback = it
+                prefs.setYouTubeFallbackEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_precise_speed"),
+            subtitle = str("pref_precise_speed_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO),
+            icon = Icons.Rounded.Speed,
+            keywords = listOf("speed", "vitesse", "précise", "tempo", "rate", "точная скорость"),
+            hasSwitch = true,
+            switchState = playerViewModel.isPreciseSpeedEnabled,
+            onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) },
+        ),
+
+        // SOURCES - Pages & Options
+        SettingsSearchItem(str("settings_tab_sources"), str("sources_services_title"), SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.ImportExport, keywords = listOf("sources", "providers", "streaming", "источники", "сервисы")),
+        SettingsSearchItem("SoundCloud", str("sources_signed_in"), SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.Cloud, keywords = listOf("soundcloud", "саундклауд")),
+        SettingsSearchItem("Qobuz", null, SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.MusicNote, route = "qobuz_settings", keywords = listOf("qobuz", "flac", "hires", "кобуз")),
+        SettingsSearchItem("TIDAL", null, SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.Waves, route = "tidal_settings", keywords = listOf("tidal", "hifi", "тайдал")),
+        SettingsSearchItem("Deezer", null, SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.GraphicEq, route = "deezer_settings", keywords = listOf("deezer", "дизер")),
+        SettingsSearchItem(str("sources_yandex"), str("pref_yandex_token"), SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.Key, keywords = listOf("yandex", "token", "яндекс", "токен")),
+        SettingsSearchItem(str("provider_order"), null, SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.SwapVert, route = "provider_order", keywords = listOf("provider order", "priority", "ordre", "приоритет", "порядок")),
+        SettingsSearchItem(str("music_import_title"), str("music_import_settings_subtitle"), SettingsCategory.SOURCES, SettingsPlace(SettingsCategory.SOURCES), Icons.Rounded.ImportExport, route = "music_import", keywords = listOf("import", "spotify", "playlist import", "импорт")),
+        SettingsSearchItem(
+            title = str("pref_local_title"),
+            subtitle = null,
+            category = SettingsCategory.SOURCES,
+            place = SettingsPlace(SettingsCategory.SOURCES),
+            icon = Icons.Filled.SdStorage,
+            keywords = listOf("local", "storage", "disk", "folder", "directory", "локальные", "папка", "диск"),
+            hasSwitch = true,
+            switchState = localMedia,
+            onSwitchChange = {
+                localMedia = it
+                prefs.setLocalMediaEnabled(it)
+            },
+        ),
+
+        // STORAGE
+        SettingsSearchItem(str("pref_storage_title"), str("pref_clear_cache"), SettingsCategory.STORAGE, SettingsPlace(SettingsCategory.STORAGE), Icons.Rounded.Storage, keywords = listOf("storage", "cache", "clear cache", "disk", "stockage", "память", "кэш", "очистить")),
+
+        // SYNC
+        SettingsSearchItem(str("settings_cat_sync"), null, SettingsCategory.SYNC, SettingsPlace(SettingsCategory.SYNC), Icons.Rounded.Devices, keywords = listOf("sync", "account", "cloud", "export", "import", "синхронизация", "аккаунт", "облако")),
+
+        // NETWORK
+        SettingsSearchItem(str("pref_proxy_title"), str("proxy_settings_title"), SettingsCategory.NETWORK, SettingsPlace(SettingsCategory.NETWORK), Icons.Rounded.Dns, route = "proxy_settings", keywords = listOf("proxy", "vpn", "socks", "http", "network", "прокси", "сеть")),
+
+        // MISC - Pages & Options
+        SettingsSearchItem(str("settings_cat_misc"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Tune, keywords = listOf("misc", "general", "options", "разное", "общие")),
+        SettingsSearchItem(str("pref_language"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Translate, keywords = listOf("language", "lang", "locale", "langue", "язык", "локализация")),
+        SettingsSearchItem(str("pref_start_screen"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Home, keywords = listOf("start screen", "home", "library", "стартовый экран")),
+        SettingsSearchItem(
+            title = str("pref_auto_update"),
+            subtitle = str("pref_auto_update_subtitle"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC),
+            icon = Icons.Rounded.SystemUpdate,
+            keywords = listOf("update", "version", "mise à jour", "обновление", "auto update"),
+            hasSwitch = true,
+            switchState = autoUpdate,
+            onSwitchChange = {
+                autoUpdate = it
+                prefs.setAutoUpdateEnabled(it)
+            },
+        ),
+        SettingsSearchItem(
+            title = str("pref_discord_title"),
+            subtitle = null,
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC),
+            icon = Icons.Rounded.Forum,
+            keywords = listOf("discord", "rpc", "presence", "дискорд", "статус"),
+            hasSwitch = true,
+            switchState = discordRpc,
+            onSwitchChange = {
+                discordRpc = it
+                prefs.setDiscordRpcEnabled(it)
+            },
+        ),
+        SettingsSearchItem(str("about_credits"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Groups, route = "credits", keywords = listOf("credits", "about", "authors", "team", "crédits", "о программе", "авторы")),
+    )
+}
+
+@Composable
+private fun SettingsSearchResults(
+    query: String,
+    navController: NavController,
+    playerViewModel: PlayerViewModel,
+    onNavigateToPlace: (SettingsPlace) -> Unit,
+) {
+    val items = getSearchableSettings(playerViewModel)
+    val trimmed = query.trim()
+    val matches = remember(trimmed, items) {
+        items.filter { item ->
+            val catName = str(item.category.titleKey)
+            item.title.contains(trimmed, ignoreCase = true) ||
+                (item.subtitle != null && item.subtitle.contains(trimmed, ignoreCase = true)) ||
+                catName.contains(trimmed, ignoreCase = true) ||
+                item.keywords.any { it.contains(trimmed, ignoreCase = true) }
+        }
+    }
+
+    if (matches.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(top = 48.dp, bottom = 24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    Icons.Rounded.SearchOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    str("settings_search_no_results"),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "\"$trimmed\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
+    } else {
+        val grouped = matches.groupBy { it.category }
+        grouped.forEach { (category, groupItems) ->
+            SettingsGroup(
+                title = str(category.titleKey),
+                items = groupItems.map { item ->
+                    { shape ->
+                        SettingsItem(
+                            shape = shape,
+                            title = item.title,
+                            subtitle = item.subtitle ?: str(item.category.titleKey),
+                            icon = item.icon ?: item.category.icon,
+                            hasSwitch = item.hasSwitch,
+                            switchState = item.switchState,
+                            onSwitchChange = item.onSwitchChange,
+                            onClick = {
+                                if (item.route != null) {
+                                    navController.navigate(item.route)
+                                } else {
+                                    onNavigateToPlace(item.place)
+                                }
+                            },
+                        )
+                    }
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
 
