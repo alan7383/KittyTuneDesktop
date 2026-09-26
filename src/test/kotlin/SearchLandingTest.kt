@@ -182,7 +182,11 @@ class SearchLandingTest {
             chart.contains("onPodium = rank <= 3"),
             "The top three are the ones a listener looks for and must read differently",
         )
-        assertTrue(chart.contains("headlineSmall"), "The podium takes a larger step than the tail")
+        assertTrue(
+            chart.contains("MaterialTheme.typography.titleLarge") &&
+                chart.contains("MaterialTheme.typography.titleSmall"),
+            "The podium takes a larger step than the tail",
+        )
     }
 
     // ── New from your artists ──
@@ -207,7 +211,8 @@ class SearchLandingTest {
     fun testEveryNewStringIsTranslatedInEveryLanguage() {
         val keys = listOf(
             "search_recent_searches", "search_clear_all", "search_see_more", "search_see_less",
-            "search_remove_recent", "chart_kind_top", "chart_kind_trending", "chart_see_full",
+            "search_remove_recent", "chart_kind_top", "chart_kind_trending",
+            "chart_section_title", "explore",
             "chart_genre_all", "chart_genre_pop", "chart_genre_hiphop", "chart_genre_electronic",
             "chart_genre_rock", "chart_genre_rnb", "chart_genre_country", "chart_genre_latin",
             "home_from_your_artists", "home_from_your_artists_sub",
