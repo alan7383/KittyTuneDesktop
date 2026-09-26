@@ -102,4 +102,28 @@ object AppIconVariants {
 
     private fun loader(): ClassLoader? =
         Thread.currentThread().contextClassLoader ?: AppIconVariants::class.java.classLoader
+
+    /** ISO 3166 codes for the flag variants, so their names come from the JDK in whatever language is active. */
+    private val COUNTRY_CODES = mapOf(
+        "algeria" to "DZ", "argentina" to "AR", "australia" to "AU", "austria" to "AT", "belgium" to "BE",
+        "bosnia_herzegovina" to "BA", "brazil" to "BR", "canada" to "CA", "cape_verde" to "CV", "colombia" to "CO",
+        "croatia" to "HR", "curacao" to "CW", "czechia" to "CZ", "dr_congo" to "CD", "ecuador" to "EC",
+        "egypt" to "EG", "france" to "FR", "germany" to "DE", "ghana" to "GH", "haiti" to "HT", "iran" to "IR",
+        "iraq" to "IQ", "ivory_coast" to "CI", "japan" to "JP", "jordan" to "JO", "mexico" to "MX",
+        "morocco" to "MA", "netherlands" to "NL", "new_zealand" to "NZ", "norway" to "NO", "panama" to "PA",
+        "paraguay" to "PY", "portugal" to "PT", "qatar" to "QA", "saudi_arabia" to "SA", "senegal" to "SN",
+        "south_africa" to "ZA", "south_korea" to "KR", "spain" to "ES", "sweden" to "SE", "switzerland" to "CH",
+        "tunisia" to "TN", "turkey" to "TR", "united_states" to "US", "uruguay" to "UY", "uzbekistan" to "UZ",
+    )
+
+    /** The variant's name in the app's language: a country from the JDK, anything else from the strings. */
+    fun localizedLabel(variant: Variant): String {
+        val locale = Strings.locale()
+        COUNTRY_CODES[variant.key]?.let { code ->
+            val name = java.util.Locale.Builder().setRegion(code).build().getDisplayCountry(locale)
+            if (name.isNotBlank() && name != code) return name
+        }
+        val translated = Strings.get("app_icon_${variant.key}")
+        return if (translated.isBlank() || translated == "app_icon_${variant.key}") variant.label else translated
+    }
 }

@@ -39,7 +39,14 @@ object SyncClient {
 
     /** What came of an exchange, in a form the settings screen can show without interpreting. */
     sealed interface Result {
-        data class Success(val peerName: String, val received: Int, val sent: Int) : Result
+        data class Success(
+            val peerName: String,
+            val received: Int,
+            val sent: Int,
+            /** Of [received] and [sent], how many were listens; the rest are likes. */
+            val receivedListens: Int = 0,
+            val sentListens: Int = 0,
+        ) : Result
 
         /** Reached, and it refused us: the secret is wrong, or it was regenerated on that device. */
         data object Unauthorized : Result
@@ -107,6 +114,8 @@ object SyncClient {
                     peerName = reply.deviceName.ifBlank { peer.deviceName },
                     received = applied.size,
                     sent = outgoing.events.size,
+                    receivedListens = applied.count { it.kind == SyncKinds.LISTEN },
+                    sentListens = outgoing.events.count { it.kind == SyncKinds.LISTEN },
                 )
             }
         } catch (t: Throwable) {

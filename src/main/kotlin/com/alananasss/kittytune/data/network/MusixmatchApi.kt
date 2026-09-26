@@ -449,9 +449,10 @@ object FreeTranslator {
             .build()
 
         try {
-            val response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body.string()
+            val body = client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body.string() else null
+            }
+            if (body != null) {
                 
                 val rootArray = com.google.gson.JsonParser.parseString(body).asJsonArray
                 val textBlocks = rootArray.get(0).asJsonArray
@@ -494,9 +495,10 @@ object FreeTranslator {
                         .url(url)
                         .header("User-Agent", "Mozilla/5.0")
                         .build()
-                    val response = client.newCall(request).execute()
-                    if (response.isSuccessful) {
-                        val body = response.body?.string() ?: return@async
+                    val body = client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) response.body?.string() else null
+                    }
+                    if (body != null) {
                         val rootArray = com.google.gson.JsonParser.parseString(body).asJsonArray
                         if (rootArray.size() > 0 && rootArray.get(0).isJsonArray) {
                             val textBlocks = rootArray.get(0).asJsonArray

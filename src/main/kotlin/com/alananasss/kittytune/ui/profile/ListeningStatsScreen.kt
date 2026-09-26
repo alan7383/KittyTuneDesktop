@@ -1,19 +1,13 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.profile
 
-import androidx.compose.material3.IconButtonDefaults
-
-import androidx.compose.material3.ButtonDefaults
-
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,1253 +17,293 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
-import com.alananasss.kittytune.core.EscapableAlertDialog
-import com.alananasss.kittytune.core.str
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
-import com.alananasss.kittytune.data.local.ListeningStatsEvent
-import com.alananasss.kittytune.data.local.TopArtistResult
-import com.alananasss.kittytune.data.local.TopTrackResult
-import java.util.Locale
-import java.util.Calendar
+import com.alananasss.kittytune.core.EscapableAlertDialog
+import com.alananasss.kittytune.core.Prefs
+import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.data.stats.ActivityBucket
+import com.alananasss.kittytune.data.stats.ListeningReport
+import com.alananasss.kittytune.data.stats.ReportArtist
+import com.alananasss.kittytune.data.stats.ReportPeriod
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
-private enum class StatsDetailDialog { NONE, PLAYS, TRACKS, ARTISTS }
+/** The full lists the summary opens. */
+internal enum class StatsList { NONE, PLAYS, TRACKS, ARTISTS }
 
+/**
+ * How the statistics are laid out: an overview with charts, a dense list for a quick look, or big "wrapped"
+ * cards that read like a recap.
+ */
+internal enum class StatsStyle(val labelKey: String, val icon: ImageVector) {
+    OVERVIEW("stats_style_overview", Icons.Rounded.Dashboard),
+    COMPACT("stats_style_compact", Icons.Rounded.ViewAgenda),
+    STORY("stats_style_story", Icons.Rounded.AutoAwesome),
+}
+
+private const val KEY_STATS_STYLE = "listening_stats_style"
+
+/**
+ * Listening statistics: how much, when, and what — for this week, month, year or all time — in the style the
+ * listener picked.
+ */
 @Composable
 fun ListeningStatsScreen(
     onBackClick: () -> Unit,
-    onTrackClick: (TopTrackResult) -> Unit,
-    onArtistClick: (TopArtistResult) -> Unit
+    onTrackClick: (trackId: Long) -> Unit,
+    onArtistClick: (ReportArtist) -> Unit,
 ) {
-    // One instance for the screen's lifetime. It used to be constructed here on every recomposition, which
-    // restarted the load and reset the selected period — so pressing "this month" did work, and was then
-    // immediately undone by the next frame (issue #33).
-    //
-    // Built through an explicit initializer rather than bare `viewModel()`. The default factory route ends
-    // in `SavedStateViewModelFactory`, which on desktop has no `create(String, CreationExtras)` and throws
-    // `UnsupportedOperationException` from inside composition — the screen crashed the window on open. The
-    // initializer form supplies a factory that does implement it, and is also the honest description of
-    // what is wanted here: this view model takes no arguments and has no saved state to restore.
+    // Built through an explicit initializer: the default factory route throws on desktop (issue #33).
     val viewModel: ListeningStatsViewModel = viewModel { ListeningStatsViewModel() }
-    val stats = viewModel.stats
-    val selectedPeriod = viewModel.selectedPeriod
-    val isLoading = viewModel.isLoading
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val report = viewModel.report
+    var openList by remember { mutableStateOf(StatsList.NONE) }
+    var showPrivacy by remember { mutableStateOf(false) }
+    var style by remember {
+        mutableStateOf(runCatching { StatsStyle.valueOf(Prefs.getString(KEY_STATS_STYLE, null) ?: "") }.getOrDefault(StatsStyle.OVERVIEW))
+    }
 
-        val prefs = remember { PlayerPreferences() }
-    var showSettingsDialog by remember { mutableStateOf(false) }
-    var isTrackingEnabled by remember { mutableStateOf(prefs.getListeningStatsEnabled()) }
-    var activeDetailDialog by remember { mutableStateOf(StatsDetailDialog.NONE) }
+    if (showPrivacy) PrivacyDialog { showPrivacy = false }
+    report?.let {
+        when (openList) {
+            StatsList.PLAYS -> PlaysListDialog(viewModel.events, onTrackClick) { openList = StatsList.NONE }
+            StatsList.TRACKS -> TracksListDialog(it.topTracks, onTrackClick) { openList = StatsList.NONE }
+            StatsList.ARTISTS -> ArtistsListDialog(it.topArtists, onArtistClick) { openList = StatsList.NONE }
+            StatsList.NONE -> Unit
+        }
+    }
 
-    if (showSettingsDialog) {
-        EscapableAlertDialog(
-            onDismissRequest = { showSettingsDialog = false },
-            title = {
-                Text(
-                    text = str("pref_privacy_title"),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        StatsHeader(
+            report = report,
+            period = viewModel.period,
+            style = style,
+            onSelect = viewModel::selectPeriod,
+            onStyle = {
+                style = it
+                Prefs.putString(KEY_STATS_STYLE, it.name)
             },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Text(
-                        text = str("pref_privacy_subtitle"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                            Text(
-                                text = str("pref_privacy_tracking_title"),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = str("pref_privacy_tracking_subtitle"),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = isTrackingEnabled,
-                            onCheckedChange = { 
-                                isTrackingEnabled = it
-                                prefs.setListeningStatsEnabled(it)
-                            },
-                            thumbContent = {
-                                if (isTrackingEnabled) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Close,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(SwitchDefaults.IconSize),
-                                        tint = MaterialTheme.colorScheme.surfaceContainerHighest
-                                    )
-                                }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                            )
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showSettingsDialog = false }) {
-                    Text(str("btn_close"))
-                }
-            }
+            onPrivacy = { showPrivacy = true },
         )
-    }
 
-    if (activeDetailDialog == StatsDetailDialog.PLAYS) {
-        val playsState by produceState<List<ListeningStatsEvent>?>(initialValue = null, selectedPeriod) {
-            value = viewModel.getAllPlaysForPeriod()
-        }
-        EscapableAlertDialog(
-            onDismissRequest = { activeDetailDialog = StatsDetailDialog.NONE },
-            title = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.primary)
-                        Text(
-                            text = "${str("listening_stats_all_plays")} (${stats.totalPlays})",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Text(
-                        text = str("listening_stats_disclaimer"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
+        AnimatedContent(
+            targetState = report?.takeIf { !viewModel.isLoading }?.let { it to style },
+            transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(90)) },
+            contentKey = { it?.let { (r, s) -> r.window to s } },
+            modifier = Modifier.fillMaxSize(),
+            label = "statsBody",
+        ) { shown ->
+            val (shownReport, shownStyle) = shown ?: (null to style)
+            when {
+                shownReport == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    ContainedLoadingIndicator()
                 }
-            },
-            text = {
-                val plays = playsState
-                if (plays == null) {
-                    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                        CircularWavyProgressIndicator()
-                    }
-                } else if (plays.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        Text(str("listening_stats_empty_title"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    val dateFormat = remember { java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale.getDefault()) }
-                    LazyColumn(
-                        modifier = Modifier.widthIn(min = 340.dp, max = 560.dp).heightIn(max = 450.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(plays) { event ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
-                                    activeDetailDialog = StatsDetailDialog.NONE
-                                    if ((event.source ?: "soundcloud") == "soundcloud") {
-                                        onTrackClick(
-                                            TopTrackResult(
-                                                trackId = event.trackId,
-                                                trackTitle = event.trackTitle,
-                                                artistName = event.artistName,
-                                                artworkUrl = event.artworkUrl,
-                                                source = event.source,
-                                                playCount = 1,
-                                                totalListenMs = event.listenDurationMs
-                                            )
-                                        )
-                                    }
-                                }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    AsyncImage(
-                                        model = event.artworkUrl,
-                                        contentDescription = event.trackTitle,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = event.trackTitle,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = event.artistName,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = dateFormat.format(java.util.Date(event.timestamp)),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                        )
-                                        if (event.listenDurationMs > 0) {
-                                            Text(
-                                                text = formatDurationMs(event.listenDurationMs),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { activeDetailDialog = StatsDetailDialog.NONE }) {
-                    Text(str("btn_close"))
-                }
-            }
-        )
-    }
-
-    if (activeDetailDialog == StatsDetailDialog.TRACKS) {
-        val tracksState by produceState<List<TopTrackResult>?>(initialValue = null, selectedPeriod) {
-            value = viewModel.getAllTracksForPeriod()
-        }
-        EscapableAlertDialog(
-            onDismissRequest = { activeDetailDialog = StatsDetailDialog.NONE },
-            title = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Rounded.BarChart, null, tint = MaterialTheme.colorScheme.primary)
-                        Text(
-                            text = "${str("listening_stats_all_tracks")} (${stats.uniqueTracks})",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Text(
-                        text = str("listening_stats_disclaimer"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
-                }
-            },
-            text = {
-                val tracks = tracksState
-                if (tracks == null) {
-                    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                        CircularWavyProgressIndicator()
-                    }
-                } else if (tracks.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        Text(str("listening_stats_empty_title"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.widthIn(min = 340.dp, max = 560.dp).heightIn(max = 450.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        itemsIndexed(tracks) { index, track ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
-                                    activeDetailDialog = StatsDetailDialog.NONE
-                                    if ((track.source ?: "soundcloud") == "soundcloud") {
-                                        onTrackClick(track)
-                                    }
-                                }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        text = "#${index + 1}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        modifier = Modifier.width(28.dp),
-                                        textAlign = TextAlign.Center
-                                    )
-                                    AsyncImage(
-                                        model = track.artworkUrl,
-                                        contentDescription = track.trackTitle,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp))
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = track.trackTitle,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = track.artistName,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Surface(
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                            shape = RoundedCornerShape(6.dp)
-                                        ) {
-                                            Text(
-                                                text = str("listening_stats_play_count", track.playCount),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = formatDurationMs(track.totalListenMs),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { activeDetailDialog = StatsDetailDialog.NONE }) {
-                    Text(str("btn_close"))
-                }
-            }
-        )
-    }
-
-    if (activeDetailDialog == StatsDetailDialog.ARTISTS) {
-        val artistsState by produceState<List<TopArtistResult>?>(initialValue = null, selectedPeriod) {
-            value = viewModel.getAllArtistsForPeriod()
-        }
-        EscapableAlertDialog(
-            onDismissRequest = { activeDetailDialog = StatsDetailDialog.NONE },
-            title = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(Icons.Rounded.People, null, tint = MaterialTheme.colorScheme.primary)
-                        Text(
-                            text = "${str("listening_stats_all_artists")} (${stats.uniqueArtists})",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Text(
-                        text = str("listening_stats_disclaimer"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                    )
-                }
-            },
-            text = {
-                val artists = artistsState
-                if (artists == null) {
-                    Box(Modifier.fillMaxWidth().height(180.dp), contentAlignment = Alignment.Center) {
-                        CircularWavyProgressIndicator()
-                    }
-                } else if (artists.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        Text(str("listening_stats_empty_title"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.widthIn(min = 340.dp, max = 560.dp).heightIn(max = 450.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        itemsIndexed(artists) { index, artist ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
-                                    activeDetailDialog = StatsDetailDialog.NONE
-                                    onArtistClick(artist)
-                                }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Text(
-                                        text = "#${index + 1}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                        modifier = Modifier.width(28.dp),
-                                        textAlign = TextAlign.Center
-                                    )
-                                    AsyncImage(
-                                        model = artist.artworkUrl,
-                                        contentDescription = artist.artistName,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.size(44.dp).clip(CircleShape)
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = artist.artistName,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Surface(
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                            shape = RoundedCornerShape(6.dp)
-                                        ) {
-                                            Text(
-                                                text = str("listening_stats_play_count", artist.playCount),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        Text(
-                                            text = formatDurationMs(artist.totalListenMs),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { activeDetailDialog = StatsDetailDialog.NONE }) {
-                    Text(str("btn_close"))
-                }
-            }
-        )
-    }
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            str("listening_stats_title"),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = str("listening_stats_subtitle"),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showSettingsDialog = true }, ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = str("pref_privacy_title"),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-                )
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 180.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            // Period Selector
-            item {
-                PeriodSelector(
-                    selectedPeriod = selectedPeriod,
-                    onPeriodSelected = { viewModel.selectPeriod(it) }
-                )
-            }
-
-            // "All time" used to be a different screen rather than a longer one: it showed the month-by-month
-            // timeline and *nothing else* — no total, no play count, no top lists, no habits. So the period
-            // with the most to say showed the least, and a week of listening looked bigger than the whole
-            // history. It now shows everything the other periods show, with the timeline added underneath
-            // rather than in place of it (issue #33).
-            if (isLoading) {
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularWavyProgressIndicator()
-                    }
-                }
-            } else if (stats.totalEvents == 0) {
-                // Empty state
-                item {
-                    EmptyStatsCard()
-                }
-            } else {
-                
-                // Hero Stats Card
-                item {
-                    HeroStatsCard(
-                        totalListenTimeMs = stats.totalListenTimeMs,
-                        totalPlays = stats.totalPlays,
-                        uniqueTracks = stats.uniqueTracks,
-                        uniqueArtists = stats.uniqueArtists,
-                        onPlaysClick = { activeDetailDialog = StatsDetailDialog.PLAYS },
-                        onTracksClick = { activeDetailDialog = StatsDetailDialog.TRACKS },
-                        onArtistsClick = { activeDetailDialog = StatsDetailDialog.ARTISTS },
-                    )
-                }
-
-                // Top Tracks
-                if (stats.topTracks.isNotEmpty()) {
-                    item {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            SectionTitle(str("listening_stats_top_tracks"))
-                            // Arrows and the wheel: there is nothing to swipe with on a desktop, so the
-                            // cards past the window edge were simply unreachable (issue #33).
-                            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(stats.topTracks) { track ->
-                                    TopTrackCard(track, onClick = { if ((track.source ?: "soundcloud") == "soundcloud") onTrackClick(track) })
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Top Artists
-                if (stats.topArtists.isNotEmpty()) {
-                    item {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            SectionTitle(str("listening_stats_top_artists"))
-                            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(stats.topArtists) { artist ->
-                                    TopArtistCard(artist, onClick = { onArtistClick(artist) })
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Listening Habits Section
-                item {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        SectionTitle(str("listening_stats_habits"))
-                        HabitsGrid(stats)
-                    }
-                }
-
-                // Fun Facts Section
-                if (stats.totalPlays > 0) {
-                    item {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            SectionTitle(str("listening_stats_insights"))
-                            InsightsSection(stats)
-                        }
-                    }
-                }
-
-                // The timeline, only where it means something: a month-by-month breakdown of "this week" is
-                // one row. Appended, so the totals above are what the tab opens on.
-                if (selectedPeriod == StatsPeriod.ALL_TIME) {
-                    item {
-                        SectionTitle(str("listening_stats_timeline"))
-                    }
-
-                    items(viewModel.timelineChunks) { chunk ->
-                        TimelineChunkCard(
-                            chunk = chunk,
-                            onTrackClick = onTrackClick,
-                            onArtistClick = onArtistClick
-                        )
-                    }
-
-                    if (viewModel.isTimelineLoading) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularWavyProgressIndicator()
-                            }
-                        }
-                    } else if (viewModel.timelineHasMore) {
-                        item {
-                            LaunchedEffect(Unit) {
-                                viewModel.loadNextTimelineChunk()
-                            }
-                        }
-                    }
-                }
+                !shownReport.hasData -> EmptyStats()
+                shownStyle == StatsStyle.OVERVIEW -> OverviewStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick)
+                shownStyle == StatsStyle.COMPACT -> CompactStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick)
+                else -> StoryStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick)
             }
         }
     }
 }
 
-// ─── Period Selector ─────────────────────────────────────────────
-
-/**
- * The period switch, as the expressive connected group the rest of the app uses (issue #33).
- *
- * `SingleChoiceSegmentedButtonRow` is the older Material 3 control and looked like it came from a
- * different app than the lyrics and effects panels, which already use the connected group.
- */
 @Composable
-private fun PeriodSelector(
-    selectedPeriod: StatsPeriod,
-    onPeriodSelected: (StatsPeriod) -> Unit
+private fun StatsHeader(
+    report: ListeningReport?,
+    period: ReportPeriod,
+    style: StatsStyle,
+    onSelect: (ReportPeriod) -> Unit,
+    onStyle: (StatsStyle) -> Unit,
+    onPrivacy: () -> Unit,
 ) {
-    com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
-        options = StatsPeriod.entries,
-        selectedOption = selectedPeriod,
-        onOptionSelected = onPeriodSelected,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        iconProvider = { period ->
-            val icon = when (period) {
-                StatsPeriod.WEEK -> Icons.Rounded.CalendarViewWeek
-                StatsPeriod.MONTH -> Icons.Rounded.CalendarMonth
-                StatsPeriod.ALL_TIME -> Icons.Rounded.AllInclusive
-            }
-            Icon(icon, null, modifier = Modifier.size(16.dp))
-        },
-        labelProvider = { period ->
-            val label = when (period) {
-                StatsPeriod.WEEK -> str("listening_stats_period_week")
-                StatsPeriod.MONTH -> str("listening_stats_period_month")
-                StatsPeriod.ALL_TIME -> str("listening_stats_period_all")
-            }
-            Text(
-                label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                softWrap = false,
-            )
-        },
-    )
-}
-
-// ─── Empty State ──────────────────────────────────────────────────
-
-@Composable
-private fun EmptyStatsCard() {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-        ),
-        shape = RoundedCornerShape(28.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Icon(
-                Icons.Rounded.Headphones,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(56.dp)
-            )
-            Text(
-                str("listening_stats_empty_title"),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                str("listening_stats_empty_desc"),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-// ─── Hero Stats Card ──────────────────────────────────────────────
-
-@Composable
-private fun HeroStatsCard(
-    totalListenTimeMs: Long,
-    totalPlays: Int,
-    uniqueTracks: Int,
-    uniqueArtists: Int,
-    onPlaysClick: () -> Unit = {},
-    onTracksClick: () -> Unit = {},
-    onArtistsClick: () -> Unit = {},
-) {
-    val targetSeconds = (totalListenTimeMs / 1000f)
-    val animatedSeconds by animateFloatAsState(
-        targetValue = targetSeconds,
-        animationSpec = tween(1500),
-        label = "seconds"
-    )
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-        ),
-        shape = RoundedCornerShape(32.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            Column {
+    var styleMenu by remember { mutableStateOf(false) }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val isNarrow = maxWidth < 560.dp
+    Column(Modifier.fillMaxWidth().padding(start = if (isNarrow) 16.dp else 24.dp, end = if (isNarrow) 8.dp else 16.dp, top = 12.dp, bottom = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
                 Text(
-                    text = str("listening_stats_time_listened").uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    text = formatDurationMs((animatedSeconds * 1000).toLong()),
-                    style = MaterialTheme.typography.displayMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-2).sp
-                    ),
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                MiniStatChip(
-                    icon = Icons.Rounded.MusicNote,
-                    value = totalPlays.toString(),
-                    label = str("listening_stats_plays"),
-                    modifier = Modifier.weight(1f),
-                    onClick = onPlaysClick
-                )
-                MiniStatChip(
-                    icon = Icons.Rounded.BarChart,
-                    value = uniqueTracks.toString(),
-                    label = str("listening_stats_unique_tracks"),
-                    modifier = Modifier.weight(1f),
-                    onClick = onTracksClick
-                )
-                MiniStatChip(
-                    icon = Icons.Rounded.People,
-                    value = uniqueArtists.toString(),
-                    label = str("listening_stats_unique_artists"),
-                    modifier = Modifier.weight(1f),
-                    onClick = onArtistsClick
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun MiniStatChip(
-    icon: ImageVector,
-    value: String,
-    label: String,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit = {}
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f),
-        shape = RoundedCornerShape(20.dp),
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
-            .pointerHoverIcon(androidx.compose.ui.input.pointer.PointerIcon(java.awt.Cursor(java.awt.Cursor.HAND_CURSOR)))
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                icon, null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(20.dp)
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-// ─── Top Track Card ───────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TopTrackCard(track: TopTrackResult, onClick: () -> Unit = {}) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier
-            .width(170.dp)
-            .height(230.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            AsyncImage(
-                model = track.artworkUrl,
-                contentDescription = track.trackTitle,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(110.dp)
-                    .clip(RoundedCornerShape(16.dp))
-            )
-
-            Column(modifier = Modifier.padding(top = 8.dp)) {
-                Text(
-                    text = track.trackTitle,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = track.artistName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = str("listening_stats_play_count", track.playCount),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-                Text(
-                    text = formatDurationMs(track.totalListenMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-// ─── Top Artist Card ──────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TopArtistCard(artist: TopArtistResult, onClick: () -> Unit = {}) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier
-            .width(140.dp)
-            .height(180.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            AsyncImage(
-                model = artist.artworkUrl,
-                contentDescription = artist.artistName,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-            )
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = artist.artistName,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = formatDurationMs(artist.totalListenMs),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-    }
-}
-
-// ─── Listening Habits Grid ────────────────────────────────────────
-
-@Composable
-private fun HabitsGrid(stats: PeriodStats) {
-    Column(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            HabitCard(
-                icon = Icons.Rounded.Replay,
-                title = str("listening_stats_manual_replays"),
-                value = stats.manualReplays.toString(),
-                subtitle = str("listening_stats_manual_replays_desc"),
-                modifier = Modifier.weight(1f)
-            )
-            HabitCard(
-                icon = Icons.Rounded.SkipNext,
-                title = str("listening_stats_skip_rate"),
-                value = String.format(Locale.US, "%.0f%%", stats.skipRate * 100),
-                subtitle = str("listening_stats_skip_rate_desc", stats.totalSkips),
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            HabitCard(
-                icon = Icons.Rounded.CheckCircle,
-                title = str("listening_stats_completion_rate"),
-                value = String.format(Locale.US, "%.0f%%", stats.completionRate * 100),
-                subtitle = str("listening_stats_completion_rate_desc"),
-                modifier = Modifier.weight(1f)
-            )
-            HabitCard(
-                icon = Icons.Rounded.RepeatOne,
-                title = str("listening_stats_repeat_loops"),
-                value = stats.repeatOneLoops.toString(),
-                subtitle = str("listening_stats_repeat_loops_desc"),
-                modifier = Modifier.weight(1f)
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            HabitCard(
-                icon = Icons.Rounded.Timer,
-                title = str("listening_stats_avg_listen"),
-                value = if (stats.totalEvents > 0) formatDurationMs(stats.totalListenTimeMs / stats.totalEvents) else str("listening_stats_duration_zero"),
-                subtitle = str("listening_stats_avg_listen_desc"),
-                modifier = Modifier.weight(1f)
-            )
-            HabitCard(
-                icon = Icons.Rounded.TrendingUp,
-                title = str("listening_stats_total_sessions"),
-                value = stats.totalEvents.toString(),
-                subtitle = str("listening_stats_total_sessions_desc"),
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun HabitCard(
-    icon: ImageVector,
-    title: String,
-    value: String,
-    subtitle: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        shape = RoundedCornerShape(20.dp),
-        modifier = modifier.height(150.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        icon, null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-            Column {
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.labelMedium,
+                    str("listening_stats_title"),
+                    style = if (isNarrow) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    maxLines = 2,
                 )
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    report?.let { spanLabel(period, it) } ?: " ",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 14.sp
                 )
             }
+            Box {
+                if (isNarrow) {
+                    FilledTonalIconButton(onClick = { styleMenu = true }) {
+                        Icon(style.icon, contentDescription = str(style.labelKey), modifier = Modifier.size(20.dp))
+                    }
+                } else {
+                    FilledTonalButton(onClick = { styleMenu = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                        Icon(style.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str(style.labelKey))
+                    }
+                }
+                DropdownMenu(
+                    expanded = styleMenu,
+                    onDismissRequest = { styleMenu = false },
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                ) {
+                    StatsStyle.entries.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(str(option.labelKey)) },
+                            leadingIcon = { Icon(option.icon, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                            trailingIcon = {
+                                if (option == style) Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            },
+                            onClick = {
+                                styleMenu = false
+                                onStyle(option)
+                            },
+                        )
+                    }
+                }
+            }
+            IconButton(onClick = onPrivacy) {
+                Icon(Icons.Rounded.Tune, contentDescription = str("pref_privacy_title"))
+            }
         }
+        Spacer(Modifier.height(12.dp))
+        com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+            options = ReportPeriod.entries,
+            selectedOption = period,
+            onOptionSelected = onSelect,
+            modifier = Modifier.widthIn(max = 560.dp),
+            fillMaxWidth = true,
+            contentPadding = if (isNarrow) PaddingValues(horizontal = 6.dp) else null,
+            labelProvider = { value ->
+                Text(
+                    str(
+                        when (value) {
+                            ReportPeriod.WEEK -> "listening_stats_period_week_short"
+                            ReportPeriod.MONTH -> "listening_stats_period_month_short"
+                            ReportPeriod.YEAR -> "listening_stats_period_year_short"
+                            ReportPeriod.ALL_TIME -> "listening_stats_period_all"
+                        }
+                    ),
+                    style = if (isNarrow) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            },
+        )
+    }
     }
 }
 
-// ─── Insights Section ─────────────────────────────────────────────
-
 @Composable
-private fun InsightsSection(stats: PeriodStats) {
-    val cs = MaterialTheme.colorScheme
+private fun EmptyStats() {
     Column(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        if (stats.topTracks.isNotEmpty()) {
-            val topTrack = stats.topTracks.first()
-            InsightCard(
-                icon = Icons.Rounded.Whatshot,
-                tint = cs.primary,
-                text = str("listening_stats_insight_top_track",
-                    topTrack.trackTitle,
-                    topTrack.playCount
-                )
-            )
-        }
-
-        if (stats.manualReplays > 0) {
-            InsightCard(
-                icon = Icons.Rounded.Replay,
-                tint = cs.secondary,
-                text = str("listening_stats_insight_replays",
-                    stats.manualReplays
-                )
-            )
-        }
-
-        if (stats.totalSkips > 5) {
-            InsightCard(
-                icon = Icons.Rounded.SkipNext,
-                tint = cs.error,
-                text = str("listening_stats_insight_skips", String.format(Locale.US, "%.0f", stats.skipRate * 100)
-                )
-            )
-        }
-
-        if (stats.repeatOneLoops > 0) {
-            InsightCard(
-                icon = Icons.Rounded.RepeatOne,
-                tint = cs.tertiary,
-                text = str("listening_stats_insight_repeat",
-                    stats.repeatOneLoops
-                )
-            )
-        }
-
-        if (stats.uniqueArtists > 5) {
-            InsightCard(
-                icon = Icons.Rounded.Palette,
-                tint = cs.primary,
-                text = str("listening_stats_insight_variety",
-                    stats.uniqueArtists
-                )
-            )
-        }
-    }
-}
-
-@Composable
-private fun InsightCard(
-    icon: ImageVector,
-    tint: Color = MaterialTheme.colorScheme.primary,
-    text: String
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(tint.copy(alpha = 0.14f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = tint,
-                    modifier = Modifier.size(20.dp)
-                )
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(88.dp)) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Headphones, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(44.dp))
             }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
         }
+        Spacer(Modifier.height(20.dp))
+        Text(str("listening_stats_empty_title"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+        Text(str("listening_stats_empty_desc"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 
-// ─── Section Title ────────────────────────────────────────────────
-
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, bottom = 12.dp, top = 8.dp)
+private fun PrivacyDialog(onDismiss: () -> Unit) {
+    val prefs = remember { PlayerPreferences() }
+    var isEnabled by remember { mutableStateOf(prefs.getListeningStatsEnabled()) }
+    EscapableAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("pref_privacy_title")) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(str("pref_privacy_subtitle"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                SwitchRow(
+                    title = str("pref_privacy_tracking_title"),
+                    subtitle = str("pref_privacy_tracking_subtitle"),
+                    checked = isEnabled,
+                ) {
+                    isEnabled = !isEnabled
+                    prefs.setListeningStatsEnabled(isEnabled)
+                }
+                Text(str("listening_stats_disclaimer"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
     )
 }
 
-// ─── Formatting Helpers ───────────────────────────────────────────
+// ─── Shared pieces ───────────────────────────────────────────────
 
+/** A cover or avatar, with an icon on the container colour while it loads or when there is none. */
 @Composable
-private fun formatDurationMs(ms: Long): String {
-    if (ms == 0L) return str("listening_stats_duration_zero")
+internal fun StatsCover(url: String?, modifier: Modifier, placeholder: ImageVector = Icons.Rounded.MusicNote) {
+    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
+        Icon(placeholder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
+        if (!url.isNullOrBlank()) {
+            AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.matchParentSize())
+        }
+    }
+}
+
+/** A titled card on the surface-container colour, with an optional "show all" action. */
+@Composable
+internal fun StatsCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    action: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainer, modifier = modifier) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    if (subtitle != null) {
+                        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                if (action != null) {
+                    TextButton(onClick = action) { Text(str("listening_stats_show_all")) }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            content()
+        }
+    }
+}
+
+internal fun statsLocale(): Locale = com.alananasss.kittytune.core.Strings.locale()
+
+/** "1 ч 5 мин", "3 мин 12 с", "40 с". */
+@Composable
+internal fun formatDuration(ms: Long): String {
+    if (ms <= 0L) return "0"
     val totalSeconds = ms / 1000
     val days = totalSeconds / 86400
     val hours = (totalSeconds % 86400) / 3600
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-
     return when {
         days > 0 -> str("listening_stats_duration_days_hrs", days, hours)
         hours > 0 -> str("listening_stats_duration_hr_min", hours, minutes)
@@ -1278,146 +312,64 @@ private fun formatDurationMs(ms: Long): String {
     }
 }
 
-// ─── Timeline Chunk Card ──────────────────────────────────────────
-
+/** Coarser, for axes and headlines: "1 ч 5 мин", "12 мин", "40 с". */
 @Composable
-private fun TimelineChunkCard(
-    chunk: TimelineChunk,
-    onTrackClick: (TopTrackResult) -> Unit,
-    onArtistClick: (TopArtistResult) -> Unit
-) {
-    val calendarStart = Calendar.getInstance().apply { timeInMillis = chunk.startDateMs }
-
-    val monthStr = calendarStart.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.getDefault())
-    val yearStr = calendarStart.get(Calendar.YEAR).toString()
-    val dateLabel = "$monthStr $yearStr"
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer
-        ),
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = dateLabel,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                chunk.topTrack?.let { track ->
-                    TimelineItemRow(
-                        label = str("listening_stats_top_track_label"),
-                        imageUrl = track.artworkUrl,
-                        title = track.trackTitle,
-                        subtitle = track.artistName,
-                        badgeText = str("listening_stats_play_count", track.playCount),
-                        onClick = { if ((track.source ?: "soundcloud") == "soundcloud") onTrackClick(track) },
-                        isCircularImage = false
-                    )
-                }
-                chunk.topArtist?.let { artist ->
-                    TimelineItemRow(
-                        label = str("listening_stats_top_artist_label"),
-                        imageUrl = artist.artworkUrl,
-                        title = artist.artistName,
-                        subtitle = str("listening_stats_play_count", artist.playCount),
-                        badgeText = formatDurationMs(artist.totalListenMs),
-                        onClick = { onArtistClick(artist) },
-                        isCircularImage = true
-                    )
-                }
-            }
-        }
+internal fun formatDurationShort(ms: Long): String {
+    val totalMinutes = ms / 60_000
+    return when {
+        totalMinutes >= 60 -> str("listening_stats_duration_hr_min", totalMinutes / 60, totalMinutes % 60)
+        totalMinutes > 0 -> str("listening_stats_duration_min", totalMinutes)
+        else -> str("listening_stats_duration_sec", ms / 1000)
     }
 }
 
-// ─── Timeline Item Row ────────────────────────────────────────────
+internal fun hourLabel(hour: Int): String = "%02d:00".format(hour)
 
-@OptIn(ExperimentalMaterial3Api::class)
+internal fun weekdayName(day: DayOfWeek): String =
+    day.getDisplayName(TextStyle.FULL_STANDALONE, statsLocale()).replaceFirstChar { it.titlecase(statsLocale()) }
+
+/** "22–28 Sept", "September 2026", "2026", or "March 2024 – today". */
 @Composable
-private fun TimelineItemRow(
-    label: String,
-    imageUrl: String?,
-    title: String,
-    subtitle: String,
-    badgeText: String,
-    onClick: () -> Unit,
-    isCircularImage: Boolean
-) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(
-            containerColor = Color.Transparent
-        ),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(if (isCircularImage) CircleShape else RoundedCornerShape(12.dp))
-            )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(bottom = 2.dp)
-                )
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Surface(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = badgeText,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-        }
+internal fun spanLabel(period: ReportPeriod, report: ListeningReport): String {
+    val zone = ZoneId.systemDefault()
+    val start = Instant.ofEpochMilli(report.window.startMs).atZone(zone).toLocalDate()
+    val end = Instant.ofEpochMilli(report.window.endMs).atZone(zone).toLocalDate().minusDays(1)
+    val loc = statsLocale()
+    return when (period) {
+        ReportPeriod.WEEK -> "${start.dayOfMonth} ${start.month.getDisplayName(TextStyle.SHORT, loc)} – ${end.dayOfMonth} ${end.month.getDisplayName(TextStyle.SHORT, loc)}"
+        ReportPeriod.MONTH -> "${start.month.getDisplayName(TextStyle.FULL_STANDALONE, loc).replaceFirstChar { it.titlecase(loc) }} ${start.year}"
+        ReportPeriod.YEAR -> start.year.toString()
+        ReportPeriod.ALL_TIME -> str("listening_stats_since", "${start.month.getDisplayName(TextStyle.FULL_STANDALONE, loc)} ${start.year}")
     }
 }
+
+internal fun bucketLabel(bucket: ActivityBucket): String {
+    val date = Instant.ofEpochMilli(bucket.startMs).atZone(ZoneId.systemDefault()).toLocalDate()
+    val loc = statsLocale()
+    return if (bucket.isMonth) {
+        "${date.month.getDisplayName(TextStyle.FULL_STANDALONE, loc).replaceFirstChar { it.titlecase(loc) }} ${date.year}"
+    } else {
+        "${date.dayOfWeek.getDisplayName(TextStyle.SHORT, loc)}, ${date.dayOfMonth} ${date.month.getDisplayName(TextStyle.SHORT, loc)}"
+    }
+}
+
+/** Every bar's label on short charts; on long ones only every few, so they never overlap. */
+internal fun axisLabel(bucket: ActivityBucket, index: Int, count: Int): String {
+    val date = Instant.ofEpochMilli(bucket.startMs).atZone(ZoneId.systemDefault()).toLocalDate()
+    val loc = statsLocale()
+    return when {
+        bucket.isMonth -> if (count <= 12 || index % 3 == 0) date.month.getDisplayName(TextStyle.NARROW_STANDALONE, loc) else ""
+        count <= 7 -> date.dayOfWeek.getDisplayName(TextStyle.SHORT_STANDALONE, loc)
+        else -> if (date.dayOfMonth == 1 || date.dayOfMonth % 5 == 0) date.dayOfMonth.toString() else ""
+    }
+}
+
+/** Whether [bucket] is today (or, for month bars, this month). */
+internal fun isCurrent(bucket: ActivityBucket): Boolean {
+    val zone = ZoneId.systemDefault()
+    val date = Instant.ofEpochMilli(bucket.startMs).atZone(zone).toLocalDate()
+    val today = java.time.LocalDate.now(zone)
+    return if (bucket.isMonth) date.year == today.year && date.month == today.month else date == today
+}
+
+internal fun Modifier.roundedClip(radius: Int): Modifier = clip(RoundedCornerShape(radius.dp))

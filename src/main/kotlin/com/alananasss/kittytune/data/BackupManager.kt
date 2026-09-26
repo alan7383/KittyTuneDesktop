@@ -135,6 +135,6 @@ object BackupManager {
 
     fun getBackupFileName(): String {
         val date = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(Date())
-        return "SoundTune_Backup_$date.backup"
+        return "KittyTune_Backup_$date.backup"
     }
 }

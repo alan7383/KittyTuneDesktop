@@ -5,6 +5,7 @@ import com.alananasss.kittytune.core.StatusNotifierItemInterface
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder
 import org.freedesktop.dbus.types.UInt32
 import org.freedesktop.dbus.types.Variant
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -16,6 +17,8 @@ class LinuxStatusNotifierLiveTest {
 
     @Test
     fun testLiveSNIContextMenuAndActivateFlow() {
+        // Talks to a real session bus, which only a Linux desktop has.
+        assumeTrue(System.getProperty("os.name").lowercase().contains("linux"))
         val windowShownLatch = CountDownLatch(1)
         val miniPlayerToggledLatch = CountDownLatch(1)
         val contextMenuTriggeredLatch = CountDownLatch(1)

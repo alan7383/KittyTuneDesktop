@@ -187,7 +187,15 @@ class Player {
     var playWhenReady: Boolean = false
         set(value) {
             field = value
-            if (value) activeEngine.play() else activeEngine.pause()
+            // The outgoing track of a crossfade too: left alone it went on fading out after a pause, which
+            // sounded like the pause had not worked, and the next press — meant as a second pause — resumed.
+            if (value) {
+                activeEngine.play()
+                fadingEngine?.play()
+            } else {
+                activeEngine.pause()
+                fadingEngine?.pause()
+            }
         }
 
     var repeatMode: Int = REPEAT_MODE_OFF
@@ -197,11 +205,15 @@ class Player {
     val duration: Long get() = activeEngine.durationMs
     val isLoading: Boolean get() = activeEngine.state == AudioEngine.State.BUFFERING
 
+    /** The slider's position, 0..1. Engines are given [volumeAmplitude], never this directly. */
     var volume: Float = 1f
         set(value) {
             field = value
-            activeEngine.setVolume(value)
+            activeEngine.setVolume(volumeAmplitude)
         }
+
+    private val volumeAmplitude: Float
+        get() = com.alananasss.kittytune.audio.VolumeCurve.sliderToAmplitude(volume)
 
     /**
      * The current track's own trim, in dB. Re-applied whenever playback moves to an engine, since
@@ -409,7 +421,7 @@ class Player {
                     newEngine.prepare()
                 }
 
-                val targetVolume = volume
+                val targetVolume = volumeAmplitude
                 newEngine.setVolume(0f)
                 newEngine.setTrackGainDb(trackGainDb)
 
@@ -457,6 +469,11 @@ class Player {
                         while (!newEngine.isPlaying && isActive && newEngine.state == AudioEngine.State.BUFFERING) {
                             delay(100)
                         }
+                        // Paused mid-fade: hold the fade where it is, so it resumes rather than having finished
+                        // in silence.
+                        while (!playWhenReady && isActive) {
+                            delay(50)
+                        }
 
                         if (oldEngine.state == AudioEngine.State.ENDED || oldEngine.state == AudioEngine.State.IDLE) {
                             newEngine.setVolume(targetVolume)
@@ -481,7 +498,7 @@ class Player {
             } finally {
                 try {
                     if (fadingEngine == oldEngine) {
-                        newEngine.setVolume(volume)
+                        newEngine.setVolume(volumeAmplitude)
                         oldEngine.setVolume(0f)
                         oldEngine.stop()
                         oldEngine.release()
@@ -600,7 +617,7 @@ class Player {
             fadingEngine?.release()
             fadingEngine = null
             
-            activeEngine.setVolume(volume)
+            activeEngine.setVolume(volumeAmplitude)
             activeEngine.setTrackGainDb(trackGainDb)
             activeEngine.setMediaItem(url, headers, startPositionMs)
             activeEngine.prepare()

@@ -33,7 +33,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.alananasss.kittytune.data.local.AppThemeMode
 import com.alananasss.kittytune.data.local.PlayerPreferences
-import com.alananasss.kittytune.ui.common.ScrollableColumn
 import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.theme.MaterialKolorColorSpecOptions
@@ -129,6 +128,24 @@ private val groupedKeyColorOptions = listOf(
 
 @Composable
 fun ColorPaletteScreen(onBackClick: () -> Unit) {
+    SettingsScaffold(
+        title = str("color_palette_screen_title"),
+        onBackClick = onBackClick
+    ) { innerPadding ->
+        Column(Modifier.fillMaxSize().padding(innerPadding).verticalScroll(rememberScrollState())) {
+            ColorPaletteContent()
+            Spacer(Modifier.height(80.dp))
+        }
+    }
+}
+
+/**
+ * Building one's own theme: the accent source, a key colour (from the palette or picked freely), and how the
+ * scheme is generated from it. The phone-shaped preview that used to sit beside this is gone — the whole app
+ * recolours as you pick, which previews it better than a drawing of a phone did.
+ */
+@Composable
+fun ColorPaletteContent() {
     val prefs = remember { PlayerPreferences() }
     val haptic = LocalHapticFeedback.current
 
@@ -141,81 +158,62 @@ fun ColorPaletteScreen(onBackClick: () -> Unit) {
 
     val isDark = ((themeMode == AppThemeMode.DARK) || (themeMode == AppThemeMode.SYSTEM && isSystemInDarkTheme()))
 
-    SettingsScaffold(
-        title = str("color_palette_screen_title"),
-        onBackClick = onBackClick
-    ) { innerPadding ->
-        ScrollableColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 840.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                SystemAccentCard(
-                    colorStyle = colorStyle,
-                    onStyleSelected = {
-                        colorStyle = it
-                        prefs.setColorStyle(it)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SystemAccentCard(
+            colorStyle = colorStyle,
+            onStyleSelected = {
+                colorStyle = it
+                prefs.setColorStyle(it)
+            },
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
 
-                SeedPaletteCard(
-                    selectedKeyColor = currentKeyColor,
-                    isDark = isDark,
-                    pureBlack = pureBlack,
-                    dynamicColor = dynamicTheme,
-                    colorStyle = colorStyle,
-                    colorSpec = colorSpec,
-                    modifier = Modifier.fillMaxWidth()
-                ) { seed ->
-                    haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
-                    currentKeyColor = seed
-                    prefs.setKeyColor(seed)
-                }
-
-                CustomSeedPickerCard(
-                    selectedKeyColor = currentKeyColor,
-                    isDark = isDark,
-                    pureBlack = pureBlack,
-                    dynamicColor = dynamicTheme,
-                    colorStyle = colorStyle,
-                    colorSpec = colorSpec,
-                    modifier = Modifier.fillMaxWidth(),
-                    onSeedChangedRealtime = { seed ->
-                        currentKeyColor = seed
-                        com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor = seed
-                    },
-                ) { seed ->
-                    currentKeyColor = seed
-                    com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor = null
-                    prefs.setKeyColor(seed)
-                }
-
-                ColorGenerationCard(
-                    colorStyle = colorStyle,
-                    colorSpec = colorSpec,
-                    modifier = Modifier.fillMaxWidth(),
-                    onStyleSelected = {
-                        colorStyle = it
-                        prefs.setColorStyle(it)
-                    },
-                    onSpecSelected = {
-                        colorSpec = it
-                        prefs.setColorSpec(it)
-                    }
-                )
-
-                Spacer(Modifier.height(80.dp))
-            }
+        SeedPaletteCard(
+            selectedKeyColor = currentKeyColor,
+            isDark = isDark,
+            pureBlack = pureBlack,
+            dynamicColor = dynamicTheme,
+            colorStyle = colorStyle,
+            colorSpec = colorSpec,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) { seed ->
+            haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
+            currentKeyColor = seed
+            prefs.setKeyColor(seed)
         }
+
+        CustomSeedPickerCard(
+            selectedKeyColor = currentKeyColor,
+            isDark = isDark,
+            pureBlack = pureBlack,
+            dynamicColor = dynamicTheme,
+            colorStyle = colorStyle,
+            colorSpec = colorSpec,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            onSeedChangedRealtime = { seed ->
+                currentKeyColor = seed
+                com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor = seed
+            },
+        ) { seed ->
+            currentKeyColor = seed
+            com.alananasss.kittytune.ui.theme.ThemeState.previewKeyColor = null
+            prefs.setKeyColor(seed)
+        }
+
+        ColorGenerationCard(
+            colorStyle = colorStyle,
+            colorSpec = colorSpec,
+            modifier = Modifier.padding(horizontal = 16.dp),
+            onStyleSelected = {
+                colorStyle = it
+                prefs.setColorStyle(it)
+            },
+            onSpecSelected = {
+                colorSpec = it
+                prefs.setColorSpec(it)
+            }
+        )
+
     }
 }
 
@@ -639,7 +637,6 @@ fun SettingsDropdownRow(
         }
     }
 }
-
 
 @Composable
 private fun ColorButtonMaterial(

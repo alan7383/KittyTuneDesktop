@@ -1014,29 +1014,29 @@ object DownloadManager {
     }
 
     /** Remux a plain HLS stream to a local m4a container with FFmpeg (stream copy, no re-encode). */
-    private fun remuxHls(m3u8Url: String, outFile: File, onProgress: (Int) -> Unit) {
-        val grabber = org.bytedeco.javacv.FFmpegFrameGrabber(m3u8Url)
-        grabber.start()
-        val recorder = org.bytedeco.javacv.FFmpegFrameRecorder(outFile.absolutePath, grabber.audioChannels).apply {
-            format = "mp4"
-            sampleRate = grabber.sampleRate
-            audioChannels = grabber.audioChannels
-            audioCodec = org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_AAC
-            start()
+    internal fun remuxHls(m3u8Url: String, outFile: File, onProgress: (Int) -> Unit) {
+        // `use` on both: their contexts are native, and an exception mid-copy must not strand them.
+        org.bytedeco.javacv.FFmpegFrameGrabber(m3u8Url).use { grabber ->
+            grabber.start()
+            org.bytedeco.javacv.FFmpegFrameRecorder(outFile.absolutePath, grabber.audioChannels).use { recorder ->
+                recorder.format = "mp4"
+                recorder.sampleRate = grabber.sampleRate
+                recorder.audioChannels = grabber.audioChannels
+                recorder.audioCodec = org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_AAC
+                recorder.start()
+                val total = grabber.lengthInTime.coerceAtLeast(1)
+                var frame = grabber.grabSamples()
+                while (frame != null) {
+                    recorder.recordSamples(frame.sampleRate, frame.audioChannels, *frame.samples)
+                    onProgress(((grabber.timestamp * 100) / total).toInt().coerceIn(0, 100))
+                    frame = grabber.grabSamples()
+                }
+            }
         }
-        val total = grabber.lengthInTime.coerceAtLeast(1)
-        var frame = grabber.grabSamples()
-        while (frame != null) {
-            recorder.recordSamples(frame.sampleRate, frame.audioChannels, *frame.samples)
-            onProgress(((grabber.timestamp * 100) / total).toInt().coerceIn(0, 100))
-            frame = grabber.grabSamples()
-        }
-        recorder.stop(); recorder.release()
-        grabber.stop(); grabber.release()
         onProgress(100)
     }
 
-    private suspend fun downloadFileToStream(url: String, outputStream: OutputStream, onProgress: (Int) -> Unit) {
+    internal suspend fun downloadFileToStream(url: String, outputStream: OutputStream, onProgress: (Int) -> Unit) {
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", com.alananasss.kittytune.utils.Config.USER_AGENT)

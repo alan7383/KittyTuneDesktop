@@ -154,7 +154,8 @@ object ProxyManager {
             Logger.i(TAG, "Proxy disabled / reverted to direct connection.")
         }
 
-        // Reset RetrofitClient singleton to recreate with new proxy settings
+        // Reset the shared clients so the next request picks up the new proxy settings.
+        sharedClient = null
         RetrofitClient.resetClient()
     }
 
@@ -167,13 +168,29 @@ object ProxyManager {
         return builder
     }
 
+    /**
+     * The app's shared client, honouring the active proxy.
+     *
+     * Built once per proxy configuration, not once per call. Callers read this through getters on
+     * every request, and each fresh client brought its own connection pool (keeping sockets and TLS
+     * buffers alive for five minutes) and its own dispatcher threads; playback telemetry alone made
+     * a dozen of them per few tracks. Callers that need other timeouts should `newBuilder()` from
+     * this, which shares the pool and threads.
+     */
     fun getOkHttpClient(): OkHttpClient {
-        val builder = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-        return configureOkHttpClient(builder).build()
+        sharedClient?.let { return it }
+        return synchronized(this) {
+            sharedClient ?: configureOkHttpClient(
+                OkHttpClient.Builder()
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(15, TimeUnit.SECONDS)
+                    .writeTimeout(15, TimeUnit.SECONDS)
+            ).build().also { sharedClient = it }
+        }
     }
+
+    @Volatile
+    private var sharedClient: OkHttpClient? = null
 
     suspend fun testProxyConnection(config: ProxyConfig): ProxyTestResult = withContext(Dispatchers.IO) {
         if (!config.isValid()) {

@@ -29,14 +29,14 @@ import javax.imageio.ImageIO
 class UploadRepository {
 
     private val api = RetrofitClient.create()
+    // Derived from the shared client so uploads reuse its connection pool and threads.
     private val s3HttpClient: OkHttpClient
-        get() = com.alananasss.kittytune.data.network.ProxyManager.configureOkHttpClient(
-            OkHttpClient.Builder()
+        get() = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.MINUTES)
                 .writeTimeout(10, TimeUnit.MINUTES)
                 .retryOnConnectionFailure(true)
-        ).build()
+                .build()
 
     suspend fun checkEligibility(): Result<UploadEligibilityResponse> =
         withContext(Dispatchers.IO) {

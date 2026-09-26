@@ -54,6 +54,7 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.lyrics.FollowActiveLine
+import com.alananasss.kittytune.ui.player.lyrics.rememberFocusLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricSinger
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineStyling
@@ -152,7 +153,10 @@ private fun PanelSyncedLyrics(
     modifier: Modifier,
     style: PanelLyricsStyle,
 ) {
-    val listState = rememberLazyListState()
+    // Starts on the line being sung, so the first frame is not the top of the song (issue #33, round 5).
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lines, vm.currentPosition + vm.lyricsOffset).coerceAtLeast(0)
+    )
     // Derived rather than read straight from the position, so the lines recompose when the line
     // changes and not on every progress tick.
     val activeIndex by remember {
@@ -189,7 +193,8 @@ private fun PanelSyncedLyrics(
         val anchorPx =
             (viewportPx * (effectiveStyle.anchorFraction - effectiveStyle.topInsetFraction).coerceAtLeast(0f)).toInt()
 
-        FollowActiveLine(listState, activeIndex, anchorPx)
+        val readingByHand = FollowActiveLine(listState, activeIndex, anchorPx)
+        val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
 
         // Interpolated between the player's four-per-second reports, so the word fill in the panel is as
         // smooth as it is on the full screen instead of stepping (issue #33).
@@ -218,7 +223,8 @@ private fun PanelSyncedLyrics(
                     // Negative for lines already sung. Before the first line starts there is no current
                     // line, and treating every line as "far away" would shrink the whole panel — so the
                     // distance is zero for all of them until the song reaches the words.
-                    distance = if (activeIndex < 0) 0 else index - activeIndex,
+                    distance = if (focusIndex < 0) 0 else index - focusIndex,
+                    isSung = index == activeIndex,
                     positionMs = smoothPosition,
                     // Shared with the full screen, which had its own copy of this and got it
                     // differently wrong — see [LyricsUtils.seekTargetFor] for what the clamp does
@@ -251,11 +257,12 @@ private fun PanelLyricLine(
     line: LyricLine,
     style: PanelLyricsStyle,
     distance: Int,
+    isSung: Boolean,
     positionMs: Float,
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val isActive = distance == 0
+    val isActive = isSung
     val displayStyle = if (style.isFullScreen) vm.lyricsFullScreenDisplayStyle else vm.lyricsDisplayStyle
 
     val treatment = LyricLineStyling.treatmentFor(

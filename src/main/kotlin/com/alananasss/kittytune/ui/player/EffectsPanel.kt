@@ -53,6 +53,7 @@ import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.Slider
+import com.alananasss.kittytune.ui.common.Tip
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -68,6 +69,13 @@ data class AudioFxDefinition(
     val activeColor: @Composable () -> Color = { MaterialTheme.colorScheme.primary },
     val activeContentColor: @Composable () -> Color = { MaterialTheme.colorScheme.onPrimary }
 )
+
+/** What the effect does on hover, and how to reach its settings when it has any. */
+@Composable
+private fun AudioFxDefinition.tooltip(): String {
+    val description = str("effect_tip_$id")
+    return if (onOpenDialog != null) "$description\n${str("effect_tip_adjust")}" else description
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -754,7 +762,8 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                                         onLongClick = fx.onOpenDialog,
                                         modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
                                         activeColor = fx.activeColor(),
-                                        activeContentColor = fx.activeContentColor()
+                                        activeContentColor = fx.activeContentColor(),
+                                        tooltip = fx.tooltip(),
                                     )
                                 }
                             }
@@ -1000,7 +1009,8 @@ fun FxTile(
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     activeColor: Color = MaterialTheme.colorScheme.primary,
-    activeContentColor: Color = MaterialTheme.colorScheme.onPrimary
+    activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    tooltip: String = "",
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -1042,47 +1052,53 @@ fun FxTile(
         }
     }
 
-    FilledTonalButton(
-        onClick = {
-            if (!longPressConsumed) onClick()
-            longPressConsumed = false
-        },
-        modifier = modifier
-            .height(84.dp)
-            .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
-                onLongClick?.invoke()
-            },
-        shapes = ButtonDefaults.shapes(),
-        interactionSource = interactionSource,
-        colors = ButtonDefaults.filledTonalButtonColors(
-            containerColor = containerColor,
-            contentColor = contentColor
-        ),
-        contentPadding = PaddingValues(0.dp)
-    ) {
-        Column(
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
+    // The weight or width lands on this box: the tooltip's own wrapper sits between it and the button.
+    Box(modifier) {
+        Tip(tooltip) {
+            FilledTonalButton(
+                onClick = {
+                    if (!longPressConsumed) onClick()
+                    longPressConsumed = false
+                },
                 modifier = Modifier
-                    .size(28.dp)
-                    .graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
-                    }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+                    .fillMaxWidth()
+                    .height(84.dp)
+                    .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
+                        onLongClick?.invoke()
+                    },
+                shapes = ButtonDefaults.shapes(),
+                interactionSource = interactionSource,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = containerColor,
+                    contentColor = contentColor
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
+                            }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
         }
     }
 }
@@ -1543,61 +1559,65 @@ fun AvailableTile(
         label = "availContentColor"
     )
 
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(22.dp),
-        color = containerColor,
-        contentColor = contentColor,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isPinned) 0.2f else 0.4f)),
-        modifier = modifier.height(72.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+    Box(modifier) {
+        Tip(str("effect_tip_${fx.id}")) {
+            Surface(
+                onClick = onClick,
+                shape = RoundedCornerShape(22.dp),
+                color = containerColor,
+                contentColor = contentColor,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isPinned) 0.2f else 0.4f)),
+                modifier = Modifier.fillMaxWidth().height(72.dp)
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = if (isPinned) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.size(36.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = fx.icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = if (isPinned) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isPinned) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = fx.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = if (isPinned) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            text = str(fx.titleKey),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = str(fx.titleKey),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
 
-            Surface(
-                shape = CircleShape,
-                color = if (isPinned) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
-                contentColor = if (isPinned) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(24.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = if (isPinned) Icons.Rounded.Check else Icons.Rounded.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isPinned) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary,
+                        contentColor = if (isPinned) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = if (isPinned) Icons.Rounded.Check else Icons.Rounded.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

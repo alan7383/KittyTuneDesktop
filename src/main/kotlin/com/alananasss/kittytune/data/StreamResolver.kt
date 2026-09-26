@@ -236,6 +236,12 @@ object StreamResolver {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+            // A track heard before plays from the cache: no network, no stream to expire.
+            if (!forDownload) {
+                com.alananasss.kittytune.data.cache.AudioCache.lookup(track.id)?.let { cached ->
+                    return@withContext ResolvedStream(cached.absolutePath)
+                }
+            }
             if (track.source == "youtube") {
                 val url = resolveFromYoutubeDirect(track)
                 return@withContext url?.let { ResolvedStream(it) }
