@@ -282,9 +282,14 @@ fun MainScreen(
                         }
                         Key.H -> showShortcutsDialog = true
                         Key.Q -> {
-                            showNowPlayingPanel = true
-                            playerPrefs.setRightPanelOpen(true)
-                            nowPlayingTab = NowPlayingTab.QUEUE
+                            if (showNowPlayingPanel && nowPlayingTab == NowPlayingTab.QUEUE) {
+                                showNowPlayingPanel = false
+                                playerPrefs.setRightPanelOpen(false)
+                            } else {
+                                showNowPlayingPanel = true
+                                playerPrefs.setRightPanelOpen(true)
+                                nowPlayingTab = NowPlayingTab.QUEUE
+                            }
                         }
                     }
                 }
@@ -321,9 +326,14 @@ fun MainScreen(
             playerPrefs.setRightPanelOpen(next)
         },
         onOpenQueue = {
-            showNowPlayingPanel = true
-            playerPrefs.setRightPanelOpen(true)
-            nowPlayingTab = NowPlayingTab.QUEUE
+            if (showNowPlayingPanel && nowPlayingTab == NowPlayingTab.QUEUE) {
+                showNowPlayingPanel = false
+                playerPrefs.setRightPanelOpen(false)
+            } else {
+                showNowPlayingPanel = true
+                playerPrefs.setRightPanelOpen(true)
+                nowPlayingTab = NowPlayingTab.QUEUE
+            }
         },
         onOpenLyrics = {
             playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
@@ -332,6 +342,8 @@ fun MainScreen(
         // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
         // lyrics, which has its own way up here (issue #33).
         onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
+        isNowPlayingOpen = showNowPlayingPanel && nowPlayingTab != NowPlayingTab.QUEUE,
+        isQueueOpen = showNowPlayingPanel && nowPlayingTab == NowPlayingTab.QUEUE,
         modifier = barModifier,
         onBarPlaced = if (isBarFloating) { coordinates ->
             val topLeft = coordinates.positionOnScreen()
