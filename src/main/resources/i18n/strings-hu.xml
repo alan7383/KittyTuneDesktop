@@ -2677,4 +2677,6 @@
     <string name="sources_yandex">Yandex Music</string>
     <string name="sources_connected">Csatlakoztatva</string>
     <string name="sources_connect">Csatlakozás</string>
+    <string name="pref_show_remaining_time">Hátralévő idő</string>
+    <string name="pref_show_remaining_time_desc">A hátralévő idő (-00:14) megjelenítése a teljes hossz helyett a lejátszási sávon</string>
 </resources>

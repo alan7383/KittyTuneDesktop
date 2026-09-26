@@ -180,6 +180,7 @@ class PlayerPreferences {
         private const val KEY_LOCAL_MEDIA_URIS_SET = "local_media_uris_set_v2"
         private const val KEY_PLAYER_BAR_BUTTONS = "player_bar_buttons"
         private const val KEY_PLAYER_BAR_STYLE = "player_bar_style"
+        const val KEY_SHOW_REMAINING_TIME = "player_bar_show_remaining"
 
         const val PLAYER_BAR_BUTTON_LIKE = "like"
         const val PLAYER_BAR_BUTTON_PANEL = "panel"
@@ -1100,6 +1101,12 @@ class PlayerPreferences {
                 PlayerBarStyle.DEFAULT
             }
         }
+
+    fun getShowRemainingTime(): Boolean = Prefs.getBoolean(KEY_SHOW_REMAINING_TIME, false)
+
+    fun setShowRemainingTime(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_REMAINING_TIME, enabled)
+
+    fun showRemainingTimeFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_REMAINING_TIME, false)
 
     /**
      * The order of the tiles in an options menu, and which of them are hidden (issue #33).

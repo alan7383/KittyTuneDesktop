@@ -599,8 +599,8 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                 ),
         )
         // Click to switch between the track's length and the time left, which counts down with a minus, as in
-        // the full player. Remembered.
-        var showRemaining by remember { mutableStateOf(com.alananasss.kittytune.core.Prefs.getBoolean(KEY_BAR_REMAINING, false)) }
+        // the full player. Remembered and synced with settings.
+        val showRemaining = rememberShowRemainingTime()
         Text(
             text = if (showRemaining) "-" + makeTimeString((duration - position).coerceAtLeast(0L)) else makeTimeString(duration),
             style = MaterialTheme.typography.labelSmall,
@@ -608,15 +608,12 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
                 .clickable {
-                    showRemaining = !showRemaining
-                    com.alananasss.kittytune.core.Prefs.putBoolean(KEY_BAR_REMAINING, showRemaining)
+                    com.alananasss.kittytune.data.local.PlayerPreferences().setShowRemainingTime(!showRemaining)
                 }
                 .padding(horizontal = 4.dp, vertical = 2.dp),
         )
     }
 }
-
-private const val KEY_BAR_REMAINING = "player_bar_show_remaining"
 
 /**
  * Shuffle / repeat, in the same language as the transport pills next to them: 42 dp tall,
@@ -777,4 +774,16 @@ private fun rememberPlayerSliderStyle(): com.alananasss.kittytune.data.local.Pla
         com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerSliderStyle()
     }
 }
+
+/**
+ * Reactive read of the "show remaining time" setting; recomposes when the pref changes.
+ */
+@Composable
+private fun rememberShowRemainingTime(): Boolean {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) {
+        com.alananasss.kittytune.data.local.PlayerPreferences().getShowRemainingTime()
+    }
+}
+
 

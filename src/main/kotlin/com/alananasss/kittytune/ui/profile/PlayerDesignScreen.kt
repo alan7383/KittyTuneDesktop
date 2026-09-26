@@ -88,6 +88,7 @@ fun PlayerDesignContent(modifier: Modifier = Modifier) {
     var playerBarButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
     var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
     var seekWheelSeconds by remember { mutableFloatStateOf(prefs.getSeekWheelSeconds()) }
+    var showRemainingTime by remember { mutableStateOf(prefs.getShowRemainingTime()) }
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -127,6 +128,11 @@ fun PlayerDesignContent(modifier: Modifier = Modifier) {
             onVolumeStyleSelected = {
                 volumeStyle = it
                 prefs.setVolumeSliderStyle(it)
+            },
+            showRemainingTime = showRemainingTime,
+            onShowRemainingTimeChanged = {
+                showRemainingTime = it
+                prefs.setShowRemainingTime(it)
             },
         )
 
@@ -314,6 +320,8 @@ private fun PlayerSlidersSection(
     onVolumeOrientationChanged: (Boolean) -> Unit,
     volumeStyle: PlayerSliderStyle?,
     onVolumeStyleSelected: (PlayerSliderStyle?) -> Unit,
+    showRemainingTime: Boolean,
+    onShowRemainingTimeChanged: (Boolean) -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -375,6 +383,61 @@ private fun PlayerSlidersSection(
                     modifier = Modifier.weight(1f),
                     onClick = { onSliderStyleSelected(PlayerSliderStyle.SQUIGGLY) }
                 )
+            }
+
+            // Remaining Time toggle (-00:14 countdown vs total duration)
+            Surface(
+                onClick = { onShowRemainingTimeChanged(!showRemainingTime) },
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = if (showRemainingTime) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.size(38.dp)
+                    ) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Rounded.Timer,
+                                contentDescription = null,
+                                tint = if (showRemainingTime) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.width(14.dp))
+
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = str("pref_show_remaining_time"),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = str("pref_show_remaining_time_desc"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(Modifier.width(12.dp))
+
+                    Switch(
+                        checked = showRemainingTime,
+                        onCheckedChange = onShowRemainingTimeChanged
+                    )
+                }
             }
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))

@@ -110,7 +110,9 @@ class LocalizationParityTest {
             "player_button_shuffle",
             "player_button_repeat",
             "player_advanced_title",
-            "pref_seek_wheel"
+            "pref_seek_wheel",
+            "pref_show_remaining_time",
+            "pref_show_remaining_time_desc"
         )
         try {
             for (lang in languages) {

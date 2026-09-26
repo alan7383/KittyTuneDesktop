@@ -2676,4 +2676,6 @@
     <string name="sources_yandex">Yandex Music</string>
     <string name="sources_connected">Connecté</string>
     <string name="sources_connect">Connecter</string>
+    <string name="pref_show_remaining_time">Temps restant</string>
+    <string name="pref_show_remaining_time_desc">Afficher le temps restant (-00:14) au lieu de la durée totale sur la barre de lecture</string>
 </resources>
