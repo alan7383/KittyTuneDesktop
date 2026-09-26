@@ -427,7 +427,8 @@ import kotlin.math.roundToInt
     
         // Reading along by hand wins for a while; the panel's copy of the lyrics follows the same
         // rule, which is why this lives in one place (issue #33).
-        FollowActiveLine(listState, activeIndex, centred = true)
+        val readingByHand = FollowActiveLine(listState, activeIndex, centred = true)
+        val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
     
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val screenHeight = maxHeight
@@ -454,7 +455,7 @@ import kotlin.math.roundToInt
                         style = viewModel.lyricsDisplayStyle,
                         // Zero for every line until the song reaches the words: with no current line there
                         // is nothing to measure distance from, and shrinking everything would be wrong.
-                        distance = if (activeIndex < 0) 0 else index - activeIndex,
+                        distance = if (focusIndex < 0) 0 else index - focusIndex,
                         blurEnabled = viewModel.lyricsLineBlurEnabled,
                     )
 
