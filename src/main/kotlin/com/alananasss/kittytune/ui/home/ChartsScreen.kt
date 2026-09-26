@@ -53,7 +53,9 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.ChartsData
 import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.ui.common.SquareCardShimmer
+import com.alananasss.kittytune.ui.common.ShimmerBox
 import com.alananasss.kittytune.ui.player.ArtworkPalette
+import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.profile.ArtistAvatar
 import java.awt.datatransfer.StringSelection
@@ -257,6 +259,51 @@ fun ChartsScreen(
             modifier = Modifier.padding(innerPadding),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            // ── The song chart ──
+            // First, because it is what someone opening "Charts" came for: songs in order. The
+            // country playlists below it are the older, per-country cut of the same idea.
+            item {
+                SongChart(
+                    kind = viewModel.chartKind,
+                    genre = viewModel.chartGenre,
+                    genres = ChartsViewModel.chartGenres,
+                    onKindChange = { viewModel.loadChart(it, viewModel.chartGenre) },
+                    onGenreChange = { viewModel.loadChart(viewModel.chartKind, it) },
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
+
+            if (viewModel.isChartLoading && viewModel.chartEntries.isEmpty()) {
+                items(6) {
+                    Box(Modifier.fillMaxWidth().height(72.dp)) { ShimmerBox(Modifier.fillMaxWidth().height(64.dp)) }
+                }
+            } else if (viewModel.chartEntries.isNotEmpty()) {
+                items(viewModel.chartEntries.size) { index ->
+                    val entry = viewModel.chartEntries[index]
+                    ChartTrackRow(
+                        track = entry.track,
+                        rank = entry.rank,
+                        currentlyPlayingTrack = playerViewModel.currentTrack,
+                        onClick = {
+                            // A chart is a queue: pressing a song plays the chart from there, so the
+                            // songs either side of it are what comes next.
+                            playerViewModel.playPlaylist(
+                                tracks = viewModel.chartEntries.map { it.track },
+                                startIndex = index,
+                                context = PlaybackContext(
+                                    displayText = str(
+                                        if (viewModel.chartKind == ChartKind.TOP) "chart_kind_top"
+                                        else "chart_kind_trending"
+                                    ),
+                                    navigationId = "charts",
+                                ),
+                            )
+                        },
+                        onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+                    )
+                }
+            }
+
             // country selector button
             item {
                 Box(
