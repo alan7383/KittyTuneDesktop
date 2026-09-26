@@ -1550,6 +1550,16 @@
 
     <string name="listening_stats_duration_zero">Keine Daten</string>
     <string name="listening_stats_duration_min">%1$d Min.</string>
+    <string name="playlist_duration_hours">%1$d Std.</string>
+    <string name="playlist_duration_days">%1$d T.</string>
+    <string name="playlist_duration_months">%1$d Mon.</string>
+    <string name="playlist_duration_months_days">%1$d Mon. %2$d T.</string>
+    <string name="playlist_duration_year">%1$d J.</string>
+    <string name="playlist_duration_years">%1$d J.</string>
+    <string name="playlist_duration_year_months">%1$d J. %2$d Mon.</string>
+    <string name="playlist_duration_years_months">%1$d J. %2$d Mon.</string>
+    <string name="playlist_duration_year_days">%1$d J. %2$d T.</string>
+    <string name="playlist_duration_years_days">%1$d J. %2$d T.</string>
     <string name="listening_stats_duration_days_hrs">%1$d T. %2$d Std.</string>
     <string name="listening_stats_duration_hr_min">%1$d Std. %2$d Min.</string>
     <string name="listening_stats_duration_min_sec">%1$d Min. %2$d Sek.</string>

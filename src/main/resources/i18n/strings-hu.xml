@@ -928,6 +928,16 @@
     <string name="listening_stats_duration_sec">%1$dmp</string>
     <string name="listening_stats_duration_zero">Nincs adat</string>
     <string name="listening_stats_duration_min">%1$d perc</string>
+    <string name="playlist_duration_hours">%1$dó</string>
+    <string name="playlist_duration_days">%1$dn</string>
+    <string name="playlist_duration_months">%1$d hó</string>
+    <string name="playlist_duration_months_days">%1$d hó %2$dn</string>
+    <string name="playlist_duration_year">%1$d év</string>
+    <string name="playlist_duration_years">%1$d év</string>
+    <string name="playlist_duration_year_months">%1$d év %2$d hó</string>
+    <string name="playlist_duration_years_months">%1$d év %2$d hó</string>
+    <string name="playlist_duration_year_days">%1$d év %2$dn</string>
+    <string name="playlist_duration_years_days">%1$d év %2$dn</string>
     <string name="listening_stats_empty_desc">Kezdj el zenét hallgatni, hogy itt lássad a statisztikáidat!</string>
     <string name="listening_stats_empty_title">Még nincsenek statisztikák</string>
     <string name="listening_stats_habits">Hallgatási szokások</string>

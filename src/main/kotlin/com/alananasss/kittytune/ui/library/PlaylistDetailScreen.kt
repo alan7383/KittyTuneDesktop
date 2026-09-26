@@ -1399,21 +1399,29 @@ fun PlaylistDetailScreen(
                             Spacer(Modifier.height(2.dp))
                         }
 
+                        val totalDurationMs = tracksToDisplay.sumOf { it.durationMs ?: 0L }
+                        val durationText = formatPlaylistTotalDuration(totalDurationMs)
+
                         val trackCountText = when {
                             isArtistView -> {
                                 val count = tracksToDisplay.size
                                 if (count == 0 && playlistSearchQuery.isNotEmpty()) {
                                     str("no_tracks_found_filter")
                                 } else {
-                                    str("new_releases_popular_tracks") + " • " + str("playlist_num_tracks", count)
+                                    val base = str("new_releases_popular_tracks") + " • " + str("playlist_num_tracks", count)
+                                    if (durationText.isNotEmpty()) "$base • $durationText" else base
                                 }
                             }
                             isYoutubeRadio -> str("radio") + " • YouTube"
                             isLoading && playlistId != "likes" -> "..."
                             else -> {
                                 val count = tracksToDisplay.size
-                                if (count == 0 && playlistSearchQuery.isNotEmpty()) str("no_tracks_found_filter")
-                                else str("playlist_num_tracks", count)
+                                if (count == 0 && playlistSearchQuery.isNotEmpty()) {
+                                    str("no_tracks_found_filter")
+                                } else {
+                                    val base = str("playlist_num_tracks", count)
+                                    if (durationText.isNotEmpty()) "$base • $durationText" else base
+                                }
                             }
                         }
                         if (trackCountText.isNotEmpty()) {
@@ -2799,3 +2807,59 @@ private fun getPlaylistTrackStableKey(index: Int, trackId: Long, trackList: List
     }
     return "${trackId}_dup$occurrence"
 }
+
+internal fun formatPlaylistTotalDuration(ms: Long): String {
+    if (ms <= 0L) return ""
+    val totalSeconds = (ms + 500) / 1000
+    val totalMinutes = totalSeconds / 60
+    val totalHours = totalMinutes / 60
+    val totalDays = totalHours / 24
+
+    return when {
+        totalDays >= 365 -> {
+            val years = totalDays / 365
+            val remDays = totalDays % 365
+            val months = remDays / 30
+            val days = remDays % 30
+            when {
+                months > 0 -> if (years == 1L) str("playlist_duration_year_months", years, months) else str("playlist_duration_years_months", years, months)
+                days > 0 -> if (years == 1L) str("playlist_duration_year_days", years, days) else str("playlist_duration_years_days", years, days)
+                else -> if (years == 1L) str("playlist_duration_year", years) else str("playlist_duration_years", years)
+            }
+        }
+        totalDays >= 30 -> {
+            val months = totalDays / 30
+            val days = totalDays % 30
+            if (days > 0) {
+                str("playlist_duration_months_days", months, days)
+            } else {
+                str("playlist_duration_months", months)
+            }
+        }
+        totalDays >= 1 -> {
+            val days = totalDays
+            val hours = totalHours % 24
+            if (hours > 0) {
+                str("listening_stats_duration_days_hrs", days, hours)
+            } else {
+                str("playlist_duration_days", days)
+            }
+        }
+        totalHours >= 1 -> {
+            val hours = totalHours
+            val minutes = totalMinutes % 60
+            if (minutes > 0) {
+                str("listening_stats_duration_hr_min", hours, minutes)
+            } else {
+                str("playlist_duration_hours", hours)
+            }
+        }
+        totalMinutes >= 1 -> {
+            str("listening_stats_duration_min", totalMinutes)
+        }
+        else -> {
+            str("listening_stats_duration_sec", totalSeconds)
+        }
+    }
+}
+
