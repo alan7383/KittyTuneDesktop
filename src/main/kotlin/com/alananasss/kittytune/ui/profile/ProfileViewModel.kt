@@ -185,16 +185,16 @@
         private fun getString(resId: String, vararg formatArgs: Any): String = str(resId, *formatArgs)
     
     
-        // Helper to paginate through all user tracks
-        private suspend fun fetchAllUserTracks(userId: Long): List<Track> {
+        // Helper to paginate through all user tracks.
+        // Limit to 5 pages (1000 tracks) for fast initial load; users can scroll-to-load more later.
+        private suspend fun fetchAllUserTracks(userId: Long, maxPages: Int = 5): List<Track> {
             val allUserTracks = mutableListOf<Track>()
             try {
                 val firstPage = api.getUserTracks(userId, limit = 200)
                 allUserTracks.addAll(firstPage.collection.filterNotNull())
                 var nextUrl = firstPage.next_href
                 var pageCount = 0
-                // Safety limit to avoid infinite loops
-                while (nextUrl != null && pageCount < 20) {
+                while (nextUrl != null && pageCount < maxPages) {
                     val nextPage = api.getUserTracksNextPage(nextUrl)
                     allUserTracks.addAll(nextPage.collection.filterNotNull())
                     nextUrl = nextPage.next_href
@@ -459,6 +459,7 @@
                         val albumsDef = async { try { api.getUserAlbums(userId).collection.filterNotNull() } catch (_: Exception) { emptyList() } }
                         val playDef = async { try { api.getUserCreatedPlaylists(userId).collection.filterNotNull() } catch (_: Exception) { emptyList() } }
     
+                        // Likes: fetch only the first 3 pages (150 tracks) upfront for a fast load.
                         val likesDef = async {
                             val allLikes = mutableListOf<Track>()
                             try {
@@ -476,7 +477,7 @@
                                 })
                                 nextUrl = firstPage.next_href
                                 var safetyCount = 0
-                                while (nextUrl != null && safetyCount < 10) {
+                                while (nextUrl != null && safetyCount < 3) {
                                     val page = api.getTrackLikesNextPage(nextUrl!!)
                                     allLikes.addAll(page.collection.mapNotNull { item ->
                                         val track = item.track ?: return@mapNotNull null
@@ -492,6 +493,7 @@
                             } catch (_: Exception) { }
                             allLikes
                         }
+                        // Similar artists: fire-and-forget, doesn't block the primary load.
                         val simDef = async {
                             var artists = emptyList<User>()
                             try {
@@ -758,33 +760,46 @@
         }
 
         private suspend fun fetchUser(userId: Long): User? {
-            return try {
-                val req = GraphQlRequest(
-                    operationName = "UserProfile",
-                    query = """
-                        query UserProfile(${'$'}urn: ID!) {
-                          user(urn: ${'$'}urn) {
-                            urn
-                            username
-                            avatarUrl
-                            city
-                            countryCode
-                            followersCount
-                            followingsCount
-                            tracksCount
-                            description
-                            permalinkUrl
-                            permalink
-                            verified
-                          }
-                        }
-                    """.trimIndent(),
-                    variables = mapOf("urn" to "soundcloud:users:$userId")
-                )
-                val response = api.getUserProfileGraphQL(req)
-                response.data?.user?.copy(id = userId) ?: try { api.getUser(userId) } catch (_: Exception) { null }
-            } catch (e: Exception) {
-                try { api.getUser(userId) } catch (_: Exception) { null }
+            // Run GraphQL and REST in parallel; cap GraphQL at 1.5 s so a 504/timeout
+            // (graph.soundcloud.com regularly returns 504 after 10 s) never blocks the load.
+            return kotlinx.coroutines.coroutineScope {
+                val graphQlDef = async {
+                    kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                        try {
+                            val req = GraphQlRequest(
+                                operationName = "UserProfile",
+                                query = """
+                                    query UserProfile(${'$'}urn: ID!) {
+                                      user(urn: ${'$'}urn) {
+                                        urn
+                                        username
+                                        avatarUrl
+                                        city
+                                        countryCode
+                                        followersCount
+                                        followingsCount
+                                        tracksCount
+                                        description
+                                        permalinkUrl
+                                        permalink
+                                        verified
+                                      }
+                                    }
+                                """.trimIndent(),
+                                variables = mapOf("urn" to "soundcloud:users:$userId")
+                            )
+                            api.getUserProfileGraphQL(req).data?.user?.copy(id = userId)
+                        } catch (_: Exception) { null }
+                    }
+                }
+                val restDef = async {
+                    try { api.getUser(userId) } catch (_: Exception) { null }
+                }
+
+                // Take REST result immediately; if GraphQL finishes first and is non-null, prefer it.
+                val restUser = restDef.await()
+                val graphUser = if (graphQlDef.isCompleted) graphQlDef.await() else null
+                graphUser ?: restUser
             }
         }
     
