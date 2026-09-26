@@ -1040,76 +1040,15 @@ import com.alananasss.kittytune.ui.common.Slider
     
         if (showDisplayStyleDialog) {
             val currentStyle = playerViewModel.lyricsDisplayStyle
-            val hasScale = currentStyle == LyricsDisplayStyle.SCALE || currentStyle == LyricsDisplayStyle.SCALE_FOCUS
-            val hasFocus = currentStyle == LyricsDisplayStyle.FOCUS || currentStyle == LyricsDisplayStyle.SCALE_FOCUS
 
             EscapableAlertDialog(
                 onDismissRequest = { showDisplayStyleDialog = false },
                 title = { Text(str("pref_lyrics_display_style")) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    val next = when {
-                                        !hasScale && hasFocus -> LyricsDisplayStyle.SCALE_FOCUS
-                                        !hasScale -> LyricsDisplayStyle.SCALE
-                                        hasFocus -> LyricsDisplayStyle.FOCUS
-                                        else -> LyricsDisplayStyle.STANDARD
-                                    }
-                                    playerViewModel.updateLyricsDisplayStyle(next)
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = hasScale,
-                                onCheckedChange = null
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(str("lyrics_style_scale"), fontWeight = FontWeight.Bold)
-                                Text(
-                                    str("lyrics_style_scale_sub"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    val next = when {
-                                        hasScale && !hasFocus -> LyricsDisplayStyle.SCALE_FOCUS
-                                        hasScale -> LyricsDisplayStyle.SCALE
-                                        !hasFocus -> LyricsDisplayStyle.FOCUS
-                                        else -> LyricsDisplayStyle.STANDARD
-                                    }
-                                    playerViewModel.updateLyricsDisplayStyle(next)
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = hasFocus,
-                                onCheckedChange = null
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(str("lyrics_style_focus"), fontWeight = FontWeight.Bold)
-                                Text(
-                                    str("lyrics_style_focus_sub"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                    com.alananasss.kittytune.ui.player.lyrics.LyricsDisplayStylePicker(
+                        selected = currentStyle,
+                        onSelect = { playerViewModel.updateLyricsDisplayStyle(it) },
+                    )
                 },
                 confirmButton = {
                     TextButton(onClick = { showDisplayStyleDialog = false }) { Text(str("btn_close")) }
@@ -1119,76 +1058,15 @@ import com.alananasss.kittytune.ui.common.Slider
 
         if (showFullScreenDisplayStyleDialog) {
             val currentStyle = playerViewModel.lyricsFullScreenDisplayStyle
-            val hasScale = currentStyle == LyricsDisplayStyle.SCALE || currentStyle == LyricsDisplayStyle.SCALE_FOCUS
-            val hasFocus = currentStyle == LyricsDisplayStyle.FOCUS || currentStyle == LyricsDisplayStyle.SCALE_FOCUS
 
             EscapableAlertDialog(
                 onDismissRequest = { showFullScreenDisplayStyleDialog = false },
                 title = { Text(str("pref_lyrics_fullscreen_display_style")) },
                 text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    val next = when {
-                                        !hasScale && hasFocus -> LyricsDisplayStyle.SCALE_FOCUS
-                                        !hasScale -> LyricsDisplayStyle.SCALE
-                                        hasFocus -> LyricsDisplayStyle.FOCUS
-                                        else -> LyricsDisplayStyle.STANDARD
-                                    }
-                                    playerViewModel.updateLyricsFullScreenDisplayStyle(next)
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = hasScale,
-                                onCheckedChange = null
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(str("lyrics_style_scale"), fontWeight = FontWeight.Bold)
-                                Text(
-                                    str("lyrics_style_scale_sub"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable {
-                                    val next = when {
-                                        hasScale && !hasFocus -> LyricsDisplayStyle.SCALE_FOCUS
-                                        hasScale -> LyricsDisplayStyle.SCALE
-                                        !hasFocus -> LyricsDisplayStyle.FOCUS
-                                        else -> LyricsDisplayStyle.STANDARD
-                                    }
-                                    playerViewModel.updateLyricsFullScreenDisplayStyle(next)
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = hasFocus,
-                                onCheckedChange = null
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(str("lyrics_style_focus"), fontWeight = FontWeight.Bold)
-                                Text(
-                                    str("lyrics_style_focus_sub"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                    com.alananasss.kittytune.ui.player.lyrics.LyricsDisplayStylePicker(
+                        selected = currentStyle,
+                        onSelect = { playerViewModel.updateLyricsFullScreenDisplayStyle(it) },
+                    )
                 },
                 confirmButton = {
                     TextButton(onClick = { showFullScreenDisplayStyleDialog = false }) { Text(str("btn_close")) }
