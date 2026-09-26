@@ -804,6 +804,7 @@ private fun menuTileIcon(id: String): ImageVector = when (id) {
     "repost" -> Icons.Rounded.Repeat
     "details" -> Icons.Rounded.Info
     "lyrics" -> Icons.Rounded.Lyrics
+    "duet_lyrics_blacklist" -> Icons.Rounded.RecordVoiceOver
     "add_playlist" -> Icons.Rounded.PlaylistAdd
     "go_album" -> Icons.Rounded.Album
     "go_artist" -> Icons.Rounded.Person

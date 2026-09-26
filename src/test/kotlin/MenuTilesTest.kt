@@ -80,4 +80,20 @@ class MenuTilesTest {
             assertEquals(ids.size, ids.distinct().size, "duplicate ids in $ids")
         }
     }
+
+    /**
+     * A tile the menu builds but the catalogue does not list can be neither hidden nor moved: the settings
+     * screen and the stored arrangement only know the catalogue. That is how the duet tile ended up stuck.
+     */
+    @Test
+    fun `every tile the options menu builds is in the catalogue`() {
+        val source = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/main/TrackOptionsOverlays.kt").readText()
+        val built = Regex("""MenuOptionItem\(\s*"([a-z_]+)"|id = "([a-z_]+)"""")
+            .findAll(source)
+            .map { it.groupValues[1].ifEmpty { it.groupValues[2] } }
+            .toSet()
+        val known = (MenuTiles.TRACK + MenuTiles.PLAYLIST).map { it.id }.toSet()
+        assertTrue(built.isNotEmpty(), "no tile ids found; the pattern no longer matches the menu code")
+        assertEquals(emptySet(), built - known, "tiles missing from MenuTiles")
+    }
 }

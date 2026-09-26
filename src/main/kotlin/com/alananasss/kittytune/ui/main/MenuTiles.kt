@@ -31,6 +31,7 @@ internal object MenuTiles {
         Tile("repost", "menu_repost"),
         Tile("details", "menu_details"),
         Tile("lyrics", "player_lyrics"),
+        Tile("duet_lyrics_blacklist", "pref_lyrics_duet_title"),
         Tile("add_playlist", "menu_add_playlist"),
         Tile("go_album", "menu_go_album"),
         Tile("go_artist", "menu_go_artist"),
