@@ -2684,4 +2684,22 @@
     <string name="sources_connect">Подключить</string>
     <string name="pref_show_remaining_time">Оставшееся время</string>
     <string name="pref_show_remaining_time_desc">Отображать оставшееся время (-00:14) вместо общей длительности на полосе воспроизведения</string>
+    <string name="search_recent_searches">Недавние запросы</string>
+    <string name="search_clear_all">Очистить всё</string>
+    <string name="search_see_more">Показать ещё</string>
+    <string name="search_see_less">Свернуть</string>
+    <string name="search_remove_recent">Убрать из недавних запросов</string>
+    <string name="chart_kind_top">Топ-50</string>
+    <string name="chart_kind_trending">Новое и набирающее</string>
+    <string name="chart_see_full">Полный чарт</string>
+    <string name="chart_genre_all">Все</string>
+    <string name="chart_genre_pop">Поп</string>
+    <string name="chart_genre_hiphop">Хип-хоп</string>
+    <string name="chart_genre_electronic">Электроника</string>
+    <string name="chart_genre_rock">Рок</string>
+    <string name="chart_genre_rnb">R&amp;B</string>
+    <string name="chart_genre_country">Кантри</string>
+    <string name="chart_genre_latin">Латинская</string>
+    <string name="home_from_your_artists">Новое от ваших исполнителей</string>
+    <string name="home_from_your_artists_sub">Что выпустили исполнители, которых вы любите</string>
 </resources>
