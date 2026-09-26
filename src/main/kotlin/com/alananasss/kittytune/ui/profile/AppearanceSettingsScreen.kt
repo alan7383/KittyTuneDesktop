@@ -62,18 +62,36 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
     var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
-    var customFontEnabled by remember { mutableStateOf(prefs.getCustomFontEnabled()) }
+    var appFont by remember { mutableStateOf(com.alananasss.kittytune.ui.theme.AppFont.parse(prefs.getAppFont())) }
     val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
     val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
 
     var showIconDialog by remember { mutableStateOf(false) }
     var showFontDialog by remember { mutableStateOf(false) }
+    var showFontAxesDialog by remember { mutableStateOf(false) }
     var showScaleDialog by remember { mutableStateOf(false) }
     if (showIconDialog) AppIconDialog(prefs, appIconVariant) { showIconDialog = false }
-    if (showFontDialog) FontAxesDialog(prefs) { showFontDialog = false }
+    if (showFontAxesDialog) FontAxesDialog(prefs) { showFontAxesDialog = false }
     if (showScaleDialog) UiScaleDialog(prefs, uiScale) { showScaleDialog = false }
+    if (showFontDialog) {
+        FontPickerDialog(
+            current = appFont,
+            onSelect = {
+                appFont = it
+                prefs.setAppFont(it.id)
+            },
+            onTuneFlex = { showFontAxesDialog = true },
+            onDismiss = { showFontDialog = false },
+        )
+    }
 
     val isDark = themeMode == AppThemeMode.DARK || (themeMode == AppThemeMode.SYSTEM && systemDark)
+    val look = when {
+        themeMode == AppThemeMode.DARK && pureBlack -> ThemeLook.AMOLED
+        themeMode == AppThemeMode.DARK -> ThemeLook.DARK
+        themeMode == AppThemeMode.LIGHT -> ThemeLook.LIGHT
+        else -> ThemeLook.SYSTEM
+    }
 
     SettingsGroup(
         items = listOf { shape ->
@@ -96,22 +114,26 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         SettingsGroupTitle(str("theme_presets_title"))
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                ThemeSelector(
-                    currentTheme = themeMode,
-                    onThemeSelected = {
-                        themeMode = it
-                        prefs.setThemeMode(it)
+            Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp)) {
+                // One compact row: the mode, with AMOLED as a theme of its own rather than a switch under Dark.
+                com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                    options = ThemeLook.entries,
+                    selectedOption = look,
+                    onOptionSelected = { chosen ->
+                        themeMode = chosen.mode
+                        pureBlack = chosen == ThemeLook.AMOLED
+                        prefs.setThemeMode(chosen.mode)
+                        prefs.setPureBlack(pureBlack)
                     },
-                )
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    fillMaxWidth = true,
+                    iconProvider = { Icon(it.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    labelProvider = { Text(str(it.labelKey), maxLines = 1, softWrap = false) },
                 )
                 ThemePresetRow(
                     selectedSeed = if (followsCover) null else keyColor,
                     isDark = isDark,
-                    pureBlack = pureBlack,
+                    pureBlack = pureBlack && isDark,
                     onSelect = { preset ->
                         keyColor = preset.seed
                         prefs.setKeyColor(preset.seed)
@@ -119,37 +141,11 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
                         followsCover = false
                         prefs.setTrackDynamicTheme(false)
                     },
+                    onCustom = onOpenCustomTheme,
                 )
             }
         }
     }
-
-    SettingsGroup(
-        items = buildList {
-            if (isDark) add { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("pref_pure_black"),
-                    icon = Icons.Rounded.Contrast,
-                    hasSwitch = true,
-                    switchState = pureBlack,
-                    onSwitchChange = {
-                        pureBlack = it
-                        prefs.setPureBlack(it)
-                    },
-                )
-            }
-            add { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("pref_custom_theme"),
-                    subtitle = str("pref_custom_theme_sub"),
-                    icon = Icons.Rounded.Palette,
-                    onClick = onOpenCustomTheme,
-                )
-            }
-        },
-    )
 
     SettingsGroup(
         title = str("settings_group_window"),
@@ -179,27 +175,124 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
             add { shape ->
                 SettingsItem(
                     shape = shape,
-                    title = str("pref_custom_font"),
-                    subtitle = str("pref_custom_font_subtitle"),
-                    hasSwitch = true,
-                    switchState = customFontEnabled,
-                    onSwitchChange = {
-                        customFontEnabled = it
-                        prefs.setCustomFontEnabled(it)
-                    },
-                    onClick = if (customFontEnabled) ({ showFontDialog = true }) else null,
+                    title = str("pref_font"),
+                    subtitle = fontLabel(appFont),
+                    icon = Icons.Rounded.TextFields,
+                    onClick = { showFontDialog = true },
                 )
             }
             add { shape ->
                 SettingsItem(
                     shape = shape,
                     title = str("pref_app_icon"),
-                    subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.label ?: "Default",
+                    subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.let { com.alananasss.kittytune.core.AppIconVariants.localizedLabel(it) } ?: str("app_icon_default"),
+                    icon = Icons.Rounded.Apps,
                     onClick = { showIconDialog = true },
                 )
             }
         },
     )
+}
+
+/** The theme choices of the mode row: the three modes plus AMOLED, which is Dark with true black. */
+private enum class ThemeLook(val mode: AppThemeMode, val labelKey: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    SYSTEM(AppThemeMode.SYSTEM, "theme_system", Icons.Rounded.BrightnessAuto),
+    LIGHT(AppThemeMode.LIGHT, "theme_light", Icons.Rounded.LightMode),
+    DARK(AppThemeMode.DARK, "theme_dark", Icons.Rounded.DarkMode),
+    AMOLED(AppThemeMode.DARK, "theme_amoled", Icons.Rounded.Contrast),
+}
+
+@Composable
+private fun fontLabel(font: com.alananasss.kittytune.ui.theme.AppFont): String =
+    if (font == com.alananasss.kittytune.ui.theme.AppFont.Default) str("font_default")
+    else com.alananasss.kittytune.ui.theme.AppFonts.nameOf(font)
+
+/**
+ * The typefaces on offer, each shown in itself: the default, the adjustable Google Sans Flex, a selection of
+ * installed fonts, the user's own, and a way to add one.
+ */
+@Composable
+private fun FontPickerDialog(
+    current: com.alananasss.kittytune.ui.theme.AppFont,
+    onSelect: (com.alananasss.kittytune.ui.theme.AppFont) -> Unit,
+    onTuneFlex: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val fonts = com.alananasss.kittytune.ui.theme.AppFonts
+    var userFonts by remember { mutableStateOf(fonts.userFonts()) }
+    val systemFonts = remember { fonts.availableSystemFonts() }
+    var rejected by remember { mutableStateOf(false) }
+    val options = buildList {
+        add(com.alananasss.kittytune.ui.theme.AppFont.Default)
+        add(com.alananasss.kittytune.ui.theme.AppFont.Flex)
+        systemFonts.forEach { add(com.alananasss.kittytune.ui.theme.AppFont.System(it)) }
+        userFonts.forEach { add(com.alananasss.kittytune.ui.theme.AppFont.UserFile(it)) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("pref_font")) },
+        text = {
+            com.alananasss.kittytune.ui.common.ScrollableColumn(
+                modifier = Modifier.heightIn(max = 460.dp),
+                contentPadding = PaddingValues(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                options.forEach { font ->
+                    val family = when (font) {
+                        com.alananasss.kittytune.ui.theme.AppFont.Flex -> remember { com.alananasss.kittytune.ui.theme.getDynamicTypography(true, 500, 100f, 0f, 0f, 0f, 18f).bodyLarge.fontFamily }
+                        else -> remember(font) { fonts.familyFor(font) }
+                    }
+                    val selected = font == current
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                            .clickable { onSelect(font) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(fontLabel(font), style = MaterialTheme.typography.titleMedium.copy(fontFamily = family))
+                            Text("Aa Бб 123 — KittyTune", style = MaterialTheme.typography.bodySmall.copy(fontFamily = family), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (font == com.alananasss.kittytune.ui.theme.AppFont.Flex) {
+                            IconButton(onClick = { onSelect(font); onTuneFlex() }) {
+                                Icon(Icons.Rounded.Tune, contentDescription = str("dialog_font_settings_title"))
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        val picked = pickFontFile(str("font_add")) ?: return@TextButton
+                        val stored = fonts.import(picked)
+                        rejected = stored == null
+                        if (stored != null) {
+                            userFonts = fonts.userFonts()
+                            onSelect(com.alananasss.kittytune.ui.theme.AppFont.UserFile(stored))
+                        }
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("font_add"))
+                }
+                if (rejected) Text(str("font_rejected"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
+    )
+}
+
+/** The system's own file dialog, filtered to fonts. */
+private fun pickFontFile(title: String): java.io.File? {
+    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
+    dialog.file = "*.ttf;*.otf"
+    dialog.setFilenameFilter { _, name -> name.endsWith(".ttf", true) || name.endsWith(".otf", true) }
+    dialog.isVisible = true
+    return dialog.files.firstOrNull()
 }
 
 /**
@@ -288,7 +381,6 @@ private class ThemePreset(val labelKey: String, val seed: Int, val style: Palett
 }
 
 private val themePresets = listOf(
-    ThemePreset("theme_preset_default", 0, PaletteStyle.Expressive),
     ThemePreset("theme_preset_ocean", 0xFF1565C0.toInt(), PaletteStyle.TonalSpot),
     ThemePreset("theme_preset_forest", 0xFF2E7D32.toInt(), PaletteStyle.TonalSpot),
     ThemePreset("theme_preset_sunset", 0xFFE64A19.toInt(), PaletteStyle.TonalSpot),
@@ -303,6 +395,7 @@ private fun ThemePresetRow(
     isDark: Boolean,
     pureBlack: Boolean,
     onSelect: (ThemePreset) -> Unit,
+    onCustom: () -> Unit,
 ) {
     com.alananasss.kittytune.ui.common.ScrollableLazyRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -321,6 +414,32 @@ private fun ThemePresetRow(
                 onClick = { onSelect(preset) },
             )
         }
+        item { CustomThemeCard(onCustom) }
+    }
+}
+
+/** The last card of the row: build a theme of one's own. */
+@Composable
+private fun CustomThemeCard(onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Surface(
+            onClick = onClick,
+            interactionSource = interaction,
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+            modifier = Modifier.size(width = 96.dp, height = 72.dp).pressScale(interaction),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+        Text(str("theme_custom_short"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -395,97 +514,6 @@ private fun ThemePresetCard(
             style = MaterialTheme.typography.labelMedium,
             color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-    }
-}
-
-@Composable
-fun ThemeSelector(
-    currentTheme: AppThemeMode,
-    onThemeSelected: (AppThemeMode) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ThemeOption(
-                icon = Icons.Outlined.BrightnessAuto,
-                selectedIcon = Icons.Filled.BrightnessAuto,
-                label = str("theme_system"),
-                isSelected = currentTheme == AppThemeMode.SYSTEM,
-                onClick = { onThemeSelected(AppThemeMode.SYSTEM) },
-                modifier = Modifier.weight(1f)
-            )
-            ThemeOption(
-                icon = Icons.Outlined.LightMode,
-                selectedIcon = Icons.Filled.LightMode,
-                label = str("theme_light"),
-                isSelected = currentTheme == AppThemeMode.LIGHT,
-                onClick = { onThemeSelected(AppThemeMode.LIGHT) },
-                modifier = Modifier.weight(1f)
-            )
-            ThemeOption(
-                icon = Icons.Outlined.DarkMode,
-                selectedIcon = Icons.Filled.DarkMode,
-                label = str("theme_dark"),
-                isSelected = currentTheme == AppThemeMode.DARK,
-                onClick = { onThemeSelected(AppThemeMode.DARK) },
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ThemeOption(
-    icon: ImageVector,
-    selectedIcon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier
-            .clickable(
-                onClick = onClick,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            )
-            .padding(vertical = 4.dp)
-    ) {
-        FilledTonalIconToggleButton(
-            checked = isSelected,
-            onCheckedChange = { onClick() },
-            modifier = Modifier.size(56.dp),
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        ) {
-            Icon(
-                imageVector = if (isSelected) selectedIcon else icon,
-                contentDescription = label,
-                modifier = Modifier.size(28.dp)
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
@@ -597,7 +625,7 @@ private fun AppIconDialog(prefs: PlayerPreferences, appIconVariant: String, onDi
                         if (painter != null) {
                             androidx.compose.foundation.Image(
                                 painter = painter,
-                                contentDescription = variant.label,
+                                contentDescription = com.alananasss.kittytune.core.AppIconVariants.localizedLabel(variant),
                                 modifier = Modifier.size(56.dp)
                             )
                         } else {
@@ -605,7 +633,7 @@ private fun AppIconDialog(prefs: PlayerPreferences, appIconVariant: String, onDi
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = variant.label,
+                            text = com.alananasss.kittytune.core.AppIconVariants.localizedLabel(variant),
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,

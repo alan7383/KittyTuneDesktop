@@ -2599,4 +2599,26 @@
     <string name="stats_story_habits">Hogyan hallgatsz</string>
     <string name="stats_story_active_days">zenés nap</string>
     <string name="menu_about">Névjegy</string>
+    <string name="app_icon_default">Alapértelmezett</string>
+    <string name="app_icon_black">Fekete</string>
+    <string name="app_icon_blue">Kék</string>
+    <string name="app_icon_chrome">Króm</string>
+    <string name="app_icon_england">Anglia</string>
+    <string name="app_icon_scotland">Skócia</string>
+    <string name="app_icon_hot_pink">Élénk rózsaszín</string>
+    <string name="app_icon_lavender">Levendula</string>
+    <string name="app_icon_leopard">Leopárd</string>
+    <string name="app_icon_lime">Lime</string>
+    <string name="app_icon_og">Eredeti</string>
+    <string name="app_icon_rose_gold">Rozéarany</string>
+    <string name="app_icon_silver">Ezüst</string>
+    <string name="app_icon_soft_purple">Lágy lila</string>
+    <string name="app_icon_sunset">Naplemente</string>
+    <string name="app_icon_tie_dye">Batikolt</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_custom_short">Saját</string>
+    <string name="pref_font">Betűtípus</string>
+    <string name="font_default">Alapértelmezett</string>
+    <string name="font_add">Saját betűtípus</string>
+    <string name="font_rejected">Nem TTF/OTF betűtípus</string>
 </resources>

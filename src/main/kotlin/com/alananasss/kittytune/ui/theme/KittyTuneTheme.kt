@@ -31,8 +31,13 @@ fun KittyTuneTheme(content: @Composable () -> Unit) {
 
     val keyColor = ThemeState.previewKeyColor ?: themePrefs.keyColor
     val font = themePrefs.font
-    val typography = remember(font) {
-        if (font == null) {
+    val appFont = themePrefs.appFont
+    val typography = remember(font, appFont) {
+        val chosen = AppFont.parse(appFont)
+        val family = AppFonts.familyFor(chosen)
+        if (family != null) {
+            Typography.withFamily(family)
+        } else if (font == null || chosen != AppFont.Flex) {
             Typography
         } else {
             getDynamicTypography(
@@ -85,6 +90,7 @@ private data class ThemePrefs(
     val colorSpec: String,
     /** Null when the custom variable font is off. */
     val font: FontAxes?,
+    val appFont: String,
 )
 
 private data class FontAxes(
@@ -105,7 +111,8 @@ private fun PlayerPreferences.readThemePrefs() = ThemePrefs(
     keyColor = getKeyColor(),
     colorStyle = getColorStyle(),
     colorSpec = getColorSpec(),
-    font = if (getCustomFontEnabled()) {
+    appFont = getAppFont(),
+    font = if (getAppFont() == "flex") {
         FontAxes(getFontWght(), getFontWdth(), getFontSlnt(), getFontRond(), getFontGrad(), getFontOpsz())
     } else {
         null

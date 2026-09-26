@@ -344,15 +344,41 @@ fun RightPanelSettingsPage() {
     )
 }
 
-/** Interface → Mini player. */
+/** Interface → Mini player: the same grouped cards as every other settings page. */
 @Composable
 fun MiniPlayerSettingsPage() {
     val prefs = remember { PlayerPreferences() }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Column(Modifier.padding(8.dp)) { MiniPlayerSettingsItems(prefs) }
-        }
+    val snapshot by Prefs.flow.collectAsState()
+    fun toggle(title: String, subtitle: String, checked: Boolean, set: (Boolean) -> Unit): @Composable (androidx.compose.ui.graphics.Shape) -> Unit = { shape ->
+        SettingsItem(shape = shape, title = title, subtitle = subtitle, hasSwitch = true, switchState = checked, onSwitchChange = set)
     }
+    val style = remember(snapshot) { prefs.getMiniPlayerStyle() }
+    SettingsGroup(
+        title = str("mini_player_section_look"),
+        items = listOf(
+            toggle(str("mini_player_style_elongated"), str("mini_player_style_elongated_desc"), style == MiniPlayerStyle.ELONGATED) {
+                prefs.setMiniPlayerStyle(if (it) MiniPlayerStyle.ELONGATED else MiniPlayerStyle.STANDARD)
+            },
+            toggle(str("mini_player_transparent_bg"), str("mini_player_transparent_bg_desc"), remember(snapshot) { prefs.getMiniPlayerTransparentBg() }) { prefs.setMiniPlayerTransparentBg(it) },
+            toggle(str("mini_player_hover_illumination"), str("mini_player_hover_illumination_desc"), remember(snapshot) { prefs.getMiniPlayerHoverIllumination() }) { prefs.setMiniPlayerHoverIllumination(it) },
+        ),
+    )
+    SettingsGroup(
+        title = str("mini_player_section_content"),
+        items = listOf(
+            toggle(str("mini_player_show_cover"), str("mini_player_show_cover_desc"), remember(snapshot) { prefs.getMiniPlayerShowCover() }) { prefs.setMiniPlayerShowCover(it) },
+            toggle(str("mini_player_show_playback_controls"), str("mini_player_show_playback_controls_desc"), remember(snapshot) { prefs.getMiniPlayerShowPlaybackControls() }) { prefs.setMiniPlayerShowPlaybackControls(it) },
+            toggle(str("mini_player_show_additional_controls"), str("mini_player_show_additional_controls_desc"), remember(snapshot) { prefs.getMiniPlayerShowAdditionalControls() }) { prefs.setMiniPlayerShowAdditionalControls(it) },
+            toggle(str("mini_player_show_progress"), str("mini_player_show_progress_desc"), remember(snapshot) { prefs.getMiniPlayerShowProgress() }) { prefs.setMiniPlayerShowProgress(it) },
+        ),
+    )
+    SettingsGroup(
+        title = str("mini_player_section_behaviour"),
+        items = listOf(
+            toggle(str("mini_player_controls_on_hover"), str("mini_player_controls_on_hover_desc"), remember(snapshot) { prefs.getMiniPlayerControlsOnHover() }) { prefs.setMiniPlayerControlsOnHover(it) },
+            toggle(str("mini_player_hover_effect"), str("mini_player_hover_effect_desc"), remember(snapshot) { prefs.getMiniPlayerHoverEffect() }) { prefs.setMiniPlayerHoverEffect(it) },
+        ),
+    )
 }
 
 /**

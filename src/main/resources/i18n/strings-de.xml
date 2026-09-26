@@ -3210,4 +3210,26 @@
     <string name="stats_story_habits">Wie du hörst</string>
     <string name="stats_story_active_days">Tage mit Musik</string>
     <string name="menu_about">Über</string>
+    <string name="app_icon_default">Standard</string>
+    <string name="app_icon_black">Schwarz</string>
+    <string name="app_icon_blue">Blau</string>
+    <string name="app_icon_chrome">Chrom</string>
+    <string name="app_icon_england">England</string>
+    <string name="app_icon_scotland">Schottland</string>
+    <string name="app_icon_hot_pink">Pink</string>
+    <string name="app_icon_lavender">Lavendel</string>
+    <string name="app_icon_leopard">Leopard</string>
+    <string name="app_icon_lime">Limette</string>
+    <string name="app_icon_og">Original</string>
+    <string name="app_icon_rose_gold">Roségold</string>
+    <string name="app_icon_silver">Silber</string>
+    <string name="app_icon_soft_purple">Zartlila</string>
+    <string name="app_icon_sunset">Sonnenuntergang</string>
+    <string name="app_icon_tie_dye">Batik</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_custom_short">Eigenes</string>
+    <string name="pref_font">Schrift</string>
+    <string name="font_default">Standard</string>
+    <string name="font_add">Eigene Schrift hinzufügen</string>
+    <string name="font_rejected">Keine TTF/OTF-Schrift</string>
 </resources>

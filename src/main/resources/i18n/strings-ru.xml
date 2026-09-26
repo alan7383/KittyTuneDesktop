@@ -2596,4 +2596,26 @@
     <string name="stats_story_habits">Как вы слушаете</string>
     <string name="stats_story_active_days">дней с музыкой</string>
     <string name="menu_about">О программе</string>
+    <string name="app_icon_default">Стандартный</string>
+    <string name="app_icon_black">Чёрный</string>
+    <string name="app_icon_blue">Синий</string>
+    <string name="app_icon_chrome">Хром</string>
+    <string name="app_icon_england">Англия</string>
+    <string name="app_icon_scotland">Шотландия</string>
+    <string name="app_icon_hot_pink">Ярко-розовый</string>
+    <string name="app_icon_lavender">Лаванда</string>
+    <string name="app_icon_leopard">Леопард</string>
+    <string name="app_icon_lime">Лайм</string>
+    <string name="app_icon_og">Оригинал</string>
+    <string name="app_icon_rose_gold">Розовое золото</string>
+    <string name="app_icon_silver">Серебро</string>
+    <string name="app_icon_soft_purple">Нежно-фиолетовый</string>
+    <string name="app_icon_sunset">Закат</string>
+    <string name="app_icon_tie_dye">Тай-дай</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_custom_short">Своя</string>
+    <string name="pref_font">Шрифт</string>
+    <string name="font_default">По умолчанию</string>
+    <string name="font_add">Добавить свой шрифт</string>
+    <string name="font_rejected">Этот файл не шрифт TTF или OTF</string>
 </resources>
