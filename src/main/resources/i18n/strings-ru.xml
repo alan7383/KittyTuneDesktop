@@ -1212,15 +1212,6 @@
     <string name="pref_lyrics_apple_effect_sub">Плавная анимация текста вместо резкого переключения между словами</string>
     <string name="pref_lyrics_inline">Встроенные тексты</string>
     <string name="pref_lyrics_inline_sub">Отображать текст песни в плеере вместо обложки</string>
-    <string name="pref_lyrics_under_cover">Текст песни под обложкой</string>
-    <string name="pref_lyrics_under_cover_sub">Показывать текущую строку синхронизированного текста под обложкой альбома</string>
-    <string name="pref_lyrics_multi_state">Многорежимное переключение текста</string>
-    <string name="pref_lyrics_multi_state_sub">Переключение: Обложка -&gt; Под обложкой -&gt; Вместо обложки</string>
-    <string name="pref_lyrics_under_cover_placement">Расположение под обложкой</string>
-    <string name="pref_lyrics_under_cover_replace">Вместо названия и исполнителя</string>
-    <string name="pref_lyrics_under_cover_above">Над названием и исполнителем</string>
-    <string name="pref_lyrics_under_cover_always">Всегда показывать под обложкой</string>
-    <string name="pref_lyrics_under_cover_always_sub">Сохранять текущую строку видимой без необходимости нажатия</string>
     <string name="pref_lyrics_local">Предпочитать локальные файлы</string>
     <string name="pref_lyrics_local_sub">Использовать встроенные теги ID3, если они доступны</string>
     <string name="pref_lyrics_precise">Точный поиск текстов</string>

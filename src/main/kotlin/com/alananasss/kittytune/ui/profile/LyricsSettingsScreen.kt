@@ -38,7 +38,6 @@ import com.alananasss.kittytune.ui.common.Slider
     import androidx.compose.ui.window.Dialog
         import com.alananasss.kittytune.data.local.LyricsAlignment
     import com.alananasss.kittytune.data.local.LyricsDisplayStyle
-    import com.alananasss.kittytune.data.local.LyricsUnderCoverPlacement
     import com.alananasss.kittytune.data.local.PlayerPreferences
     import com.alananasss.kittytune.ui.common.SettingsGroup
     import com.alananasss.kittytune.ui.common.SettingsItem
@@ -67,12 +66,6 @@ import com.alananasss.kittytune.ui.common.Slider
         val sidebarAlignment = playerViewModel.lyricsSidebarAlignment
         var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
         var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
-        var inlineLyrics by remember { mutableStateOf(prefs.getInlineLyricsEnabled()) }
-        var lyricsUnderCover by remember { mutableStateOf(prefs.getLyricsUnderCoverEnabled()) }
-        var lyricsMultiState by remember { mutableStateOf(prefs.getLyricsMultiStateToggle()) }
-        var lyricsUnderCoverPlacement by remember { mutableStateOf(prefs.getLyricsUnderCoverPlacement()) }
-        var lyricsUnderCoverAlways by remember { mutableStateOf(prefs.getLyricsUnderCoverAlwaysVisible()) }
-        var showPlacementDialog by remember { mutableStateOf(false) }
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showSidebarAlignmentDialog by remember { mutableStateOf(false) }
@@ -137,42 +130,6 @@ import com.alananasss.kittytune.ui.common.Slider
                     }
                 },
                 confirmButton = { TextButton(onClick = { showProviderDialog = false }) { Text(str("btn_cancel")) } }
-            )
-        }
-
-        if (showPlacementDialog) {
-            EscapableAlertDialog(
-                onDismissRequest = { showPlacementDialog = false },
-                title = { Text(str("pref_lyrics_under_cover_placement")) },
-                text = {
-                    Column {
-                        Row(
-                            Modifier.fillMaxWidth().clickable {
-                                lyricsUnderCoverPlacement = LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST
-                                prefs.setLyricsUnderCoverPlacement(lyricsUnderCoverPlacement)
-                                showPlacementDialog = false
-                            }.padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = (lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST), onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("pref_lyrics_under_cover_replace"))
-                        }
-                        Row(
-                            Modifier.fillMaxWidth().clickable {
-                                lyricsUnderCoverPlacement = LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST
-                                prefs.setLyricsUnderCoverPlacement(lyricsUnderCoverPlacement)
-                                showPlacementDialog = false
-                            }.padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = (lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST), onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("pref_lyrics_under_cover_above"))
-                        }
-                    }
-                },
-                confirmButton = { TextButton(onClick = { showPlacementDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
 
@@ -1297,58 +1254,6 @@ import com.alananasss.kittytune.ui.common.Slider
                                 },
                                 onClick = { showLyricsFontDialog = true }
                             )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_lyrics_under_cover"),
-                                subtitle = str("pref_lyrics_under_cover_sub"),
-                                hasSwitch = true,
-                                switchState = lyricsUnderCover,
-                                onSwitchChange = {
-                                    lyricsUnderCover = it
-                                    prefs.setLyricsUnderCoverEnabled(it)
-                                }
-                            )
-                        }
-                        if (lyricsUnderCover) {
-                            add { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_multi_state"),
-                                    subtitle = str("pref_lyrics_multi_state_sub"),
-                                    hasSwitch = true,
-                                    switchState = lyricsMultiState,
-                                    onSwitchChange = {
-                                        lyricsMultiState = it
-                                        prefs.setLyricsMultiStateToggle(it)
-                                    }
-                                )
-                            }
-                            add { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_under_cover_placement"),
-                                    subtitle = when (lyricsUnderCoverPlacement) {
-                                        LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST -> str("pref_lyrics_under_cover_replace")
-                                        LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST -> str("pref_lyrics_under_cover_above")
-                                    },
-                                    onClick = { showPlacementDialog = true }
-                                )
-                            }
-                            add { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_lyrics_under_cover_always"),
-                                    subtitle = str("pref_lyrics_under_cover_always_sub"),
-                                    hasSwitch = true,
-                                    switchState = lyricsUnderCoverAlways,
-                                    onSwitchChange = {
-                                        lyricsUnderCoverAlways = it
-                                        prefs.setLyricsUnderCoverAlwaysVisible(it)
-                                    }
-                                )
-                            }
                         }
                         // Only unsynced lyrics scroll on their own — synced ones already
                         // follow the track (issue #33).

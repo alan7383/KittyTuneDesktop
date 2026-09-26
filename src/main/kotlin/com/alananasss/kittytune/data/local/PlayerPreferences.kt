@@ -47,9 +47,6 @@ enum class PlayerSliderStyle { BAR, WAVY, SLIM, SQUIGGLY }
  */
 enum class LyricsDisplayStyle { STANDARD, SCALE, FOCUS, SCALE_FOCUS }
 
-enum class LyricsUnderCoverPlacement { REPLACE_TITLE_ARTIST, ABOVE_TITLE_ARTIST }
-enum class LyricsDisplayState { OFF, UNDER_COVER, COVER_REPLACED }
-
 enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
 /**
  * What the full-screen player draws behind the words.
@@ -275,10 +272,6 @@ class PlayerPreferences {
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
         private const val KEY_LYRICS_DUET_VIEW = "lyrics_duet_view"
         private const val KEY_LYRICS_DUET_BLACKLIST = "lyrics_duet_blacklist"
-        private const val KEY_LYRICS_UNDER_COVER_ENABLED = "lyrics_under_cover_enabled"
-        private const val KEY_LYRICS_MULTI_STATE_TOGGLE = "lyrics_multi_state_toggle"
-        private const val KEY_LYRICS_UNDER_COVER_PLACEMENT = "lyrics_under_cover_placement"
-        private const val KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE = "lyrics_under_cover_always_visible"
 
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
         private const val KEY_LYRICS_UI_STYLE = "lyrics_ui_style"
@@ -313,7 +306,6 @@ class PlayerPreferences {
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
-        private const val KEY_INLINE_LYRICS = "inline_lyrics_enabled"
         private const val KEY_DISCORD_TOKEN = "discord_token"
         private const val KEY_DISCORD_ENABLED = "discord_rpc_enabled"
         private const val KEY_PRECISE_LYRICS_SEARCH = "precise_lyrics_search_enabled"
@@ -493,9 +485,6 @@ class PlayerPreferences {
     fun getDiscordAssetLogo(): String? = Prefs.getString(KEY_DISCORD_ASSET_LOGO, null)
     fun setDiscordAssetLogo(assetId: String?) = Prefs.putString(KEY_DISCORD_ASSET_LOGO, assetId)
 
-    fun getInlineLyricsEnabled(): Boolean = Prefs.getBoolean(KEY_INLINE_LYRICS, true)
-    fun setInlineLyricsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_INLINE_LYRICS, enabled)
-
     fun getShowLyricsButtonEnabled(): Boolean = Prefs.getBoolean(KEY_SHOW_LYRICS_BUTTON, true)
     fun setShowLyricsButtonEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_LYRICS_BUTTON, enabled)
 
@@ -589,22 +578,6 @@ class PlayerPreferences {
         }
         setLyricsDuetBlacklist(current)
     }
-
-    fun getLyricsUnderCoverEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, false)
-    fun setLyricsUnderCoverEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, enabled)
-
-    fun getLyricsMultiStateToggle(): Boolean = Prefs.getBoolean(KEY_LYRICS_MULTI_STATE_TOGGLE, false)
-    fun setLyricsMultiStateToggle(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_MULTI_STATE_TOGGLE, enabled)
-
-    fun getLyricsUnderCoverPlacement(): LyricsUnderCoverPlacement {
-        val name = Prefs.getString(KEY_LYRICS_UNDER_COVER_PLACEMENT, LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST.name)
-        return runCatching { LyricsUnderCoverPlacement.valueOf(name ?: "") }.getOrDefault(LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST)
-    }
-    fun setLyricsUnderCoverPlacement(placement: LyricsUnderCoverPlacement) =
-        Prefs.putString(KEY_LYRICS_UNDER_COVER_PLACEMENT, placement.name)
-
-    fun getLyricsUnderCoverAlwaysVisible(): Boolean = Prefs.getBoolean(KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE, false)
-    fun setLyricsUnderCoverAlwaysVisible(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE, enabled)
 
     fun setCachedUserId(id: Long) {
         Prefs.putLong(KEY_CACHED_USER_ID, id)

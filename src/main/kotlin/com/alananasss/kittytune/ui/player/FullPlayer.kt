@@ -10,12 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import com.alananasss.kittytune.data.local.LyricsUnderCoverPlacement
-import com.alananasss.kittytune.data.local.LyricsDisplayState
-import com.alananasss.kittytune.ui.player.lyrics.PlayerInlineLyrics
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -125,16 +120,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     var showText by remember { mutableStateOf(true) }
     var showQuickSettings by remember { mutableStateOf(false) }
 
-    val toggleLyricsAction: () -> Unit = {
-        val multiState = viewModel.playerPrefs.getLyricsMultiStateToggle()
-        val underCover = viewModel.playerPrefs.getLyricsUnderCoverEnabled()
-        if (multiState && underCover && viewModel.lyricsLines.isNotEmpty()) {
-            viewModel.toggleInlineLyrics()
-            showText = (viewModel.lyricsDisplayState == LyricsDisplayState.COVER_REPLACED)
-        } else {
-            showText = !showText
-        }
-    }
+    val toggleLyricsAction: () -> Unit = { showText = !showText }
 
     // Nothing to build a screen around. Leaving rather than drawing an empty sleeve on a grey wall: the
     // lyrics screen underneath is still there and is the better thing to be looking at.
@@ -774,9 +760,6 @@ private fun CoverColumn(
         val side = min(min(maxWidth, maxCoverHeight), cap)
         val controlsWidth = maxOf(side, min(maxWidth, 400.dp))
 
-        val lyricsUnderCoverPlacement = remember { viewModel.playerPrefs.getLyricsUnderCoverPlacement() }
-        val showUnderCover = viewModel.isLyricsUnderCoverActive && (!showText || !viewModel.hasLyrics)
-
         Column(horizontalAlignment = Alignment.Start) {
             AnimatedArtwork(
                 artworkUrl = track.fullResArtwork,
@@ -805,39 +788,9 @@ private fun CoverColumn(
                     },
             )
 
-            if (showUnderCover && lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.ABOVE_TITLE_ARTIST) {
-                Spacer(Modifier.height(10.dp))
-                Box(Modifier.width(controlsWidth)) {
-                    PlayerInlineLyrics(
-                        viewModel = viewModel,
-                        textColor = palette.bright,
-                        onClick = onToggleText,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
             Spacer(Modifier.height(18.dp))
             Box(Modifier.width(controlsWidth)) {
-                AnimatedContent(
-                    targetState = showUnderCover && lyricsUnderCoverPlacement == LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST,
-                    transitionSpec = {
-                        (fadeIn(animationSpec = tween(300)) + slideInVertically { it / 3 })
-                            .togetherWith(fadeOut(animationSpec = tween(200)) + slideOutVertically { -it / 3 })
-                    },
-                    label = "TitleLyricsUnderCover"
-                ) { showLyricsLine ->
-                    if (showLyricsLine) {
-                        PlayerInlineLyrics(
-                            viewModel = viewModel,
-                            textColor = palette.bright,
-                            onClick = onToggleText,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        TrackCredit(viewModel = viewModel, palette = palette)
-                    }
-                }
+                TrackCredit(viewModel = viewModel, palette = palette)
             }
             Spacer(Modifier.height(12.dp))
             Box(Modifier.width(controlsWidth)) {
@@ -997,7 +950,7 @@ private fun FullPlayerControls(
             QuietButton(
                 icon = Icons.Rounded.Lyrics,
                 label = str("player_lyrics"),
-                tint = if (showText || viewModel.isLyricsUnderCoverActive) palette.bright else palette.dim,
+                tint = if (showText) palette.bright else palette.dim,
                 onClick = onToggleText,
             )
         }

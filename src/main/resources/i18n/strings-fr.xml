@@ -1214,15 +1214,6 @@
     <string name="pref_lyrics_apple_effect_sub">Remplit les lettres de façon fluide au lieu de sauter d\'un mot à l\'autre.</string>
     <string name="pref_lyrics_inline">Paroles intégrées</string>
     <string name="pref_lyrics_inline_sub">Affiche les paroles dans le lecteur à la place de la pochette</string>
-    <string name="pref_lyrics_under_cover">Paroles sous la pochette</string>
-    <string name="pref_lyrics_under_cover_sub">Affiche la ligne de paroles synchronisée sous la pochette d\'album</string>
-    <string name="pref_lyrics_multi_state">Bouton de paroles multi-états</string>
-    <string name="pref_lyrics_multi_state_sub">Alterne : Pochette -&gt; Sous la pochette -&gt; Remplacer la pochette</string>
-    <string name="pref_lyrics_under_cover_placement">Disposition sous la pochette</string>
-    <string name="pref_lyrics_under_cover_replace">Remplacer le titre et l\'artiste</string>
-    <string name="pref_lyrics_under_cover_above">Au-dessus du titre et de l\'artiste</string>
-    <string name="pref_lyrics_under_cover_always">Toujours afficher sous la pochette</string>
-    <string name="pref_lyrics_under_cover_always_sub">Garde la ligne courante affichée sans avoir à cliquer</string>
     <string name="pref_lyrics_local">Priorité aux fichiers locaux</string>
     <string name="pref_lyrics_local_sub">Utiliser les tags ID3 intégrés si disponibles</string>
     <string name="pref_lyrics_precise">Recherche précise</string>

@@ -487,7 +487,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             if (track.source != "youtube" && !isSpotify) {
                 add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_details")) { viewModel.openTrackDetails(track) })
             }
-            add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track, forceSheet = true) })
+            add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track) })
             val isDuetBlacklisted = viewModel.isTrackDuetBlacklisted(track.id)
             add(
                 MenuOptionItem(

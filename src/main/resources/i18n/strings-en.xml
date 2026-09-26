@@ -1214,15 +1214,6 @@
     <string name="pref_lyrics_apple_effect_sub">Fills letters smoothly instead of jumping from word to word.</string>
     <string name="pref_lyrics_inline">Inline Lyrics</string>
     <string name="pref_lyrics_inline_sub">Display lyrics inside the player, replacing artwork</string>
-    <string name="pref_lyrics_under_cover">Lyrics under album cover</string>
-    <string name="pref_lyrics_under_cover_sub">Show current synced lyric line under the album art</string>
-    <string name="pref_lyrics_multi_state">Multi-state lyrics toggle</string>
-    <string name="pref_lyrics_multi_state_sub">Cycle: Cover -&gt; Under cover -&gt; Replace cover</string>
-    <string name="pref_lyrics_under_cover_placement">Under cover layout</string>
-    <string name="pref_lyrics_under_cover_replace">Replace title and artist</string>
-    <string name="pref_lyrics_under_cover_above">Above title and artist</string>
-    <string name="pref_lyrics_under_cover_always">Always show under cover</string>
-    <string name="pref_lyrics_under_cover_always_sub">Keep the current line visible without having to tap</string>
     <string name="pref_lyrics_local">Prefer local files</string>
     <string name="pref_lyrics_local_sub">Use embedded ID3 tags if available</string>
     <string name="pref_lyrics_precise">Precise Search</string>

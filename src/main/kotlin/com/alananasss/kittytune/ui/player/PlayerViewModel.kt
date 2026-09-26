@@ -47,7 +47,6 @@ import com.alananasss.kittytune.data.network.SoundCloudTelemetryTracker
 import com.alananasss.kittytune.utils.Logger
 import kotlin.time.Duration.Companion.milliseconds
 
-import com.alananasss.kittytune.data.local.LyricsDisplayState
 import com.alananasss.kittytune.data.lyrics.providers.*
 import com.alananasss.kittytune.data.lyrics.clients.*
 
@@ -795,15 +794,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     var lyricsMode by mutableStateOf(LyricsMode.SYNCED)
     var rawPlainLyrics by mutableStateOf<String?>(null)
-    var lyricsDisplayState by mutableStateOf(LyricsDisplayState.OFF)
-    var showInlineLyrics: Boolean
-        get() = lyricsDisplayState == LyricsDisplayState.COVER_REPLACED
-        set(value) {
-            lyricsDisplayState = if (value) LyricsDisplayState.COVER_REPLACED else LyricsDisplayState.OFF
-        }
-    val isLyricsUnderCoverActive: Boolean
-        get() = (lyricsDisplayState == LyricsDisplayState.UNDER_COVER || playerPrefs.getLyricsUnderCoverAlwaysVisible()) &&
-                hasLyrics && lyricsLines.isNotEmpty() && lyricsDisplayState != LyricsDisplayState.COVER_REPLACED
     var lyricsOffset by mutableLongStateOf(0L)
         private set
     var showLyricsOffsetControls by mutableStateOf(false)
@@ -1409,7 +1399,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 return@trackChangeHandler
             }
 
-            showInlineLyrics = false
             lyricsLines.clear()
             rawPlainLyrics = null
 
@@ -1545,26 +1534,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // playback change, so after a launch the media keys and the Windows flyout did nothing until
         // play was pressed inside the app.
         updateMprisMedia()
-    }
-
-    fun toggleInlineLyrics() {
-        val multiStateEnabled = playerPrefs.getLyricsMultiStateToggle()
-        val underCoverEnabled = playerPrefs.getLyricsUnderCoverEnabled()
-        val hasSyncedLyrics = lyricsLines.isNotEmpty()
-
-        if (multiStateEnabled && underCoverEnabled && hasSyncedLyrics) {
-            lyricsDisplayState = when (lyricsDisplayState) {
-                LyricsDisplayState.OFF -> LyricsDisplayState.UNDER_COVER
-                LyricsDisplayState.UNDER_COVER -> LyricsDisplayState.COVER_REPLACED
-                LyricsDisplayState.COVER_REPLACED -> LyricsDisplayState.OFF
-            }
-        } else {
-            lyricsDisplayState = if (lyricsDisplayState == LyricsDisplayState.COVER_REPLACED) {
-                LyricsDisplayState.OFF
-            } else {
-                LyricsDisplayState.COVER_REPLACED
-            }
-        }
     }
 
 
@@ -1817,22 +1786,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         currentTrack?.let { loadLyrics(it) }
     }
 
-    fun openLyrics(targetTrack: Track? = null, forceSheet: Boolean = false) {
+    fun openLyrics(targetTrack: Track? = null) {
         val target = targetTrack ?: currentTrack ?: return
         val isDifferentTrack = target.id != currentTrack?.id
         if (isDifferentTrack) playPlaylist(listOf(target), 0)
 
-        if (!forceSheet && playerPrefs.getInlineLyricsEnabled()) {
-            toggleInlineLyrics()
-        } else {
-            lyricsMode = if (lyricsLines.isNotEmpty()) {
-                LyricsMode.SYNCED
-            } else {
-                LyricsMode.PLAIN
-            }
-            showMenuSheet = false
-            showLyricsSheet = if (isDifferentTrack) true else !showLyricsSheet
-        }
+        lyricsMode = if (lyricsLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
+        showMenuSheet = false
+        showLyricsSheet = if (isDifferentTrack) true else !showLyricsSheet
     }
 
     private fun parseArtistAndTitle(title: String, uploader: String): Pair<String, String> {
