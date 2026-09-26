@@ -17,6 +17,8 @@
     <string name="about_credits_contribute_section">Szeretnél hozzájárulni?</string>
     <string name="about_credits_crowdin_title">KittyTune fordítása</string>
     <string name="about_credits_crowdin_desc">Segíts lefordítani a KittyTune-t a nyelvedre Crowdin-on</string>
+    <string name="about_credits_discord_title">Csatlakozz a Discord közösséghez</string>
+    <string name="about_credits_discord_desc">Beszélgess a közösséggel, jelents hibákat és oszd meg visszajelzéseid</string>
     <string name="about_credits_github_title">Kód hozzájárulás</string>
     <string name="about_credits_github_desc">Hibák jelentése, PR beküldése és funkciók javaslása</string>
     <string name="about_credits_kofi_title">Támogatás Ko-fi-n</string>
@@ -24,6 +26,7 @@
     <string name="about_credits_stats_contributors">%1$d közreműködő</string>
     <string name="about_credits_stats_languages">6 nyelv</string>
     <string name="about_credits_stats_open_source">100% Nyílt forráskód</string>
+    <string name="about_discord">Discord szerver</string>
     <string name="about_downloads_desc">Windows, Linux, macOS</string>
     <string name="about_downloads_title">Más platformok</string>
     <string name="about_github">Forráskód (GitHub)</string>

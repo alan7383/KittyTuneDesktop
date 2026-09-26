@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -355,6 +356,17 @@ fun CreditsScreen(
                     )
                 }
 
+                // CTA Discord
+                item {
+                    ContributeActionCard(
+                        iconPainter = painterResource("drawable/ic_discord.xml"),
+                        title = str(R.string.about_credits_discord_title),
+                        subtitle = str(R.string.about_credits_discord_desc),
+                        badge = "Discord",
+                        onClick = { uriHandler.openUri("https://discord.gg/thyHQH9jV9") }
+                    )
+                }
+
                 // CTA GitHub
                 item {
                     ContributeActionCard(
@@ -548,12 +560,13 @@ private fun ContributorCard(
 
 @Composable
 private fun ContributeActionCard(
-    icon: ImageVector,
     title: String,
     subtitle: String,
     badge: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    iconPainter: androidx.compose.ui.graphics.painter.Painter? = null
 ) {
     Card(
         onClick = onClick,
@@ -575,12 +588,21 @@ private fun ContributeActionCard(
                 modifier = Modifier.size(44.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    if (icon != null) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    } else if (iconPainter != null) {
+                        Icon(
+                            painter = iconPainter,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
             Spacer(Modifier.width(14.dp))

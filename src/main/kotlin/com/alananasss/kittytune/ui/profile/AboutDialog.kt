@@ -251,6 +251,14 @@ fun AboutDialog(
                             { shape ->
                                 SettingsItem(
                                     shape = shape,
+                                    iconPainter = painterResource("drawable/ic_discord.xml"),
+                                    title = str("about_discord"),
+                                    onClick = { uriHandler.openUri("https://discord.gg/thyHQH9jV9") }
+                                )
+                            },
+                            { shape ->
+                                SettingsItem(
+                                    shape = shape,
                                     icon = Icons.Rounded.Code,
                                     title = str("about_github"),
                                     onClick = { uriHandler.openUri("https://github.com/alan7383/kittytune") }

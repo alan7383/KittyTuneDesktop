@@ -2437,6 +2437,8 @@
     <string name="about_credits_dev_section">Phát triển</string>
     <string name="about_credits_filter_all">Tất cả</string>
     <string name="about_credits_filter_community">Cộng đồng</string>
+    <string name="about_credits_discord_title">Tham gia cộng đồng Discord</string>
+    <string name="about_credits_discord_desc">Trò chuyện với cộng đồng, báo lỗi và chia sẻ phản hồi</string>
     <string name="about_credits_filter_dev">Phát triển</string>
     <string name="about_credits_filter_translation">Dịch thuật</string>
     <string name="about_credits_github_desc">Báo cáo lỗi, gửi PR và đề xuất tính năng mới</string>
@@ -2449,6 +2451,7 @@
     <string name="about_credits_subtitle">Lời cảm ơn chân thành tới tất cả những ai đã giúp KittyTune trở nên tuyệt vời hơn.</string>
     <string name="about_credits_title">Đội ngũ &amp; Đóng góp</string>
     <string name="about_credits_translation_section">Dịch thuật</string>
+    <string name="about_discord">Máy chủ Discord</string>
     <string name="about_help_group">Trợ giúp &amp; Mã nguồn mở</string>
     <string name="about_role_community_contrib">Mã nguồn &amp; Cộng đồng</string>
     <string name="about_role_community_contrib_desc">Đóng góp, phản hồi &amp; đề xuất tính năng</string>
