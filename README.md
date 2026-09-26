@@ -321,12 +321,8 @@ licensed under the **MIT License**.
 
 thanks to everyone who helps make KittyTune Desktop better:
 
-<a href="https://github.com/dyr00l" title="dyr00l">
-  <img src="https://images.weserv.nl/?url=github.com/dyr00l.png&mask=circle&w=64&h=64" width="64" height="64" alt="dyr00l" />
-</a>
-<a href="https://github.com/Felitendo" title="Felitendo">
-  <img src="https://images.weserv.nl/?url=github.com/Felitendo.png&mask=circle&w=64&h=64" width="64" height="64" alt="Felitendo" />
-</a>
+[![Contributors](https://contrib.rocks/image?repo=alan7383/KittyTuneDesktop)](https://github.com/alan7383/KittyTuneDesktop/graphs/contributors)
+
 
 ---
 
