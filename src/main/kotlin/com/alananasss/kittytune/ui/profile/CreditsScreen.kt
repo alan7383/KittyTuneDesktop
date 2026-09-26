@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -348,7 +349,7 @@ fun CreditsScreen(
                 // CTA Crowdin
                 item {
                     ContributeActionCard(
-                        icon = Icons.Rounded.Language,
+                        mark = rememberVectorPainter(Icons.Rounded.Language),
                         title = str(R.string.about_credits_crowdin_title),
                         subtitle = str(R.string.about_credits_crowdin_desc),
                         badge = "Crowdin",
@@ -359,7 +360,7 @@ fun CreditsScreen(
                 // CTA Discord
                 item {
                     ContributeActionCard(
-                        iconPainter = painterResource("drawable/ic_discord.xml"),
+                        mark = painterResource("drawable/ic_discord.xml"),
                         title = str(R.string.about_credits_discord_title),
                         subtitle = str(R.string.about_credits_discord_desc),
                         badge = "Discord",
@@ -370,7 +371,7 @@ fun CreditsScreen(
                 // CTA GitHub
                 item {
                     ContributeActionCard(
-                        icon = Icons.Rounded.Code,
+                        mark = rememberVectorPainter(Icons.Rounded.Code),
                         title = str(R.string.about_credits_github_title),
                         subtitle = str(R.string.about_credits_github_desc),
                         badge = "GitHub",
@@ -381,7 +382,7 @@ fun CreditsScreen(
                 // CTA Ko-fi
                 item {
                     ContributeActionCard(
-                        icon = Icons.Rounded.VolunteerActivism,
+                        mark = rememberVectorPainter(Icons.Rounded.VolunteerActivism),
                         title = str(R.string.about_credits_kofi_title),
                         subtitle = str(R.string.about_credits_kofi_desc),
                         badge = "Ko-fi",
@@ -559,14 +560,22 @@ private fun ContributorCard(
 }
 
 @Composable
+/**
+ * One of the ways to help, as a card.
+ *
+ * [mark] is a [Painter] rather than an [ImageVector] because the four of them are not the same kind
+ * of thing: three are Material icons and the Discord one is a drawable. A painter covers both, and
+ * `rememberVectorPainter` bridges the vectors. It took two optional icon parameters before, so a
+ * caller who passed neither got an empty 44 dp disc — and the compiler had nothing to say about it,
+ * which is the kind of thing found by looking at the screen rather than by building it.
+ */
 private fun ContributeActionCard(
     title: String,
     subtitle: String,
     badge: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    icon: ImageVector? = null,
-    iconPainter: androidx.compose.ui.graphics.painter.Painter? = null
+    mark: androidx.compose.ui.graphics.painter.Painter,
 ) {
     Card(
         onClick = onClick,
@@ -588,21 +597,12 @@ private fun ContributeActionCard(
                 modifier = Modifier.size(44.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    if (icon != null) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    } else if (iconPainter != null) {
-                        Icon(
-                            painter = iconPainter,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
+                    Icon(
+                        painter = mark,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
             }
             Spacer(Modifier.width(14.dp))
