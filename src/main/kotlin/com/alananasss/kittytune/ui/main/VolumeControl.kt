@@ -130,6 +130,33 @@ internal fun VolumeControl(
     }
 }
 
+/**
+ * The volume track alone, in the style the user picked, for a screen that lays out its own speaker and
+ * level — the full player, whose colours come from the artwork rather than the theme.
+ */
+@Composable
+internal fun StyledVolumeTrack(
+    volume: Float,
+    isPlaying: Boolean,
+    activeColor: Color,
+    inactiveColor: Color,
+    onVolumeChange: (Float) -> Unit,
+    onVolumeChangeFinished: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalWaveMoving provides isPlaying) {
+        VolumeTrack(
+            volume = volume,
+            style = rememberVolumeStyle(),
+            onVolumeChange = onVolumeChange,
+            onVolumeChangeFinished = onVolumeChangeFinished,
+            modifier = modifier,
+            activeColor = activeColor,
+            inactiveColor = inactiveColor,
+        )
+    }
+}
+
 /** Whether the wavy volume track should be moving: only while music plays, like the seek bar. */
 private val LocalWaveMoving = androidx.compose.runtime.compositionLocalOf { false }
 
@@ -198,6 +225,9 @@ private fun VolumeTrack(
     onVolumeChangeFinished: () -> Unit,
     modifier: Modifier = Modifier,
     vertical: Boolean = false,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
+    // Material's own inactive-track colour: visible on the bar's container, unlike a surface tone.
+    inactiveColor: Color = MaterialTheme.colorScheme.secondaryContainer,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
@@ -232,9 +262,6 @@ private fun VolumeTrack(
         }
     }
 
-    val activeColor = MaterialTheme.colorScheme.primary
-    // Material's own inactive-track colour: visible on the bar's container, unlike a surface tone.
-    val inactiveColor = MaterialTheme.colorScheme.secondaryContainer
     val latestOnChange by rememberUpdatedState(onVolumeChange)
     val latestOnFinished by rememberUpdatedState(onVolumeChangeFinished)
 
@@ -366,7 +393,7 @@ private fun rememberVolumeStyle(): PlayerSliderStyle {
     }
 }
 
-private fun volumeIcon(volume: Float): ImageVector =
+internal fun volumeIcon(volume: Float): ImageVector =
     if (volume <= 0.001f) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp
 
 internal fun volumePercentLabel(volume: Float): String = "${(volume * 100).roundToInt()}%"
