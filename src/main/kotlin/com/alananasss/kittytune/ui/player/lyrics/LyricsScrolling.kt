@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -132,6 +133,7 @@ internal object LyricsScrolling {
  *   height. A line anchored by its top edge sits lower the more it wraps, so a long line opened below the
  *   centre (issue #33, round 5). Measured from the laid-out line, so it falls back to [anchorPx] for a line
  *   not on screen yet.
+ * @return whether the reader is scrolling by hand — true from their scroll until following resumes.
  */
 @Composable
 internal fun FollowActiveLine(
@@ -139,8 +141,18 @@ internal fun FollowActiveLine(
     activeIndex: Int,
     anchorPx: Int = 0,
     centred: Boolean = false,
-) {
+): Boolean {
     var lastManualScrollMs by remember { mutableStateOf(0L) }
+    var readingByHand by remember { mutableStateOf(false) }
+
+    // Its own clock, not the follow loop's: that one only runs when the line changes, and a reader who
+    // scrolls during a long line would otherwise stay "by hand" until the next one.
+    LaunchedEffect(lastManualScrollMs) {
+        if (lastManualScrollMs == 0L) return@LaunchedEffect
+        readingByHand = true
+        delay(LyricsScrolling.MANUAL_GRACE_MS)
+        readingByHand = false
+    }
 
     /** True for exactly as long as the scroll below is ours, so the flag cannot be misattributed. */
     var autoScrolling by remember { mutableStateOf(false) }
@@ -212,6 +224,27 @@ internal fun FollowActiveLine(
             autoScrolling = false
         }
     }
+    return readingByHand
+}
+
+/**
+ * The line the view is about: the one being sung, or — while the reader scrolls by hand — the one nearest
+ * the middle of the viewport.
+ *
+ * Only the treatment (scale, dimming, blur) follows it; the highlight stays on the sung line. Measuring
+ * blur from the sung line alone blurred everything a reader had scrolled to, which is the opposite of
+ * reading (issue #33, round 5).
+ */
+@Composable
+internal fun rememberFocusLine(listState: LazyListState, activeIndex: Int, readingByHand: Boolean): Int {
+    val centreLine by remember(listState) { derivedStateOf { listState.lineNearestViewportCentre() } }
+    return if (readingByHand && centreLine >= 0) centreLine else activeIndex
+}
+
+private fun LazyListState.lineNearestViewportCentre(): Int {
+    val info = layoutInfo
+    val middle = (info.viewportStartOffset + info.viewportEndOffset) / 2
+    return info.visibleItemsInfo.minByOrNull { kotlin.math.abs(it.offset + it.size / 2 - middle) }?.index ?: -1
 }
 
 /**
