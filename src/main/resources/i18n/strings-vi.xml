@@ -3124,4 +3124,6 @@
     <string name="sources_yandex">Yandex Music</string>
     <string name="sources_connected">Đã kết nối</string>
     <string name="sources_connect">Kết nối</string>
+    <string name="pref_show_remaining_time">Thời gian còn lại</string>
+    <string name="pref_show_remaining_time_desc">Hiển thị thời gian còn lại (-00:14) thay vì tổng thời lượng trên thanh phát lại</string>
 </resources>

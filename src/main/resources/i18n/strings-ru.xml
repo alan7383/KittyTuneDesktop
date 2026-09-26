@@ -2674,4 +2674,6 @@
     <string name="sources_yandex">Яндекс Музыка</string>
     <string name="sources_connected">Подключено</string>
     <string name="sources_connect">Подключить</string>
+    <string name="pref_show_remaining_time">Оставшееся время</string>
+    <string name="pref_show_remaining_time_desc">Отображать оставшееся время (-00:14) вместо общей длительности на полосе воспроизведения</string>
 </resources>

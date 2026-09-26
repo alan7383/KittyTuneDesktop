@@ -1298,6 +1298,7 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
                 }
         )
 
+        val showRemaining = rememberFullPlayerShowRemaining()
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1305,17 +1306,38 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
         ) {
             TimeLabel(com.alananasss.kittytune.utils.makeTimeString(shown), palette)
             com.alananasss.kittytune.ui.player.automix.AutomixBadge(textColor = palette.bright)
-            // Counting down, with the minus the reference shows: "how much is left" without arithmetic.
-            TimeLabel("-" + com.alananasss.kittytune.utils.makeTimeString(duration - shown), palette)
+            // Counting down or total duration, switchable by clicking and synced with settings.
+            TimeLabel(
+                text = if (showRemaining) "-" + com.alananasss.kittytune.utils.makeTimeString((duration - shown).coerceAtLeast(0L)) else com.alananasss.kittytune.utils.makeTimeString(duration),
+                palette = palette,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable {
+                        com.alananasss.kittytune.data.local.PlayerPreferences().setShowRemainingTime(!showRemaining)
+                    }
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+            )
         }
     }
 }
 
 @Composable
-private fun TimeLabel(text: String, palette: FullPlayerPalette) {
+private fun TimeLabel(text: String, palette: FullPlayerPalette, modifier: Modifier = Modifier) {
     androidx.compose.material3.Text(
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = palette.dim,
+        modifier = modifier,
     )
+}
+
+/**
+ * Reactive read of the "show remaining time" setting; recomposes when the pref changes.
+ */
+@Composable
+private fun rememberFullPlayerShowRemaining(): Boolean {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) {
+        com.alananasss.kittytune.data.local.PlayerPreferences().getShowRemainingTime()
+    }
 }
