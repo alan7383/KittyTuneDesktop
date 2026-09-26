@@ -123,13 +123,13 @@ object WindowsFullScreen {
             originalStyle = User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE)
             if (window is Frame) {
                 wasMaximized = (window.extendedState and Frame.MAXIMIZED_BOTH) != 0
-                if (!wasMaximized) {
-                    savedBounds = window.bounds
-                }
                 // Normalize window state before applying monitor bounds so Win32 does not constrain it to work area
                 if (wasMaximized) {
                     window.extendedState = Frame.NORMAL
                 }
+                // Taken after un-maximising, so a maximized window also remembers its normal size: that is the
+                // rectangle it restores through on the way back to maximized.
+                savedBounds = window.bounds
             } else {
                 savedBounds = window.bounds
             }
@@ -185,14 +185,19 @@ object WindowsFullScreen {
 
             val shouldMaximize = restorePlacement == WindowPlacement.Maximized || wasMaximized
             if (shouldMaximize && window is Frame) {
-                window.extendedState = Frame.MAXIMIZED_BOTH
-                User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_MAXIMIZE)
+                // The restored style only takes effect with SWP_FRAMECHANGED. Maximizing before that maximized a
+                // window Windows still took for a caption-less popup, and a popup maximizes over the whole
+                // monitor: leaving full screen put the window on top of the taskbar. So the frame change goes
+                // first, onto the normal rectangle, and the maximize after it lands on the work area.
+                val normal = savedBounds ?: fallbackBounds ?: window.bounds
                 User32.INSTANCE.SetWindowPos(
                     hwnd,
                     HWND_NOTOPMOST,
-                    0, 0, 0, 0,
-                    WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
+                    normal.x, normal.y, normal.width, normal.height,
+                    WinUser.SWP_FRAMECHANGED or WinUser.SWP_NOACTIVATE
                 )
+                User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_MAXIMIZE)
+                window.extendedState = Frame.MAXIMIZED_BOTH
             } else {
                 if (window is Frame) {
                     window.extendedState = Frame.NORMAL
