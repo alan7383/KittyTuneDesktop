@@ -17,6 +17,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 
 import androidx.savedstate.read
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import com.alananasss.kittytune.ui.profile.SettingsNavigation
 
 /**
  * Back and forward, on the side buttons of the mouse (issue #33).
@@ -40,6 +41,8 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
  * Takes functions rather than a `NavHostController` so the part with the reasoning in it — when a
  * forward entry is offered and when it is thrown away — can be tested without a navigation host.
  */
+private const val SETTINGS_ROUTE = "settings"
+
 class HistoryNavigator internal constructor(
     private val currentRoute: () -> String?,
     private val hasPrevious: () -> Boolean,
@@ -55,9 +58,11 @@ class HistoryNavigator internal constructor(
     /** Set around our own navigations, so the observer can tell them from the reader's. */
     internal var moving = false
 
-    val canGoBack: Boolean get() = isLyricsOpen() || hasPrevious()
+    private val inSettings: Boolean get() = currentRoute() == SETTINGS_ROUTE
 
-    val canGoForward: Boolean get() = forward.isNotEmpty()
+    val canGoBack: Boolean get() = isLyricsOpen() || hasPrevious() || (inSettings && SettingsNavigation.canGoBack)
+
+    val canGoForward: Boolean get() = forward.isNotEmpty() || (inSettings && SettingsNavigation.canGoForward)
 
     /** How many entries are waiting, for tests and for anything that wants to show the trail. */
     val forwardSize: Int get() = forward.size
@@ -71,6 +76,8 @@ class HistoryNavigator internal constructor(
             moving = false
             return
         }
+        // Inside settings, back walks the settings' own history (sub-pages, categories) before leaving them.
+        if (inSettings && SettingsNavigation.back()) return
         if (!hasPrevious()) return
         val leaving = currentRoute() ?: return
         moving = true
@@ -84,6 +91,7 @@ class HistoryNavigator internal constructor(
     }
 
     fun forward() {
+        if (inSettings && SettingsNavigation.forward()) return
         val route = forward.removeLastOrNull() ?: return
         moving = true
         if (route == LYRICS_ROUTE) {

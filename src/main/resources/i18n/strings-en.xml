@@ -2596,4 +2596,5 @@
     <string name="stats_story_when">Your hour</string>
     <string name="stats_story_habits">How you listen</string>
     <string name="stats_story_active_days">days with music</string>
+    <string name="menu_about">About</string>
 </resources>

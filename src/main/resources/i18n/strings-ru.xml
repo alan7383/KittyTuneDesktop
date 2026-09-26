@@ -2595,4 +2595,5 @@
     <string name="stats_story_when">Ваше время</string>
     <string name="stats_story_habits">Как вы слушаете</string>
     <string name="stats_story_active_days">дней с музыкой</string>
+    <string name="menu_about">О программе</string>
 </resources>
