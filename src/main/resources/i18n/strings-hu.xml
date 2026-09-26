@@ -1159,6 +1159,11 @@
     <string name="player_lyrics">Dalszöveg</string>
     <string name="lyrics_fullscreen">Teljes képernyő</string>
     <string name="lyrics_exit_fullscreen">Kilépés a teljes képernyőből</string>
+    <string name="pref_screensaver_title">Automatikus képernyőkímélő</string>
+    <string name="pref_screensaver_desc">60 mp inaktivitás után fókusz módra vált teljes képernyőn</string>
+    <string name="screensaver_focus_mode">Képernyőkímélő és fókusz mód</string>
+    <string name="screensaver_tap_to_wake">Mozgassa az egeret vagy kattintson a kilépéshez</string>
+    <string name="screensaver_session_stats">Munkamenet statisztikák</string>
     <string name="player_previous">Előző szám</string>
     <string name="player_play_pause">Lejátszás / pillanatállj</string>
     <string name="player_next">Következő szám</string>

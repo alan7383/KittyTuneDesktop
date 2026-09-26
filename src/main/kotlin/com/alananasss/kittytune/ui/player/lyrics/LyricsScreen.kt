@@ -103,6 +103,7 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.ui.common.Slider
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.DarkMode
 import kotlin.math.roundToInt
     import com.alananasss.kittytune.ui.player.LyricsMode
     import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -1555,9 +1556,11 @@ fun QuickLyricsSettingsDialog(
                                                 Icon(Icons.Rounded.Add, null)
                                             }
                                         }
+
                                     }
                                 }
                             }
+
 
                             // UI STYLE
                             Card(
@@ -2373,6 +2376,47 @@ fun QuickLyricsSettingsDialog(
                             }
 
 
+
+                            // ÉCRAN DE VEILLE — carte dans la colonne droite
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.DarkMode,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = str("pref_screensaver_title"),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = str("pref_screensaver_desc"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = viewModel.fullPlayerScreensaverEnabled,
+                                            onCheckedChange = { viewModel.updateFullPlayerScreensaverEnabled(it) }
+                                        )
+                                    }
+                                }
+                            }
 
                             // Bouton RECHERCHE MANUELLE en bas de la colonne de droite
                             Button(

@@ -167,6 +167,8 @@ class PlayerPreferences {
         private const val LEGACY_ORBS_STYLE = "ORBS"
         private const val KEY_FULL_PLAYER_COVER_SCALE = "full_player_cover_scale"
         private const val KEY_FULL_PLAYER_LYRICS_ALIGN = "full_player_lyrics_align"
+        private const val KEY_FULL_PLAYER_SCREENSAVER_ENABLED = "full_player_screensaver_enabled"
+        private const val KEY_FULL_PLAYER_SCREENSAVER_TIMEOUT = "full_player_screensaver_timeout"
         private const val KEY_SAVE_POSITION = "save_position_enabled"
         private const val KEY_START_DESTINATION = "start_destination_pref"
         private const val KEY_DYNAMIC_THEME = "dynamic_theme_enabled"
@@ -836,6 +838,12 @@ class PlayerPreferences {
         }
     }
     fun setFullPlayerLyricsAlign(align: LyricsAlignment) = Prefs.putString(KEY_FULL_PLAYER_LYRICS_ALIGN, align.name)
+
+    fun getFullPlayerScreensaverEnabled(): Boolean = Prefs.getBoolean(KEY_FULL_PLAYER_SCREENSAVER_ENABLED, false)
+    fun setFullPlayerScreensaverEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_FULL_PLAYER_SCREENSAVER_ENABLED, enabled)
+
+    fun getFullPlayerScreensaverTimeout(): Int = Prefs.getInt(KEY_FULL_PLAYER_SCREENSAVER_TIMEOUT, 60)
+    fun setFullPlayerScreensaverTimeout(seconds: Int) = Prefs.putInt(KEY_FULL_PLAYER_SCREENSAVER_TIMEOUT, seconds)
 
     fun getSavePositionEnabled(): Boolean = Prefs.getBoolean(KEY_SAVE_POSITION, true)
     fun setSavePositionEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SAVE_POSITION, enabled)

@@ -2564,6 +2564,11 @@
     <string name="lyrics_badge_line_sync">Đồng bộ từng dòng</string>
     <string name="lyrics_badge_word_sync">Đồng bộ từng từ</string>
     <string name="lyrics_exit_fullscreen">Thoát toàn màn hình</string>
+    <string name="pref_screensaver_title">Trình bảo vệ màn hình tự động</string>
+    <string name="pref_screensaver_desc">Chuyển sang chế độ tập trung sau 60 giây không hoạt động ở chế độ toàn màn hình</string>
+    <string name="screensaver_focus_mode">Chế độ bảo vệ màn hình &amp; tập trung</string>
+    <string name="screensaver_tap_to_wake">Di chuyển chuột hoặc nhấp để thoát</string>
+    <string name="screensaver_session_stats">Thống kê phiên</string>
     <string name="lyrics_fullscreen">Toàn màn hình</string>
     <string name="lyrics_style_focus">Tiêu điểm (Focus)</string>
     <string name="lyrics_style_focus_sub">Các dòng khác mờ đi rõ rệt và hơi nhòe.</string>

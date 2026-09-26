@@ -21,6 +21,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.material.icons.rounded.FormatSize
     import androidx.compose.material.icons.rounded.Remove
     import androidx.compose.material.icons.rounded.SdStorage
+    import androidx.compose.material.icons.rounded.DarkMode
     import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import com.alananasss.kittytune.ui.common.Slider
@@ -1294,6 +1295,8 @@ import com.alananasss.kittytune.ui.common.Slider
 
             if (shows(LyricsSettingsPage.FULLSCREEN)) {
                 LyricsModeGroup(
+                    screensaverEnabled = playerViewModel.fullPlayerScreensaverEnabled,
+                    onScreensaverChange = { playerViewModel.updateFullPlayerScreensaverEnabled(it) },
                     style = playerViewModel.lyricsFullScreenUiStyle,
                     onStyleClick = { showFullScreenUiStyleDialog = true },
                     lineBlur = playerViewModel.lyricsFullScreenLineBlurEnabled,
@@ -1317,6 +1320,8 @@ import com.alananasss.kittytune.ui.common.Slider
 
             if (shows(LyricsSettingsPage.CENTRAL)) {
                 LyricsModeGroup(
+                    screensaverEnabled = null,
+                    onScreensaverChange = {},
                     style = playerViewModel.lyricsUiStyle,
                     onStyleClick = { showUiStyleDialog = true },
                     lineBlur = playerViewModel.lyricsLineBlurEnabled,
@@ -1341,6 +1346,8 @@ import com.alananasss.kittytune.ui.common.Slider
             if (shows(LyricsSettingsPage.SIDEBAR)) {
                 // The side panel has no display-style or spacing knobs of its own.
                 LyricsModeGroup(
+                    screensaverEnabled = null,
+                    onScreensaverChange = {},
                     style = playerViewModel.lyricsSidebarUiStyle,
                     onStyleClick = { showSidebarUiStyleDialog = true },
                     lineBlur = playerViewModel.lyricsSidebarLineBlurEnabled,
@@ -1478,6 +1485,8 @@ private class LyricsSpacing(
  */
 @Composable
 private fun LyricsModeGroup(
+    screensaverEnabled: Boolean?,
+    onScreensaverChange: (Boolean) -> Unit,
     style: com.alananasss.kittytune.data.local.LyricsUiStyle,
     onStyleClick: () -> Unit,
     lineBlur: Boolean,
@@ -1493,6 +1502,16 @@ private fun LyricsModeGroup(
     val isClassic = style == com.alananasss.kittytune.data.local.LyricsUiStyle.CLASSIC
     SettingsGroup(
         items = buildList {
+            if (screensaverEnabled != null) add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_screensaver_title"),
+                    subtitle = str("pref_screensaver_desc"),
+                    hasSwitch = true,
+                    switchState = screensaverEnabled,
+                    onSwitchChange = onScreensaverChange,
+                )
+            }
             add { shape ->
                 SettingsItem(
                     shape = shape,
