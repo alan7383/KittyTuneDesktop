@@ -8,9 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.alananasss.kittytune.core.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.alananasss.kittytune.data.GenreData
 import com.alananasss.kittytune.data.HistoryRepository
 import com.alananasss.kittytune.data.LikeRepository
+import com.alananasss.kittytune.data.RecentSearchRepository
 import com.alananasss.kittytune.data.SearchCategory
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.data.local.HistoryItem
@@ -180,19 +180,146 @@ import com.alananasss.kittytune.utils.Logger
         private var searchJob: Job? = null
         val personalizedCategories = mutableStateListOf<SearchCategory>()
     
-        val moodCategories = GenreData.getMoods()
-        val genreCategories = GenreData.getGenres()
-    
+        // ── Search landing (issue #56) ──
+        // What the search screen shows when the field is empty. Moods and genres used to be here as
+        // two long chip walls; they are static lists of taste categories, and neither of them changes
+        // with the listener, so they took the two most valuable rows on the screen to say nothing.
+        // What is here instead is per-listener and either a chart or something already known: the
+        // queries just run, the songs in the chart, and what the artists you liked have put out.
+
+        /** The queries already run, newest first. */
+        val recentSearches = mutableStateListOf<String>()
+        private var recentSearchesJob: Job? = null
+
+        /** Enough of the chart to preview on the landing; the whole thing lives on the Charts screen. */
+        val chartPreview = mutableStateListOf<ChartEntry>()
+        var chartPreviewKind by mutableStateOf(ChartKind.TOP)
+            private set
+        var isChartPreviewLoading by mutableStateOf(false)
+            private set
+
+        /** Newest songs from the artists whose work is already in the liked list. */
+        val likedArtistUpdates = mutableStateListOf<Track>()
+
+        private fun observeRecentSearches() {
+            if (recentSearchesJob != null) return
+            recentSearchesJob = viewModelScope.launch {
+                RecentSearchRepository.recent().collect { terms ->
+                    recentSearches.clear()
+                    recentSearches.addAll(terms)
+                }
+            }
+        }
+
+        /** Called when a search is actually run, so a half-typed word never becomes history. */
+        private fun recordSearch(query: String) {
+            viewModelScope.launch { RecentSearchRepository.record(query) }
+        }
+
+        fun forgetSearch(query: String) {
+            viewModelScope.launch { RecentSearchRepository.forget(query) }
+        }
+
+        fun clearRecentSearches() {
+            viewModelScope.launch { RecentSearchRepository.clear() }
+        }
+
+        /**
+         * Re-runs a stored query: puts it in the field and searches it, which is what pressing a
+         * recent search is expected to do.
+         */
+        fun runRecentSearch(query: String) {
+            searchQuery = query
+            searchJob?.cancel()
+            searchJob = viewModelScope.launch { performSearch(query) }
+        }
+
+        fun loadChartPreview(kind: ChartKind = chartPreviewKind) {
+            chartPreviewKind = kind
+            viewModelScope.launch {
+                isChartPreviewLoading = true
+                try {
+                    val response = api.getCharts(
+                        kind = kind.apiValue,
+                        genre = "soundcloud:genres:all-music",
+                        limit = CHART_PREVIEW_LENGTH,
+                    )
+                    val entries = response.collection.mapNotNull { item ->
+                        item.track?.let { ChartEntry(rank = 0, track = it, score = item.score ?: 0.0) }
+                    }.mapIndexed { index, entry -> entry.copy(rank = index + 1) }
+                    if (kind == chartPreviewKind) {
+                        chartPreview.clear()
+                        chartPreview.addAll(entries)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    if (kind == chartPreviewKind) isChartPreviewLoading = false
+                }
+            }
+        }
+
+        /**
+         * Newest songs from artists already present in the liked list.
+         *
+         * A handful of artists rather than all of them: the endpoint is one request per artist, and
+         * this runs on the home screen's critical path. Artists with nothing new simply contribute
+         * nothing, and the songs already liked are dropped so the row is only ever new ones.
+         */
+        private suspend fun fetchLikedArtistUpdates(localLikes: List<Track>): List<Track> {
+            val artists = localLikes.asSequence()
+                .mapNotNull { it.user?.takeIf { user -> user.id > 0 } }
+                .distinctBy { it.id }
+                .take(ARTIST_UPDATE_SOURCES)
+                .toList()
+            if (artists.isEmpty()) return emptyList()
+
+            val likedIds = localLikes.mapTo(HashSet()) { it.id }
+            val fetched = coroutineScope {
+                artists.map { artist ->
+                    async {
+                        runCatching { api.getUserTracks(artist.id, limit = TRACKS_PER_ARTIST).collection }
+                            .getOrDefault(emptyList())
+                    }
+                }.awaitAll()
+            }
+
+            return fetched.flatten()
+                .filter { it.id > 0L && it.id !in likedIds }
+                .distinctBy { it.id }
+                // ISO 8601 sorts as text, so the newest really is last; a track with no date goes to
+                // the end rather than to the top on an empty string.
+                .sortedByDescending { it.createdAt ?: it.releaseDate ?: "" }
+                .take(ARTIST_UPDATE_TOTAL)
+        }
+
+        companion object {
+            /** How many songs the landing's chart preview shows. */
+            const val CHART_PREVIEW_LENGTH = 5
+
+            /** How many liked artists are asked for new songs. One request each. */
+            const val ARTIST_UPDATE_SOURCES = 6
+
+            private const val TRACKS_PER_ARTIST = 5
+            private const val ARTIST_UPDATE_TOTAL = 18
+        }
+
         init {
             loadFromCache()
             if (isOfflineMode) {
                 isLoading = false
             }
 
+            // The history is local, so it can be read straight away. The chart is not: asking for it
+            // with no network only produces a failed request and a spinner that never resolves, so it
+            // waits for the same ready signal the rest of the feed does.
+            observeRecentSearches()
+
             viewModelScope.launch {
                 SessionManager.isClientIdValid.collect { isReady ->
                     if (isReady && !isOfflineMode) {
                         loadData()
+                        loadChartPreview()
                     }
                 }
             }
@@ -440,6 +567,9 @@ import com.alananasss.kittytune.utils.Logger
     
         private suspend fun performSearch(query: String) {
             isSearchLoading = true; clearSearchResults()
+            // The field searches as you type, so this is the first moment a query becomes a search
+            // rather than a prefix. Recording it here is what keeps "lo" out of the history.
+            recordSearch(query)
             try {
                 when (activeSearchSource) {
                     SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
@@ -1171,16 +1301,33 @@ import com.alananasss.kittytune.utils.Logger
                     val historySectionDef = async { fetchHistoryBasedSection() }
                     val discoverySectionDef = async { fetchDiscoverySection(localLikes) }
                     val recommendationsDef = async { fetchTrackRecommendations(localLikes) }
-    
+                    val artistUpdatesDef = async { fetchLikedArtistUpdates(localLikes) }
+
                     val genericSections = genericSectionsDef.await()
                     val personalSections = personalSectionsDef.await()
                     val historySection = historySectionDef.await()
                     val discoverySection = discoverySectionDef.await()
                     val recommendationsSection = recommendationsDef.await()
-    
+                    val artistUpdates = artistUpdatesDef.await()
+
+                    likedArtistUpdates.clear()
+                    likedArtistUpdates.addAll(artistUpdates)
+
                     if (discoverySection != null) allSections.add(discoverySection)
                     if (recommendationsSection != null) allSections.add(recommendationsSection)
                     if (historySection != null) allSections.add(historySection)
+                    // Straight after your own history: what the artists you already play have put
+                    // out belongs next to what you just listened to, not down with the generic rows.
+                    if (artistUpdates.isNotEmpty()) {
+                        allSections.add(
+                            HomeSection(
+                                title = str("home_from_your_artists"),
+                                subtitle = str("home_from_your_artists_sub"),
+                                content = artistUpdates,
+                                type = SectionType.TRACKS_ROW,
+                            )
+                        )
+                    }
                     allSections.addAll(personalSections)
                     allSections.addAll(genericSections)
                 }
@@ -1253,21 +1400,36 @@ import com.alananasss.kittytune.utils.Logger
                     val historySectionDef = async { fetchHistoryBasedSection() }
                     val discoverySectionDef = async { fetchDiscoverySection(sourceLikes) }
                     val recommendationsDef = async { fetchTrackRecommendations(localLikes) }
-    
+                    val artistUpdatesDef = async { fetchLikedArtistUpdates(sourceLikes) }
+
                     val discoverySection = discoverySectionDef.await()
                     if (discoverySection != null) allSections.add(discoverySection)
-    
+
                     val streamTracks = streamDef.await()
                     if (streamTracks.isNotEmpty()) {
                         allSections.add(HomeSection(str("home_stream"), null, streamTracks, SectionType.HIGHLIGHT_ROW))
                     }
-    
+
                     val recommendationsSection = recommendationsDef.await()
                     if (recommendationsSection != null) allSections.add(recommendationsSection)
-    
+
                     val historySection = historySectionDef.await()
                     if (historySection != null) allSections.add(historySection)
-    
+
+                    val artistUpdates = artistUpdatesDef.await()
+                    likedArtistUpdates.clear()
+                    likedArtistUpdates.addAll(artistUpdates)
+                    if (artistUpdates.isNotEmpty()) {
+                        allSections.add(
+                            HomeSection(
+                                title = str("home_from_your_artists"),
+                                subtitle = str("home_from_your_artists_sub"),
+                                content = artistUpdates,
+                                type = SectionType.TRACKS_ROW,
+                            )
+                        )
+                    }
+
                     if (sourceLikes.isNotEmpty()) {
                         val personalSections = fetchPersonalizedSections(sourceLikes, me.username ?: str("unknown_user"))
                         allSections.addAll(personalSections)
