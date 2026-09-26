@@ -517,6 +517,7 @@ fun PlayerBar(
                 VolumeControl(
                     volume = vm.volume,
                     preferVertical = verticalVolumeSlider,
+                    isPlaying = vm.isPlaying,
                     onVolumeChange = { vm.updateVolume(it) },
                     onVolumeChangeFinished = { vm.persistVolume() },
                     onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },

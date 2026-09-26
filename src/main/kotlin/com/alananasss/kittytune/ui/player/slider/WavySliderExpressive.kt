@@ -180,7 +180,7 @@ fun WavySliderExpressive(
             val now = System.nanoTime()
             val seconds = (now - last) / 1_000_000_000f
             last = now
-            wavePhasePx.floatValue = (wavePhasePx.floatValue + waveSpeedPx * seconds) % wavelengthPx
+            wavePhasePx.floatValue = wavePhasePx(waveSpeedPx, wavelengthPx)
             // Position updates arrive about every 250 ms; closing the gap over that span keeps the
             // thumb moving steadily instead of stepping four times a second.
             val target = normalizedValueState.value

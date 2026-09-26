@@ -192,6 +192,8 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
             }
         },
     )
+
+    CoversSettingsGroup()
 }
 
 /** The theme choices of the mode row: the three modes plus AMOLED, which is Dark with true black. */
@@ -301,16 +303,21 @@ private fun pickFontFile(title: String): java.io.File? {
  */
 @Composable
 fun PlayerDesignSettingsPage() {
+    // Shape, sliders and volume, the bar's buttons and the scroll step.
+    PlayerDesignContent(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        MenuTilesSection(str("menu_tiles_track"), PlayerPreferences.MENU_TRACK, com.alananasss.kittytune.ui.main.MenuTiles.TRACK)
+        MenuTilesSection(str("menu_tiles_playlist"), PlayerPreferences.MENU_PLAYLIST, com.alananasss.kittytune.ui.main.MenuTiles.PLAYLIST)
+    }
+}
+
+/** Covers: moving artwork and profiles, on the Themes page with the rest of how the app looks. */
+@Composable
+internal fun CoversSettingsGroup() {
     val prefs = remember { PlayerPreferences() }
     var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
     var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
     var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
-    var showMenuTilesDialog by remember { mutableStateOf(false) }
-    if (showMenuTilesDialog) MenuTilesDialog(prefs) { showMenuTilesDialog = false }
-
-    // Shape, sliders, the bar's buttons and the scroll step.
-    PlayerDesignContent(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-
     SettingsGroup(
         title = str("settings_group_covers"),
         items = buildList {
@@ -353,18 +360,6 @@ fun PlayerDesignSettingsPage() {
                     },
                 )
             }
-        },
-    )
-
-    SettingsGroup(
-        items = listOf { shape ->
-            SettingsItem(
-                shape = shape,
-                title = str("menu_tiles_title"),
-                subtitle = str("menu_tiles_desc"),
-                icon = Icons.Rounded.GridView,
-                onClick = { showMenuTilesDialog = true },
-            )
         },
     )
 }
@@ -716,53 +711,6 @@ private fun loadIconVariantPainter(key: String): androidx.compose.ui.graphics.pa
             )
         }
     }.getOrNull()
-
-/**
- * Which tiles the track and playlist menus show. Visibility only: the order is set by dragging the tiles
- * themselves, the one place it can be judged (issue #33).
- */
-@Composable
-private fun MenuTilesDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
-    var hiddenTrackTiles by remember { mutableStateOf(prefs.getHiddenMenuTiles(PlayerPreferences.MENU_TRACK)) }
-    var hiddenPlaylistTiles by remember { mutableStateOf(prefs.getHiddenMenuTiles(PlayerPreferences.MENU_PLAYLIST)) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(str("menu_tiles_title")) },
-        text = {
-            com.alananasss.kittytune.ui.common.ScrollableColumn(
-                modifier = Modifier.heightIn(max = 460.dp),
-                contentPadding = PaddingValues(end = 12.dp),
-            ) {
-                listOf(
-                    Triple(str("menu_tiles_track"), PlayerPreferences.MENU_TRACK, com.alananasss.kittytune.ui.main.MenuTiles.TRACK),
-                    Triple(str("menu_tiles_playlist"), PlayerPreferences.MENU_PLAYLIST, com.alananasss.kittytune.ui.main.MenuTiles.PLAYLIST),
-                ).forEach { (label, menu, catalogue) ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
-                    )
-                    val hiddenHere = if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles else hiddenPlaylistTiles
-                    catalogue.forEach { tile ->
-                        val shown = tile.id !in hiddenHere
-                        SwitchRow(title = str(tile.labelKey), checked = shown) {
-                            val next = if (shown) hiddenHere + tile.id else hiddenHere - tile.id
-                            prefs.setHiddenMenuTiles(menu, next)
-                            if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles = next else hiddenPlaylistTiles = next
-                        }
-                    }
-                    TextButton(onClick = {
-                        prefs.resetMenuTiles(menu)
-                        if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles = emptySet() else hiddenPlaylistTiles = emptySet()
-                    }) { Text(str("menu_tiles_reset")) }
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
-    )
-}
 
 /** A compact switch row whose whole width is the target, for lists inside dialogs and small windows. */
 @Composable

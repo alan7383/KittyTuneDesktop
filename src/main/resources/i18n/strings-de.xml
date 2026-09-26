@@ -3232,4 +3232,6 @@
     <string name="font_default">Standard</string>
     <string name="font_add">Eigene Schrift hinzufügen</string>
     <string name="font_rejected">Keine TTF/OTF-Schrift</string>
+    <string name="volume_style_title">Lautstärke-Stil</string>
+    <string name="volume_style_same">Wie Leiste</string>
 </resources>

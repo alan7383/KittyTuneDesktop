@@ -3068,4 +3068,6 @@
     <string name="font_default">Mặc định</string>
     <string name="font_add">Thêm phông của bạn</string>
     <string name="font_rejected">Tệp không phải phông TTF/OTF</string>
+    <string name="volume_style_title">Kiểu âm lượng</string>
+    <string name="volume_style_same">Như thanh phát</string>
 </resources>

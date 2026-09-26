@@ -2620,4 +2620,6 @@
     <string name="font_default">Par défaut</string>
     <string name="font_add">Ajouter une police</string>
     <string name="font_rejected">Ce fichier n\'est pas une police TTF/OTF</string>
+    <string name="volume_style_title">Style du volume</string>
+    <string name="volume_style_same">Comme la barre</string>
 </resources>

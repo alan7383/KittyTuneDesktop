@@ -941,6 +941,11 @@ class PlayerPreferences {
             PlayerSliderStyle.WAVY
         }
     }
+    /** The volume track's own style, or null to follow the seek bar's. */
+    fun getVolumeSliderStyle(): PlayerSliderStyle? =
+        Prefs.getString("volume_slider_style", null)?.let { runCatching { PlayerSliderStyle.valueOf(it) }.getOrNull() }
+    fun setVolumeSliderStyle(style: PlayerSliderStyle?) = Prefs.putString("volume_slider_style", style?.name)
+
     fun playerSliderStyleFlow(): Flow<PlayerSliderStyle> =
         Prefs.stringFlow(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name).map { name ->
             try {
