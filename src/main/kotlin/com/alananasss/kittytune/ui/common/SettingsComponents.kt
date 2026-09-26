@@ -403,16 +403,26 @@ fun SplitSettingsItem(
     }
 }
 
-/** The settings' switch: a check or a cross in the thumb, so its state reads without relying on colour. */
+/**
+ * The settings' switch: a check or a cross in the thumb, so its state reads without relying on colour.
+ *
+ * [enabled] is separate from [onCheckedChange] on purpose. A Material `Switch` derives its enabled
+ * state from whether it has a callback, so a switch that is *shown* but whose row owns the click
+ * would render greyed out. Passing `enabled = true` alongside a null callback is how a row keeps a
+ * live-looking switch while the row stays the single click target — which is the Material pattern
+ * for a list item that toggles, and the only arrangement in which a click cannot fire twice.
+ */
 @Composable
 fun SettingsSwitch(
     checked: Boolean,
     onCheckedChange: ((Boolean) -> Unit)?,
     interactionSource: MutableInteractionSource? = null,
+    enabled: Boolean = true,
 ) {
     Switch(
         checked = checked,
         onCheckedChange = onCheckedChange,
+        enabled = enabled,
         interactionSource = interactionSource,
         thumbContent = {
             Icon(
