@@ -96,6 +96,20 @@ internal fun CompactStats(
 @Composable
 private fun NumbersStrip(report: ListeningReport, period: ReportPeriod, onOpen: (StatsList) -> Unit) {
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (maxWidth < 520.dp) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                Row(Modifier.fillMaxWidth()) {
+                    NumberCell(formatDurationShort(report.totalListenMs), str("listening_stats_time_listened"), Modifier.weight(1f), null)
+                    NumberCell(report.plays.toString(), str("listening_stats_plays"), Modifier.weight(1f)) { onOpen(StatsList.PLAYS) }
+                }
+                Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                    NumberCell(report.uniqueTracks.toString(), str("listening_stats_unique_tracks"), Modifier.weight(1f)) { onOpen(StatsList.TRACKS) }
+                    NumberCell(report.uniqueArtists.toString(), str("listening_stats_unique_artists"), Modifier.weight(1f)) { onOpen(StatsList.ARTISTS) }
+                }
+            }
+            return@BoxWithConstraints
+        }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             NumberCell(formatDurationShort(report.totalListenMs), str("listening_stats_time_listened"), Modifier.weight(1.4f), null)
             VerticalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
@@ -104,6 +118,7 @@ private fun NumbersStrip(report: ListeningReport, period: ReportPeriod, onOpen: 
             NumberCell(report.uniqueTracks.toString(), str("listening_stats_unique_tracks"), Modifier.weight(1f)) { onOpen(StatsList.TRACKS) }
             VerticalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
             NumberCell(report.uniqueArtists.toString(), str("listening_stats_unique_artists"), Modifier.weight(1f)) { onOpen(StatsList.ARTISTS) }
+        }
         }
     }
     report.change?.let {

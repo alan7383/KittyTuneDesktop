@@ -126,10 +126,17 @@ private fun StatsHeader(
     onPrivacy: () -> Unit,
 ) {
     var styleMenu by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+    val isNarrow = maxWidth < 560.dp
+    Column(Modifier.fillMaxWidth().padding(start = if (isNarrow) 16.dp else 24.dp, end = if (isNarrow) 8.dp else 16.dp, top = 12.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(str("listening_stats_title"), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    str("listening_stats_title"),
+                    style = if (isNarrow) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                )
                 Text(
                     report?.let { spanLabel(period, it) } ?: " ",
                     style = MaterialTheme.typography.bodyMedium,
@@ -137,10 +144,16 @@ private fun StatsHeader(
                 )
             }
             Box {
-                FilledTonalButton(onClick = { styleMenu = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
-                    Icon(style.icon, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(str(style.labelKey))
+                if (isNarrow) {
+                    FilledTonalIconButton(onClick = { styleMenu = true }) {
+                        Icon(style.icon, contentDescription = str(style.labelKey), modifier = Modifier.size(20.dp))
+                    }
+                } else {
+                    FilledTonalButton(onClick = { styleMenu = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                        Icon(style.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str(style.labelKey))
+                    }
                 }
                 DropdownMenu(
                     expanded = styleMenu,
@@ -174,6 +187,7 @@ private fun StatsHeader(
             onOptionSelected = onSelect,
             modifier = Modifier.widthIn(max = 560.dp),
             fillMaxWidth = true,
+            contentPadding = if (isNarrow) PaddingValues(horizontal = 6.dp) else null,
             labelProvider = { value ->
                 Text(
                     str(
@@ -184,12 +198,13 @@ private fun StatsHeader(
                             ReportPeriod.ALL_TIME -> "listening_stats_period_all"
                         }
                     ),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = if (isNarrow) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                     maxLines = 1,
                     softWrap = false,
                 )
             },
         )
+    }
     }
 }
 

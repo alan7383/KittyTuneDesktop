@@ -108,27 +108,37 @@ internal fun OverviewStats(
 @Composable
 private fun SummaryCard(report: ListeningReport, period: ReportPeriod, onOpen: (StatsList) -> Unit) {
     Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-        Column(Modifier.fillMaxWidth().padding(24.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val isNarrow = maxWidth < 520.dp
+        Column(Modifier.fillMaxWidth().padding(if (isNarrow) 18.dp else 24.dp)) {
             Text(
                 str("listening_stats_time_listened"),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
             )
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FlowRow(verticalArrangement = Arrangement.spacedBy(6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                 Text(
                     formatDuration(report.totalListenMs),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = if (isNarrow) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    softWrap = false,
                 )
                 report.change?.let { ChangeChip(it, period) }
             }
             Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryTile(Icons.Rounded.PlayArrow, report.plays.toString(), str("listening_stats_plays"), Modifier.weight(1f)) { onOpen(StatsList.PLAYS) }
-                SummaryTile(Icons.Rounded.MusicNote, report.uniqueTracks.toString(), str("listening_stats_unique_tracks"), Modifier.weight(1f)) { onOpen(StatsList.TRACKS) }
-                SummaryTile(Icons.Rounded.People, report.uniqueArtists.toString(), str("listening_stats_unique_artists"), Modifier.weight(1f)) { onOpen(StatsList.ARTISTS) }
+            val tiles: List<@Composable (Modifier) -> Unit> = listOf(
+                { m -> SummaryTile(Icons.Rounded.PlayArrow, report.plays.toString(), str("listening_stats_plays"), m) { onOpen(StatsList.PLAYS) } },
+                { m -> SummaryTile(Icons.Rounded.MusicNote, report.uniqueTracks.toString(), str("listening_stats_unique_tracks"), m) { onOpen(StatsList.TRACKS) } },
+                { m -> SummaryTile(Icons.Rounded.People, report.uniqueArtists.toString(), str("listening_stats_unique_artists"), m) { onOpen(StatsList.ARTISTS) } },
+            )
+            if (isNarrow) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { it(Modifier.fillMaxWidth()) } }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { it(Modifier.weight(1f)) } }
             }
+        }
         }
     }
 }
@@ -174,7 +184,7 @@ private fun SummaryTile(icon: ImageVector, value: String, label: String, modifie
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                 Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
