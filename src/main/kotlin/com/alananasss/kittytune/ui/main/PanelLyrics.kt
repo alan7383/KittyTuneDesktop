@@ -152,7 +152,10 @@ private fun PanelSyncedLyrics(
     modifier: Modifier,
     style: PanelLyricsStyle,
 ) {
-    val listState = rememberLazyListState()
+    // Starts on the line being sung, so the first frame is not the top of the song (issue #33, round 5).
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lines, vm.currentPosition + vm.lyricsOffset).coerceAtLeast(0)
+    )
     // Derived rather than read straight from the position, so the lines recompose when the line
     // changes and not on every progress tick.
     val activeIndex by remember {

@@ -128,9 +128,18 @@ internal object LyricsScrolling {
  * @param anchorPx how far below the top of the viewport the active line should settle. Zero puts it at the
  *   top of the content area, which is what a view with a large top inset already wants; a short view passes
  *   a real anchor instead of padding a third of itself away.
+ * @param centred put the middle of the active line on the middle of the viewport instead, whatever its
+ *   height. A line anchored by its top edge sits lower the more it wraps, so a long line opened below the
+ *   centre (issue #33, round 5). Measured from the laid-out line, so it falls back to [anchorPx] for a line
+ *   not on screen yet.
  */
 @Composable
-internal fun FollowActiveLine(listState: LazyListState, activeIndex: Int, anchorPx: Int = 0) {
+internal fun FollowActiveLine(
+    listState: LazyListState,
+    activeIndex: Int,
+    anchorPx: Int = 0,
+    centred: Boolean = false,
+) {
     var lastManualScrollMs by remember { mutableStateOf(0L) }
 
     /** True for exactly as long as the scroll below is ours, so the flag cannot be misattributed. */
@@ -191,9 +200,12 @@ internal fun FollowActiveLine(listState: LazyListState, activeIndex: Int, anchor
             // *is* placed, the animation is the point — that is the song moving from one line to the
             // next, and it should glide.
             if (placed) {
-                listState.animateScrollToItem(index = activeIndex, scrollOffset = -anchorPx)
+                listState.animateScrollToItem(activeIndex, followOffset(listState, activeIndex, anchorPx, centred))
             } else {
-                listState.scrollToItem(index = activeIndex, scrollOffset = -anchorPx)
+                listState.scrollToItem(activeIndex, -anchorPx)
+                // A snap remeasures at once, so the line is laid out now and can be centred before the
+                // frame is drawn.
+                if (centred) listState.scrollToItem(activeIndex, followOffset(listState, activeIndex, anchorPx, true))
             }
             placed = true
         } finally {
@@ -202,6 +214,19 @@ internal fun FollowActiveLine(listState: LazyListState, activeIndex: Int, anchor
     }
 }
 
+/**
+ * The scroll offset that puts line [index] where [FollowActiveLine] wants it.
+ *
+ * Item offsets count from the start of the content area and the viewport starts before it by the top
+ * padding, so the viewport's middle in the same terms is the mean of its start and end offsets.
+ */
+private fun followOffset(listState: LazyListState, index: Int, anchorPx: Int, centred: Boolean): Int {
+    if (!centred) return -anchorPx
+    val info = listState.layoutInfo
+    val line = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return -anchorPx
+    val middle = (info.viewportStartOffset + info.viewportEndOffset) / 2
+    return line.size / 2 - middle
+}
 
 /**
  * Drives a list of untimed lyrics from the playback position, and steps aside when the reader scrolls.

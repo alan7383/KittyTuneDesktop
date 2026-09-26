@@ -94,7 +94,10 @@ const val PANEL_GUTTER = 8
  * Shorter than the panels' own springs: this is one rectangle's contents changing, not an edge
  * travelling, and a fade that outlasts the click reads as lag rather than as motion.
  */
-private const val SHEET_SWAP_MS = 220
+private const val SHEET_SWAP_MS = 260
+
+/** How long the side being left takes to fade: a shorter beat than the arrival, so the two do not overlap. */
+private const val SHEET_EXIT_MS = 120
 
 /**
  * How long the full player takes to arrive and to leave.
@@ -540,14 +543,22 @@ fun MainScreen(
                 // and it survives being cross-faded for the same reason.
                 androidx.compose.animation.AnimatedContent(
                     targetState = playerViewModel.showLyricsSheet,
+                    // The outgoing side leaves quickly and the incoming one starts just after, easing out: both
+                    // at full length at once smeared two busy screens into each other (issue #33, round 5).
                     transitionSpec = {
                         (androidx.compose.animation.fadeIn(
-                            androidx.compose.animation.core.tween(SHEET_SWAP_MS)
+                            androidx.compose.animation.core.tween(
+                                SHEET_SWAP_MS, delayMillis = SHEET_EXIT_MS / 2,
+                                easing = androidx.compose.animation.core.LinearOutSlowInEasing,
+                            )
                         ) + androidx.compose.animation.scaleIn(
-                            androidx.compose.animation.core.tween(SHEET_SWAP_MS),
-                            initialScale = 0.98f,
+                            androidx.compose.animation.core.tween(
+                                SHEET_SWAP_MS + SHEET_EXIT_MS / 2,
+                                easing = androidx.compose.animation.core.LinearOutSlowInEasing,
+                            ),
+                            initialScale = 0.97f,
                         )) togetherWith androidx.compose.animation.fadeOut(
-                            androidx.compose.animation.core.tween(SHEET_SWAP_MS)
+                            androidx.compose.animation.core.tween(SHEET_EXIT_MS)
                         ) using androidx.compose.animation.SizeTransform(clip = false) { _, _ ->
                             androidx.compose.animation.core.snap()
                         }

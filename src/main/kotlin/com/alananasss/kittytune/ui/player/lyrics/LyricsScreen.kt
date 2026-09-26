@@ -391,7 +391,11 @@ import kotlin.math.roundToInt
         val currentPosition = viewModel.currentPosition
         val adjustedPosition = currentPosition + viewModel.lyricsOffset
         val lyrics = viewModel.lyricsLines
-        val listState = rememberLazyListState()
+        // Built on the line being sung, not on line one: the placement below runs after the first frame, and
+        // that frame — the top of the song, mid-fade — was the jolt at every opening (issue #33, round 5).
+        val listState = rememberLazyListState(
+            initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lyrics, adjustedPosition).coerceAtLeast(0)
+        )
         val fontSize = viewModel.lyricsFontSize
         val alignment = when(viewModel.lyricsAlignment) {
             LyricsAlignment.LEFT -> TextAlign.Left
@@ -423,7 +427,7 @@ import kotlin.math.roundToInt
     
         // Reading along by hand wins for a while; the panel's copy of the lyrics follows the same
         // rule, which is why this lives in one place (issue #33).
-        FollowActiveLine(listState, activeIndex)
+        FollowActiveLine(listState, activeIndex, centred = true)
     
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val screenHeight = maxHeight
