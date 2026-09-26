@@ -175,7 +175,8 @@ fun PlaylistDetailsSheet(
                         if (saves > 0) add(str("playlist_details_saves", String.format("%,d", saves)))
                         playlist.trackCount?.takeIf { it > 0 }?.let { add(str("playlist_num_tracks", it)) }
                         val totalMs = playlist.tracks.orEmpty().mapNotNull { it.durationMs }.sum()
-                        if (totalMs > 0) add(formatTotalDuration(totalMs))
+                        val duration = formatPlaylistTotalDuration(totalMs)
+                        if (duration.isNotEmpty()) add(duration)
                         (playlist.lastModified ?: playlist.createdAt)?.let {
                             val relative = getRelativeTime(it)
                             if (relative.isNotEmpty()) add(str("detail_updated", relative))
@@ -516,10 +517,3 @@ fun parseSoundCloudTags(tagList: String?): List<String> {
     return tags
 }
 
-/** "1 h 23 min" / "23 min" from a summed track duration. */
-private fun formatTotalDuration(ms: Long): String {
-    val totalMin = ms / 60000
-    val h = totalMin / 60
-    val min = totalMin % 60
-    return if (h > 0) "$h h $min min" else "$min min"
-}

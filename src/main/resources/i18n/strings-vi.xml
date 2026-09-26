@@ -1409,6 +1409,16 @@
     <string name="listening_stats_empty_desc">Hãy bắt đầu nghe nhạc để xem các số liệu của bạn tại đây!</string>
     <string name="listening_stats_duration_zero">Không có dữ liệu</string>
     <string name="listening_stats_duration_min">%1$d phút</string>
+    <string name="playlist_duration_hours">%1$d giờ</string>
+    <string name="playlist_duration_days">%1$d ngày</string>
+    <string name="playlist_duration_months">%1$d tháng</string>
+    <string name="playlist_duration_months_days">%1$d tháng %2$d ngày</string>
+    <string name="playlist_duration_year">%1$d năm</string>
+    <string name="playlist_duration_years">%1$d năm</string>
+    <string name="playlist_duration_year_months">%1$d năm %2$d tháng</string>
+    <string name="playlist_duration_years_months">%1$d năm %2$d tháng</string>
+    <string name="playlist_duration_year_days">%1$d năm %2$d ngày</string>
+    <string name="playlist_duration_years_days">%1$d năm %2$d ngày</string>
     <string name="listening_stats_duration_days_hrs">%1$d ngày %2$d giờ</string>
     <string name="listening_stats_duration_hr_min">%1$d giờ %2$d phút</string>
     <string name="listening_stats_duration_min_sec">%1$d phút %2$d giây</string>

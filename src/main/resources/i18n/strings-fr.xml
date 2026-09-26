@@ -924,6 +924,16 @@
     <string name="listening_stats_duration_sec">%1$ds</string>
     <string name="listening_stats_duration_zero">Aucune donnée</string>
     <string name="listening_stats_duration_min">%1$d min</string>
+    <string name="playlist_duration_hours">%1$dh</string>
+    <string name="playlist_duration_days">%1$dj</string>
+    <string name="playlist_duration_months">%1$d mois</string>
+    <string name="playlist_duration_months_days">%1$d mois %2$dj</string>
+    <string name="playlist_duration_year">%1$d an</string>
+    <string name="playlist_duration_years">%1$d ans</string>
+    <string name="playlist_duration_year_months">%1$d an %2$d mois</string>
+    <string name="playlist_duration_years_months">%1$d ans %2$d mois</string>
+    <string name="playlist_duration_year_days">%1$d an %2$dj</string>
+    <string name="playlist_duration_years_days">%1$d ans %2$dj</string>
     <string name="listening_stats_empty_desc">Commencez à écouter pour voir vos stats !</string>
     <string name="listening_stats_empty_title">Pas encore de stats</string>
     <string name="listening_stats_habits">Habitudes d\'écoute</string>

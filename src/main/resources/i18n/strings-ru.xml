@@ -924,6 +924,16 @@
     <string name="listening_stats_duration_sec">%1$d с</string>
     <string name="listening_stats_duration_zero">Нет данных</string>
     <string name="listening_stats_duration_min">%1$d мин.</string>
+    <string name="playlist_duration_hours">%1$d ч.</string>
+    <string name="playlist_duration_days">%1$d дн.</string>
+    <string name="playlist_duration_months">%1$d мес.</string>
+    <string name="playlist_duration_months_days">%1$d мес. %2$d дн.</string>
+    <string name="playlist_duration_year">%1$d г.</string>
+    <string name="playlist_duration_years">%1$d г.</string>
+    <string name="playlist_duration_year_months">%1$d г. %2$d мес.</string>
+    <string name="playlist_duration_years_months">%1$d г. %2$d мес.</string>
+    <string name="playlist_duration_year_days">%1$d г. %2$d дн.</string>
+    <string name="playlist_duration_years_days">%1$d г. %2$d дн.</string>
     <string name="listening_stats_empty_desc">Начните слушать музыку, чтобы увидеть здесь свою статистику!</string>
     <string name="listening_stats_empty_title">Пока нет статистики</string>
     <string name="listening_stats_habits">Привычки прослушивания</string>
