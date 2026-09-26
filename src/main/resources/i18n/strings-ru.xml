@@ -1155,6 +1155,11 @@
     <string name="player_lyrics">Текст песни</string>
     <string name="lyrics_fullscreen">Во весь экран</string>
     <string name="lyrics_exit_fullscreen">Выйти из полноэкранного режима</string>
+    <string name="pref_screensaver_title">Автозаставка</string>
+    <string name="pref_screensaver_desc">Переходит в режим концентрации после 60 с бездействия на весь экран</string>
+    <string name="screensaver_focus_mode">Режим заставки и концентрации</string>
+    <string name="screensaver_tap_to_wake">Подвиньте мышь или кликните для выхода</string>
+    <string name="screensaver_session_stats">Статистика сессии</string>
     <string name="player_previous">Предыдущий трек</string>
     <string name="player_play_pause">Воспроизведение / пауза</string>
     <string name="player_next">Следующий трек</string>

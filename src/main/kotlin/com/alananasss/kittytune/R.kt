@@ -1088,6 +1088,12 @@ object R {
         const val tidal_quality_aac_320 = "tidal_quality_aac_320"
         const val tidal_quality_flac = "tidal_quality_flac"
         const val tidal_quality_hires = "tidal_quality_hires"
+
+        const val pref_screensaver_title = "pref_screensaver_title"
+        const val pref_screensaver_desc = "pref_screensaver_desc"
+        const val screensaver_focus_mode = "screensaver_focus_mode"
+        const val screensaver_tap_to_wake = "screensaver_tap_to_wake"
+        const val screensaver_session_stats = "screensaver_session_stats"
     }
     object drawable {
         const val ic_logo_qobuz = "drawable/ic_logo_qobuz.xml"

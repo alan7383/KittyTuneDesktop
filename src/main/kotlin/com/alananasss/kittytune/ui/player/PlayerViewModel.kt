@@ -190,6 +190,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var fullPlayerLyricsAlign by mutableStateOf(playerPrefs.getFullPlayerLyricsAlign())
         private set
+    var fullPlayerScreensaverEnabled by mutableStateOf(playerPrefs.getFullPlayerScreensaverEnabled())
+        private set
+    var fullPlayerScreensaverTimeoutSeconds by mutableIntStateOf(playerPrefs.getFullPlayerScreensaverTimeout())
+        private set
 
     /**
      * Seeded straight from preferences rather than from the engine: [player] is a lazy getter,
@@ -833,6 +837,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     /** Media milliseconds heard in the current listen. Exposed for the player's own displays. */
     val currentSessionListenMs: Long get() = listenSession?.listenedMs ?: 0L
 
+    // --- Cumulative Session Stats (since app start / listening session) ---
+    private var _sessionListenMs = mutableLongStateOf(0L)
+    private var _sessionPlaysCount = mutableIntStateOf(0)
+
+    /** Total media ms heard during this app session (including current track's progress). */
+    val sessionTotalListenMs: Long
+        get() = _sessionListenMs.longValue + (listenSession?.listenedMs ?: 0L)
+
+    /** Whether the current track has accumulated enough listen time to count as a play. */
+    val currentTrackCountsAsPlay: Boolean
+        get() = currentTrack?.let {
+            com.alananasss.kittytune.data.stats.ListenRules.countsAsPlay(
+                listenSession?.listenedMs ?: 0L,
+                it.durationMs ?: 0L
+            )
+        } ?: false
+
+    /** Total tracks that reached a valid play during this app session. */
+    val effectiveSessionPlays: Int
+        get() = _sessionPlaysCount.intValue + if (currentTrackCountsAsPlay) 1 else 0
+
     /**
      * Makes sure the track that is playing has a session, whichever code path started it.
      *
@@ -872,8 +897,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         listenSession = null
         listenSessionTrack = null
         if (track == null) return
+        val wasPlay = com.alananasss.kittytune.data.stats.ListenRules.countsAsPlay(session.listenedMs, track.durationMs ?: 0L)
+        if (wasPlay) {
+            _sessionPlaysCount.intValue += 1
+        }
+        _sessionListenMs.longValue += session.listenedMs
+
         // Heard for real: worth keeping for next time, whether or not statistics are on.
-        if (com.alananasss.kittytune.data.stats.ListenRules.countsAsPlay(session.listenedMs, track.durationMs ?: 0L)) {
+        if (wasPlay) {
             com.alananasss.kittytune.data.cache.AudioCache.offer(track)
         }
         if (!playerPrefs.getListeningStatsEnabled()) return
@@ -3991,6 +4022,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateFullPlayerLyricsAlign(align: com.alananasss.kittytune.data.local.LyricsAlignment) {
         fullPlayerLyricsAlign = align
         playerPrefs.setFullPlayerLyricsAlign(align)
+    }
+
+    fun updateFullPlayerScreensaverEnabled(enabled: Boolean) {
+        fullPlayerScreensaverEnabled = enabled
+        playerPrefs.setFullPlayerScreensaverEnabled(enabled)
+    }
+
+    fun updateFullPlayerScreensaverTimeout(seconds: Int) {
+        fullPlayerScreensaverTimeoutSeconds = seconds
+        playerPrefs.setFullPlayerScreensaverTimeout(seconds)
     }
 
     fun toggleRain() {

@@ -1155,6 +1155,11 @@
     <string name="player_lyrics">Lyrics</string>
     <string name="lyrics_fullscreen">Full screen</string>
     <string name="lyrics_exit_fullscreen">Exit full screen</string>
+    <string name="pref_screensaver_title">Auto Screensaver</string>
+    <string name="pref_screensaver_desc">Switches to focus mode after 60s of inactivity in full screen</string>
+    <string name="screensaver_focus_mode">Screensaver &amp; Focus Mode</string>
+    <string name="screensaver_tap_to_wake">Move mouse or click anywhere to exit</string>
+    <string name="screensaver_session_stats">Session stats</string>
     <string name="player_previous">Previous track</string>
     <string name="player_play_pause">Play / pause</string>
     <string name="player_next">Next track</string>

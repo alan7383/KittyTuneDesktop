@@ -774,6 +774,54 @@ private fun PlayerAdvancedSection(
 }
 
 
+/** Screensaver toggle — dims the full-screen player after a period of inactivity. */
+@Composable
+private fun ScreensaverSection(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).padding(end = 16.dp)) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.DarkMode,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.width(14.dp))
+                Column {
+                    Text(
+                        text = str("pref_screensaver_title"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = str("pref_screensaver_desc"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            com.alananasss.kittytune.ui.common.SettingsSwitch(checked = enabled, onCheckedChange = onEnabledChange)
+        }
+    }
+}
+
 private fun sliderStyleKey(style: PlayerSliderStyle): String = when (style) {
     PlayerSliderStyle.BAR -> "slider_style_bar"
     PlayerSliderStyle.WAVY -> "slider_style_wavy"

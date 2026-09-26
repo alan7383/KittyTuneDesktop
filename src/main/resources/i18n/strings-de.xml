@@ -2728,6 +2728,11 @@
     <string name="lyrics_badge_line_sync">Zeilensynchron</string>
     <string name="lyrics_badge_word_sync">Wortsynchron</string>
     <string name="lyrics_exit_fullscreen">Vollbild beenden</string>
+    <string name="pref_screensaver_title">Automatischer Bildschirmschoner</string>
+    <string name="pref_screensaver_desc">Wechselt nach 60 s Inaktivität im Vollbildmodus in den Fokusmodus</string>
+    <string name="screensaver_focus_mode">Bildschirmschoner- &amp; Fokusmodus</string>
+    <string name="screensaver_tap_to_wake">Maus bewegen oder klicken zum Beenden</string>
+    <string name="screensaver_session_stats">Sitzungsstatistiken</string>
     <string name="lyrics_fullscreen">Vollbild</string>
     <string name="lyrics_style_focus">Fokus</string>
     <string name="lyrics_style_focus_sub">Die anderen Zeilen verblassen deutlich und werden leicht unscharf.</string>

@@ -1155,6 +1155,11 @@
     <string name="player_lyrics">Paroles</string>
     <string name="lyrics_fullscreen">Plein écran</string>
     <string name="lyrics_exit_fullscreen">Quitter le plein écran</string>
+    <string name="pref_screensaver_title">Écran de veille automatique</string>
+    <string name="pref_screensaver_desc">Passe en mode concentration après 60s d\'inactivité en plein écran</string>
+    <string name="screensaver_focus_mode">Mode Écran de veille / Concentration</string>
+    <string name="screensaver_tap_to_wake">Bougez la souris ou cliquez pour quitter la veille</string>
+    <string name="screensaver_session_stats">Stats de session</string>
     <string name="player_previous">Piste précédente</string>
     <string name="player_play_pause">Lecture / pause</string>
     <string name="player_next">Piste suivante</string>
