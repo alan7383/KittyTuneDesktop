@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -305,7 +306,7 @@ fun PlayerBar(
                                     onClick = { vm.dislikeCurrentTrackInMix() }
                                 ) {
                                     Icon(
-                                        Icons.Outlined.HeartBroken,
+                                        androidx.compose.material.icons.Icons.Outlined.ThumbDown,
                                         contentDescription = str("mix_dislike"),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(20.dp),
@@ -590,13 +591,25 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                     },
                 ),
         )
+        // Click to switch between the track's length and the time left, which counts down with a minus, as in
+        // the full player. Remembered.
+        var showRemaining by remember { mutableStateOf(com.alananasss.kittytune.core.Prefs.getBoolean(KEY_BAR_REMAINING, false)) }
         Text(
-            text = makeTimeString(duration),
+            text = if (showRemaining) "-" + makeTimeString((duration - position).coerceAtLeast(0L)) else makeTimeString(duration),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable {
+                    showRemaining = !showRemaining
+                    com.alananasss.kittytune.core.Prefs.putBoolean(KEY_BAR_REMAINING, showRemaining)
+                }
+                .padding(horizontal = 4.dp, vertical = 2.dp),
         )
     }
 }
+
+private const val KEY_BAR_REMAINING = "player_bar_show_remaining"
 
 /**
  * Shuffle / repeat, in the same language as the transport pills next to them: 42 dp tall,
