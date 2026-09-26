@@ -2626,4 +2626,11 @@
     <string name="floating_bar_margin">Отступ снизу</string>
     <string name="floating_bar_translucent">Прозрачность</string>
     <string name="floating_bar_translucent_sub">Страница видна сквозь панель</string>
+    <string name="sources_services_title">Сервисы и аккаунты</string>
+    <string name="sources_playback_title">Поиск и импорт</string>
+    <string name="sources_signed_in">Вход выполнен</string>
+    <string name="sources_guest">Как гость — войдите, чтобы были лайки и библиотека</string>
+    <string name="sources_yandex">Яндекс Музыка</string>
+    <string name="sources_connected">Подключено</string>
+    <string name="sources_connect">Подключить</string>
 </resources>

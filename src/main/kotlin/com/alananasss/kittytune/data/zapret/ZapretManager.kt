@@ -32,9 +32,9 @@ object ZapretManager {
     private val probeClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .proxy(Proxy.NO_PROXY)
-            .connectTimeout(5, TimeUnit.SECONDS)
-            .readTimeout(5, TimeUnit.SECONDS)
-            .callTimeout(8, TimeUnit.SECONDS)
+            .connectTimeout(6, TimeUnit.SECONDS)
+            .readTimeout(6, TimeUnit.SECONDS)
+            .callTimeout(12, TimeUnit.SECONDS)
             .followRedirects(false)
             .build()
     }
@@ -55,20 +55,56 @@ object ZapretManager {
      * path on Linux.
      */
     fun detect(): File? {
-        if (isWindows) {
-            val running = ProcessHandle.allProcesses().toList().firstNotNullOfOrNull { process ->
-                process.info().command().orElse(null)?.takeIf { it.endsWith("winws.exe", ignoreCase = true) }
-            }
-            // winws.exe lives in <zapret>/bin.
-            return running?.let { File(it).parentFile?.parentFile }?.takeIf { ZapretInstall(it).isValid }
-        }
-        return listOf("/opt/zapret", "/usr/local/zapret").map(::File).firstOrNull { ZapretInstall(it).isValid }
+        if (!isWindows) return listOf("/opt/zapret", "/usr/local/zapret").map(::File).firstOrNull { ZapretInstall(it).isValid }
+        return (sequenceOf(runningWinwsPath(), serviceImagePath()).filterNotNull().map { File(it).parentFile?.parentFile }
+            + commonFolders())
+            .filterNotNull()
+            .firstOrNull { ZapretInstall(it).isValid }
     }
 
-    /** Whether zapret is running now, so the page can say whether the lists are in use. */
-    fun isRunning(): Boolean = ProcessHandle.allProcesses().anyMatch { process ->
-        val command = process.info().command().orElse("") ?: ""
-        command.endsWith("winws.exe", ignoreCase = true) || command.endsWith("/nfqws")
+    /** The running winws.exe's path, when this process may read it (it may not, when winws runs elevated). */
+    private fun runningWinwsPath(): String? = ProcessHandle.allProcesses().toList().firstNotNullOfOrNull { process ->
+        process.info().command().orElse(null)?.takeIf { it.endsWith("winws.exe", ignoreCase = true) }
+    }
+
+    /**
+     * The zapret service's executable, from the registry. `service.bat` installs winws as a service; the
+     * service's configuration is readable without administrator rights even when the process itself is not.
+     */
+    private fun serviceImagePath(): String? = listOf("zapret", "winws1", "winws").firstNotNullOfOrNull { name ->
+        runCatching {
+            val process = ProcessBuilder("reg", "query", "HKLM\\SYSTEM\\CurrentControlSet\\Services\\$name", "/v", "ImagePath")
+                .redirectErrorStream(true).start()
+            val output = process.inputStream.bufferedReader().readText()
+            process.waitFor()
+            Regex("([A-Za-z]:\\\\[^\"]*?winws\\.exe)", RegexOption.IGNORE_CASE).find(output)?.groupValues?.get(1)
+        }.getOrNull()
+    }
+
+    /** Where people unpack zapret: the desktop, downloads, documents, the drive's root — a level or two deep. */
+    private fun commonFolders(): Sequence<File> {
+        val home = File(System.getProperty("user.home"))
+        val roots = listOf(File(home, "Desktop"), File(home, "Downloads"), File(home, "Documents"), home, File("C:\\"), File("D:\\"))
+        return roots.asSequence().filter { it.isDirectory }.flatMap { root ->
+            val first = root.listFiles { f -> f.isDirectory }.orEmpty().asSequence()
+            first + first.filter { it.name.contains("zapret", true) }.flatMap { it.listFiles { f -> f.isDirectory }.orEmpty().asSequence() }
+        }.filter { File(it, "bin/winws.exe").isFile }
+    }
+
+    /**
+     * Whether zapret is running now. By name through `tasklist` on Windows: an elevated winws hides its path
+     * from this process, but not its name.
+     */
+    fun isRunning(): Boolean {
+        if (isWindows) {
+            return runCatching {
+                val process = ProcessBuilder("tasklist", "/FI", "IMAGENAME eq winws.exe", "/NH").redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().readText()
+                process.waitFor()
+                output.contains("winws.exe", ignoreCase = true)
+            }.getOrDefault(false)
+        }
+        return ProcessHandle.allProcesses().anyMatch { (it.info().command().orElse("") ?: "").endsWith("/nfqws") }
     }
 
     /** Probes every service in parallel. */
@@ -78,7 +114,7 @@ object ZapretManager {
             async(Dispatchers.IO) {
                 ServiceCheck(
                     service = service,
-                    reachability = probe(service.probeUrl),
+                    reachability = if (service.probeUrls.all { probe(it) == Reachability.REACHABLE }) Reachability.REACHABLE else Reachability.BLOCKED,
                     isCovered = service.domains.all { ZapretHostList.isCovered(it, covered) },
                 )
             }
@@ -86,9 +122,27 @@ object ZapretManager {
     }
 
     /** Any answer at all — a 403 included — means the connection got through; a timeout or reset does not. */
+    /**
+     * A real request, with its body read: blocking by traffic inspection often lets the handshake and a few
+     * kilobytes through and then stalls the connection, so a HEAD with an empty answer said "works" for services
+     * whose searches never returned. Any status counts — a 401 from an API is it answering.
+     */
     private fun probe(url: String): Reachability = runCatching {
-        probeClient.newCall(Request.Builder().url(url).head().build()).execute().use { Reachability.REACHABLE }
+        probeClient.newCall(Request.Builder().url(url).header("User-Agent", "Mozilla/5.0").build()).execute().use { response ->
+            response.body.byteStream().use { input ->
+                val buffer = ByteArray(8192)
+                var total = 0L
+                while (total < PROBE_BYTES) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    total += count
+                }
+            }
+            Reachability.REACHABLE
+        }
     }.getOrDefault(Reachability.BLOCKED)
+
+    private const val PROBE_BYTES = 64L * 1024
 
     /** Adds the domains of [services] to the user list; returns the domains written. */
     suspend fun addDomains(services: Collection<ZapretService>): List<String> = withContext(Dispatchers.IO) {

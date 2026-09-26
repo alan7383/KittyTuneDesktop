@@ -2629,4 +2629,11 @@
     <string name="floating_bar_margin">Távolság alulról</string>
     <string name="floating_bar_translucent">Áttetsző</string>
     <string name="floating_bar_translucent_sub">Az oldal átlátszik</string>
+    <string name="sources_services_title">Szolgáltatások és fiókok</string>
+    <string name="sources_playback_title">Keresés és importálás</string>
+    <string name="sources_signed_in">Bejelentkezve</string>
+    <string name="sources_guest">Vendégként — jelentkezzen be</string>
+    <string name="sources_yandex">Yandex Music</string>
+    <string name="sources_connected">Csatlakoztatva</string>
+    <string name="sources_connect">Csatlakozás</string>
 </resources>

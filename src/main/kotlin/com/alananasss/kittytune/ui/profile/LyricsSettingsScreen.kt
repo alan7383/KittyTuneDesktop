@@ -10,6 +10,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.foundation.lazy.items
     import androidx.compose.foundation.shape.RoundedCornerShape
     import androidx.compose.material.icons.Icons
+    import androidx.compose.material.icons.rounded.DragIndicator
     import androidx.compose.material.icons.rounded.Add
     import androidx.compose.material.icons.rounded.CropFree
     import androidx.compose.material.icons.rounded.Fullscreen
@@ -263,38 +264,28 @@ import com.alananasss.kittytune.ui.common.Slider
                 onDismissRequest = { showProviderOrderDialog = false },
                 title = { Text(str("pref_lyrics_order", "Provider Priority Order")) },
                 text = {
-                    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
-                        items(currentOrder.size) { index ->
-                            val p = currentOrder[index]
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    "${index + 1}. ${p.displayName}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Row {
-                                    if (index > 0) {
-                                        IconButton(onClick = {
-                                            val list = currentOrder.toMutableList()
-                                            val item = list.removeAt(index)
-                                            list.add(index - 1, item)
-                                            currentOrder = list
-                                        }) {
-                                            Text("▲")
-                                        }
-                                    }
-                                    if (index < currentOrder.size - 1) {
-                                        IconButton(onClick = {
-                                            val list = currentOrder.toMutableList()
-                                            val item = list.removeAt(index)
-                                            list.add(index + 1, item)
-                                            currentOrder = list
-                                        }) {
-                                            Text("▼")
+                    // Dragged by the handle, like the queue and the sidebar's rows: the arrows moved a row one
+                    // step per click, which for the last provider was a dozen clicks.
+                    com.alananasss.kittytune.ui.common.ScrollableColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp), contentPadding = PaddingValues(end = 12.dp)) {
+                        sh.calvin.reorderable.ReorderableColumn(
+                            list = currentOrder,
+                            onSettle = { from, to -> currentOrder = currentOrder.toMutableList().apply { add(to, removeAt(from)) } },
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) { index, provider, isDragging ->
+                            key(provider) {
+                                ReorderableItem {
+                                    val elevation by androidx.compose.animation.core.animateDpAsState(if (isDragging) 6.dp else 0.dp, label = "providerDrag")
+                                    Surface(
+                                        shape = RoundedCornerShape(14.dp),
+                                        color = if (isDragging) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        shadowElevation = elevation,
+                                    ) {
+                                        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(onClick = {}, modifier = Modifier.draggableHandle()) {
+                                                Icon(androidx.compose.material.icons.Icons.Rounded.DragIndicator, contentDescription = str("action_reorder"))
+                                            }
+                                            Text("${index + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(24.dp))
+                                            Text(provider.displayName, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                                         }
                                     }
                                 }

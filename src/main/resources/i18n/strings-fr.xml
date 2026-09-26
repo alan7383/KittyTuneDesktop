@@ -2628,4 +2628,11 @@
     <string name="floating_bar_margin">Distance du bas</string>
     <string name="floating_bar_translucent">Transparence</string>
     <string name="floating_bar_translucent_sub">La page apparaît à travers</string>
+    <string name="sources_services_title">Services et comptes</string>
+    <string name="sources_playback_title">Recherche et import</string>
+    <string name="sources_signed_in">Connecté</string>
+    <string name="sources_guest">Invité — connectez-vous pour vos likes</string>
+    <string name="sources_yandex">Yandex Music</string>
+    <string name="sources_connected">Connecté</string>
+    <string name="sources_connect">Connecter</string>
 </resources>

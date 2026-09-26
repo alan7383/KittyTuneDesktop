@@ -3076,4 +3076,11 @@
     <string name="floating_bar_margin">Cách đáy</string>
     <string name="floating_bar_translucent">Trong suốt</string>
     <string name="floating_bar_translucent_sub">Thấy trang phía sau</string>
+    <string name="sources_services_title">Dịch vụ và tài khoản</string>
+    <string name="sources_playback_title">Tìm kiếm và nhập</string>
+    <string name="sources_signed_in">Đã đăng nhập</string>
+    <string name="sources_guest">Khách — đăng nhập để dùng thư viện</string>
+    <string name="sources_yandex">Yandex Music</string>
+    <string name="sources_connected">Đã kết nối</string>
+    <string name="sources_connect">Kết nối</string>
 </resources>
