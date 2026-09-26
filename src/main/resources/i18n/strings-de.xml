@@ -3305,7 +3305,6 @@
     <string name="search_remove_recent">Aus den letzten Suchen entfernen</string>
     <string name="chart_kind_top">Top 50</string>
     <string name="chart_kind_trending">Neu &amp; aufsteigend</string>
-    <string name="chart_see_full">Die vollständige Chartliste</string>
     <string name="chart_genre_all">Alle</string>
     <string name="chart_genre_pop">Pop</string>
     <string name="chart_genre_hiphop">Hip-Hop</string>
@@ -3316,4 +3315,6 @@
     <string name="chart_genre_latin">Latin</string>
     <string name="home_from_your_artists">Neu von deinen Künstlern</string>
     <string name="home_from_your_artists_sub">Was die Künstler, die du magst, veröffentlicht haben</string>
+    <string name="explore">Entdecken</string>
+    <string name="chart_section_title">Chartliste</string>
 </resources>

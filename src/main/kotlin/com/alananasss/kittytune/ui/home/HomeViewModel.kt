@@ -284,12 +284,23 @@ import com.alananasss.kittytune.utils.Logger
                 }.awaitAll()
             }
 
+            // At most [MAX_PER_ARTIST] songs from any one artist, while the rest of the row stays in
+            // date order. One prolific uploader was filling the whole shelf with their own newest
+            // five, which is a shelf of one artist wearing a shelf's clothes.
+            val perArtist = mutableMapOf<Long, Int>()
             return fetched.flatten()
                 .filter { it.id > 0L && it.id !in likedIds }
                 .distinctBy { it.id }
                 // ISO 8601 sorts as text, so the newest really is last; a track with no date goes to
                 // the end rather than to the top on an empty string.
                 .sortedByDescending { it.createdAt ?: it.releaseDate ?: "" }
+                .filter { track ->
+                    val id = track.user?.id ?: 0L
+                    if (id == 0L) return@filter true
+                    val seen = perArtist.getOrDefault(id, 0)
+                    perArtist[id] = seen + 1
+                    seen < MAX_PER_ARTIST
+                }
                 .take(ARTIST_UPDATE_TOTAL)
         }
 
@@ -301,6 +312,7 @@ import com.alananasss.kittytune.utils.Logger
             const val ARTIST_UPDATE_SOURCES = 6
 
             private const val TRACKS_PER_ARTIST = 5
+            private const val MAX_PER_ARTIST = 2
             private const val ARTIST_UPDATE_TOTAL = 18
         }
 

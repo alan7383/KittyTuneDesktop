@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,22 +64,41 @@ fun SongChart(
     onGenreChange: (ChartGenre) -> Unit,
     modifier: Modifier = Modifier,
     showGenreRow: Boolean = true,
+    /**
+     * A switch is in flight, so the list below is about to be replaced.
+     *
+     * Without this the segmented button flips and the rows underneath stay put for as long as the
+     * request takes, which is indistinguishable from the switch doing nothing.
+     */
+    isSwitching: Boolean = false,
 ) {
     Column(modifier = modifier) {
-        ExpressiveConnectedButtonGroup(
-            options = ChartKind.entries,
-            selectedOption = kind,
-            onOptionSelected = onKindChange,
-            fillMaxWidth = true,
-            labelProvider = { option ->
-                Text(
-                    text = str(
-                        if (option == ChartKind.TOP) "chart_kind_top" else "chart_kind_trending"
-                    ),
-                    maxLines = 1,
+        Box {
+            ExpressiveConnectedButtonGroup(
+                options = ChartKind.entries,
+                selectedOption = kind,
+                onOptionSelected = onKindChange,
+                fillMaxWidth = true,
+                labelProvider = { option ->
+                    Text(
+                        text = str(
+                            if (option == ChartKind.TOP) "chart_kind_top" else "chart_kind_trending"
+                        ),
+                        maxLines = 1,
+                    )
+                },
+            )
+            if (isSwitching) {
+                LinearWavyProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .height(2.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = Color.Transparent,
                 )
-            },
-        )
+            }
+        }
 
         if (showGenreRow) {
             Spacer(Modifier.padding(top = 4.dp))
@@ -138,7 +159,7 @@ fun ChartTrackRow(
         modifier = modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(
                 if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent
             )
@@ -150,20 +171,20 @@ fun ChartTrackRow(
                 onClick = onClick,
             )
             .pressScale(interactionSource)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "$rank",
             style = if (onPodium) {
-                MaterialTheme.typography.headlineSmall
+                MaterialTheme.typography.titleLarge
             } else {
-                MaterialTheme.typography.titleMedium
+                MaterialTheme.typography.titleSmall
             },
             fontWeight = FontWeight.Bold,
             color = rankColor,
             textAlign = TextAlign.Center,
-            modifier = Modifier.width(40.dp),
+            modifier = Modifier.width(34.dp),
         )
 
         Box(contentAlignment = Alignment.Center) {
@@ -173,15 +194,15 @@ fun ChartTrackRow(
                 error = rememberDefaultAvatarPainter(),
                 fallback = rememberDefaultAvatarPainter(),
                 modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp)),
             )
 
             when {
                 isCurrent -> Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -189,15 +210,15 @@ fun ChartTrackRow(
                         imageVector = Icons.Rounded.GraphicEq,
                         contentDescription = str("player_playing_now"),
                         tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
                 // A chart is a queue: pressing a song means playing the chart from there, so the cover
                 // offers that on hover rather than hiding it behind a menu.
                 hovered -> Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -205,13 +226,13 @@ fun ChartTrackRow(
                         imageVector = Icons.Rounded.PlayArrow,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
         }
 
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(12.dp))
 
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -236,39 +257,6 @@ fun ChartTrackRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-    }
-}
-
-/** The heading a chart section carries: its title, and a way into the whole list. */
-@Composable
-fun ChartSectionHeader(
-    title: String,
-    onSeeAll: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
-        if (onSeeAll != null) {
-            Text(
-                text = str("search_see_all"),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onSeeAll)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-            )
         }
     }
 }
