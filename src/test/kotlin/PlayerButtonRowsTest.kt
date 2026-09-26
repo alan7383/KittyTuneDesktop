@@ -4,11 +4,18 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * The player-bar button rows in Interface -> Player design.
+ * The player-bar button rows, and the menu-tile rows beside them.
  *
- * Three things were wrong with them, all of them visible on screen rather than in a failure:
- * the marks were nearly invisible, the switches had no check in the thumb while every other switch
- * in the app did, and a press could toggle nothing at all.
+ * These were a hand-rolled row: a clickable `Surface` with a `Switch` inside it, its own icon chip,
+ * its own switch. Three things followed from that. The marks were nearly invisible, because the chip
+ * was `primaryContainer` and the glyph `primary` — one hue at two lightnesses. The switches had no
+ * check in the thumb while every other switch in the app did. And the rows felt inert, because the
+ * surface and the switch each had their own interaction source, so a press lit one small part of a
+ * row instead of the row.
+ *
+ * The fix was not to tune the copy of the row. It was to stop having one: these are `SettingsItem`
+ * now, the same control as every other row in the settings, which is what "it should behave like
+ * the others" has to mean if it is to stay true.
  */
 class PlayerButtonRowsTest {
 
@@ -18,112 +25,108 @@ class PlayerButtonRowsTest {
         return file.readText()
     }
 
-    private fun bar(): String {
-        val file = File("src/main/kotlin/com/alananasss/kittytune/ui/main/PlayerBar.kt")
-        assertTrue(file.exists(), "PlayerBar.kt should exist")
-        return file.readText()
+    private fun settingsItem(): String {
+        val text = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt").readText()
+        val start = text.indexOf("fun SettingsItem(")
+        assertTrue(start >= 0, "SettingsItem should exist")
+        return text.substring(start, text.indexOf("\nfun ", start + 10).takeIf { it > 0 } ?: (start + 6000))
     }
 
-    private fun row(): String {
-        val text = design()
-        val start = text.indexOf("private fun ButtonToggleRow(")
-        assertTrue(start >= 0, "ButtonToggleRow should exist")
-        return text.substring(start, text.indexOf("\n}\n", start))
-    }
-
-    // ── The marks were barely there ──
+    // ── The rows are the shared row ──
 
     @Test
-    fun testTheChipAndItsMarkAreATonalPair() {
-        val body = row()
-
-        assertTrue(
-            body.contains("color = if (item.enabled) MaterialTheme.colorScheme.primaryContainer"),
-            "The chip keeps its tonal fill",
-        )
-        assertTrue(
-            body.contains("MaterialTheme.colorScheme.onPrimaryContainer"),
-            "…and the mark is drawn in the colour meant to sit on it. It was `primary` on " +
-                "`primaryContainer` — the same hue at two lightnesses, which is why the glyph " +
-                "barely registered against the circle behind it.",
-        )
+    fun testBothListsUseTheSharedSettingsRow() {
+        val design = design()
         assertFalse(
-            Regex("""tint = if \(item\.enabled\) MaterialTheme\.colorScheme\.primary\b""").containsMatchIn(body),
-            "Primary on primaryContainer is the pairing that caused this",
+            design.contains("ButtonToggleRow"),
+            "The hand-rolled row is gone; a second copy of a settings row is how these drifted",
         )
-    }
-
-    @Test
-    fun testTheMarkIsBigEnoughToRead() {
-        // It was 20 dp in a 38 dp circle. At that size a Material glyph's thin strokes disappear
-        // against a tinted fill before contrast is even considered.
-        assertTrue(row().contains("modifier = Modifier.size(22.dp)"), "22 dp, in a 40 dp chip")
-        assertTrue(row().contains("modifier = Modifier.size(40.dp)"))
-    }
-
-    // ── The switches were the wrong switch ──
-
-    @Test
-    fun testTheRowsUseTheSharedSwitchSoTheyGetItsCheck() {
-        val body = row()
-
+        // The player-bar buttons and the menu tiles, both.
         assertTrue(
-            body.contains("SettingsSwitch("),
-            "The rows must use the shared switch, which puts a check in the thumb",
+            design.countOf("SettingsItem(") >= 2,
+            "Both lists go through the shared row",
         )
-        assertFalse(
-            Regex("""(?<!\.)\bSwitch\(\s*\n\s*checked = item\.enabled""").containsMatchIn(body),
-            "Not a bare Material Switch: that is the one without the check",
+        assertTrue(
+            design.contains("hasSwitch = true") && design.contains("switchState = item.enabled"),
+            "…as switch rows, with their state carried through",
         )
     }
 
     @Test
-    fun testTheSharedSwitchCarriesTheCheck() {
-        val shared = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt")
-            .readText()
+    fun testTheRowsAreWiredAsSwitchesNotLinks() {
+        val design = design()
+        assertTrue(
+            design.contains("onSwitchChange = { onToggle(item.key, it) }"),
+            "The player-bar list toggles its button through the switch callback",
+        )
+        assertTrue(
+            design.contains("prefs.setHiddenMenuTiles(menu, hidden)"),
+            "And the menu-tile list persists its own change",
+        )
+        // A switch row must not also be a link row: SettingsItem gives onClick precedence, and a
+        // row with both would navigate instead of toggling.
+        assertFalse(
+            Regex("onClick\\s*=").containsMatchIn(design.substringAfter("SettingsItem(").take(600)),
+            "No onClick alongside the switch, or the row would navigate rather than toggle",
+        )
+    }
+
+    // ── Which is only true if the shared row really is one control ──
+
+    @Test
+    fun testTheSharedRowSharesOneInteractionSource() {
+        val body = settingsItem()
+        assertTrue(
+            body.contains("val interactionSource = remember { MutableInteractionSource() }"),
+            "One interaction source for the row",
+        )
+        assertTrue(
+            body.countOf("interactionSource = interactionSource") >= 2,
+            "…given to both the card and the switch, which is what merges their feedback into one " +
+                "control. Two sources meant a press lit the switch but not the row it sat in.",
+        )
+    }
+
+    @Test
+    fun testTheSharedRowIsTheWholeClickTarget() {
+        val body = settingsItem()
+        assertTrue(
+            body.contains("onClick = { onToggleOrClick() }") &&
+                body.contains("enabled = onClick != null || hasSwitch"),
+            "A switch row is enabled and the card is what you press, anywhere on it",
+        )
+        assertTrue(
+            body.contains("if (hasSwitch && onSwitchChange != null)"),
+            "…and the press toggles rather than navigating",
+        )
+    }
+
+    @Test
+    fun testTheSharedRowCarriesACheckInTheThumb() {
+        val body = settingsItem()
+        assertTrue(body.contains("SettingsSwitch("), "The shared switch, not a bare one")
+        val shared = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt").readText()
         val start = shared.indexOf("fun SettingsSwitch(")
-        val body = shared.substring(start, shared.indexOf("\n}\n", start))
-        assertTrue(body.contains("thumbContent"))
+        val switch = shared.substring(start, shared.indexOf("\n}\n", start))
+        assertTrue(switch.contains("thumbContent"))
         assertTrue(
-            body.contains("Icons.Rounded.Check") && body.contains("Icons.Rounded.Close"),
+            switch.contains("Icons.Rounded.Check") && switch.contains("Icons.Rounded.Close"),
             "A check when on and a cross when off, so the state does not rely on colour alone",
         )
     }
 
-    // ── A press could do nothing ──
-
     @Test
-    fun testTheRowIsTheOnlyClickTarget() {
-        val body = row()
-
+    fun testTheSharedRowDrainsItsMarkInTheToneItSitsOn() {
+        val body = settingsItem()
         assertTrue(
-            body.contains("Surface(\n        onClick = { onToggle(!item.enabled) },"),
-            "The whole row toggles, which is the Material pattern for a list item",
+            body.contains("color = MaterialTheme.colorScheme.secondaryContainer") &&
+                body.contains("tint = MaterialTheme.colorScheme.onSecondaryContainer"),
+            "The chip and its mark are one tonal pair",
         )
-        // The switch is shown and not handled. Both firing would write the same value twice and the
-        // switch would look like it had ignored the press.
-        assertTrue(
-            body.contains("onCheckedChange = null"),
-            "The switch must not carry its own callback inside a clickable row",
+        assertFalse(
+            Regex("tint = MaterialTheme\\.colorScheme\\.primary\\b").containsMatchIn(body),
+            "primary on secondaryContainer is the pairing that made the old chips unreadable",
         )
-        assertTrue(
-            body.contains("enabled = true"),
-            "…and must be told it is enabled, because Material derives that from the callback " +
-                "being present and would otherwise grey it out",
-        )
-    }
-
-    @Test
-    fun testTheSharedSwitchCanBeShownWithoutHandlingClicks() {
-        val shared = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt")
-            .readText()
-        val start = shared.indexOf("fun SettingsSwitch(")
-        val body = shared.substring(start, shared.indexOf("\n}\n", start))
-        assertTrue(
-            body.contains("enabled: Boolean = true"),
-            "The switch needs `enabled` separate from the callback, or this arrangement is impossible",
-        )
-        assertTrue(body.contains("enabled = enabled"))
     }
 
     // ── The glyphs are the ones the bar actually shows ──
@@ -131,26 +134,24 @@ class PlayerButtonRowsTest {
     @Test
     fun testTheGlyphsMatchThePlayerBar() {
         val design = design()
-        val bar = bar()
+        val bar = File("src/main/kotlin/com/alananasss/kittytune/ui/main/PlayerBar.kt").readText()
 
         // The point of the list is to say which buttons are shown, so the mark has to be the mark
-        // that button carries. The lyrics one is a file, not a Material icon, which is why these are
-        // painters and not vectors.
+        // that button carries. The lyrics one is a file rather than a Material icon, which is why
+        // these are painters and not vectors.
         assertTrue(
             design.contains("""mark = painterResource("icons/lyrics.svg")"""),
             "The bar draws its lyrics button from a file, so the list must as well",
         )
-        assertTrue(
-            File("src/main/resources/icons/lyrics.svg").exists(),
-            "…and that file has to exist, or the row crashes instead of drawing nothing",
-        )
+        assertTrue(File("src/main/resources/icons/lyrics.svg").exists())
         assertTrue(bar.contains("icons/lyrics.svg"), "The bar really does draw it from there")
 
-        for (icon in listOf("Icons.Filled.Favorite", "Icons.Outlined.Tune", "Icons.Outlined.QueueMusic",
-                            "Icons.Filled.Shuffle", "Icons.Filled.Repeat",
-                            "Icons.Rounded.PictureInPictureAlt")) {
-            assertTrue(design.contains("rememberVectorPainter($icon)"), "The list should show $icon")
-            assertTrue(bar.contains(icon), "…and the bar should be the one drawing $icon")
+        for (icon in listOf(
+            "Icons.Filled.Favorite", "Icons.Outlined.Tune", "Icons.Outlined.QueueMusic",
+            "Icons.Filled.Shuffle", "Icons.Filled.Repeat", "Icons.Rounded.PictureInPictureAlt",
+        )) {
+            assertTrue(design.contains("rememberVectorPainter($icon)"), "The list shows $icon")
+            assertTrue(bar.contains(icon), "…and the bar is what draws $icon")
         }
     }
 
@@ -163,3 +164,5 @@ class PlayerButtonRowsTest {
         assertFalse(decl.contains("icon:"), "One mark, not a second spelling of it")
     }
 }
+
+private fun String.countOf(needle: String): Int = split(needle).size - 1
