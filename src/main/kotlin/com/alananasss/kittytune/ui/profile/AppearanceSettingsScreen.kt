@@ -289,13 +289,11 @@ private fun FontPickerDialog(
 }
 
 /** The system's own file dialog, filtered to fonts. */
-private fun pickFontFile(title: String): java.io.File? {
-    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
-    dialog.file = "*.ttf;*.otf"
-    dialog.setFilenameFilter { _, name -> name.endsWith(".ttf", true) || name.endsWith(".otf", true) }
-    dialog.isVisible = true
-    return dialog.files.firstOrNull()
-}
+private fun pickFontFile(title: String): java.io.File? =
+    com.alananasss.kittytune.core.NativeFileDialog.openFile(
+        title,
+        com.alananasss.kittytune.core.NativeFileDialog.FileType(title, listOf("ttf", "otf")),
+    )
 
 /**
  * Interface → Player design: the sliders, which buttons the player bar carries, the covers, and the tiles

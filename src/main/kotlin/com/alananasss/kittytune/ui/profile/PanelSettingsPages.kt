@@ -271,14 +271,11 @@ private fun LibraryTilePreview(iconPath: String?, icon: ImageVector, fill: Modif
  * Asks for an image file, or null when the dialog is dismissed. The filter is a hint the platform may ignore,
  * so the file is still validated afterwards — see [LibraryTileIcons.import].
  */
-private fun pickImageFile(title: String): java.io.File? {
-    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
-    dialog.setFilenameFilter { _, name ->
-        listOf(".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp").any { name.endsWith(it, true) }
-    }
-    dialog.isVisible = true
-    return dialog.files.firstOrNull()
-}
+private fun pickImageFile(title: String): java.io.File? =
+    com.alananasss.kittytune.core.NativeFileDialog.openFile(
+        title,
+        com.alananasss.kittytune.core.NativeFileDialog.FileType(title, listOf("png", "jpg", "jpeg", "webp", "gif", "bmp")),
+    )
 
 /** Interface → Right panel: which tabs the now-playing panel has and which half it opens on. */
 @Composable
