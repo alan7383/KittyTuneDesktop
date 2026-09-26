@@ -1,6 +1,5 @@
 package com.alananasss.kittytune.ui.player
 
-import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -46,9 +45,6 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.draw.blur
@@ -960,13 +956,17 @@ private fun FullPlayerControls(
     }
 }
 
+/**
+ * The full player's volume: the same styled track as the player bar's — plain, slim, wavy or squiggly, with
+ * the dot that jumps when grabbed and the wave that moves only while music plays — in the artwork's colours.
+ * The wheel works anywhere on the row.
+ */
 @Composable
 private fun FullPlayerVolumeBar(
     viewModel: PlayerViewModel,
     palette: FullPlayerPalette,
 ) {
-    val vol = viewModel.volume.coerceIn(0f, 1f)
-
+    val volume = viewModel.volume.coerceIn(0f, 1f)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -976,93 +976,36 @@ private fun FullPlayerVolumeBar(
                         val event = awaitPointerEvent()
                         val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
                         if (scrollDelta != 0f) {
-                            val next = (viewModel.volume - scrollDelta * 0.02f).coerceIn(0f, 1f)
-                            viewModel.updateVolume(next)
+                            viewModel.updateVolume((viewModel.volume - scrollDelta * 0.05f).coerceIn(0f, 1f))
                             viewModel.persistVolumeSoon()
                         }
                     }
                 }
             },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        val volumeIcon = when {
-            vol <= 0.001f -> Icons.AutoMirrored.Filled.VolumeOff
-            vol < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-            else -> Icons.AutoMirrored.Filled.VolumeUp
-        }
-
         QuietButton(
-            icon = volumeIcon,
+            icon = com.alananasss.kittytune.ui.main.volumeIcon(volume),
             label = str("volume_title"),
             tint = palette.dim,
             size = 18.dp,
             onClick = { viewModel.toggleMute() }
         )
-
-        var scrubbingVolume by remember { mutableStateOf(false) }
-        var scrubVolFraction by remember { mutableFloatStateOf(vol) }
-
-        val activeFraction = if (scrubbingVolume) scrubVolFraction else vol
-        val volPercent = (activeFraction * 100).roundToInt()
-
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(20.dp)
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { offset ->
-                            scrubbingVolume = true
-                            scrubVolFraction = (offset.x / size.width).coerceIn(0f, 1f)
-                            viewModel.updateVolume(scrubVolFraction)
-                        },
-                        onDragEnd = {
-                            viewModel.updateVolume(scrubVolFraction)
-                            viewModel.persistVolumeSoon()
-                            scrubbingVolume = false
-                        },
-                        onDragCancel = { scrubbingVolume = false },
-                        onHorizontalDrag = { change, _ ->
-                            scrubVolFraction = (change.position.x / size.width).coerceIn(0f, 1f)
-                            viewModel.updateVolume(scrubVolFraction)
-                        }
-                    )
-                }
-                .pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        val next = (offset.x / size.width).coerceIn(0f, 1f)
-                        viewModel.updateVolume(next)
-                        viewModel.persistVolumeSoon()
-                    }
-                }
-                .drawBehind {
-                    val track = 3.dp.toPx()
-                    val y = size.height / 2f
-                    val radius = track / 2f
-                    drawRoundRect(
-                        color = palette.dim.copy(alpha = 0.22f),
-                        topLeft = Offset(0f, y - radius),
-                        size = androidx.compose.ui.geometry.Size(size.width, track),
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius),
-                    )
-                    val played = size.width * activeFraction
-                    if (played > 0f) {
-                        drawRoundRect(
-                            color = palette.dim.copy(alpha = 0.8f),
-                            topLeft = Offset(0f, y - radius),
-                            size = androidx.compose.ui.geometry.Size(played, track),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius),
-                        )
-                    }
-                    drawCircle(color = palette.bright, radius = track * 1.3f, center = Offset(played, y))
-                }
+        com.alananasss.kittytune.ui.main.StyledVolumeTrack(
+            volume = volume,
+            isPlaying = viewModel.isPlaying,
+            activeColor = palette.bright,
+            inactiveColor = palette.dim.copy(alpha = 0.25f),
+            onVolumeChange = { viewModel.updateVolume(it) },
+            onVolumeChangeFinished = { viewModel.persistVolume() },
+            modifier = Modifier.weight(1f),
         )
-
         androidx.compose.material3.Text(
-            text = "$volPercent%",
+            text = com.alananasss.kittytune.ui.main.volumePercentLabel(volume),
             style = MaterialTheme.typography.labelSmall,
             color = palette.dim,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
             modifier = Modifier.width(36.dp)
         )
     }
