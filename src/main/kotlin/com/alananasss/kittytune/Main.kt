@@ -369,6 +369,11 @@ fun main(args: Array<String>) {
                 }
             }
         ) {
+        // Keys whose press was taken as a shortcut, so their release is taken too. A focused button clicks on
+        // the release of Space or Enter without asking whether it saw the press: after the play button in the
+        // full player had been clicked with the mouse it kept the focus, and Space then paused on the press and
+        // played again on the release — the pause that "only works every other time".
+        val shortcutKeysHeld = remember { mutableSetOf<Key>() }
         Window(
             visible = isWindowVisible,
             onCloseRequest = {
@@ -441,10 +446,13 @@ fun main(args: Array<String>) {
 
                     if (isShortcutKey) {
                         com.alananasss.kittytune.core.GlobalShortcutDispatcher.dispatch(event)
+                        shortcutKeysHeld += event.key
                         true
                     } else {
                         false
                     }
+                } else if (event.type == KeyEventType.KeyUp && shortcutKeysHeld.remove(event.key)) {
+                    true
                 } else {
                     false
                 }

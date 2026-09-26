@@ -187,7 +187,15 @@ class Player {
     var playWhenReady: Boolean = false
         set(value) {
             field = value
-            if (value) activeEngine.play() else activeEngine.pause()
+            // The outgoing track of a crossfade too: left alone it went on fading out after a pause, which
+            // sounded like the pause had not worked, and the next press — meant as a second pause — resumed.
+            if (value) {
+                activeEngine.play()
+                fadingEngine?.play()
+            } else {
+                activeEngine.pause()
+                fadingEngine?.pause()
+            }
         }
 
     var repeatMode: Int = REPEAT_MODE_OFF
@@ -460,6 +468,11 @@ class Player {
 
                         while (!newEngine.isPlaying && isActive && newEngine.state == AudioEngine.State.BUFFERING) {
                             delay(100)
+                        }
+                        // Paused mid-fade: hold the fade where it is, so it resumes rather than having finished
+                        // in silence.
+                        while (!playWhenReady && isActive) {
+                            delay(50)
                         }
 
                         if (oldEngine.state == AudioEngine.State.ENDED || oldEngine.state == AudioEngine.State.IDLE) {
