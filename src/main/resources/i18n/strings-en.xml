@@ -2265,6 +2265,11 @@
     <string name="full_player_section_title">Fullscreen Player</string>
     <string name="full_player_bg_style">Background style</string>
     <string name="full_player_bg_apple_music">Apple Music</string>
+    <string name="full_player_layout">Layout</string>
+    <string name="full_player_layout_right">Text right</string>
+    <string name="full_player_layout_left">Text left</string>
+    <string name="full_player_layout_centred">Centred</string>
+    <string name="full_player_layout_single_line">One line</string>
     <string name="full_player_bg_apple_music_fact">Fun fact: this background is not a lookalike. It is Apple Music's own effect, worked out from reverse-engineering analyses, right down to the album art stacked, twisted and blurred.</string>
     <string name="full_player_bg_blur">Blur</string>
     <string name="full_player_bg_gradient">Gradient</string>

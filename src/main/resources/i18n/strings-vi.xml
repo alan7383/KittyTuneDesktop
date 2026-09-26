@@ -2507,6 +2507,11 @@
     <string name="feed_playlist_tracks">%1$d bài hát</string>
     <string name="feed_refresh">Làm mới bảng tin</string>
     <string name="full_player_bg_apple_music">Apple Music</string>
+    <string name="full_player_layout">Bố cục</string>
+    <string name="full_player_layout_right">Lời bên phải</string>
+    <string name="full_player_layout_left">Lời bên trái</string>
+    <string name="full_player_layout_centred">Ở giữa</string>
+    <string name="full_player_layout_single_line">Một dòng</string>
     <string name="full_player_bg_apple_music_fact">Thú vị: hình nền này không phải là bản sao mô phỏng thông thường. Nó tái tạo trực tiếp hiệu ứng của Apple Music qua phân tích kỹ thuật ngược, từ các lớp ảnh bìa xếp chồng, xoay góc đến làm mờ.</string>
     <string name="full_player_bg_blur">Làm mờ</string>
     <string name="full_player_bg_gradient">Chuyển sắc (Gradient)</string>

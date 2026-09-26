@@ -2672,6 +2672,11 @@
     <string name="feed_playlist_tracks">%1$d Titel</string>
     <string name="feed_refresh">Feed aktualisieren</string>
     <string name="full_player_bg_apple_music">Apple Music</string>
+    <string name="full_player_layout">Anordnung</string>
+    <string name="full_player_layout_right">Text rechts</string>
+    <string name="full_player_layout_left">Text links</string>
+    <string name="full_player_layout_centred">Zentriert</string>
+    <string name="full_player_layout_single_line">Eine Zeile</string>
     <string name="full_player_bg_apple_music_fact">Interessanter Fakt: Dieser Hintergrund ist keine Nachahmung. Es ist der echte Effekt von Apple Music, rekonstruiert durch Reverse-Engineering, bis hin zu den gestapelten, verdrehten und weichgezeichneten Covern.</string>
     <string name="full_player_bg_blur">Weichzeichnen</string>
     <string name="full_player_bg_gradient">Farbverlauf</string>

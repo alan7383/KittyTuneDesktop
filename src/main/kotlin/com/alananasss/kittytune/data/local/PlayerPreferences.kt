@@ -58,6 +58,13 @@ enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
  */
 enum class FullPlayerBgStyle { APPLE_MUSIC, BLUR, GRADIENT, PURE_BLACK }
 
+/**
+ * Where the full player puts the words against the cover (issue #33, round 5): beside it on either side, alone in
+ * the middle with the cover shrunk into the bar below, or a single current line under the cover. A window taller
+ * than it is wide keeps its own stacked layout whichever is chosen, except the single line, which suits it too.
+ */
+enum class FullPlayerLayout { LYRICS_RIGHT, LYRICS_LEFT, LYRICS_CENTRED, COVER_AND_LINE }
+
 enum class PlayerBarStyle { DEFAULT, ROUNDED, FLOATING }
 
 /**
@@ -154,6 +161,7 @@ class PlayerPreferences {
         const val MINI_PLAYER_ELONGATED_DEFAULT_HEIGHT = 38
         const val MINI_PLAYER_ELONGATED_DEFAULT_WIDTH = 500
         private const val KEY_FULL_PLAYER_BG_STYLE = "full_player_bg_style"
+        private const val KEY_FULL_PLAYER_LAYOUT = "full_player_layout"
 
         /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
         private const val LEGACY_ORBS_STYLE = "ORBS"
@@ -809,6 +817,11 @@ class PlayerPreferences {
         }
     }
     fun setFullPlayerBgStyle(style: FullPlayerBgStyle) = Prefs.putString(KEY_FULL_PLAYER_BG_STYLE, style.name)
+
+    fun getFullPlayerLayout(): FullPlayerLayout =
+        FullPlayerLayout.entries.firstOrNull { it.name == Prefs.getString(KEY_FULL_PLAYER_LAYOUT, null) }
+            ?: FullPlayerLayout.LYRICS_RIGHT
+    fun setFullPlayerLayout(layout: FullPlayerLayout) = Prefs.putString(KEY_FULL_PLAYER_LAYOUT, layout.name)
 
     fun getFullPlayerCoverScale(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_SCALE, 1.0f).coerceIn(0.6f, 1.4f)
     fun setFullPlayerCoverScale(scale: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_SCALE, scale.coerceIn(0.6f, 1.4f))

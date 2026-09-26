@@ -2269,6 +2269,11 @@
     <string name="full_player_section_title">Teljes képernyős lejátszó</string>
     <string name="full_player_bg_style">Háttér stílus</string>
     <string name="full_player_bg_apple_music">Apple Music</string>
+    <string name="full_player_layout">Elrendezés</string>
+    <string name="full_player_layout_right">Szöveg jobbra</string>
+    <string name="full_player_layout_left">Szöveg balra</string>
+    <string name="full_player_layout_centred">Középen</string>
+    <string name="full_player_layout_single_line">Egy sor</string>
     <string name="full_player_bg_apple_music_fact">Vicces tény: ez a háttér nem utánzat. Ez az Apple Music igazi effektje, visszafejtési elemzések alapján rekonstruálva, egészen az egymásra rétegezett, megcsavart és elmosott borítóig.</string>
     <string name="full_player_bg_blur">Elmosás</string>
     <string name="full_player_bg_gradient">Színátmenet</string>

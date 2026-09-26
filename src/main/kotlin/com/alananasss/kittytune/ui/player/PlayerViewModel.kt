@@ -184,6 +184,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var isQueuePreserveUpcomingEnabled by mutableStateOf(playerPrefs.getQueuePreserveUpcomingOnJump())
     var fullPlayerBgStyle by mutableStateOf(playerPrefs.getFullPlayerBgStyle())
         private set
+    var fullPlayerLayout by mutableStateOf(playerPrefs.getFullPlayerLayout())
+        private set
     var fullPlayerCoverScale by mutableFloatStateOf(playerPrefs.getFullPlayerCoverScale())
         private set
     var fullPlayerLyricsAlign by mutableStateOf(playerPrefs.getFullPlayerLyricsAlign())
@@ -3973,6 +3975,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateFullPlayerBgStyle(style: com.alananasss.kittytune.data.local.FullPlayerBgStyle) {
         fullPlayerBgStyle = style
         playerPrefs.setFullPlayerBgStyle(style)
+    }
+
+    fun updateFullPlayerLayout(layout: com.alananasss.kittytune.data.local.FullPlayerLayout) {
+        fullPlayerLayout = layout
+        playerPrefs.setFullPlayerLayout(layout)
     }
 
     fun updateFullPlayerCoverScale(scale: Float) {
