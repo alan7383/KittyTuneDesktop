@@ -63,6 +63,21 @@ enum class FullPlayerBgStyle { APPLE_MUSIC, BLUR, GRADIENT, PURE_BLACK }
 
 enum class PlayerBarStyle { DEFAULT, ROUNDED, FLOATING }
 
+/**
+ * The floating bar's shape: its corner (0 is square, 40 a pill), how much of the window's width it takes,
+ * how far above the bottom edge it floats, and whether the page shows through it.
+ */
+data class FloatingBarLook(
+    val cornerDp: Int,
+    val widthPercent: Int,
+    val marginDp: Int,
+    val isTranslucent: Boolean,
+) {
+    companion object {
+        val DEFAULT = FloatingBarLook(cornerDp = 40, widthPercent = 100, marginDp = 16, isTranslucent = true)
+    }
+}
+
 enum class AppLanguage(val code: String) {
     SYSTEM("system"),
     FRENCH("fr"),
@@ -945,6 +960,21 @@ class PlayerPreferences {
     fun getVolumeSliderStyle(): PlayerSliderStyle? =
         Prefs.getString("volume_slider_style", null)?.let { runCatching { PlayerSliderStyle.valueOf(it) }.getOrNull() }
     fun setVolumeSliderStyle(style: PlayerSliderStyle?) = Prefs.putString("volume_slider_style", style?.name)
+
+    /** How the floating player bar is drawn; see [FloatingBarLook]. */
+    fun getFloatingBarLook(): FloatingBarLook = FloatingBarLook(
+        cornerDp = Prefs.getInt("floating_bar_corner", FloatingBarLook.DEFAULT.cornerDp),
+        widthPercent = Prefs.getInt("floating_bar_width", FloatingBarLook.DEFAULT.widthPercent),
+        marginDp = Prefs.getInt("floating_bar_margin", FloatingBarLook.DEFAULT.marginDp),
+        isTranslucent = Prefs.getBoolean("floating_bar_translucent", FloatingBarLook.DEFAULT.isTranslucent),
+    )
+
+    fun setFloatingBarLook(look: FloatingBarLook) {
+        Prefs.putInt("floating_bar_corner", look.cornerDp)
+        Prefs.putInt("floating_bar_width", look.widthPercent)
+        Prefs.putInt("floating_bar_margin", look.marginDp)
+        Prefs.putBoolean("floating_bar_translucent", look.isTranslucent)
+    }
 
     fun playerSliderStyleFlow(): Flow<PlayerSliderStyle> =
         Prefs.stringFlow(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name).map { name ->

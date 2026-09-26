@@ -2622,4 +2622,10 @@
     <string name="font_rejected">Ce fichier n\'est pas une police TTF/OTF</string>
     <string name="volume_style_title">Style du volume</string>
     <string name="volume_style_same">Comme la barre</string>
+    <string name="floating_bar_title">Barre flottante</string>
+    <string name="floating_bar_corner">Coins</string>
+    <string name="floating_bar_width">Largeur</string>
+    <string name="floating_bar_margin">Distance du bas</string>
+    <string name="floating_bar_translucent">Transparence</string>
+    <string name="floating_bar_translucent_sub">La page apparaît à travers</string>
 </resources>

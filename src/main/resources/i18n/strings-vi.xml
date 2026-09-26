@@ -3070,4 +3070,10 @@
     <string name="font_rejected">Tệp không phải phông TTF/OTF</string>
     <string name="volume_style_title">Kiểu âm lượng</string>
     <string name="volume_style_same">Như thanh phát</string>
+    <string name="floating_bar_title">Thanh nổi</string>
+    <string name="floating_bar_corner">Bo góc</string>
+    <string name="floating_bar_width">Chiều rộng</string>
+    <string name="floating_bar_margin">Cách đáy</string>
+    <string name="floating_bar_translucent">Trong suốt</string>
+    <string name="floating_bar_translucent_sub">Thấy trang phía sau</string>
 </resources>

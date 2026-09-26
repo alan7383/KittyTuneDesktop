@@ -2620,4 +2620,10 @@
     <string name="font_rejected">Этот файл не шрифт TTF или OTF</string>
     <string name="volume_style_title">Стиль громкости</string>
     <string name="volume_style_same">Как у трека</string>
+    <string name="floating_bar_title">Плавающая панель</string>
+    <string name="floating_bar_corner">Скругление</string>
+    <string name="floating_bar_width">Ширина</string>
+    <string name="floating_bar_margin">Отступ снизу</string>
+    <string name="floating_bar_translucent">Прозрачность</string>
+    <string name="floating_bar_translucent_sub">Страница видна сквозь панель</string>
 </resources>
