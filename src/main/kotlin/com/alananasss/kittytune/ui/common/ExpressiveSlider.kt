@@ -62,6 +62,7 @@ fun Slider(
             SliderDefaults.Track(
                 sliderState = sliderState,
                 trackCornerSize = Dp.Unspecified,
+                drawStopIndicator = null,
                 enabled = enabled,
                 colors = colors,
             )
