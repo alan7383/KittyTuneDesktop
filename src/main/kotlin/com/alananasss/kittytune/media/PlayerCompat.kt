@@ -22,14 +22,30 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * The crossfade's two gain ramps, kept at file level so the mix glow can be lit by the same numbers
- * the ears hear.
+ * Where the two gain ramps live, as fractions of the fade.
  *
- * They are the whole reason this pair exists rather than a plain linear fade: the outgoing track
- * ramps down over the first 60% of the fade and the incoming ramps up over the last 60%, so the two
- * overlap and the summed power stays flat. A second copy of this in the UI would be a second opinion
- * about when a track is audible, and the two would slowly stop agreeing — which is the one thing a
- * glow like that must not do.
+ * Equal power needs **both** ramps over the *same* span: `out = cos(θ)` and `in = sin(θ)` with one
+ * `θ`, and their squares only sum to a constant if both are the same function of progress. These two
+ * used to span `[0, 0.6]` and `[0.4, 1]` — overlapping, but not identically — so the sum fell to
+ * about 0.13 halfway through and the mix sagbed roughly 9 dB at exactly the moment it existed to be
+ * seamless. The overlap was real; the arithmetic around it was not.
+ *
+ * A 40% span keeps the shape those numbers were reaching for: the outgoing track holds full for the
+ * first third, the two genuinely blend across the middle, and the incoming is alone for the last
+ * third. The point of a crossfade is that the sum does not move, and only a shared span achieves it.
+ */
+internal const val CROSSFADE_SPAN_START = 0.3f
+internal const val CROSSFADE_SPAN_END = 0.7f
+
+/**
+ * The crossfade's two gain ramps, at file level so the mix glow can be lit by the same numbers the
+ * ears hear.
+ *
+ * A second copy of this in the UI would be a second opinion about when a track is audible, and the
+ * two would slowly stop agreeing — which is the one thing a glow like that must not do. The span
+ * constants above are shared for the same reason: when the engine's overlap was corrected, the glow
+ * had to be corrected with it, in the same commit, or it would have been lighting a fade that no
+ * longer existed.
  */
 internal fun equalPowerIn(edge0: Float, edge1: Float, x: Float): Float {
     val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
@@ -494,8 +510,8 @@ class Player {
                         }
 
                         val progress = i.toFloat() / steps
-                        val fadeOut = equalPowerOut(0f, 0.6f, progress)
-                        val fadeIn = equalPowerIn(0.4f, 1f, progress)
+                        val fadeOut = equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
+                        val fadeIn = equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
 
                         // The artwork is lit by this, so the glow and the mix are the same event
                         // rather than two things that usually happen together.

@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.audio.automix.AutomixManager
 import com.alananasss.kittytune.core.LocalWindowSeen
+import com.alananasss.kittytune.media.CROSSFADE_SPAN_END
+import com.alananasss.kittytune.media.CROSSFADE_SPAN_START
 import com.alananasss.kittytune.media.equalPowerIn
 import com.alananasss.kittytune.media.equalPowerOut
 import kotlinx.coroutines.delay
@@ -50,11 +52,10 @@ val MIX_HALO_MARGIN: Dp = 72.dp
  *   equal-power and overlap only across the middle of the fade, so progress on its own would put the
  *   light at full before the fade and full after it with nothing in between — the opposite of what a
  *   handover looks like. What moves is [mixHandover]: how much of both tracks is audible at once.
- * - **The glow follows the overlap, not the level.** The two ramps span different intervals — the
- *   outgoing over the first 60% and the incoming over the last 60% — so they are *not* equal power
- *   and the mix does dip audibly in the middle, by about 9 dB (`MixGlowTest` pins the number). The
- *   glow deliberately does not mirror that dip: it is a readout of the handover, and a light that
- *   went out at the moment the listener is most attentive would be a bad one.
+ * - **The glow follows the overlap, not the level.** The two gain ramps share one span
+ *   ([CROSSFADE_SPAN_START] to [CROSSFADE_SPAN_END]), so the handover is the middle of the fade and
+ *   nothing else moves. The glow is a readout of that, which is also why it never dips: a light that
+ *   sagged at the moment the listener is most attentive would be a bad one.
  *
  * Everything here is drawn, not composed: the 30 fps clock writes a float that is read inside the
  * draw lambda, so a running glow repaints without recomposing the player.
@@ -132,7 +133,8 @@ fun rememberMixGlow(outgoingBpm: Float): MixGlow {
  */
 internal fun mixHandover(progress: Float): Float {
     if (progress <= 0f || progress >= 1f) return 0f
-    val both = equalPowerOut(0f, 0.6f, progress) * equalPowerIn(0.4f, 1f, progress)
+    val both = equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress) *
+        equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
     return (both / HANDOVER_PEAK).coerceIn(0f, 1f)
 }
 
@@ -284,14 +286,15 @@ private fun easeInOutSine(x: Float): Float = 0.5f - 0.5f * cos(PI.toFloat() * x.
 /**
  * The highest the handover ever gets, measured off the engine's own curve rather than written down.
  *
- * Scanning keeps the normalisation honest: widen or narrow the overlap in [equalPowerOut] and this
- * follows, instead of leaving the glow capped at whatever fraction it used to reach.
+ * Scanning keeps the normalisation honest: widen or narrow [CROSSFADE_SPAN_START] and this follows,
+ * instead of leaving the glow capped at whatever fraction it used to reach.
  */
 private val HANDOVER_PEAK: Float by lazy {
     var peak = 0f
     var p = 0f
     while (p <= 1f) {
-        val v = equalPowerOut(0f, 0.6f, p) * equalPowerIn(0.4f, 1f, p)
+        val v = equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, p) *
+            equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, p)
         if (v > peak) peak = v
         p += 0.001f
     }
