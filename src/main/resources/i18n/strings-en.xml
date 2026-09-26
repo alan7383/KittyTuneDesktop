@@ -2692,7 +2692,6 @@
     <string name="search_remove_recent">Remove from recent searches</string>
     <string name="chart_kind_top">Top 50</string>
     <string name="chart_kind_trending">New &amp; trending</string>
-    <string name="chart_see_full">The full chart</string>
     <string name="chart_genre_all">All</string>
     <string name="chart_genre_pop">Pop</string>
     <string name="chart_genre_hiphop">Hip-hop</string>
@@ -2703,4 +2702,6 @@
     <string name="chart_genre_latin">Latin</string>
     <string name="home_from_your_artists">New from your artists</string>
     <string name="home_from_your_artists_sub">What the artists you like have put out</string>
+    <string name="explore">Explore</string>
+    <string name="chart_section_title">Chart</string>
 </resources>
