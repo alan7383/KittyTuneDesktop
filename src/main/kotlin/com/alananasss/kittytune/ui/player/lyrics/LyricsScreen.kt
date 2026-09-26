@@ -1079,6 +1079,13 @@ import kotlin.math.roundToInt
 
 
 
+    /**
+     * The lyrics timing panel: how far the words are shifted against the song, nudged in tenths of a second.
+     *
+     * A title with a way out, the shift large in the middle between the two nudges, and the reset under it — lit
+     * only when there is something to reset (issue #33, round 5). It had no close button although it was handed
+     * one, and a reset written in English whatever the language.
+     */
     @Composable
     fun LyricsOffsetControls(
         offset: Long,
@@ -1087,118 +1094,102 @@ import kotlin.math.roundToInt
         onClose: () -> Unit,
         modifier: Modifier = Modifier
     ) {
+        val scheme = MaterialTheme.colorScheme
         Surface(
-            modifier = modifier.fillMaxWidth(), // Padding is managed by the parent
-            shape = RoundedCornerShape(24.dp),
-            // Themed like the rest of the screen. This panel floats over the lyrics, so it uses a raised
-            // container rather than a black scrim that ignored the palette (issue #33).
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            modifier = modifier.widthIn(max = 420.dp).fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            // Themed like the rest of the screen: it floats over the lyrics, so a raised container rather than a
+            // black scrim that ignored the palette (issue #33).
+            color = scheme.surfaceContainerHigh,
+            border = androidx.compose.foundation.BorderStroke(1.dp, scheme.outlineVariant),
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+            Column(Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Timer, null, tint = scheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         text = str("lyrics_sync"),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        fontWeight = FontWeight.Bold
-                    )
-    
-                    // Proper formatting: +0.1s, -0.5s, 0.0s
-                    val seconds = offset / 1000.0
-                    val sign = if (offset > 0) "+" else ""
-                    val color = if (offset == 0L) MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.primary
-    
-                    Text(
-                        text = String.format(java.util.Locale.US, "%s%.1fs", sign, seconds),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = color,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(end = 8.dp) // Small visual alignment
+                        color = scheme.onSurface,
+                        modifier = Modifier.weight(1f),
                     )
-                }
-    
-                Spacer(Modifier.height(16.dp))
-    
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // MINUS BUTTON (Active repetition)
-                    RepeatingIconButton(onClick = { onAdjust(-100L) }, // -0.1s
-                        icon = Icons.Rounded.Remove,
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-    
-                    // RESET BUTTON (Simple click is enough)
-                    TextButton(onClick = onReset) {
-                        Text(
-                            "RESET",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Rounded.Close, contentDescription = str("btn_close"), tint = scheme.onSurfaceVariant)
                     }
-    
-                    // PLUS BUTTON (Active repetition)
-                    RepeatingIconButton(onClick = { onAdjust(100L) }, // +0.1s
-                        icon = Icons.Rounded.Add,
-                        tint = MaterialTheme.colorScheme.onSurface
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, end = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RepeatingIconButton(onClick = { onAdjust(-OFFSET_STEP_MS) }, icon = Icons.Rounded.Remove, tint = scheme.onSurface)
+                    val shiftColor by androidx.compose.animation.animateColorAsState(
+                        if (offset == 0L) scheme.onSurfaceVariant else scheme.primary, label = "lyricsOffsetColor"
                     )
+                    Text(
+                        text = String.format(java.util.Locale.US, "%s%.1f s", if (offset > 0) "+" else "", offset / 1000.0),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = shiftColor,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f),
+                    )
+                    RepeatingIconButton(onClick = { onAdjust(OFFSET_STEP_MS) }, icon = Icons.Rounded.Add, tint = scheme.onSurface)
+                }
+
+                TextButton(
+                    onClick = onReset,
+                    enabled = offset != 0L,
+                    modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp, end = 12.dp),
+                ) {
+                    Icon(Icons.Rounded.RestartAlt, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(str("btn_reset"), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
     }
-    
+
+    /**
+     * A round button that fires once on press and keeps firing while held.
+     *
+     * The press used to start the repeat and cancel it on the very next line, without waiting for the release:
+     * holding never repeated, and a click whose coroutine had not been dispatched yet did nothing at all. The
+     * first step now runs on the press itself and the repeat lives until the finger lifts.
+     */
     @Composable
-    fun RepeatingIconButton(onClick: () -> Unit,
+    fun RepeatingIconButton(
+        onClick: () -> Unit,
         icon: androidx.compose.ui.graphics.vector.ImageVector,
         tint: Color,
         modifier: Modifier = Modifier
     ) {
         val currentOnClick by rememberUpdatedState(onClick)
         val scope = rememberCoroutineScope()
-    
-        // We use Surface instead of FilledIconButton to have total control over touch events
         Surface(
-            shape = CircleShape, // Round shape like an IconButton
+            shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             modifier = modifier
-                .size(48.dp) // Standard button size
-                .clip(CircleShape) // Important for visual effect and touch
+                .size(48.dp)
+                .clip(CircleShape)
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onPress = {
-                            // Start coroutine for repetition
-                            val job = scope.launch {
-                                // 1. Immediate click on touch
-                                currentOnClick()
-    
-                                // 2. Delay before starting repetition (e.g., 400ms)
-                                delay(400)
-    
-                                // 3. Repetition loop while finger is pressed
+                            currentOnClick()
+                            val repeat = scope.launch {
+                                delay(REPEAT_START_DELAY_MS)
                                 while (isActive) {
                                     currentOnClick()
-                                    delay(100) // Repetition speed (0.1s)
+                                    delay(REPEAT_INTERVAL_MS)
                                 }
                             }
-    
-                            // Cancel loop as soon as it's released
-                            job.cancel()
+                            tryAwaitRelease()
+                            repeat.cancel()
                         }
                     )
                 }
         ) {
-            // Center icon in the Surface
             Box(contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = tint)
             }
@@ -2532,4 +2523,6 @@ private fun autoScrollSpeedLabel(speed: Float): String {
     return "$text×"
 }
 
-
+private const val OFFSET_STEP_MS = 100L
+private const val REPEAT_START_DELAY_MS = 400L
+private const val REPEAT_INTERVAL_MS = 100L
