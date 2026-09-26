@@ -9,7 +9,11 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -74,6 +78,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
 import com.alananasss.kittytune.ui.player.cover.CanvasVideo
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.FullPlayerLayout
 import com.alananasss.kittytune.ui.main.PanelLyrics
 import com.alananasss.kittytune.ui.utils.fadingEdge
 
@@ -203,8 +208,13 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
         val isPortrait = maxHeight > maxWidth
         val hasLyrics = viewModel.hasLyrics
         val showPortraitLyrics = isPortrait && hasLyrics && showText
+        val layout = viewModel.fullPlayerLayout
 
-        if (isPortrait) {
+        // The single line suits a tall window as well as a wide one, so it is the one layout a portrait window
+        // honours; the others become the stacked portrait layout below (issue #33, round 5).
+        if (layout == FullPlayerLayout.COVER_AND_LINE) {
+            CoverAndLineLayout(viewModel, palette, showText, toggleLyricsAction)
+        } else if (isPortrait) {
             AnimatedContent(
                 targetState = showPortraitLyrics,
                 transitionSpec = {
@@ -267,62 +277,18 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                     }
                 }
             }
+        } else if (layout == FullPlayerLayout.LYRICS_CENTRED) {
+            CentredLyricsLayout(viewModel, palette, showText, toggleLyricsAction)
         } else {
-            val totalWidth = maxWidth
-            val fullLyricsWidth = totalWidth * (LYRICS_SHARE / (1f + LYRICS_SHARE))
-            val progress = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f)
-            val coverStartPadding = 24.dp + 32.dp * progress
-
-            Row(
-                // No padding on this Row, and the two halves inset themselves. The lyrics half has to reach the
-                // window's own edge so that its scrollbar sits against it — "met la barre de slide tout à droite"
-                // — and a Row-level inset would hold it 56 dp short of that (issue #33).
-                modifier = Modifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .padding(start = coverStartPadding, end = 24.dp, top = 40.dp, bottom = 40.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CoverColumn(
-                        viewModel = viewModel,
-                        palette = palette,
-                        // How much room the cover has to itself, which is what decides how large it gets: the
-                        // sleeve grows into the space the words leave rather than sliding across it.
-                        roomToItself = 1f - progress,
-                        showText = showText,
-                        onToggleText = toggleLyricsAction,
-                    )
-                }
-
-                // Kept out of the row entirely once it has no width, since `weight` refuses zero — and there is
-                // nothing left to draw at that point anyway.
-                if (lyricsShare > 0.001f) {
-                    val alpha = if (showText) progress else (progress * 1.4f - 0.4f).coerceIn(0f, 1f)
-                    Box(
-                        Modifier
-                            .weight(lyricsShare)
-                            .fillMaxHeight()
-                            .clipToBounds()
-                            .graphicsLayer {
-                                this.alpha = alpha
-                                this.translationX = (1f - progress) * 40.dp.toPx()
-                            },
-                    ) {
-                        Box(
-                            Modifier
-                                .requiredWidth(fullLyricsWidth)
-                                .fillMaxHeight()
-                                .padding(start = 16.dp, end = 40.dp, top = 24.dp, bottom = 24.dp)
-                        ) {
-                            LyricsOnCoverColour(viewModel, palette)
-                        }
-                    }
-                }
-            }
+            CoverBesideLyrics(
+                viewModel = viewModel,
+                palette = palette,
+                lyricsShare = lyricsShare,
+                showText = showText,
+                onToggleText = toggleLyricsAction,
+                lyricsFirst = layout == FullPlayerLayout.LYRICS_LEFT,
+                totalWidth = maxWidth,
+            )
         }
 
         // The two things this screen needs of its own, in the corner and dim: the way out, and the lyrics
@@ -352,6 +318,223 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 onClick = onExitFullScreen,
             )
         }
+    }
+}
+
+/**
+ * The cover and the words side by side, the words on the right or — mirrored — on the left.
+ *
+ * The words' share of the row is animated rather than switched, so hiding them lets the sleeve grow into the
+ * room they leave instead of jumping to the middle.
+ */
+@Composable
+private fun CoverBesideLyrics(
+    viewModel: PlayerViewModel,
+    palette: FullPlayerPalette,
+    lyricsShare: Float,
+    showText: Boolean,
+    onToggleText: () -> Unit,
+    lyricsFirst: Boolean,
+    totalWidth: androidx.compose.ui.unit.Dp,
+) {
+    val fullLyricsWidth = totalWidth * (LYRICS_SHARE / (1f + LYRICS_SHARE))
+    val progress = (lyricsShare / LYRICS_SHARE).coerceIn(0f, 1f)
+    // The cover's inset on the window's side grows as the words arrive, so the pair sits as one composition.
+    val outerInset = 24.dp + 32.dp * progress
+
+    // No padding on this Row, and the two halves inset themselves: the words have to reach the window's own edge
+    // so that their scrollbar sits against it — "met la barre de slide tout à droite" (issue #33).
+    Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        val cover: @Composable RowScope.() -> Unit = {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(
+                        start = if (lyricsFirst) 24.dp else outerInset,
+                        end = if (lyricsFirst) outerInset else 24.dp,
+                        top = 40.dp,
+                        bottom = 40.dp,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                CoverColumn(
+                    viewModel = viewModel,
+                    palette = palette,
+                    // How much room the cover has to itself decides how large it gets: the sleeve grows into the
+                    // space the words leave rather than sliding across it.
+                    roomToItself = 1f - progress,
+                    showText = showText,
+                    onToggleText = onToggleText,
+                )
+            }
+        }
+        // Kept out of the row entirely once it has no width, since `weight` refuses zero.
+        val words: @Composable RowScope.() -> Unit = {
+            if (lyricsShare > 0.001f) {
+                val alpha = if (showText) progress else (progress * 1.4f - 0.4f).coerceIn(0f, 1f)
+                val slide = if (lyricsFirst) -1f else 1f
+                Box(
+                    Modifier
+                        .weight(lyricsShare)
+                        .fillMaxHeight()
+                        .clipToBounds()
+                        .graphicsLayer {
+                            this.alpha = alpha
+                            this.translationX = slide * (1f - progress) * 40.dp.toPx()
+                        },
+                    contentAlignment = if (lyricsFirst) Alignment.CenterEnd else Alignment.CenterStart,
+                ) {
+                    Box(
+                        Modifier
+                            .requiredWidth(fullLyricsWidth)
+                            .fillMaxHeight()
+                            .padding(
+                                start = if (lyricsFirst) 40.dp else 16.dp,
+                                end = if (lyricsFirst) 16.dp else 40.dp,
+                                top = 24.dp,
+                                bottom = 24.dp,
+                            )
+                    ) {
+                        LyricsOnCoverColour(viewModel, palette)
+                    }
+                }
+            }
+        }
+        if (lyricsFirst) {
+            words()
+            cover()
+        } else {
+            cover()
+            words()
+        }
+    }
+}
+
+/**
+ * The words alone in the middle, the way Apple Music's full-screen lyrics are, with the sleeve shrunk into a bar
+ * along the bottom beside the credit and the transport. Hiding the words brings the full cover back.
+ */
+@Composable
+private fun CentredLyricsLayout(
+    viewModel: PlayerViewModel,
+    palette: FullPlayerPalette,
+    showText: Boolean,
+    onToggleText: () -> Unit,
+) {
+    val track = viewModel.currentTrack ?: return
+    AnimatedContent(
+        targetState = showText && viewModel.hasLyrics,
+        transitionSpec = { fadeIn(tween(260)).togetherWith(fadeOut(tween(200))) },
+        label = "centredLyrics",
+        modifier = Modifier.fillMaxSize(),
+    ) { showsWords ->
+        if (!showsWords) {
+            Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
+                CoverColumn(viewModel, palette, roomToItself = 1f, showText = showText, onToggleText = onToggleText)
+            }
+            return@AnimatedContent
+        }
+        Column(
+            Modifier.fillMaxSize().padding(top = 32.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier
+                    .weight(1f)
+                    .widthIn(max = CENTRED_LYRICS_MAX_WIDTH)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+            ) {
+                LyricsOnCoverColour(viewModel, palette)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.widthIn(max = CENTRED_LYRICS_MAX_WIDTH).fillMaxWidth().padding(horizontal = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                AnimatedArtwork(
+                    artworkUrl = track.fullResArtwork,
+                    animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
+                    isPlaying = viewModel.isPlaying,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(72.dp)
+                        .shadow(12.dp, RoundedCornerShape(10.dp), clip = false)
+                        .clip(RoundedCornerShape(10.dp)),
+                )
+                Box(Modifier.weight(1f)) { TrackCredit(viewModel = viewModel, palette = palette) }
+                Box(Modifier.weight(1.3f)) {
+                    FullPlayerControls(viewModel = viewModel, palette = palette, showText = showText, onToggleText = onToggleText)
+                }
+            }
+        }
+    }
+}
+
+/** Wide enough for a long line at a large size, narrow enough that the eye does not travel across a 4K screen. */
+private val CENTRED_LYRICS_MAX_WIDTH = 1100.dp
+
+/**
+ * The cover alone with one line under it — the line being sung, replaced as the next one starts. The lyrics
+ * button hides the line and leaves the cover.
+ */
+@Composable
+private fun CoverAndLineLayout(
+    viewModel: PlayerViewModel,
+    palette: FullPlayerPalette,
+    showText: Boolean,
+    onToggleText: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 40.dp), contentAlignment = Alignment.Center) {
+        CoverColumn(
+            viewModel = viewModel,
+            palette = palette,
+            roomToItself = 1f,
+            showText = showText,
+            onToggleText = onToggleText,
+            showCurrentLine = showText && viewModel.lyricsLines.isNotEmpty(),
+        )
+    }
+}
+
+/**
+ * The line being sung, sliding up as the next one takes its place. Two lines tall whatever it says, so the
+ * credit under it does not bob as short and long lines alternate.
+ */
+@Composable
+private fun CurrentLyricLine(viewModel: PlayerViewModel, palette: FullPlayerPalette, modifier: Modifier = Modifier) {
+    val line by remember {
+        androidx.compose.runtime.derivedStateOf {
+            val lines = viewModel.lyricsLines
+            lines.getOrNull(
+                com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.activeLineIndex(
+                    lines, viewModel.currentPosition + viewModel.lyricsOffset
+                )
+            )?.text.orEmpty()
+        }
+    }
+    AnimatedContent(
+        targetState = line,
+        transitionSpec = {
+            (fadeIn(tween(320)) + slideInVertically(tween(320)) { it / 2 })
+                .togetherWith(fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 2 })
+        },
+        label = "currentLyricLine",
+        modifier = modifier,
+    ) { text ->
+        androidx.compose.material3.Text(
+            text = text,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = palette.bright,
+            minLines = 2,
+            maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -745,6 +928,8 @@ private fun CoverColumn(
     roomToItself: Float,
     showText: Boolean,
     onToggleText: () -> Unit,
+    /** The line being sung, between the sleeve and the credit — the single-line layout. */
+    showCurrentLine: Boolean = false,
 ) {
     val track = viewModel.currentTrack ?: return
 
@@ -752,7 +937,8 @@ private fun CoverColumn(
         // The cap rises as the words leave, and incorporates user cover zoom factor
         val coverScale = viewModel.fullPlayerCoverScale
         val cap = (COVER_MAX + (COVER_MAX_ALONE - COVER_MAX) * roomToItself) * coverScale
-        val maxCoverHeight = maxOf(maxHeight - 210.dp, maxHeight * 0.54f)
+        val lineRoom = if (showCurrentLine) CURRENT_LINE_ROOM else 0.dp
+        val maxCoverHeight = maxOf(maxHeight - 210.dp - lineRoom, maxHeight * 0.5f)
         val side = min(min(maxWidth, maxCoverHeight), cap)
         val controlsWidth = maxOf(side, min(maxWidth, 400.dp))
 
@@ -784,6 +970,10 @@ private fun CoverColumn(
                     },
             )
 
+            if (showCurrentLine) {
+                Spacer(Modifier.height(20.dp))
+                CurrentLyricLine(viewModel, palette, Modifier.width(controlsWidth))
+            }
             Spacer(Modifier.height(18.dp))
             Box(Modifier.width(controlsWidth)) {
                 TrackCredit(viewModel = viewModel, palette = palette)
@@ -805,6 +995,9 @@ private fun CoverColumn(
  * Wide enough to be the subject on a laptop, small enough that a 4K window does not turn it into a poster.
  */
 private val COVER_MAX = 480.dp
+
+/** Height the single-line layout takes from the cover for its two lines of text and their gap. */
+private val CURRENT_LINE_ROOM = 90.dp
 
 /**
  * And what it may reach once it is the only thing on screen.

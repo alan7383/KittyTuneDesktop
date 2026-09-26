@@ -2267,6 +2267,11 @@
     <string name="full_player_section_title">Lecteur plein écran</string>
     <string name="full_player_bg_style">Style de fond</string>
     <string name="full_player_bg_apple_music">Apple Music</string>
+    <string name="full_player_layout">Disposition</string>
+    <string name="full_player_layout_right">Texte à droite</string>
+    <string name="full_player_layout_left">Texte à gauche</string>
+    <string name="full_player_layout_centred">Centré</string>
+    <string name="full_player_layout_single_line">Une ligne</string>
     <string name="full_player_bg_apple_music_fact">Fun fact : ce fond n’est pas une imitation. C’est le vrai effet d’Apple Music, reconstitué à partir des analyses de reverse engineering, jusqu’à la pochette empilée, tordue et floutée.</string>
     <string name="full_player_bg_blur">Flou</string>
     <string name="full_player_bg_gradient">Dégradé</string>

@@ -1493,6 +1493,30 @@ fun QuickLyricsSettingsDialog(
                                         )
 
                                         Spacer(Modifier.height(14.dp))
+                                        Text(
+                                            text = str("full_player_layout"),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(Modifier.height(10.dp))
+                                        ExpressiveConnectedButtonGroup(
+                                            fillMaxWidth = true,
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                                            options = com.alananasss.kittytune.data.local.FullPlayerLayout.entries,
+                                            selectedOption = viewModel.fullPlayerLayout,
+                                            onOptionSelected = { viewModel.updateFullPlayerLayout(it) },
+                                            labelProvider = { layout ->
+                                                val text = when (layout) {
+                                                    com.alananasss.kittytune.data.local.FullPlayerLayout.LYRICS_RIGHT -> str("full_player_layout_right")
+                                                    com.alananasss.kittytune.data.local.FullPlayerLayout.LYRICS_LEFT -> str("full_player_layout_left")
+                                                    com.alananasss.kittytune.data.local.FullPlayerLayout.LYRICS_CENTRED -> str("full_player_layout_centred")
+                                                    com.alananasss.kittytune.data.local.FullPlayerLayout.COVER_AND_LINE -> str("full_player_layout_single_line")
+                                                }
+                                                Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                                            }
+                                        )
+
+                                        Spacer(Modifier.height(14.dp))
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,

@@ -2265,6 +2265,11 @@
     <string name="full_player_section_title">Полноэкранный плеер</string>
     <string name="full_player_bg_style">Стиль фона</string>
     <string name="full_player_bg_apple_music">Apple Music</string>
+    <string name="full_player_layout">Расположение</string>
+    <string name="full_player_layout_right">Текст справа</string>
+    <string name="full_player_layout_left">Текст слева</string>
+    <string name="full_player_layout_centred">По центру</string>
+    <string name="full_player_layout_single_line">Одна строка</string>
     <string name="full_player_bg_apple_music_fact">Интересный факт: этот фон не имитация. Это настоящий эффект Apple Music, восстановленный по результатам реверс-инжиниринга, вплоть до наложенной в несколько слоёв, закрученной и размытой обложки.</string>
     <string name="full_player_bg_blur">Размытие</string>
     <string name="full_player_bg_gradient">Градиент</string>
