@@ -2612,6 +2612,8 @@
     <string name="about_credits_crowdin_title">KittyTune übersetzen</string>
     <string name="about_credits_filter_all">Alle</string>
     <string name="about_credits_filter_community">Community</string>
+    <string name="about_credits_discord_title">Discord-Community beitreten</string>
+    <string name="about_credits_discord_desc">Tausche dich mit der Community aus, melde Fehler und gib Feedback</string>
     <string name="about_credits_filter_dev">Entwicklung</string>
     <string name="about_credits_filter_translation">Übersetzungen</string>
     <string name="about_credits_github_desc">Fehler melden, PRs einreichen und Funktionen vorschlagen</string>
@@ -2621,6 +2623,7 @@
     <string name="about_credits_stats_contributors">%1$d Mitwirkende</string>
     <string name="about_credits_stats_languages">6 Sprachen</string>
     <string name="about_credits_stats_open_source">100% Open Source</string>
+    <string name="about_discord">Discord-Server</string>
     <string name="about_help_group">Hilfe &amp; Open Source</string>
     <string name="about_role_community_contrib">Code &amp; Community</string>
     <string name="about_role_community_contrib_desc">Beiträge, Feedback &amp; Vorschläge</string>

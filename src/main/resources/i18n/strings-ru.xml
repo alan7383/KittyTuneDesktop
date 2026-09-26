@@ -17,6 +17,8 @@
     <string name="about_credits_contribute_section">Хотите помочь проекту?</string>
     <string name="about_credits_crowdin_title">Перевести KittyTune</string>
     <string name="about_credits_crowdin_desc">Помогите перевести KittyTune на ваш язык на Crowdin</string>
+    <string name="about_credits_discord_title">Присоединяйтесь к Discord</string>
+    <string name="about_credits_discord_desc">Общайтесь с сообществом, сообщайте об ошибках и делитесь отзывами</string>
     <string name="about_credits_github_title">Внести вклад в код</string>
     <string name="about_credits_github_desc">Сообщайте об ошибках, создавайте PR и предлагайте функции</string>
     <string name="about_credits_kofi_title">Поддержать на Ko-fi</string>
@@ -24,6 +26,7 @@
     <string name="about_credits_stats_contributors">%1$d авторов</string>
     <string name="about_credits_stats_languages">6 языков</string>
     <string name="about_credits_stats_open_source">100% Open Source</string>
+    <string name="about_discord">Сервер Discord</string>
     <string name="about_downloads_desc">Windows, Linux, macOS</string>
     <string name="about_downloads_title">Другие платформы</string>
     <string name="about_github">Исходный код (GitHub)</string>
