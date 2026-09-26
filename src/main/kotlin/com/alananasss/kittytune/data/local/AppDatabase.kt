@@ -31,6 +31,7 @@ object AppDatabase {
     val albumCacheDao: AlbumCacheDao by lazy { AlbumCacheDao(this) }
     val folderDao: FolderDao by lazy { FolderDao(this) }
     val beatInfoDao: BeatInfoDao by lazy { BeatInfoDao(this) }
+    val recentSearchDao: RecentSearchDao by lazy { RecentSearchDao(this) }
 
     fun init() {
         Class.forName("org.sqlite.JDBC")
@@ -103,6 +104,11 @@ object AppDatabase {
             """CREATE TABLE IF NOT EXISTS library_item_meta (
                 itemKey TEXT PRIMARY KEY NOT NULL, folderId INTEGER, isPinned INTEGER NOT NULL DEFAULT 0,
                 addedAt INTEGER NOT NULL)""",
+            // The searches this listener has run, newest first, capped at RecentSearchRepository.MAX_ENTRIES.
+            // The term is the key, so searching the same thing twice reorders one row rather than
+            // stacking two identical ones (issue #56).
+            """CREATE TABLE IF NOT EXISTS recent_search (
+                query TEXT PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)""",
         )
         conn.createStatement().use { st ->
             ddl.forEach { st.execute(it) }
@@ -222,6 +228,39 @@ object AppDatabase {
             bind(ps, args)
             ps.executeUpdate()
         }
+    }
+
+    /**
+     * Several statements, one transaction, one invalidation.
+     *
+     * For the writes where the second statement is what makes the first one correct — adding a row
+     * and then dropping the ones that no longer fit under the cap. Under [exec] each of them would be
+     * its own commit and its own invalidation, so a crash between them would leave the table one row
+     * over the cap, and every screen watching the database would recompute twice for one keystroke.
+     *
+     * The transaction is on the one shared connection, as [execBatch]'s is, with the same trade.
+     */
+    internal suspend fun execTogether(vararg statements: Pair<String, Array<out Any?>>) {
+        if (statements.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            val previousAutoCommit = conn.autoCommit
+            conn.autoCommit = false
+            try {
+                for ((sql, args) in statements) {
+                    conn.prepareStatement(sql).use { ps ->
+                        bind(ps, args)
+                        ps.executeUpdate()
+                    }
+                }
+                conn.commit()
+            } catch (t: Throwable) {
+                runCatching { conn.rollback() }
+                throw t
+            } finally {
+                conn.autoCommit = previousAutoCommit
+            }
+        }
+        invalidate()
     }
 
     internal suspend fun scalarLong(sql: String, vararg args: Any?): Long =
