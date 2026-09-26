@@ -20,19 +20,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.onClick
-import androidx.compose.foundation.PointerMatcher
-import androidx.compose.ui.input.pointer.PointerButton
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.ui.draw.rotate
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
@@ -41,21 +28,13 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.GraphicEq
-import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Verified
-import androidx.compose.ui.draw.shadow
-import sh.calvin.reorderable.ReorderableCollectionItemScope
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
-import com.alananasss.kittytune.domain.Track
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -73,17 +52,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
-import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
-import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
@@ -170,335 +146,6 @@ fun NowPlayingPanel(
 }
 
 
-
-/**
- * The queue, as the panel shows it (issue #33).
- *
- * Three things were reported about this one list. The interface lurched when you started a track
- * from it; the tracks already played took up as much room as the ones still to come; and there was
- * no way to drop one.
- *
- * Nothing is hidden and nothing is trimmed. What was already played stays in the list, because
- * [PlayerViewModel.smartPrevious] walks this very list backwards and [PlayerViewModel.toggleShuffle]
- * rebuilds it from the untouched original — deleting the past would cost the Previous button and the
- * way back out of shuffle, for a complaint that is about attention rather than storage. Instead the
- * rows before the previous one are compacted: half-size artwork, no artist line, dimmed, under an
- * expandable "Already played" heading with an arrow, with the track just played left at full size
- * because that is the one worth recognising.
- *
- * When there are too many played tracks, they collapse under the arrow to avoid cluttering the queue.
- * Clicking the arrow opens them completely.
- */
-private sealed interface QueueListItem {
-    data class PastHeader(val count: Int, val isExpanded: Boolean) : QueueListItem
-    data class TrackItem(val queueIndex: Int, val track: Track) : QueueListItem
-}
-
-/** Beyond this many heard tracks, they collapse under an arrow so the queue stays tidy (issue #33). */
-private const val PAST_COLLAPSE_THRESHOLD = 3
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun QueueList(vm: PlayerViewModel) {
-    val listState = rememberLazyListState()
-    val queue = vm.queueState
-    val currentIndex = vm.currentQueueIndex
-    val keys = remember(queue) { com.alananasss.kittytune.ui.player.queueItemKeys(queue) }
-
-    // Compacted for having been heard, not for sitting at a lower index. Jumping ahead to the sixth
-    // track used to draw the five skipped ones as "already played", and jumping back drew the ones
-    // really heard as still to come (issue #33). The track just played keeps its full row either way,
-    // since that is the one worth recognising.
-    val played = vm.playedTrackIds
-    val pastIndices = remember(queue, currentIndex, played) {
-        queue.indices.filter { it < currentIndex - 1 && queue[it].id in played }
-    }
-    val pastCount = pastIndices.size
-    val firstPast = pastIndices.firstOrNull()
-
-    val hasTooManyPast = pastCount > PAST_COLLAPSE_THRESHOLD
-    var pastExpandedByUser by remember { mutableStateOf<Boolean?>(null) }
-    val isPastExpanded = pastExpandedByUser ?: (!hasTooManyPast)
-
-    val listItems = remember(queue, currentIndex, played, isPastExpanded) {
-        val items = mutableListOf<QueueListItem>()
-        var pastHeaderAdded = false
-
-        for (index in queue.indices) {
-            val track = queue[index]
-            val isPast = index < currentIndex - 1 && track.id in played
-
-            if (firstPast != null && index == firstPast && !pastHeaderAdded) {
-                items.add(QueueListItem.PastHeader(count = pastCount, isExpanded = isPastExpanded))
-                pastHeaderAdded = true
-            }
-
-            if (isPast && !isPastExpanded) {
-                continue
-            }
-
-            items.add(QueueListItem.TrackItem(queueIndex = index, track = track))
-        }
-        items
-    }
-
-    val reorderableState = rememberReorderableLazyListState(
-        lazyListState = listState,
-        // Resolved through the keys rather than the raw lazy-list indices so reordering
-        // stays robust even when a header is present or past rows are collapsed.
-        onMove = { from, to ->
-            val fromIndex = keys.indexOf(from.key)
-            val toIndex = keys.indexOf(to.key)
-            if (fromIndex >= 0 && toIndex >= 0) vm.moveQueueItem(fromIndex, toIndex)
-        }
-    )
-
-    val currentKey = if (currentIndex in keys.indices) keys[currentIndex] else null
-    val targetTrackIndex = (currentIndex - 1).coerceAtLeast(0)
-    val targetListIndex = listItems.indexOfFirst {
-        it is QueueListItem.TrackItem && it.queueIndex == targetTrackIndex
-    }.coerceAtLeast(0)
-
-    com.alananasss.kittytune.ui.player.AnchorCurrentQueueItem(
-        listState = listState,
-        currentIndex = currentIndex,
-        currentTrackId = vm.currentTrack?.id,
-        currentKey = currentKey,
-        targetIndex = targetListIndex,
-    )
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)
-    ) {
-        items(
-            items = listItems,
-            key = { item ->
-                when (item) {
-                    is QueueListItem.PastHeader -> "queue_header_past"
-                    is QueueListItem.TrackItem -> keys[item.queueIndex]
-                }
-            }
-        ) { item ->
-            when (item) {
-                is QueueListItem.PastHeader -> {
-                    QueueSectionRule(
-                        label = str("queue_played"),
-                        count = item.count,
-                        isCollapsible = true,
-                        isExpanded = item.isExpanded,
-                        onToggle = { pastExpandedByUser = !item.isExpanded },
-                    )
-                }
-                is QueueListItem.TrackItem -> {
-                    val index = item.queueIndex
-                    val track = item.track
-                    val isCurrent = index == currentIndex
-                    val isPast = index < currentIndex - 1 && track.id in played
-
-                    ReorderableItem(
-                        state = reorderableState,
-                        key = keys[index]
-                    ) { isDragging ->
-                        Column {
-                            // Named where the treatment changes, so the upcoming tracks read as a section.
-                            if (currentIndex >= 0 && index == currentIndex + 1) {
-                                QueueSectionRule(str("queue_up_next"))
-                            }
-
-                            QueueRow(
-                                vm = vm,
-                                track = track,
-                                index = index,
-                                isCurrent = isCurrent,
-                                isPast = isPast,
-                                isDragging = isDragging,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** The heading that marks where one part of the queue stops and the next begins. */
-@Composable
-private fun QueueSectionRule(
-    label: String,
-    count: Int? = null,
-    isCollapsible: Boolean = false,
-    isExpanded: Boolean = true,
-    onToggle: (() -> Unit)? = null,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, top = 10.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (isCollapsible && onToggle != null) {
-            val interactionSource = remember { MutableInteractionSource() }
-            val isHovered by interactionSource.collectIsHoveredAsState()
-            val arrowRotation by animateFloatAsState(
-                targetValue = if (isExpanded) 180f else 0f,
-                label = "past_arrow_rot"
-            )
-
-            Tip(if (isExpanded) str("queue_collapse_played") else str("queue_expand_played")) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = onToggle
-                        )
-                        .pointerHoverIcon(PointerIcon.Hand)
-                        .padding(vertical = 2.dp, horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (count != null) "$label ($count)" else label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = if (isExpanded) str("queue_collapse_played") else str("queue_expand_played"),
-                        tint = if (isHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .rotate(arrowRotation),
-                    )
-                }
-            }
-        } else {
-            Text(
-                text = if (count != null) "$label ($count)" else label,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Spacer(Modifier.width(8.dp))
-        HorizontalDivider(
-            modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
-    }
-}
-
-/**
- * One row of the queue.
- *
- * An extension on the reorderable scope rather than a plain composable, because `draggableHandle()`
- * only exists inside it and the row is where the handle lives.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ReorderableCollectionItemScope.QueueRow(
-    vm: PlayerViewModel,
-    track: Track,
-    index: Int,
-    isCurrent: Boolean,
-    isPast: Boolean,
-    isDragging: Boolean,
-) {
-    val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "elevation")
-    val backgroundColor = if (isDragging)
-        MaterialTheme.colorScheme.surfaceContainerHigh
-    else
-        MaterialTheme.colorScheme.surfaceContainerLow
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(elevation)
-            .clip(RoundedCornerShape(8.dp))
-            .background(backgroundColor)
-            .onClick(
-                matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                onClick = { vm.showTrackOptions(track) }
-            )
-            .clickable { vm.skipToQueueItem(index) }
-            .padding(horizontal = 8.dp, vertical = if (isPast) 4.dp else 8.dp)
-            // Only where there is something to fade: the modifier forces its own layer, which is not
-            // worth paying for on every upcoming row.
-            .then(if (isPast) Modifier.alpha(PAST_ROW_ALPHA) else Modifier),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AsyncImage(
-            model = track.artworkUrl,
-            contentDescription = null,
-            modifier = Modifier
-                .size(if (isPast) 26.dp else 40.dp)
-                .clip(RoundedCornerShape(6.dp)),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = track.title ?: "",
-                style = if (isPast) MaterialTheme.typography.bodySmall
-                else MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                color = if (isCurrent) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // The artist line is what makes a row two lines tall, and it is there to help *choose* a
-            // track. Something already played is only there to be recognised, so it goes.
-            if (!isPast) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ArtistLinkText(
-                        track = track,
-                        onArtistClick = { vm.navigateToTrackArtist(it) },
-                        text = track.displayArtist.ifBlank { track.user?.username ?: "" },
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (track.user?.verified == true) {
-                        Spacer(Modifier.width(3.dp))
-                        Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
-                    }
-                }
-            }
-        }
-        // No cross on the track being played. `removeTrackFromQueue` would take it out from under the
-        // player and clamp `currentQueueIndex` onto whichever track slid into its place, leaving the
-        // audio and the queue disagreeing about what is playing.
-        if (!isCurrent) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clip(CircleShape)
-                    .clickable { vm.removeTrackFromQueue(index) }
-                    .pointerHoverIcon(PointerIcon.Hand),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Close,
-                    contentDescription = str("queue_remove"),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(14.dp),
-                )
-            }
-        }
-        Icon(
-            imageVector = Icons.Rounded.DragHandle,
-            contentDescription = "Reorder",
-            tint = if (isDragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            modifier = Modifier
-                .size(24.dp)
-                .draggableHandle()
-                .pointerHoverIcon(PointerIcon.Hand)
-        )
-    }
-}
-
-/** How far the already-played rows recede. Legible on purpose — they are still part of the queue. */
-private const val PAST_ROW_ALPHA = 0.55f
 
 /**
  * The panel's lyrics tab: a header, and the words underneath (issue #33).

@@ -193,34 +193,12 @@ fun SettingsItem(
                 Spacer(modifier = Modifier.width(8.dp))
             }
 
-            if (hasSwitch && onSwitchChange != null) {
-                Switch(
+            if (hasSwitch) {
+                // Without a handler the switch still shows the state, it just cannot be changed here.
+                SettingsSwitch(
                     checked = switchState,
-                    onCheckedChange = { onSwitchChange(it) },
+                    onCheckedChange = onSwitchChange,
                     interactionSource = interactionSource,
-                    thumbContent = {
-                        if (switchState) {
-                            Icon(
-                                imageVector = Icons.Rounded.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(SwitchDefaults.IconSize),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = null,
-                                modifier = Modifier.size(SwitchDefaults.IconSize),
-                                tint = MaterialTheme.colorScheme.surfaceContainerHighest
-                            )
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                        checkedTrackColor = MaterialTheme.colorScheme.primary,
-                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                    )
                 )
             } else if (trailingContent != null) {
                 trailingContent()
@@ -418,4 +396,32 @@ fun SplitSettingsItem(
             }
         }
     }
+}
+
+/** The settings' switch: a check or a cross in the thumb, so its state reads without relying on colour. */
+@Composable
+fun SettingsSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    interactionSource: MutableInteractionSource? = null,
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        interactionSource = interactionSource,
+        thumbContent = {
+            Icon(
+                imageVector = if (checked) Icons.Rounded.Check else Icons.Rounded.Close,
+                contentDescription = null,
+                modifier = Modifier.size(SwitchDefaults.IconSize),
+                tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+            )
+        },
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ),
+    )
 }

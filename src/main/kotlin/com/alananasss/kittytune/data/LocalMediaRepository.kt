@@ -5,6 +5,8 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.data.local.LocalTrack
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.domain.Track
+import com.alananasss.kittytune.domain.User
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -165,4 +167,26 @@ object LocalMediaRepository {
     }
 
     fun isLocalTrack(id: Long): Boolean = id < 0 && id > -9000000000000000000
+
+    fun isSupportedAudioFile(file: File): Boolean = file.isFile && file.extension.lowercase() in AUDIO_EXTS
+
+    /**
+     * Adds one file to the local library and returns it ready to play — what "Open with KittyTune"
+     * does with a file handed over by the OS. Null when it is not an audio file the app can read.
+     */
+    suspend fun importFile(file: File): Track? = withContext(Dispatchers.IO) {
+        if (!isSupportedAudioFile(file)) return@withContext null
+        val local = processFile(file) ?: return@withContext null
+        dao.insertTrack(local)
+        local.toPlayableTrack()
+    }
+
+    private fun LocalTrack.toPlayableTrack() = Track(
+        id = id,
+        title = title,
+        artworkUrl = localArtworkPath.ifEmpty { artworkUrl },
+        durationMs = duration,
+        user = User(0, artist, null),
+        description = str("description_local_file", localAudioPath),
+    )
 }

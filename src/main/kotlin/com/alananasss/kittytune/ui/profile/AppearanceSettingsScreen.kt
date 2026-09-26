@@ -1,14 +1,12 @@
 package com.alananasss.kittytune.ui.profile
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -23,597 +21,676 @@ import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import com.alananasss.kittytune.core.AppInstance
-import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.*
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
-import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.common.Slider
-import com.alananasss.kittytune.ui.common.getSettingsShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.Color
-import androidx.compose.material.icons.outlined.Image
+import com.alananasss.kittytune.ui.common.pressScale
+import com.materialkolor.PaletteStyle
+import com.materialkolor.rememberDynamicColorScheme
 
+private val isWindows = System.getProperty("os.name").lowercase().contains("win")
+
+/**
+ * Interface → Themes: whether the colours follow the cover, the light/dark mode, a row of ready-made
+ * palettes, the way to build one's own, and the window-level look (title bar, scale, font, icon).
+ *
+ * "Dynamic theme" and "Dynamic theme from the track" used to be two switches that nobody could tell apart;
+ * they are one switch now, and picking a ready-made palette turns it off, since the two cannot both win.
+ */
 @Composable
-fun AppearanceSettingsScreen(
-    onNavigateToColors: () -> Unit,
-    onNavigateToPlayerDesign: () -> Unit = {},
-    onBackClick: (() -> Unit)? = null
-) {
+fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     val prefs = remember { PlayerPreferences() }
     val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
 
-    var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
-    var dynamicTheme by remember { mutableStateOf(prefs.getDynamicTheme() && prefs.getTrackDynamicTheme()) }
-    var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
-    var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
-    var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
-    var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
-    var showCustomizeDialog by remember { mutableStateOf(false) }
-    var showIconDialog by remember { mutableStateOf(false) }
-    val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
+    var followsCover by remember { mutableStateOf(prefs.getTrackDynamicTheme()) }
+    var keyColor by remember { mutableIntStateOf(prefs.getKeyColor()) }
     var themeMode by remember { mutableStateOf(prefs.getThemeMode()) }
     var pureBlack by remember { mutableStateOf(prefs.getPureBlack()) }
-    var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
-    var customFontEnabled by remember { mutableStateOf(prefs.getCustomFontEnabled()) }
-    var sidebarHoverExpand by remember { mutableStateOf(prefs.isSidebarHoverExpandEnabled()) }
+    var themedTitleBar by remember { mutableStateOf(prefs.getThemedTitleBar()) }
+    var appFont by remember { mutableStateOf(com.alananasss.kittytune.ui.theme.AppFont.parse(prefs.getAppFont())) }
+    val appIconVariant by prefs.appIconVariantFlow().collectAsState(initial = prefs.getAppIconVariant())
+    val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
 
-    var showStartDestDialog by remember { mutableStateOf(false) }
-    var showInfoHalfDialog by remember { mutableStateOf(false) }
-    var infoPanelHalf by remember { mutableStateOf(prefs.getInfoPanelHalf()) }
-    var showFontConfigDialog by remember { mutableStateOf(false) }
-
-    val isPureBlackVisible = themeMode == AppThemeMode.DARK || (themeMode == AppThemeMode.SYSTEM && systemDark)
-
-    if (showStartDestDialog) {
-        AlertDialog(
-            onDismissRequest = { showStartDestDialog = false },
-            title = { Text(str("pref_start_screen")) },
-            text = {
-                Column {
-                    StartDestRadioButton(str("nav_home"), StartDestination.HOME, startDestination) {
-                        startDestination = it
-                        prefs.setStartDestination(it)
-                        showStartDestDialog = false
-                    }
-                    StartDestRadioButton(str("nav_library"), StartDestination.LIBRARY, startDestination) {
-                        startDestination = it
-                        prefs.setStartDestination(it)
-                        showStartDestDialog = false
-                    }
-                }
+    var showIconDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
+    var showFontAxesDialog by remember { mutableStateOf(false) }
+    var showScaleDialog by remember { mutableStateOf(false) }
+    if (showIconDialog) AppIconDialog(prefs, appIconVariant) { showIconDialog = false }
+    if (showFontAxesDialog) FontAxesDialog(prefs) { showFontAxesDialog = false }
+    if (showScaleDialog) UiScaleDialog(prefs, uiScale) { showScaleDialog = false }
+    if (showFontDialog) {
+        FontPickerDialog(
+            current = appFont,
+            onSelect = {
+                appFont = it
+                prefs.setAppFont(it.id)
             },
-            confirmButton = { TextButton(onClick = { showStartDestDialog = false }) { Text(str("btn_cancel")) } }
+            onTuneFlex = { showFontAxesDialog = true },
+            onDismiss = { showFontDialog = false },
         )
     }
 
-    if (showInfoHalfDialog) {
-        AlertDialog(
-            onDismissRequest = { showInfoHalfDialog = false },
-            title = { Text(str("pref_info_half")) },
-            text = {
-                Column {
-                    listOf(
-                        InfoPanelHalf.REMEMBER to str("pref_info_half_remember"),
-                        InfoPanelHalf.COMMENTS to str("menu_comments"),
-                        InfoPanelHalf.LYRICS to str("player_lyrics"),
-                    ).forEach { (value, label) ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    infoPanelHalf = value
-                                    prefs.setInfoPanelHalf(value)
-                                    showInfoHalfDialog = false
-                                }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected = infoPanelHalf == value, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(label)
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showInfoHalfDialog = false }) { Text(str("btn_cancel")) } }
-        )
+    val isDark = themeMode == AppThemeMode.DARK || (themeMode == AppThemeMode.SYSTEM && systemDark)
+    val look = when {
+        themeMode == AppThemeMode.DARK && pureBlack -> ThemeLook.AMOLED
+        themeMode == AppThemeMode.DARK -> ThemeLook.DARK
+        themeMode == AppThemeMode.LIGHT -> ThemeLook.LIGHT
+        else -> ThemeLook.SYSTEM
     }
 
+    SettingsGroup(
+        items = listOf { shape ->
+            SettingsItem(
+                shape = shape,
+                title = str("pref_dynamic_theme_merged"),
+                subtitle = str("pref_dynamic_theme_merged_sub"),
+                icon = Icons.Rounded.AutoAwesome,
+                hasSwitch = true,
+                switchState = followsCover,
+                onSwitchChange = {
+                    followsCover = it
+                    prefs.setTrackDynamicTheme(it)
+                    prefs.setDynamicTheme(it)
+                },
+            )
+        },
+    )
 
-
-    if (showCustomizeDialog) {
-        CustomizeButtonsDialog(prefs = prefs, onDismiss = { showCustomizeDialog = false })
-    }
-
-
-
-    if (showIconDialog) {
-        AlertDialog(
-            onDismissRequest = { showIconDialog = false },
-            title = { Text(str("pref_app_icon")) },
-            text = {
-                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.heightIn(max = 420.dp)
-                ) {
-                    val variants = com.alananasss.kittytune.core.AppIconVariants.AVAILABLE
-                    items(variants.size) { index ->
-                        val variant = variants[index]
-                        val selected = variant.key == appIconVariant
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (selected) MaterialTheme.colorScheme.secondaryContainer
-                                    else androidx.compose.ui.graphics.Color.Transparent
-                                )
-                                .clickable {
-                                    prefs.setAppIconVariant(variant.key)
-                                    com.alananasss.kittytune.core.AppIconInstaller.apply(variant.key)
-                                    showIconDialog = false
-                                }
-                                .padding(8.dp)
-                        ) {
-                            // Loaded by hand rather than with painterResource, which throws from
-                            // inside composition when the bitmap is missing (issue #33).
-                            val painter = remember(variant.key) { loadIconVariantPainter(variant.key) }
-                            if (painter != null) {
-                                androidx.compose.foundation.Image(
-                                    painter = painter,
-                                    contentDescription = variant.label,
-                                    modifier = Modifier.size(56.dp)
-                                )
-                            } else {
-                                Spacer(Modifier.size(56.dp))
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = variant.label,
-                                style = MaterialTheme.typography.labelSmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showIconDialog = false }) { Text(str("btn_cancel")) } }
-        )
-    }
-
-    if (showFontConfigDialog) {
-        var wght by remember { mutableFloatStateOf(prefs.getFontWght().toFloat()) }
-        var wdth by remember { mutableFloatStateOf(prefs.getFontWdth()) }
-        var slnt by remember { mutableFloatStateOf(prefs.getFontSlnt()) }
-        var rond by remember { mutableFloatStateOf(prefs.getFontRond()) }
-
-        fun applyPreset(pWght: Float, pWdth: Float, pSlnt: Float, pRond: Float) {
-            wght = pWght; prefs.setFontWght(pWght.toInt())
-            wdth = pWdth; prefs.setFontWdth(pWdth)
-            slnt = pSlnt; prefs.setFontSlnt(pSlnt)
-            rond = pRond; prefs.setFontRond(pRond)
-        }
-
-        AlertDialog(
-            onDismissRequest = { showFontConfigDialog = false },
-            title = { Text(str("dialog_font_settings_title"), fontWeight = FontWeight.Bold) },
-            text = {
-                Column(
-                    modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        item { androidx.compose.material3.OutlinedButton(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp), onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("font_preset_default")) } }
-                        item { androidx.compose.material3.OutlinedButton(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp), onClick = { applyPreset(600f, 100f, 0f, 100f) }) { Text(str("font_preset_rounded")) } }
-                        item { androidx.compose.material3.OutlinedButton(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp), onClick = { applyPreset(250f, 105f, 0f, 0f) }) { Text(str("font_preset_elegant")) } }
-                        item { androidx.compose.material3.OutlinedButton(contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp), onClick = { applyPreset(900f, 110f, 0f, 50f) }) { Text(str("font_preset_chunky")) } }
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                    Column {
-                        Text(str("dialog_font_weight", wght.toInt()), style = MaterialTheme.typography.labelLarge)
-                        Slider(value = wght, onValueChange = { wght = it; prefs.setFontWght(it.toInt()) }, valueRange = 100f..1000f)
-                    }
-                    Column {
-                        Text(str("dialog_font_width", wdth.toInt()), style = MaterialTheme.typography.labelLarge)
-                        Slider(value = wdth, onValueChange = { wdth = it; prefs.setFontWdth(it) }, valueRange = 25f..151f)
-                    }
-                    Column {
-                        Text(str("dialog_font_slant", slnt.toInt()), style = MaterialTheme.typography.labelLarge)
-                        Slider(value = slnt, onValueChange = { slnt = it; prefs.setFontSlnt(it) }, valueRange = -10f..0f)
-                    }
-                    Column {
-                        Text(str("dialog_font_roundness", rond.toInt()), style = MaterialTheme.typography.labelLarge)
-                        Slider(value = rond, onValueChange = { rond = it; prefs.setFontRond(it) }, valueRange = 0f..100f)
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showFontConfigDialog = false }) { Text(str("btn_close")) } },
-            dismissButton = { TextButton(onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("btn_reset")) } }
-        )
-    }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-            Box {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    SettingsGroupTitle(str("settings_cat_appearance"))
-                    ThemeSelector(
-                        currentTheme = themeMode,
-                        onThemeSelected = {
-                            themeMode = it
-                            prefs.setThemeMode(it)
-                        },
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        // The themed title bar row only exists on Windows, where the window
-                        // manager lets us paint the caption at all (issue #33).
-                        val isTitleBarRowVisible = remember {
-                            System.getProperty("os.name").lowercase().contains("win")
-                        }
-                        val titleBarIndex = if (isPureBlackVisible) 5 else 4
-                        val customizeIndex = titleBarIndex + (if (isTitleBarRowVisible) 1 else 0)
-                        val totalVisibleItems = customizeIndex + 1
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 0),
-                            title = str("pref_dynamic_theme"),
-                            subtitle = str("pref_dynamic_theme_sub"),
-                            hasSwitch = true,
-                            switchState = dynamicTheme,
-                            onSwitchChange = {
-                                dynamicTheme = it
-                                prefs.setDynamicTheme(it)
-                                prefs.setTrackDynamicTheme(it)
-                            }
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 1),
-                            title = str("pref_colors"),
-                            subtitle = str("pref_colors_subtitle"),
-                            onClick = onNavigateToColors
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 2),
-                            title = str("pref_player_design"),
-                            subtitle = str("pref_player_design_sub"),
-                            onClick = onNavigateToPlayerDesign
-                        )
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 3),
-                            title = str("pref_app_icon"),
-                            subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.label ?: "Default",
-                            onClick = { showIconDialog = true }
-                        )
-
-                        AnimatedVisibility(
-                            visible = isPureBlackVisible,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 4),
-                                title = str("pref_pure_black"),
-                                hasSwitch = true,
-                                switchState = pureBlack,
-                                onSwitchChange = {
-                                    pureBlack = it
-                                    prefs.setPureBlack(it)
-                                }
-                            )
-                        }
-
-                        if (isTitleBarRowVisible) {
-                            SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, titleBarIndex),
-                                title = str("pref_themed_title_bar"),
-                                subtitle = str("pref_themed_title_bar_sub"),
-                                hasSwitch = true,
-                                switchState = themedTitleBar,
-                                onSwitchChange = {
-                                    themedTitleBar = it
-                                    prefs.setThemedTitleBar(it)
-                                }
-                            )
-                        }
-
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, customizeIndex),
-                            title = str("pref_customize_buttons"),
-                            subtitle = str("pref_customize_buttons_sub"),
-                            onClick = { showCustomizeDialog = true }
-                        )
-                    }
-                }
-            }
-
-            Box {
-                val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    SettingsGroupTitle(str("pref_zoom_level"))
-                    Text(str("pref_zoom_level_sub"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.height(16.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                        shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(24.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text(str("pref_zoom_compact"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale < 0.95f) FontWeight.Bold else FontWeight.Normal)
-                                Text(str("pref_zoom_default"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale in 0.95f..1.05f) FontWeight.Bold else FontWeight.Normal)
-                                Text(str("pref_zoom_airy"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale > 1.05f) FontWeight.Bold else FontWeight.Normal)
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Slider(
-                                value = uiScale,
-                                onValueChange = { prefs.setUiScale(it) },
-                                valueRange = 0.7f..1.3f,
-                                steps = 5,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                (7..13).forEach { step ->
-                                    Text("${step * 10} %", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                            Spacer(Modifier.height(16.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                OutlinedButton(onClick = { prefs.setUiScale(1.0f) }) {
-                                    Text(str("btn_reset"))
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(24.dp))
-                }
-            }
-
-            Box {
-                SettingsGroup(
-                    title = str("settings_cat_general"),
-                    items = buildList {
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_start_screen"),
-                                subtitle = when (startDestination) {
-                                    StartDestination.HOME -> str("nav_home")
-                                    StartDestination.LIBRARY -> str("nav_library")
-                                },
-                                onClick = { showStartDestDialog = true }
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_info_half"),
-                                subtitle = when (infoPanelHalf) {
-                                    InfoPanelHalf.REMEMBER -> str("pref_info_half_remember")
-                                    InfoPanelHalf.COMMENTS -> str("menu_comments")
-                                    InfoPanelHalf.LYRICS -> str("player_lyrics")
-                                },
-                                onClick = { showInfoHalfDialog = true }
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_auto_update"),
-                                subtitle = str("pref_auto_update_subtitle"),
-                                hasSwitch = true,
-                                switchState = autoUpdate,
-                                onSwitchChange = {
-                                    autoUpdate = it
-                                    prefs.setAutoUpdateEnabled(it)
-                                }
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_custom_font"),
-                                subtitle = str("pref_custom_font_subtitle"),
-                                hasSwitch = true,
-                                switchState = customFontEnabled,
-                                onSwitchChange = {
-                                    customFontEnabled = it
-                                    prefs.setCustomFontEnabled(it)
-                                },
-                                onClick = if (customFontEnabled) {
-                                    { showFontConfigDialog = true }
-                                } else null
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_sidebar_hover_expand"),
-                                subtitle = str("pref_sidebar_hover_expand_sub"),
-                                hasSwitch = true,
-                                switchState = sidebarHoverExpand,
-                                onSwitchChange = {
-                                    sidebarHoverExpand = it
-                                    prefs.setSidebarHoverExpandEnabled(it)
-                                }
-                            )
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_animated_covers"),
-                                subtitle = str("pref_animated_covers_desc"),
-                                hasSwitch = true,
-                                switchState = animatedCovers,
-                                onSwitchChange = {
-                                    animatedCovers = it
-                                    prefs.setAnimatedCoversEnabled(it)
-                                }
-                            )
-                        }
-                        if (animatedCovers) {
-                            add { shape ->
-                                SettingsItem(
-                                    shape = shape,
-                                    title = str("pref_animated_covers_fade_ui"),
-                                    subtitle = str("pref_animated_covers_fade_ui_desc"),
-                                    hasSwitch = true,
-                                    switchState = animatedCoversFadeUi,
-                                    onSwitchChange = {
-                                        animatedCoversFadeUi = it
-                                        prefs.setAnimatedCoversFadeUiEnabled(it)
-                                    }
-                                )
-                            }
-                        }
-                        add { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_animated_artist_profiles"),
-                                subtitle = str("pref_animated_artist_profiles_desc"),
-                                hasSwitch = true,
-                                switchState = animatedArtistProfiles,
-                                onSwitchChange = {
-                                    animatedArtistProfiles = it
-                                    prefs.setAnimatedArtistProfilesEnabled(it)
-                                }
-                            )
-                        }
-                    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        SettingsGroupTitle(str("theme_presets_title"))
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 4.dp)) {
+                // One compact row: the mode, with AMOLED as a theme of its own rather than a switch under Dark.
+                com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                    options = ThemeLook.entries,
+                    selectedOption = look,
+                    onOptionSelected = { chosen ->
+                        themeMode = chosen.mode
+                        pureBlack = chosen == ThemeLook.AMOLED
+                        prefs.setThemeMode(chosen.mode)
+                        prefs.setPureBlack(pureBlack)
+                    },
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    fillMaxWidth = true,
+                    iconProvider = { Icon(it.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    labelProvider = { Text(str(it.labelKey), maxLines = 1, softWrap = false) },
+                )
+                ThemePresetRow(
+                    selectedSeed = if (followsCover) null else keyColor,
+                    isDark = isDark,
+                    pureBlack = pureBlack && isDark,
+                    onSelect = { preset ->
+                        keyColor = preset.seed
+                        prefs.setKeyColor(preset.seed)
+                        prefs.setColorStyle(preset.styleName)
+                        followsCover = false
+                        prefs.setTrackDynamicTheme(false)
+                    },
+                    onCustom = onOpenCustomTheme,
                 )
             }
         }
+    }
+
+    SettingsGroup(
+        title = str("settings_group_window"),
+        items = buildList {
+            if (isWindows) add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_themed_title_bar"),
+                    subtitle = str("pref_themed_title_bar_sub"),
+                    hasSwitch = true,
+                    switchState = themedTitleBar,
+                    onSwitchChange = {
+                        themedTitleBar = it
+                        prefs.setThemedTitleBar(it)
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_zoom_level"),
+                    subtitle = str("pref_zoom_level_sub"),
+                    trailingText = "${(uiScale * 100).toInt()} %",
+                    onClick = { showScaleDialog = true },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_font"),
+                    subtitle = fontLabel(appFont),
+                    icon = Icons.Rounded.TextFields,
+                    onClick = { showFontDialog = true },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_app_icon"),
+                    subtitle = com.alananasss.kittytune.core.AppIconVariants.byKey(appIconVariant)?.let { com.alananasss.kittytune.core.AppIconVariants.localizedLabel(it) } ?: str("app_icon_default"),
+                    icon = Icons.Rounded.Apps,
+                    onClick = { showIconDialog = true },
+                )
+            }
+        },
+    )
+
+    CoversSettingsGroup()
+}
+
+/** The theme choices of the mode row: the three modes plus AMOLED, which is Dark with true black. */
+private enum class ThemeLook(val mode: AppThemeMode, val labelKey: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    SYSTEM(AppThemeMode.SYSTEM, "theme_system", Icons.Rounded.BrightnessAuto),
+    LIGHT(AppThemeMode.LIGHT, "theme_light", Icons.Rounded.LightMode),
+    DARK(AppThemeMode.DARK, "theme_dark", Icons.Rounded.DarkMode),
+    AMOLED(AppThemeMode.DARK, "theme_amoled", Icons.Rounded.Contrast),
 }
 
 @Composable
-fun ThemeSelector(
-    currentTheme: AppThemeMode,
-    onThemeSelected: (AppThemeMode) -> Unit,
-    modifier: Modifier = Modifier
+private fun fontLabel(font: com.alananasss.kittytune.ui.theme.AppFont): String =
+    if (font == com.alananasss.kittytune.ui.theme.AppFont.Default) str("font_default")
+    else com.alananasss.kittytune.ui.theme.AppFonts.nameOf(font)
+
+/**
+ * The typefaces on offer, each shown in itself: the default, the adjustable Google Sans Flex, a selection of
+ * installed fonts, the user's own, and a way to add one.
+ */
+@Composable
+private fun FontPickerDialog(
+    current: com.alananasss.kittytune.ui.theme.AppFont,
+    onSelect: (com.alananasss.kittytune.ui.theme.AppFont) -> Unit,
+    onTuneFlex: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 24.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            ThemeOption(
-                icon = Icons.Outlined.BrightnessAuto,
-                selectedIcon = Icons.Filled.BrightnessAuto,
-                label = str("theme_system"),
-                isSelected = currentTheme == AppThemeMode.SYSTEM,
-                onClick = { onThemeSelected(AppThemeMode.SYSTEM) },
-                modifier = Modifier.weight(1f)
-            )
-            ThemeOption(
-                icon = Icons.Outlined.LightMode,
-                selectedIcon = Icons.Filled.LightMode,
-                label = str("theme_light"),
-                isSelected = currentTheme == AppThemeMode.LIGHT,
-                onClick = { onThemeSelected(AppThemeMode.LIGHT) },
-                modifier = Modifier.weight(1f)
-            )
-            ThemeOption(
-                icon = Icons.Outlined.DarkMode,
-                selectedIcon = Icons.Filled.DarkMode,
-                label = str("theme_dark"),
-                isSelected = currentTheme == AppThemeMode.DARK,
-                onClick = { onThemeSelected(AppThemeMode.DARK) },
-                modifier = Modifier.weight(1f)
-            )
-        }
+    val fonts = com.alananasss.kittytune.ui.theme.AppFonts
+    var userFonts by remember { mutableStateOf(fonts.userFonts()) }
+    val systemFonts = remember { fonts.availableSystemFonts() }
+    var rejected by remember { mutableStateOf(false) }
+    val options = buildList {
+        add(com.alananasss.kittytune.ui.theme.AppFont.Default)
+        add(com.alananasss.kittytune.ui.theme.AppFont.Flex)
+        systemFonts.forEach { add(com.alananasss.kittytune.ui.theme.AppFont.System(it)) }
+        userFonts.forEach { add(com.alananasss.kittytune.ui.theme.AppFont.UserFile(it)) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("pref_font")) },
+        text = {
+            com.alananasss.kittytune.ui.common.ScrollableColumn(
+                modifier = Modifier.heightIn(max = 460.dp),
+                contentPadding = PaddingValues(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                options.forEach { font ->
+                    val family = when (font) {
+                        com.alananasss.kittytune.ui.theme.AppFont.Flex -> remember { com.alananasss.kittytune.ui.theme.getDynamicTypography(true, 500, 100f, 0f, 0f, 0f, 18f).bodyLarge.fontFamily }
+                        else -> remember(font) { fonts.familyFor(font) }
+                    }
+                    val selected = font == current
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                            .clickable { onSelect(font) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(fontLabel(font), style = MaterialTheme.typography.titleMedium.copy(fontFamily = family))
+                            Text("Aa Бб 123 — KittyTune", style = MaterialTheme.typography.bodySmall.copy(fontFamily = family), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (font == com.alananasss.kittytune.ui.theme.AppFont.Flex) {
+                            IconButton(onClick = { onSelect(font); onTuneFlex() }) {
+                                Icon(Icons.Rounded.Tune, contentDescription = str("dialog_font_settings_title"))
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        val picked = pickFontFile(str("font_add")) ?: return@TextButton
+                        val stored = fonts.import(picked)
+                        rejected = stored == null
+                        if (stored != null) {
+                            userFonts = fonts.userFonts()
+                            onSelect(com.alananasss.kittytune.ui.theme.AppFont.UserFile(stored))
+                        }
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("font_add"))
+                }
+                if (rejected) Text(str("font_rejected"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
+    )
+}
+
+/** The system's own file dialog, filtered to fonts. */
+private fun pickFontFile(title: String): java.io.File? =
+    com.alananasss.kittytune.core.NativeFileDialog.openFile(
+        title,
+        com.alananasss.kittytune.core.NativeFileDialog.FileType(title, listOf("ttf", "otf")),
+    )
+
+/**
+ * Interface → Player design: the sliders, which buttons the player bar carries, the covers, and the tiles
+ * of the track and playlist menus.
+ */
+@Composable
+fun PlayerDesignSettingsPage() {
+    // Shape, sliders and volume, the bar's buttons and the scroll step.
+    PlayerDesignContent(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        MenuTilesSection(str("menu_tiles_track"), PlayerPreferences.MENU_TRACK, com.alananasss.kittytune.ui.main.MenuTiles.TRACK)
+        MenuTilesSection(str("menu_tiles_playlist"), PlayerPreferences.MENU_PLAYLIST, com.alananasss.kittytune.ui.main.MenuTiles.PLAYLIST)
     }
 }
+
+/** Covers: moving artwork and profiles, on the Themes page with the rest of how the app looks. */
 @Composable
-private fun ThemeOption(
-    icon: ImageVector,
-    selectedIcon: ImageVector,
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+internal fun CoversSettingsGroup() {
+    val prefs = remember { PlayerPreferences() }
+    var animatedCovers by remember { mutableStateOf(prefs.getAnimatedCoversEnabled()) }
+    var animatedCoversFadeUi by remember { mutableStateOf(prefs.getAnimatedCoversFadeUiEnabled()) }
+    var animatedArtistProfiles by remember { mutableStateOf(prefs.getAnimatedArtistProfilesEnabled()) }
+    SettingsGroup(
+        title = str("settings_group_covers"),
+        items = buildList {
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_animated_covers"),
+                    subtitle = str("pref_animated_covers_desc"),
+                    hasSwitch = true,
+                    switchState = animatedCovers,
+                    onSwitchChange = {
+                        animatedCovers = it
+                        prefs.setAnimatedCoversEnabled(it)
+                    },
+                )
+            }
+            if (animatedCovers) add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_animated_covers_fade_ui"),
+                    subtitle = str("pref_animated_covers_fade_ui_desc"),
+                    hasSwitch = true,
+                    switchState = animatedCoversFadeUi,
+                    onSwitchChange = {
+                        animatedCoversFadeUi = it
+                        prefs.setAnimatedCoversFadeUiEnabled(it)
+                    },
+                )
+            }
+            add { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_animated_artist_profiles"),
+                    subtitle = str("pref_animated_artist_profiles_desc"),
+                    hasSwitch = true,
+                    switchState = animatedArtistProfiles,
+                    onSwitchChange = {
+                        animatedArtistProfiles = it
+                        prefs.setAnimatedArtistProfilesEnabled(it)
+                    },
+                )
+            }
+        },
+    )
+}
+
+
+/**
+ * A ready-made palette: a key colour and the style it is generated with. Zero is the app's own seed with its
+ * default (expressive) style — the look KittyTune ships with. The named ones use the tonal-spot style, which
+ * keeps the key colour's hue; the expressive style rotates it, and a "Forest" that comes out red is no preset.
+ */
+private class ThemePreset(val labelKey: String, val seed: Int, val style: PaletteStyle) {
+    /** What the colour-style preference stores for this preset; "System" is the default expressive style. */
+    val styleName: String get() = if (seed == 0) "System" else style.name
+}
+
+private val themePresets = listOf(
+    ThemePreset("theme_preset_ocean", 0xFF1565C0.toInt(), PaletteStyle.TonalSpot),
+    ThemePreset("theme_preset_forest", 0xFF2E7D32.toInt(), PaletteStyle.TonalSpot),
+    ThemePreset("theme_preset_sunset", 0xFFE64A19.toInt(), PaletteStyle.TonalSpot),
+    ThemePreset("theme_preset_rose", 0xFFD81B60.toInt(), PaletteStyle.TonalSpot),
+    ThemePreset("theme_preset_lavender", 0xFF7E57C2.toInt(), PaletteStyle.TonalSpot),
+    ThemePreset("theme_preset_mint", 0xFF00A884.toInt(), PaletteStyle.TonalSpot),
+)
+
+@Composable
+private fun ThemePresetRow(
+    selectedSeed: Int?,
+    isDark: Boolean,
+    pureBlack: Boolean,
+    onSelect: (ThemePreset) -> Unit,
+    onCustom: () -> Unit,
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier
-            .clickable(
-                onClick = onClick,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            )
-            .padding(vertical = 4.dp)
+    com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        fadeColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        FilledTonalIconToggleButton(checked = isSelected,
-            onCheckedChange = { onClick() },
-            modifier = Modifier.size(56.dp),
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledTonalIconToggleButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        ) {
-            Icon(
-                imageVector = if (isSelected) selectedIcon else icon,
-                contentDescription = label,
-                modifier = Modifier.size(28.dp)
+        items(themePresets.size) { index ->
+            val preset = themePresets[index]
+            ThemePresetCard(
+                label = str(preset.labelKey),
+                seed = preset.seed,
+                style = preset.style,
+                isSelected = selectedSeed == preset.seed,
+                isDark = isDark,
+                pureBlack = pureBlack,
+                onClick = { onSelect(preset) },
             )
         }
+        item { CustomThemeCard(onCustom) }
+    }
+}
+
+/** The last card of the row: build a theme of one's own. */
+@Composable
+private fun CustomThemeCard(onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Surface(
+            onClick = onClick,
+            interactionSource = interaction,
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+            modifier = Modifier.size(width = 96.dp, height = 72.dp).pressScale(interaction),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(36.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Palette, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+        Text(str("theme_custom_short"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** A thumbnail of the palette a key colour produces: a surface with its primary, secondary and tertiary. */
+@Composable
+private fun ThemePresetCard(
+    label: String,
+    seed: Int,
+    style: PaletteStyle,
+    isSelected: Boolean,
+    isDark: Boolean,
+    pureBlack: Boolean,
+    onClick: () -> Unit,
+) {
+    val scheme = rememberDynamicColorScheme(
+        seedColor = if (seed == 0) Color(0xFFFF7A1A) else Color(seed),
+        isDark = isDark,
+        isAmoled = pureBlack,
+        style = style,
+    )
+    val interaction = remember { MutableInteractionSource() }
+    val ring by animateColorAsState(
+        if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        label = "presetRing",
+    )
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Surface(
+            onClick = onClick,
+            interactionSource = interaction,
+            shape = RoundedCornerShape(18.dp),
+            color = scheme.surfaceContainer,
+            border = BorderStroke(if (isSelected) 2.dp else 1.dp, ring),
+            modifier = Modifier.size(width = 96.dp, height = 72.dp).pressScale(interaction),
+        ) {
+            Box(Modifier.fillMaxSize().padding(10.dp)) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val radius = size.height * 0.28f
+                    drawCircle(scheme.primary, radius, Offset(radius, radius))
+                    val barHeight = size.height * 0.16f
+                    val barLeft = radius * 2 + 8.dp.toPx()
+                    drawRoundRect(
+                        scheme.secondaryContainer,
+                        topLeft = Offset(barLeft, radius - barHeight),
+                        size = Size(size.width - barLeft, barHeight),
+                        cornerRadius = CornerRadius(barHeight / 2),
+                    )
+                    drawRoundRect(
+                        scheme.tertiary,
+                        topLeft = Offset(barLeft, radius + 2.dp.toPx()),
+                        size = Size((size.width - barLeft) * 0.6f, barHeight),
+                        cornerRadius = CornerRadius(barHeight / 2),
+                    )
+                    drawRoundRect(
+                        scheme.primaryContainer,
+                        topLeft = Offset(0f, size.height - barHeight * 1.4f),
+                        size = Size(size.width, barHeight * 1.4f),
+                        cornerRadius = CornerRadius(barHeight),
+                    )
+                }
+                if (isSelected) {
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = scheme.primary,
+                        modifier = Modifier.align(Alignment.TopEnd).size(18.dp),
+                    )
+                }
+            }
+        }
         Text(
-            text = label,
+            label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
         )
     }
 }
 
+/** A radio row whose whole width is the target, used by the settings' single-choice dialogs. */
 @Composable
-fun StartDestRadioButton(text: String,
-    dest: StartDestination,
-    selected: StartDestination,
-    onSelect: (StartDestination) -> Unit
-) {
+internal fun ChoiceRow(text: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable { onSelect(dest) }.padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = (dest == selected), onClick = null)
+        RadioButton(selected = selected, onClick = null)
         Spacer(Modifier.width(8.dp))
         Text(text)
     }
 }
 
+/** A single-choice dialog: pick one of [options] and it closes. */
+@Composable
+internal fun <T> ChoiceDialog(
+    title: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                options.forEach { (value, label) ->
+                    ChoiceRow(label, value == selected) {
+                        onSelect(value)
+                        onDismiss()
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } },
+    )
+}
+
+@Composable
+private fun UiScaleDialog(prefs: PlayerPreferences, uiScale: Float, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("pref_zoom_level")) },
+        text = {
+            Column {
+                Text(str("pref_zoom_level_sub"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(str("pref_zoom_compact"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale < 0.95f) FontWeight.Bold else FontWeight.Normal)
+                    Text(str("pref_zoom_default"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale in 0.95f..1.05f) FontWeight.Bold else FontWeight.Normal)
+                    Text(str("pref_zoom_airy"), style = MaterialTheme.typography.labelLarge, fontWeight = if (uiScale > 1.05f) FontWeight.Bold else FontWeight.Normal)
+                }
+                Spacer(Modifier.height(8.dp))
+                Slider(
+                    value = uiScale,
+                    onValueChange = { prefs.setUiScale(it) },
+                    valueRange = 0.7f..1.3f,
+                    steps = 5,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    (7..13).forEach { step ->
+                        Text("${step * 10} %", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
+        dismissButton = { TextButton(onClick = { prefs.setUiScale(1.0f) }) { Text(str("btn_reset")) } },
+    )
+}
+
+@Composable
+private fun AppIconDialog(prefs: PlayerPreferences, appIconVariant: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("pref_app_icon")) },
+        text = {
+            androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.heightIn(max = 420.dp)
+            ) {
+                val variants = com.alananasss.kittytune.core.AppIconVariants.AVAILABLE
+                items(variants.size) { index ->
+                    val variant = variants[index]
+                    val selected = variant.key == appIconVariant
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                            .clickable {
+                                prefs.setAppIconVariant(variant.key)
+                                com.alananasss.kittytune.core.AppIconInstaller.apply(variant.key)
+                                onDismiss()
+                            }
+                            .padding(8.dp)
+                    ) {
+                        // Loaded by hand rather than with painterResource, which throws from
+                        // inside composition when the bitmap is missing (issue #33).
+                        val painter = remember(variant.key) { loadIconVariantPainter(variant.key) }
+                        if (painter != null) {
+                            androidx.compose.foundation.Image(
+                                painter = painter,
+                                contentDescription = com.alananasss.kittytune.core.AppIconVariants.localizedLabel(variant),
+                                modifier = Modifier.size(56.dp)
+                            )
+                        } else {
+                            Spacer(Modifier.size(56.dp))
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = com.alananasss.kittytune.core.AppIconVariants.localizedLabel(variant),
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } }
+    )
+}
+
+@Composable
+private fun FontAxesDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
+    var wght by remember { mutableFloatStateOf(prefs.getFontWght().toFloat()) }
+    var wdth by remember { mutableFloatStateOf(prefs.getFontWdth()) }
+    var slnt by remember { mutableFloatStateOf(prefs.getFontSlnt()) }
+    var rond by remember { mutableFloatStateOf(prefs.getFontRond()) }
+
+    fun applyPreset(pWght: Float, pWdth: Float, pSlnt: Float, pRond: Float) {
+        wght = pWght; prefs.setFontWght(pWght.toInt())
+        wdth = pWdth; prefs.setFontWdth(pWdth)
+        slnt = pSlnt; prefs.setFontSlnt(pSlnt)
+        rond = pRond; prefs.setFontRond(pRond)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("dialog_font_settings_title"), fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("font_preset_default")) } }
+                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(600f, 100f, 0f, 100f) }) { Text(str("font_preset_rounded")) } }
+                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(250f, 105f, 0f, 0f) }) { Text(str("font_preset_elegant")) } }
+                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(900f, 110f, 0f, 50f) }) { Text(str("font_preset_chunky")) } }
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Column {
+                    Text(str("dialog_font_weight", wght.toInt()), style = MaterialTheme.typography.labelLarge)
+                    Slider(value = wght, onValueChange = { wght = it; prefs.setFontWght(it.toInt()) }, valueRange = 100f..1000f)
+                }
+                Column {
+                    Text(str("dialog_font_width", wdth.toInt()), style = MaterialTheme.typography.labelLarge)
+                    Slider(value = wdth, onValueChange = { wdth = it; prefs.setFontWdth(it) }, valueRange = 25f..151f)
+                }
+                Column {
+                    Text(str("dialog_font_slant", slnt.toInt()), style = MaterialTheme.typography.labelLarge)
+                    Slider(value = slnt, onValueChange = { slnt = it; prefs.setFontSlnt(it) }, valueRange = -10f..0f)
+                }
+                Column {
+                    Text(str("dialog_font_roundness", rond.toInt()), style = MaterialTheme.typography.labelLarge)
+                    Slider(value = rond, onValueChange = { rond = it; prefs.setFontRond(it) }, valueRange = 0f..100f)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
+        dismissButton = { TextButton(onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("btn_reset")) } }
+    )
+}
 
 /**
  * Decodes an app-icon variant into a painter, or returns null when the bitmap is not in this
@@ -633,369 +710,37 @@ private fun loadIconVariantPainter(key: String): androidx.compose.ui.graphics.pa
         }
     }.getOrNull()
 
-/**
- * One place to customise every optional button and tile in the app (issue #33).
- *
- * Three separate dialogs would have been three places to go looking. The sections are the three
- * surfaces that carry optional controls: the sidebar's navigation rows, the player bar's right-hand
- * buttons, and the fixed library tiles.
- *
- * The library rows preview each tile the way the library will actually draw it, so the effect of the
- * colour switch and of an imported icon is visible without leaving the dialog.
- */
+/** A compact switch row whose whole width is the target, for lists inside dialogs and small windows. */
 @Composable
-private fun CustomizeButtonsDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
-    var hiddenNav by remember { mutableStateOf(prefs.getHiddenSidebarNav()) }
-    var hiddenLibraryButtons by remember { mutableStateOf(prefs.getHiddenLibraryButtons()) }
-    var playerBarButtons by remember { mutableStateOf(prefs.getPlayerBarButtons()) }
-    var hiddenPanelTabs by remember { mutableStateOf(prefs.getHiddenPanelTabs()) }
-    var hiddenTrackTiles by remember { mutableStateOf(prefs.getHiddenMenuTiles(PlayerPreferences.MENU_TRACK)) }
-    var hiddenPlaylistTiles by remember { mutableStateOf(prefs.getHiddenMenuTiles(PlayerPreferences.MENU_PLAYLIST)) }
-    var hidden by remember { mutableStateOf(prefs.getHiddenLibraryTiles()) }
-    // Not a setting of its own: the tiles follow the palette exactly while the dynamic theme is
-    // on, which is how it was asked for. Read here only so the previews match the library.
-    val themed = prefs.getDynamicTheme()
-    var icons by remember {
-        mutableStateOf(PlayerPreferences.LIBRARY_TILES.associateWith { prefs.getLibraryTileIcon(it) })
-    }
-    /** Set when a picked file turned out not to be an image; cleared by the next attempt. */
-    var rejectedFile by remember { mutableStateOf(false) }
-
-    val scheme = MaterialTheme.colorScheme
-    val labels = mapOf(
-        PlayerPreferences.LIBRARY_TILE_LIKES to str("lib_liked_tracks"),
-        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to str("lib_downloads"),
-        PlayerPreferences.LIBRARY_TILE_LOCAL to str("lib_local_media"),
-    )
-    val builtInIcons = mapOf(
-        PlayerPreferences.LIBRARY_TILE_LIKES to Icons.Rounded.Favorite,
-        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to Icons.Rounded.DownloadForOffline,
-        PlayerPreferences.LIBRARY_TILE_LOCAL to Icons.Rounded.FolderOpen,
-    )
-    // Mirrors the library exactly: flat container roles while the dynamic theme is on, the original
-    // gradients when it is off. See rememberFixedLibraryTiles.
-    val gradients = mapOf(
-        PlayerPreferences.LIBRARY_TILE_LIKES to
-            if (themed) null else listOf(Color(0xFF7C4DFF), Color(0xFFB388FF)),
-        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to
-            if (themed) null else listOf(Color(0xFF00C853), Color(0xFF69F0AE)),
-        PlayerPreferences.LIBRARY_TILE_LOCAL to
-            if (themed) null else listOf(Color(0xFF0091EA), Color(0xFF40C4FF)),
-    )
-    val flats = mapOf(
-        PlayerPreferences.LIBRARY_TILE_LIKES to scheme.primaryContainer.takeIf { themed },
-        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to scheme.secondaryContainer.takeIf { themed },
-        PlayerPreferences.LIBRARY_TILE_LOCAL to scheme.tertiaryContainer.takeIf { themed },
-    )
-    val tints = mapOf(
-        PlayerPreferences.LIBRARY_TILE_LIKES to
-            if (themed) scheme.onPrimaryContainer else Color.White,
-        PlayerPreferences.LIBRARY_TILE_DOWNLOADS to
-            if (themed) scheme.onSecondaryContainer else Color.White,
-        PlayerPreferences.LIBRARY_TILE_LOCAL to
-            if (themed) scheme.onTertiaryContainer else Color.White,
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(str("pref_customize_buttons")) },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                CustomizeSectionTitle(str("customize_section_sidebar"))
-                Text(
-                    str("customize_section_sidebar_desc"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant
-                )
-                listOf(
-                    PlayerPreferences.SIDEBAR_NAV_FEED to str("nav_feed"),
-                    PlayerPreferences.SIDEBAR_NAV_EXPLORE to str("explorer_title"),
-                    PlayerPreferences.SIDEBAR_NAV_RECOGNITION to str("pref_bottom_menu_fab_recognition"),
-                    PlayerPreferences.SIDEBAR_NAV_SYNC to str("sync_title"),
-                ).forEach { (key, label) ->
-                    val shown = key !in hiddenNav
-                    CustomizeCheckRow(label = label, checked = shown) {
-                        hiddenNav = if (shown) hiddenNav + key else hiddenNav - key
-                        prefs.setHiddenSidebarNav(hiddenNav)
-                    }
-                }
-
-                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-
-                CustomizeSectionTitle(str("pref_player_bar_buttons"))
-                Text(
-                    str("pref_player_bar_buttons_desc"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant
-                )
-                listOf(
-                    PlayerPreferences.PLAYER_BAR_BUTTON_LIKE to str("player_button_like"),
-                    PlayerPreferences.PLAYER_BAR_BUTTON_PANEL to str("player_button_panel"),
-                    PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE to str("player_button_queue"),
-                ).forEach { (key, label) ->
-                    val checked = key in playerBarButtons
-                    CustomizeCheckRow(label = label, checked = checked) {
-                        playerBarButtons =
-                            if (checked) playerBarButtons - key else playerBarButtons + key
-                        prefs.setPlayerBarButtons(playerBarButtons)
-                    }
-                }
-
-                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-
-                // The same switches the panel's own gear offers. Both, because the panel is where the
-                // effect is visible and this dialog is where someone goes looking for a setting.
-                CustomizeSectionTitle(str("panel_tabs_title"))
-                Text(
-                    str("panel_tabs_desc"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant
-                )
-                listOf(
-                    PlayerPreferences.PANEL_TAB_TRACK to str("detail_track_title"),
-                    PlayerPreferences.PANEL_TAB_QUEUE to str("player_queue"),
-                    PlayerPreferences.PANEL_TAB_LYRICS to str("player_lyrics"),
-                    PlayerPreferences.PANEL_TAB_EFFECTS to str("player_effects"),
-                ).forEach { (key, label) ->
-                    val shown = key !in hiddenPanelTabs
-                    // Never the last one: a panel with no tabs has nothing to show and no way back.
-                    val isLastShown = shown && hiddenPanelTabs.size == 3
-                    CustomizeCheckRow(label = label, checked = shown, enabled = !isLastShown) {
-                        hiddenPanelTabs = if (shown) hiddenPanelTabs + key else hiddenPanelTabs - key
-                        prefs.setHiddenPanelTabs(hiddenPanelTabs)
-                    }
-                }
-
-                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-
-                // Visibility only. The order is set by dragging the tiles themselves, which is what
-                // was asked for and also the only place it can be judged — a list of labels in a
-                // dialog says nothing about how a 3-across grid will read (issue #33).
-                CustomizeSectionTitle(str("menu_tiles_title"))
-                Text(
-                    str("menu_tiles_desc"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant
-                )
-                listOf(
-                    Triple(
-                        str("menu_tiles_track"),
-                        PlayerPreferences.MENU_TRACK,
-                        com.alananasss.kittytune.ui.main.MenuTiles.TRACK,
-                    ),
-                    Triple(
-                        str("menu_tiles_playlist"),
-                        PlayerPreferences.MENU_PLAYLIST,
-                        com.alananasss.kittytune.ui.main.MenuTiles.PLAYLIST,
-                    ),
-                ).forEach { (label, menu, catalogue) ->
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = scheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    val hiddenHere = if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles else hiddenPlaylistTiles
-                    catalogue.forEach { tile ->
-                        val shown = tile.id !in hiddenHere
-                        CustomizeCheckRow(label = str(tile.labelKey), checked = shown) {
-                            val next = if (shown) hiddenHere + tile.id else hiddenHere - tile.id
-                            prefs.setHiddenMenuTiles(menu, next)
-                            if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles = next
-                            else hiddenPlaylistTiles = next
-                        }
-                    }
-                    TextButton(onClick = {
-                        prefs.resetMenuTiles(menu)
-                        if (menu == PlayerPreferences.MENU_TRACK) hiddenTrackTiles = emptySet()
-                        else hiddenPlaylistTiles = emptySet()
-                    }) { Text(str("menu_tiles_reset")) }
-                }
-
-                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-
-                CustomizeSectionTitle(str("customize_section_library"))
-                listOf(
-                    PlayerPreferences.LIBRARY_BUTTON_CREATE to str("lib_create"),
-                    PlayerPreferences.LIBRARY_BUTTON_HISTORY to str("history_title"),
-                ).forEach { (key, label) ->
-                    val shown = key !in hiddenLibraryButtons
-                    CustomizeCheckRow(label = label, checked = shown) {
-                        hiddenLibraryButtons =
-                            if (shown) hiddenLibraryButtons + key else hiddenLibraryButtons - key
-                        prefs.setHiddenLibraryButtons(hiddenLibraryButtons)
-                    }
-                }
-
-                HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
-
-                CustomizeSectionTitle(str("pref_library_tiles"))
-                Text(
-                    str("pref_library_tiles_desc"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant
-                )
-                PlayerPreferences.LIBRARY_TILES.forEach { tile ->
-                    val shown = tile !in hidden
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        androidx.compose.material3.Checkbox(
-                            checked = shown,
-                            onCheckedChange = {
-                                hidden = if (shown) hidden + tile else hidden - tile
-                                prefs.setHiddenLibraryTiles(hidden)
-                            }
-                        )
-                        LibraryTilePreview(
-                            iconPath = icons[tile],
-                            icon = builtInIcons.getValue(tile),
-                            gradient = gradients.getValue(tile),
-                            flatColor = flats.getValue(tile),
-                            tint = tints.getValue(tile),
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            labels[tile].orEmpty(),
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        IconButton(onClick = {
-                            val picked = pickImageFile(str("lib_tile_choose_icon"))
-                            if (picked != null) {
-                                val stored = com.alananasss.kittytune.data.local.LibraryTileIcons
-                                    .import(tile, picked)
-                                rejectedFile = stored == null
-                                if (stored != null) {
-                                    prefs.setLibraryTileIcon(tile, stored)
-                                    icons = icons + (tile to stored)
-                                }
-                            }
-                        }) {
-                            Icon(
-                                Icons.Outlined.Image,
-                                contentDescription = str("lib_tile_choose_icon"),
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        if (icons[tile] != null) {
-                            IconButton(onClick = {
-                                com.alananasss.kittytune.data.local.LibraryTileIcons.clear(tile)
-                                prefs.setLibraryTileIcon(tile, null)
-                                icons = icons + (tile to null)
-                                rejectedFile = false
-                            }) {
-                                Icon(
-                                    Icons.Rounded.Refresh,
-                                    contentDescription = str("lib_tile_reset_icon"),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (rejectedFile) {
-                    Text(
-                        str("lib_tile_icon_rejected"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.error
-                    )
-                }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } }
-    )
-}
-
-@Composable
-private fun CustomizeSectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 8.dp)
-    )
-}
-
-/** A checkbox whose whole row is the target, the way the settings list behaves. */
-@Composable
-private fun CustomizeCheckRow(
-    label: String,
+internal fun SwitchRow(
+    title: String,
     checked: Boolean,
+    subtitle: String? = null,
     enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
     Row(
-        Modifier
+        modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
             .clickable(enabled = enabled, onClick = onToggle)
-            .padding(vertical = 10.dp)
-            // Says why it will not budge, rather than simply not budging.
-            .alpha(if (enabled) 1f else 0.5f),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
-        Spacer(Modifier.width(8.dp))
-        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-/** One tile drawn the way the library draws it: the icon, or the imported image, over the gradient. */
-@Composable
-private fun LibraryTilePreview(
-    iconPath: String?,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    gradient: List<Color>?,
-    flatColor: Color?,
-    tint: Color,
-) {
-    val file = iconPath?.let { path -> remember(path) { java.io.File(path) } }
-    val fill = when {
-        flatColor != null -> Modifier.background(flatColor)
-        gradient != null -> Modifier.background(androidx.compose.ui.graphics.Brush.linearGradient(gradient))
-        else -> Modifier
-    }
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .then(fill),
-        contentAlignment = Alignment.Center
-    ) {
-        if (file != null && file.isFile) {
-            coil3.compose.AsyncImage(
-                model = file,
-                contentDescription = null,
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                modifier = Modifier.matchParentSize()
-            )
-        } else {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
+        Spacer(Modifier.width(12.dp))
+        // The row is the target; the switch only shows the state, so one click never toggles twice.
+        com.alananasss.kittytune.ui.common.SettingsSwitch(checked = checked, onCheckedChange = null)
     }
 }
-
-/**
- * Asks for an image file, or null when the dialog is dismissed.
- *
- * The filter is a hint the platform is free to ignore, so the file still has to be validated
- * afterwards — see [com.alananasss.kittytune.data.local.LibraryTileIcons.import].
- */
-private fun pickImageFile(title: String): java.io.File? {
-    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD)
-    dialog.setFilenameFilter { _, name ->
-        listOf(".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp").any { name.endsWith(it, true) }
-    }
-    dialog.isVisible = true
-    return dialog.files.firstOrNull()
-}
-
-
-

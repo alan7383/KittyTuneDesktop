@@ -45,6 +45,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.pointer.PointerType
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
@@ -59,11 +60,10 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlayCircle
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
-import androidx.compose.material.icons.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.ViewStream
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material3.DropdownMenu
@@ -96,7 +96,6 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -109,9 +108,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.awt.SwingWindow
-import androidx.compose.ui.window.WindowDecoration
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import coil3.compose.AsyncImage
@@ -251,6 +249,7 @@ fun MiniLyricsPlayerWindow(
     var isPinned by remember { mutableStateOf(true) }
     var isDragging by remember { mutableStateOf(false) }
 
+    // Debounced, and never mid-drag: a drag moves the window a hundred times a second.
     LaunchedEffect(windowState.position, windowState.size, isElongated, isDragging) {
         if (isDragging) return@LaunchedEffect
         kotlinx.coroutines.delay(400)
@@ -285,28 +284,19 @@ fun MiniLyricsPlayerWindow(
         viewModel.toggleMiniPlayer(false)
     }
 
+    // Out of the way while the app is full screen, like any overlay.
     val isFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen
 
-    SwingWindow(
+    Window(
         onCloseRequest = closeMiniPlayer,
         state = windowState,
         visible = !isFullScreen,
         alwaysOnTop = isPinned,
-        decoration = WindowDecoration.Undecorated(),
+        undecorated = true,
         transparent = true,
         resizable = true,
         title = "KittyTune Mini Player",
-        init = { window ->
-            com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
-        },
     ) {
-        DisposableEffect(window, isFullScreen) {
-            if (!isFullScreen) {
-                com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
-            }
-            onDispose {}
-        }
-
         val density = LocalDensity.current
         val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
         val customDensity = remember(density, uiScale) {
@@ -403,6 +393,18 @@ fun MiniLyricsPlayerWindow(
             }
         }
 
+        // A floating tool, not another app: no taskbar button (with Java's icon) and no Alt+Tab entry.
+        // Windows needs the restyle; KDE and GNOME need the skip hints, sent again after every remap.
+        LaunchedEffect(window, isFullScreen) {
+            if (isFullScreen) return@LaunchedEffect
+            if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
+            } else {
+                com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
+            }
+        }
+
+        // Moved by the window manager itself where it can (smooth at the monitor's refresh rate), by hand otherwise.
         val dragHandler = remember(window) {
             WindowDragHandler(
                 window = window,
@@ -431,9 +433,7 @@ fun MiniLyricsPlayerWindow(
                     }
                 }
                 override fun componentMoved(e: java.awt.event.ComponentEvent) {
-                    if (!isDragging) {
-                        saveCurrentBounds()
-                    }
+                    if (!isDragging) saveCurrentBounds()
                 }
             }
             window.addComponentListener(listener)
@@ -462,9 +462,8 @@ fun MiniLyricsPlayerWindow(
 
                 val surfaceAlpha by animateFloatAsState(
                     targetValue = when {
-                        transparentBg && !hoverIllumination -> 0.0f
-                        transparentBg && !isEffectivelyHovered -> 0.0f
-                        transparentBg && isEffectivelyHovered -> 0.35f
+                        transparentBg && (!hoverIllumination || !isEffectivelyHovered) -> 0.0f
+                        transparentBg -> 0.35f
                         !hoverIllumination -> if (hoverEffect) 0.82f else 0.96f
                         !hoverEffect || isEffectivelyHovered -> 0.96f
                         else -> 0.82f
@@ -480,7 +479,7 @@ fun MiniLyricsPlayerWindow(
 
                 val surfaceBorder = when {
                     transparentBg && (!isEffectivelyHovered || !hoverIllumination) -> null
-                    transparentBg && isEffectivelyHovered && hoverIllumination -> androidx.compose.foundation.BorderStroke(
+                    transparentBg -> androidx.compose.foundation.BorderStroke(
                         1.dp,
                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                     )
@@ -491,34 +490,20 @@ fun MiniLyricsPlayerWindow(
                 }
 
                 val surfaceShape = if (isElongated) RoundedCornerShape(10.dp) else RoundedCornerShape(22.dp)
-                val shadowElevation = if (transparentBg) 0.dp else if (isElongated) 4.dp else 8.dp
+                // No shadow. The card fills its window, so a shadow had nowhere to fall: it was cut off at the
+                // window's rectangle, which read as square corners behind the rounded card, and it showed
+                // through the translucent surface. The border does the separating instead.
+                val shadowElevation = 0.dp
 
-                Surface(
-                    shape = surfaceShape,
-                    color = surfaceColor,
-                    border = surfaceBorder,
-                    shadowElevation = shadowElevation,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .hoverable(windowInteractionSource)
-                ) {
-                    // Context menu state: opened by right-click anywhere on the mini player
-                    var contextMenuVisible by remember { mutableStateOf(false) }
-                    var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
-                    var showSettingsDialog by remember { mutableStateOf(false) }
-
-                    Box(
+                Box(Modifier.fillMaxSize()) {
+                    Surface(
+                        shape = surfaceShape,
+                        color = surfaceColor,
+                        border = surfaceBorder,
+                        shadowElevation = shadowElevation,
                         modifier = Modifier
                             .fillMaxSize()
-                            .onPointerEvent(PointerEventType.Press) { event ->
-                                if (event.button == PointerButton.Secondary) {
-                                    val pos = event.changes.first().position
-                                    contextMenuOffset = with(density) {
-                                        DpOffset(pos.x.toDp(), pos.y.toDp())
-                                    }
-                                    contextMenuVisible = true
-                                }
-                            }
+                            .hoverable(windowInteractionSource)
                             .pointerInput(Unit) {
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = true)
@@ -538,404 +523,104 @@ fun MiniLyricsPlayerWindow(
                                 }
                             }
                     ) {
-                        if (isElongated) {
-                            MiniLyricsElongatedContent(
-                                viewModel = viewModel,
-                                windowHeight = windowState.size.height,
-                                showCover = showCover,
-                                showPlayback = showPlayback,
-                                showAdditional = showAdditional,
-                                controlsOnHover = controlsOnHover,
-                                showProgress = showProgress,
-                                transparentBg = transparentBg,
-                                isDragging = isDragging,
-                            )
-                        } else {
-                            MiniLyricsContent(
-                                viewModel = viewModel,
-                                windowHeight = windowState.size.height,
-                                showCover = showCover,
-                                showPlayback = showPlayback,
-                                showAdditional = showAdditional,
-                                controlsOnHover = controlsOnHover,
-                                showProgress = showProgress,
-                                transparentBg = transparentBg,
-                                isDragging = isDragging,
-                            )
-                        }
+                        // Context menu state: opened by right-click anywhere on the mini player
+                        var contextMenuVisible by remember { mutableStateOf(false) }
+                        var contextMenuOffset by remember { mutableStateOf(DpOffset.Zero) }
+                        var settingsVisible by remember { mutableStateOf(false) }
 
-                            DropdownMenu(
-                                expanded = contextMenuVisible,
-                                onDismissRequest = { contextMenuVisible = false },
-                                offset = contextMenuOffset,
-                            ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("menu_show_window"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.OpenInNew,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    onClick = {
-                                        contextMenuVisible = false
-                                        onOpenMainWindow()
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("pref_mini_player_settings"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Settings,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    onClick = {
-                                        contextMenuVisible = false
-                                        showSettingsDialog = true
-                                    },
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (isPinned) str("mini_player_unpin") else str("mini_player_pin"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.PushPin,
-                                            contentDescription = null,
-                                            tint = if (isPinned) MaterialTheme.colorScheme.primary
-                                                   else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    onClick = {
-                                        isPinned = !isPinned
-                                        contextMenuVisible = false
-                                    },
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_style_elongated"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.ViewStream,
-                                            contentDescription = null,
-                                            tint = if (isElongated) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (isElongated) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onPointerEvent(PointerEventType.Press) { event ->
+                                    if (event.button == PointerButton.Secondary) {
+                                        val pos = event.changes.first().position
+                                        contextMenuOffset = with(density) {
+                                            DpOffset(pos.x.toDp(), pos.y.toDp())
                                         }
-                                    },
-                                    onClick = {
-                                        val newStyle = if (isElongated) MiniPlayerStyle.STANDARD else MiniPlayerStyle.ELONGATED
-                                        prefs.setMiniPlayerStyle(newStyle)
-                                    },
+                                        contextMenuVisible = true
+                                    }
+                                }
+                        ) {
+                            if (isElongated) {
+                                MiniLyricsElongatedContent(
+                                    viewModel = viewModel,
+                                    windowHeight = windowState.size.height,
+                                    showCover = showCover,
+                                    showPlayback = showPlayback,
+                                    showAdditional = showAdditional,
+                                    controlsOnHover = controlsOnHover,
+                                    showProgress = showProgress,
+                                    transparentBg = transparentBg,
+                                    isDragging = isDragging,
                                 )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_transparent_bg"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Opacity,
-                                            contentDescription = null,
-                                            tint = if (transparentBg) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (transparentBg) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerTransparentBg(!transparentBg)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_hover_illumination"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.LightMode,
-                                            contentDescription = null,
-                                            tint = if (hoverIllumination) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (hoverIllumination) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerHoverIllumination(!hoverIllumination)
-                                    },
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_cover"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Image,
-                                            contentDescription = null,
-                                            tint = if (showCover) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showCover) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowCover(!showCover)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_playback_controls"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.PlayCircle,
-                                            contentDescription = null,
-                                            tint = if (showPlayback) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showPlayback) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowPlaybackControls(!showPlayback)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_additional_controls"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Favorite,
-                                            contentDescription = null,
-                                            tint = if (showAdditional) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showAdditional) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowAdditionalControls(!showAdditional)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_controls_on_hover"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Visibility,
-                                            contentDescription = null,
-                                            tint = if (controlsOnHover) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (controlsOnHover) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerControlsOnHover(!controlsOnHover)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_hover_effect"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.AutoAwesome,
-                                            contentDescription = null,
-                                            tint = if (hoverEffect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (hoverEffect) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerHoverEffect(!hoverEffect)
-                                    },
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("mini_player_show_progress"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.GraphicEq,
-                                            contentDescription = null,
-                                            tint = if (showProgress) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    trailingIcon = {
-                                        if (showProgress) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Check,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp),
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        prefs.setMiniPlayerShowProgress(!showProgress)
-                                    },
-                                )
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            str("menu_mini_player_hide"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.error,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Close,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    },
-                                    onClick = {
-                                        contextMenuVisible = false
-                                        closeMiniPlayer()
-                                    },
+                            } else {
+                                MiniLyricsContent(
+                                    viewModel = viewModel,
+                                    windowHeight = windowState.size.height,
+                                    showCover = showCover,
+                                    showPlayback = showPlayback,
+                                    showAdditional = showAdditional,
+                                    controlsOnHover = controlsOnHover,
+                                    showProgress = showProgress,
+                                    transparentBg = transparentBg,
+                                    isDragging = isDragging,
                                 )
                             }
 
-                            if (showSettingsDialog) {
-                                MiniPlayerSettingsDialog(
-                                    prefs = prefs,
-                                    onDismiss = { showSettingsDialog = false }
-                                )
+                            // Its own window at the pointer: a DropdownMenu is drawn inside the mini player,
+                            // a strip a few dozen dp tall, so the old ten-item menu was cut off at its edge and
+                            // could not be scrolled. The settings themselves open in a window of their own.
+                            if (contextMenuVisible) {
+                                com.alananasss.kittytune.ui.common.FloatingMenuWindow(
+                                    anchorXDp = window.x + contextMenuOffset.x.value,
+                                    anchorYDp = window.y + contextMenuOffset.y.value,
+                                    contentHeight = com.alananasss.kittytune.ui.common.FLOATING_MENU_PADDING +
+                                        com.alananasss.kittytune.ui.common.FLOATING_MENU_DIVIDER +
+                                        com.alananasss.kittytune.ui.common.FLOATING_MENU_ITEM_HEIGHT * 4,
+                                    contentWidth = 240.dp,
+                                    onDismiss = { contextMenuVisible = false },
+                                ) {
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.OpenInNew,
+                                        text = str("menu_show_window"),
+                                        onClick = {
+                                            contextMenuVisible = false
+                                            onOpenMainWindow()
+                                        },
+                                    )
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.PushPin,
+                                        text = if (isPinned) str("mini_player_unpin") else str("mini_player_pin"),
+                                        onClick = {
+                                            isPinned = !isPinned
+                                            contextMenuVisible = false
+                                        },
+                                    )
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.Tune,
+                                        text = str("mini_player_settings_title"),
+                                        onClick = {
+                                            contextMenuVisible = false
+                                            settingsVisible = true
+                                        },
+                                    )
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                    )
+                                    com.alananasss.kittytune.ui.common.FloatingMenuItem(
+                                        icon = Icons.Rounded.Close,
+                                        text = str("menu_mini_player_hide"),
+                                        danger = true,
+                                        onClick = {
+                                            contextMenuVisible = false
+                                            closeMiniPlayer()
+                                        },
+                                    )
+                                }
+                            }
+                            if (settingsVisible) {
+                                MiniPlayerSettingsWindow(onClose = { settingsVisible = false })
                             }
 
                             // Right edge resize handle
@@ -946,16 +631,11 @@ fun MiniLyricsPlayerWindow(
                                     .width(6.dp)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR)))
                                     .pointerInput(Unit) {
-                                        awaitEachGesture {
-                                            awaitFirstDown(requireUnconsumed = false).consume()
-                                        }
+                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
                                     }
                                     .pointerInput(minWidthPx, maxWidthPx) {
                                         detectDragGestures(
-                                            onDragEnd = {
-                                                saveCurrentBounds()
-                                                com.alananasss.kittytune.core.Prefs.flush()
-                                            },
+                                            onDragEnd = { saveCurrentBounds() },
                                             onDrag = { change, dragAmount ->
                                                 change.consume()
                                                 val newW = (window.width + dragAmount.x.toInt()).coerceIn(minWidthPx, maxWidthPx)
@@ -973,16 +653,11 @@ fun MiniLyricsPlayerWindow(
                                     .height(6.dp)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.S_RESIZE_CURSOR)))
                                     .pointerInput(Unit) {
-                                        awaitEachGesture {
-                                            awaitFirstDown(requireUnconsumed = false).consume()
-                                        }
+                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
                                     }
                                     .pointerInput(minHeightPx, maxHeightPx) {
                                         detectDragGestures(
-                                            onDragEnd = {
-                                                saveCurrentBounds()
-                                                com.alananasss.kittytune.core.Prefs.flush()
-                                            },
+                                            onDragEnd = { saveCurrentBounds() },
                                             onDrag = { change, dragAmount ->
                                                 change.consume()
                                                 val newH = (window.height + dragAmount.y.toInt()).coerceIn(minHeightPx, maxHeightPx)
@@ -1005,16 +680,13 @@ fun MiniLyricsPlayerWindow(
                                     .hoverable(gripInteraction)
                                     .pointerHoverIcon(PointerIcon(Cursor(Cursor.SE_RESIZE_CURSOR)))
                                     .pointerInput(Unit) {
-                                        awaitEachGesture {
-                                            awaitFirstDown(requireUnconsumed = false).consume()
-                                        }
+                                        awaitEachGesture { awaitFirstDown(requireUnconsumed = false).consume() }
                                     }
                                     .pointerInput(minWidthPx, maxWidthPx, minHeightPx, maxHeightPx) {
                                         detectDragGestures(
                                             onDragEnd = {
                                                 isGripHovered = false
                                                 saveCurrentBounds()
-                                                com.alananasss.kittytune.core.Prefs.flush()
                                             },
                                             onDragCancel = {
                                                 isGripHovered = false
@@ -1061,6 +733,7 @@ fun MiniLyricsPlayerWindow(
             }
         }
     }
+}
 
 @Composable
 private fun MiniLyricsContent(
@@ -1289,10 +962,15 @@ private fun MiniLyricsContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp)
+                    // Clear of the 22 dp corners, for the same reason as the elongated bar's.
+                    .padding(start = 24.dp, end = 24.dp, bottom = 6.dp)
                     .height(2.5.dp)
                     .clip(RoundedCornerShape(1.dp)),
                 color = MaterialTheme.colorScheme.primary,
+                // A hairline needs neither Material's gap nor its stop dot, which sat at the right end as
+                // a stray white point.
+                gapSize = 0.dp,
+                drawStopIndicator = {},
                 trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
             )
         }
@@ -1523,10 +1201,16 @@ private fun MiniLyricsElongatedContent(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp)
+                    // Inset past the 10 dp corners and lifted off the edge: laid on the border itself,
+                    // its ends ran into the rounding and it read as a line sticking out of the bar.
+                    .padding(start = 14.dp, end = 14.dp, bottom = 3.dp)
                     .height(2.dp)
                     .clip(RoundedCornerShape(1.dp)),
                 color = MaterialTheme.colorScheme.primary,
+                // A hairline needs neither Material's gap nor its stop dot, which sat at the right end as
+                // a stray white point.
+                gapSize = 0.dp,
+                drawStopIndicator = {},
                 trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (transparentBg) 0.25f else 0.4f),
             )
         }

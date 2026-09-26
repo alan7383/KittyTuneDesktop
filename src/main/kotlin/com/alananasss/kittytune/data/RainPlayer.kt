@@ -149,27 +149,23 @@ class RainPlayer {
             }
 
             // Decode MP3 -> 16-bit PCM WAV using FFmpeg (JavaCV recorder).
-            val grabber = org.bytedeco.javacv.FFmpegFrameGrabber(tmpMp3.absolutePath)
-            grabber.sampleRate = 44100
-            grabber.audioChannels = 2
-            grabber.start()
-
-            val recorder = org.bytedeco.javacv.FFmpegFrameRecorder(wav.absolutePath, 2).apply {
-                format = "wav"
-                sampleRate = 44100
-                audioChannels = 2
-                audioCodec = org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_PCM_S16LE
-                start()
+            org.bytedeco.javacv.FFmpegFrameGrabber(tmpMp3.absolutePath).use { grabber ->
+                grabber.sampleRate = 44100
+                grabber.audioChannels = 2
+                grabber.start()
+                org.bytedeco.javacv.FFmpegFrameRecorder(wav.absolutePath, 2).use { recorder ->
+                    recorder.format = "wav"
+                    recorder.sampleRate = 44100
+                    recorder.audioChannels = 2
+                    recorder.audioCodec = org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_PCM_S16LE
+                    recorder.start()
+                    var frame = grabber.grabSamples()
+                    while (frame != null) {
+                        recorder.recordSamples(frame.sampleRate, frame.audioChannels, *frame.samples)
+                        frame = grabber.grabSamples()
+                    }
+                }
             }
-
-            var frame = grabber.grabSamples()
-            while (frame != null) {
-                recorder.recordSamples(frame.sampleRate, frame.audioChannels, *frame.samples)
-                frame = grabber.grabSamples()
-            }
-
-            recorder.stop(); recorder.release()
-            grabber.stop(); grabber.release()
             return wav
         }
     }

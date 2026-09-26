@@ -47,7 +47,6 @@ import com.alananasss.kittytune.data.network.SoundCloudTelemetryTracker
 import com.alananasss.kittytune.utils.Logger
 import kotlin.time.Duration.Companion.milliseconds
 
-import com.alananasss.kittytune.data.local.LyricsDisplayState
 import com.alananasss.kittytune.data.lyrics.providers.*
 import com.alananasss.kittytune.data.lyrics.clients.*
 
@@ -184,6 +183,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var isPreciseSpeedEnabled by mutableStateOf(playerPrefs.getPreciseSpeedEnabled())
     var isQueuePreserveUpcomingEnabled by mutableStateOf(playerPrefs.getQueuePreserveUpcomingOnJump())
     var fullPlayerBgStyle by mutableStateOf(playerPrefs.getFullPlayerBgStyle())
+        private set
+    var fullPlayerLayout by mutableStateOf(playerPrefs.getFullPlayerLayout())
         private set
     var fullPlayerCoverScale by mutableFloatStateOf(playerPrefs.getFullPlayerCoverScale())
         private set
@@ -795,15 +796,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     var lyricsMode by mutableStateOf(LyricsMode.SYNCED)
     var rawPlainLyrics by mutableStateOf<String?>(null)
-    var lyricsDisplayState by mutableStateOf(LyricsDisplayState.OFF)
-    var showInlineLyrics: Boolean
-        get() = lyricsDisplayState == LyricsDisplayState.COVER_REPLACED
-        set(value) {
-            lyricsDisplayState = if (value) LyricsDisplayState.COVER_REPLACED else LyricsDisplayState.OFF
-        }
-    val isLyricsUnderCoverActive: Boolean
-        get() = (lyricsDisplayState == LyricsDisplayState.UNDER_COVER || playerPrefs.getLyricsUnderCoverAlwaysVisible()) &&
-                hasLyrics && lyricsLines.isNotEmpty() && lyricsDisplayState != LyricsDisplayState.COVER_REPLACED
     var lyricsOffset by mutableLongStateOf(0L)
         private set
     var showLyricsOffsetControls by mutableStateOf(false)
@@ -879,7 +871,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val track = listenSessionTrack
         listenSession = null
         listenSessionTrack = null
-        if (track == null || !playerPrefs.getListeningStatsEnabled()) return
+        if (track == null) return
+        // Heard for real: worth keeping for next time, whether or not statistics are on.
+        if (com.alananasss.kittytune.data.stats.ListenRules.countsAsPlay(session.listenedMs, track.durationMs ?: 0L)) {
+            com.alananasss.kittytune.data.cache.AudioCache.offer(track)
+        }
+        if (!playerPrefs.getListeningStatsEnabled()) return
 
         // Nothing heard at all is not a listen and not a skip — it is a track that was loaded. Recording
         // it would put a row in the table that every aggregate then has to exclude, and would make the
@@ -1089,7 +1086,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var discordJob: Job? = null
     private var discordRpc: com.alananasss.kittytune.data.DiscordRPC? = null
     private var mprisService: com.alananasss.kittytune.data.MprisService? = null
-    private var kdeMpris2Service: com.alananasss.kittytune.data.KdeMpris2Service? = null
     private var windowsSmtcService: com.alananasss.kittytune.data.WindowsSmtcService? = null
 
     companion object {
@@ -1405,7 +1401,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 return@trackChangeHandler
             }
 
-            showInlineLyrics = false
             lyricsLines.clear()
             rawPlainLyrics = null
 
@@ -1537,27 +1532,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         restoreSession()
         syncWithCurrentPlayback()
 
-        initKdeMpris2Service()
-    }
-
-    fun toggleInlineLyrics() {
-        val multiStateEnabled = playerPrefs.getLyricsMultiStateToggle()
-        val underCoverEnabled = playerPrefs.getLyricsUnderCoverEnabled()
-        val hasSyncedLyrics = lyricsLines.isNotEmpty()
-
-        if (multiStateEnabled && underCoverEnabled && hasSyncedLyrics) {
-            lyricsDisplayState = when (lyricsDisplayState) {
-                LyricsDisplayState.OFF -> LyricsDisplayState.UNDER_COVER
-                LyricsDisplayState.UNDER_COVER -> LyricsDisplayState.COVER_REPLACED
-                LyricsDisplayState.COVER_REPLACED -> LyricsDisplayState.OFF
-            }
-        } else {
-            lyricsDisplayState = if (lyricsDisplayState == LyricsDisplayState.COVER_REPLACED) {
-                LyricsDisplayState.OFF
-            } else {
-                LyricsDisplayState.COVER_REPLACED
-            }
-        }
+        // Publish the restored track right away. The OS media integrations used to start on the first
+        // playback change, so after a launch the media keys and the Windows flyout did nothing until
+        // play was pressed inside the app.
+        updateMprisMedia()
     }
 
 
@@ -1586,65 +1564,44 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun initMprisService() {
-        if (mprisService == null) {
-            try {
-                mprisService = com.alananasss.kittytune.data.MprisService(
-                    onPlay = { player.play() },
-                    onPause = { player.pause() },
-                    onPlayPause = { togglePlayPause() },
-                    onNext = { playNext() },
-                    onPrevious = { smartPrevious() },
-                    onSeek = { seekTo(it) }
-                )
-            } catch (e: Exception) {
-                println("MPRIS service init exception: ${e.message}")
-            }
-        }
-    }
-
-    private fun initKdeMpris2Service() {
-        if (kdeMpris2Service == null) {
-            try {
-                kdeMpris2Service = com.alananasss.kittytune.data.KdeMpris2Service(
-                    onPlay = { player.play() },
-                    onPause = { player.pause() },
-                    onPlayPause = { togglePlayPause() },
-                    onNext = { playNext() },
-                    onPrevious = { smartPrevious() },
-                    onSeek = { seekTo(it) },
-                    onVolume = { v -> updateVolume(v.toFloat()) },
-                    onShuffle = { s ->
-                        if (s != shuffleEnabled) toggleShuffle()
-                    },
-                    onLoopStatus = { ls ->
-                        val target = when (ls) {
-                            com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.None -> RepeatMode.NONE
-                            com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Track -> RepeatMode.ONE
-                            com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Playlist -> RepeatMode.ALL
-                        }
-                        if (repeatMode != target) {
-                            repeatMode = target
-                            applyRepeatMode()
-                            saveStateAsync(saveQueue = false)
-                            kdeMpris2Service?.updateLoopStatus(ls)
-                        }
+        if (mprisService != null) return
+        mprisService = runCatching {
+            com.alananasss.kittytune.data.MprisService(
+                onRaise = { com.alananasss.kittytune.core.MainWindowRaiser.raise() },
+                onPlay = { play() },
+                onPause = { pause() },
+                onPlayPause = { togglePlayPause() },
+                onNext = { playNext() },
+                onPrevious = { smartPrevious() },
+                onSeek = { seekTo(it) },
+                onVolume = { v -> updateVolume(v.toFloat()) },
+                onShuffle = { s -> if (s != shuffleEnabled) toggleShuffle() },
+                onLoopStatus = { status ->
+                    val target = when (status) {
+                        com.alananasss.kittytune.data.MprisService.LoopStatus.None -> RepeatMode.NONE
+                        com.alananasss.kittytune.data.MprisService.LoopStatus.Track -> RepeatMode.ONE
+                        com.alananasss.kittytune.data.MprisService.LoopStatus.Playlist -> RepeatMode.ALL
                     }
-                )
-            } catch (e: Exception) {
-                println("KDE MPRIS2 service init exception: ${e.message}")
-            }
-        }
+                    if (repeatMode != target) {
+                        repeatMode = target
+                        applyRepeatMode()
+                        saveStateAsync(saveQueue = false)
+                    }
+                },
+            )
+        }.onFailure { e -> println("MPRIS service init failed: ${e.message}") }.getOrNull()
     }
 
     private fun initWindowsSmtcService() {
         if (windowsSmtcService == null) {
             try {
                 windowsSmtcService = com.alananasss.kittytune.data.WindowsSmtcService(
-                    onPlay = { togglePlayPause() },
-                    onPause = { togglePlayPause() },
+                    onPlay = { play() },
+                    onPause = { pause() },
                     onPlayPause = { togglePlayPause() },
                     onNext = { playNext() },
-                    onPrevious = { smartPrevious() }
+                    onPrevious = { smartPrevious() },
+                    onSeek = { seekTo(it) },
                 )
             } catch (e: Exception) {
                 println("Windows SMTC service init exception: ${e.message}")
@@ -1654,25 +1611,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateMprisMedia() {
         initMprisService()
-        mprisService?.updateMedia(currentTrack, isPlaying, currentPosition)
-
-        initKdeMpris2Service()
-        val kdeService = kdeMpris2Service
-        if (kdeService != null) {
-            kdeService.updateMedia(currentTrack, isPlaying, currentPosition)
-            kdeService.updateVolume(volume.toDouble())
-            kdeService.updateShuffle(shuffleEnabled)
-            kdeService.updateLoopStatus(
-                when (repeatMode) {
-                    RepeatMode.NONE -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.None
-                    RepeatMode.ALL -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Playlist
-                    RepeatMode.ONE -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Track
-                }
-            )
+        mprisService?.let { service ->
+            service.updateMedia(currentTrack, isPlaying, currentPosition)
+            service.updateVolume(volume.toDouble())
+            service.updateShuffle(shuffleEnabled)
+            service.updateLoopStatus(repeatMode.toMprisLoopStatus())
         }
 
         initWindowsSmtcService()
-        windowsSmtcService?.updateMedia(currentTrack, isPlaying)
+        windowsSmtcService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
     }
 
     fun updateDiscordPresence() {
@@ -1710,12 +1657,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } catch (_: Exception) {
         }
         mprisService = null
-
-        try {
-            kdeMpris2Service?.close()
-        } catch (_: Exception) {
-        }
-        kdeMpris2Service = null
 
         try {
             windowsSmtcService?.close()
@@ -1847,22 +1788,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         currentTrack?.let { loadLyrics(it) }
     }
 
-    fun openLyrics(targetTrack: Track? = null, forceSheet: Boolean = false) {
+    fun openLyrics(targetTrack: Track? = null) {
         val target = targetTrack ?: currentTrack ?: return
         val isDifferentTrack = target.id != currentTrack?.id
         if (isDifferentTrack) playPlaylist(listOf(target), 0)
 
-        if (!forceSheet && playerPrefs.getInlineLyricsEnabled()) {
-            toggleInlineLyrics()
-        } else {
-            lyricsMode = if (lyricsLines.isNotEmpty()) {
-                LyricsMode.SYNCED
-            } else {
-                LyricsMode.PLAIN
-            }
-            showMenuSheet = false
-            showLyricsSheet = if (isDifferentTrack) true else !showLyricsSheet
-        }
+        lyricsMode = if (lyricsLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
+        showMenuSheet = false
+        showLyricsSheet = if (isDifferentTrack) true else !showLyricsSheet
     }
 
     private fun parseArtistAndTitle(title: String, uploader: String): Pair<String, String> {
@@ -3136,7 +3069,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (refresh) isCommentsLoading = true
             try {
                 val response = if (refresh) {
-                    api.getTrackComments(trackId = t.id, threaded = 1, filterReplies = 1, sort = commentSort.value)
+                    api.getTrackComments(trackId = t.id, limit = 20, threaded = 1, filterReplies = 1, sort = commentSort.value)
                 } else {
                     api.getCommentsNextPage(commentNextHref!!)
                 }
@@ -3772,13 +3705,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (isPlaying) togglePlayPause()
     }
 
+    /** Plays files handed over by the OS, adding them to the local library on the way. */
+    fun playLocalFiles(files: List<java.io.File>) {
+        viewModelScope.launch {
+            val tracks = files.mapNotNull { com.alananasss.kittytune.data.LocalMediaRepository.importFile(it) }
+            if (tracks.isNotEmpty()) playPlaylist(tracks, startIndex = 0)
+        }
+    }
+
     fun toggleShuffle() {
         shuffleEnabled = !shuffleEnabled;
         if (shuffleEnabled) applyShuffle() else revertShuffle();
         updateQueueState();
         saveStateAsync(saveQueue = true)
 
-        kdeMpris2Service?.updateShuffle(shuffleEnabled)
+        mprisService?.updateShuffle(shuffleEnabled)
     }
 
     private fun applyShuffle(startIndex: Int = currentQueueIndex, sourceList: List<Track> = _originalQueue) {
@@ -3819,13 +3760,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         applyRepeatMode()
         saveStateAsync(saveQueue = false)
 
-        kdeMpris2Service?.updateLoopStatus(
-            when (repeatMode) {
-                RepeatMode.NONE -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.None
-                RepeatMode.ALL -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Playlist
-                RepeatMode.ONE -> com.alananasss.kittytune.data.KdeMpris2Service.LoopStatus.Track
-            }
-        )
+        mprisService?.updateLoopStatus(repeatMode.toMprisLoopStatus())
+    }
+
+    private fun RepeatMode.toMprisLoopStatus() = when (this) {
+        RepeatMode.NONE -> com.alananasss.kittytune.data.MprisService.LoopStatus.None
+        RepeatMode.ALL -> com.alananasss.kittytune.data.MprisService.LoopStatus.Playlist
+        RepeatMode.ONE -> com.alananasss.kittytune.data.MprisService.LoopStatus.Track
     }
 
     fun updateQueueState() {
@@ -4034,6 +3975,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateFullPlayerBgStyle(style: com.alananasss.kittytune.data.local.FullPlayerBgStyle) {
         fullPlayerBgStyle = style
         playerPrefs.setFullPlayerBgStyle(style)
+    }
+
+    fun updateFullPlayerLayout(layout: com.alananasss.kittytune.data.local.FullPlayerLayout) {
+        fullPlayerLayout = layout
+        playerPrefs.setFullPlayerLayout(layout)
     }
 
     fun updateFullPlayerCoverScale(scale: Float) {

@@ -25,6 +25,9 @@ import androidx.savedstate.read
 import androidx.compose.foundation.layout.*
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
+import com.alananasss.kittytune.ui.common.clearance
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -91,7 +94,10 @@ const val PANEL_GUTTER = 8
  * Shorter than the panels' own springs: this is one rectangle's contents changing, not an edge
  * travelling, and a fade that outlasts the click reads as lag rather than as motion.
  */
-private const val SHEET_SWAP_MS = 220
+private const val SHEET_SWAP_MS = 260
+
+/** How long the side being left takes to fade: a shorter beat than the arrival, so the two do not overlap. */
+private const val SHEET_EXIT_MS = 120
 
 /**
  * How long the full player takes to arrive and to leave.
@@ -119,6 +125,11 @@ fun MainScreen(
     val backStackEntry by navController.currentBackStackEntryAsState()
     androidx.compose.runtime.LaunchedEffect(backStackEntry) {
         playerViewModel.showLyricsSheet = false
+        // An empty search left open does not follow you around: leaving home closes it.
+        val route = backStackEntry?.destination?.route
+        if (route != null && route != "home" && homeViewModel.isSearching && homeViewModel.searchQuery.isBlank()) {
+            homeViewModel.clearSearch()
+        }
     }
 
     // Same navigation protocol as the Android MainScreen: PlayerViewModel exposes
@@ -287,6 +298,53 @@ fun MainScreen(
     // The mouse's side buttons, on the root so they work wherever the pointer happens to be.
     val historyNavigator = rememberHistoryNavigator(navController, playerViewModel)
 
+    val playerBarStyle by playerPrefs.playerBarStyleFlow().collectAsState(initial = playerPrefs.getPlayerBarStyle())
+    val isBarFloating = playerBarStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING
+    val barOverlay = remember { com.alananasss.kittytune.ui.common.PlayerBarOverlay() }
+    LaunchedEffect(isBarFloating) { if (!isBarFloating) barOverlay.bounds = null }
+
+    val playerBarModifier = when (playerBarStyle) {
+        com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier.fillMaxWidth()
+        com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> Modifier
+            .fillMaxWidth()
+            .padding(top = PANEL_GUTTER.dp)
+        com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> Modifier
+            .fillMaxWidth()
+            .padding(top = PANEL_GUTTER.dp)
+    }
+    val playerBar: @Composable (Modifier) -> Unit = { barModifier ->
+    PlayerBar(
+        playerViewModel = playerViewModel,
+        onToggleNowPlaying = {
+            val next = !showNowPlayingPanel
+            showNowPlayingPanel = next
+            playerPrefs.setRightPanelOpen(next)
+        },
+        onOpenQueue = {
+            showNowPlayingPanel = true
+            playerPrefs.setRightPanelOpen(true)
+            nowPlayingTab = NowPlayingTab.QUEUE
+        },
+        onOpenLyrics = {
+            playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
+        },
+        // Straight to the big one, which is what he asked for: "I think you can do this when you click
+        // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
+        // lyrics, which has its own way up here (issue #33).
+        onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
+        modifier = barModifier,
+        onBarPlaced = if (isBarFloating) { coordinates ->
+            val topLeft = coordinates.positionOnScreen()
+            barOverlay.bounds = androidx.compose.ui.geometry.Rect(
+                topLeft.x, topLeft.y, topLeft.x + coordinates.size.width, topLeft.y + coordinates.size.height,
+            )
+        } else null,
+    )
+    }
+
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.alananasss.kittytune.ui.common.LocalPlayerBarOverlay provides barOverlay.takeIf { isBarFloating },
+    ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -365,9 +423,13 @@ fun MainScreen(
             // The hover detection wraps both the sidebar and the resize handle with full height so that the cursor
             // can move anywhere on the left panel or cross the handle gap without triggering an unexpected exit.
             // When exiting, a 400 ms grace period prevents jittery collapse when swiping across boundaries.
+            // The sidebar's own rows end above a floating bar; its card still reaches the bottom behind it.
+            val sidebarOverlap = com.alananasss.kittytune.ui.common.rememberPlayerBarOverlap()
+            val sidebarClearance = sidebarOverlap.clearance()
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
+                    .then(sidebarOverlap.modifier)
                     .pointerInput(isHoverExpandEnabled) {
                         if (!isHoverExpandEnabled) return@pointerInput
                         awaitPointerEventScope {
@@ -396,7 +458,7 @@ fun MainScreen(
                         }
                     }
             ) {
-                Row(modifier = Modifier.fillMaxHeight()) {
+                Row(modifier = Modifier.fillMaxHeight().padding(bottom = sidebarClearance)) {
 
             // When hover-expand is active for the collapsed sidebar, hovering expands the panel
             // directly to show the real labels. Tooltips are suppressed so that popup scenes
@@ -481,14 +543,22 @@ fun MainScreen(
                 // and it survives being cross-faded for the same reason.
                 androidx.compose.animation.AnimatedContent(
                     targetState = playerViewModel.showLyricsSheet,
+                    // The outgoing side leaves quickly and the incoming one starts just after, easing out: both
+                    // at full length at once smeared two busy screens into each other (issue #33, round 5).
                     transitionSpec = {
                         (androidx.compose.animation.fadeIn(
-                            androidx.compose.animation.core.tween(SHEET_SWAP_MS)
+                            androidx.compose.animation.core.tween(
+                                SHEET_SWAP_MS, delayMillis = SHEET_EXIT_MS / 2,
+                                easing = androidx.compose.animation.core.LinearOutSlowInEasing,
+                            )
                         ) + androidx.compose.animation.scaleIn(
-                            androidx.compose.animation.core.tween(SHEET_SWAP_MS),
-                            initialScale = 0.98f,
+                            androidx.compose.animation.core.tween(
+                                SHEET_SWAP_MS + SHEET_EXIT_MS / 2,
+                                easing = androidx.compose.animation.core.LinearOutSlowInEasing,
+                            ),
+                            initialScale = 0.97f,
                         )) togetherWith androidx.compose.animation.fadeOut(
-                            androidx.compose.animation.core.tween(SHEET_SWAP_MS)
+                            androidx.compose.animation.core.tween(SHEET_EXIT_MS)
                         ) using androidx.compose.animation.SizeTransform(clip = false) { _, _ ->
                             androidx.compose.animation.core.snap()
                         }
@@ -514,10 +584,15 @@ fun MainScreen(
                                 playerPrefs.setRightPanelOpen(next)
                             }
                         )
+                        val navSlidePx = with(androidx.compose.ui.platform.LocalDensity.current) { NavSlideDistance.roundToPx() }
                         NavHost(
                             navController = navController,
                         startDestination = "home",
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enterTransition = { navEnter(navSlidePx) },
+                        exitTransition = { navExit(navSlidePx) },
+                        popEnterTransition = { navPopEnter(navSlidePx) },
+                        popExitTransition = { navPopExit(navSlidePx) },
                     ) {
                         composable("home") {
                             HomeContent(
@@ -608,13 +683,6 @@ fun MainScreen(
                                 onBackClick = null
                             )
                         }
-                        composable("appearance_settings") {
-                            com.alananasss.kittytune.ui.profile.AppearanceSettingsScreen(
-                                onNavigateToColors = { navController.navigate("color_palette") },
-                                onNavigateToPlayerDesign = { navController.navigate("player_design") },
-                                onBackClick = { navController.popBackStack() }
-                            )
-                        }
                         composable("color_palette") { 
                             com.alananasss.kittytune.ui.profile.ColorPaletteScreen(
                                 onBackClick = { navController.popBackStack() }
@@ -633,28 +701,19 @@ fun MainScreen(
                                 playerViewModel = playerViewModel
                             )
                         }
-                        composable("lyrics_settings") {
-                            com.alananasss.kittytune.ui.profile.LyricsSettingsScreen(
-                                onBackClick = { navController.popBackStack() },
-                                playerViewModel = playerViewModel
-                            )
-                        }
                         // The listening statistics screen existed but nothing navigated to it, so
                         // the events being recorded had nowhere to be seen (issue #33).
                         composable("listening_stats") {
                             com.alananasss.kittytune.ui.profile.ListeningStatsScreen(
                                 onBackClick = { navController.popBackStack() },
-                                onTrackClick = { top -> playerViewModel.navigateToTrackDetails(top.trackId) },
-                                onArtistClick = { top ->
-                                    if (top.source == "spotify" && !top.artistPermalink.isNullOrBlank()) {
-                                        playerViewModel.navigateToSpotifyArtist(
-                                            top.artistPermalink.removePrefix("spotify:artist:")
-                                        )
+                                onTrackClick = { trackId -> playerViewModel.navigateToTrackDetails(trackId) },
+                                onArtistClick = { artist ->
+                                    val permalink = artist.permalink
+                                    if (artist.source == "spotify" && !permalink.isNullOrBlank()) {
+                                        playerViewModel.navigateToSpotifyArtist(permalink.removePrefix("spotify:artist:"))
                                     } else {
-                                        playerViewModel.resolveAndNavigateToArtist(
-                                            top.artistName,
-                                            top.artistId,
-                                        )
+                                        // The stats keep the name always and the id only sometimes.
+                                        playerViewModel.resolveAndNavigateToArtist(artist.name, artist.artistId)
                                     }
                                 },
                             )
@@ -1120,40 +1179,17 @@ fun MainScreen(
             }
         }
 
-        val playerBarStyle by playerPrefs.playerBarStyleFlow().collectAsState(initial = playerPrefs.getPlayerBarStyle())
-        val playerBarModifier = when (playerBarStyle) {
-            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 6.dp)
-            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-            com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> Modifier
-                .fillMaxWidth()
-                .padding(top = PANEL_GUTTER.dp)
-        }
+        // Docked styles sit below the panels; the floating one is drawn over them, further down.
+        if (!isBarFloating) playerBar(playerBarModifier)
+    }
 
-        PlayerBar(
-            playerViewModel = playerViewModel,
-            onToggleNowPlaying = {
-                val next = !showNowPlayingPanel
-                showNowPlayingPanel = next
-                playerPrefs.setRightPanelOpen(next)
-            },
-            onOpenQueue = {
-                showNowPlayingPanel = true
-                playerPrefs.setRightPanelOpen(true)
-                nowPlayingTab = NowPlayingTab.QUEUE
-            },
-            onOpenLyrics = {
-                playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
-            },
-            // Straight to the big one, which is what he asked for: "I think you can do this when you click
-            // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
-            // lyrics, which has its own way up here (issue #33).
-            onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
-            modifier = playerBarModifier
-        )
+    if (isBarFloating) {
+        val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+        val floatLook = remember(prefsSnapshot) { playerPrefs.getFloatingBarLook() }
+        Box(Modifier.fillMaxSize().padding(horizontal = PANEL_GUTTER.dp).padding(bottom = floatLook.marginDp.dp), contentAlignment = Alignment.BottomCenter) {
+            playerBar(Modifier.fillMaxWidth())
+        }
+    }
     }
 
     TrackOptionsOverlays(playerViewModel)
@@ -1165,7 +1201,9 @@ fun MainScreen(
         contentAlignment = Alignment.BottomEnd
     ) {
         com.alananasss.kittytune.ui.player.automix.AutomixDebugOverlay(
-            currentPositionMs = playerViewModel.currentPosition,
+            // A lambda, not the value: reading the position here recomposed this whole screen
+            // several times a second for the sake of a debug overlay that is usually hidden.
+            currentPositionMs = { playerViewModel.currentPosition },
             modifier = Modifier.padding(bottom = 100.dp, end = 20.dp)
         )
     }

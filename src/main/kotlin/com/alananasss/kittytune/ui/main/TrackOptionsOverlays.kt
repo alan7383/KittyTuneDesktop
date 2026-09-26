@@ -286,10 +286,17 @@ private fun ArtistPickerRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .background(if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
+            .background(
+                androidx.compose.animation.animateColorAsState(
+                    if (hovered) MaterialTheme.colorScheme.surfaceContainerHighest
+                    else MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0f),
+                    animationSpec = androidx.compose.animation.core.tween(120),
+                    label = "artistRowHover",
+                ).value
+            )
             .hoverable(interaction)
             .pointerHoverIcon(PointerIcon.Hand)
-            .clickable(interactionSource = interaction, indication = null) {
+            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
                 viewModel.dismissSelectArtistDialog()
                 val cleanId = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(
                     artist.id.ifBlank { artist.uri ?: "" }
@@ -480,7 +487,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             if (track.source != "youtube" && !isSpotify) {
                 add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_details")) { viewModel.openTrackDetails(track) })
             }
-            add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track, forceSheet = true) })
+            add(MenuOptionItem("lyrics", Icons.Rounded.Description, str("player_lyrics")) { viewModel.openLyrics(track) })
             val isDuetBlacklisted = viewModel.isTrackDuetBlacklisted(track.id)
             add(
                 MenuOptionItem(

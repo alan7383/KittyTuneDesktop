@@ -168,6 +168,17 @@ object SyncScheduler {
                     is SyncClient.Result.Success -> {
                         succeeded++
                         _lastSyncAtMs.value = System.currentTimeMillis()
+                        SyncHistory.add(
+                            SyncRecord(
+                                atMs = System.currentTimeMillis(),
+                                deviceName = result.peerName,
+                                isSuccess = true,
+                                receivedListens = result.receivedListens,
+                                receivedLikes = result.received - result.receivedListens,
+                                sentListens = result.sentListens,
+                                sentLikes = result.sent - result.sentListens,
+                            )
+                        )
                         if (result.received > 0 || result.sent > 0) {
                             Logger.e(
                                 "SyncScheduler",
@@ -177,12 +188,13 @@ object SyncScheduler {
                         }
                     }
 
-                    SyncClient.Result.Unauthorized -> Logger.e(
-                        "SyncScheduler",
-                        "${device.label} refused our code; it needs pairing again"
-                    )
+                    SyncClient.Result.Unauthorized -> {
+                        Logger.e("SyncScheduler", "${device.label} refused our code; it needs pairing again")
+                        SyncHistory.add(SyncRecord(System.currentTimeMillis(), device.label, isSuccess = false, error = "unauthorized"))
+                    }
 
-                    is SyncClient.Result.Failed -> Unit
+                    is SyncClient.Result.Failed ->
+                        SyncHistory.add(SyncRecord(System.currentTimeMillis(), device.label, isSuccess = false, error = result.reason))
                 }
             }
             succeeded
@@ -207,6 +219,8 @@ object SyncScheduler {
     private suspend fun drain(device: KnownDevice): SyncClient.Result {
         var received = 0
         var sent = 0
+        var receivedListens = 0
+        var sentListens = 0
         var last: SyncClient.Result = SyncClient.Result.Failed("not attempted")
 
         var rounds = 0
@@ -221,16 +235,18 @@ object SyncScheduler {
             if (result !is SyncClient.Result.Success) return result
             received += result.received
             sent += result.sent
+            receivedListens += result.receivedListens
+            sentListens += result.sentListens
             val more = result.received >= SyncMerge.MAX_EVENTS_PER_EXCHANGE ||
                 result.sent >= SyncMerge.MAX_EVENTS_PER_EXCHANGE
             if (!more) {
-                return SyncClient.Result.Success(result.peerName, received, sent)
+                return SyncClient.Result.Success(result.peerName, received, sent, receivedListens, sentListens)
             }
         }
         // Ran out of rounds or hit the event cap with the peer still reporting more. Report what was
         // actually moved rather than just the last round's share of it.
         return (last as? SyncClient.Result.Success)
-            ?.let { SyncClient.Result.Success(it.peerName, received, sent) }
+            ?.let { SyncClient.Result.Success(it.peerName, received, sent, receivedListens, sentListens) }
             ?: last
     }
 

@@ -27,6 +27,7 @@ import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.Tray
 import coil3.compose.setSingletonImageLoaderFactory
 import com.alananasss.kittytune.core.DesktopBackDispatcher
+import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.ui.ImageLoaderFactory
 import com.alananasss.kittytune.ui.login.LoginScreen
@@ -88,12 +89,18 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
 }
 
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
-fun main() {
+fun main(args: Array<String>) {
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
+    // Before anything heavy loads: a second launch only has to wake the first one up.
+    // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
+    if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
     runCatching {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
     }
     AppBootstrap.init()
+    // Swing's own dialogs (folder pickers, the avatar chooser) in the system's look rather than Java's Metal,
+    // which is what made them look cut down next to Windows' own. Compose is unaffected.
+    runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }
 
     application {
         val playerViewModel = remember { PlayerViewModel(AppInstance.application) }
@@ -133,8 +140,31 @@ fun main() {
             }
         }
 
+        // Zapret, once: find it if it is running, and add the domains of whichever services are blocked.
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val zapret = com.alananasss.kittytune.data.zapret.ZapretManager
+                    if (zapret.folder == null) zapret.detect()?.let { zapret.folder = it }
+                    zapret.autoConfigureOnce()
+                }
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            com.alananasss.kittytune.core.OpenFileRequests.requests.collect { files ->
+                playerViewModel.playLocalFiles(files)
+            }
+        }
+
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            com.alananasss.kittytune.core.MainWindowRaiser.handler = { showMainWindow() }
+            onDispose { com.alananasss.kittytune.core.MainWindowRaiser.handler = null }
+        }
+
         val osName = remember { System.getProperty("os.name").lowercase() }
         val isLinux = remember { osName.contains("linux") || osName.contains("nix") }
+        val isWindowsHost = remember { osName.contains("win") }
 
         var useSniTray by remember { mutableStateOf(isLinux) }
 
@@ -167,16 +197,41 @@ fun main() {
         val trayMenuScope = androidx.compose.runtime.rememberCoroutineScope()
 
         if (trayIcon != null && !useSniTray) {
-            // No AWT PopupMenu (that is the XP-looking system menu) — right-click is hooked to
-            // the custom Compose tray menu below, which matches KittyTune's theme.
-            Tray(
-                icon = trayIcon,
-                tooltip = "KittyTune",
-                onAction = { showMainWindow() },
-            )
-            androidx.compose.runtime.DisposableEffect(trayIcon, useSniTray) {
-                com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope)
-                onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
+            if (isWindowsHost) {
+                // Windows gets a real Win32 menu (see Win32TrayMenu): dark when the app is, rounded on
+                // Windows 11, and the only kind the hidden-icons flyout stays open around.
+                Tray(
+                    icon = trayIcon,
+                    tooltip = "KittyTune",
+                    onAction = { showMainWindow() },
+                )
+                androidx.compose.runtime.DisposableEffect(trayIcon) {
+                    com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope) { _, _ ->
+                        com.alananasss.kittytune.core.Win32TrayMenu.show(
+                            trayMenuEntries(
+                                playerViewModel = playerViewModel,
+                                onShowWindow = { showMainWindow() },
+                                onExit = {
+                                    com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
+                                    exitApplication()
+                                },
+                            )
+                        )
+                    }
+                    onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
+                }
+            } else {
+                // No AWT PopupMenu (that is the XP-looking system menu) — right-click is hooked to
+                // the custom Compose tray menu below, which matches KittyTune's theme.
+                Tray(
+                    icon = trayIcon,
+                    tooltip = "KittyTune",
+                    onAction = { showMainWindow() },
+                )
+                androidx.compose.runtime.DisposableEffect(trayIcon, useSniTray) {
+                    com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.install(trayMenuScope)
+                    onDispose { com.alananasss.kittytune.ui.tray.ModernTrayMenuHook.uninstall() }
+                }
             }
         }
 
@@ -252,7 +307,15 @@ fun main() {
                 isAppFullScreen = false
                 isRestoringFromFullScreen = true
                 try {
-                    val restorePlacement = savedPlacement
+                    // On Windows the window never left Compose's placement; WindowsFullScreen.exit restores
+                    // it natively from inside the window. Restoring here as well raced that restore and
+                    // left the frame at whichever size landed last.
+                    if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                        kotlinx.coroutines.delay(300)
+                        return@LaunchedEffect
+                    }
+                    val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
+                        ?: androidx.compose.ui.window.WindowPlacement.Floating
                     if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Floating) {
                         val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                         val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
@@ -306,6 +369,11 @@ fun main() {
                 }
             }
         ) {
+        // Keys whose press was taken as a shortcut, so their release is taken too. A focused button clicks on
+        // the release of Space or Enter without asking whether it saw the press: after the play button in the
+        // full player had been clicked with the mouse it kept the focus, and Space then paused on the press and
+        // played again on the release — the pause that "only works every other time".
+        val shortcutKeysHeld = remember { mutableSetOf<Key>() }
         Window(
             visible = isWindowVisible,
             onCloseRequest = {
@@ -378,10 +446,13 @@ fun main() {
 
                     if (isShortcutKey) {
                         com.alananasss.kittytune.core.GlobalShortcutDispatcher.dispatch(event)
+                        shortcutKeysHeld += event.key
                         true
                     } else {
                         false
                     }
+                } else if (event.type == KeyEventType.KeyUp && shortcutKeysHeld.remove(event.key)) {
+                    true
                 } else {
                     false
                 }
@@ -497,12 +568,20 @@ fun main() {
                 fontScale = currentDensity.fontScale * uiScale
             )
 
-            CompositionLocalProvider(LocalDensity provides customDensity) {
+            val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
+
+            CompositionLocalProvider(
+                LocalDensity provides customDensity,
+                com.alananasss.kittytune.core.LocalWindowSeen provides windowSeen,
+            ) {
                 KittyTuneTheme {
                     // Inside the theme, so the title bar and underlying window canvas track
                     // the live palette — the cover-seeded dynamic theme included — instead of
                     // a colour read once at startup (issue #33).
                     ThemedTitleBarEffect(window)
+                    // The tray's native menu follows the app's light or dark palette.
+                    val menuDark = androidx.compose.material3.MaterialTheme.colorScheme.surface.luminance() < 0.5f
+                    LaunchedEffect(menuDark) { com.alananasss.kittytune.core.Win32TrayMenu.setDark(menuDark) }
                     ThemedWindowBackgroundEffect(window)
                     Surface { AppRouter(playerViewModel = playerViewModel) }
                 }
@@ -521,9 +600,20 @@ fun main() {
         // Custom tray context menu — transparent, rounded, themed; lives outside the main window
         // so it can open next to the tray icon on any OS.
         com.alananasss.kittytune.ui.tray.ModernTrayMenuHost(
+            nowPlaying = playerViewModel.currentTrack?.let { track ->
+                com.alananasss.kittytune.ui.tray.TrayNowPlaying(
+                    title = track.title,
+                    artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
+                    artworkUrl = track.fullResArtwork,
+                    isPlaying = playerViewModel.isPlaying,
+                )
+            },
             isMiniPlayerVisible = playerViewModel.isMiniPlayerVisible,
             onShowWindow = { showMainWindow() },
             onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
+            onPlayPause = { playerViewModel.togglePlayPause() },
+            onNext = { playerViewModel.playNext() },
+            onPrevious = { playerViewModel.smartPrevious() },
             onExit = {
                 com.alananasss.kittytune.core.AppInstance.isShuttingDown = true
                 exitApplication()
@@ -757,4 +847,29 @@ internal fun clampFloatingBounds(
     if (y < usable.y) y = usable.y
 
     return java.awt.Rectangle(x, y, w, h)
+}
+
+/** What the tray menu offers, read from the player at the moment it opens. */
+private fun trayMenuEntries(
+    playerViewModel: PlayerViewModel,
+    onShowWindow: () -> Unit,
+    onExit: () -> Unit,
+): List<com.alananasss.kittytune.core.Win32TrayMenu.Entry> {
+    val entry = com.alananasss.kittytune.core.Win32TrayMenu::Entry
+    val separator = com.alananasss.kittytune.core.Win32TrayMenu.Entry.Separator
+    val track = playerViewModel.currentTrack
+    return buildList {
+        if (track != null) {
+            val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+            add(entry(listOfNotNull(track.title, artist.takeIf { it.isNotBlank() }).joinToString(" — "), null, false, false))
+            add(entry(if (playerViewModel.isPlaying) str("action_pause") else str("action_play"), { playerViewModel.togglePlayPause() }, false, false))
+            add(entry(str("player_next"), { playerViewModel.playNext() }, false, false))
+            add(entry(str("player_previous"), { playerViewModel.smartPrevious() }, false, false))
+            add(separator)
+        }
+        add(entry(str("menu_show_window"), onShowWindow, false, false))
+        add(entry(str("menu_mini_player_show"), { playerViewModel.toggleMiniPlayer() }, playerViewModel.isMiniPlayerVisible, false))
+        add(separator)
+        add(entry(str("menu_exit"), onExit, false, false))
+    }
 }

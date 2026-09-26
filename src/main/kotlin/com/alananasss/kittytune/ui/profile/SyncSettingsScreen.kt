@@ -19,6 +19,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.SyncAlt
+import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -73,8 +77,26 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun SyncSettingsScreen(onBackClick: (() -> Unit)? = null) {
-    val scope = rememberCoroutineScope()
     val scrollState = com.alananasss.kittytune.ui.common.rememberRestorableScrollState()
+    SettingsScaffold(
+        title = str("sync_title"),
+        onBackClick = onBackClick,
+        scrollState = scrollState,
+    ) { padding ->
+        ScrollableColumn(
+            state = scrollState,
+            modifier = Modifier.fillMaxWidth().padding(padding),
+        ) {
+            SyncSettingsContent()
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+/** The sync page's content, shared by its own screen and the Devices category of the settings. */
+@Composable
+fun SyncSettingsContent() {
+    val scope = rememberCoroutineScope()
 
     var devices by remember { mutableStateOf(SyncPeers.all()) }
     var pairing by remember { mutableStateOf(false) }
@@ -86,6 +108,7 @@ fun SyncSettingsScreen(onBackClick: (() -> Unit)? = null) {
 
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
     var syncLikesEnabled by remember { mutableStateOf(playerPrefs.getSyncLikesEnabled()) }
+    var syncListensEnabled by remember { mutableStateOf(playerPrefs.getSyncListensEnabled()) }
     var showDisclaimerDialog by remember { mutableStateOf(!playerPrefs.isSyncDisclaimerDismissed()) }
 
     if (showDisclaimerDialog) {
@@ -169,117 +192,123 @@ fun SyncSettingsScreen(onBackClick: (() -> Unit)? = null) {
         )
     }
 
-    SettingsScaffold(
-        title = str("sync_title"),
-        onBackClick = onBackClick,
-        scrollState = scrollState,
-    ) { padding ->
-        ScrollableColumn(
-            state = scrollState,
-            modifier = Modifier.fillMaxWidth().padding(padding),
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // The one sentence worth keeping from the old screen: it is the answer to "where does my
+        // listening history go", and no arrangement of controls says it.
+        Text(
+            str("sync_intro"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp),
+        )
+
+        StatusCard(
+            devices = devices,
+            isSyncing = isSyncing,
+            onSyncNow = {
+                scope.launch {
+                    SyncScheduler.syncAll("button")
+                    devices = SyncPeers.all()
+                    status = str("sync_all_done")
+                }
+            },
+        )
+
+        // Sized to its label rather than to the window. Pairing happens once per device, so a
+        // full-width slab overstated it next to the card that actually carries the state.
+        Button(
+            onClick = { pairing = true },
+            shapes = ButtonDefaults.shapes(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                // The one sentence worth keeping from the old screen: it is the answer to "where does my
-                // listening history go", and no arrangement of controls says it.
-                Text(
-                    str("sync_intro"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+            Icon(Icons.Rounded.Add, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(str("sync_pair_device"))
+        }
 
-                StatusCard(
-                    devices = devices,
-                    isSyncing = isSyncing,
-                    onSyncNow = {
-                        scope.launch {
-                            SyncScheduler.syncAll("button")
-                            devices = SyncPeers.all()
-                            status = str("sync_all_done")
-                        }
+        status?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        if (devices.isNotEmpty()) {
+            SettingsGroupTitle(str("sync_devices"))
+            devices.forEachIndexed { index, device ->
+                DeviceRow(
+                    device = device,
+                    shape = getSettingsShape(devices.size, index),
+                    onForget = {
+                        SyncPeers.forget(device.deviceId)
+                        devices = SyncPeers.all()
                     },
                 )
-
-                // Sized to its label rather than to the window. Pairing happens once per device, so a
-                // full-width slab overstated it next to the card that actually carries the state.
-                Button(
-                    onClick = { pairing = true },
-                    shapes = ButtonDefaults.shapes(),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
-                ) {
-                    Icon(Icons.Rounded.Add, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(str("sync_pair_device"))
-                }
-
-                status?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-
-                if (devices.isNotEmpty()) {
-                    SettingsGroupTitle(str("sync_devices"))
-                    devices.forEachIndexed { index, device ->
-                        DeviceRow(
-                            device = device,
-                            shape = getSettingsShape(devices.size, index),
-                            onForget = {
-                                SyncPeers.forget(device.deviceId)
-                                devices = SyncPeers.all()
-                            },
-                        )
-                    }
-                }
-
-                SettingsGroupTitle(str("sync_likes_title"))
-                SettingsItem(
-                    shape = getSettingsShape(1, 0),
-                    title = str("sync_likes_title"),
-                    subtitle = str("sync_likes_sub"),
-                    icon = Icons.Rounded.Favorite,
-                    hasSwitch = true,
-                    switchState = syncLikesEnabled,
-                    onSwitchChange = { enabled ->
-                        syncLikesEnabled = enabled
-                        playerPrefs.setSyncLikesEnabled(enabled)
-                        if (enabled) {
-                            scope.launch {
-                                com.alananasss.kittytune.data.sync.SyncLikes.seedMissing()
-                                com.alananasss.kittytune.data.sync.SyncLikes.seedMissingPlaylists()
-                                SyncScheduler.triggerImmediateSync("sync likes enabled")
-                            }
-                        }
-                    },
-                )
-
-                Spacer(Modifier.height(8.dp))
-                TextButton(onClick = { showAdvanced = !showAdvanced }) {
-                    Icon(
-                        if (showAdvanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                        null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(str("sync_advanced"))
-                }
-                AnimatedVisibility(visible = showAdvanced) {
-                    AdvancedSection(
-                        onForgetAll = {
-                            SyncPeers.forgetAll()
-                            devices = SyncPeers.all()
-                        },
-                        onStatus = { status = it },
-                    )
-                }
-                Spacer(Modifier.height(24.dp))
             }
+        }
+
+        SettingsGroupTitle(str("sync_what_title"))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            SettingsItem(
+                shape = getSettingsShape(2, 0),
+                title = str("sync_listens_title"),
+                subtitle = str("sync_listens_sub"),
+                icon = Icons.Rounded.BarChart,
+                hasSwitch = true,
+                switchState = syncListensEnabled,
+                onSwitchChange = { enabled ->
+                    syncListensEnabled = enabled
+                    playerPrefs.setSyncListensEnabled(enabled)
+                    // Anything that arrived while it was off is still in the log; bring it in now.
+                    if (enabled) scope.launch { com.alananasss.kittytune.data.sync.SyncApply.reconcile() }
+                },
+            )
+            SettingsItem(
+                shape = getSettingsShape(2, 1),
+                title = str("sync_likes_title"),
+                subtitle = str("sync_likes_sub"),
+                icon = Icons.Rounded.Favorite,
+                hasSwitch = true,
+                switchState = syncLikesEnabled,
+                onSwitchChange = { enabled ->
+                    syncLikesEnabled = enabled
+                    playerPrefs.setSyncLikesEnabled(enabled)
+                    if (enabled) {
+                        scope.launch {
+                            com.alananasss.kittytune.data.sync.SyncLikes.seedMissing()
+                            com.alananasss.kittytune.data.sync.SyncLikes.seedMissingPlaylists()
+                            SyncScheduler.triggerImmediateSync("sync likes enabled")
+                        }
+                    }
+                },
+            )
+        }
+
+        SyncHistorySection()
+
+        Spacer(Modifier.height(8.dp))
+        TextButton(onClick = { showAdvanced = !showAdvanced }) {
+            Icon(
+                if (showAdvanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                null,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(str("sync_advanced"))
+        }
+        AnimatedVisibility(visible = showAdvanced) {
+            AdvancedSection(
+                onForgetAll = {
+                    SyncPeers.forgetAll()
+                    devices = SyncPeers.all()
+                },
+                onStatus = { status = it },
+            )
         }
     }
 }
@@ -690,5 +719,62 @@ private fun agoLabel(atMs: Long): String {
         hours < 24 -> "$hours h"
         days == 1L -> str("sync_yesterday")
         else -> str("sync_days_ago", days)
+    }
+}
+
+/**
+ * What the last exchanges moved, newest first: the answer to "did my listens from the phone arrive?".
+ */
+@Composable
+private fun SyncHistorySection() {
+    val records by com.alananasss.kittytune.data.sync.SyncHistory.records.collectAsState()
+    SettingsGroupTitle(str("sync_history_title"))
+    if (records.isEmpty()) {
+        Text(
+            str("sync_history_empty"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+        return
+    }
+    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            records.take(12).forEach { record -> SyncRecordRow(record) }
+        }
+    }
+}
+
+@Composable
+private fun SyncRecordRow(record: com.alananasss.kittytune.data.sync.SyncRecord) {
+    val scheme = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            when {
+                !record.isSuccess -> Icons.Rounded.ErrorOutline
+                record.movedAnything -> Icons.Rounded.SyncAlt
+                else -> Icons.Rounded.CheckCircleOutline
+            },
+            contentDescription = null,
+            tint = if (record.isSuccess) scheme.primary else scheme.error,
+            modifier = Modifier.size(22.dp),
+        )
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(record.deviceName, style = MaterialTheme.typography.titleSmall)
+            Text(
+                when {
+                    !record.isSuccess -> str("sync_history_failed", record.error.orEmpty())
+                    !record.movedAnything -> str("sync_history_nothing")
+                    else -> str(
+                        "sync_history_moved",
+                        record.receivedListens, record.receivedLikes, record.sentListens, record.sentLikes,
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+            )
+        }
+        Text(agoLabel(record.atMs), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
     }
 }

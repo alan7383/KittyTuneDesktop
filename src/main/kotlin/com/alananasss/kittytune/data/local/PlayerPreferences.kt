@@ -47,9 +47,6 @@ enum class PlayerSliderStyle { BAR, WAVY, SLIM, SQUIGGLY }
  */
 enum class LyricsDisplayStyle { STANDARD, SCALE, FOCUS, SCALE_FOCUS }
 
-enum class LyricsUnderCoverPlacement { REPLACE_TITLE_ARTIST, ABOVE_TITLE_ARTIST }
-enum class LyricsDisplayState { OFF, UNDER_COVER, COVER_REPLACED }
-
 enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
 /**
  * What the full-screen player draws behind the words.
@@ -61,7 +58,29 @@ enum class DiscordStatusDisplay { ACTIVITY, SOUNDCLOUD, ARTIST, SONG }
  */
 enum class FullPlayerBgStyle { APPLE_MUSIC, BLUR, GRADIENT, PURE_BLACK }
 
+/**
+ * Where the full player puts the words against the cover (issue #33, round 5): beside it on either side, alone in
+ * the middle with the cover shrunk into the bar below, or a single current line under the cover. A window taller
+ * than it is wide keeps its own stacked layout whichever is chosen, except the single line, which suits it too.
+ */
+enum class FullPlayerLayout { LYRICS_RIGHT, LYRICS_LEFT, LYRICS_CENTRED, COVER_AND_LINE }
+
 enum class PlayerBarStyle { DEFAULT, ROUNDED, FLOATING }
+
+/**
+ * The floating bar's shape: its corner (0 is square, 40 a pill), how much of the window's width it takes,
+ * how far above the bottom edge it floats, and whether the page shows through it.
+ */
+data class FloatingBarLook(
+    val cornerDp: Int,
+    val widthPercent: Int,
+    val marginDp: Int,
+    val isTranslucent: Boolean,
+) {
+    companion object {
+        val DEFAULT = FloatingBarLook(cornerDp = 40, widthPercent = 100, marginDp = 16, isTranslucent = true)
+    }
+}
 
 enum class AppLanguage(val code: String) {
     SYSTEM("system"),
@@ -142,6 +161,7 @@ class PlayerPreferences {
         const val MINI_PLAYER_ELONGATED_DEFAULT_HEIGHT = 38
         const val MINI_PLAYER_ELONGATED_DEFAULT_WIDTH = 500
         private const val KEY_FULL_PLAYER_BG_STYLE = "full_player_bg_style"
+        private const val KEY_FULL_PLAYER_LAYOUT = "full_player_layout"
 
         /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
         private const val LEGACY_ORBS_STYLE = "ORBS"
@@ -151,6 +171,7 @@ class PlayerPreferences {
         private const val KEY_START_DESTINATION = "start_destination_pref"
         private const val KEY_DYNAMIC_THEME = "dynamic_theme_enabled"
         private const val KEY_PLAYER_VOLUME = "player_volume"
+        private const val KEY_VOLUME_IS_PERCEPTUAL = "player_volume_perceptual"
         private const val KEY_VERTICAL_VOLUME_SLIDER = "vertical_volume_slider"
         private const val KEY_APP_ICON_VARIANT = "app_icon_variant"
         private const val KEY_THEME_MODE = "app_theme_mode"
@@ -224,9 +245,20 @@ class PlayerPreferences {
          */
         const val SIDEBAR_NAV_SYNC = "sync"
 
-        /** Home is deliberately absent: see [getHiddenSidebarNav]. */
+        const val SIDEBAR_NAV_HOME = "home"
+
+        /** The rows shown by default. Home can be switched off too, as long as one row stays on. */
         val SIDEBAR_NAV_ITEMS =
-            listOf(SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC)
+            listOf(SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC)
+
+        // Optional destinations the sidebar can carry; off until someone switches them on.
+        const val SIDEBAR_NAV_STATS = "stats"
+        const val SIDEBAR_NAV_HISTORY = "history"
+        const val SIDEBAR_NAV_SETTINGS = "settings"
+        const val SIDEBAR_NAV_SEARCH = "search"
+        val SIDEBAR_NAV_EXTRAS = listOf(SIDEBAR_NAV_SEARCH, SIDEBAR_NAV_STATS, SIDEBAR_NAV_HISTORY, SIDEBAR_NAV_SETTINGS)
+
+        private const val KEY_SIDEBAR_NAV_LAYOUT = "sidebar_nav_layout"
 
         private const val KEY_LIBRARY_BUTTONS_HIDDEN = "library_buttons_hidden"
 
@@ -248,10 +280,6 @@ class PlayerPreferences {
         private const val KEY_LYRICS_APPLE_EFFECT = "lyrics_apple_effect"
         private const val KEY_LYRICS_DUET_VIEW = "lyrics_duet_view"
         private const val KEY_LYRICS_DUET_BLACKLIST = "lyrics_duet_blacklist"
-        private const val KEY_LYRICS_UNDER_COVER_ENABLED = "lyrics_under_cover_enabled"
-        private const val KEY_LYRICS_MULTI_STATE_TOGGLE = "lyrics_multi_state_toggle"
-        private const val KEY_LYRICS_UNDER_COVER_PLACEMENT = "lyrics_under_cover_placement"
-        private const val KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE = "lyrics_under_cover_always_visible"
 
         private const val KEY_LYRICS_WORD_SYNC = "lyrics_word_sync"
         private const val KEY_LYRICS_UI_STYLE = "lyrics_ui_style"
@@ -286,7 +314,6 @@ class PlayerPreferences {
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
-        private const val KEY_INLINE_LYRICS = "inline_lyrics_enabled"
         private const val KEY_DISCORD_TOKEN = "discord_token"
         private const val KEY_DISCORD_ENABLED = "discord_rpc_enabled"
         private const val KEY_PRECISE_LYRICS_SEARCH = "precise_lyrics_search_enabled"
@@ -376,6 +403,10 @@ class PlayerPreferences {
     fun setSyncDisclaimerDismissed(dismissed: Boolean) = Prefs.putBoolean(KEY_SYNC_DISCLAIMER_DISMISSED, dismissed)
 
     fun getSyncLikesEnabled(): Boolean = Prefs.getBoolean(KEY_SYNC_LIKES, true)
+
+    /** Whether listens are shared with paired devices. Off keeps them on this device only. */
+    fun getSyncListensEnabled(): Boolean = Prefs.getBoolean("sync_listens_enabled", true)
+    fun setSyncListensEnabled(enabled: Boolean) = Prefs.putBoolean("sync_listens_enabled", enabled)
     fun setSyncLikesEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SYNC_LIKES, enabled)
 
     fun getHasCompletedSetup(): Boolean = Prefs.getBoolean(KEY_HAS_COMPLETED_SETUP, false)
@@ -423,6 +454,10 @@ class PlayerPreferences {
     fun setAutomixStartOffsetCustomSec(seconds: Int) = Prefs.putInt(KEY_AUTOMIX_START_OFFSET_CUSTOM_SEC, seconds.coerceIn(0, 60))
 
     fun getCustomFontEnabled() = Prefs.getBoolean(KEY_CUSTOM_FONT_ENABLED, true)
+
+    /** The app's typeface id (see [com.alananasss.kittytune.ui.theme.AppFont]); follows the old switch until set. */
+    fun getAppFont(): String = Prefs.getString("app_font", null) ?: if (getCustomFontEnabled()) "flex" else "default"
+    fun setAppFont(id: String) = Prefs.putString("app_font", id)
     fun setCustomFontEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_CUSTOM_FONT_ENABLED, enabled)
 
     fun getFontWght() = Prefs.getInt(KEY_FONT_WGHT, 400)
@@ -457,9 +492,6 @@ class PlayerPreferences {
 
     fun getDiscordAssetLogo(): String? = Prefs.getString(KEY_DISCORD_ASSET_LOGO, null)
     fun setDiscordAssetLogo(assetId: String?) = Prefs.putString(KEY_DISCORD_ASSET_LOGO, assetId)
-
-    fun getInlineLyricsEnabled(): Boolean = Prefs.getBoolean(KEY_INLINE_LYRICS, true)
-    fun setInlineLyricsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_INLINE_LYRICS, enabled)
 
     fun getShowLyricsButtonEnabled(): Boolean = Prefs.getBoolean(KEY_SHOW_LYRICS_BUTTON, true)
     fun setShowLyricsButtonEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_LYRICS_BUTTON, enabled)
@@ -555,22 +587,6 @@ class PlayerPreferences {
         setLyricsDuetBlacklist(current)
     }
 
-    fun getLyricsUnderCoverEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, false)
-    fun setLyricsUnderCoverEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_UNDER_COVER_ENABLED, enabled)
-
-    fun getLyricsMultiStateToggle(): Boolean = Prefs.getBoolean(KEY_LYRICS_MULTI_STATE_TOGGLE, false)
-    fun setLyricsMultiStateToggle(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_MULTI_STATE_TOGGLE, enabled)
-
-    fun getLyricsUnderCoverPlacement(): LyricsUnderCoverPlacement {
-        val name = Prefs.getString(KEY_LYRICS_UNDER_COVER_PLACEMENT, LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST.name)
-        return runCatching { LyricsUnderCoverPlacement.valueOf(name ?: "") }.getOrDefault(LyricsUnderCoverPlacement.REPLACE_TITLE_ARTIST)
-    }
-    fun setLyricsUnderCoverPlacement(placement: LyricsUnderCoverPlacement) =
-        Prefs.putString(KEY_LYRICS_UNDER_COVER_PLACEMENT, placement.name)
-
-    fun getLyricsUnderCoverAlwaysVisible(): Boolean = Prefs.getBoolean(KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE, false)
-    fun setLyricsUnderCoverAlwaysVisible(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_UNDER_COVER_ALWAYS_VISIBLE, enabled)
-
     fun setCachedUserId(id: Long) {
         Prefs.putLong(KEY_CACHED_USER_ID, id)
     }
@@ -653,7 +669,18 @@ class PlayerPreferences {
     fun dynamicThemeFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_DYNAMIC_THEME, true)
 
     // Persisted volume so the app reopens at the level used when it was closed.
-    fun getSavedVolume(): Float = Prefs.getFloat(KEY_PLAYER_VOLUME, 1f)
+    /**
+     * The volume slider's position. Saved values from before the perceptual curve were amplitudes;
+     * they are converted once, so an update does not change how loud anyone's music is.
+     */
+    fun getSavedVolume(): Float {
+        val saved = Prefs.getFloat(KEY_PLAYER_VOLUME, 1f)
+        if (Prefs.getBoolean(KEY_VOLUME_IS_PERCEPTUAL, false)) return saved
+        val migrated = com.alananasss.kittytune.audio.VolumeCurve.amplitudeToSlider(saved)
+        Prefs.putFloat(KEY_PLAYER_VOLUME, migrated)
+        Prefs.putBoolean(KEY_VOLUME_IS_PERCEPTUAL, true)
+        return migrated
+    }
     fun saveVolume(value: Float) = Prefs.putFloat(KEY_PLAYER_VOLUME, value.coerceIn(0f, 1f))
 
     fun getVerticalVolumeSlider(): Boolean = Prefs.getBoolean(KEY_VERTICAL_VOLUME_SLIDER, false)
@@ -791,6 +818,11 @@ class PlayerPreferences {
     }
     fun setFullPlayerBgStyle(style: FullPlayerBgStyle) = Prefs.putString(KEY_FULL_PLAYER_BG_STYLE, style.name)
 
+    fun getFullPlayerLayout(): FullPlayerLayout =
+        FullPlayerLayout.entries.firstOrNull { it.name == Prefs.getString(KEY_FULL_PLAYER_LAYOUT, null) }
+            ?: FullPlayerLayout.LYRICS_RIGHT
+    fun setFullPlayerLayout(layout: FullPlayerLayout) = Prefs.putString(KEY_FULL_PLAYER_LAYOUT, layout.name)
+
     fun getFullPlayerCoverScale(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_SCALE, 1.0f).coerceIn(0.6f, 1.4f)
     fun setFullPlayerCoverScale(scale: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_SCALE, scale.coerceIn(0.6f, 1.4f))
 
@@ -913,6 +945,26 @@ class PlayerPreferences {
             PlayerSliderStyle.WAVY
         }
     }
+    /** The volume track's own style, or null to follow the seek bar's. */
+    fun getVolumeSliderStyle(): PlayerSliderStyle? =
+        Prefs.getString("volume_slider_style", null)?.let { runCatching { PlayerSliderStyle.valueOf(it) }.getOrNull() }
+    fun setVolumeSliderStyle(style: PlayerSliderStyle?) = Prefs.putString("volume_slider_style", style?.name)
+
+    /** How the floating player bar is drawn; see [FloatingBarLook]. */
+    fun getFloatingBarLook(): FloatingBarLook = FloatingBarLook(
+        cornerDp = Prefs.getInt("floating_bar_corner", FloatingBarLook.DEFAULT.cornerDp),
+        widthPercent = Prefs.getInt("floating_bar_width", FloatingBarLook.DEFAULT.widthPercent),
+        marginDp = Prefs.getInt("floating_bar_margin", FloatingBarLook.DEFAULT.marginDp),
+        isTranslucent = Prefs.getBoolean("floating_bar_translucent", FloatingBarLook.DEFAULT.isTranslucent),
+    )
+
+    fun setFloatingBarLook(look: FloatingBarLook) {
+        Prefs.putInt("floating_bar_corner", look.cornerDp)
+        Prefs.putInt("floating_bar_width", look.widthPercent)
+        Prefs.putInt("floating_bar_margin", look.marginDp)
+        Prefs.putBoolean("floating_bar_translucent", look.isTranslucent)
+    }
+
     fun playerSliderStyleFlow(): Flow<PlayerSliderStyle> =
         Prefs.stringFlow(KEY_PLAYER_SLIDER_STYLE, PlayerSliderStyle.WAVY.name).map { name ->
             try {
@@ -1164,6 +1216,24 @@ class PlayerPreferences {
 
     fun setHiddenSidebarNav(items: Set<String>) =
         Prefs.putString(KEY_SIDEBAR_NAV_HIDDEN, items.joinToString(","))
+
+    /**
+     * The sidebar's rows below Home, in order, each shown or hidden. Stored as `key` or `!key` per row.
+     *
+     * Rows missing from what was stored — every row, before this setting existed, and any row added by a
+     * later version — are appended: the original four follow the older hidden set, the optional ones start off.
+     */
+    fun getSidebarNavLayout(): List<SidebarNavEntry> =
+        parseSidebarNavLayout(Prefs.getString(KEY_SIDEBAR_NAV_LAYOUT, null), getHiddenSidebarNav())
+
+    fun setSidebarNavLayout(entries: List<SidebarNavEntry>) =
+        Prefs.putString(
+            KEY_SIDEBAR_NAV_LAYOUT,
+            entries.joinToString(",") { if (it.isVisible) it.key else "!${it.key}" },
+        )
+
+    fun sidebarNavLayoutFlow(): Flow<List<SidebarNavEntry>> =
+        Prefs.stringFlow(KEY_SIDEBAR_NAV_LAYOUT, null).map { parseSidebarNavLayout(it, getHiddenSidebarNav()) }
 
     fun hiddenSidebarNavFlow(): Flow<Set<String>> =
         Prefs.stringFlow(KEY_SIDEBAR_NAV_HIDDEN, null).map { raw ->
@@ -1567,3 +1637,21 @@ class PlayerPreferences {
 const val RIGHT_PANEL_MIN_WIDTH = 280f
 const val RIGHT_PANEL_MAX_WIDTH = 440f
 const val RIGHT_PANEL_DEFAULT_WIDTH = 340f
+
+/** One row of the sidebar's navigation: which destination, and whether it is shown. */
+data class SidebarNavEntry(val key: String, val isVisible: Boolean)
+
+internal fun parseSidebarNavLayout(raw: String?, legacyHidden: Set<String>): List<SidebarNavEntry> {
+    val known = PlayerPreferences.SIDEBAR_NAV_ITEMS + PlayerPreferences.SIDEBAR_NAV_EXTRAS
+    val stored = raw.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }.mapNotNull { token ->
+        val key = token.removePrefix("!")
+        if (key in known) SidebarNavEntry(key, isVisible = !token.startsWith("!")) else null
+    }.distinctBy { it.key }
+    val missing = known.filter { key -> stored.none { it.key == key } }.map { key ->
+        SidebarNavEntry(key, isVisible = key in PlayerPreferences.SIDEBAR_NAV_ITEMS && key !in legacyHidden)
+    }
+    val (home, rest) = missing.partition { it.key == PlayerPreferences.SIDEBAR_NAV_HOME }
+    val layout = home + stored + rest
+    // Never nothing at all: with every row off the sidebar would have no way anywhere.
+    return if (layout.none { it.isVisible }) layout.map { if (it.key == PlayerPreferences.SIDEBAR_NAV_HOME) it.copy(isVisible = true) else it } else layout
+}

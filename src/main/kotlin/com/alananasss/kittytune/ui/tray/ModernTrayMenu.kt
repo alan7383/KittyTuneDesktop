@@ -2,33 +2,36 @@
 
 package com.alananasss.kittytune.ui.tray
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,64 +41,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.rememberWindowState
+import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
-import com.alananasss.kittytune.ui.theme.KittyTuneTheme
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
+import com.alananasss.kittytune.ui.common.FLOATING_MENU_DIVIDER
+import com.alananasss.kittytune.ui.common.FLOATING_MENU_ITEM_HEIGHT
+import com.alananasss.kittytune.ui.common.FLOATING_MENU_PADDING
+import com.alananasss.kittytune.ui.common.FloatingMenuItem
+import com.alananasss.kittytune.ui.common.FloatingMenuWindow
+import com.alananasss.kittytune.ui.common.pressScale
 
 /**
- * Shared visibility/position for the custom tray context menu.
- *
- * The AWT `PopupMenu` Compose's [androidx.compose.ui.window.Tray] installs is drawn entirely by
- * the OS — square corners, system colours, no theme link — which is what made the tray look like
- * Windows XP next to the rest of the app. This state lets any tray backend (Windows/macOS AWT
- * icon, Linux SNI ContextMenu) open one Compose window instead.
+ * Where and whether the tray's context menu is open. Any tray backend — the AWT icon on Windows and
+ * macOS, the SNI item on Linux — reports the pointer here, and [ModernTrayMenuHost] shows the menu.
  */
 object TrayMenuState {
     var visible by mutableStateOf(false)
         private set
 
-    /** Physical pixels (AWT desktop space) → converted to dp when the window opens. */
-    var xDp by mutableStateOf(0f)
+    /** The pointer, in the screen coordinates AWT reports — the same units Compose places windows in. */
+    var x by mutableStateOf(0f)
         private set
-    var yDp by mutableStateOf(0f)
+    var y by mutableStateOf(0f)
         private set
 
-    fun show(physicalX: Int, physicalY: Int) {
-        val metrics = com.alananasss.kittytune.getScreenMetricsDp(null, physicalX, physicalY)
-        val scaleX = metrics.scaleX.coerceAtLeast(0.1f)
-        val scaleY = metrics.scaleY.coerceAtLeast(0.1f)
-        val cursorXDp = physicalX / scaleX
-        val cursorYDp = physicalY / scaleY
-
-        val usable = metrics.usableBoundsDp
-        val width = MENU_WINDOW_WIDTH_DP
-        val height = MENU_WINDOW_HEIGHT_DP
-
-        // Tray docks at the bottom on Windows/Linux and the top on macOS — open away from the edge.
-        val opensUpward = cursorYDp > usable.y + usable.height / 2f
-        var left = cursorXDp - 12f
-        var top = if (opensUpward) cursorYDp - height - 4f else cursorYDp + 8f
-
-        val maxLeft = (usable.x + usable.width - width).toFloat().coerceAtLeast(usable.x.toFloat())
-        left = left.coerceIn(usable.x.toFloat(), maxLeft)
-        val maxTop = (usable.y + usable.height - height).toFloat().coerceAtLeast(usable.y.toFloat())
-        top = top.coerceIn(usable.y.toFloat(), maxTop)
-
-        xDp = left
-        yDp = top
+    fun show(screenX: Int, screenY: Int) {
+        x = screenX.toFloat()
+        y = screenY.toFloat()
         visible = true
     }
 
@@ -103,190 +77,179 @@ object TrayMenuState {
         visible = false
     }
 
-    fun toggle(physicalX: Int, physicalY: Int) {
-        if (visible) hide() else show(physicalX, physicalY)
+    fun toggle(screenX: Int, screenY: Int) {
+        if (visible) hide() else show(screenX, screenY)
     }
 }
 
-/** Content size — window adds padding around it so the drop shadow is not clipped. */
-private const val MENU_CONTENT_WIDTH_DP = 248f
-private const val MENU_CONTENT_HEIGHT_DP = 156f
-private const val MENU_SHADOW_PAD_DP = 16f
-private const val MENU_WINDOW_WIDTH_DP = MENU_CONTENT_WIDTH_DP + MENU_SHADOW_PAD_DP
-private const val MENU_WINDOW_HEIGHT_DP = MENU_CONTENT_HEIGHT_DP + MENU_SHADOW_PAD_DP
+/** What is playing, for the menu's header. Null fields are simply left out. */
+data class TrayNowPlaying(
+    val title: String?,
+    val artist: String?,
+    val artworkUrl: String?,
+    val isPlaying: Boolean,
+)
+
+private val HEADER_HEIGHT = 60.dp
 
 /**
- * Floating tray menu: transparent undecorated window, rounded translucent panel, Material 3
- * hover states — the same visual language as the mini player and in-app popups.
+ * The tray's context menu: what is playing with transport controls on top, then the app actions, in
+ * the app's own menu style (see [FloatingMenuWindow]).
  */
 @Composable
 fun ModernTrayMenuHost(
+    nowPlaying: TrayNowPlaying?,
     isMiniPlayerVisible: Boolean,
     onShowWindow: () -> Unit,
     onToggleMiniPlayer: () -> Unit,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
     onExit: () -> Unit,
 ) {
     if (!TrayMenuState.visible) return
 
-    val windowState = rememberWindowState(
-        position = WindowPosition(TrayMenuState.xDp.dp, TrayMenuState.yDp.dp),
-        size = DpSize(MENU_WINDOW_WIDTH_DP.dp, MENU_WINDOW_HEIGHT_DP.dp),
-    )
-
-    Window(
-        onCloseRequest = { TrayMenuState.hide() },
-        state = windowState,
-        undecorated = true,
-        transparent = true,
-        focusable = true,
-        alwaysOnTop = true,
-        title = "KittyTune",
-        onKeyEvent = { event ->
-            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                TrayMenuState.hide()
-                true
-            } else {
-                false
-            }
-        },
+    FloatingMenuWindow(
+        anchorXDp = TrayMenuState.x,
+        anchorYDp = TrayMenuState.y,
+        contentHeight = FLOATING_MENU_PADDING + HEADER_HEIGHT + FLOATING_MENU_DIVIDER + FLOATING_MENU_ITEM_HEIGHT * 3,
+        onDismiss = { TrayMenuState.hide() },
     ) {
-        runCatching {
-            window.background = java.awt.Color(0, 0, 0, 0)
-        }
+        NowPlayingHeader(
+            nowPlaying = nowPlaying,
+            onPlayPause = onPlayPause,
+            onNext = onNext,
+            onPrevious = onPrevious,
+        )
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        )
+        FloatingMenuItem(
+            icon = Icons.Rounded.OpenInNew,
+            text = str("menu_show_window"),
+            onClick = {
+                TrayMenuState.hide()
+                onShowWindow()
+            },
+        )
+        FloatingMenuItem(
+            icon = Icons.Rounded.PictureInPictureAlt,
+            text = if (isMiniPlayerVisible) str("menu_mini_player_hide") else str("menu_mini_player_show"),
+            onClick = {
+                TrayMenuState.hide()
+                onToggleMiniPlayer()
+            },
+        )
+        FloatingMenuItem(
+            icon = Icons.Rounded.Close,
+            text = str("menu_exit"),
+            danger = true,
+            onClick = {
+                TrayMenuState.hide()
+                onExit()
+            },
+        )
+    }
+}
 
-        // Clicking any other window (or the desktop) closes the menu, like a native tray popup.
-        DisposableEffect(window) {
-            com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
-            val listener = object : WindowAdapter() {
-                override fun windowLostFocus(e: WindowEvent?) {
-                    TrayMenuState.hide()
-                }
-            }
-            window.addWindowFocusListener(listener)
-            onDispose { window.removeWindowFocusListener(listener) }
-        }
-
-        KittyTuneTheme {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(MENU_SHADOW_PAD_DP.dp / 2)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
-                    ),
-                    shadowElevation = 12.dp,
+/** Cover, title and artist, and previous / play-pause / next — the reason most people open a tray menu. */
+@Composable
+private fun NowPlayingHeader(
+    nowPlaying: TrayNowPlaying?,
+    onPlayPause: () -> Unit,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().height(HEADER_HEIGHT).padding(horizontal = 6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.MusicNote,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            val artwork = nowPlaying?.artworkUrl
+            if (!artwork.isNullOrBlank()) {
+                AsyncImage(
+                    model = artwork,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 8.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        TrayMenuItem(
-                            icon = Icons.Rounded.OpenInNew,
-                            text = str("menu_show_window"),
-                            onClick = {
-                                TrayMenuState.hide()
-                                onShowWindow()
-                            },
-                        )
-                        TrayMenuItem(
-                            icon = Icons.Rounded.PictureInPictureAlt,
-                            text = if (isMiniPlayerVisible) {
-                                str("menu_mini_player_hide")
-                            } else {
-                                str("menu_mini_player_show")
-                            },
-                            onClick = {
-                                TrayMenuState.hide()
-                                onToggleMiniPlayer()
-                            },
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 6.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                            thickness = 1.dp,
-                        )
-
-                        TrayMenuItem(
-                            icon = Icons.Rounded.Close,
-                            text = str("menu_exit"),
-                            danger = true,
-                            onClick = {
-                                TrayMenuState.hide()
-                                onExit()
-                            },
-                        )
-                    }
-                }
+                )
             }
         }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = nowPlaying?.title?.takeIf { it.isNotBlank() } ?: "KittyTune",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            nowPlaying?.artist?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        val enabled = nowPlaying != null
+        TransportButton(Icons.Rounded.SkipPrevious, enabled, onPrevious)
+        TransportButton(
+            if (nowPlaying?.isPlaying == true) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+            enabled,
+            onPlayPause,
+            emphasized = true,
+        )
+        TransportButton(Icons.Rounded.SkipNext, enabled, onNext)
     }
 }
 
 @Composable
-private fun TrayMenuItem(
+private fun TransportButton(
     icon: ImageVector,
-    text: String,
-    danger: Boolean = false,
+    enabled: Boolean,
     onClick: () -> Unit,
+    emphasized: Boolean = false,
 ) {
-    var hovered by remember { mutableStateOf(false) }
-    val interactionSource = remember { MutableInteractionSource() }
-
-    val container by animateColorAsState(
-        targetValue = when {
-            hovered && danger -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
-            hovered -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.75f)
-            else -> Color.Transparent
-        },
-        label = "trayMenuItemBg",
-    )
-    val content by animateColorAsState(
-        targetValue = when {
-            hovered && danger -> MaterialTheme.colorScheme.onErrorContainer
-            hovered -> MaterialTheme.colorScheme.onSecondaryContainer
-            danger -> MaterialTheme.colorScheme.error
-            else -> MaterialTheme.colorScheme.onSurface
-        },
-        label = "trayMenuItemContent",
-    )
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    val interaction = remember { MutableInteractionSource() }
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(container)
+            .size(32.dp)
+            .pressScale(interaction, pressedScale = 0.9f)
+            .clip(CircleShape)
+            .background(if (emphasized) MaterialTheme.colorScheme.primary else Color.Transparent)
             .clickable(
-                interactionSource = interactionSource,
-                indication = null,
+                enabled = enabled,
+                interactionSource = interaction,
+                indication = ripple(),
                 onClick = onClick,
-            )
-            .onPointerEvent(PointerEventType.Enter) { hovered = true }
-            .onPointerEvent(PointerEventType.Exit) { hovered = false }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            ),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = icon,
+            icon,
             contentDescription = null,
-            tint = content,
+            tint = when {
+                !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                emphasized -> MaterialTheme.colorScheme.onPrimary
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
             modifier = Modifier.size(18.dp),
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (danger) FontWeight.Medium else FontWeight.Normal,
-            color = content,
-            maxLines = 1,
         )
     }
 }

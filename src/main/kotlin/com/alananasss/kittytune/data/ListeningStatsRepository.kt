@@ -112,7 +112,8 @@ object ListeningStatsRepository {
             // The log first, so the row can carry the event's id and be immune to being applied twice.
             // A log that cannot be written is not a reason to lose the listen, so the id is simply
             // absent in that case and the row goes in unnumbered.
-            val eventId = runCatching {
+            val shareListens = com.alananasss.kittytune.data.local.PlayerPreferences().getSyncListensEnabled()
+            val eventId = if (!shareListens) null else runCatching {
                 SyncLog.append(kind = SyncKinds.LISTEN, payload = payload, timestampMs = timestamp).id
             }.getOrNull()
 
@@ -138,7 +139,7 @@ object ListeningStatsRepository {
             // The other devices should not have to wait for the next heartbeat to hear about this.
             // Debounced and coalesced inside the scheduler, so a shuffled album does not become
             // fifteen exchanges (issue #33).
-            if (!blocking) SyncScheduler.requestSync("listen recorded")
+            if (!blocking && shareListens) SyncScheduler.requestSync("listen recorded")
         }
 
         if (blocking) {

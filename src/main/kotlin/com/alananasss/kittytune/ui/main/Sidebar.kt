@@ -58,11 +58,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
 
+import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -127,8 +129,8 @@ fun Sidebar(
 
     // Whole sections of the app somebody may never open; Home always stays (issue #33).
     val navPrefs = remember { PlayerPreferences() }
-    val hiddenNav by navPrefs.hiddenSidebarNavFlow()
-        .collectAsState(initial = navPrefs.getHiddenSidebarNav())
+    val navLayout by navPrefs.sidebarNavLayoutFlow()
+        .collectAsState(initial = navPrefs.getSidebarNavLayout())
 
     // How far into a collapse the panel is, read from the width it is actually being laid out at rather
     // than from an animation of this file's own. `MainScreen` puts that width on a spring; a second
@@ -158,76 +160,36 @@ fun Sidebar(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                SidebarNavItem(
-                    label = str("nav_home"),
-                    selected = currentRoute == "home",
-                    iconSelected = Icons.Filled.Home,
-                    iconUnselected = Icons.Outlined.Home,
-                    collapse = collapse,
-                ) {
-                    homeViewModel?.clearSearch()
-                    if (currentRoute != "home") {
-                        navController.navigate("home") {
-                            launchSingleTop = true
+                // The rest, in the order and with the rows the settings page arranged.
+                navLayout.filter { it.isVisible }.forEach { entry ->
+                    val destination = SidebarDestinations.ALL[entry.key] ?: return@forEach
+                    key(destination.key) {
+                        val isSearchRow = destination.key == PlayerPreferences.SIDEBAR_NAV_SEARCH
+                        val isHomeRow = destination.key == PlayerPreferences.SIDEBAR_NAV_HOME
+                        val searching = homeViewModel?.isSearching == true
+                        SidebarNavItem(
+                            label = str(destination.labelKey),
+                            selected = currentRoute == destination.route && when {
+                                isSearchRow -> searching
+                                isHomeRow -> !searching
+                                else -> true
+                            },
+                            iconSelected = destination.iconSelected,
+                            iconUnselected = destination.iconUnselected,
+                            collapse = collapse,
+                        ) {
+                            playerViewModel.showLyricsSheet = false
+                            when {
+                                isSearchRow -> homeViewModel?.activateSearch()
+                                isHomeRow -> homeViewModel?.clearSearch()
+                            }
+                            if (currentRoute != destination.route) {
+                                navController.navigate(destination.route) { launchSingleTop = true }
+                            }
                         }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
-                if (PlayerPreferences.SIDEBAR_NAV_FEED !in hiddenNav) SidebarNavItem(
-                    label = str("nav_feed"),
-                    selected = currentRoute == "feed",
-                    iconSelected = Icons.Rounded.DynamicFeed,
-                    iconUnselected = Icons.Rounded.DynamicFeed,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "feed") {
-                        navController.navigate("feed") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
-                if (PlayerPreferences.SIDEBAR_NAV_EXPLORE !in hiddenNav) SidebarNavItem(
-                    label = str("explorer_title"),
-                    selected = currentRoute == "genres",
-                    iconSelected = Icons.Filled.Explore,
-                    iconUnselected = Icons.Outlined.Explore,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "genres") {
-                        navController.navigate("genres") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
-                if (PlayerPreferences.SIDEBAR_NAV_RECOGNITION !in hiddenNav) SidebarNavItem(
-                    label = str("pref_bottom_menu_fab_recognition"),
-                    selected = currentRoute == "recognition",
-                    iconSelected = Icons.Rounded.GraphicEq,
-                    iconUnselected = Icons.Rounded.GraphicEq,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "recognition") {
-                        navController.navigate("recognition") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
-                // One click, from anywhere. Sync lived at the bottom of the settings page, which for a
-                // feature whose first problem is being discovered at all was the same as hiding it.
-                if (PlayerPreferences.SIDEBAR_NAV_SYNC !in hiddenNav) SidebarNavItem(
-                    label = str("sync_title"),
-                    selected = currentRoute == "sync_settings",
-                    iconSelected = Icons.Rounded.Devices,
-                    iconUnselected = Icons.Rounded.Devices,
-                    collapse = collapse,
-                ) {
-                    if (currentRoute != "sync_settings") {
-                        navController.navigate("sync_settings") { launchSingleTop = true }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
                     }
                 }
             }
@@ -344,14 +306,14 @@ private fun SidebarProfileRow(
                         AsyncImage(
                             model = avatarUrl,
                             contentDescription = null,
-                            error = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
-                            fallback = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
+                            error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
+                            fallback = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.size(SidebarMorph.ICON_SIZE).clip(CircleShape),
                         )
                     } else {
                         androidx.compose.foundation.Image(
-                            painter = androidx.compose.ui.res.painterResource(DEFAULT_AVATAR),
+                            painter = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.size(SidebarMorph.ICON_SIZE).clip(CircleShape),
@@ -408,58 +370,46 @@ private fun ProfileMenu(
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         val isGuest = playerViewModel.currentUserId == 0L
-        DropdownMenuItem(
-            text = { Text(if (isGuest) str("profile_menu_login") else str("profile_menu_logout")) },
-            onClick = {
-                onDismiss()
-                com.alananasss.kittytune.data.TokenManager.logout()
-            },
-        )
-        androidx.compose.material3.HorizontalDivider()
-        DropdownMenuItem(
-            text = { Text(str("nav_about_support")) },
-            onClick = {
-                onDismiss()
-                onAbout()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("about_credits")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.isPlayerExpanded = false
-                playerViewModel.showLyricsSheet = false
-                navController.navigate("credits")
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("profile_menu_settings")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.showLyricsSheet = false
-                navController.navigate("settings")
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("nav_upload")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.showLyricsSheet = false
-                navController.navigate("upload")
-            },
-        )
-        DropdownMenuItem(
-            text = { Text(str("nav_profile")) },
-            onClick = {
-                onDismiss()
-                playerViewModel.showLyricsSheet = false
-                playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
-            },
-        )
+        ProfileMenuItem(
+            label = if (isGuest) str("profile_menu_login") else str("profile_menu_logout"),
+            icon = if (isGuest) Icons.AutoMirrored.Rounded.Login else Icons.AutoMirrored.Rounded.Logout,
+            tint = if (isGuest) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        ) {
+            onDismiss()
+            com.alananasss.kittytune.data.TokenManager.logout()
+        }
+        androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 4.dp))
+        ProfileMenuItem(str("menu_about"), Icons.Rounded.Info) {
+            onDismiss()
+            onAbout()
+        }
+        ProfileMenuItem(str("profile_menu_settings"), Icons.Rounded.Settings) {
+            onDismiss()
+            playerViewModel.showLyricsSheet = false
+            navController.navigate("settings")
+        }
+        ProfileMenuItem(str("nav_profile"), Icons.Rounded.AccountCircle) {
+            onDismiss()
+            playerViewModel.showLyricsSheet = false
+            playerViewModel.navigateToPlaylistId = "profile:${playerViewModel.currentUserId}"
+        }
     }
 }
 
-private const val DEFAULT_AVATAR = "drawable/ic_default_user_artwork_placeholder_round.xml"
+@Composable
+private fun ProfileMenuItem(
+    label: String,
+    icon: ImageVector,
+    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(
+        text = { Text(label, style = MaterialTheme.typography.labelLarge) },
+        leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp)) },
+        onClick = onClick,
+    )
+}
+
 
 /** Left/right click handling shared by all library entry composables. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -601,22 +551,42 @@ fun LibraryPanel(
                 onUpload = onUpload,
             )
 
-            if (collapse < 1f) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = ((1f - collapse) * 44f).dp)
-                        .receded(collapse)
-                ) {
-                    LibrarySearchRow(libraryViewModel)
+            // One slot for both: the search row recedes in it and the rail's actions arrive in it. They
+            // used to be stacked — the search row shrank to nothing while the actions appeared at full
+            // height in a single frame part-way through, so every entry below slid up and then jumped
+            // down. With the slot's height moving only between the two rows' own heights, the entries
+            // hardly move at all.
+            // With both of the rail's buttons switched off there is nothing to show in it: its height eases to
+            // zero so the entries below move up instead of leaving a gap, and back when one is switched on.
+            val slotPrefs = remember { PlayerPreferences() }
+            val hiddenRailButtons by slotPrefs.hiddenLibraryButtonsFlow().collectAsState(initial = slotPrefs.getHiddenLibraryButtons())
+            val railHasButtons = PlayerPreferences.LIBRARY_BUTTONS.any { it !in hiddenRailButtons }
+            val railHeight by androidx.compose.animation.core.animateDpAsState(
+                if (railHasButtons) RAIL_ACTIONS_HEIGHT else 0.dp,
+                androidx.compose.animation.core.tween(260),
+                label = "railActionsHeight",
+            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(
+                        if (fullScreen) SEARCH_ROW_HEIGHT
+                        else androidx.compose.ui.unit.lerp(SEARCH_ROW_HEIGHT, railHeight, collapse)
+                    )
+                    .clipToBounds()
+            ) {
+                if (collapse < 1f) {
+                    Box(Modifier.fillMaxWidth().receded(collapse)) {
+                        LibrarySearchRow(libraryViewModel)
+                    }
                 }
-            }
-            if (!fullScreen && collapse > 0f) {
-                RailActions(
-                    collapse = collapse,
-                    onCreate = { showCreatePlaylistDialog = true },
-                    onHistory = onHistory,
-                )
+                if (!fullScreen && collapse > 0f) {
+                    RailActions(
+                        collapse = collapse,
+                        onCreate = { showCreatePlaylistDialog = true },
+                        onHistory = onHistory,
+                    )
+                }
             }
 
             LibraryContent(
@@ -1996,6 +1966,13 @@ private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> 
  * @param collapse 0 when the panel is open, 1 when it is a rail, and every value in between while it
  *   travels.
  */
+/** Heights of the two rows that share the slot above the library list. */
+private val SEARCH_ROW_HEIGHT = 44.dp
+private val RAIL_ACTIONS_HEIGHT = 40.dp
+
+/** How far a destination's highlight sits in from the card's edges. */
+private val NAV_ITEM_INSET = 6.dp
+
 @Composable
 private fun SidebarNavItem(
     label: String,
@@ -2005,8 +1982,21 @@ private fun SidebarNavItem(
     collapse: Float = 0f,
     onClick: () -> Unit,
 ) {
-    val color = if (selected) MaterialTheme.colorScheme.onSurface
-    else MaterialTheme.colorScheme.onSurfaceVariant
+    // Material's navigation indicator: the current destination sits on a secondary-container pill,
+    // eased in and out, instead of being told apart only by bold text.
+    val indicator by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "navIndicator",
+    )
+    val color by androidx.compose.animation.animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = androidx.compose.animation.core.tween(180),
+        label = "navContent",
+    )
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
@@ -2016,12 +2006,18 @@ private fun SidebarNavItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .clickable {
+                // Inset from the card's edges, and (with the 2 dp gap in the column) apart from the
+                // neighbours: flush against each other, the selected pill and a hovered row's highlight
+                // touched and read as one shape spilling onto the next item. The icon keeps its place.
+                .padding(horizontal = NAV_ITEM_INSET)
+                .pressScale(interaction, pressedScale = 0.97f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(indicator)
+                .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
                     focusManager.clearFocus()
                     onClick()
                 }
-                .padding(start = SidebarMorph.ICON_INSET, end = 8.dp)
+                .padding(start = SidebarMorph.ICON_INSET - NAV_ITEM_INSET, end = 8.dp)
                 .padding(vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

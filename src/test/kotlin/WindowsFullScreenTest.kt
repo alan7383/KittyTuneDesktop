@@ -1,6 +1,15 @@
 import androidx.compose.ui.window.WindowPlacement
 import com.alananasss.kittytune.data.theme.WindowsFullScreen
+import com.sun.jna.platform.win32.User32
+import com.sun.jna.platform.win32.WinUser
+import java.awt.GraphicsEnvironment
+import java.awt.Rectangle
+import javax.swing.JFrame
+import javax.swing.SwingUtilities
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 class WindowsFullScreenTest {
@@ -87,5 +96,42 @@ class WindowsFullScreenTest {
         // WS_VISIBLE must be preserved
         org.junit.Assert.assertTrue((fsStyle and com.sun.jna.platform.win32.WinUser.WS_VISIBLE) != 0)
     }
-}
 
+    /**
+     * The reported bug: with the full player open, clicking another monitor minimised the app. That is
+     * what AWT's exclusive full screen does on purpose when its window loses focus, which is why Windows
+     * uses the borderless mode instead. This drives a real window through it.
+     */
+    @Test
+    fun borderlessFullScreenSurvivesFocusLossAndRestoresBounds() {
+        assumeTrue(WindowsFullScreen.isWindows && !GraphicsEnvironment.isHeadless())
+        val start = Rectangle(120, 120, 900, 600)
+        val app = onEdt { JFrame("fs-test").apply { bounds = start; isVisible = true } }
+        val other = onEdt { JFrame("other").apply { setBounds(40, 40, 200, 150); isVisible = true } }
+        try {
+            val hwnd = WindowsFullScreen.handleOf(app)!!
+            val framedStyle = User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE)
+
+            assertTrue(onEdt { WindowsFullScreen.enter(app) })
+            val monitor = onEdt { app.graphicsConfiguration.bounds }
+            assertEquals("covers the whole monitor", monitor, onEdt { app.bounds })
+
+            onEdt { other.toFront(); other.requestFocus() }
+            Thread.sleep(300)
+            assertFalse("focus loss must not minimise", onEdt { app.extendedState and java.awt.Frame.ICONIFIED != 0 })
+
+            assertTrue(onEdt { WindowsFullScreen.exit(app, WindowPlacement.Floating, start) })
+            assertEquals(start, onEdt { app.bounds })
+            assertEquals("frame restored", framedStyle, User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE))
+            assertFalse(WindowsFullScreen.isFullScreen)
+        } finally {
+            onEdt { other.dispose(); app.dispose() }
+        }
+    }
+
+    private fun <T> onEdt(block: () -> T): T {
+        var result: Result<T>? = null
+        SwingUtilities.invokeAndWait { result = runCatching(block) }
+        return result!!.getOrThrow()
+    }
+}

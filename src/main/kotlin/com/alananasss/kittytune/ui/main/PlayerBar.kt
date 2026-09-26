@@ -1,7 +1,5 @@
 package com.alananasss.kittytune.ui.main
 
-import androidx.compose.material3.ButtonDefaults
-import kotlin.math.roundToInt
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
 import com.alananasss.kittytune.ui.player.slider.PlayerSlider
@@ -10,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,6 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.material.icons.outlined.ThumbDown
+import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -29,18 +29,11 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
-import androidx.compose.material.icons.rounded.TextSnippet
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.outlined.HeartBroken
 import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.automirrored.filled.VolumeDown
-import androidx.compose.material.icons.automirrored.filled.VolumeOff
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -48,14 +41,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.alananasss.kittytune.ui.modifiers.squish
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,15 +60,12 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ripple
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import java.awt.Cursor
-import coil3.compose.AsyncImage
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.ui.common.ArtistLinkText
-import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
@@ -101,54 +90,11 @@ import androidx.compose.foundation.onClick
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.material3.SliderState
-import androidx.compose.material3.VerticalSlider
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.onPointerEvent
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import com.alananasss.kittytune.data.local.PlayerPreferences
-import kotlinx.coroutines.delay
-
-/**
- * What the row spends before the track: the speaker icon and the gap after it.
- *
- * Counted once. It used to include the slider's own inner padding as well, which the slider then also
- * applied inside its fixed width — so the track was short by that padding twice over (issue #33).
- */
-private val VOLUME_ICON_SIZE = 20.dp
-
-/** Between the speaker and the track. Enough to separate them, not enough to eat the track. */
-private val VOLUME_ICON_GAP = 8.dp
-
-/** Gap between the slider track and the volume percentage text. */
-private val VOLUME_TEXT_GAP = 6.dp
-
-/** Fixed width for the volume percentage label (comfortably fits "100%"). */
-private val VOLUME_TEXT_WIDTH = 36.dp
-
-private val VOLUME_ROW_OVERHEAD = VOLUME_ICON_SIZE + VOLUME_ICON_GAP + VOLUME_TEXT_GAP + VOLUME_TEXT_WIDTH
-
-/**
- * Shortest track worth aiming at. With less room than this the bar switches to the vertical hover
- * control rather than showing a sliver.
- */
-private val MIN_VOLUME_SLIDER_WIDTH = 90.dp
-
-/** And the widest it grows to on a roomy window. */
-private val MAX_VOLUME_SLIDER_WIDTH = 160.dp
 
 /**
  * Bottom full-width playback bar: track info left, transport + progress center,
@@ -169,29 +115,47 @@ fun PlayerBar(
      */
     onOpenFullPlayer: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** Floating only: told where the pill itself is, which the content uses to keep clear of it. */
+    onBarPlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
 ) {
     val vm = playerViewModel
     val track = vm.currentTrack
     val visibleButtons = rememberPlayerBarButtons()
     val showLyricsButton = rememberShowLyricsButton()
-    val playerBarStyle = rememberPlayerBarStyle()
+    val barStyle = rememberPlayerBarStyle()
+    val isFloating = barStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING
+    val floatLook = rememberFloatingBarLook()
+    // In the pill every hover and press is a circle, like the pill itself; the stock shape is a squircle.
+    val iconShapes = if (isFloating) IconButtonShapes(androidx.compose.foundation.shape.CircleShape, androidx.compose.foundation.shape.CircleShape) else IconButtonDefaults.shapes()
 
-    val barShape = when (playerBarStyle) {
-        com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> RoundedCornerShape(24.dp)
-        com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> RoundedCornerShape(20.dp)
-        com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> PanelShape
-    }
-    val barBorder = if (playerBarStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING) {
-        androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
-    } else null
-    val barShadow = if (playerBarStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING) 8.dp else 0.dp
-
+    Box(modifier, contentAlignment = Alignment.Center) {
     Surface(
-        modifier = modifier.height(88.dp),
-        shape = barShape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = barBorder,
-        shadowElevation = barShadow,
+        modifier = when (barStyle) {
+            // A pill that floats clear of the window's edges, like a dock: centred, capped in width so it
+            // reads as an object rather than a strip, lifted by a soft shadow and a hairline edge.
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
+                .fillMaxWidth(floatLook.widthPercent / 100f)
+                .padding(horizontal = 24.dp)
+                .height(76.dp)
+                .then(onBarPlaced?.let { report -> Modifier.onGloballyPositioned { report(it) } } ?: Modifier)
+            else -> Modifier.fillMaxWidth().height(88.dp)
+        },
+        shape = when (barStyle) {
+            com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> PanelShape
+            com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> RoundedCornerShape(28.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> RoundedCornerShape(floatLook.cornerDp.dp)
+        },
+        // Floating, it lies over the content: a little see-through, so what scrolls beneath shows, and lifted
+        // by a deep soft shadow and a light edge so it reads as an object above the page.
+        color = when {
+            !isFloating -> MaterialTheme.colorScheme.surfaceContainerLow
+            floatLook.isTranslucent -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f)
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        },
+        border = if (isFloating) {
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
+        } else null,
+        shadowElevation = if (isFloating) 18.dp else 0.dp,
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val barWidth = maxWidth
@@ -210,7 +174,7 @@ fun PlayerBar(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = if (isFloating) 18.dp else 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // --- left: artwork + title/artist + like -----------------------------------
@@ -228,7 +192,7 @@ fun PlayerBar(
                                 // take what they want and the heart — last in the row — is the part
                                 // that gets clipped away as the UI scale goes up (issue #33).
                                 .weight(1f, fill = false)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(if (isFloating) 28.dp else 8.dp))
                                 .onClick(
                                     matcher = PointerMatcher.mouse(PointerButton.Secondary),
                                     onClick = { vm.showTrackOptions(track, fromPlayer = true) }
@@ -242,8 +206,8 @@ fun PlayerBar(
                                 isPlaying = vm.isPlaying,
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(if (isVeryCompact) 48.dp else 56.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
+                                    .size(if (isVeryCompact) 48.dp else if (isFloating) 52.dp else 56.dp)
+                                    .clip(RoundedCornerShape(if (isFloating) 26.dp else 8.dp)),
                             )
                             Spacer(Modifier.width(if (isVeryCompact) 8.dp else 12.dp))
                             Column(Modifier.weight(1f, fill = false).widthIn(max = if (isCompact) 160.dp else 220.dp)) {
@@ -258,8 +222,14 @@ fun PlayerBar(
                                 val isAutomixing by AutomixManager.isAutomixing.collectAsState()
                                 val mixBeatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
                                 val isCrossfading = MusicManager.isCrossfadingOut
-                                val remainingMs = if (vm.duration > 0) vm.duration - vm.currentPosition else Long.MAX_VALUE
-                                val isNearingEnd = remainingMs in 0L..20_000L
+                                // Derived, so the bar recomposes when this flips (once a track), not
+                                // on every position tick.
+                                val isNearingEnd by remember(vm) {
+                                    androidx.compose.runtime.derivedStateOf {
+                                        val remainingMs = if (vm.duration > 0) vm.duration - vm.currentPosition else Long.MAX_VALUE
+                                        remainingMs in 0L..20_000L
+                                    }
+                                }
                                 val isTransitionActive = (isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)) && isNearingEnd
 
                                 val nextTrack = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
@@ -320,7 +290,7 @@ fun PlayerBar(
                         }
                         if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {
                             Spacer(Modifier.width(8.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleLike() }) {
+                            IconButton(shapes = iconShapes, onClick = { vm.toggleLike() }) {
                                 Icon(
                                     if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                     contentDescription = str("player_like"),
@@ -332,11 +302,11 @@ fun PlayerBar(
                             if (vm.isYourMixActive) {
                                 Spacer(Modifier.width(4.dp))
                                 IconButton(
-                                    shapes = IconButtonDefaults.shapes(),
+                                    shapes = iconShapes,
                                     onClick = { vm.dislikeCurrentTrackInMix() }
                                 ) {
                                     Icon(
-                                        Icons.Outlined.HeartBroken,
+                                        androidx.compose.material.icons.Icons.Outlined.ThumbDown,
                                         contentDescription = str("mix_dislike"),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(20.dp),
@@ -356,6 +326,9 @@ fun PlayerBar(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                 ) {
+                    // The floating pill is its own object with air around it, so its buttons get air between them
+                    // too: at the docked bar's 6 dp they read as one strip on the pill (round 5).
+                    val transportGap = if (isFloating) 12.dp else 6.dp
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons) {
                         ExpressiveToggleButton(
                             selected = vm.shuffleEnabled,
@@ -363,7 +336,7 @@ fun PlayerBar(
                             contentDescription = "Shuffle",
                             onClick = { vm.toggleShuffle() },
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(transportGap))
                     }
 
                     val backInteractionSource = remember { MutableInteractionSource() }
@@ -429,7 +402,7 @@ fun PlayerBar(
                         Icon(Icons.Filled.SkipPrevious, null, modifier = Modifier.size(22.dp))
                     }
 
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(transportGap))
 
                     Box(
                         modifier = Modifier
@@ -452,7 +425,7 @@ fun PlayerBar(
                         )
                     }
 
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(transportGap))
 
                     Box(
                         modifier = Modifier
@@ -472,7 +445,7 @@ fun PlayerBar(
                     }
 
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons) {
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(transportGap))
                         ExpressiveToggleButton(
                             selected = vm.repeatMode != RepeatMode.NONE,
                             icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
@@ -483,55 +456,7 @@ fun PlayerBar(
                     }
                 }
 
-                // Progress row
-                val seekWheelSeconds = rememberSeekWheelSeconds()
-                val sliderStyle = rememberPlayerSliderStyle()
-                var scrubbing by remember { mutableStateOf(false) }
-                var scrubPosition by remember { mutableFloatStateOf(0f) }
-                val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition
-                val duration = vm.duration.coerceAtLeast(1L)
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = makeTimeString(position),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    PlayerSlider(
-                        value = position.toFloat().coerceIn(0f, duration.toFloat()),
-                        onValueChange = {
-                            scrubbing = true
-                            scrubPosition = it
-                            vm.updateScrubPosition(it.toLong())
-                        },
-                        onValueChangeFinished = {
-                            vm.seekTo(scrubPosition.toLong())
-                            scrubbing = false
-                        },
-                        sliderStyle = sliderStyle,
-                        isPlaying = vm.isPlaying,
-                        valueRange = 0f..duration.toFloat(),
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp)
-                            .seekWheel(
-                                positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
-                                durationMs = { vm.duration },
-                                stepSeconds = { seekWheelSeconds },
-                                onSeek = { target ->
-                                    // Straight to the player rather than through the scrub state: a
-                                    // wheel notch is a decision, not a drag in progress.
-                                    scrubbing = false
-                                    vm.seekTo(target)
-                                },
-                            ),
-                    )
-                    Text(
-                        text = makeTimeString(duration),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                PlaybackProgressRow(vm)
             }
 
             val verticalVolumeSlider = rememberVerticalVolumeSlider()
@@ -544,13 +469,14 @@ fun PlayerBar(
             ) {
                 if (showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons) {
                     IconButton(
-                        shapes = IconButtonDefaults.shapes(),
+                        shapes = iconShapes,
                         onClick = onOpenLyrics,
                     ) {
                         Icon(
                             painter = androidx.compose.ui.res.painterResource("icons/lyrics.svg"),
                             contentDescription = "Lyrics",
-                            tint = if (vm.hasLyrics) MaterialTheme.colorScheme.primary
+                            // Lit while the lyrics are open, like any toggle, not whenever a track has them.
+                            tint = if (vm.showLyricsSheet) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                         )
@@ -559,7 +485,7 @@ fun PlayerBar(
                 if (!isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons) {
                     Tip(str("mini_player_title")) {
                         IconButton(
-                            shapes = IconButtonDefaults.shapes(),
+                            shapes = iconShapes,
                             onClick = { vm.toggleMiniPlayer() },
                         ) {
                             Icon(
@@ -574,7 +500,7 @@ fun PlayerBar(
                 }
                 if (PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons) {
                     IconButton(
-                        shapes = IconButtonDefaults.shapes(),
+                        shapes = iconShapes,
                         onClick = onToggleNowPlaying,
                     ) {
                         Icon(
@@ -589,7 +515,7 @@ fun PlayerBar(
                 // a click rather than access to it (issue #33).
                 if (!isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons) {
                     IconButton(
-                        shapes = IconButtonDefaults.shapes(),
+                        shapes = iconShapes,
                         onClick = onOpenQueue,
                     ) {
                         Icon(
@@ -601,70 +527,92 @@ fun PlayerBar(
                     }
                 }
 
-                val volume = vm.volume
-                // BoxWithConstraints is the last child of the row, so `maxWidth` here is the width
-                // left over for the volume control.
-                //
-                // The slider's width is then derived from it rather than left to `weight`. Asking
-                // for a weighted, wrap-content width inside a row that is itself wrap-content let
-                // the row report more than it had been given: the excess was clamped away and the
-                // track came out cut off with space still visible beside it, which is why the first
-                // attempt at this did not fix the report (issue #33). Computed this way the row is
-                // exactly icon + padding + slider wide, so there is nothing left to clip.
-                BoxWithConstraints(contentAlignment = Alignment.Center) {
-                    val roomForSlider = maxWidth - VOLUME_ROW_OVERHEAD
-                    val tooNarrowForSlider = roomForSlider < MIN_VOLUME_SLIDER_WIDTH
-                    if (verticalVolumeSlider || tooNarrowForSlider) {
-                        VolumeHoverControl(
-                            volume = volume,
-                            onVolumeChange = { vm.updateVolume(it) },
-                            onVolumeChangeFinished = { vm.persistVolume() },
-                            onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
-                            onToggleMute = { vm.toggleMute() },
-                        )
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                when {
-                                    volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
-                                    volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-                                    else -> Icons.AutoMirrored.Filled.VolumeUp
-                                },
-                                contentDescription = "Mute",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .size(VOLUME_ICON_SIZE)
-                                    .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() }
-                                    .clickable { vm.toggleMute() },
-                            )
-                            Spacer(Modifier.width(VOLUME_ICON_GAP))
-                            Slider(
-                                value = volume,
-                                onValueChange = { vm.updateVolume(it) },
-                                onValueChangeFinished = { vm.persistVolume() },
-                                modifier = Modifier
-                                    .width(roomForSlider.coerceAtMost(MAX_VOLUME_SLIDER_WIDTH))
-                                    .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
-                            )
-                            Spacer(Modifier.width(VOLUME_TEXT_GAP))
-                            Text(
-                                text = "${(volume * 100).roundToInt()}%",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .width(VOLUME_TEXT_WIDTH)
-                                    .volumeWheel({ vm.volume }) { vm.updateVolume(it); vm.persistVolumeSoon() },
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                }
+                VolumeControl(
+                    volume = vm.volume,
+                    preferVertical = verticalVolumeSlider,
+                    isPlaying = vm.isPlaying,
+                    onVolumeChange = { vm.updateVolume(it) },
+                    onVolumeChangeFinished = { vm.persistVolume() },
+                    onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
+                    onToggleMute = { vm.toggleMute() },
+                )
             }
         }
+    }
     }
 }
 }
 
+
+/**
+ * Elapsed time, seek bar and duration.
+ *
+ * Its own composable so the position, which changes several times a second, only recomposes this
+ * row. Read inline, it used to recompose the whole player bar on every tick.
+ */
+@Composable
+private fun PlaybackProgressRow(vm: PlayerViewModel) {
+    val seekWheelSeconds = rememberSeekWheelSeconds()
+    val sliderStyle = rememberPlayerSliderStyle()
+    var scrubbing by remember { mutableStateOf(false) }
+    var scrubPosition by remember { mutableFloatStateOf(0f) }
+    val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition
+    val duration = vm.duration.coerceAtLeast(1L)
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = makeTimeString(position),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        PlayerSlider(
+            value = position.toFloat().coerceIn(0f, duration.toFloat()),
+            onValueChange = {
+                scrubbing = true
+                scrubPosition = it
+                vm.updateScrubPosition(it.toLong())
+            },
+            onValueChangeFinished = {
+                vm.seekTo(scrubPosition.toLong())
+                scrubbing = false
+            },
+            sliderStyle = sliderStyle,
+            isPlaying = vm.isPlaying,
+            valueRange = 0f..duration.toFloat(),
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 8.dp)
+                .seekWheel(
+                    positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
+                    durationMs = { vm.duration },
+                    stepSeconds = { seekWheelSeconds },
+                    onSeek = { target ->
+                        // Straight to the player rather than through the scrub state: a
+                        // wheel notch is a decision, not a drag in progress.
+                        scrubbing = false
+                        vm.seekTo(target)
+                    },
+                ),
+        )
+        // Click to switch between the track's length and the time left, which counts down with a minus, as in
+        // the full player. Remembered.
+        var showRemaining by remember { mutableStateOf(com.alananasss.kittytune.core.Prefs.getBoolean(KEY_BAR_REMAINING, false)) }
+        Text(
+            text = if (showRemaining) "-" + makeTimeString((duration - position).coerceAtLeast(0L)) else makeTimeString(duration),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable {
+                    showRemaining = !showRemaining
+                    com.alananasss.kittytune.core.Prefs.putBoolean(KEY_BAR_REMAINING, showRemaining)
+                }
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+        )
+    }
+}
+
+private const val KEY_BAR_REMAINING = "player_bar_show_remaining"
 
 /**
  * Shuffle / repeat, in the same language as the transport pills next to them: 42 dp tall,
@@ -731,36 +679,6 @@ private fun ExpressiveToggleButton(
 }
 
 /**
- * Scroll wheel over any volume control raises or lowers it, in 5% steps. Wheel deltas are
- * positive downwards, so the sign is inverted to match the direction the user pushed.
- *
- * [currentVolume] and [onVolumeChange] are read through [rememberUpdatedState] because the
- * `pointerInput` block is keyed on Unit and therefore never restarts: capturing them directly
- * froze the level at whatever it was when the control first composed, so scrolling only ever
- * moved one step either side of that stale value.
- */
-@Composable
-private fun Modifier.volumeWheel(
-    currentVolume: () -> Float,
-    onVolumeChange: (Float) -> Unit,
-): Modifier {
-    val volume by androidx.compose.runtime.rememberUpdatedState(currentVolume)
-    val onChange by androidx.compose.runtime.rememberUpdatedState(onVolumeChange)
-    return this.pointerInput(Unit) {
-        awaitPointerEventScope {
-            while (true) {
-                val event = awaitPointerEvent()
-                if (event.type != PointerEventType.Scroll) continue
-                val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                if (delta == 0f) continue
-                onChange((volume() - delta * 0.05f).coerceIn(0f, 1f))
-                event.changes.forEach { it.consume() }
-            }
-        }
-    }
-}
-
-/**
  * The wheel over the progress bar, moving the playhead (issue #33).
  *
  * "If you hover over the slider showing how long the track is, you can use the mouse wheel to rewind
@@ -803,6 +721,18 @@ private fun Modifier.seekWheel(
  * Reactive read of which optional player-bar buttons the user keeps; recomposes on pref changes.
  */
 @Composable
+private fun rememberPlayerBarStyle(): com.alananasss.kittytune.data.local.PlayerBarStyle {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { PlayerPreferences().getPlayerBarStyle() }
+}
+
+@Composable
+private fun rememberFloatingBarLook(): com.alananasss.kittytune.data.local.FloatingBarLook {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { PlayerPreferences().getFloatingBarLook() }
+}
+
+@Composable
 private fun rememberPlayerBarButtons(): Set<String> {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) { PlayerPreferences().getPlayerBarButtons() }
@@ -844,161 +774,3 @@ private fun rememberPlayerSliderStyle(): com.alananasss.kittytune.data.local.Pla
     }
 }
 
-/**
- * Reactive read of the "player bar style" setting; recomposes when the pref changes.
- */
-@Composable
-private fun rememberPlayerBarStyle(): com.alananasss.kittytune.data.local.PlayerBarStyle {
-    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
-    return remember(prefsSnapshot) {
-        com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerBarStyle()
-    }
-}
-
-/**
- * Speaker button that reveals a vertical volume slider on hover, floating above the bar.
- *
- * Hover rather than click, because a click on the speaker already means mute and a control that
- * needed two different clicks to do two things was the confusing part. The panel stays up while
- * the pointer is over either the button or the panel itself, with a short grace period so the
- * gap between them does not dismiss it mid-reach.
- */
-@OptIn(
-    ExperimentalMaterial3Api::class,
-    ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalComposeUiApi::class,
-)
-@Composable
-private fun VolumeHoverControl(
-    volume: Float,
-    onVolumeChange: (Float) -> Unit,
-    onVolumeChangeFinished: () -> Unit,
-    onVolumeScrolled: (Float) -> Unit,
-    onToggleMute: () -> Unit,
-) {
-    var overButton by remember { mutableStateOf(false) }
-    var overPanel by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
-
-    LaunchedEffect(overButton, overPanel) {
-        if (overButton || overPanel) {
-            expanded = true
-        } else {
-            delay(250)
-            expanded = false
-        }
-    }
-
-    val levelIcon = when {
-        volume <= 0.01f -> Icons.AutoMirrored.Filled.VolumeOff
-        volume < 0.5f -> Icons.AutoMirrored.Filled.VolumeDown
-        else -> Icons.AutoMirrored.Filled.VolumeUp
-    }
-
-    Box {
-        val buttonShape by animateDpAsState(
-            targetValue = if (expanded) 14.dp else 20.dp,
-            animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
-            label = "volumeButtonShape",
-        )
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(buttonShape))
-                .background(
-                    if (expanded) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                    else Color.Transparent
-                )
-                .onPointerEvent(PointerEventType.Enter) { overButton = true }
-                .onPointerEvent(PointerEventType.Exit) { overButton = false }
-                .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
-                .volumeWheel({ volume }, onVolumeScrolled)
-                .clickable(indication = ripple(), interactionSource = remember { MutableInteractionSource() }) {
-                    onToggleMute()
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                levelIcon,
-                contentDescription = "Volume",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-
-        if (expanded) {
-            Popup(
-                popupPositionProvider = AboveAnchorCentered,
-                properties = PopupProperties(focusable = false),
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 8.dp,
-                    modifier = Modifier
-                        .padding(bottom = 6.dp)
-                        .onPointerEvent(PointerEventType.Enter) { overPanel = true }
-                        .onPointerEvent(PointerEventType.Exit) { overPanel = false }
-                        .volumeWheel({ volume }, onVolumeScrolled),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 14.dp),
-                    ) {
-                        val state = remember {
-                            SliderState(volume, 0, { onVolumeChangeFinished() }, 0f..1f)
-                        }
-                        // Follow changes that did not come from this slider — the mute button,
-                        // the wheel, a keyboard shortcut — instead of only seeding once.
-                        LaunchedEffect(volume) {
-                            if (kotlin.math.abs(state.value - volume) > 0.001f) state.value = volume
-                        }
-                        LaunchedEffect(state) {
-                            snapshotFlow { state.value }.collect { onVolumeChange(it) }
-                        }
-                        Text(
-                            text = "${(state.value * 100).roundToInt()}%",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        VerticalSlider(
-                            state = state,
-                            // A volume slider fills from the bottom. The default direction puts
-                            // the origin at the top, which is what made it read upside down.
-                            topToBottom = false,
-                            modifier = Modifier.height(150.dp),
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Icon(
-                            levelIcon,
-                            contentDescription = "Mute",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
-                                .clickable { onToggleMute() },
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Places a popup directly above its anchor, horizontally centred and clamped to the window. */
-private object AboveAnchorCentered : PopupPositionProvider {
-    override fun calculatePosition(
-        anchorBounds: IntRect,
-        windowSize: IntSize,
-        layoutDirection: LayoutDirection,
-        popupContentSize: IntSize,
-    ): IntOffset {
-        val x = anchorBounds.left + (anchorBounds.width - popupContentSize.width) / 2
-        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-        return IntOffset(
-            x.coerceIn(0, maxX),
-            (anchorBounds.top - popupContentSize.height).coerceAtLeast(0),
-        )
-    }
-}
