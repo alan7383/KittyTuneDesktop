@@ -1,6 +1,8 @@
 package com.alananasss.kittytune
 
 import com.alananasss.kittytune.audio.automix.AutomixManager
+import com.alananasss.kittytune.media.CROSSFADE_SPAN_END
+import com.alananasss.kittytune.media.CROSSFADE_SPAN_START
 import com.alananasss.kittytune.media.equalPowerIn
 import com.alananasss.kittytune.media.equalPowerOut
 import com.alananasss.kittytune.ui.player.cover.mixHandover
@@ -53,8 +55,9 @@ class MixGlowTest {
         assertTrue(player.contains("internal fun equalPowerIn"))
         assertTrue(player.contains("internal fun equalPowerOut"))
         assertTrue(
-            glow.contains("equalPowerOut(0f, 0.6f, progress)") && glow.contains("equalPowerIn(0.4f, 1f, progress)"),
-            "The glow must read the same two ramps, with the same edges, as the fade runs them",
+            glow.contains("equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)") &&
+                glow.contains("equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)"),
+            "The glow must read the same two ramps, over the same span, as the fade runs them",
         )
         assertTrue(
             glow.contains("import com.alananasss.kittytune.media.equalPowerIn"),
@@ -121,32 +124,54 @@ class MixGlowTest {
     }
 
     /**
-     * Not a wish — a measurement.
+     * The mix has to hold its level through the whole fade.
      *
-     * The two ramps span different intervals, so `out^2 + in^2` is not the constant 1 that equal
-     * power means, and the mix sags in the middle. Equal power needs both ramps over the *same*
-     * span; with a common span the sum is 1.0 at every point, which is the number to compare against
-     * if this is ever fixed.
+     * This is the whole point of an equal-power crossfade: the sum of the two gains squared is a
+     * constant, so the moment one track hands over to the next the level does not move. It was not
+     * true here — the two ramps spanned `[0, 0.6]` and `[0.4, 1]`, which overlap but are not the
+     * same function, and the sum fell to about 0.13 halfway through: roughly 9 dB of sag at exactly
+     * the point the fade exists to be seamless.
      *
-     * Pinned rather than asserted as correct, so the dip cannot quietly get worse — and so the next
-     * reader of the glow's comments finds out that "the mix is smooth" is not currently true.
+     * The regression is pinned here rather than in a comment, so widening one ramp without the other
+     * cannot bring it back quietly.
      */
     @Test
-    fun testTheMixIsNotEqualPower() {
-        fun power(outFrom: Float, outTo: Float, inFrom: Float, inTo: Float, p: Float): Float {
-            val o = equalPowerOut(outFrom, outTo, p)
-            val i = equalPowerIn(inFrom, inTo, p)
-            return o * o + i * i
+    fun testTheMixHoldsItsLevelThroughTheFade() {
+        val power = sample.map { p ->
+            val o = equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, p)
+            val i = equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, p)
+            o * o + i * i
         }
+        val spread = power.max() - power.min()
+        assertTrue(spread < 0.01f, "The summed level moved by $spread across the fade")
 
-        val asShipped = sample.map { power(0f, 0.6f, 0.4f, 1f, it) }
-        val dip = 1f - asShipped.min()
-        assertTrue(dip > 0.5f, "Expected a deep dip, measured $dip")
+        // The shape that caused it, kept as a guard on the reasoning: overlapping is not the same
+        // thing as shared, and only sharing holds the sum still.
+        val mismatched = sample.map { p ->
+            val o = equalPowerOut(0f, 0.6f, p)
+            val i = equalPowerIn(0.4f, 1f, p)
+            o * o + i * i
+        }
+        assertTrue(
+            1f - mismatched.min() > 0.5f,
+            "Ramps over different spans must still sag, or this test is not testing what it claims",
+        )
+    }
 
-        // What it would be with one shared span, which is what equal power actually requires.
-        val shared = sample.map { power(0.3f, 0.7f, 0.3f, 0.7f, it) }
-        val sharedSpread = shared.max() - shared.min()
-        assertTrue(sharedSpread < 0.01f, "A shared span would be flat, varied by $sharedSpread")
+    @Test
+    fun testTheTwoRampsShareOneSpan() {
+        val player = source("media/PlayerCompat.kt")
+        assertTrue(player.contains("internal const val CROSSFADE_SPAN_START"))
+        assertTrue(player.contains("internal const val CROSSFADE_SPAN_END"))
+        // The engine runs the ramps over the shared span, not over two literals.
+        assertTrue(
+            player.contains("equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)"),
+            "The engine must use the shared span it publishes",
+        )
+        // And the handover still sits in the middle, which is the shape the span was chosen for.
+        assertTrue(CROSSFADE_SPAN_START < 0.5f && CROSSFADE_SPAN_END > 0.5f)
+        val midpoint = mixHandover(0.5f)
+        assertEquals(1f, midpoint, 0.02f, "The two tracks are equally loud at the halfway point")
     }
 
     // ── It is drawn, not recomposed ──
