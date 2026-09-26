@@ -1216,15 +1216,6 @@
     <string name="pref_lyrics_apple_effect_sub">Sima betűkitöltés a szavak közötti ugrálás helyett.</string>
     <string name="pref_lyrics_inline">Beágyazott dalszöveg</string>
     <string name="pref_lyrics_inline_sub">Megjeleníti a dalszöveget a lejátszóban a borítókép helyén</string>
-    <string name="pref_lyrics_under_cover">Dalszöveg a borító alatt</string>
-    <string name="pref_lyrics_under_cover_sub">A szinkronizált dalszöveg aktuális sorának megjelenítése az albumborító alatt</string>
-    <string name="pref_lyrics_multi_state">Többállapotú dalszöveg-kapcsoló</string>
-    <string name="pref_lyrics_multi_state_sub">Ciklikus váltás: Borító -&gt; Borító alatt -&gt; Borító helyett</string>
-    <string name="pref_lyrics_under_cover_placement">Borító alatti elrendezés</string>
-    <string name="pref_lyrics_under_cover_replace">Cím és előadó helyett</string>
-    <string name="pref_lyrics_under_cover_above">Cím és előadó felett</string>
-    <string name="pref_lyrics_under_cover_always">Mindig jelenjen meg a borító alatt</string>
-    <string name="pref_lyrics_under_cover_always_sub">Az aktuális sor látható marad érintés nélkül is</string>
     <string name="pref_lyrics_local">Helyi fájlok előnyben</string>
     <string name="pref_lyrics_local_sub">Beágyazott (ID3) szövegek használata</string>
     <string name="pref_lyrics_precise">Precíz keresés</string>

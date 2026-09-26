@@ -992,15 +992,6 @@
     <string name="pref_lyrics_show_button_sub">Zeigt eine Schnellzugriff-Schaltfläche im Player</string>
     <string name="pref_lyrics_inline">Songtext im Player</string>
     <string name="pref_lyrics_inline_sub">Zeigt den Songtext im Player anstelle des Covers</string>
-    <string name="pref_lyrics_under_cover">Songtext unter dem Albumcover</string>
-    <string name="pref_lyrics_under_cover_sub">Zeigt die aktuelle synchronisierte Zeile unter dem Albumcover</string>
-    <string name="pref_lyrics_multi_state">Mehrstufiger Songtext-Umschalter</string>
-    <string name="pref_lyrics_multi_state_sub">Abfolge: Cover -> Unter dem Cover -> Cover ersetzen</string>
-    <string name="pref_lyrics_under_cover_placement">Layout unter dem Cover</string>
-    <string name="pref_lyrics_under_cover_replace">Titel und Künstler ersetzen</string>
-    <string name="pref_lyrics_under_cover_above">Über Titel und Künstler</string>
-    <string name="pref_lyrics_under_cover_always">Immer unter dem Cover anzeigen</string>
-    <string name="pref_lyrics_under_cover_always_sub">Hält die aktuelle Zeile sichtbar, ohne dass du tippen musst</string>
     <string name="pref_lyrics_provider_title">Songtext-Anbieter</string>
     <string name="pref_lyrics_provider_max_quality">Maximale Qualität (Musixmatch)</string>
     <string name="pref_lyrics_provider_open_source">100 % kostenlos (LrcLib)</string>

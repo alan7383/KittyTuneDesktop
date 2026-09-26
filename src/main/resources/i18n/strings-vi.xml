@@ -919,15 +919,6 @@
     <string name="pref_lyrics_show_button_sub">Hiển thị nút truy cập nhanh trên trình phát</string>
     <string name="pref_lyrics_inline">Lời bài hát trực tiếp</string>
     <string name="pref_lyrics_inline_sub">Hiển thị lời bài hát ngay trên giao diện trình phát thay thế ảnh bìa</string>
-    <string name="pref_lyrics_under_cover">Lời bài hát dưới ảnh bìa</string>
-    <string name="pref_lyrics_under_cover_sub">Hiển thị dòng lời đồng bộ hiện tại bên dưới ảnh bìa</string>
-    <string name="pref_lyrics_multi_state">Chuyển đổi trạng thái lời bài hát</string>
-    <string name="pref_lyrics_multi_state_sub">Xoay vòng: Ảnh bìa -> Dưới ảnh bìa -> Thay thế ảnh bìa</string>
-    <string name="pref_lyrics_under_cover_placement">Bố cục dưới ảnh bìa</string>
-    <string name="pref_lyrics_under_cover_replace">Thay thế tiêu đề và nghệ sĩ</string>
-    <string name="pref_lyrics_under_cover_above">Phía trên tiêu đề và nghệ sĩ</string>
-    <string name="pref_lyrics_under_cover_always">Luôn hiển thị dưới ảnh bìa</string>
-    <string name="pref_lyrics_under_cover_always_sub">Giữ dòng lời hiện tại luôn hiển thị mà không cần chạm</string>
     <string name="pref_lyrics_provider_title">Nhà cung cấp lời bài hát</string>
     <string name="pref_lyrics_provider_max_quality">Chất lượng cao nhất (Musixmatch)</string>
     <string name="pref_lyrics_provider_open_source">Hoàn toàn miễn phí (LrcLib)</string>
