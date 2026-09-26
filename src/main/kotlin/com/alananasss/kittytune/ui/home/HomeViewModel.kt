@@ -238,23 +238,18 @@ import com.alananasss.kittytune.utils.Logger
             chartPreviewKind = kind
             viewModelScope.launch {
                 isChartPreviewLoading = true
-                try {
-                    val response = api.getCharts(
-                        kind = kind.apiValue,
-                        genre = "soundcloud:genres:all-music",
-                        limit = CHART_PREVIEW_LENGTH,
-                    )
-                    val entries = response.collection.mapNotNull { item ->
-                        item.track?.let { ChartEntry(rank = 0, track = it, score = item.score ?: 0.0) }
-                    }.mapIndexed { index, entry -> entry.copy(rank = index + 1) }
-                    if (kind == chartPreviewKind) {
-                        chartPreview.clear()
-                        chartPreview.addAll(entries)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    if (kind == chartPreviewKind) isChartPreviewLoading = false
+                val entries = fetchChart(
+                    api = api,
+                    kind = kind,
+                    genre = ChartsViewModel.chartGenres.first(),
+                    limit = CHART_PREVIEW_LENGTH,
+                    // The landing previews one market; picking another belongs to the chart screen.
+                    countryCode = "US",
+                )
+                if (kind == chartPreviewKind) {
+                    chartPreview.clear()
+                    chartPreview.addAll(entries)
+                    isChartPreviewLoading = false
                 }
             }
         }

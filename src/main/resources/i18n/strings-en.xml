@@ -2704,4 +2704,5 @@
     <string name="home_from_your_artists_sub">What the artists you like have put out</string>
     <string name="explore">Explore</string>
     <string name="chart_section_title">Chart</string>
+    <string name="chart_genre_folk">Folk</string>
 </resources>

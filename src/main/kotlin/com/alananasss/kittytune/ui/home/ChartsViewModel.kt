@@ -26,16 +26,25 @@
 
     /**
      * A chart is a list of songs in order, so the two things worth choosing between are which list and
-     * which genre — not which country. This mirrors how SoundCloud addresses its own charts
-     * (`charts-<kind>:<genre>` system playlists, with `top` and `trending` as the only two kinds).
+     * which genre.
+     *
+     * The two lists are not the same request, which is worth stating because it was not obvious:
+     * `GET /charts` answers only `kind=trending`. `kind=top` comes back as an empty object, with or
+     * without a genre, and so does every genre other than `all-music` — the endpoint narrowed to one
+     * live feed. The Top 50 is a different thing entirely: it is a playlist SoundCloud curates by
+     * hand and publishes at `soundcloud.com/music-charts-<country>/sets/<slug>`, fifty tracks in
+     * order, which `/resolve` hands back whole. So the genre row belongs to [ChartKind.TOP] and the
+     * trending feed has no genre to pick.
      */
-    enum class ChartKind(val apiValue: String) {
-        TOP("top"),
-        TRENDING("trending"),
-    }
+    enum class ChartKind { TOP, TRENDING }
 
-    /** Genres the chart endpoint is asked for. `all-music` is SoundCloud's own catch-all. */
-    data class ChartGenre(val id: String, val apiValue: String)
+    /**
+     * A chart playlist, by the slug SoundCloud publishes it under.
+     *
+     * [slug] is the path segment after `/sets/`; the country is the `music-charts-<cc>` account, which
+     * is why the same genre has a different chart in a different market.
+     */
+    data class ChartGenre(val id: String, val slug: String)
 
     /** One song at its place in the chart. [rank] is the position, never the score. */
     data class ChartEntry(val rank: Int, val track: Track, val score: Double)
@@ -64,9 +73,9 @@
         /**
          * Loads the ranked song list.
          *
-         * The endpoint returns the songs in chart order with a score beside each one, so the rank is
-         * simply the position: re-sorting by score would be second-guessing a list the server has
-         * already ordered, and on `trending` the score is a velocity, not a size.
+         * The rank is the row's position and never the score: on the trending feed the score is a
+         * velocity, not a size, and re-sorting it would be second-guessing an order the server has
+         * already decided.
          */
         fun loadChart(kind: ChartKind, genre: ChartGenre) {
             chartKind = kind
@@ -74,30 +83,20 @@
 
             viewModelScope.launch {
                 isChartLoading = true
-                try {
-                    val response = api.getCharts(
-                        kind = kind.apiValue,
-                        genre = genre.apiValue,
-                        limit = CHART_LENGTH,
-                    )
-                    val entries = response.collection.mapNotNull { item ->
-                        item.track?.let { ChartEntry(rank = 0, track = it, score = item.score ?: 0.0) }
-                    }.mapIndexed { index, entry -> entry.copy(rank = index + 1) }
-
-                    // A switch made mid-flight must not leave the newer request's answer overwritten
-                    // by the older one's.
-                    if (kind == chartKind && genre == chartGenre) {
-                        chartEntries.clear()
-                        chartEntries.addAll(entries)
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    if (kind == chartKind && genre == chartGenre) isChartLoading = false
+                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode())
+                // A switch made mid-flight must not leave the newer request's answer overwritten by
+                // the older one's.
+                if (kind == chartKind && genre == chartGenre) {
+                    chartEntries.clear()
+                    chartEntries.addAll(entries)
+                    isChartLoading = false
                 }
             }
         }
-    
+
+        fun currentCountryCode(): String =
+            ChartsData.charts.getOrNull(selectedCountryIndex)?.countryCode ?: "US"
+
         fun loadCountryCharts(index: Int) {
             selectedCountryIndex = index
             val countryData = ChartsData.charts[index]
@@ -190,15 +189,20 @@
             const val CHART_LENGTH = 50
 
             val chartGenres = listOf(
-                ChartGenre("all", "soundcloud:genres:all-music"),
-                ChartGenre("pop", "soundcloud:genres:pop"),
-                ChartGenre("hiphop", "soundcloud:genres:hiphoprap"),
-                ChartGenre("electronic", "soundcloud:genres:electronic"),
-                ChartGenre("rock", "soundcloud:genres:rock"),
-                ChartGenre("rnb", "soundcloud:genres:rnb"),
-                ChartGenre("country", "soundcloud:genres:country"),
-                ChartGenre("latin", "soundcloud:genres:latin"),
+                ChartGenre("all", "all-music-genres"),
+                ChartGenre("pop", "pop"),
+                ChartGenre("hiphop", "hip-hop"),
+                ChartGenre("electronic", "electronic"),
+                ChartGenre("rock", "rock"),
+                ChartGenre("rnb", "r-b"),
+                ChartGenre("country", "country"),
+                ChartGenre("latin", "latin"),
+                ChartGenre("folk", "folk"),
             )
+
+            /** The curated chart playlist URL, for a country code as [ChartsData] spells it. */
+            fun chartPlaylistUrl(countryCode: String, genre: ChartGenre): String =
+                "https://soundcloud.com/music-charts-${countryCode.lowercase()}/sets/${genre.slug}"
         }
     }
 

@@ -100,7 +100,10 @@ fun SongChart(
             }
         }
 
-        if (showGenreRow) {
+        if (showGenreRow && kind == ChartKind.TOP) {
+            // Only for the curated Top 50. The trending feed has no genre to pick — asking it for one
+            // returns an empty chart — so a genre row shown there would be a control that does
+            // nothing, which is worse than no control.
             Spacer(Modifier.padding(top = 4.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(genres) { option ->

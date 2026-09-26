@@ -2706,4 +2706,5 @@
     <string name="home_from_your_artists_sub">Amit a kedvenceid kiadtak</string>
     <string name="explore">Felfedezés</string>
     <string name="chart_section_title">Lista</string>
+    <string name="chart_genre_folk">Népzmű</string>
 </resources>

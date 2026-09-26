@@ -1134,6 +1134,7 @@ object R {
         const val chart_genre_rnb = "chart_genre_rnb"
         const val chart_genre_country = "chart_genre_country"
         const val chart_genre_latin = "chart_genre_latin"
+        const val chart_genre_folk = "chart_genre_folk"
     }
 
     object font {

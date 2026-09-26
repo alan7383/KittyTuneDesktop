@@ -2705,4 +2705,5 @@
     <string name="home_from_your_artists_sub">Ce que les artistes que vous aimez ont publié</string>
     <string name="explore">Explorer</string>
     <string name="chart_section_title">Classement</string>
+    <string name="chart_genre_folk">Folk</string>
 </resources>
