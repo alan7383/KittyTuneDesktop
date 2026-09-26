@@ -3106,7 +3106,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (refresh) isCommentsLoading = true
             try {
                 val response = if (refresh) {
-                    api.getTrackComments(trackId = t.id, threaded = 1, filterReplies = 1, sort = commentSort.value)
+                    api.getTrackComments(trackId = t.id, limit = 20, threaded = 1, filterReplies = 1, sort = commentSort.value)
                 } else {
                     api.getCommentsNextPage(commentNextHref!!)
                 }

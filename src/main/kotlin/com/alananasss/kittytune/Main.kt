@@ -98,6 +98,9 @@ fun main(args: Array<String>) {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
     }
     AppBootstrap.init()
+    // Swing's own dialogs (folder pickers, the avatar chooser) in the system's look rather than Java's Metal,
+    // which is what made them look cut down next to Windows' own. Compose is unaffected.
+    runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }
 
     application {
         val playerViewModel = remember { PlayerViewModel(AppInstance.application) }
