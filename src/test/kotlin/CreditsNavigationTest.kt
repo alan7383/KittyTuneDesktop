@@ -14,7 +14,9 @@ import kotlin.test.assertEquals
 class CreditsNavigationTest {
     @Test
     fun testNavigationToCredits() {
+        val testClassLoader = javaClass.classLoader
         javax.swing.SwingUtilities.invokeAndWait {
+            Thread.currentThread().contextClassLoader = testClassLoader
             var currentRoute: String? = null
             var creditsNavLambda: (() -> Unit)? = null
             val scene = ImageComposeScene(width = 1000, height = 800, density = Density(1f)) {
