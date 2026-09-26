@@ -163,37 +163,31 @@ fun Sidebar(
                     .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                SidebarNavItem(
-                    label = str("nav_home"),
-                    selected = currentRoute == "home",
-                    iconSelected = Icons.Filled.Home,
-                    iconUnselected = Icons.Outlined.Home,
-                    collapse = collapse,
-                ) {
-                    homeViewModel?.clearSearch()
-                    if (currentRoute != "home") {
-                        navController.navigate("home") {
-                            launchSingleTop = true
-                        }
-                    } else {
-                        playerViewModel.showLyricsSheet = false
-                    }
-                }
                 // The rest, in the order and with the rows the settings page arranged.
                 navLayout.filter { it.isVisible }.forEach { entry ->
                     val destination = SidebarDestinations.ALL[entry.key] ?: return@forEach
                     key(destination.key) {
+                        val isSearchRow = destination.key == PlayerPreferences.SIDEBAR_NAV_SEARCH
+                        val isHomeRow = destination.key == PlayerPreferences.SIDEBAR_NAV_HOME
+                        val searching = homeViewModel?.isSearching == true
                         SidebarNavItem(
                             label = str(destination.labelKey),
-                            selected = currentRoute == destination.route,
+                            selected = currentRoute == destination.route && when {
+                                isSearchRow -> searching
+                                isHomeRow -> !searching
+                                else -> true
+                            },
                             iconSelected = destination.iconSelected,
                             iconUnselected = destination.iconUnselected,
                             collapse = collapse,
                         ) {
+                            playerViewModel.showLyricsSheet = false
+                            when {
+                                isSearchRow -> homeViewModel?.activateSearch()
+                                isHomeRow -> homeViewModel?.clearSearch()
+                            }
                             if (currentRoute != destination.route) {
                                 navController.navigate(destination.route) { launchSingleTop = true }
-                            } else {
-                                playerViewModel.showLyricsSheet = false
                             }
                         }
                     }
@@ -562,12 +556,22 @@ fun LibraryPanel(
             // height in a single frame part-way through, so every entry below slid up and then jumped
             // down. With the slot's height moving only between the two rows' own heights, the entries
             // hardly move at all.
+            // With both of the rail's buttons switched off there is nothing to show in it: its height eases to
+            // zero so the entries below move up instead of leaving a gap, and back when one is switched on.
+            val slotPrefs = remember { PlayerPreferences() }
+            val hiddenRailButtons by slotPrefs.hiddenLibraryButtonsFlow().collectAsState(initial = slotPrefs.getHiddenLibraryButtons())
+            val railHasButtons = PlayerPreferences.LIBRARY_BUTTONS.any { it !in hiddenRailButtons }
+            val railHeight by androidx.compose.animation.core.animateDpAsState(
+                if (railHasButtons) RAIL_ACTIONS_HEIGHT else 0.dp,
+                androidx.compose.animation.core.tween(260),
+                label = "railActionsHeight",
+            )
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(
                         if (fullScreen) SEARCH_ROW_HEIGHT
-                        else androidx.compose.ui.unit.lerp(SEARCH_ROW_HEIGHT, RAIL_ACTIONS_HEIGHT, collapse)
+                        else androidx.compose.ui.unit.lerp(SEARCH_ROW_HEIGHT, railHeight, collapse)
                     )
                     .clipToBounds()
             ) {
