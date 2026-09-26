@@ -1343,32 +1343,61 @@ private fun CoverColumn(
         val controlsWidth = maxOf(side, min(maxWidth, 400.dp))
 
         Column(horizontalAlignment = Alignment.Start) {
-            AnimatedArtwork(
-                artworkUrl = track.fullResArtwork,
-                animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
-                isPlaying = viewModel.isPlaying,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .width(side)
-                    .aspectRatio(1f)
-                    // A real shadow, because in the reference the sleeve sits above the wall rather than
-                    // being printed on it. It is most of what makes that screen feel like an object.
-                    .shadow(28.dp, RoundedCornerShape(14.dp), clip = false)
-                    .clip(RoundedCornerShape(14.dp))
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                                if (scrollDelta != 0f) {
-                                    val next = (viewModel.fullPlayerCoverScale - scrollDelta * 0.04f).coerceIn(0.6f, 1.4f)
-                                    viewModel.updateFullPlayerCoverScale(next)
+            // One glow, three layers, in the order they have to stack: the halo behind the sleeve so
+            // only its spill shows, the sleeve itself, then the travelling band clipped to the
+            // sleeve's corners. The wrapper is exactly the cover's width so the layout below is
+            // unaffected; the halo is free to overflow it.
+            val automixDebug by viewModel.automixDebugInfo.collectAsState()
+            val mixGlow = com.alananasss.kittytune.ui.player.cover.rememberMixGlow(
+                outgoingBpm = automixDebug?.outBpm ?: 0f,
+            )
+            val glowColors = remember(palette.mesh) { palette.mesh }
+
+            Box(Modifier.width(side)) {
+                com.alananasss.kittytune.ui.player.cover.MixHalo(
+                    glow = mixGlow,
+                    colors = glowColors,
+                    modifier = Modifier
+                        // Centred on the cover, so the spill is even on every side.
+                        .align(Alignment.Center)
+                        .size(side + com.alananasss.kittytune.ui.player.cover.MIX_HALO_MARGIN * 2),
+                )
+
+                AnimatedArtwork(
+                    artworkUrl = track.fullResArtwork,
+                    animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
+                    isPlaying = viewModel.isPlaying,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .width(side)
+                        .aspectRatio(1f)
+                        // A real shadow, because in the reference the sleeve sits above the wall rather than
+                        // being printed on it. It is most of what makes that screen feel like an object.
+                        .shadow(28.dp, RoundedCornerShape(14.dp), clip = false)
+                        .clip(RoundedCornerShape(14.dp))
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+                                    if (scrollDelta != 0f) {
+                                        val next = (viewModel.fullPlayerCoverScale - scrollDelta * 0.04f).coerceIn(0.6f, 1.4f)
+                                        viewModel.updateFullPlayerCoverScale(next)
+                                    }
                                 }
                             }
-                        }
-                    },
-            )
+                        },
+                )
+
+                com.alananasss.kittytune.ui.player.cover.MixSweep(
+                    glow = mixGlow,
+                    colors = glowColors,
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(14.dp)),
+                )
+            }
 
             if (showCurrentLine) {
                 Spacer(Modifier.height(20.dp))
