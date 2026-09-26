@@ -82,6 +82,18 @@ fun SettingsGroup(
     }
 }
 
+/**
+ * A row in a settings group.
+ *
+ * The mark is [icon] for the Material icons nearly every row uses, or [mark] for a drawable — the
+ * only way to get a brand's own logo, since Material has no Discord. Both are optional because most
+ * rows genuinely have none: a switch row, a slider row, a plain link.
+ *
+ * There was a third spelling, `iconRes: String?`, and it had no callers at all. With three ways in,
+ * whichever matched first won and the rest were dropped without a word, so a row handed an `iconRes`
+ * that did not exist drew nothing and looked deliberate. Two ways in, one resolution, one place the
+ * mark is drawn.
+ */
 @Composable
 fun SettingsItem(
     shape: Shape,
@@ -90,8 +102,7 @@ fun SettingsItem(
     trailingText: String? = null,
     trailingContent: (@Composable () -> Unit)? = null,
     icon: ImageVector? = null,
-    iconPainter: androidx.compose.ui.graphics.painter.Painter? = null,
-    iconRes: String? = null,
+    mark: androidx.compose.ui.graphics.painter.Painter? = null,
     onClick: (() -> Unit)? = null,
     hasSwitch: Boolean = false,
     switchState: Boolean = false,
@@ -112,6 +123,10 @@ fun SettingsItem(
         }
     }
 
+    // Decided once, here, and drawn once below. A vector is turned into a painter rather than
+    // branching at the draw site, so both kinds take one path through it instead of two.
+    val rowMark = icon?.let { androidx.compose.ui.graphics.vector.rememberVectorPainter(it) } ?: mark
+
     Card(
         onClick = { onToggleOrClick() },
         enabled = onClick != null || hasSwitch,
@@ -127,29 +142,19 @@ fun SettingsItem(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val resolvedPainter = iconPainter ?: (if (iconRes != null) androidx.compose.ui.res.painterResource(iconRes) else null)
-            if (icon != null || resolvedPainter != null) {
+            if (rowMark != null) {
                 Surface(
                     modifier = Modifier.size(42.dp),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.secondaryContainer
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        if (icon != null) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        } else if (resolvedPainter != null) {
-                            Icon(
-                                painter = resolvedPainter,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
+                        Icon(
+                            painter = rowMark,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.width(16.dp))

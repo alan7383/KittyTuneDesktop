@@ -251,7 +251,7 @@ fun AboutDialog(
                             { shape ->
                                 SettingsItem(
                                     shape = shape,
-                                    iconPainter = painterResource("drawable/ic_discord.xml"),
+                                    mark = painterResource("drawable/ic_discord.xml"),
                                     title = str("about_discord"),
                                     onClick = { uriHandler.openUri("https://discord.gg/thyHQH9jV9") }
                                 )
