@@ -143,9 +143,10 @@ private fun SidebarLayoutEditor(prefs: PlayerPreferences) {
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                            val isLastOn = entry.isVisible && layout.count { it.isVisible } == 1
                             SettingsSwitch(
                                 checked = entry.isVisible,
-                                onCheckedChange = { shown ->
+                                onCheckedChange = if (isLastOn) null else { shown ->
                                     save(layout.map { if (it.key == entry.key) it.copy(isVisible = shown) else it })
                                 },
                             )

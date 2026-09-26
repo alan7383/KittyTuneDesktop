@@ -240,15 +240,18 @@ class PlayerPreferences {
          */
         const val SIDEBAR_NAV_SYNC = "sync"
 
-        /** Home is deliberately absent: see [getHiddenSidebarNav]. */
+        const val SIDEBAR_NAV_HOME = "home"
+
+        /** The rows shown by default. Home can be switched off too, as long as one row stays on. */
         val SIDEBAR_NAV_ITEMS =
-            listOf(SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC)
+            listOf(SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC)
 
         // Optional destinations the sidebar can carry; off until someone switches them on.
         const val SIDEBAR_NAV_STATS = "stats"
         const val SIDEBAR_NAV_HISTORY = "history"
         const val SIDEBAR_NAV_SETTINGS = "settings"
-        val SIDEBAR_NAV_EXTRAS = listOf(SIDEBAR_NAV_STATS, SIDEBAR_NAV_HISTORY, SIDEBAR_NAV_SETTINGS)
+        const val SIDEBAR_NAV_SEARCH = "search"
+        val SIDEBAR_NAV_EXTRAS = listOf(SIDEBAR_NAV_SEARCH, SIDEBAR_NAV_STATS, SIDEBAR_NAV_HISTORY, SIDEBAR_NAV_SETTINGS)
 
         private const val KEY_SIDEBAR_NAV_LAYOUT = "sidebar_nav_layout"
 
@@ -1661,5 +1664,8 @@ internal fun parseSidebarNavLayout(raw: String?, legacyHidden: Set<String>): Lis
     val missing = known.filter { key -> stored.none { it.key == key } }.map { key ->
         SidebarNavEntry(key, isVisible = key in PlayerPreferences.SIDEBAR_NAV_ITEMS && key !in legacyHidden)
     }
-    return stored + missing
+    val (home, rest) = missing.partition { it.key == PlayerPreferences.SIDEBAR_NAV_HOME }
+    val layout = home + stored + rest
+    // Never nothing at all: with every row off the sidebar would have no way anywhere.
+    return if (layout.none { it.isVisible }) layout.map { if (it.key == PlayerPreferences.SIDEBAR_NAV_HOME) it.copy(isVisible = true) else it } else layout
 }
