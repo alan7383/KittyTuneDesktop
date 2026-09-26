@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
@@ -28,6 +29,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -542,54 +545,56 @@ private fun PlayerButtonsSection(
     showLyricsButton: Boolean,
     onToggle: (String, Boolean) -> Unit
 ) {
+    // The icons are the ones the bar itself draws, so a row here is recognisable as that button.
     val items = listOf(
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE,
             label = str("player_button_like"),
             desc = str("player_button_like_desc"),
-            icon = Icons.Filled.Favorite,
+            mark = rememberVectorPainter(Icons.Filled.Favorite),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS,
             label = str("player_button_lyrics"),
             desc = str("player_button_lyrics_desc"),
-            icon = Icons.AutoMirrored.Rounded.TextSnippet,
+            // The bar draws this one from a file, so the list has to as well.
+            mark = painterResource("icons/lyrics.svg"),
             enabled = showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER,
             label = str("mini_player_title"),
             desc = str("player_button_miniplayer_desc"),
-            icon = Icons.Rounded.PictureInPictureAlt,
+            mark = rememberVectorPainter(Icons.Rounded.PictureInPictureAlt),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL,
             label = str("player_button_panel"),
             desc = str("player_button_panel_desc"),
-            icon = Icons.Outlined.Tune,
+            mark = rememberVectorPainter(Icons.Outlined.Tune),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE,
             label = str("player_button_queue"),
             desc = str("player_button_queue_desc"),
-            icon = Icons.AutoMirrored.Outlined.QueueMusic,
+            mark = rememberVectorPainter(Icons.Outlined.QueueMusic),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE,
             label = str("player_button_shuffle"),
             desc = str("player_button_shuffle_desc"),
-            icon = Icons.Filled.Shuffle,
+            mark = rememberVectorPainter(Icons.Filled.Shuffle),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT,
             label = str("player_button_repeat"),
             desc = str("player_button_repeat_desc"),
-            icon = Icons.Filled.Repeat,
+            mark = rememberVectorPainter(Icons.Filled.Repeat),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons
         ),
     )
@@ -636,11 +641,19 @@ private fun PlayerButtonsSection(
     }
 }
 
+/**
+ * One row of the player-bar button list.
+ *
+ * [mark] is a painter rather than a vector because one of these buttons is not a Material icon — the
+ * bar draws its lyrics button from `icons/lyrics.svg` — and a settings list that draws a different
+ * glyph from the thing it is configuring is worse than no glyph. Same shape as the mark on a
+ * settings row and on a help card: one required value, both kinds through one path.
+ */
 private data class ButtonConfigItem(
     val key: String,
     val label: String,
     val desc: String,
-    val icon: ImageVector,
+    val mark: androidx.compose.ui.graphics.painter.Painter,
     val enabled: Boolean
 )
 
@@ -664,15 +677,22 @@ private fun ButtonToggleRow(
         ) {
             Surface(
                 shape = CircleShape,
+                // The chip and its mark are a tonal pair, primaryContainer with onPrimaryContainer.
+                // It was primary on primaryContainer, which is the same hue at two lightnesses and
+                // left the glyph barely there.
                 color = if (item.enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.size(38.dp)
+                modifier = Modifier.size(40.dp)
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = item.icon,
+                        painter = item.mark,
                         contentDescription = null,
-                        tint = if (item.enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (item.enabled) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        modifier = Modifier.size(22.dp),
                     )
                 }
             }
@@ -697,9 +717,15 @@ private fun ButtonToggleRow(
 
             Spacer(Modifier.width(12.dp))
 
-            Switch(
+            // Shown, not handled: the row above is the single click target. A switch with its own
+            // callback inside a clickable row is two toggles for one press — both fire, the state is
+            // written twice with the same value, and the switch looks like it ignored you. Passing
+            // null for the callback and true for `enabled` keeps it looking live, because Material
+            // otherwise derives "enabled" from the callback being present and greys it out.
+            com.alananasss.kittytune.ui.common.SettingsSwitch(
                 checked = item.enabled,
-                onCheckedChange = onToggle
+                onCheckedChange = null,
+                enabled = true,
             )
         }
     }
@@ -939,7 +965,13 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
     val prefs = remember { PlayerPreferences() }
     var hidden by remember(menu) { mutableStateOf(prefs.getHiddenMenuTiles(menu)) }
     val items = catalogue.map { tile ->
-        ButtonConfigItem(key = tile.id, label = str(tile.labelKey), desc = "", icon = menuTileIcon(tile.id), enabled = tile.id !in hidden)
+        ButtonConfigItem(
+            key = tile.id,
+            label = str(tile.labelKey),
+            desc = "",
+            mark = rememberVectorPainter(menuTileIcon(tile.id)),
+            enabled = tile.id !in hidden,
+        )
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
