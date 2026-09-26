@@ -378,8 +378,57 @@ private fun SourcesSection(navController: NavController) {
         com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_128 -> str("deezer_quality_mp3_128")
     }
 
+    // Every service in one list, each saying whether it is connected, the way an accounts page does: the
+    // Yandex token used to sit in a group of its own, as if it were a different kind of thing.
+    var showYandexTokenDialog by remember { mutableStateOf(false) }
+    val yandexConnected = com.alananasss.kittytune.data.yandex.YandexMusicClient.isConnected
+    val soundCloudSignedIn = !com.alananasss.kittytune.data.TokenManager.isGuestMode() &&
+        !com.alananasss.kittytune.data.TokenManager.getAccessToken().isNullOrBlank()
+    if (showYandexTokenDialog) YandexTokenDialog(onDismiss = { showYandexTokenDialog = false })
+
     SettingsGroup(
-        title = str("audio_providers_title"),
+        title = str("sources_services_title"),
+        items = listOf(
+            { shape ->
+                ServiceRow(
+                    shape = shape,
+                    name = "SoundCloud",
+                    subtitle = str(if (soundCloudSignedIn) "sources_signed_in" else "sources_guest"),
+                    iconRes = com.alananasss.kittytune.R.drawable.ic_logo_soundcloud,
+                    isConnected = soundCloudSignedIn,
+                    onClick = { navController.navigate("profile") },
+                )
+            },
+            { shape ->
+                ServiceRow(shape, "Qobuz", qobuzSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_qobuz, isConnected = true) {
+                    navController.navigate("qobuz_settings")
+                }
+            },
+            { shape ->
+                ServiceRow(shape, "TIDAL", tidalSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_tidal, isConnected = true) {
+                    navController.navigate("tidal_settings")
+                }
+            },
+            { shape ->
+                ServiceRow(shape, "Deezer", deezerSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_deezer, isConnected = true) {
+                    navController.navigate("deezer_settings")
+                }
+            },
+            { shape ->
+                ServiceRow(
+                    shape = shape,
+                    name = str("sources_yandex"),
+                    subtitle = str(if (yandexConnected) "pref_yandex_token_sub" else "yandex_not_connected"),
+                    iconRes = null,
+                    isConnected = yandexConnected,
+                    onClick = { showYandexTokenDialog = true },
+                )
+            },
+        ),
+    )
+
+    SettingsGroup(
+        title = str("sources_playback_title"),
         items = listOf(
             { shape ->
                 SettingsItem(
@@ -387,76 +436,20 @@ private fun SourcesSection(navController: NavController) {
                     title = str("provider_order"),
                     subtitle = orderSummary,
                     icon = Icons.Rounded.SwapVert,
-                    onClick = { navController.navigate("provider_order") }
+                    onClick = { navController.navigate("provider_order") },
                 )
             },
-            { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("qobuz_integration"),
-                    subtitle = qobuzSubtitle,
-                    iconRes = com.alananasss.kittytune.R.drawable.ic_logo_qobuz,
-                    onClick = { navController.navigate("qobuz_settings") }
-                )
-            },
-            { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("tidal_integration"),
-                    subtitle = tidalSubtitle,
-                    iconRes = com.alananasss.kittytune.R.drawable.ic_logo_tidal,
-                    onClick = { navController.navigate("tidal_settings") }
-                )
-            },
-            { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("deezer_integration"),
-                    subtitle = deezerSubtitle,
-                    iconRes = com.alananasss.kittytune.R.drawable.ic_logo_deezer,
-                    onClick = { navController.navigate("deezer_settings") }
-                )
-            }
-        )
-    )
-
-    Spacer(Modifier.height(24.dp))
-
-    SettingsGroup(
-        title = str("music_import_title"),
-        items = listOf(
             { shape ->
                 SettingsItem(
                     shape = shape,
                     title = str("music_import_title"),
                     subtitle = str("music_import_settings_subtitle"),
-                    onClick = { navController.navigate("music_import") }
+                    icon = Icons.Rounded.ImportExport,
+                    onClick = { navController.navigate("music_import") },
                 )
-            }
-        )
+            },
+        ),
     )
-
-    Spacer(Modifier.height(24.dp))
-
-    var showYandexTokenDialog by remember { mutableStateOf(false) }
-    val yandexConnected = com.alananasss.kittytune.data.yandex.YandexMusicClient.isConnected
-    SettingsGroup(
-        title = str("pref_yandex_token"),
-        items = listOf(
-            { shape ->
-                SettingsItem(
-                    shape = shape,
-                    title = str("pref_yandex_token"),
-                    subtitle = if (yandexConnected) str("pref_yandex_token_sub")
-                    else str("yandex_not_connected"),
-                    onClick = { showYandexTokenDialog = true },
-                )
-            }
-        )
-    )
-    if (showYandexTokenDialog) {
-        YandexTokenDialog(onDismiss = { showYandexTokenDialog = false })
-    }
 
     Spacer(Modifier.height(24.dp))
 
@@ -609,6 +602,54 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
                         }
                     ) { Text(str("btn_save")) }
                 }
+            }
+        }
+    }
+}
+
+
+/** A service in the sources list: its logo, what state it is in, and a "connected" mark. */
+@Composable
+private fun ServiceRow(
+    shape: androidx.compose.ui.graphics.Shape,
+    name: String,
+    subtitle: String,
+    iconRes: String?,
+    isConnected: Boolean,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        shape = shape,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(42.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (iconRes != null) {
+                        Icon(androidx.compose.ui.res.painterResource(iconRes), contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(22.dp))
+                    } else {
+                        Text(name.take(1), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            Spacer(Modifier.width(12.dp))
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = if (isConnected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                Text(
+                    str(if (isConnected) "sources_connected" else "sources_connect"),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isConnected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
             }
         }
     }

@@ -3240,4 +3240,11 @@
     <string name="floating_bar_margin">Abstand unten</string>
     <string name="floating_bar_translucent">Durchscheinend</string>
     <string name="floating_bar_translucent_sub">Seite scheint durch</string>
+    <string name="sources_services_title">Dienste und Konten</string>
+    <string name="sources_playback_title">Suche und Import</string>
+    <string name="sources_signed_in">Angemeldet</string>
+    <string name="sources_guest">Als Gast — anmelden für Likes</string>
+    <string name="sources_yandex">Yandex Music</string>
+    <string name="sources_connected">Verbunden</string>
+    <string name="sources_connect">Verbinden</string>
 </resources>
