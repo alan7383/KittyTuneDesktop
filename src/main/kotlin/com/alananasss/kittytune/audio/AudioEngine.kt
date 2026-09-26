@@ -370,7 +370,7 @@ class AudioEngine {
     }
 
     fun setVolume(v: Float) {
-        volume = v.coerceIn(0f, 1f)
+        volume = if (v <= 0.001f) 0f else v.coerceIn(0f, 1f)
         applyLineVolume()
     }
 

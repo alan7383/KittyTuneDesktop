@@ -21,7 +21,7 @@ object VolumeCurve {
 
     fun sliderToAmplitude(position: Float): Float {
         val p = position.coerceIn(0f, 1f)
-        if (p <= 0f) return 0f
+        if (p <= 0.001f) return 0f
         return 10f.pow(RANGE_DB * (p - 1f) / 20f)
     }
 

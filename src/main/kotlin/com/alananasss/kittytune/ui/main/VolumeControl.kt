@@ -282,10 +282,15 @@ private fun VolumeTrack(
             .pointerInput(vertical) {
                 fun levelAt(position: Offset): Float {
                     val inset = TRACK_INSET.toPx()
-                    return if (vertical) {
-                        (1f - (position.y - inset) / (size.height - 2 * inset).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                    val raw = if (vertical) {
+                        1f - (position.y - inset) / (size.height - 2 * inset).coerceAtLeast(1f)
                     } else {
-                        ((position.x - inset) / (size.width - 2 * inset).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                        (position.x - inset) / (size.width - 2 * inset).coerceAtLeast(1f)
+                    }
+                    return when {
+                        raw <= 0.015f -> 0f
+                        raw >= 0.985f -> 1f
+                        else -> raw.coerceIn(0f, 1f)
                     }
                 }
                 awaitEachGesture {
@@ -313,26 +318,109 @@ private fun VolumeTrack(
         val inset = TRACK_INSET.toPx()
         val length = ((if (vertical) size.height else size.width) - 2 * inset).coerceAtLeast(0f)
         val cross = (if (vertical) size.width else size.height) / 2f
-        // Along the track from its start (left, or bottom when vertical), and across it from the centre.
-        fun at(along: Float, across: Float = 0f): Offset =
-            if (vertical) Offset(cross + across, size.height - inset - along)
-            else Offset(inset + along, cross + across)
-
         val stroke = thickness.toPx()
         val filled = length * volume.coerceIn(0f, 1f)
-        val gap = if (spec.gapAroundThumb) spec.thumbLength.toPx() / 2f + 3.dp.toPx() else 0f
-        val activeEnd = (filled - gap).coerceAtLeast(0f)
-        val inactiveStart = (filled + gap).coerceAtMost(length)
 
-        // Inactive part: a straight line from past the thumb to the end.
-        if (inactiveStart < length) {
-            drawLine(inactiveColor, at(inactiveStart), at(length), stroke, StrokeCap.Round)
-        }
-        // Active part: straight, or a still wave for the wavy styles.
-        if (activeEnd > 0f) {
-            if (spec.amplitude == 0.dp) {
-                drawLine(activeColor, at(0f), at(activeEnd), stroke, StrokeCap.Round)
+        val barWidth = 4.dp.toPx()
+        val gapMargin = 3.dp.toPx()
+
+        if (spec.amplitude == 0.dp) {
+            // Straight track (BAR and SLIM)
+            val gapScale = if (spec.gapAroundThumb) {
+                (filled / (barWidth + gapMargin * 2f)).coerceIn(0f, 1f)
+            } else 0f
+            val actualGap = if (spec.gapAroundThumb) gapMargin * gapScale else 0f
+            val actualThumbHalf = if (spec.gapAroundThumb) (barWidth / 2f) * gapScale else 0f
+
+            val remaining = length - filled
+            val inactiveGapScale = if (spec.gapAroundThumb) {
+                (remaining / (barWidth + gapMargin * 2f)).coerceIn(0f, 1f)
+            } else 0f
+            val actualInactiveGap = if (spec.gapAroundThumb) gapMargin * inactiveGapScale else 0f
+            val actualInactiveThumbHalf = if (spec.gapAroundThumb) (barWidth / 2f) * inactiveGapScale else 0f
+
+            if (vertical) {
+                val bottomY = size.height - inset
+                val topY = inset
+                val thumbY = bottomY - filled
+
+                // Active track (from bottom up towards thumb)
+                if (volume > 0.001f) {
+                    val activeTop = (thumbY + actualThumbHalf + actualGap).coerceAtMost(bottomY)
+                    val activeHeight = (bottomY - activeTop).coerceAtLeast(0f)
+                    if (activeHeight > 0f) {
+                        val corner = CornerRadius(minOf(stroke / 2f, activeHeight / 2f))
+                        drawRoundRect(
+                            color = activeColor,
+                            topLeft = Offset(cross - stroke / 2f, activeTop),
+                            size = Size(stroke, activeHeight),
+                            cornerRadius = corner,
+                        )
+                    }
+                }
+
+                // Inactive track (from thumb up towards top)
+                if (volume < 0.999f) {
+                    val inactiveBottom = (thumbY - actualInactiveThumbHalf - actualInactiveGap).coerceAtLeast(topY)
+                    val inactiveHeight = (inactiveBottom - topY).coerceAtLeast(0f)
+                    if (inactiveHeight > 0f) {
+                        val corner = CornerRadius(minOf(stroke / 2f, inactiveHeight / 2f))
+                        drawRoundRect(
+                            color = inactiveColor,
+                            topLeft = Offset(cross - stroke / 2f, topY),
+                            size = Size(stroke, inactiveHeight),
+                            cornerRadius = corner,
+                        )
+                    }
+                }
             } else {
+                val startX = inset
+                val endX = inset + length
+                val thumbX = startX + filled
+
+                // Active track (from left up towards thumb)
+                if (volume > 0.001f) {
+                    val activeRight = (thumbX - actualThumbHalf - actualGap).coerceAtLeast(startX)
+                    val activeWidth = (activeRight - startX).coerceAtLeast(0f)
+                    if (activeWidth > 0f) {
+                        val corner = CornerRadius(minOf(stroke / 2f, activeWidth / 2f))
+                        drawRoundRect(
+                            color = activeColor,
+                            topLeft = Offset(startX, cross - stroke / 2f),
+                            size = Size(activeWidth, stroke),
+                            cornerRadius = corner,
+                        )
+                    }
+                }
+
+                // Inactive track (from thumb up towards right)
+                if (volume < 0.999f) {
+                    val inactiveLeft = (thumbX + actualInactiveThumbHalf + actualInactiveGap).coerceAtMost(endX)
+                    val inactiveWidth = (endX - inactiveLeft).coerceAtLeast(0f)
+                    if (inactiveWidth > 0f) {
+                        val corner = CornerRadius(minOf(stroke / 2f, inactiveWidth / 2f))
+                        drawRoundRect(
+                            color = inactiveColor,
+                            topLeft = Offset(inactiveLeft, cross - stroke / 2f),
+                            size = Size(inactiveWidth, stroke),
+                            cornerRadius = corner,
+                        )
+                    }
+                }
+            }
+        } else {
+            // Wavy / squiggly tracks
+            fun at(along: Float, across: Float = 0f): Offset =
+                if (vertical) Offset(cross + across, size.height - inset - along)
+                else Offset(inset + along, cross + across)
+
+            val activeEnd = if (volume <= 0.001f) 0f else filled
+            val inactiveStart = if (volume >= 0.999f) length else filled
+
+            if (inactiveStart < length) {
+                drawLine(inactiveColor, at(inactiveStart), at(length), stroke, StrokeCap.Round)
+            }
+            if (activeEnd > 0f) {
                 val amplitude = spec.amplitude.toPx() * waveScale
                 val k = (2.0 * Math.PI / spec.wavelength.toPx()).toFloat()
                 val shift = phase.floatValue
@@ -348,18 +436,29 @@ private fun VolumeTrack(
                 drawPath(wave, activeColor, style = Stroke(width = stroke, cap = StrokeCap.Round))
             }
         }
-        // Thumb: a bar for the bar style (always shown, as Material draws it), a dot for the others
-        // (shown under the pointer, so the idle track stays quiet).
+
+        // Thumb: a bar for the bar style, a dot for the others
         if (spec.gapAroundThumb) {
             val barLength = spec.thumbLength.toPx() * (1f + 0.2f * thumbGrow)
-            val barWidth = 4.dp.toPx()
-            val centre = at(filled)
-            val topLeft = if (vertical) Offset(centre.x - barLength / 2f, centre.y - barWidth / 2f)
-            else Offset(centre.x - barWidth / 2f, centre.y - barLength / 2f)
+            val thumbPos = if (vertical) {
+                Offset(cross, size.height - inset - filled)
+            } else {
+                Offset(inset + filled, cross)
+            }
+            val topLeft = if (vertical) {
+                Offset(thumbPos.x - barLength / 2f, thumbPos.y - barWidth / 2f)
+            } else {
+                Offset(thumbPos.x - barWidth / 2f, thumbPos.y - barLength / 2f)
+            }
             val barSize = if (vertical) Size(barLength, barWidth) else Size(barWidth, barLength)
             drawRoundRect(activeColor, topLeft, barSize, CornerRadius(barWidth / 2f))
         } else if (thumbGrow > 0f) {
-            drawCircle(activeColor, 7.dp.toPx() * thumbGrow.coerceAtLeast(0f), at(filled))
+            val dotPos = if (vertical) {
+                Offset(cross, size.height - inset - filled)
+            } else {
+                Offset(inset + filled, cross)
+            }
+            drawCircle(activeColor, 7.dp.toPx() * thumbGrow.coerceAtLeast(0f), dotPos)
         }
     }
 }
@@ -396,7 +495,11 @@ private fun rememberVolumeStyle(): PlayerSliderStyle {
 internal fun volumeIcon(volume: Float): ImageVector =
     if (volume <= 0.001f) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp
 
-internal fun volumePercentLabel(volume: Float): String = "${(volume * 100).roundToInt()}%"
+internal fun volumePercentLabel(volume: Float): String {
+    if (volume <= 0.001f) return "0%"
+    val percent = (volume * 100).roundToInt()
+    return "${maxOf(1, percent)}%"
+}
 
 /**
  * Scroll wheel over any volume control raises or lowers it, in 5% steps. Wheel deltas are

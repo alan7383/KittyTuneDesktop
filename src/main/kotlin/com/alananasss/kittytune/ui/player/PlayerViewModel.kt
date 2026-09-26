@@ -203,7 +203,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var volumePersistJob: Job? = null
 
     fun updateVolume(v: Float) {
-        val newVol = v.coerceIn(0f, 1f)
+        val newVol = if (v <= 0.001f) 0f else v.coerceIn(0f, 1f)
         volume = newVol
         MusicManager.setVolume(newVol)
     }
@@ -228,11 +228,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleMute() {
-        if (volume > 0f) {
+        if (volume > 0.001f) {
             volumeBeforeMute = volume
             updateVolume(0f)
         } else {
-            updateVolume(if (volumeBeforeMute > 0f) volumeBeforeMute else 1.0f)
+            updateVolume(if (volumeBeforeMute > 0.001f) volumeBeforeMute else 1.0f)
         }
     }
 

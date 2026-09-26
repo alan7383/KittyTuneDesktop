@@ -22,4 +22,20 @@ class VolumePercentageDisplayTest {
         assertEquals("35%", volumePercentLabel(0.346f))
         assertEquals("34%", volumePercentLabel(0.344f))
     }
+
+    @Test
+    fun `shows 0 percent only when silent and at least 1 percent when audible`() {
+        assertEquals("0%", volumePercentLabel(0f))
+        assertEquals("0%", volumePercentLabel(0.0005f))
+        assertEquals("0%", volumePercentLabel(0.001f))
+        assertEquals("1%", volumePercentLabel(0.002f))
+        assertEquals("1%", volumePercentLabel(0.004f))
+        assertEquals("1%", volumePercentLabel(0.01f))
+    }
+
+    @Test
+    fun `never displays minus zero percent`() {
+        assertEquals("0%", volumePercentLabel(-0.0f))
+        assertEquals("0%", volumePercentLabel(-0.001f))
+    }
 }
