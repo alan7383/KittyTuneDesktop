@@ -2598,4 +2598,26 @@
     <string name="stats_story_habits">Comment vous écoutez</string>
     <string name="stats_story_active_days">jours avec musique</string>
     <string name="menu_about">À propos</string>
+    <string name="app_icon_default">Par défaut</string>
+    <string name="app_icon_black">Noir</string>
+    <string name="app_icon_blue">Bleu</string>
+    <string name="app_icon_chrome">Chrome</string>
+    <string name="app_icon_england">Angleterre</string>
+    <string name="app_icon_scotland">Écosse</string>
+    <string name="app_icon_hot_pink">Rose vif</string>
+    <string name="app_icon_lavender">Lavande</string>
+    <string name="app_icon_leopard">Léopard</string>
+    <string name="app_icon_lime">Citron vert</string>
+    <string name="app_icon_og">Original</string>
+    <string name="app_icon_rose_gold">Or rose</string>
+    <string name="app_icon_silver">Argent</string>
+    <string name="app_icon_soft_purple">Violet doux</string>
+    <string name="app_icon_sunset">Coucher de soleil</string>
+    <string name="app_icon_tie_dye">Tie-dye</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_custom_short">Personnalisé</string>
+    <string name="pref_font">Police</string>
+    <string name="font_default">Par défaut</string>
+    <string name="font_add">Ajouter une police</string>
+    <string name="font_rejected">Ce fichier n\'est pas une police TTF/OTF</string>
 </resources>

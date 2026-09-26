@@ -3046,4 +3046,26 @@
     <string name="stats_story_habits">Cách bạn nghe</string>
     <string name="stats_story_active_days">ngày có nhạc</string>
     <string name="menu_about">Giới thiệu</string>
+    <string name="app_icon_default">Mặc định</string>
+    <string name="app_icon_black">Đen</string>
+    <string name="app_icon_blue">Xanh dương</string>
+    <string name="app_icon_chrome">Chrome</string>
+    <string name="app_icon_england">Anh</string>
+    <string name="app_icon_scotland">Scotland</string>
+    <string name="app_icon_hot_pink">Hồng đậm</string>
+    <string name="app_icon_lavender">Oải hương</string>
+    <string name="app_icon_leopard">Da báo</string>
+    <string name="app_icon_lime">Chanh</string>
+    <string name="app_icon_og">Nguyên bản</string>
+    <string name="app_icon_rose_gold">Vàng hồng</string>
+    <string name="app_icon_silver">Bạc</string>
+    <string name="app_icon_soft_purple">Tím nhạt</string>
+    <string name="app_icon_sunset">Hoàng hôn</string>
+    <string name="app_icon_tie_dye">Loang màu</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_custom_short">Tùy chỉnh</string>
+    <string name="pref_font">Phông chữ</string>
+    <string name="font_default">Mặc định</string>
+    <string name="font_add">Thêm phông của bạn</string>
+    <string name="font_rejected">Tệp không phải phông TTF/OTF</string>
 </resources>

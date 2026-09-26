@@ -436,6 +436,10 @@ class PlayerPreferences {
     fun setAutomixStartOffsetCustomSec(seconds: Int) = Prefs.putInt(KEY_AUTOMIX_START_OFFSET_CUSTOM_SEC, seconds.coerceIn(0, 60))
 
     fun getCustomFontEnabled() = Prefs.getBoolean(KEY_CUSTOM_FONT_ENABLED, true)
+
+    /** The app's typeface id (see [com.alananasss.kittytune.ui.theme.AppFont]); follows the old switch until set. */
+    fun getAppFont(): String = Prefs.getString("app_font", null) ?: if (getCustomFontEnabled()) "flex" else "default"
+    fun setAppFont(id: String) = Prefs.putString("app_font", id)
     fun setCustomFontEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_CUSTOM_FONT_ENABLED, enabled)
 
     fun getFontWght() = Prefs.getInt(KEY_FONT_WGHT, 400)

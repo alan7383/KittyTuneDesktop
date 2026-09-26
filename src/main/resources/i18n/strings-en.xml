@@ -2597,4 +2597,26 @@
     <string name="stats_story_habits">How you listen</string>
     <string name="stats_story_active_days">days with music</string>
     <string name="menu_about">About</string>
+    <string name="app_icon_default">Default</string>
+    <string name="app_icon_black">Black</string>
+    <string name="app_icon_blue">Blue</string>
+    <string name="app_icon_chrome">Chrome</string>
+    <string name="app_icon_england">England</string>
+    <string name="app_icon_scotland">Scotland</string>
+    <string name="app_icon_hot_pink">Hot pink</string>
+    <string name="app_icon_lavender">Lavender</string>
+    <string name="app_icon_leopard">Leopard</string>
+    <string name="app_icon_lime">Lime</string>
+    <string name="app_icon_og">OG</string>
+    <string name="app_icon_rose_gold">Rose gold</string>
+    <string name="app_icon_silver">Silver</string>
+    <string name="app_icon_soft_purple">Soft purple</string>
+    <string name="app_icon_sunset">Sunset</string>
+    <string name="app_icon_tie_dye">Tie-dye</string>
+    <string name="theme_amoled">AMOLED</string>
+    <string name="theme_custom_short">Your own</string>
+    <string name="pref_font">Font</string>
+    <string name="font_default">Default</string>
+    <string name="font_add">Add your own font</string>
+    <string name="font_rejected">That file isn\'t a TTF or OTF font</string>
 </resources>
