@@ -30,6 +30,9 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.R
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.CreditContributor
+import com.alananasss.kittytune.data.ContributorCategory
+import com.alananasss.kittytune.data.CreditsRepository
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.SettingsScaffold
 
@@ -40,21 +43,6 @@ enum class CreditFilter {
     COMMUNITY
 }
 
-enum class ContributorCategory {
-    DEV,
-    TRANSLATION,
-    COMMUNITY
-}
-
-data class CreditContributor(
-    val name: String,
-    val roleResKey: String,
-    val descriptionResKey: String,
-    val badge: String,
-    val url: String,
-    val avatarUrl: String?,
-    val category: ContributorCategory
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,102 +51,8 @@ fun CreditsScreen(
 ) {
     val uriHandler = LocalUriHandler.current
 
-    val contributors = remember {
-        listOf(
-            CreditContributor(
-                name = "alananasss",
-                roleResKey = R.string.about_role_dev,
-                descriptionResKey = R.string.about_role_dev_desc,
-                badge = "Lead Dev",
-                url = "https://github.com/alan7383",
-                avatarUrl = "https://github.com/alan7383.png",
-                category = ContributorCategory.DEV
-            ),
-            CreditContributor(
-                name = "imsawiq",
-                roleResKey = R.string.about_role_community_contrib,
-                descriptionResKey = R.string.about_role_community_contrib_desc,
-                badge = "Contributor",
-                url = "https://github.com/imsawiq",
-                avatarUrl = "https://github.com/imsawiq.png",
-                category = ContributorCategory.DEV
-            ),
-            CreditContributor(
-                name = "Jason-Marshall Fastner (jason-fastner007)",
-                roleResKey = R.string.about_role_community_contrib,
-                descriptionResKey = R.string.about_role_community_contrib_desc,
-                badge = "🇩🇪 Deutsch",
-                url = "https://github.com/jason-fastner007",
-                avatarUrl = "https://github.com/jason-fastner007.png",
-                // He opened pull requests as well as doing the German, so he sits with the code. The
-                // badge still says which language he is the one for.
-                category = ContributorCategory.DEV
-            ),
-            CreditContributor(
-                name = "wynriu",
-                roleResKey = R.string.about_role_translation_vi,
-                descriptionResKey = R.string.about_role_translation_vi_desc,
-                badge = "🇻🇳 Tiếng Việt",
-                url = "https://github.com/wynriu",
-                avatarUrl = "https://github.com/wynriu.png",
-                category = ContributorCategory.TRANSLATION
-            ),
-            CreditContributor(
-                name = "Егор Белоусов (kivoyoso)",
-                roleResKey = R.string.about_role_translation_ru,
-                descriptionResKey = R.string.about_role_translation_ru_desc,
-                badge = "🇷🇺 Русский",
-                url = "https://crowdin.com/profile/kivoyoso",
-                avatarUrl = "https://github.com/kivoyoso.png",
-                category = ContributorCategory.TRANSLATION
-            ),
-            CreditContributor(
-                name = "meowsite",
-                roleResKey = R.string.about_role_translation_qa,
-                descriptionResKey = R.string.about_role_translation_qa_desc,
-                badge = "🌐 QA & Feedback",
-                url = "https://github.com/meowsite",
-                avatarUrl = "https://github.com/meowsite.png",
-                category = ContributorCategory.COMMUNITY
-            ),
-            CreditContributor(
-                name = "dyr00l",
-                roleResKey = R.string.about_role_community_contrib,
-                descriptionResKey = R.string.about_role_community_contrib_desc,
-                badge = "QA & Feedback",
-                url = "https://github.com/dyr00l",
-                avatarUrl = "https://github.com/dyr00l.png",
-                category = ContributorCategory.COMMUNITY
-            ),
-            CreditContributor(
-                name = "sneoww98",
-                roleResKey = R.string.about_role_community_contrib,
-                descriptionResKey = R.string.about_role_community_contrib_desc,
-                badge = "Contributor",
-                url = "https://github.com/sneoww98",
-                avatarUrl = "https://github.com/sneoww98.png",
-                category = ContributorCategory.COMMUNITY
-            ),
-            CreditContributor(
-                name = "quntqunt",
-                roleResKey = R.string.about_role_community_contrib,
-                descriptionResKey = R.string.about_role_community_contrib_desc,
-                badge = "Contributor",
-                url = "https://github.com/quntqunt",
-                avatarUrl = "https://github.com/quntqunt.png",
-                category = ContributorCategory.COMMUNITY
-            ),
-            CreditContributor(
-                name = "tankist939-afk",
-                roleResKey = R.string.about_role_community_contrib,
-                descriptionResKey = R.string.about_role_community_contrib_desc,
-                badge = "Contributor",
-                url = "https://github.com/tankist939-afk",
-                avatarUrl = "https://github.com/tankist939-afk.png",
-                category = ContributorCategory.COMMUNITY
-            )
-        )
-    }
+    // Data, not code: see resources/credits.json. Adding someone is a one-line edit.
+    val contributors = remember { CreditsRepository.all() }
 
     var selectedFilter by remember { mutableStateOf(CreditFilter.ALL) }
 
