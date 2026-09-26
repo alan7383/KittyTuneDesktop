@@ -326,6 +326,9 @@ fun PlayerBar(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
                 ) {
+                    // The floating pill is its own object with air around it, so its buttons get air between them
+                    // too: at the docked bar's 6 dp they read as one strip on the pill (round 5).
+                    val transportGap = if (isFloating) 12.dp else 6.dp
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons) {
                         ExpressiveToggleButton(
                             selected = vm.shuffleEnabled,
@@ -333,7 +336,7 @@ fun PlayerBar(
                             contentDescription = "Shuffle",
                             onClick = { vm.toggleShuffle() },
                         )
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(transportGap))
                     }
 
                     val backInteractionSource = remember { MutableInteractionSource() }
@@ -399,7 +402,7 @@ fun PlayerBar(
                         Icon(Icons.Filled.SkipPrevious, null, modifier = Modifier.size(22.dp))
                     }
 
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(transportGap))
 
                     Box(
                         modifier = Modifier
@@ -422,7 +425,7 @@ fun PlayerBar(
                         )
                     }
 
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(transportGap))
 
                     Box(
                         modifier = Modifier
@@ -442,7 +445,7 @@ fun PlayerBar(
                     }
 
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons) {
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(transportGap))
                         ExpressiveToggleButton(
                             selected = vm.repeatMode != RepeatMode.NONE,
                             icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
