@@ -694,93 +694,67 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             )
         }
 
-        // Comments sort selector (SoundCloud only). No title above it: the selected half of the
-        // toggle already names the section and carries the count.
+        // Sorting and writing, in one row: a round sort button, then one long field with the send button
+        // inside it (SoundCloud only).
         if (!isSpotifyTrack && !lyricsHalf) item {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                var isSortMenuExpanded by remember { mutableStateOf(false) }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box {
-                        OutlinedButton(
-                            onClick = { isSortMenuExpanded = true },
-                            shapes = ButtonDefaults.shapes(),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = str("sorted_by", str(vm.commentSort.labelResId)),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
-                        }
-
-                        DropdownMenu(
-                            expanded = isSortMenuExpanded,
-                            onDismissRequest = { isSortMenuExpanded = false }
-                        ) {
-                            CommentSort.values().forEach { sortOption ->
-                                DropdownMenuItem(
-                                    text = { Text(str(sortOption.labelResId)) },
-                                    onClick = {
-                                        vm.onCommentSortChanged(sortOption)
-                                        isSortMenuExpanded = false
-                                    },
-                                    trailingIcon = {
-                                        if (sortOption == vm.commentSort) {
-                                            Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    if (vm.isCommentsLoading) {
-                        CircularWavyProgressIndicator(modifier = Modifier.size(18.dp))
-                    }
+            var isSortMenuExpanded by remember { mutableStateOf(false) }
+            var newCommentText by remember { mutableStateOf("") }
+            val send = {
+                if (newCommentText.isNotBlank()) {
+                    vm.postComment(newCommentText, null)
+                    newCommentText = ""
                 }
             }
-        }
-
-        // Add a new comment
-        if (!isSpotifyTrack && !lyricsHalf) item {
-            var newCommentText by remember { mutableStateOf("") }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box {
+                    FilledTonalIconButton(onClick = { isSortMenuExpanded = true }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = str("sorted_by", str(vm.commentSort.labelResId)))
+                    }
+                    DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
+                        CommentSort.values().forEach { sortOption ->
+                            DropdownMenuItem(
+                                text = { Text(str(sortOption.labelResId)) },
+                                onClick = {
+                                    vm.onCommentSortChanged(sortOption)
+                                    isSortMenuExpanded = false
+                                },
+                                trailingIcon = {
+                                    if (sortOption == vm.commentSort) {
+                                        Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
                 OutlinedTextField(
                     value = newCommentText,
                     onValueChange = { newCommentText = it },
                     modifier = Modifier.weight(1f).trackTextInput(),
-                    // The panel is narrow and the send button takes its share, so the hint has to
-                    // survive being given less room than it wants: one line, ellipsized, and a step
-                    // down from bodyLarge so it usually fits whole (issue #33).
-                    placeholder = {
-                        Text(str("add_comment_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    },
+                    placeholder = { Text(str("add_comment_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     textStyle = MaterialTheme.typography.bodyMedium,
                     singleLine = true,
-                    shape = RoundedCornerShape(24.dp)
-                )
-                IconButton(
-                    onClick = {
-                        if (newCommentText.isNotBlank()) {
-                            vm.postComment(newCommentText, null)
-                            newCommentText = ""
+                    shape = RoundedCornerShape(28.dp),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { send() }),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = send,
+                            enabled = newCommentText.isNotBlank(),
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                            modifier = Modifier.padding(end = 4.dp).size(40.dp),
+                        ) {
+                            Icon(Icons.Rounded.Send, contentDescription = null, modifier = Modifier.size(20.dp))
                         }
                     },
-                    colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                ) {
-                    Icon(Icons.Rounded.Send, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                }
+                )
             }
         }
 
@@ -857,7 +831,7 @@ private fun InfoHalfToggle(
     ) {
         Row(Modifier.padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
             InfoHalfChip(
-                text = "${str("menu_comments")} ($count)",
+                text = str("menu_comments"),
                 isSelected = !lyricsSelected,
                 onClick = { onSelect(false) },
                 modifier = Modifier.weight(1f)
