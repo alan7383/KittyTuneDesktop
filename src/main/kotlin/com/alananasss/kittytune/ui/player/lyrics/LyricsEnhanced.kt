@@ -135,12 +135,12 @@ fun LyricsEnhanced(
     }
 
     val leadMs = if (isWordSyncedFormat) WORD_SYNC_LEAD_MS else LRC_LEAD_MS
-    val playbackPositionMs = remember(viewModel.currentTrack?.id) {
+    val playbackPositionMs = remember {
         mutableLongStateOf(MusicManager.player.currentPosition.coerceAtLeast(0L))
     }
-    val listState = key(lyricsSessionKey) { rememberLazyListState() }
+    val listState = remember(lyricsSessionKey) { LazyListState() }
 
-    LaunchedEffect(lyricsSessionKey) {
+    LaunchedEffect(viewModel.currentTrack?.id, lyricsSessionKey) {
         playbackPositionMs.longValue = MusicManager.player.currentPosition.coerceAtLeast(0L)
     }
 
@@ -201,12 +201,10 @@ fun LyricsEnhanced(
         }
     }
 
-    val playbackSyncPosition: () -> Int = remember {
-        {
-            (playbackPositionMs.longValue + viewModel.lyricsOffset + leadMs)
-                .coerceIn(0L, Int.MAX_VALUE.toLong())
-                .toInt()
-        }
+    val playbackSyncPosition: () -> Int = {
+        (playbackPositionMs.longValue + viewModel.lyricsOffset + leadMs)
+            .coerceIn(0L, Int.MAX_VALUE.toLong())
+            .toInt()
     }
 
     val lyricsFontFamily = rememberLyricsFontFamily(viewModel.lyricsFont)

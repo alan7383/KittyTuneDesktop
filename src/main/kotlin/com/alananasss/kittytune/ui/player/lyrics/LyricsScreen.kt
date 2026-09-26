@@ -391,9 +391,11 @@ import kotlin.math.roundToInt
         val lyrics = viewModel.lyricsLines
         // Built on the line being sung, not on line one: the placement below runs after the first frame, and
         // that frame — the top of the song, mid-fade — was the jolt at every opening (issue #33, round 5).
-        val listState = rememberLazyListState(
-            initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lyrics, adjustedPosition).coerceAtLeast(0)
-        )
+        val listState = key(viewModel.currentTrack?.id) {
+            rememberLazyListState(
+                initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lyrics, adjustedPosition).coerceAtLeast(0)
+            )
+        }
         val fontSize = viewModel.lyricsFontSize
         val alignment = when(viewModel.lyricsAlignment) {
             LyricsAlignment.LEFT -> TextAlign.Left
@@ -673,7 +675,7 @@ import kotlin.math.roundToInt
             )
         }
 
-        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val listState = key(viewModel.currentTrack?.id) { rememberLazyListState() }
         val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
         // Wheel and drag always win: the reader is following the words, and having the view creep
         // out from under them would be worse than no auto-scroll at all. Any manual scroll parks

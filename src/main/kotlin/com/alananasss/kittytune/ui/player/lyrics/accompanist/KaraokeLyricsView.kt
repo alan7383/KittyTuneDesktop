@@ -209,7 +209,7 @@ fun KaraokeLyricsView(
 
     val currentTimeMs: () -> Int = currentPosition
 
-    val timeProvider = remember { currentPosition }
+    val timeProvider: () -> Int = currentPosition
 
     val accompanimentToMainMap = remember(lyrics.lines) {
         val map = mutableMapOf<Int, Int>()
@@ -307,6 +307,11 @@ fun KaraokeLyricsView(
     var lastScrollTime by remember { mutableLongStateOf(0L) }
     var lastFocusedIndex by remember { mutableIntStateOf(-1) }
 
+    LaunchedEffect(lyrics) {
+        lastFocusedIndex = -1
+        lastScrollTime = 0L
+    }
+
     val isManualScrolling by remember {
         derivedStateOf {
             (listState.isScrollInProgress && !scrollInCode.value) || isSnapScroll.value || isScrubbing
@@ -372,10 +377,9 @@ fun KaraokeLyricsView(
         }
     }
     LookaheadScope {
-        Crossfade(lyrics) { lyrics ->
-            Box(modifier = modifier.clipToBounds()) {
-                LazyColumn(
-                    state = listState,
+        Box(modifier = modifier.clipToBounds()) {
+            LazyColumn(
+                state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
@@ -586,4 +590,3 @@ fun KaraokeLyricsView(
             }
         }
     }
-}

@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -154,9 +155,11 @@ private fun PanelSyncedLyrics(
     style: PanelLyricsStyle,
 ) {
     // Starts on the line being sung, so the first frame is not the top of the song (issue #33, round 5).
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lines, vm.currentPosition + vm.lyricsOffset).coerceAtLeast(0)
-    )
+    val listState = key(vm.currentTrack?.id) {
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lines, vm.currentPosition + vm.lyricsOffset).coerceAtLeast(0)
+        )
+    }
     // Derived rather than read straight from the position, so the lines recompose when the line
     // changes and not on every progress tick.
     val activeIndex by remember {
@@ -428,7 +431,7 @@ private fun PanelLyricLine(
 private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: PanelLyricsStyle) {
     val text = vm.rawPlainLyrics.orEmpty()
     val lines = remember(text) { text.split("\n") }
-    val listState = rememberLazyListState()
+    val listState = key(vm.currentTrack?.id) { rememberLazyListState() }
     val scope = rememberCoroutineScope()
 
     // Wheel and drag always win: the reader is following the words, and having the view creep out
