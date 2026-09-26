@@ -64,22 +64,17 @@ fun SettingsScreen(
     onBackClick: (() -> Unit)? = null,
     playerViewModel: PlayerViewModel
 ) {
-    var category by rememberSaveable { mutableStateOf(SettingsCategory.INTERFACE) }
-    val stack = remember { mutableStateListOf<SettingsSubPage>() }
-    val location = SettingsLocation(category, stack.lastOrNull(), stack.size)
+    val location = SettingsNavigation.current
 
-    com.alananasss.kittytune.core.BackHandler(enabled = stack.isNotEmpty()) { stack.removeLastOrNull() }
+    com.alananasss.kittytune.core.BackHandler(enabled = location.depth > 0) { SettingsNavigation.up() }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val isWide = maxWidth >= WIDE_LAYOUT
         Row(Modifier.fillMaxSize().padding(start = 12.dp, top = 12.dp, bottom = 12.dp)) {
             CategoryList(
-                selected = category,
+                selected = location.category,
                 isWide = isWide,
-                onSelect = {
-                    category = it
-                    stack.clear()
-                },
+                onSelect = { SettingsNavigation.go(SettingsPlace(it)) },
                 onCredits = { navController.navigate("credits") },
             )
             Spacer(Modifier.width(8.dp))
@@ -103,13 +98,13 @@ fun SettingsScreen(
             ) { shown ->
                 SettingsPane(
                     title = str(shown.subPage?.titleKey ?: shown.category.titleKey),
-                    onBack = if (shown.subPage != null) ({ stack.removeLastOrNull(); Unit }) else onBackClick,
+                    onBack = if (shown.subPage != null) ({ SettingsNavigation.up() }) else onBackClick,
                 ) {
                     SettingsPageContent(
                         location = shown,
                         navController = navController,
                         playerViewModel = playerViewModel,
-                        onOpen = { stack.add(it) },
+                        onOpen = { page -> SettingsNavigation.go(shown.copy(pages = shown.pages + page)) },
                     )
                 }
             }
@@ -117,11 +112,8 @@ fun SettingsScreen(
     }
 }
 
-/** Where settings are: a category, and the sub-page opened inside it, if any. */
-private data class SettingsLocation(val category: SettingsCategory, val subPage: SettingsSubPage?, val depth: Int)
-
 /** The categories, in the order they are worth opening. */
-private enum class SettingsCategory(val titleKey: String, val icon: ImageVector) {
+internal enum class SettingsCategory(val titleKey: String, val icon: ImageVector) {
     INTERFACE("settings_cat_interface", Icons.Rounded.Palette),
     AUDIO("settings_cat_audio", Icons.Rounded.GraphicEq),
     SOURCES("settings_tab_sources", Icons.Rounded.ImportExport),
@@ -132,7 +124,7 @@ private enum class SettingsCategory(val titleKey: String, val icon: ImageVector)
 }
 
 /** Pages opened inside a category. */
-private enum class SettingsSubPage(val titleKey: String, val subtitleKey: String? = null, val icon: ImageVector? = null) {
+internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: String? = null, val icon: ImageVector? = null) {
     THEMES("settings_page_themes", "settings_page_themes_sub", Icons.Rounded.ColorLens),
     PLAYER("settings_page_player", "settings_page_player_sub", Icons.Rounded.PlayCircle),
     LEFT_PANEL("settings_page_left_panel", "settings_page_left_panel_sub", Icons.Rounded.ViewSidebar),
@@ -156,7 +148,7 @@ private val interfacePages = listOf(
 
 @Composable
 private fun SettingsPageContent(
-    location: SettingsLocation,
+    location: SettingsPlace,
     navController: NavController,
     playerViewModel: PlayerViewModel,
     onOpen: (SettingsSubPage) -> Unit,

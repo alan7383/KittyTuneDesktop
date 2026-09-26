@@ -374,12 +374,7 @@ private fun ProfileMenu(
     navController: NavController,
     onAbout: () -> Unit,
 ) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismiss,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         val isGuest = playerViewModel.currentUserId == 0L
         ProfileMenuItem(
             label = if (isGuest) str("profile_menu_login") else str("profile_menu_logout"),
@@ -390,25 +385,14 @@ private fun ProfileMenu(
             com.alananasss.kittytune.data.TokenManager.logout()
         }
         androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 4.dp))
-        ProfileMenuItem(str("nav_about_support"), Icons.Rounded.Info) {
+        ProfileMenuItem(str("menu_about"), Icons.Rounded.Info) {
             onDismiss()
             onAbout()
-        }
-        ProfileMenuItem(str("about_credits"), Icons.Rounded.Groups) {
-            onDismiss()
-            playerViewModel.isPlayerExpanded = false
-            playerViewModel.showLyricsSheet = false
-            navController.navigate("credits")
         }
         ProfileMenuItem(str("profile_menu_settings"), Icons.Rounded.Settings) {
             onDismiss()
             playerViewModel.showLyricsSheet = false
             navController.navigate("settings")
-        }
-        ProfileMenuItem(str("nav_upload"), Icons.Rounded.CloudUpload) {
-            onDismiss()
-            playerViewModel.showLyricsSheet = false
-            navController.navigate("upload")
         }
         ProfileMenuItem(str("nav_profile"), Icons.Rounded.AccountCircle) {
             onDismiss()
@@ -429,7 +413,6 @@ private fun ProfileMenuItem(
         text = { Text(label, style = MaterialTheme.typography.labelLarge) },
         leadingIcon = { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp)) },
         onClick = onClick,
-        modifier = Modifier.padding(horizontal = 4.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
     )
 }
 

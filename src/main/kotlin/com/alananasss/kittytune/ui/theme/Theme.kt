@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.data.local.AppThemeMode
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
@@ -292,6 +293,11 @@ fun SoundTuneTheme(
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         typography = typography,
+        // Menus, tooltips and snackbars use the extra-small shape; the stock 4 dp made every dropdown look
+        // square next to the app's 16–28 dp cards, so they all get the same softer corner.
+        shapes = androidx.compose.material3.Shapes(
+            extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+        ),
         content = content,
         motionScheme = MotionScheme.expressive(),
     )
