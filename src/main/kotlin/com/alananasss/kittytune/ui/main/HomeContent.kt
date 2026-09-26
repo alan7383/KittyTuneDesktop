@@ -841,8 +841,15 @@ private fun SearchResults(
 
         // ── Content ──
         if (!hasQuery) {
-            // Browse categories when search bar is empty
-            BrowseCategories(vm, navController)
+            // With an empty field: recent searches, a chart, and what the liked artists have
+            // published — instead of the mood and genre chip walls this used to show (issue #56).
+            com.alananasss.kittytune.ui.home.SearchLanding(
+                vm = vm,
+                playerViewModel = playerViewModel,
+                onOpenCharts = { navController.navigate("charts") },
+                onOpenNewReleases = { navController.navigate("new_releases") },
+                onOpenTag = { tag -> navController.navigate("tag/$tag") },
+            )
         } else if (vm.isSearchLoading &&
             vm.searchResultsTracks.isEmpty() &&
             vm.searchResultsArtists.isEmpty() &&
@@ -917,111 +924,6 @@ private fun SourceChip(label: String, selected: Boolean, onClick: () -> Unit) {
             text = label,
             style = MaterialTheme.typography.labelMedium,
         )
-    }
-}
-
-// ──────────────────────────────────────────────────────────────────────
-//  Browse Categories (shown when search is active but query is empty)
-// ──────────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun BrowseCategories(vm: HomeViewModel, navController: NavController) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        // Personalized categories
-        if (vm.personalizedCategories.isNotEmpty()) {
-            item {
-                Text(
-                    text = str("search_section_personalized"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            item {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    vm.personalizedCategories.forEach { cat ->
-                        CategoryChip(cat.title, cat.icon) {
-                            navController.navigate("tag/${cat.query}")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Moods
-        item {
-            Text(
-                text = str("search_section_moods"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        item {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                vm.moodCategories.forEach { cat ->
-                    CategoryChip(cat.title, cat.icon) {
-                        navController.navigate("tag/${cat.query}")
-                    }
-                }
-            }
-        }
-
-        // Genres
-        item {
-            Text(
-                text = str("search_section_genres"),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-            )
-        }
-        item {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                vm.genreCategories.forEach { cat ->
-                    CategoryChip(cat.title, cat.icon) {
-                        navController.navigate("tag/${cat.query}")
-                    }
-                }
-            }
-        }
-    }
-    }
-
-
-@Composable
-private fun CategoryChip(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit,
-) {
-    Button(
-        onClick = onClick,
-        shapes = ButtonDefaults.shapes(),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(label, style = MaterialTheme.typography.labelLarge)
-        }
     }
 }
 
