@@ -75,13 +75,24 @@ fun CreditsScreen(
                 category = ContributorCategory.DEV
             ),
             CreditContributor(
+                name = "imsawiq",
+                roleResKey = R.string.about_role_community_contrib,
+                descriptionResKey = R.string.about_role_community_contrib_desc,
+                badge = "Contributor",
+                url = "https://github.com/imsawiq",
+                avatarUrl = "https://github.com/imsawiq.png",
+                category = ContributorCategory.DEV
+            ),
+            CreditContributor(
                 name = "Jason-Marshall Fastner (jason-fastner007)",
-                roleResKey = R.string.about_role_translation_de,
-                descriptionResKey = R.string.about_role_translation_de_desc,
+                roleResKey = R.string.about_role_community_contrib,
+                descriptionResKey = R.string.about_role_community_contrib_desc,
                 badge = "🇩🇪 Deutsch",
                 url = "https://github.com/jason-fastner007",
                 avatarUrl = "https://github.com/jason-fastner007.png",
-                category = ContributorCategory.TRANSLATION
+                // He opened pull requests as well as doing the German, so he sits with the code. The
+                // badge still says which language he is the one for.
+                category = ContributorCategory.DEV
             ),
             CreditContributor(
                 name = "wynriu",
