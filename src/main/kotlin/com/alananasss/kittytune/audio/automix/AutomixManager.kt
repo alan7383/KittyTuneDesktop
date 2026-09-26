@@ -45,6 +45,25 @@ object AutomixManager {
     private val _mixBeatsLeft = MutableStateFlow<Int?>(null)
     val mixBeatsLeft = _mixBeatsLeft.asStateFlow()
 
+    /**
+     * How far through the fade we are, 0 to 1, and 0 whenever no fade is running.
+     *
+     * The crossfade loop computed this the whole time and threw it away: it drove the two gain ramps
+     * and nothing else, so there was no way for a screen to show the shape of a mix — only that one
+     * was happening. It is published here so the artwork can be lit by the same number the ears are
+     * hearing, rather than by a second guess at it made from the playhead.
+     *
+     * Read it with the audio's own curve (see [equalPowerIn] / [equalPowerOut]) to get how much sound
+     * is actually moving; the raw value is the *position* through the fade, which is not the same
+     * thing, because the two ramps overlap rather than run end to end.
+     */
+    private val _mixProgress = MutableStateFlow(0f)
+    val mixProgress = _mixProgress.asStateFlow()
+
+    fun setMixProgress(progress: Float) {
+        _mixProgress.value = progress.coerceIn(0f, 1f)
+    }
+
     @Volatile
     var currentAutomixPlan: AutomixPlan? = null
         private set
@@ -91,6 +110,7 @@ object AutomixManager {
     fun clearPlan() {
         currentAutomixPlan = null
         _mixBeatsLeft.value = null
+        _mixProgress.value = 0f
         val cur = _automixDebugInfo.value
         if (cur != null && !_isAutomixing.value) {
             _automixDebugInfo.value = cur.copy(
