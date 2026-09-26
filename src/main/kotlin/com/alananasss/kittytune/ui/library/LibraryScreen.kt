@@ -71,6 +71,7 @@ fun LibraryScreen(
     onPlaylistClick: (String) -> Unit,
     onLikedTracksClick: () -> Unit,
     onProfileClick: () -> Unit,
+    onUploadClick: (() -> Unit)? = null,
     playerViewModel: PlayerViewModel,
     libraryViewModel: LibraryViewModel = viewModel()
 ) {
@@ -382,6 +383,18 @@ fun LibraryScreen(
                                 onClick = {
                                     showCreateMenu = false
                                     showCreateFolderDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(str("upload_screen_title")) },
+                                leadingIcon = { Icon(Icons.Rounded.CloudUpload, contentDescription = null) },
+                                onClick = {
+                                    showCreateMenu = false
+                                    if (onUploadClick != null) {
+                                        onUploadClick()
+                                    } else {
+                                        playerViewModel.navigateToUpload()
+                                    }
                                 }
                             )
                         }
