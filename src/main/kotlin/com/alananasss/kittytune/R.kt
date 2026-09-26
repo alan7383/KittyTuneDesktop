@@ -266,6 +266,11 @@ object R {
         const val search_library_hint = "search_library_hint"
         const val search_playlist_hint = "search_playlist_hint"
         const val search_settings_hint = "search_settings_hint"
+        const val search_recent_searches = "search_recent_searches"
+        const val search_clear_all = "search_clear_all"
+        const val search_see_more = "search_see_more"
+        const val search_see_less = "search_see_less"
+        const val search_remove_recent = "search_remove_recent"
         const val settings_search_results = "settings_search_results"
         const val settings_search_no_results = "settings_search_no_results"
         const val lib_offline_mode = "lib_offline_mode"
@@ -1113,6 +1118,23 @@ object R {
         const val background_animation = "/raw/background_animation.json"
         const val waveform_animation = "/raw/waveform_animation.json"
     }
+
+    object string_extra {
+        const val home_from_your_artists = "home_from_your_artists"
+        const val home_from_your_artists_sub = "home_from_your_artists_sub"
+        const val chart_kind_top = "chart_kind_top"
+        const val chart_kind_trending = "chart_kind_trending"
+        const val chart_see_full = "chart_see_full"
+        const val chart_genre_all = "chart_genre_all"
+        const val chart_genre_pop = "chart_genre_pop"
+        const val chart_genre_hiphop = "chart_genre_hiphop"
+        const val chart_genre_electronic = "chart_genre_electronic"
+        const val chart_genre_rock = "chart_genre_rock"
+        const val chart_genre_rnb = "chart_genre_rnb"
+        const val chart_genre_country = "chart_genre_country"
+        const val chart_genre_latin = "chart_genre_latin"
+    }
+
     object font {
         const val google_sans_flex = "/fonts/google_sans_flex.ttf"
     }

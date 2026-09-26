@@ -2687,4 +2687,22 @@
     <string name="sources_connect">Csatlakozás</string>
     <string name="pref_show_remaining_time">Hátralévő idő</string>
     <string name="pref_show_remaining_time_desc">A hátralévő idő (-00:14) megjelenítése a teljes hossz helyett a lejátszási sávon</string>
+    <string name="search_recent_searches">Legutóbbi keresések</string>
+    <string name="search_clear_all">Összes törlése</string>
+    <string name="search_see_more">Több megjelenítése</string>
+    <string name="search_see_less">Kevesebb megjelenítése</string>
+    <string name="search_remove_recent">Eltávolítás a legutóbbi keresések közül</string>
+    <string name="chart_kind_top">Top 50</string>
+    <string name="chart_kind_trending">Új &amp; felemelődő</string>
+    <string name="chart_see_full">A teljes lista</string>
+    <string name="chart_genre_all">Összes</string>
+    <string name="chart_genre_pop">Pop</string>
+    <string name="chart_genre_hiphop">Hip-hop</string>
+    <string name="chart_genre_electronic">Elektronika</string>
+    <string name="chart_genre_rock">Rock</string>
+    <string name="chart_genre_rnb">R&amp;B</string>
+    <string name="chart_genre_country">Country</string>
+    <string name="chart_genre_latin">Latin</string>
+    <string name="home_from_your_artists">Újdonságok a kedvenceidtől</string>
+    <string name="home_from_your_artists_sub">Amit a kedvenceid kiadtak</string>
 </resources>
