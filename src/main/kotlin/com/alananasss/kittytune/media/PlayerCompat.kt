@@ -18,6 +18,28 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
+import kotlin.math.cos
+import kotlin.math.sin
+
+/**
+ * The crossfade's two gain ramps, kept at file level so the mix glow can be lit by the same numbers
+ * the ears hear.
+ *
+ * They are the whole reason this pair exists rather than a plain linear fade: the outgoing track
+ * ramps down over the first 60% of the fade and the incoming ramps up over the last 60%, so the two
+ * overlap and the summed power stays flat. A second copy of this in the UI would be a second opinion
+ * about when a track is audible, and the two would slowly stop agreeing — which is the one thing a
+ * glow like that must not do.
+ */
+internal fun equalPowerIn(edge0: Float, edge1: Float, x: Float): Float {
+    val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+    return sin(t * (Math.PI / 2.0).toFloat())
+}
+
+internal fun equalPowerOut(edge0: Float, edge1: Float, x: Float): Float {
+    val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+    return cos(t * (Math.PI / 2.0).toFloat())
+}
 
 /** Metadata attached to a media item (title/artist/artwork for the notification & UI). */
 class MediaMetadata private constructor(
@@ -358,16 +380,6 @@ class Player {
         )
     }
 
-    private fun equalPowerIn(edge0: Float, edge1: Float, x: Float): Float {
-        val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
-        return kotlin.math.sin(t * (Math.PI / 2.0).toFloat())
-    }
-
-    private fun equalPowerOut(edge0: Float, edge1: Float, x: Float): Float {
-        val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
-        return kotlin.math.cos(t * (Math.PI / 2.0).toFloat())
-    }
-
     private fun startCrossfade(
         newEngine: AudioEngine,
         oldEngine: AudioEngine,
@@ -458,6 +470,7 @@ class Player {
                     newEngine.setVolume(targetVolume)
                     oldEngine.stop()
                     oldEngine.release()
+                    AutomixManager.setMixProgress(0f)
                 } else {
                     val steps = (actualCrossfadeMs / 15L).toInt().coerceIn(50, 800)
                     val delayMs = (actualCrossfadeMs / steps).coerceAtLeast(5L)
@@ -483,6 +496,10 @@ class Player {
                         val progress = i.toFloat() / steps
                         val fadeOut = equalPowerOut(0f, 0.6f, progress)
                         val fadeIn = equalPowerIn(0.4f, 1f, progress)
+
+                        // The artwork is lit by this, so the glow and the mix are the same event
+                        // rather than two things that usually happen together.
+                        AutomixManager.setMixProgress(progress)
 
                         newEngine.setVolume(targetVolume * fadeIn)
                         oldEngine.setVolume(targetVolume * fadeOut)
@@ -531,6 +548,10 @@ class Player {
                     }
                 }
                 isCrossfadingOut = false
+                // Every exit from the loop above lands here, including a fade cut short or a track
+                // that ended underneath it. Leaving the artwork lit for a mix that is over would be
+                // worse than never lighting it.
+                AutomixManager.setMixProgress(0f)
             }
         }
     }
