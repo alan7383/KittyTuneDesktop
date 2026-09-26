@@ -38,8 +38,6 @@ import androidx.compose.ui.unit.min
     import androidx.compose.material.icons.Icons
     import androidx.compose.material.icons.rounded.Close
     import androidx.compose.material.icons.rounded.Notes
-    import androidx.compose.material.icons.rounded.FormatSize
-    import androidx.compose.material.icons.rounded.CenterFocusStrong
     import androidx.compose.material.icons.rounded.FilterCenterFocus
     import androidx.compose.material.icons.rounded.Add
     import androidx.compose.material.icons.rounded.ArrowDropDown
@@ -2229,73 +2227,7 @@ fun QuickLyricsSettingsDialog(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Spacer(Modifier.height(10.dp))
-                                        val hasScale = displayStyle == LyricsDisplayStyle.SCALE || displayStyle == LyricsDisplayStyle.SCALE_FOCUS
-                                        val hasFocus = displayStyle == LyricsDisplayStyle.FOCUS || displayStyle == LyricsDisplayStyle.SCALE_FOCUS
-
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                                        ) {
-                                            ToggleButton(
-                                                checked = hasScale,
-                                                onCheckedChange = { nextScale ->
-                                                    val next = when {
-                                                        nextScale && hasFocus -> LyricsDisplayStyle.SCALE_FOCUS
-                                                        nextScale -> LyricsDisplayStyle.SCALE
-                                                        hasFocus -> LyricsDisplayStyle.FOCUS
-                                                        else -> LyricsDisplayStyle.STANDARD
-                                                    }
-                                                    updateDisplayStyle(next)
-                                                },
-                                                modifier = Modifier.weight(1f),
-                                                shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                                            ) {
-                                                Row(
-                                                    horizontalArrangement = Arrangement.Center,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(Icons.Rounded.FormatSize, null, modifier = Modifier.size(16.dp))
-                                                    Spacer(Modifier.width(6.dp))
-                                                    Text(
-                                                        str("lyrics_style_scale"),
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        maxLines = 1,
-                                                        softWrap = false
-                                                    )
-                                                }
-                                            }
-
-                                            ToggleButton(
-                                                checked = hasFocus,
-                                                onCheckedChange = { nextFocus ->
-                                                    val next = when {
-                                                        hasScale && nextFocus -> LyricsDisplayStyle.SCALE_FOCUS
-                                                        hasScale -> LyricsDisplayStyle.SCALE
-                                                        nextFocus -> LyricsDisplayStyle.FOCUS
-                                                        else -> LyricsDisplayStyle.STANDARD
-                                                    }
-                                                    updateDisplayStyle(next)
-                                                },
-                                                modifier = Modifier.weight(1f),
-                                                shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                                            ) {
-                                                Row(
-                                                    horizontalArrangement = Arrangement.Center,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Icon(Icons.Rounded.CenterFocusStrong, null, modifier = Modifier.size(16.dp))
-                                                    Spacer(Modifier.width(6.dp))
-                                                    Text(
-                                                        str("lyrics_style_focus"),
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        fontWeight = FontWeight.Bold,
-                                                        maxLines = 1,
-                                                        softWrap = false
-                                                    )
-                                                }
-                                            }
-                                        }
+                                        LyricsDisplayStylePicker(selected = displayStyle, onSelect = { updateDisplayStyle(it) })
                                     }
                                 }
                             }
