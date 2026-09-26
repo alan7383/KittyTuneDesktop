@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -98,9 +100,6 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
  * lyrics/effects/queue/volume right — mirrors the reference player bar.
  */
 
-/** How wide the floating bar grows: past this it stops reading as an object and becomes a strip again. */
-private val FLOATING_BAR_MAX_WIDTH = 1180.dp
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerBar(
@@ -115,6 +114,8 @@ fun PlayerBar(
      */
     onOpenFullPlayer: () -> Unit = {},
     modifier: Modifier = Modifier,
+    /** Floating only: told where the pill itself is, which the content uses to keep clear of it. */
+    onBarPlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
 ) {
     val vm = playerViewModel
     val track = vm.currentTrack
@@ -122,6 +123,9 @@ fun PlayerBar(
     val showLyricsButton = rememberShowLyricsButton()
     val barStyle = rememberPlayerBarStyle()
     val isFloating = barStyle == com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING
+    val floatLook = rememberFloatingBarLook()
+    // In the pill every hover and press is a circle, like the pill itself; the stock shape is a squircle.
+    val iconShapes = if (isFloating) IconButtonShapes(androidx.compose.foundation.shape.CircleShape, androidx.compose.foundation.shape.CircleShape) else IconButtonDefaults.shapes()
 
     Box(modifier, contentAlignment = Alignment.Center) {
     Surface(
@@ -129,20 +133,24 @@ fun PlayerBar(
             // A pill that floats clear of the window's edges, like a dock: centred, capped in width so it
             // reads as an object rather than a strip, lifted by a soft shadow and a hairline edge.
             com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
-                .widthIn(max = FLOATING_BAR_MAX_WIDTH)
-                .fillMaxWidth()
+                .fillMaxWidth(floatLook.widthPercent / 100f)
                 .padding(horizontal = 24.dp)
                 .height(76.dp)
+                .then(onBarPlaced?.let { report -> Modifier.onGloballyPositioned { report(it) } } ?: Modifier)
             else -> Modifier.fillMaxWidth().height(88.dp)
         },
         shape = when (barStyle) {
             com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> PanelShape
             com.alananasss.kittytune.data.local.PlayerBarStyle.ROUNDED -> RoundedCornerShape(28.dp)
-            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> RoundedCornerShape(40.dp)
+            com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> RoundedCornerShape(floatLook.cornerDp.dp)
         },
         // Floating, it lies over the content: a little see-through, so what scrolls beneath shows, and lifted
         // by a deep soft shadow and a light edge so it reads as an object above the page.
-        color = if (isFloating) MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f) else MaterialTheme.colorScheme.surfaceContainerLow,
+        color = when {
+            !isFloating -> MaterialTheme.colorScheme.surfaceContainerLow
+            floatLook.isTranslucent -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f)
+            else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        },
         border = if (isFloating) {
             androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.22f))
         } else null,
@@ -183,7 +191,7 @@ fun PlayerBar(
                                 // take what they want and the heart — last in the row — is the part
                                 // that gets clipped away as the UI scale goes up (issue #33).
                                 .weight(1f, fill = false)
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(if (isFloating) 28.dp else 8.dp))
                                 .onClick(
                                     matcher = PointerMatcher.mouse(PointerButton.Secondary),
                                     onClick = { vm.showTrackOptions(track, fromPlayer = true) }
@@ -281,7 +289,7 @@ fun PlayerBar(
                         }
                         if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {
                             Spacer(Modifier.width(8.dp))
-                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { vm.toggleLike() }) {
+                            IconButton(shapes = iconShapes, onClick = { vm.toggleLike() }) {
                                 Icon(
                                     if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                     contentDescription = str("player_like"),
@@ -293,7 +301,7 @@ fun PlayerBar(
                             if (vm.isYourMixActive) {
                                 Spacer(Modifier.width(4.dp))
                                 IconButton(
-                                    shapes = IconButtonDefaults.shapes(),
+                                    shapes = iconShapes,
                                     onClick = { vm.dislikeCurrentTrackInMix() }
                                 ) {
                                     Icon(
@@ -457,7 +465,7 @@ fun PlayerBar(
             ) {
                 if (showLyricsButton && PlayerPreferences.PLAYER_BAR_BUTTON_LYRICS in visibleButtons) {
                     IconButton(
-                        shapes = IconButtonDefaults.shapes(),
+                        shapes = iconShapes,
                         onClick = onOpenLyrics,
                     ) {
                         Icon(
@@ -472,7 +480,7 @@ fun PlayerBar(
                 if (!isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons) {
                     Tip(str("mini_player_title")) {
                         IconButton(
-                            shapes = IconButtonDefaults.shapes(),
+                            shapes = iconShapes,
                             onClick = { vm.toggleMiniPlayer() },
                         ) {
                             Icon(
@@ -487,7 +495,7 @@ fun PlayerBar(
                 }
                 if (PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons) {
                     IconButton(
-                        shapes = IconButtonDefaults.shapes(),
+                        shapes = iconShapes,
                         onClick = onToggleNowPlaying,
                     ) {
                         Icon(
@@ -502,7 +510,7 @@ fun PlayerBar(
                 // a click rather than access to it (issue #33).
                 if (!isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons) {
                     IconButton(
-                        shapes = IconButtonDefaults.shapes(),
+                        shapes = iconShapes,
                         onClick = onOpenQueue,
                     ) {
                         Icon(
@@ -699,6 +707,12 @@ private fun Modifier.seekWheel(
 private fun rememberPlayerBarStyle(): com.alananasss.kittytune.data.local.PlayerBarStyle {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) { PlayerPreferences().getPlayerBarStyle() }
+}
+
+@Composable
+private fun rememberFloatingBarLook(): com.alananasss.kittytune.data.local.FloatingBarLook {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) { PlayerPreferences().getFloatingBarLook() }
 }
 
 @Composable

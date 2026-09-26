@@ -2621,4 +2621,10 @@
     <string name="font_rejected">That file isn\'t a TTF or OTF font</string>
     <string name="volume_style_title">Volume style</string>
     <string name="volume_style_same">Like seek bar</string>
+    <string name="floating_bar_title">Floating bar</string>
+    <string name="floating_bar_corner">Corners</string>
+    <string name="floating_bar_width">Width</string>
+    <string name="floating_bar_margin">Distance from the bottom</string>
+    <string name="floating_bar_translucent">See-through</string>
+    <string name="floating_bar_translucent_sub">The page shows through the bar</string>
 </resources>

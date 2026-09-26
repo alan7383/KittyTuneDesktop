@@ -329,7 +329,13 @@ fun MainScreen(
         // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
         // lyrics, which has its own way up here (issue #33).
         onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
-        modifier = barModifier
+        modifier = barModifier,
+        onBarPlaced = if (isBarFloating) { coordinates ->
+            val topLeft = coordinates.positionOnScreen()
+            barOverlay.bounds = androidx.compose.ui.geometry.Rect(
+                topLeft.x, topLeft.y, topLeft.x + coordinates.size.width, topLeft.y + coordinates.size.height,
+            )
+        } else null,
     )
     }
 
@@ -1167,18 +1173,10 @@ fun MainScreen(
     }
 
     if (isBarFloating) {
-        Box(Modifier.fillMaxSize().padding(horizontal = PANEL_GUTTER.dp, vertical = 14.dp), contentAlignment = Alignment.BottomCenter) {
-            playerBar(
-                Modifier
-                    .fillMaxWidth()
-                    .onGloballyPositioned { coordinates ->
-                        val topLeft = coordinates.positionOnScreen()
-                        barOverlay.bounds = androidx.compose.ui.geometry.Rect(
-                            topLeft.x, topLeft.y,
-                            topLeft.x + coordinates.size.width, topLeft.y + coordinates.size.height,
-                        )
-                    },
-            )
+        val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+        val floatLook = remember(prefsSnapshot) { playerPrefs.getFloatingBarLook() }
+        Box(Modifier.fillMaxSize().padding(horizontal = PANEL_GUTTER.dp).padding(bottom = floatLook.marginDp.dp), contentAlignment = Alignment.BottomCenter) {
+            playerBar(Modifier.fillMaxWidth())
         }
     }
     }

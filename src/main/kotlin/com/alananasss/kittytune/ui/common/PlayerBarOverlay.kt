@@ -65,8 +65,10 @@ fun rememberPlayerBarOverlap(): PlayerBarOverlap {
 @Composable
 fun PlayerBarOverlap.clearance(): Dp {
     val px = overlapPx
-    if (px <= 0f) return 0.dp
-    return with(LocalDensity.current) { px.toDp() } + 12.dp
+    val target = if (px <= 0f) 0.dp else with(LocalDensity.current) { px.toDp() } + 16.dp
+    // Eased, so whatever sits above the bar (the sidebar's profile row, a list's end) glides to its new place.
+    val animated by androidx.compose.animation.core.animateDpAsState(target, androidx.compose.animation.core.tween(280), label = "barClearance")
+    return animated
 }
 
 /** [this] with [extra] added to its bottom. */

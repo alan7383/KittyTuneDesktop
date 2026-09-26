@@ -2623,4 +2623,10 @@
     <string name="font_rejected">Nem TTF/OTF betűtípus</string>
     <string name="volume_style_title">Hangerő stílusa</string>
     <string name="volume_style_same">Mint a sáv</string>
+    <string name="floating_bar_title">Lebegő sáv</string>
+    <string name="floating_bar_corner">Sarkok</string>
+    <string name="floating_bar_width">Szélesség</string>
+    <string name="floating_bar_margin">Távolság alulról</string>
+    <string name="floating_bar_translucent">Áttetsző</string>
+    <string name="floating_bar_translucent_sub">Az oldal átlátszik</string>
 </resources>

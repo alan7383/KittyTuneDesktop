@@ -102,6 +102,15 @@ fun PlayerDesignContent(modifier: Modifier = Modifier) {
             }
         )
 
+        // The floating bar's own shape, only while it is the chosen one.
+        androidx.compose.animation.AnimatedVisibility(
+            visible = playerBarStyle == PlayerBarStyle.FLOATING,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+        ) {
+            FloatingBarSection()
+        }
+
         // 2. Curseurs & Progression (Sliders)
         PlayerSlidersSection(
             sliderStyle = sliderStyle,
@@ -854,5 +863,62 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
                 }
             }
         }
+    }
+}
+
+
+/** Corner, width, distance from the bottom and see-through, for the floating bar. */
+@Composable
+private fun FloatingBarSection() {
+    val prefs = remember { PlayerPreferences() }
+    var look by remember { mutableStateOf(prefs.getFloatingBarLook()) }
+    fun update(next: com.alananasss.kittytune.data.local.FloatingBarLook) {
+        look = next
+        prefs.setFloatingBarLook(next)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(str("floating_bar_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                TextButton(onClick = { update(com.alananasss.kittytune.data.local.FloatingBarLook.DEFAULT) }) { Text(str("btn_reset")) }
+            }
+            // A live miniature of the bar with the chosen corner and width.
+            Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest), contentAlignment = Alignment.Center) {
+                Surface(
+                    shape = RoundedCornerShape((look.cornerDp * 0.5f).dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = if (look.isTranslucent) 0.85f else 1f),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.fillMaxWidth(look.widthPercent / 100f * 0.92f).height(36.dp),
+                ) {}
+            }
+            FloatingSlider(str("floating_bar_corner"), "${look.cornerDp} dp", look.cornerDp.toFloat(), 0f..40f) { update(look.copy(cornerDp = it.toInt())) }
+            FloatingSlider(str("floating_bar_width"), "${look.widthPercent} %", look.widthPercent.toFloat(), 50f..100f) { update(look.copy(widthPercent = it.toInt())) }
+            FloatingSlider(str("floating_bar_margin"), "${look.marginDp} dp", look.marginDp.toFloat(), 4f..40f) { update(look.copy(marginDp = it.toInt())) }
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable { update(look.copy(isTranslucent = !look.isTranslucent)) }.padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(str("floating_bar_translucent"), style = MaterialTheme.typography.bodyLarge)
+                    Text(str("floating_bar_translucent_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                com.alananasss.kittytune.ui.common.SettingsSwitch(checked = look.isTranslucent, onCheckedChange = null)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingSlider(title: String, value: String, current: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    Column {
+        Row {
+            Text(title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(value, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        com.alananasss.kittytune.ui.common.Slider(value = current, onValueChange = onChange, valueRange = range, modifier = Modifier.fillMaxWidth())
     }
 }

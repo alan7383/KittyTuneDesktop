@@ -3234,4 +3234,10 @@
     <string name="font_rejected">Keine TTF/OTF-Schrift</string>
     <string name="volume_style_title">Lautstärke-Stil</string>
     <string name="volume_style_same">Wie Leiste</string>
+    <string name="floating_bar_title">Schwebende Leiste</string>
+    <string name="floating_bar_corner">Ecken</string>
+    <string name="floating_bar_width">Breite</string>
+    <string name="floating_bar_margin">Abstand unten</string>
+    <string name="floating_bar_translucent">Durchscheinend</string>
+    <string name="floating_bar_translucent_sub">Seite scheint durch</string>
 </resources>
