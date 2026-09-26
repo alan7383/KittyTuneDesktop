@@ -132,11 +132,17 @@ class SearchLandingTest {
 
     @Test
     fun testChartIsRankedAndOrderedByPosition() {
+        val repo = source("ui/home/ChartRepository.kt")
+        assertTrue(repo.contains("data class ChartEntry") || repo.contains("ChartEntry(rank = index + 1"))
         val vm = source("ui/home/ChartsViewModel.kt")
         assertTrue(vm.contains("data class ChartEntry(val rank: Int"), "A chart row carries its rank")
         assertTrue(
-            vm.contains("mapIndexed { index, entry -> entry.copy(rank = index + 1) }"),
+            repo.contains("mapIndexed { index, track -> ChartEntry(rank = index + 1"),
             "The rank is the position in the server's order, never the score",
+        )
+        assertTrue(
+            !repo.contains("sortedBy") && !repo.contains("sortedByDescending"),
+            "Re-sorting the chart by play count would be second-guessing the server's order",
         )
         assertTrue(
             vm.contains("kind == chartKind && genre == chartGenre"),
@@ -149,15 +155,41 @@ class SearchLandingTest {
     }
 
     @Test
-    fun testChartOffersTopAndTrendingLikeSoundCloud() {
-        val vm = source("ui/home/ChartsViewModel.kt")
+    fun testChartAsksTheRightSourceForEachKind() {
+        val repo = source("ui/home/ChartRepository.kt")
         assertTrue(
-            vm.contains("TOP(\"top\")") && vm.contains("TRENDING(\"trending\")"),
-            "top and trending are the only two kinds, as in SoundCloud's own charts",
+            repo.contains("kind = \"trending\""),
+            "GET /charts answers only kind=trending; anything else is an empty object",
         )
         assertTrue(
-            vm.contains("soundcloud:genres:all-music"),
-            "all-music is SoundCloud's catch-all genre and belongs first",
+            repo.contains("api.resolveUrl(url)") && repo.contains("chartPlaylistUrl(countryCode, genre)"),
+            "The Top 50 is a curated playlist resolved by URL, not a charts query",
+        )
+        assertTrue(
+            repo.contains("resolved.get(\"kind\")?.asString == \"playlist\""),
+            "A resolve that answers with anything else is a slug that moved, not a chart",
+        )
+    }
+
+    @Test
+    fun testChartGenresAreSlugsNotApiGenreIds() {
+        val vm = source("ui/home/ChartsViewModel.kt")
+        // These were soundcloud:genres: ids, which the charts endpoint answers with {} for.
+        assertTrue(
+            !vm.contains("soundcloud:genres:"),
+            "The chart genres are playlist slugs now; the genres endpoint serves no charts",
+        )
+        for (slug in listOf("all-music-genres", "hip-hop", "r-b", "folk")) {
+            assertTrue(vm.contains("\"$slug\""), "The curated chart slug '$slug' belongs in the list")
+        }
+    }
+
+    @Test
+    fun testGenreRowIsHiddenForTrendingBecauseItWouldBeDead() {
+        val chart = source("ui/home/SongChart.kt")
+        assertTrue(
+            chart.contains("showGenreRow && kind == ChartKind.TOP"),
+            "The trending feed ignores genre, so a genre row there is a control that does nothing",
         )
     }
 
@@ -214,7 +246,7 @@ class SearchLandingTest {
             "search_remove_recent", "chart_kind_top", "chart_kind_trending",
             "chart_section_title", "explore",
             "chart_genre_all", "chart_genre_pop", "chart_genre_hiphop", "chart_genre_electronic",
-            "chart_genre_rock", "chart_genre_rnb", "chart_genre_country", "chart_genre_latin",
+            "chart_genre_rock", "chart_genre_rnb", "chart_genre_country", "chart_genre_latin", "chart_genre_folk",
             "home_from_your_artists", "home_from_your_artists_sub",
         )
         for (lang in languages) {
@@ -238,7 +270,7 @@ class SearchLandingTest {
     @Test
     fun testChartKindsAreTheOnlyTwoEnumEntries() {
         assertEquals(2, ChartKind.entries.size)
-        assertEquals("top", ChartKind.TOP.apiValue)
-        assertEquals("trending", ChartKind.TRENDING.apiValue)
+        assertEquals(ChartKind.TOP, ChartKind.entries.first())
+        assertEquals(ChartKind.TRENDING, ChartKind.entries.last())
     }
 }
