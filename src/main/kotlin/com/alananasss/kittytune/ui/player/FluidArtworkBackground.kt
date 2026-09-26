@@ -453,8 +453,24 @@ fun FluidArtworkBackground(
     val seed = remember { Random.nextInt() }
 
     LaunchedEffect(artworkUrl) {
-        val url = artworkUrl?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
-        val texture = loadTexture(url) ?: return@LaunchedEffect
+        val url = artworkUrl?.takeIf { it.isNotBlank() }
+        if (url == null) {
+            if (current != null) {
+                appear.animateTo(0f, tween(CROSSFADE_MS))
+                current = null
+                previous = null
+            }
+            return@LaunchedEffect
+        }
+        val texture = loadTexture(url)
+        if (texture == null) {
+            if (current != null) {
+                appear.animateTo(0f, tween(CROSSFADE_MS))
+                current = null
+                previous = null
+            }
+            return@LaunchedEffect
+        }
         val showing = current
         current = texture
         if (showing != null && showing !== texture) {
@@ -500,34 +516,40 @@ fun FluidArtworkBackground(
     }
 
     Box(modifier) {
-        if (appear.value < 1f) fallback()
+        // Fallback is always composed underneath so the background is never transparent
+        fallback()
 
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = appear.value
-                    val sigma = fluidBlurSigma(size.width, size.height)
-                    renderEffect = ImageFilter
-                        .makeBlur(sigma, sigma, FilterTileMode.CLAMP)
-                        .asComposeRenderEffect()
-                }
-                .drawBehind {
-                    val cur = current ?: return@drawBehind
-                    builder.setFluidUniforms(
-                        width = size.width,
-                        height = size.height,
-                        seconds = seconds,
-                        seed = seed,
-                        current = cur,
-                        previous = previous ?: cur,
-                        fade = crossfade.value,
-                    )
-                    paint.shader = builder.makeShader(null)
-                    drawIntoCanvas { canvas ->
-                        canvas.skiaCanvas.drawRect(Rect.makeWH(size.width, size.height), paint)
+        if (current != null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = appear.value
+                        val sigma = fluidBlurSigma(size.width, size.height)
+                        renderEffect = ImageFilter
+                            .makeBlur(sigma, sigma, FilterTileMode.CLAMP)
+                            .asComposeRenderEffect()
                     }
-                }
-        )
+                    .drawBehind {
+                        val cur = current ?: return@drawBehind
+                        builder.setFluidUniforms(
+                            width = size.width,
+                            height = size.height,
+                            seconds = seconds,
+                            seed = seed,
+                            current = cur,
+                            previous = previous ?: cur,
+                            fade = crossfade.value,
+                        )
+                        val shader = runCatching { builder.makeShader(null) }.getOrNull()
+                        if (shader != null) {
+                            paint.shader = shader
+                            drawIntoCanvas { canvas ->
+                                canvas.skiaCanvas.drawRect(Rect.makeWH(size.width, size.height), paint)
+                            }
+                        }
+                    }
+            )
+        }
     }
 }
