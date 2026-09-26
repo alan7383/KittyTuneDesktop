@@ -114,6 +114,8 @@ fun PlayerBar(
      * (issue #33). The Info tab is still one press away on the panel's own tab row.
      */
     onOpenFullPlayer: () -> Unit = {},
+    isNowPlayingOpen: Boolean = false,
+    isQueueOpen: Boolean = false,
     modifier: Modifier = Modifier,
     /** Floating only: told where the pill itself is, which the content uses to keep clear of it. */
     onBarPlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
@@ -506,7 +508,8 @@ fun PlayerBar(
                         Icon(
                             Icons.Outlined.Tune,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (isNowPlayingOpen) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -521,7 +524,8 @@ fun PlayerBar(
                         Icon(
                             Icons.Outlined.QueueMusic,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = if (isQueueOpen) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                         )
                     }
