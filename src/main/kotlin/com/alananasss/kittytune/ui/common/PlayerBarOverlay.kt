@@ -12,8 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
  */
 @Stable
 class PlayerBarOverlay {
-    /** The bar's bounds in screen pixels, or null when it is not floating. */
+    /** The bar's bounds in window pixels, or null when it is not floating. */
     var bounds by mutableStateOf<Rect?>(null)
 }
 
@@ -40,8 +40,9 @@ class PlayerBarOverlap internal constructor(private val overlay: PlayerBarOverla
     private var ownBounds by mutableStateOf<Rect?>(null)
 
     val modifier: Modifier = if (overlay == null) Modifier else Modifier.onGloballyPositioned { coordinates ->
-        val topLeft = coordinates.positionOnScreen()
-        ownBounds = Rect(topLeft.x, topLeft.y, topLeft.x + coordinates.size.width, topLeft.y + coordinates.size.height)
+        if (coordinates.isAttached) {
+            ownBounds = coordinates.boundsInWindow()
+        }
     }
 
     /** Covered height in pixels; zero when the bar is elsewhere or not floating. */
@@ -49,9 +50,13 @@ class PlayerBarOverlap internal constructor(private val overlay: PlayerBarOverla
         get() {
             val bar = overlay?.bounds ?: return 0f
             val own = ownBounds ?: return 0f
+            if (bar.isEmpty || own.isEmpty) return 0f
+            if (bar.left.isNaN() || bar.right.isNaN() || bar.top.isNaN() || bar.bottom.isNaN()) return 0f
+            if (own.left.isNaN() || own.right.isNaN() || own.top.isNaN() || own.bottom.isNaN()) return 0f
             val sideBySide = own.right <= bar.left || own.left >= bar.right
             if (sideBySide) return 0f
-            return (own.bottom - bar.top).coerceIn(0f, own.height)
+            val overlap = (own.bottom - bar.top).coerceIn(0f, own.height)
+            return if (overlap.isNaN() || overlap < 0f) 0f else overlap
         }
 }
 
@@ -65,16 +70,22 @@ fun rememberPlayerBarOverlap(): PlayerBarOverlap {
 @Composable
 fun PlayerBarOverlap.clearance(): Dp {
     val px = overlapPx
-    val target = if (px <= 0f) 0.dp else with(LocalDensity.current) { px.toDp() } + 16.dp
+    val target = if (px.isNaN() || px <= 0f) 0.dp else with(LocalDensity.current) { px.toDp() } + 16.dp
+    val safeTarget = if (target.value.isNaN() || target.value < 0f) 0.dp else target
     // Eased, so whatever sits above the bar (the sidebar's profile row, a list's end) glides to its new place.
-    val animated by androidx.compose.animation.core.animateDpAsState(target, androidx.compose.animation.core.tween(280), label = "barClearance")
-    return animated
+    val animated by androidx.compose.animation.core.animateDpAsState(
+        targetValue = safeTarget,
+        animationSpec = androidx.compose.animation.core.tween(280),
+        label = "barClearance"
+    )
+    return if (animated.value.isNaN() || animated.value < 0f) 0.dp else animated
 }
 
 /** [this] with [extra] added to its bottom. */
 @Composable
 fun PaddingValues.plusBottom(extra: Dp): PaddingValues {
-    if (extra == 0.dp) return this
+    val safeExtra = if (extra.value.isNaN() || extra.value <= 0f) 0.dp else extra
+    if (safeExtra == 0.dp) return this
     val direction = LocalLayoutDirection.current
     // Some callers hand in custom PaddingValues whose sides are unspecified or go below zero mid-animation
     // (the sidebar's collapse); the stock constructor rejects both, so each side is made safe.
@@ -83,6 +94,6 @@ fun PaddingValues.plusBottom(extra: Dp): PaddingValues {
         start = calculateStartPadding(direction).safe(),
         top = calculateTopPadding().safe(),
         end = calculateEndPadding(direction).safe(),
-        bottom = calculateBottomPadding().safe() + extra.safe(),
+        bottom = calculateBottomPadding().safe() + safeExtra.safe(),
     )
 }

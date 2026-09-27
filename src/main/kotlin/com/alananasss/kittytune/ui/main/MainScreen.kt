@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.*
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
+import androidx.compose.ui.layout.boundsInWindow
 import com.alananasss.kittytune.ui.common.clearance
 import androidx.compose.material3.*
 import androidx.compose.foundation.layout.fillMaxSize
@@ -346,10 +346,9 @@ fun MainScreen(
         isQueueOpen = showNowPlayingPanel && nowPlayingTab == NowPlayingTab.QUEUE,
         modifier = barModifier,
         onBarPlaced = if (isBarFloating) { coordinates ->
-            val topLeft = coordinates.positionOnScreen()
-            barOverlay.bounds = androidx.compose.ui.geometry.Rect(
-                topLeft.x, topLeft.y, topLeft.x + coordinates.size.width, topLeft.y + coordinates.size.height,
-            )
+            if (coordinates.isAttached) {
+                barOverlay.bounds = coordinates.boundsInWindow()
+            }
         } else null,
     )
     }
