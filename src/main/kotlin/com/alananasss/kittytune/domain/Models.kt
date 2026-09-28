@@ -451,6 +451,46 @@
                 if (artworkUrl != null) return artworkUrl.replace("large", "t500x500")
                 return user?.avatarUrl.getHighResAvatarUrl() ?: "https://picsum.photos/200"
             }
+
+        val thumbnailUrl: String
+            get() {
+                val base = artworkUrl?.takeIf { it.isNotBlank() }
+                    ?: user?.avatarUrl?.takeIf { it.isNotBlank() }
+                return resolveThumbnailUrl(base)
+            }
+    }
+
+    fun resolveThumbnailUrl(rawUrl: String?): String {
+        val base = rawUrl?.takeIf { it.isNotBlank() } ?: return "https://picsum.photos/200"
+        if (base.startsWith("/") || base.startsWith("file://") || base.startsWith("content://")) {
+            return base
+        }
+        return when {
+            base.contains("googleusercontent.com") -> {
+                if (base.contains("=w") || base.contains("=s")) {
+                    base.replace(Regex("=w\\d+-h\\d+.*"), "=w300-h300")
+                        .replace(Regex("=s\\d+.*"), "=s300")
+                } else {
+                    "$base=w300-h300"
+                }
+            }
+            base.contains("i.ytimg.com") -> {
+                base.replace("maxresdefault.jpg", "hqdefault.jpg")
+                    .replace("sddefault.jpg", "hqdefault.jpg")
+            }
+            base.contains("sndcdn.com") -> {
+                if (base.contains("default_avatar")) {
+                    base
+                } else {
+                    base.replace(Regex("-(?:t500x500|crop|original|large)(\\.[a-zA-Z0-9]+)"), "-t300x300$1")
+                }
+            }
+            base.contains("i.scdn.co") -> {
+                base.replace("ab67616d0000b273", "ab67616d00001e02")
+                    .replace("ab6761610000e5eb", "ab67616100005174")
+            }
+            else -> base
+        }
     }
     
     // misc responses
@@ -515,6 +555,14 @@
                 // grid while opening it revealed the real first-track cover. Every code path that
                 // built a Playlist had to remember to blank the avatar to avoid it; now none has to.
                 return "https://picsum.photos/200"
+            }
+
+        val thumbnailUrl: String
+            get() {
+                val base = artworkUrl?.takeIf { it.isNotBlank() }
+                    ?: calculatedArtworkUrl?.takeIf { it.isNotBlank() }
+                    ?: tracks?.firstOrNull { usablePlaylistCover(it.fullResArtwork) }?.fullResArtwork
+                return resolveThumbnailUrl(base)
             }
     }
     data class UpdateProfileRequest(val username: String?, val description: String?, val city: String?, @SerializedName("country_code") val countryCode: String?, @SerializedName("first_name") val firstName: String? = null, @SerializedName("last_name") val lastName: String? = null)
@@ -656,6 +704,12 @@
                 // grid while opening it revealed the real first-track cover. Every code path that
                 // built a Playlist had to remember to blank the avatar to avoid it; now none has to.
                 return "https://picsum.photos/200"
+            }
+
+        val thumbnailUrl: String
+            get() {
+                val base = usableArtwork ?: artworkUrl ?: calculatedArtworkUrl
+                return resolveThumbnailUrl(base)
             }
     }
     

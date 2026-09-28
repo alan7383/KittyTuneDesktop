@@ -1287,7 +1287,7 @@ fun LibraryScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 AsyncImage(
-                    model = track.fullResArtwork,
+                    model = track.thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -1371,7 +1371,7 @@ fun LibraryScreen(
         ) {
             Box(modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant)) {
                 AsyncImage(
-                    model = track.fullResArtwork,
+                    model = track.thumbnailUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()

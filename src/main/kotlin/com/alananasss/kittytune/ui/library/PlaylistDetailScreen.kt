@@ -1941,7 +1941,7 @@ fun PlaylistSquareCard(playlist: Playlist, onClick: () -> Unit) {
             .clickable { onClick() }
     ) {
         AsyncImage(
-            model = playlist.fullResArtwork,
+            model = playlist.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -2007,7 +2007,7 @@ fun TrackListItem(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 AsyncImage(
-                    model = track.fullResArtwork,
+                    model = track.thumbnailUrl,
                     contentDescription = null,
                     modifier = Modifier
                         .size(48.dp)
@@ -2265,7 +2265,7 @@ fun TrackTableItem(
             Row(modifier = Modifier.weight(TrackTableColumns.title), verticalAlignment = Alignment.CenterVertically) {
                 Box(contentAlignment = Alignment.Center) {
                     AsyncImage(
-                        model = track.fullResArtwork,
+                        model = track.thumbnailUrl,
                         contentDescription = null,
                         modifier = Modifier
                             .size(40.dp)
