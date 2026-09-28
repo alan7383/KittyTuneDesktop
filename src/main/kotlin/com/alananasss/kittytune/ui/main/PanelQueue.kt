@@ -401,7 +401,7 @@ private fun QueueCover(track: Track, size: Dp, isCurrent: Boolean, isPlaying: Bo
     val shape = RoundedCornerShape(if (size < 32.dp) 6.dp else 8.dp)
     Box(Modifier.size(size).clip(shape), contentAlignment = Alignment.Center) {
         AsyncImage(
-            model = track.artworkUrl,
+            model = track.thumbnailUrl,
             contentDescription = null,
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
         )

@@ -597,7 +597,7 @@ fun SquareCard(playlist: Playlist, onClick: () -> Unit) {
             .padding(6.dp)
     ) {
         AsyncImage(
-            model = playlist.fullResArtwork,
+            model = playlist.thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.size(148.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant)
@@ -650,7 +650,7 @@ private fun PopularTrackListItem(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 AsyncImage(
-                    model = track.fullResArtwork,
+                    model = track.thumbnailUrl,
                     contentDescription = null,
                     modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
                     contentScale = ContentScale.Crop
@@ -888,7 +888,7 @@ private fun CinematicPlaylistCard(playlist: Playlist, onClick: () -> Unit) {
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(
-                model = playlist.fullResArtwork,
+                model = playlist.thumbnailUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

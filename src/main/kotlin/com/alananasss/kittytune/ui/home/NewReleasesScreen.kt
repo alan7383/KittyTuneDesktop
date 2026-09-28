@@ -227,7 +227,7 @@ fun PopularTrackRow(
         // artwork + playing indicator overlay
         Box(contentAlignment = Alignment.Center) {
             AsyncImage(
-                model = track.fullResArtwork,
+                model = track.thumbnailUrl,
                 contentDescription = null,
                 modifier = Modifier
                     .size(56.dp)
@@ -302,7 +302,7 @@ fun NewReleasePlaylistCard(
     ) {
         Column {
             AsyncImage(
-                model = playlist.fullResArtwork,
+                model = playlist.thumbnailUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

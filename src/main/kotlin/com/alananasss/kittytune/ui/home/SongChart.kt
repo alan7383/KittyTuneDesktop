@@ -192,7 +192,7 @@ fun ChartTrackRow(
 
         Box(contentAlignment = Alignment.Center) {
             AsyncImage(
-                model = track.fullResArtwork,
+                model = track.thumbnailUrl,
                 contentDescription = null,
                 error = rememberDefaultAvatarPainter(),
                 fallback = rememberDefaultAvatarPainter(),
