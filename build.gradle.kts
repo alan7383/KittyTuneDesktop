@@ -102,8 +102,8 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.19.1")
     implementation("net.java.dev.jna:jna-platform:5.19.1")
 
-    implementation("com.github.hypfvieh:dbus-java-core:5.2.0")
-    implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:5.2.0")
+    implementation("com.github.hypfvieh:dbus-java-core:5.2.1")
+    implementation("com.github.hypfvieh:dbus-java-transport-jnr-unixsocket:5.2.1")
 
     testImplementation(kotlin("test"))
     testImplementation("junit:junit:4.13.2")
