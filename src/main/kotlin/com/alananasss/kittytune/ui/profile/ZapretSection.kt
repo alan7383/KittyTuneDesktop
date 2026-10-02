@@ -44,14 +44,17 @@ fun ZapretSection() {
 
     LaunchedEffect(Unit) { isRunning = withContext(Dispatchers.IO) { ZapretManager.isRunning() } }
 
+    var isDetecting by remember { mutableStateOf(false) }
+
     fun useFolder(chosen: File?) {
         if (chosen == null) return
-        if (!ZapretInstall(chosen).isValid) {
+        val root = ZapretManager.resolveZapretRoot(chosen) ?: chosen
+        if (!ZapretInstall(root).isValid) {
             message = str("zapret_invalid")
             return
         }
-        ZapretManager.folder = chosen
-        folder = chosen
+        ZapretManager.folder = root
+        folder = root
         message = null
     }
 
@@ -92,11 +95,29 @@ fun ZapretSection() {
                             overflow = TextOverflow.MiddleEllipsis,
                         )
                     }
-                    TextButton(onClick = {
-                        val found = ZapretManager.detect()
-                        if (found == null) message = str("zapret_not_found") else useFolder(found)
-                    }) {
-                        Text(str("zapret_detect"))
+                    TextButton(
+                        onClick = {
+                            if (!isDetecting) {
+                                isDetecting = true
+                                message = null
+                                scope.launch {
+                                    val found = withContext(Dispatchers.IO) { ZapretManager.detect() }
+                                    if (found == null) message = str("zapret_not_found") else useFolder(found)
+                                    isDetecting = false
+                                }
+                            }
+                        },
+                        enabled = !isDetecting
+                    ) {
+                        if (isDetecting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Text(str("zapret_detect"))
+                        }
                     }
                     FilledTonalButton(onClick = { useFolder(pickFolder(str("zapret_folder"), folder)) }) {
                         Text(str("zapret_choose"))
@@ -189,7 +210,8 @@ private fun ServiceRow(check: ServiceCheck, canAdd: Boolean, onAdd: () -> Unit) 
 }
 
 private fun pickFolder(title: String, current: File?): File? {
-    val chooser = javax.swing.JFileChooser(current ?: File(System.getProperty("user.home"), "Desktop")).apply {
+    val initial = current?.takeIf { it.isDirectory } ?: ZapretManager.defaultSearchFolder()
+    val chooser = javax.swing.JFileChooser(initial).apply {
         dialogTitle = title
         fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
     }

@@ -22,10 +22,31 @@ class ZapretInstall(val folder: File) {
     private val bundledLists: List<File> = listOf(
         File(folder, "lists/list-general.txt"),
         File(folder, "lists/list-google.txt"),
+        File(folder, "lists/list-exclude.txt"),
+        File(folder, "lists/list-discord.txt"),
+        File(folder, "lists/list-youtube.txt"),
         File(folder, "ipset/zapret-hosts.txt"),
     ).filter { it.isFile }
 
-    val isValid: Boolean get() = userList.isFile || File(folder, "lists").isDirectory || File(folder, "ipset").isDirectory
+    val isValid: Boolean
+        get() {
+            if (!folder.isDirectory) return false
+            if (folder.name.equals("bin", true) ||
+                folder.name.equals("x86_64", true) ||
+                folder.name.equals("x86", true) ||
+                folder.name.equals("lists", true) ||
+                folder.name.equals("ipset", true)
+            ) return false
+
+            if (userList.isFile) return true
+            if (File(folder, "bin/winws.exe").isFile || File(folder, "bin/x86_64/winws.exe").isFile) return true
+            val listsDir = File(folder, "lists")
+            if (listsDir.isDirectory && (bundledLists.isNotEmpty() || listsDir.listFiles()?.isNotEmpty() == true)) return true
+            val ipsetDir = File(folder, "ipset")
+            if (ipsetDir.isDirectory && ipsetDir.listFiles()?.isNotEmpty() == true) return true
+            if (File(folder, "winws.exe").isFile && listsDir.isDirectory) return true
+            return false
+        }
 
     /** Every domain zapret already handles, from its own lists and the user's. */
     fun coveredDomains(): Set<String> =
