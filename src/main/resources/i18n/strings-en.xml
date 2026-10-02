@@ -2465,7 +2465,7 @@
     <string name="deezer_web_login_desc">Log in to Deezer in a WebView. KittyTune saves your Deezer session cookie for high quality playback and downloads.</string>
     <string name="player_like">Like</string>
     <string name="pref_lyrics_order">Lyrics Provider Order</string>
-    <string name="pref_lyrics_order_sub">Order in which providers are searched</string>
+    <string name="pref_lyrics_order_sub">Manage provider priority and availability</string>
     <string name="pref_lyrics_paxsenix_key">Paxsenix API Key</string>
     <string name="pref_lyrics_paxsenix_key_sub">Required for Apple Music, Spotify and Paxsenix Musixmatch</string>
     <string name="pref_lyrics_provider_lrclib_short">LRCLIB</string>

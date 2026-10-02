@@ -671,8 +671,8 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         SettingsSearchItem(
             title = str("pref_local_title"),
             subtitle = null,
-            category = SettingsCategory.SOURCES,
-            place = SettingsPlace(SettingsCategory.SOURCES),
+            category = SettingsCategory.STORAGE,
+            place = SettingsPlace(SettingsCategory.STORAGE),
             icon = Icons.Filled.SdStorage,
             keywords = listOf("local", "storage", "disk", "folder", "directory", "локальные", "папка", "диск"),
             hasSwitch = true,
@@ -1037,12 +1037,6 @@ private fun SourcesSection(navController: NavController) {
             },
         ),
     )
-
-    Spacer(Modifier.height(24.dp))
-
-    // The one part of this tab with a screenful of its own content, so it keeps the heading it had.
-    MainCategoryTitle(str("pref_local_title"), Icons.Filled.SdStorage)
-    LocalMediaSettingsScreen(onBackClick = null)
 }
 
 /** The proxy, whose own screen is long enough to deserve one and short enough to reach in one row. */

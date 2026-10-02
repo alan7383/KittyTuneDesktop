@@ -22,12 +22,14 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.material.icons.rounded.Remove
     import androidx.compose.material.icons.rounded.SdStorage
     import androidx.compose.material.icons.rounded.DarkMode
+    import androidx.compose.material.icons.rounded.SwapVert
     import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import com.alananasss.kittytune.ui.common.Slider
     import androidx.compose.runtime.*
     import androidx.compose.ui.Alignment
     import androidx.compose.ui.Modifier
+    import androidx.compose.ui.draw.alpha
     import androidx.compose.ui.draw.clip
     import androidx.compose.ui.graphics.Shape
         import com.alananasss.kittytune.core.EscapableAlertDialog
@@ -43,6 +45,7 @@ import com.alananasss.kittytune.ui.common.Slider
     import com.alananasss.kittytune.ui.common.SettingsGroup
     import com.alananasss.kittytune.ui.common.SettingsItem
     import com.alananasss.kittytune.ui.common.SettingsScaffold
+    import com.alananasss.kittytune.ui.common.SettingsSwitch
     import com.alananasss.kittytune.ui.player.PlayerViewModel
     import com.alananasss.kittytune.ui.common.SettingsGroupTitle
     import com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider
@@ -88,6 +91,7 @@ import com.alananasss.kittytune.ui.common.Slider
         var paxsenixKeyInput by remember { mutableStateOf(prefs.getPaxsenixApiKey()) }
         var showProviderOrderDialog by remember { mutableStateOf(false) }
         var providerOrder by remember { mutableStateOf(prefs.getLyricsProviderOrder()) }
+        var providerEnabledMap by remember { mutableStateOf(PreferredLyricsProvider.entries.associateWith { prefs.getLyricsProviderEnabled(it) }) }
 
         var showUiStyleDialog by remember { mutableStateOf(false) }
         var showSidebarUiStyleDialog by remember { mutableStateOf(false) }
@@ -218,32 +222,78 @@ import com.alananasss.kittytune.ui.common.Slider
 
         if (showProviderOrderDialog) {
             var currentOrder by remember { mutableStateOf(prefs.getLyricsProviderOrder().toMutableList()) }
+            var currentEnabled by remember {
+                mutableStateOf(
+                    PreferredLyricsProvider.entries.associateWith { prefs.getLyricsProviderEnabled(it) }
+                )
+            }
             EscapableAlertDialog(
                 onDismissRequest = { showProviderOrderDialog = false },
                 title = { Text(str("pref_lyrics_order", "Provider Priority Order")) },
                 text = {
-                    // Dragged by the handle, like the queue and the sidebar's rows: the arrows moved a row one
-                    // step per click, which for the last provider was a dozen clicks.
-                    com.alananasss.kittytune.ui.common.ScrollableColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp), contentPadding = PaddingValues(end = 12.dp)) {
+                    com.alananasss.kittytune.ui.common.ScrollableColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
+                        contentPadding = PaddingValues(end = 12.dp)
+                    ) {
                         sh.calvin.reorderable.ReorderableColumn(
                             list = currentOrder,
-                            onSettle = { from, to -> currentOrder = currentOrder.toMutableList().apply { add(to, removeAt(from)) } },
-                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            onSettle = { from, to ->
+                                currentOrder = currentOrder.toMutableList().apply { add(to, removeAt(from)) }
+                            },
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) { index, provider, isDragging ->
                             key(provider) {
                                 ReorderableItem {
-                                    val elevation by androidx.compose.animation.core.animateDpAsState(if (isDragging) 6.dp else 0.dp, label = "providerDrag")
+                                    val elevation by androidx.compose.animation.core.animateDpAsState(
+                                        if (isDragging) 6.dp else 0.dp,
+                                        label = "providerDrag"
+                                    )
+                                    val isEnabled = currentEnabled[provider] ?: true
                                     Surface(
                                         shape = RoundedCornerShape(14.dp),
                                         color = if (isDragging) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
                                         shadowElevation = elevation,
                                     ) {
-                                        Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(min = 52.dp)
+                                                .padding(horizontal = 4.dp, vertical = 6.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             IconButton(onClick = {}, modifier = Modifier.draggableHandle()) {
-                                                Icon(androidx.compose.material.icons.Icons.Rounded.DragIndicator, contentDescription = str("action_reorder"))
+                                                Icon(
+                                                    androidx.compose.material.icons.Icons.Rounded.DragIndicator,
+                                                    contentDescription = str("action_reorder"),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
                                             }
-                                            Text("${index + 1}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(24.dp))
-                                            Text(provider.displayName, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                                            Row(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .alpha(if (isEnabled) 1f else 0.45f),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    "${index + 1}",
+                                                    style = MaterialTheme.typography.labelLarge,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.width(28.dp)
+                                                )
+                                                Text(
+                                                    provider.displayName,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            SettingsSwitch(
+                                                checked = isEnabled,
+                                                onCheckedChange = { checked ->
+                                                    currentEnabled = currentEnabled + (provider to checked)
+                                                }
+                                            )
+                                            Spacer(Modifier.width(8.dp))
                                         }
                                     }
                                 }
@@ -254,7 +304,11 @@ import com.alananasss.kittytune.ui.common.Slider
                 confirmButton = {
                     TextButton(onClick = {
                         providerOrder = currentOrder
+                        providerEnabledMap = currentEnabled
                         prefs.setLyricsProviderOrder(currentOrder)
+                        currentEnabled.forEach { (p, enabled) ->
+                            prefs.setLyricsProviderEnabled(p, enabled)
+                        }
                         showProviderOrderDialog = false
                     }) {
                         Text(str("btn_save", "Save"))
@@ -1402,21 +1456,6 @@ import com.alananasss.kittytune.ui.common.Slider
                                 subtitle = if (paxsenixKeyInput.isNotBlank()) "••••••••" else str("pref_lyrics_paxsenix_key_sub", "Required for Apple Music, Spotify and Paxsenix Musixmatch"),
                                 onClick = { showPaxsenixKeyDialog = true }
                             )
-                        }
-                        PreferredLyricsProvider.entries.forEach { p ->
-                            add { shape ->
-                                var enabled by remember { mutableStateOf(prefs.getLyricsProviderEnabled(p)) }
-                                SettingsItem(
-                                    shape = shape,
-                                    title = p.displayName,
-                                    hasSwitch = true,
-                                    switchState = enabled,
-                                    onSwitchChange = {
-                                        enabled = it
-                                        prefs.setLyricsProviderEnabled(p, it)
-                                    }
-                                )
-                            }
                         }
                     },
                 )

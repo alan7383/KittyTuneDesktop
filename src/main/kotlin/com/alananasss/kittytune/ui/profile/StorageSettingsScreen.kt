@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -228,6 +229,10 @@ fun StorageSettingsScreen() {
     backupMessage?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 32.dp))
     }
+
+    Spacer(Modifier.height(16.dp))
+    MainCategoryTitle(str("pref_local_title"), Icons.Filled.SdStorage)
+    LocalMediaSettingsScreen(onBackClick = null)
 }
 
 @Composable
