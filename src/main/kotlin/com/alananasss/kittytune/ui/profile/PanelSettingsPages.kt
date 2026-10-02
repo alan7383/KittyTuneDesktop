@@ -55,6 +55,7 @@ fun LeftPanelSettingsPage() {
                     hoverExpand = it
                     prefs.setSidebarHoverExpandEnabled(it)
                 },
+                highlightKey = "pref_sidebar_hover_expand",
             )
         },
     )

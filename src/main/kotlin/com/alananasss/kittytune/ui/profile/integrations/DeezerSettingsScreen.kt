@@ -38,6 +38,7 @@ fun DeezerSettingsScreen(
     var fastMode by remember { mutableStateOf(prefs.getDeezerFastMode()) }
     var useAccount by remember { mutableStateOf(prefs.getDeezerUseAccount()) }
     var deezerCookie by remember { mutableStateOf(prefs.getDeezerCookie()) }
+    var deezerEnabled by remember { mutableStateOf(!prefs.isAudioProviderDisabled(com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.DEEZER)) }
 
     var showResolverDialog by remember { mutableStateOf(false) }
     var showProxyModeDialog by remember { mutableStateOf(false) }
@@ -316,6 +317,20 @@ fun DeezerSettingsScreen(
                 SettingsGroup(
                     title = str("settings_cat_general"),
                     items = buildList {
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("provider_enabled_title"),
+                                subtitle = str("provider_enabled_desc"),
+                                icon = Icons.Rounded.PowerSettingsNew,
+                                hasSwitch = true,
+                                switchState = deezerEnabled,
+                                onSwitchChange = { enabled ->
+                                    prefs.setAudioProviderDisabled(com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.DEEZER, !enabled)
+                                    deezerEnabled = enabled
+                                }
+                            )
+                        }
                         add { shape ->
                             SettingsItem(
                                 shape = shape,

@@ -72,7 +72,7 @@ import com.alananasss.kittytune.utils.Logger
     }
     
     enum class SearchSource {
-        SOUNDCLOUD, YOUTUBE, SPOTIFY,
+        SOUNDCLOUD, YOUTUBE, YOUTUBE_MUSIC, SPOTIFY,
 
         /**
          * Catalogue only — see [com.alananasss.kittytune.data.applemusic.AppleMusicClient]. Apple's own
@@ -134,6 +134,8 @@ import com.alananasss.kittytune.utils.Logger
         val searchResultsArtists = mutableStateListOf<User>()
         val searchResultsPlaylists = mutableStateListOf<Playlist>()
         val searchResultsYoutube = mutableStateListOf<Track>()
+        val searchResultsYoutubeMusic = mutableStateListOf<Track>()
+        private var youtubeMusicContinuation: String? = null
         val searchResultsSpotify = mutableStateListOf<Track>()
 
         val searchResultsDeezerTracks = mutableStateListOf<Track>()
@@ -562,7 +564,8 @@ import com.alananasss.kittytune.utils.Logger
         }
     
         private fun clearSearchResults() {
-            searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear(); searchResultsYoutube.clear()
+            searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear(); searchResultsYoutube.clear(); searchResultsYoutubeMusic.clear()
+            youtubeMusicContinuation = null
             searchResultsSpotify.clear(); searchResultsSpotifyAlbums.clear(); searchResultsSpotifyPlaylists.clear(); searchResultsSpotifyArtists.clear()
             searchResultsDeezerTracks.clear(); searchResultsDeezerAlbums.clear(); searchResultsDeezerPlaylists.clear(); searchResultsDeezerArtists.clear()
             searchResultsTidalTracks.clear(); searchResultsTidalAlbums.clear(); searchResultsTidalPlaylists.clear(); searchResultsTidalArtists.clear()
@@ -581,6 +584,7 @@ import com.alananasss.kittytune.utils.Logger
                 when (activeSearchSource) {
                     SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
                     SearchSource.YOUTUBE -> performYoutubeSearch(query)
+                    SearchSource.YOUTUBE_MUSIC -> performYoutubeMusicSearch(query)
                     SearchSource.SPOTIFY -> performSpotifySearch(query)
                     SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
                     SearchSource.YANDEX_MUSIC -> performYandexSearch(query)
@@ -837,6 +841,38 @@ import com.alananasss.kittytune.utils.Logger
                 }
             }
         }
+
+        private suspend fun performYoutubeMusicSearch(query: String) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val result = com.zionhuang.innertube.YouTube.search(
+                        query,
+                        com.zionhuang.innertube.YouTube.SearchFilter.FILTER_SONG
+                    ).getOrNull()
+                    youtubeMusicContinuation = result?.continuation
+                    val songs = result?.items?.filterIsInstance<com.zionhuang.innertube.models.SongItem>().orEmpty()
+                    val mappedTracks = songs.map { song ->
+                        val videoUrl = "https://www.youtube.com/watch?v=${song.id}"
+                        Track(
+                            id = kotlin.math.abs(videoUrl.hashCode().toLong()).coerceAtLeast(1L),
+                            title = song.title,
+                            user = User(0L, song.artists.joinToString(", ") { it.name }, null),
+                            artworkUrl = song.thumbnail,
+                            durationMs = (song.duration ?: 0) * 1000L,
+                            permalinkUrl = videoUrl,
+                            source = "youtube_music"
+                        )
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        searchResultsYoutubeMusic.clear()
+                        searchResultsYoutubeMusic.addAll(mappedTracks)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
         private suspend fun performSoundCloudSearch(query: String) {
             coroutineScope {
                 when (activeFilter) {
@@ -884,6 +920,29 @@ import com.alananasss.kittytune.utils.Logger
                             }
                         }
                         else -> {}
+                    }
+                    if (activeSearchSource == SearchSource.YOUTUBE_MUSIC && youtubeMusicContinuation != null) {
+                        val cont = youtubeMusicContinuation ?: return@launch
+                        withContext(Dispatchers.IO) {
+                            val res = com.zionhuang.innertube.YouTube.searchContinuation(cont).getOrNull()
+                            youtubeMusicContinuation = res?.continuation
+                            val moreSongs = res?.items?.filterIsInstance<com.zionhuang.innertube.models.SongItem>().orEmpty()
+                            val moreMapped = moreSongs.map { song ->
+                                val videoUrl = "https://www.youtube.com/watch?v=${song.id}"
+                                Track(
+                                    id = kotlin.math.abs(videoUrl.hashCode().toLong()).coerceAtLeast(1L),
+                                    title = song.title,
+                                    user = User(0L, song.artists.joinToString(", ") { it.name }, null),
+                                    artworkUrl = song.thumbnail,
+                                    durationMs = (song.duration ?: 0) * 1000L,
+                                    permalinkUrl = videoUrl,
+                                    source = "youtube_music"
+                                )
+                            }
+                            withContext(Dispatchers.Main) {
+                                searchResultsYoutubeMusic.addAll(moreMapped)
+                            }
+                        }
                     }
                 } catch (e: Exception) { e.printStackTrace() } finally { isSearchLoadingMore = false }
             }

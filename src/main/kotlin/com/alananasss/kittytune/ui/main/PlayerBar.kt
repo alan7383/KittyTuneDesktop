@@ -58,8 +58,7 @@ import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.ripple
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -202,17 +201,29 @@ fun PlayerBar(
                                 .clickable { onOpenFullPlayer() }
                                 .padding(4.dp),
                         ) {
-                            AnimatedArtwork(
-                                artworkUrl = track.fullResArtwork,
-                                animatedCoverUrl = vm.currentAnimatedCoverUrl,
-                                isPlaying = vm.isPlaying,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(if (isVeryCompact) 48.dp else if (isFloating) 52.dp else 56.dp)
-                                    .clip(RoundedCornerShape(if (isFloating) 26.dp else 8.dp)),
-                            )
+                            val artworkSize = if (isVeryCompact) 48.dp else if (isFloating) 52.dp else 56.dp
+                            val artworkShape = RoundedCornerShape(if (isFloating) 26.dp else 8.dp)
+
+                            Box(modifier = Modifier.size(artworkSize)) {
+                                AnimatedArtwork(
+                                    artworkUrl = track.fullResArtwork,
+                                    animatedCoverUrl = vm.currentAnimatedCoverUrl,
+                                    isPlaying = vm.isPlaying,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(artworkShape),
+                                )
+                                com.alananasss.kittytune.ui.common.TrackSourceCoverBadge(
+                                    track = track,
+                                    resolvedSource = vm.currentStreamSource,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .offset(x = 2.dp, y = 2.dp)
+                                )
+                            }
                             Spacer(Modifier.width(if (isVeryCompact) 8.dp else 12.dp))
-                            Column(Modifier.weight(1f, fill = false).widthIn(max = if (isCompact) 160.dp else 220.dp)) {
+                            Column(Modifier.weight(1f, fill = false).widthIn(max = if (isCompact) 180.dp else 260.dp)) {
                                 Text(
                                     text = track.title.orEmpty(),
                                     style = MaterialTheme.typography.bodyMedium,

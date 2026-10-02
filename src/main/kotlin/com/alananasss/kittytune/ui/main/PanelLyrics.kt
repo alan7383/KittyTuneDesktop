@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.alananasss.kittytune.ui.main
 
 import androidx.compose.animation.core.animateDpAsState
@@ -108,6 +110,19 @@ fun PanelLyrics(
             }
         }
         !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier, style)
+        vm.isLyricsLoading -> Column(
+            modifier = modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        ) {
+            androidx.compose.material3.ContainedLoadingIndicator()
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = str("lyrics_searching"),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         else -> Column(
             modifier = modifier.fillMaxWidth().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,

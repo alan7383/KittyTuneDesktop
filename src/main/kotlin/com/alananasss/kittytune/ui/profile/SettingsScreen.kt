@@ -108,6 +108,7 @@ fun SettingsScreen(
                 label = "settingsPage",
             ) { shown ->
                 SettingsPane(
+                    location = shown,
                     title = str(shown.subPage?.titleKey ?: shown.category.titleKey),
                     onBack = if (shown.subPage != null) ({ SettingsNavigation.up() }) else onBackClick,
                     searchQuery = searchQuery,
@@ -230,6 +231,7 @@ private fun SettingsPageContent(
 /** The right pane: a title row with search field, with a back arrow on sub-pages, over the page's own scrolling content. */
 @Composable
 private fun SettingsPane(
+    location: SettingsPlace,
     title: String,
     onBack: (() -> Unit)?,
     searchQuery: String,
@@ -302,7 +304,7 @@ private fun SettingsPane(
         }
         com.alananasss.kittytune.ui.common.ScrollableColumn(
             modifier = Modifier.fillMaxSize(),
-            state = rememberScrollState(),
+            state = androidx.compose.runtime.key(location) { rememberScrollState() },
             contentPadding = PaddingValues(bottom = 80.dp),
             content = content,
         )
@@ -320,6 +322,7 @@ internal data class SettingsSearchItem(
     val hasSwitch: Boolean = false,
     val switchState: Boolean = false,
     val onSwitchChange: ((Boolean) -> Unit)? = null,
+    val highlightKey: String? = null,
 )
 
 @Composable
@@ -372,6 +375,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 animatedArtistProfiles = it
                 prefs.setAnimatedArtistProfilesEnabled(it)
             },
+            highlightKey = "pref_animated_artist_profiles",
         ),
         SettingsSearchItem(
             title = str("pref_animated_covers"),
@@ -386,6 +390,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 animatedCovers = it
                 prefs.setAnimatedCoversEnabled(it)
             },
+            highlightKey = "pref_animated_covers",
         ),
         SettingsSearchItem(
             title = str("pref_animated_covers_fade_ui"),
@@ -400,6 +405,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 animatedCoversFadeUi = it
                 prefs.setAnimatedCoversFadeUiEnabled(it)
             },
+            highlightKey = "pref_animated_covers_fade_ui",
         ),
         SettingsSearchItem(
             title = str("pref_theme_pure_black"),
@@ -414,6 +420,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 pureBlack = it
                 prefs.setPureBlack(it)
             },
+            highlightKey = "pref_theme_pure_black",
         ),
         SettingsSearchItem(
             title = str("pref_dynamic_theme_merged"),
@@ -429,6 +436,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 prefs.setTrackDynamicTheme(it)
                 prefs.setDynamicTheme(it)
             },
+            highlightKey = "pref_dynamic_theme",
         ),
         SettingsSearchItem(
             title = str("pref_sidebar_hover_expand"),
@@ -443,6 +451,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 sidebarHoverExpand = it
                 prefs.setSidebarHoverExpandEnabled(it)
             },
+            highlightKey = "pref_sidebar_hover_expand",
         ),
         SettingsSearchItem(
             title = str("pref_vertical_volume_slider"),
@@ -457,6 +466,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 verticalVolume = it
                 prefs.setVerticalVolumeSlider(it)
             },
+            highlightKey = "pref_vertical_volume_slider",
         ),
         SettingsSearchItem(
             title = str("pref_show_remaining_time"),
@@ -471,17 +481,31 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 showRemainingTime = it
                 prefs.setShowRemainingTime(it)
             },
+            highlightKey = "pref_show_remaining_time",
         ),
         SettingsSearchItem(
             title = str("pref_screensaver_title"),
             subtitle = str("pref_screensaver_desc"),
             category = SettingsCategory.INTERFACE,
-            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS, SettingsSubPage.LYRICS_FULLSCREEN)),
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)),
             icon = Icons.Rounded.DarkMode,
             keywords = listOf("screensaver", "écran de veille", "veille", "sleep", "dim", "fullscreen", "plein écran", "заставка", "экранная заставка"),
             hasSwitch = true,
             switchState = playerViewModel.fullPlayerScreensaverEnabled,
             onSwitchChange = { playerViewModel.updateFullPlayerScreensaverEnabled(it) },
+            highlightKey = "pref_screensaver",
+        ),
+        SettingsSearchItem(
+            title = str("pref_full_player_source_title"),
+            subtitle = str("pref_full_player_source_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)),
+            icon = Icons.Rounded.GraphicEq,
+            keywords = listOf("source", "soundcloud", "youtube", "logo", "badge", "fullscreen", "plein écran", "titre", "point"),
+            hasSwitch = true,
+            switchState = playerViewModel.fullPlayerSourceIndicatorEnabled,
+            onSwitchChange = { playerViewModel.updateFullPlayerSourceIndicatorEnabled(it) },
+            highlightKey = "pref_full_player_source",
         ),
 
         // AUDIO - Pages & Categories
@@ -503,6 +527,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             hasSwitch = true,
             switchState = playerViewModel.effectsState.isNormalizationEnabled,
             onSwitchChange = { playerViewModel.toggleNormalization(it) },
+            highlightKey = "pref_norm",
         ),
         SettingsSearchItem(
             title = str("pref_crossfade_title"),
@@ -517,6 +542,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 crossfade = it
                 prefs.setCrossfadeEnabled(it)
             },
+            highlightKey = "pref_crossfade",
         ),
         SettingsSearchItem(
             title = str(com.alananasss.kittytune.R.string.automix),
@@ -531,6 +557,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 automix = it
                 prefs.setAutomixEnabled(it)
             },
+            highlightKey = "pref_automix",
         ),
         SettingsSearchItem(
             title = str("pref_autoplay"),
@@ -545,6 +572,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 autoplay = it
                 prefs.setAutoplayEnabled(it)
             },
+            highlightKey = "pref_autoplay",
         ),
         SettingsSearchItem(
             title = str("pref_continuous_playback"),
@@ -559,6 +587,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 continuousPlayback = it
                 prefs.setContinuousPlaybackEnabled(it)
             },
+            highlightKey = "pref_continuous_playback",
         ),
         SettingsSearchItem(
             title = str("pref_persist_queue"),
@@ -573,6 +602,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 persistentQueue = it
                 prefs.setPersistentQueueEnabled(it)
             },
+            highlightKey = "pref_persist_queue",
         ),
         SettingsSearchItem(
             title = str("pref_queue_preserve_upcoming"),
@@ -584,6 +614,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             hasSwitch = true,
             switchState = playerViewModel.isQueuePreserveUpcomingEnabled,
             onSwitchChange = { playerViewModel.toggleQueuePreserveUpcoming(it) },
+            highlightKey = "pref_queue_preserve_upcoming",
         ),
         SettingsSearchItem(
             title = str("pref_save_position"),
@@ -598,6 +629,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 savePosition = it
                 prefs.setSavePositionEnabled(it)
             },
+            highlightKey = "pref_save_position",
         ),
         SettingsSearchItem(
             title = str("pref_youtube_fallback"),
@@ -612,6 +644,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 youtubeFallback = it
                 prefs.setYouTubeFallbackEnabled(it)
             },
+            highlightKey = "pref_youtube_fallback",
         ),
         SettingsSearchItem(
             title = str("pref_precise_speed"),
@@ -623,6 +656,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             hasSwitch = true,
             switchState = playerViewModel.isPreciseSpeedEnabled,
             onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) },
+            highlightKey = "pref_precise_speed",
         ),
 
         // SOURCES - Pages & Options
@@ -675,6 +709,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 autoUpdate = it
                 prefs.setAutoUpdateEnabled(it)
             },
+            highlightKey = "pref_auto_update",
         ),
         SettingsSearchItem(
             title = str("pref_discord_title"),
@@ -689,6 +724,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 discordRpc = it
                 prefs.setDiscordRpcEnabled(it)
             },
+            highlightKey = "pref_discord",
         ),
         SettingsSearchItem(str("about_credits"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Groups, route = "credits", keywords = listOf("credits", "about", "authors", "team", "crédits", "о программе", "авторы")),
     )
@@ -755,7 +791,11 @@ private fun SettingsSearchResults(
                             switchState = item.switchState,
                             onSwitchChange = item.onSwitchChange,
                             onClick = {
+                                if (item.highlightKey != null) {
+                                    com.alananasss.kittytune.ui.common.SettingsHighlightManager.setHighlightKey(item.highlightKey)
+                                }
                                 if (item.route != null) {
+                                    onNavigateToPlace(item.place)
                                     navController.navigate(item.route)
                                 } else {
                                     onNavigateToPlace(item.place)
@@ -884,36 +924,46 @@ private fun CategoryItem(
 private fun SourcesSection(navController: NavController) {
     val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
     val order = prefs.getAudioProviderOrder()
+    val disabledProviders = prefs.getDisabledAudioProviders()
+    val disabledSuffix = str("provider_disabled_suffix")
     val orderSummary = order.joinToString(", ") { item ->
-        when (item) {
+        val name = when (item) {
             com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.QOBUZ -> "Qobuz"
             com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.TIDAL -> "TIDAL"
             com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.DEEZER -> "Deezer"
             com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.YOUTUBE_MUSIC -> "YouTube Music"
             com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.SOUNDCLOUD -> "SoundCloud"
         }
+        if (item in disabledProviders) "$name $disabledSuffix" else name
     }
 
+    val qobuzDisabled = com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.QOBUZ in disabledProviders
+    val tidalDisabled = com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.TIDAL in disabledProviders
+    val deezerDisabled = com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.DEEZER in disabledProviders
+
     val qobuzInstances = prefs.getQobuzCustomInstances().split("\n").filter { it.isNotBlank() }
-    val qobuzSubtitle = if (qobuzInstances.isEmpty() || prefs.getQobuzCustomInstances() == com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.DEFAULT_INSTANCE) {
+    val baseQobuzSubtitle = if (qobuzInstances.isEmpty() || prefs.getQobuzCustomInstances() == com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.DEFAULT_INSTANCE) {
         "${prefs.getQobuzCountry()} • ${str("qobuz_custom_instances_desc_default")}"
     } else {
         "${prefs.getQobuzCountry()} • ${str("qobuz_custom_instances_desc_custom", qobuzInstances.size)}"
     }
+    val qobuzSubtitle = if (qobuzDisabled) "$disabledSuffix • $baseQobuzSubtitle" else baseQobuzSubtitle
 
     val tidalQuality = prefs.getTidalAudioQuality()
-    val tidalSubtitle = when (tidalQuality) {
+    val baseTidalSubtitle = when (tidalQuality) {
         com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.AAC_320 -> str("tidal_quality_aac_320")
         com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.FLAC -> str("tidal_quality_flac")
         com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality.HI_RES_LOSSLESS -> str("tidal_quality_hires")
     }
+    val tidalSubtitle = if (tidalDisabled) "$disabledSuffix • $baseTidalSubtitle" else baseTidalSubtitle
 
     val deezerQuality = prefs.getDeezerAudioQuality()
-    val deezerSubtitle = when (deezerQuality) {
+    val baseDeezerSubtitle = when (deezerQuality) {
         com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.FLAC -> str("deezer_quality_flac")
         com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_320 -> str("deezer_quality_mp3_320")
         com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality.MP3_128 -> str("deezer_quality_mp3_128")
     }
+    val deezerSubtitle = if (deezerDisabled) "$disabledSuffix • $baseDeezerSubtitle" else baseDeezerSubtitle
 
     // Every service in one list, each saying whether it is connected, the way an accounts page does: the
     // Yandex token used to sit in a group of its own, as if it were a different kind of thing.
@@ -937,17 +987,17 @@ private fun SourcesSection(navController: NavController) {
                 )
             },
             { shape ->
-                ServiceRow(shape, "Qobuz", qobuzSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_qobuz, isConnected = true) {
+                ServiceRow(shape, "Qobuz", qobuzSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_qobuz, isConnected = !qobuzDisabled) {
                     navController.navigate("qobuz_settings")
                 }
             },
             { shape ->
-                ServiceRow(shape, "TIDAL", tidalSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_tidal, isConnected = true) {
+                ServiceRow(shape, "TIDAL", tidalSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_tidal, isConnected = !tidalDisabled) {
                     navController.navigate("tidal_settings")
                 }
             },
             { shape ->
-                ServiceRow(shape, "Deezer", deezerSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_deezer, isConnected = true) {
+                ServiceRow(shape, "Deezer", deezerSubtitle, com.alananasss.kittytune.R.drawable.ic_logo_deezer, isConnected = !deezerDisabled) {
                     navController.navigate("deezer_settings")
                 }
             },

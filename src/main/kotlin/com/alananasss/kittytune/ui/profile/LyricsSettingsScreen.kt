@@ -1510,6 +1510,7 @@ private fun LyricsModeGroup(
                     hasSwitch = true,
                     switchState = screensaverEnabled,
                     onSwitchChange = onScreensaverChange,
+                    highlightKey = "pref_screensaver",
                 )
             }
             add { shape ->

@@ -32,6 +32,7 @@ fun TidalSettingsScreen(
     var audioQuality by remember { mutableStateOf(prefs.getTidalAudioQuality()) }
     var resolverEndpoints by remember { mutableStateOf(prefs.getTidalResolverEndpoints()) }
     var tidalCookie by remember { mutableStateOf(prefs.getTidalCookie()) }
+    var tidalEnabled by remember { mutableStateOf(!prefs.isAudioProviderDisabled(com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.TIDAL)) }
 
     var showQualityDialog by remember { mutableStateOf(false) }
     var showResolverEndpointsDialog by remember { mutableStateOf(false) }
@@ -195,6 +196,20 @@ fun TidalSettingsScreen(
                 SettingsGroup(
                     title = str("settings_cat_general"),
                     items = buildList {
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("provider_enabled_title"),
+                                subtitle = str("provider_enabled_desc"),
+                                icon = Icons.Rounded.PowerSettingsNew,
+                                hasSwitch = true,
+                                switchState = tidalEnabled,
+                                onSwitchChange = { enabled ->
+                                    prefs.setAudioProviderDisabled(com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.TIDAL, !enabled)
+                                    tidalEnabled = enabled
+                                }
+                            )
+                        }
                         add { shape ->
                             SettingsItem(
                                 shape = shape,

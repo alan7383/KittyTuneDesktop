@@ -22,23 +22,77 @@ class AudioProvidersParityTest {
     @Test
     fun testAudioProviderOrderDefaultAndSerialization() {
         val defaultList = AudioProviderOrder.Default
-        assertTrue(defaultList.contains(AudioProviderOrderItem.SOUNDCLOUD))
-        assertTrue(defaultList.contains(AudioProviderOrderItem.YOUTUBE_MUSIC))
-        assertTrue(defaultList.contains(AudioProviderOrderItem.DEEZER))
-        assertTrue(defaultList.contains(AudioProviderOrderItem.TIDAL))
-        assertTrue(defaultList.contains(AudioProviderOrderItem.QOBUZ))
+        assertEquals(AudioProviderOrderItem.SOUNDCLOUD, defaultList[0])
+        assertEquals(AudioProviderOrderItem.YOUTUBE_MUSIC, defaultList[1])
+        assertEquals(
+            listOf(
+                AudioProviderOrderItem.SOUNDCLOUD,
+                AudioProviderOrderItem.YOUTUBE_MUSIC,
+                AudioProviderOrderItem.DEEZER,
+                AudioProviderOrderItem.TIDAL,
+                AudioProviderOrderItem.QOBUZ,
+            ),
+            defaultList
+        )
 
         val serialized = AudioProviderOrder.serialize(defaultList)
         val deserialized = AudioProviderOrder.deserialize(serialized)
         assertEquals(defaultList, deserialized)
 
-        // Test partial decoding adds missing items in default order
+        // Test partial decoding adds missing items in default order (SoundCloud, YouTube Music first)
         val partial = AudioProviderOrder.deserialize("DEEZER,TIDAL")
         assertEquals(AudioProviderOrderItem.DEEZER, partial[0])
         assertEquals(AudioProviderOrderItem.TIDAL, partial[1])
-        assertTrue(partial.contains(AudioProviderOrderItem.QOBUZ))
-        assertTrue(partial.contains(AudioProviderOrderItem.SOUNDCLOUD))
-        assertTrue(partial.contains(AudioProviderOrderItem.YOUTUBE_MUSIC))
+        assertEquals(AudioProviderOrderItem.SOUNDCLOUD, partial[2])
+        assertEquals(AudioProviderOrderItem.YOUTUBE_MUSIC, partial[3])
+        assertEquals(AudioProviderOrderItem.QOBUZ, partial[4])
+    }
+
+    @Test
+    fun testOnlyHiResProvidersAreDisableable() {
+        assertTrue(AudioProviderOrderItem.QOBUZ.isDisableable())
+        assertTrue(AudioProviderOrderItem.TIDAL.isDisableable())
+        assertTrue(AudioProviderOrderItem.DEEZER.isDisableable())
+        assertFalse(AudioProviderOrderItem.YOUTUBE_MUSIC.isDisableable())
+        assertFalse(AudioProviderOrderItem.SOUNDCLOUD.isDisableable())
+
+        assertEquals(
+            setOf(
+                AudioProviderOrderItem.QOBUZ,
+                AudioProviderOrderItem.TIDAL,
+                AudioProviderOrderItem.DEEZER
+            ),
+            AudioProviderOrder.Disableable
+        )
+    }
+
+    @Test
+    fun testDisabledSetSurvivesSerialization() {
+        val disabled = setOf(AudioProviderOrderItem.TIDAL, AudioProviderOrderItem.QOBUZ)
+        val raw = AudioProviderOrder.serializeDisabled(disabled)
+        assertEquals(disabled, AudioProviderOrder.deserializeDisabled(raw))
+    }
+
+    @Test
+    fun testBaseSourcesCanNeverBeSerializedAsDisabled() {
+        val raw = AudioProviderOrder.serializeDisabled(
+            setOf(
+                AudioProviderOrderItem.SOUNDCLOUD,
+                AudioProviderOrderItem.YOUTUBE_MUSIC
+            )
+        )
+        assertTrue(AudioProviderOrder.deserializeDisabled(raw).isEmpty())
+    }
+
+    @Test
+    fun testMalformedAndEmptyDisabledInputYieldsEmptySet() {
+        assertTrue(AudioProviderOrder.deserializeDisabled(null).isEmpty())
+        assertTrue(AudioProviderOrder.deserializeDisabled("").isEmpty())
+        assertTrue(AudioProviderOrder.deserializeDisabled("garbage,,TIDALX").isEmpty())
+        assertEquals(
+            setOf(AudioProviderOrderItem.DEEZER),
+            AudioProviderOrder.deserializeDisabled(" deezer , nope ")
+        )
     }
 
     @Test

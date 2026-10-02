@@ -675,6 +675,7 @@ private fun SearchSourceButton(vm: HomeViewModel) {
     val sources = listOf(
         SearchSource.SOUNDCLOUD,
         SearchSource.YOUTUBE,
+        SearchSource.YOUTUBE_MUSIC,
         SearchSource.SPOTIFY,
         SearchSource.APPLE_MUSIC,
         SearchSource.YANDEX_MUSIC,
@@ -733,6 +734,7 @@ private fun SearchSourceButton(vm: HomeViewModel) {
 private fun searchSourceLabel(source: SearchSource): String = when (source) {
     SearchSource.SOUNDCLOUD -> "SoundCloud"
     SearchSource.YOUTUBE -> "YouTube"
+    SearchSource.YOUTUBE_MUSIC -> "YouTube Music"
     SearchSource.SPOTIFY -> "Spotify"
     SearchSource.APPLE_MUSIC -> "Apple Music"
     SearchSource.YANDEX_MUSIC -> "Yandex Music"
@@ -766,7 +768,8 @@ private fun SearchResults(
         }
     }
     LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && hasQuery && vm.activeFilter != SearchFilter.ALL && !vm.isSearchLoadingMore) {
+        val canLoadMore = vm.activeSearchSource == SearchSource.YOUTUBE_MUSIC || vm.activeFilter != SearchFilter.ALL
+        if (shouldLoadMore && hasQuery && canLoadMore && !vm.isSearchLoadingMore) {
             vm.loadMoreSearchResults()
         }
     }
@@ -855,6 +858,7 @@ private fun SearchResults(
             vm.searchResultsArtists.isEmpty() &&
             vm.searchResultsPlaylists.isEmpty() &&
             vm.searchResultsYoutube.isEmpty() &&
+            vm.searchResultsYoutubeMusic.isEmpty() &&
             vm.searchResultsSpotify.isEmpty() &&
             vm.searchResultsApple.isEmpty() &&
             vm.searchResultsDeezerTracks.isEmpty() &&
@@ -869,6 +873,7 @@ private fun SearchResults(
             // Actual results
             when (vm.activeSearchSource) {
                 SearchSource.YOUTUBE -> YoutubeResults(vm, playerViewModel, listState)
+                SearchSource.YOUTUBE_MUSIC -> YoutubeMusicResults(vm, playerViewModel, listState)
                 SearchSource.SPOTIFY -> SpotifyResults(vm, playerViewModel, navController)
                 // One list for both catalogues, because they produce the same type and behave the same way:
                 // press a row, it goes and finds the song on a source that can play it (issue #33).
@@ -1528,6 +1533,49 @@ private fun YoutubeResults(
     ) {
         items(tracks) { track ->
             SearchTrackRow(track, playerViewModel)
+        }
+    }
+}
+
+@Composable
+private fun YoutubeMusicResults(
+    vm: HomeViewModel,
+    playerViewModel: PlayerViewModel,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+) {
+    val tracks = vm.searchResultsYoutubeMusic
+
+    if (tracks.isEmpty() && !vm.isSearchLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                text = str("search_no_results"),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        items(tracks) { track ->
+            SearchTrackRow(track, playerViewModel)
+        }
+        if (vm.isSearchLoadingMore) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularWavyProgressIndicator(modifier = Modifier.size(24.dp))
+                }
+            }
         }
     }
 }

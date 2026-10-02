@@ -104,6 +104,7 @@ import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.ui.common.Slider
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.DarkMode
+import androidx.compose.material.icons.rounded.GraphicEq
 import kotlin.math.roundToInt
     import com.alananasss.kittytune.ui.player.LyricsMode
     import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -251,7 +252,11 @@ import kotlin.math.roundToInt
                         )
                     } else {
                         if (viewModel.lyricsLines.isEmpty() && viewModel.rawPlainLyrics.isNullOrBlank()) {
-                            EmptyLyricsState(onManualSearch = { viewModel.isSearchingLyrics = true })
+                            if (viewModel.isLyricsLoading) {
+                                SearchingLyricsState()
+                            } else {
+                                EmptyLyricsState(onManualSearch = { viewModel.isSearchingLyrics = true })
+                            }
                         } else {
                             AnimatedContent(
                                 targetState = viewModel.lyricsMode,
@@ -745,6 +750,24 @@ import kotlin.math.roundToInt
     }
     
     @Composable
+    fun SearchingLyricsState() {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ContainedLoadingIndicator()
+            Spacer(Modifier.height(20.dp))
+            Text(
+                str("lyrics_searching"),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+
+    @Composable
     fun EmptyLyricsState(onManualSearch: () -> Unit) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -822,6 +845,47 @@ import kotlin.math.roundToInt
         // Themed rather than hard-coded black (issue #33): this view covers the whole player,
         // so a flat black panel clashed with both the light theme and the cover-seeded palette.
         Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+            val hasAutoLyrics = viewModel.lyricsLines.isNotEmpty() || !viewModel.rawPlainLyrics.isNullOrBlank()
+            if (hasAutoLyrics) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = str("lyrics_auto_found_title"),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = str("lyrics_auto_found_desc"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Button(
+                            onClick = onCloseSearch,
+                            shapes = ButtonDefaults.shapes(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(str("lyrics_auto_found_use"), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(16.dp)
@@ -942,7 +1006,7 @@ import kotlin.math.roundToInt
                 }
             }
 
-            if (viewModel.isLyricsLoading) {
+            if (viewModel.isManualSearchLoading) {
                 LinearWavyProgressIndicator(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.primary
@@ -953,7 +1017,7 @@ import kotlin.math.roundToInt
                 viewModel.unifiedLyricSearchResults.toList()
             }
 
-            if (searchResults.isEmpty() && !viewModel.isLyricsLoading) {
+            if (searchResults.isEmpty() && !viewModel.isManualSearchLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize().padding(32.dp),
                     contentAlignment = Alignment.Center
@@ -2377,7 +2441,7 @@ fun QuickLyricsSettingsDialog(
 
 
 
-                            // ÉCRAN DE VEILLE — carte dans la colonne droite
+                            // ÉCRAN DE VEILLE & SOURCE AUDIO PLEIN ÉCRAN
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                                 shape = RoundedCornerShape(16.dp),
@@ -2413,6 +2477,43 @@ fun QuickLyricsSettingsDialog(
                                         Switch(
                                             checked = viewModel.fullPlayerScreensaverEnabled,
                                             onCheckedChange = { viewModel.updateFullPlayerScreensaverEnabled(it) }
+                                        )
+                                    }
+
+                                    androidx.compose.material3.HorizontalDivider(
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).padding(end = 10.dp)) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.GraphicEq,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Column {
+                                                Text(
+                                                    text = str("pref_full_player_source_title"),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Text(
+                                                    text = str("pref_full_player_source_desc"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = viewModel.fullPlayerSourceIndicatorEnabled,
+                                            onCheckedChange = { viewModel.updateFullPlayerSourceIndicatorEnabled(it) }
                                         )
                                     }
                                 }

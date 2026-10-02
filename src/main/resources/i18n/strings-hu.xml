@@ -2318,6 +2318,10 @@
     <string name="provider_order_reset">Sorrend visszaállítása</string>
     <string name="provider_order_settings_desc">Húzd a forrásokat olyan sorrendbe, ahogyan a KittyTune próbálja őket</string>
     <string name="provider_order_summary">Húzd feljebb a forrásokat, hogy a lejátszás és letöltés során korábban kerüljenek sorra.</string>
+    <string name="provider_enabled_hint">A SoundCloud és a YouTube Music alapvető források, mindig elérhetőek maradnak.</string>
+    <string name="provider_disabled_suffix">(kikapcsolva)</string>
+    <string name="provider_enabled_title">Hangforrás engedélyezése</string>
+    <string name="provider_enabled_desc">Engedélyezi a forrás használatát a lejátszáshoz és a letöltésekhez</string>
     <string name="audio_provider_soundcloud">SoundCloud</string>
     <string name="audio_provider_tidal">TIDAL</string>
     <string name="audio_provider_deezer">Deezer</string>
@@ -2710,4 +2714,17 @@
     <string name="explore">Felfedezés</string>
     <string name="chart_section_title">Lista</string>
     <string name="chart_genre_folk">Népzmű</string>
+    <string name="lyrics_searching">Dalszöveg keresése…</string>
+    <string name="lyrics_auto_found_title">Dalszöveg automatikusan megtalálva</string>
+    <string name="lyrics_auto_found_desc">A számhoz automatikusan találtunk dalszöveget.</string>
+    <string name="lyrics_auto_found_use">Megtekintés</string>
+    <string name="pref_track_source_badge_title">Hangforrás jelző</string>
+    <string name="pref_track_source_badge_desc">Platform jelvény (YouTube, SoundCloud stb.) megjelenítése az éppen játszott számnál</string>
+    <string name="pref_track_source_badge_both">Ikon és szöveg</string>
+    <string name="pref_track_source_badge_icon">Csak ikon</string>
+    <string name="pref_track_source_badge_text">Csak szöveg</string>
+    <string name="pref_track_source_badge_hidden">Kikapcsolva</string>
+    <string name="pref_full_player_source_title">Hangforrás jelző</string>
+    <string name="pref_full_player_source_desc">A platform logójának megjelenítése (YouTube, SoundCloud stb.) a lejátszott számnál</string>
+    <string name="audio_source_tooltip">Audió forrása: %s</string>
 </resources>

@@ -67,6 +67,8 @@ enum class FullPlayerLayout { LYRICS_RIGHT, LYRICS_LEFT, LYRICS_CENTRED, COVER_A
 
 enum class PlayerBarStyle { DEFAULT, ROUNDED, FLOATING }
 
+enum class TrackSourceBadgeStyle { ICON_AND_TEXT, ICON_ONLY, TEXT_ONLY, HIDDEN }
+
 /**
  * The floating bar's shape: its corner (0 is square, 40 a pill), how much of the window's width it takes,
  * how far above the bottom edge it floats, and whether the page shows through it.
@@ -182,6 +184,8 @@ class PlayerPreferences {
         private const val KEY_LOCAL_MEDIA_URIS_SET = "local_media_uris_set_v2"
         private const val KEY_PLAYER_BAR_BUTTONS = "player_bar_buttons"
         private const val KEY_PLAYER_BAR_STYLE = "player_bar_style"
+        private const val KEY_TRACK_SOURCE_BADGE_STYLE = "track_source_badge_style"
+        const val KEY_FULL_PLAYER_SOURCE_INDICATOR_ENABLED = "full_player_source_indicator_enabled"
         const val KEY_SHOW_REMAINING_TIME = "player_bar_show_remaining"
 
         const val PLAYER_BAR_BUTTON_LIKE = "like"
@@ -385,6 +389,7 @@ class PlayerPreferences {
         private const val KEY_SYNC_DISCLAIMER_DISMISSED = "sync_disclaimer_dismissed"
 
         const val KEY_AUDIO_PROVIDER_ORDER = "audio_provider_order"
+        const val KEY_DISABLED_AUDIO_PROVIDERS = "disabled_audio_providers"
         const val KEY_QOBUZ_COUNTRY = "qobuz_country"
         const val KEY_QOBUZ_CUSTOM_INSTANCES = "qobuz_custom_instances"
         const val KEY_QOBUZ_QUALITY = "qobuz_quality"
@@ -1116,6 +1121,40 @@ class PlayerPreferences {
 
     fun showRemainingTimeFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_REMAINING_TIME, false)
 
+    fun getTrackSourceBadgeStyle(): TrackSourceBadgeStyle {
+        val raw = Prefs.getString(KEY_TRACK_SOURCE_BADGE_STYLE, TrackSourceBadgeStyle.ICON_AND_TEXT.name)
+        return try {
+            TrackSourceBadgeStyle.valueOf(raw ?: TrackSourceBadgeStyle.ICON_AND_TEXT.name)
+        } catch (_: Exception) {
+            TrackSourceBadgeStyle.ICON_AND_TEXT
+        }
+    }
+
+    fun setTrackSourceBadgeStyle(style: TrackSourceBadgeStyle) =
+        Prefs.putString(KEY_TRACK_SOURCE_BADGE_STYLE, style.name)
+
+    fun trackSourceBadgeStyleFlow(): Flow<TrackSourceBadgeStyle> =
+        Prefs.stringFlow(KEY_TRACK_SOURCE_BADGE_STYLE, TrackSourceBadgeStyle.ICON_AND_TEXT.name).map { raw ->
+            try {
+                TrackSourceBadgeStyle.valueOf(raw ?: TrackSourceBadgeStyle.ICON_AND_TEXT.name)
+            } catch (_: Exception) {
+                TrackSourceBadgeStyle.ICON_AND_TEXT
+            }
+        }
+
+    fun getFullPlayerSourceIndicatorEnabled(): Boolean =
+        Prefs.getBoolean(KEY_FULL_PLAYER_SOURCE_INDICATOR_ENABLED, false)
+
+    fun setFullPlayerSourceIndicatorEnabled(enabled: Boolean) =
+        Prefs.putBoolean(KEY_FULL_PLAYER_SOURCE_INDICATOR_ENABLED, enabled)
+
+    fun fullPlayerSourceIndicatorEnabledFlow(): Flow<Boolean> =
+        Prefs.booleanFlow(KEY_FULL_PLAYER_SOURCE_INDICATOR_ENABLED, false)
+
+    fun getTrackSourceIndicatorEnabled(): Boolean = getFullPlayerSourceIndicatorEnabled()
+    fun setTrackSourceIndicatorEnabled(enabled: Boolean) = setFullPlayerSourceIndicatorEnabled(enabled)
+    fun trackSourceIndicatorEnabledFlow(): Flow<Boolean> = fullPlayerSourceIndicatorEnabledFlow()
+
     /**
      * The order of the tiles in an options menu, and which of them are hidden (issue #33).
      *
@@ -1575,11 +1614,32 @@ class PlayerPreferences {
     // Audio Provider Order
     fun getAudioProviderOrder(): List<com.alananasss.kittytune.audio.providers.AudioProviderOrderItem> {
         val raw = Prefs.getString(KEY_AUDIO_PROVIDER_ORDER, null)
+        // If the user still has the old default where Qobuz was first, migrate to the SoundCloud-first default
+        if (raw == "QOBUZ,TIDAL,DEEZER,YOUTUBE_MUSIC,SOUNDCLOUD") {
+            return com.alananasss.kittytune.audio.providers.AudioProviderOrder.Default
+        }
         return com.alananasss.kittytune.audio.providers.AudioProviderOrder.deserialize(raw)
     }
 
     fun setAudioProviderOrder(order: List<com.alananasss.kittytune.audio.providers.AudioProviderOrderItem>) {
         Prefs.putString(KEY_AUDIO_PROVIDER_ORDER, com.alananasss.kittytune.audio.providers.AudioProviderOrder.serialize(order))
+    }
+
+    // Disabled audio providers
+    fun getDisabledAudioProviders(): Set<com.alananasss.kittytune.audio.providers.AudioProviderOrderItem> {
+        val raw = Prefs.getString(KEY_DISABLED_AUDIO_PROVIDERS, null)
+        return com.alananasss.kittytune.audio.providers.AudioProviderOrder.deserializeDisabled(raw)
+    }
+
+    fun isAudioProviderDisabled(provider: com.alananasss.kittytune.audio.providers.AudioProviderOrderItem): Boolean {
+        return provider.isDisableable() && provider in getDisabledAudioProviders()
+    }
+
+    fun setAudioProviderDisabled(provider: com.alananasss.kittytune.audio.providers.AudioProviderOrderItem, disabled: Boolean) {
+        if (!provider.isDisableable()) return
+        val current = getDisabledAudioProviders().toMutableSet()
+        if (disabled) current.add(provider) else current.remove(provider)
+        Prefs.putString(KEY_DISABLED_AUDIO_PROVIDERS, com.alananasss.kittytune.audio.providers.AudioProviderOrder.serializeDisabled(current))
     }
 
     // Qobuz

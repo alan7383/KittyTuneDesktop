@@ -8,17 +8,30 @@ enum class AudioProviderOrderItem {
     SOUNDCLOUD;
 
     fun isPlaybackProvider(): Boolean = true
+
+    /**
+     * Whether the user may switch this provider off.
+     *
+     * Qobuz, TIDAL and Deezer can serve FLAC / Hi-Res streams that weigh hundreds of
+     * megabytes per hour, so they can be disabled to save bandwidth. SoundCloud and
+     * YouTube Music are the lightweight base sources and stay always available.
+     */
+    fun isDisableable(): Boolean = this == QOBUZ || this == TIDAL || this == DEEZER
 }
 
 object AudioProviderOrder {
     val Default: List<AudioProviderOrderItem> =
         listOf(
-            AudioProviderOrderItem.QOBUZ,
-            AudioProviderOrderItem.TIDAL,
-            AudioProviderOrderItem.DEEZER,
-            AudioProviderOrderItem.YOUTUBE_MUSIC,
             AudioProviderOrderItem.SOUNDCLOUD,
+            AudioProviderOrderItem.YOUTUBE_MUSIC,
+            AudioProviderOrderItem.DEEZER,
+            AudioProviderOrderItem.TIDAL,
+            AudioProviderOrderItem.QOBUZ,
         )
+
+    /** Providers that may be switched off (see [AudioProviderOrderItem.isDisableable]). */
+    val Disableable: Set<AudioProviderOrderItem> =
+        AudioProviderOrderItem.entries.filter { it.isDisableable() }.toSet()
 
     fun serialize(providers: List<AudioProviderOrderItem>): String =
         normalize(providers).joinToString(",") { it.name }
@@ -27,9 +40,22 @@ object AudioProviderOrder {
         normalize(
             value
                 ?.split(',')
-                ?.mapNotNull { raw -> AudioProviderOrderItem.entries.find { it.name == raw.trim() } }
+                ?.mapNotNull { raw -> AudioProviderOrderItem.entries.find { it.name.equals(raw.trim(), ignoreCase = true) } }
                 .orEmpty(),
         )
+
+    fun serializeDisabled(disabled: Set<AudioProviderOrderItem>): String =
+        disabled
+            .filter { it.isDisableable() }
+            .joinToString(",") { it.name }
+
+    fun deserializeDisabled(value: String?): Set<AudioProviderOrderItem> =
+        value
+            ?.split(',')
+            ?.mapNotNull { raw -> AudioProviderOrderItem.entries.find { it.name.equals(raw.trim(), ignoreCase = true) } }
+            ?.filter { it.isDisableable() }
+            .orEmpty()
+            .toSet()
 
     private fun normalize(providers: List<AudioProviderOrderItem>): List<AudioProviderOrderItem> =
         (providers + Default)
