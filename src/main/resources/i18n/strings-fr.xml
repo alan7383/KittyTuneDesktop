@@ -2348,6 +2348,10 @@
     <string name="provider_order_settings_desc">Glissez les sources audio pour définir l\'ordre de priorité</string>
     <string name="provider_order_summary">Faites glisser les sources vers le haut pour les essayer en priorité lors de la lecture et du téléchargement.</string>
     <string name="provider_order_reset">Réinitialiser l\'ordre</string>
+    <string name="provider_enabled_hint">SoundCloud et YouTube Music sont les sources de base et restent toujours disponibles.</string>
+    <string name="provider_disabled_suffix">(désactivé)</string>
+    <string name="provider_enabled_title">Activer la source audio</string>
+    <string name="provider_enabled_desc">Autoriser cette source pour la lecture et le téléchargement des pistes</string>
     <string name="audio_provider_soundcloud">SoundCloud</string>
     <string name="audio_provider_tidal">TIDAL</string>
     <string name="audio_provider_deezer">Deezer</string>
@@ -2709,4 +2713,17 @@
     <string name="explore">Explorer</string>
     <string name="chart_section_title">Classement</string>
     <string name="chart_genre_folk">Folk</string>
+    <string name="lyrics_searching">Recherche des paroles en cours…</string>
+    <string name="lyrics_auto_found_title">Paroles trouvées automatiquement</string>
+    <string name="lyrics_auto_found_desc">Des paroles ont été trouvées automatiquement pour ce morceau.</string>
+    <string name="lyrics_auto_found_use">Afficher</string>
+    <string name="pref_track_source_badge_title">Indicateur de source audio</string>
+    <string name="pref_track_source_badge_desc">Afficher le badge de la plateforme (YouTube, SoundCloud, etc.) pour le morceau en lecture</string>
+    <string name="pref_track_source_badge_both">Icône et texte</string>
+    <string name="pref_track_source_badge_icon">Icône seule</string>
+    <string name="pref_track_source_badge_text">Texte seul</string>
+    <string name="pref_track_source_badge_hidden">Masqué</string>
+    <string name="pref_full_player_source_title">Indicateur de source audio</string>
+    <string name="pref_full_player_source_desc">Afficher le logo de la plateforme (YouTube, SoundCloud, etc.) pour le morceau en lecture</string>
+    <string name="audio_source_tooltip">Audio venant de %s</string>
 </resources>

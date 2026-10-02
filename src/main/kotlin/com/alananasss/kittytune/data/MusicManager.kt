@@ -159,7 +159,7 @@ object MusicManager {
         val headers = mutableMapOf(
             "User-Agent" to "SoundCloud/2025.12.10-release (Android 10; Android)",
         )
-        if (track.source != "youtube") {
+        if (track.source != "youtube" && track.source != "youtube_music") {
             headers["Origin"] = "https://soundcloud.com"
             headers["Referer"] = "https://soundcloud.com/"
         }

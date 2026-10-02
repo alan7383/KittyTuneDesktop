@@ -2240,6 +2240,10 @@
     <string name="provider_order_settings_desc">Kéo các nguồn âm thanh để sắp xếp thứ tự ưu tiên mà KittyTune sẽ thử</string>
     <string name="provider_order_summary">Kéo các nguồn lên trên để ưu tiên thử trước khi phát nhạc và tải xuống.</string>
     <string name="provider_order_reset">Đặt lại thứ tự nguồn</string>
+    <string name="provider_enabled_hint">SoundCloud và YouTube Music là các nguồn cơ bản và luôn khả dụng.</string>
+    <string name="provider_disabled_suffix">(tắt)</string>
+    <string name="provider_enabled_title">Bật nguồn âm thanh</string>
+    <string name="provider_enabled_desc">Cho phép sử dụng nguồn này để phát nhạc và tải xuống</string>
     <string name="audio_provider_soundcloud">SoundCloud</string>
     <string name="audio_provider_tidal">TIDAL</string>
     <string name="audio_provider_deezer">Deezer</string>
@@ -3157,4 +3161,17 @@
     <string name="explore">Khám phá</string>
     <string name="chart_section_title">Bảng xếp hạng</string>
     <string name="chart_genre_folk">Dân ca</string>
+    <string name="lyrics_searching">Đang tìm lời bài hát…</string>
+    <string name="lyrics_auto_found_title">Đã tự động tìm thấy lời bài hát</string>
+    <string name="lyrics_auto_found_desc">Đã tìm thấy lời bài hát tự động cho bài này.</string>
+    <string name="lyrics_auto_found_use">Xem</string>
+    <string name="pref_track_source_badge_title">Chỉ báo nguồn âm thanh</string>
+    <string name="pref_track_source_badge_desc">Hiển thị biểu tượng nền tảng (YouTube, SoundCloud, v.v.) cho bài hát đang phát</string>
+    <string name="pref_track_source_badge_both">Biểu tượng &amp; chữ</string>
+    <string name="pref_track_source_badge_icon">Chỉ biểu tượng</string>
+    <string name="pref_track_source_badge_text">Chỉ chữ</string>
+    <string name="pref_track_source_badge_hidden">Tắt</string>
+    <string name="pref_full_player_source_title">Chỉ báo nguồn âm thanh</string>
+    <string name="pref_full_player_source_desc">Hiển thị biểu tượng nguồn (YouTube, SoundCloud, v.v.) cho bài hát đang phát</string>
+    <string name="audio_source_tooltip">Âm thanh từ %s</string>
 </resources>

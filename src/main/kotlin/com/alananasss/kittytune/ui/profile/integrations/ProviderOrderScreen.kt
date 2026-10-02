@@ -27,6 +27,8 @@ import com.alananasss.kittytune.audio.providers.AudioProviderOrderItem
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.SettingsScaffold
+import com.alananasss.kittytune.ui.common.SettingsSwitch
+import androidx.compose.ui.draw.alpha
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -40,6 +42,7 @@ fun ProviderOrderScreen(
             addAll(prefs.getAudioProviderOrder())
         }
     }
+    var disabledProviders by remember { mutableStateOf(prefs.getDisabledAudioProviders()) }
 
     LaunchedEffect(Unit) {
         val loaded = prefs.getAudioProviderOrder()
@@ -47,10 +50,16 @@ fun ProviderOrderScreen(
             currentList.clear()
             currentList.addAll(loaded)
         }
+        disabledProviders = prefs.getDisabledAudioProviders()
     }
 
     fun persistOrder() {
         prefs.setAudioProviderOrder(currentList.toList())
+    }
+
+    fun setProviderEnabled(provider: AudioProviderOrderItem, enabled: Boolean) {
+        prefs.setAudioProviderDisabled(provider, !enabled)
+        disabledProviders = prefs.getDisabledAudioProviders()
     }
 
     fun moveItem(fromIndex: Int, toIndex: Int) {
@@ -113,6 +122,7 @@ fun ProviderOrderScreen(
                             AudioProviderOrderItem.YOUTUBE_MUSIC -> Pair("audio_provider_youtube_music", R.drawable.ic_logo_youtube_music)
                             AudioProviderOrderItem.SOUNDCLOUD -> Pair("audio_provider_soundcloud", R.drawable.ic_logo_soundcloud)
                         }
+                        val isDisabled = item in disabledProviders
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -123,39 +133,56 @@ fun ProviderOrderScreen(
                                 .background(backgroundColor)
                                 .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            Text(
-                                text = "${index + 1}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.width(32.dp)
-                            )
-                            val resourceExists = remember(iconRes) {
-                                Thread.currentThread().contextClassLoader.getResource(iconRes) != null
-                            }
-                            if (resourceExists) {
-                                Icon(
-                                    painter = painterResource(iconRes),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(24.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .alpha(if (isDisabled) 0.45f else 1f)
+                            ) {
+                                Text(
+                                    text = "${index + 1}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.width(32.dp)
                                 )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Rounded.DragHandle,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(24.dp)
+                                val resourceExists = remember(iconRes) {
+                                    Thread.currentThread().contextClassLoader.getResource(iconRes) != null
+                                }
+                                if (resourceExists) {
+                                    Icon(
+                                        painter = painterResource(iconRes),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DragHandle,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    text = str(nameKey),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                text = str(nameKey),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
-                            )
+
+                            if (item.isDisableable()) {
+                                Spacer(modifier = Modifier.width(12.dp))
+                                SettingsSwitch(
+                                    checked = !isDisabled,
+                                    onCheckedChange = { enabled -> setProviderEnabled(item, enabled) }
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             // Quick Move Up/Down buttons for desktop mouse convenience
                             IconButton(
@@ -198,11 +225,20 @@ fun ProviderOrderScreen(
                 }
             }
 
+            Text(
+                text = str("provider_enabled_hint"),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+
             TextButton(
                 onClick = {
                     currentList.clear()
                     currentList.addAll(AudioProviderOrder.Default)
                     persistOrder()
+                    AudioProviderOrder.Disableable.forEach { prefs.setAudioProviderDisabled(it, false) }
+                    disabledProviders = prefs.getDisabledAudioProviders()
                 },
                 modifier = Modifier
                     .fillMaxWidth()

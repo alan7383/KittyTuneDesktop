@@ -230,7 +230,7 @@ object StreamResolver {
                 if (localTrack != null && localTrack.localAudioPath.isNotEmpty()) {
                     val fileExists = java.io.File(localTrack.localAudioPath).exists()
                     if (fileExists) {
-                        return@withContext ResolvedStream(localTrack.localAudioPath)
+                        return@withContext ResolvedStream(localTrack.localAudioPath, source = "local")
                     }
                 }
             } catch (e: Exception) {
@@ -239,12 +239,12 @@ object StreamResolver {
             // A track heard before plays from the cache: no network, no stream to expire.
             if (!forDownload) {
                 com.alananasss.kittytune.data.cache.AudioCache.lookup(track.id)?.let { cached ->
-                    return@withContext ResolvedStream(cached.absolutePath)
+                    return@withContext ResolvedStream(cached.absolutePath, source = track.source ?: "cache")
                 }
             }
-            if (track.source == "youtube") {
+            if (track.source == "youtube" || track.source == "youtube_music") {
                 val url = resolveFromYoutubeDirect(track)
-                return@withContext url?.let { ResolvedStream(it) }
+                return@withContext url?.let { ResolvedStream(it, source = track.source) }
             }
 
             if (track.source == "spotify") {
@@ -255,7 +255,7 @@ object StreamResolver {
                 }
                 val streamUrl = resolveViaNewPipe(track)
                 if (streamUrl != null) {
-                    return@withContext ResolvedStream(streamUrl)
+                    return@withContext ResolvedStream(streamUrl, source = "youtube")
                 }
                 try {
                     val query = "${track.displayArtist} ${track.title}".trim()
@@ -285,7 +285,7 @@ object StreamResolver {
                     Logger.w("StreamResolver", "Provider track (${track.source}) resolution failed, trying YouTube fallback for: ${track.title}")
                     val ytFallback = resolveViaNewPipe(track)
                     if (ytFallback != null) {
-                        return@withContext ResolvedStream(ytFallback)
+                        return@withContext ResolvedStream(ytFallback, source = "youtube")
                     }
                 }
                 Logger.w("StreamResolver", "Could not resolve provider track (${track.source}): ${track.title}")
@@ -303,7 +303,7 @@ object StreamResolver {
                 if (allowYoutube) {
                     val streamUrl = resolveViaNewPipe(track)
                     if (streamUrl != null) {
-                        return@withContext ResolvedStream(streamUrl)
+                        return@withContext ResolvedStream(streamUrl, source = "youtube")
                     }
                 }
             }
@@ -318,7 +318,7 @@ object StreamResolver {
                 } else if (allowYoutube) {
                     Logger.w("StreamResolver", "All sources failed for '${track.title}', trying final YouTube fallback")
                     val ytUrl = resolveViaNewPipe(track)
-                    ytUrl?.let { ResolvedStream(it) }
+                    ytUrl?.let { ResolvedStream(it, source = "youtube") }
                 } else {
                     null
                 }
@@ -372,6 +372,10 @@ object StreamResolver {
         val attempted = mutableSetOf<AudioProviderOrderItem>()
         for (provider in order) {
             if (!attempted.add(provider)) continue
+            if (prefs.isAudioProviderDisabled(provider)) {
+                Logger.d("StreamResolver", "Provider $provider is disabled, skipping for '${track.title}'")
+                continue
+            }
             try {
                 when (provider) {
                     AudioProviderOrderItem.QOBUZ -> {
@@ -392,7 +396,7 @@ object StreamResolver {
                         val resolved = QobuzAudioProvider.resolve(query)
                         if (resolved != null && resolved.mediaUri.isNotBlank()) {
                             Logger.i("StreamResolver", "Using Qobuz stream for '${track.title}': ${resolved.label}")
-                            return ResolvedStream(resolved.mediaUri, mimeType = "audio/mp4")
+                            return ResolvedStream(resolved.mediaUri, mimeType = "audio/mp4", source = "qobuz")
                         }
                     }
                     AudioProviderOrderItem.TIDAL -> {
@@ -416,7 +420,7 @@ object StreamResolver {
                         )
                         if (resolved != null && resolved.mediaUri.isNotBlank()) {
                             Logger.i("StreamResolver", "Using Tidal stream for '${track.title}': ${resolved.label}")
-                            return ResolvedStream(resolved.mediaUri, mimeType = resolved.mimeType)
+                            return ResolvedStream(resolved.mediaUri, mimeType = resolved.mimeType, source = "tidal")
                         }
                     }
                     AudioProviderOrderItem.DEEZER -> {
@@ -451,14 +455,14 @@ object StreamResolver {
                         if (resolved != null && resolved.mediaUri.isNotBlank()) {
                             Logger.i("StreamResolver", "Using Deezer stream for '${track.title}': ${resolved.label}")
                             val mimeType = if (resolved.mediaUri.contains(".flac", ignoreCase = true) || resolved.label.contains("FLAC", ignoreCase = true)) "audio/flac" else "audio/mpeg"
-                            return ResolvedStream(resolved.mediaUri, mimeType = mimeType)
+                            return ResolvedStream(resolved.mediaUri, mimeType = mimeType, source = "deezer")
                         }
                     }
                     AudioProviderOrderItem.YOUTUBE_MUSIC -> {
                         val ytUrl = resolveViaNewPipe(track)
                         if (ytUrl != null) {
                             Logger.i("StreamResolver", "Using YouTube stream for '${track.title}'")
-                            return ResolvedStream(ytUrl)
+                            return ResolvedStream(ytUrl, source = "youtube")
                         }
                     }
                     AudioProviderOrderItem.SOUNDCLOUD -> {
@@ -616,7 +620,7 @@ object StreamResolver {
         if (candidates.isEmpty()) {
             if (prefs.getYouTubeFallbackEnabled()) {
                 val url = resolveViaNewPipe(track)
-                return url?.let { ResolvedStream(it) }
+                return url?.let { ResolvedStream(it, source = "youtube") }
             }
             return null
         }
@@ -660,7 +664,7 @@ object StreamResolver {
 
                 val isHlsLike = protocol == "hls" || protocol.contains("encrypted-hls")
                 if (isHlsLike) {
-                    return ResolvedStream(streamInfoUrl, licenseAuthToken)
+                    return ResolvedStream(streamInfoUrl, licenseAuthToken, source = "soundcloud")
                 }
 
                 val finalRequest = okhttp3.Request.Builder().url(streamInfoUrl).build()
@@ -670,7 +674,7 @@ object StreamResolver {
                 if (!finalResponse.isSuccessful) continue
 
                 val finalUrl = finalResponse.request.url.toString()
-                return ResolvedStream(finalUrl, licenseAuthToken)
+                return ResolvedStream(finalUrl, licenseAuthToken, source = "soundcloud")
             } catch (e: Exception) {
                 e.printStackTrace()
                 continue
@@ -679,7 +683,7 @@ object StreamResolver {
 
         if (prefs.getYouTubeFallbackEnabled()) {
             val url = resolveViaNewPipe(track)
-            return url?.let { ResolvedStream(it) }
+            return url?.let { ResolvedStream(it, source = "youtube") }
         }
         return null
     }

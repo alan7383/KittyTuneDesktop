@@ -2408,6 +2408,10 @@
     <string name="provider_order_settings_desc">Ziehe die Audioanbieter in die Reihenfolge, in der Kittytune sie ausprobieren soll</string>
     <string name="provider_order_summary">Ziehe Anbieter weiter nach oben, damit sie bei Wiedergabe und Downloads früher versucht werden.</string>
     <string name="provider_order_reset">Anbieterreihenfolge zurücksetzen</string>
+    <string name="provider_enabled_hint">SoundCloud und YouTube Music sind die Basisquellen und immer verfügbar.</string>
+    <string name="provider_disabled_suffix">(aus)</string>
+    <string name="provider_enabled_title">Audioanbieter aktivieren</string>
+    <string name="provider_enabled_desc">Diesen Anbieter für Wiedergabe und Downloads verwenden</string>
     <string name="audio_provider_soundcloud">SoundCloud</string>
     <string name="audio_provider_tidal">TIDAL</string>
     <string name="audio_provider_deezer">Deezer</string>
@@ -3321,4 +3325,17 @@
     <string name="explore">Entdecken</string>
     <string name="chart_section_title">Chartliste</string>
     <string name="chart_genre_folk">Folk</string>
+    <string name="lyrics_searching">Songtext wird gesucht…</string>
+    <string name="lyrics_auto_found_title">Songtext automatisch gefunden</string>
+    <string name="lyrics_auto_found_desc">Für diesen Titel wurde automatisch ein Songtext gefunden.</string>
+    <string name="lyrics_auto_found_use">Anzeigen</string>
+    <string name="pref_track_source_badge_title">Audioquellen-Anzeige</string>
+    <string name="pref_track_source_badge_desc">Plattform-Badge (YouTube, SoundCloud usw.) für den aktuellen Titel anzeigen</string>
+    <string name="pref_track_source_badge_both">Symbol &amp; Text</string>
+    <string name="pref_track_source_badge_icon">Nur Symbol</string>
+    <string name="pref_track_source_badge_text">Nur Text</string>
+    <string name="pref_track_source_badge_hidden">Aus</string>
+    <string name="pref_full_player_source_title">Audioquellen-Anzeige</string>
+    <string name="pref_full_player_source_desc">Plattform-Logo (YouTube, SoundCloud usw.) für den aktuellen Titel anzeigen</string>
+    <string name="audio_source_tooltip">Audio von %s</string>
 </resources>

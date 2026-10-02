@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +35,7 @@ fun QobuzSettingsScreen(
     var qobuzCountry by remember { mutableStateOf(prefs.getQobuzCountry()) }
     var qobuzCustomInstances by remember { mutableStateOf(prefs.getQobuzCustomInstances()) }
     var qobuzQuality by remember { mutableStateOf(prefs.getQobuzQuality()) }
+    var qobuzEnabled by remember { mutableStateOf(!prefs.isAudioProviderDisabled(com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.QOBUZ)) }
 
     var showCountryDialog by remember { mutableStateOf(false) }
     var showInstancesDialog by remember { mutableStateOf(false) }
@@ -252,8 +254,22 @@ fun QobuzSettingsScreen(
             item {
                 SettingsGroup(
                     title = str("settings_cat_general"),
-                    items = listOf(
-                        { shape ->
+                    items = buildList {
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("provider_enabled_title"),
+                                subtitle = str("provider_enabled_desc"),
+                                icon = Icons.Rounded.PowerSettingsNew,
+                                hasSwitch = true,
+                                switchState = qobuzEnabled,
+                                onSwitchChange = { enabled ->
+                                    prefs.setAudioProviderDisabled(com.alananasss.kittytune.audio.providers.AudioProviderOrderItem.QOBUZ, !enabled)
+                                    qobuzEnabled = enabled
+                                }
+                            )
+                        }
+                        add { shape ->
                             SettingsItem(
                                 shape = shape,
                                 title = str("qobuz_country"),
@@ -261,8 +277,8 @@ fun QobuzSettingsScreen(
                                 icon = Icons.Rounded.Language,
                                 onClick = { showCountryDialog = true }
                             )
-                        },
-                        { shape ->
+                        }
+                        add { shape ->
                             val instances = qobuzCustomInstances.split("\n").filter { it.isNotBlank() }
                             val desc = if (instances.isEmpty() || qobuzCustomInstances == QobuzAudioProvider.DEFAULT_INSTANCE) {
                                 str("qobuz_custom_instances_desc_default")
@@ -276,8 +292,8 @@ fun QobuzSettingsScreen(
                                 icon = Icons.Rounded.Link,
                                 onClick = { showInstancesDialog = true }
                             )
-                        },
-                        { shape ->
+                        }
+                        add { shape ->
                             val qualityLabel = when (qobuzQuality) {
                                 27 -> str("qobuz_quality_hires_192")
                                 7 -> str("qobuz_quality_hires_96")
@@ -292,7 +308,7 @@ fun QobuzSettingsScreen(
                                 onClick = { showQualityDialog = true }
                             )
                         }
-                    )
+                    }
                 )
             }
         }

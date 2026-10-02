@@ -20,9 +20,19 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.surfaceColorAtElevation
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -111,13 +121,57 @@ fun SettingsItem(
     sliderValue: Float = 0f,
     sliderRange: ClosedFloatingPointRange<Float> = 0f..1f,
     onSliderChange: ((Float) -> Unit)? = null,
-    titleColor: Color = MaterialTheme.colorScheme.onSurface
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    highlightKey: String? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
+    val isHighlighted = SettingsHighlightManager.isHighlighted(highlightKey)
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val highlightAlpha = remember { Animatable(0f) }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val baseColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val highlightOverlay = remember(primaryColor) { primaryColor.copy(alpha = 0.26f) }
+    val highlightedBaseColor = remember(highlightOverlay, baseColor) { highlightOverlay.compositeOver(baseColor) }
+
+    val isScrolling = SettingsHighlightManager.isScrollingToTarget
+
+    LaunchedEffect(isHighlighted, isScrolling) {
+        if (isHighlighted) {
+            if (isScrolling) {
+                delay(900)
+                SettingsHighlightManager.isScrollingToTarget = false
+            }
+            delay(150)
+            try {
+                bringIntoViewRequester.bringIntoView()
+            } catch (_: Exception) {}
+
+            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
+            delay(1200)
+            highlightAlpha.animateTo(0f, tween(500, easing = FastOutSlowInEasing))
+            SettingsHighlightManager.clearHighlight(highlightKey)
+        }
+    }
+
+    val animatedContainerColor = if (highlightAlpha.value > 0f) {
+        lerp(baseColor, highlightedBaseColor, highlightAlpha.value)
+    } else {
+        baseColor
+    }
+
     val onToggleOrClick = {
         if (hasSwitch && onSwitchChange != null) {
-            onSwitchChange(!switchState)
+            if (onClick != null) {
+                onClick()
+            } else {
+                onSwitchChange(!switchState)
+            }
         } else {
             onClick?.invoke()
         }
@@ -130,9 +184,11 @@ fun SettingsItem(
     Card(
         onClick = { onToggleOrClick() },
         enabled = onClick != null || hasSwitch,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = animatedContainerColor),
         shape = shape,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester),
         interactionSource = interactionSource
     ) {
         Row(
@@ -292,15 +348,57 @@ fun SplitSettingsItem(
     onClick: () -> Unit,
     switchState: Boolean,
     onSwitchChange: (Boolean) -> Unit,
-    titleColor: Color = MaterialTheme.colorScheme.onSurface
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    highlightKey: String? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
+    val isHighlighted = SettingsHighlightManager.isHighlighted(highlightKey)
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val highlightAlpha = remember { Animatable(0f) }
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val baseColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val highlightOverlay = remember(primaryColor) { primaryColor.copy(alpha = 0.26f) }
+    val highlightedBaseColor = remember(highlightOverlay, baseColor) { highlightOverlay.compositeOver(baseColor) }
+
+    val isScrolling = SettingsHighlightManager.isScrollingToTarget
+
+    LaunchedEffect(isHighlighted, isScrolling) {
+        if (isHighlighted) {
+            if (isScrolling) {
+                delay(900)
+                SettingsHighlightManager.isScrollingToTarget = false
+            }
+            delay(150)
+            try {
+                bringIntoViewRequester.bringIntoView()
+            } catch (_: Exception) {}
+
+            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(0f, tween(200, easing = LinearEasing))
+            highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
+            delay(1200)
+            highlightAlpha.animateTo(0f, tween(500, easing = FastOutSlowInEasing))
+            SettingsHighlightManager.clearHighlight(highlightKey)
+        }
+    }
+
+    val animatedContainerColor = if (highlightAlpha.value > 0f) {
+        lerp(baseColor, highlightedBaseColor, highlightAlpha.value)
+    } else {
+        baseColor
+    }
+
     Card(
         onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        colors = CardDefaults.cardColors(containerColor = animatedContainerColor),
         shape = shape,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
     ) {
         Row(
             modifier = Modifier

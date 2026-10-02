@@ -638,14 +638,14 @@ fun AudioSettingsScreen(
                         val isGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
                         val totalVisibleItems = if (!isGuest) 11 else 10
 
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 2), title = str("pref_stop_on_task_clear"), hasSwitch = true, switchState = stopOnTaskClear, onSwitchChange = { stopOnTaskClear = it; prefs.setStopOnTaskClear(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 3), title = str("pref_persist_queue"), subtitle = str("pref_persist_queue_sub"), hasSwitch = true, switchState = persistentQueueEnabled, onSwitchChange = { persistentQueueEnabled = it; prefs.setPersistentQueueEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 4), title = str("pref_queue_preserve_upcoming"), subtitle = str("pref_queue_preserve_upcoming_sub"), hasSwitch = true, switchState = playerViewModel.isQueuePreserveUpcomingEnabled, onSwitchChange = { playerViewModel.toggleQueuePreserveUpcoming(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) })
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 7), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) })
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) }, highlightKey = "pref_autoplay")
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) }, highlightKey = "pref_continuous_playback")
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 2), title = str("pref_stop_on_task_clear"), hasSwitch = true, switchState = stopOnTaskClear, onSwitchChange = { stopOnTaskClear = it; prefs.setStopOnTaskClear(it) }, highlightKey = "pref_stop_on_task_clear")
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 3), title = str("pref_persist_queue"), subtitle = str("pref_persist_queue_sub"), hasSwitch = true, switchState = persistentQueueEnabled, onSwitchChange = { persistentQueueEnabled = it; prefs.setPersistentQueueEnabled(it) }, highlightKey = "pref_persist_queue")
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 4), title = str("pref_queue_preserve_upcoming"), subtitle = str("pref_queue_preserve_upcoming_sub"), hasSwitch = true, switchState = playerViewModel.isQueuePreserveUpcomingEnabled, onSwitchChange = { playerViewModel.toggleQueuePreserveUpcoming(it) }, highlightKey = "pref_queue_preserve_upcoming")
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) }, highlightKey = "pref_save_position")
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) }, highlightKey = "pref_youtube_fallback")
+                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 7), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) }, highlightKey = "pref_precise_speed")
                         
                         SplitSettingsItem(
                             shape = getSettingsShape(totalVisibleItems, 8),
@@ -653,7 +653,8 @@ fun AudioSettingsScreen(
                             subtitle = str("pref_norm_sub"),
                             onClick = { showNormDialog = true },
                             switchState = isNormEnabled,
-                            onSwitchChange = { playerViewModel.toggleNormalization(it) }
+                            onSwitchChange = { playerViewModel.toggleNormalization(it) },
+                            highlightKey = "pref_norm"
                         )
 
                         if (!isGuest) {
@@ -713,7 +714,8 @@ fun AudioSettingsScreen(
                             onSwitchChange = { 
                                 crossfadeEnabled = it
                                 prefs.setCrossfadeEnabled(it)
-                            }
+                            },
+                            highlightKey = "pref_crossfade"
                         )
 
                         AnimatedVisibility(
@@ -774,7 +776,8 @@ fun AudioSettingsScreen(
                             onSwitchChange = { 
                                 automixEnabled = it
                                 prefs.setAutomixEnabled(it)
-                            }
+                            },
+                            highlightKey = "pref_automix"
                         )
 
                         AnimatedVisibility(
@@ -941,7 +944,8 @@ fun AudioSettingsScreen(
                                 subtitle = str("pref_audio_mono_sub"),
                                 hasSwitch = true,
                                 switchState = playerViewModel.effectsState.isMonoEnabled,
-                                onSwitchChange = { playerViewModel.toggleMono() }
+                                onSwitchChange = { playerViewModel.toggleMono() },
+                                highlightKey = "pref_audio_mono"
                             )
                         }
                     )

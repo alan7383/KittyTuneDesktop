@@ -114,6 +114,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var currentUser by mutableStateOf<User?>(null)
     private val initialTrack = if (playerPrefs.getPersistentQueueEnabled()) playerPrefs.getLastTrack() else null
     var currentTrack by mutableStateOf<Track?>(initialTrack)
+    var currentStreamSource by mutableStateOf<String?>(initialTrack?.source)
     var isPlaying by mutableStateOf(false)
     var isLoading by mutableStateOf(false)
     var duration by mutableLongStateOf(initialTrack?.durationMs ?: 0L)
@@ -193,6 +194,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var fullPlayerScreensaverEnabled by mutableStateOf(playerPrefs.getFullPlayerScreensaverEnabled())
         private set
     var fullPlayerScreensaverTimeoutSeconds by mutableIntStateOf(playerPrefs.getFullPlayerScreensaverTimeout())
+        private set
+    var fullPlayerSourceIndicatorEnabled by mutableStateOf(playerPrefs.getFullPlayerSourceIndicatorEnabled())
         private set
 
     /**
@@ -781,6 +784,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var lyricsLines = mutableStateListOf<LyricLine>()
     var isLyricsLoading by mutableStateOf(false)
     var isSearchingLyrics by mutableStateOf(false)
+    var isManualSearchLoading by mutableStateOf(false)
     var manualSearchQuery by mutableStateOf("")
     val lyricSearchResults = mutableStateListOf<LrcLibResponse>()
     var manualSearchProvider by mutableStateOf("MUSIXMATCH") // Par défaut sur Musixmatch !
@@ -2037,7 +2041,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         rawPlainLyrics = payload.plain
         lyricsMode = if (payload.lines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
         isLyricsLoading = false
-        if (payload.lines.isNotEmpty() || !payload.plain.isNullOrBlank()) isSearchingLyrics = false
     }
 
     /** Lyrics tagged into the downloaded file, when the user asked for those to come first. */
@@ -2455,7 +2458,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             isLyricsLoading = false
-            if (resultLines.isNotEmpty() || !rawPlainLyrics.isNullOrBlank()) isSearchingLyrics = false
         }
     }
 
@@ -2481,6 +2483,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         // to the newer search's list, which is both wrong and a crash.
         manualLyricSearchJob?.cancel()
         isLyricsLoading = true
+        isManualSearchLoading = true
         unifiedLyricSearchResults.clear()
 
         manualLyricSearchJob = viewModelScope.launch(Dispatchers.IO) {
@@ -2604,7 +2607,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                withContext(Dispatchers.Main) { isLyricsLoading = false }
+                withContext(Dispatchers.Main) {
+                    isLyricsLoading = false
+                    isManualSearchLoading = false
+                }
             }
         }
     }
@@ -4034,6 +4040,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         playerPrefs.setFullPlayerScreensaverTimeout(seconds)
     }
 
+    fun updateFullPlayerSourceIndicatorEnabled(enabled: Boolean) {
+        fullPlayerSourceIndicatorEnabled = enabled
+        playerPrefs.setFullPlayerSourceIndicatorEnabled(enabled)
+    }
+
     fun toggleRain() {
         val n = !effectsState.isRainEnabled; effectsState = effectsState.copy(isRainEnabled = n); applyEffectsAndSave()
     }
@@ -5085,9 +5096,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             var resolvedMimeType: String? = null
+            var resolvedStream: com.alananasss.kittytune.data.ResolvedStream? = null
+            val isLocal = trackToPlay.source == "local" || (resolvedUrl != null && !resolvedUrl.startsWith("http"))
+
             if (resolvedUrl == null) {
                 // Not downloaded, resolve from network / streamCache
                 val resolved = StreamResolver.resolveStreamWithDrm(trackToPlay)
+                resolvedStream = resolved
                 resolvedUrl = resolved?.url
                 resolvedMimeType = resolved?.mimeType
 
@@ -5096,6 +5111,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     MusicManager.putDrmToken(trackToPlay.id, resolved.licenseAuthToken)
                     println("DRM token pre-cached for track ${trackToPlay.id}")
                 }
+            }
+
+            val finalStreamSource = if (isLocal) {
+                "local"
+            } else {
+                resolvedStream?.source ?: trackToPlay.source ?: "soundcloud"
             }
 
             if (resolvedUrl == null) {
@@ -5126,6 +5147,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             withContext(Dispatchers.Main) {
                 try {
+                    currentStreamSource = finalStreamSource
                     queueChunkingJob?.cancel()
 
                     val crossfadeDurationMs = playerPrefs.getCrossfadeDuration() * 1000L

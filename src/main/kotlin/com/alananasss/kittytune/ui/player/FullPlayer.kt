@@ -523,17 +523,19 @@ private fun CentredLyricsLayout(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                AnimatedArtwork(
-                    artworkUrl = track.fullResArtwork,
-                    animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
-                    isPlaying = viewModel.isPlaying,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(72.dp)
-                        .shadow(12.dp, RoundedCornerShape(10.dp), clip = false)
-                        .clip(RoundedCornerShape(10.dp)),
-                )
+                Box(Modifier.size(72.dp)) {
+                    AnimatedArtwork(
+                        artworkUrl = track.fullResArtwork,
+                        animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
+                        isPlaying = viewModel.isPlaying,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .shadow(12.dp, RoundedCornerShape(10.dp), clip = false)
+                            .clip(RoundedCornerShape(10.dp)),
+                    )
+                }
                 Box(Modifier.weight(1f)) { TrackCredit(viewModel = viewModel, palette = palette) }
                 Box(Modifier.weight(1.3f)) {
                     FullPlayerControls(viewModel = viewModel, palette = palette, showText = showText, onToggleText = onToggleText)
@@ -712,17 +714,19 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.ScreensaverOverla
             }
 
             // ── Pochette ──────────────────────────────────────────────────────────────
-            AnimatedArtwork(
-                artworkUrl = track.fullResArtwork,
-                animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
-                isPlaying = viewModel.isPlaying,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(210.dp)
-                    .shadow(32.dp, RoundedCornerShape(22.dp), clip = false)
-                    .clip(RoundedCornerShape(22.dp)),
-            )
+            Box(Modifier.size(210.dp)) {
+                AnimatedArtwork(
+                    artworkUrl = track.fullResArtwork,
+                    animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
+                    isPlaying = viewModel.isPlaying,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .shadow(32.dp, RoundedCornerShape(22.dp), clip = false)
+                        .clip(RoundedCornerShape(22.dp)),
+                )
+            }
 
             // ── 1 Ligne de Texte ──────────────────────────────────────────────────────
             val activeLineText by remember {
@@ -772,15 +776,31 @@ private fun androidx.compose.animation.AnimatedVisibilityScope.ScreensaverOverla
                             textAlign = TextAlign.Center,
                         )
                     } else {
-                        androidx.compose.material3.Text(
-                            text = track.title.orEmpty(),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            androidx.compose.material3.Text(
+                                text = track.title.orEmpty(),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            if (viewModel.fullPlayerSourceIndicatorEnabled) {
+                                com.alananasss.kittytune.ui.common.TrackSourceInlineDot(
+                                    track = track,
+                                    resolvedSource = viewModel.currentStreamSource,
+                                    dotColor = Color.White.copy(alpha = 0.6f),
+                                    iconTint = Color.Unspecified,
+                                    iconSize = 18.dp,
+                                    modifier = Modifier.padding(start = 6.dp)
+                                )
+                            }
+                        }
                         Spacer(Modifier.height(2.dp))
                         androidx.compose.material3.Text(
                             text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
@@ -1456,14 +1476,30 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            androidx.compose.material3.Text(
-                text = track.title ?: "",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                color = palette.bright,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                androidx.compose.material3.Text(
+                    text = track.title ?: "",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = palette.bright,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (viewModel.fullPlayerSourceIndicatorEnabled) {
+                    com.alananasss.kittytune.ui.common.TrackSourceInlineDot(
+                        track = track,
+                        resolvedSource = viewModel.currentStreamSource,
+                        dotColor = palette.bright.copy(alpha = 0.6f),
+                        iconTint = Color.Unspecified,
+                        iconSize = 14.dp,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
             androidx.compose.material3.Text(
                 // Artist and album on one line, separated by an em dash, which is how the reference reads and
                 // is one line instead of two for something nobody needs two lines of.

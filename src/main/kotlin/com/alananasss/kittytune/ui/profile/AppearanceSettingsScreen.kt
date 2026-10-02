@@ -107,6 +107,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
                     prefs.setTrackDynamicTheme(it)
                     prefs.setDynamicTheme(it)
                 },
+                highlightKey = "pref_dynamic_theme",
             )
         },
     )
@@ -330,6 +331,7 @@ internal fun CoversSettingsGroup() {
                         animatedCovers = it
                         prefs.setAnimatedCoversEnabled(it)
                     },
+                    highlightKey = "pref_animated_covers",
                 )
             }
             if (animatedCovers) add { shape ->
@@ -343,6 +345,7 @@ internal fun CoversSettingsGroup() {
                         animatedCoversFadeUi = it
                         prefs.setAnimatedCoversFadeUiEnabled(it)
                     },
+                    highlightKey = "pref_animated_covers_fade_ui",
                 )
             }
             add { shape ->
@@ -356,6 +359,7 @@ internal fun CoversSettingsGroup() {
                         animatedArtistProfiles = it
                         prefs.setAnimatedArtistProfilesEnabled(it)
                     },
+                    highlightKey = "pref_animated_artist_profiles",
                 )
             }
         },

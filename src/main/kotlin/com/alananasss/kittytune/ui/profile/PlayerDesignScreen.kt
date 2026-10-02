@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerBarStyle
+import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.local.PlayerSliderStyle
 import com.alananasss.kittytune.ui.common.ScrollableColumn
@@ -93,6 +94,7 @@ fun PlayerDesignContent(modifier: Modifier = Modifier) {
     var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
     var seekWheelSeconds by remember { mutableFloatStateOf(prefs.getSeekWheelSeconds()) }
     var showRemainingTime by remember { mutableStateOf(prefs.getShowRemainingTime()) }
+    var fullPlayerSourceEnabled by remember { mutableStateOf(prefs.getFullPlayerSourceIndicatorEnabled()) }
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -164,6 +166,14 @@ fun PlayerDesignContent(modifier: Modifier = Modifier) {
             }
         )
 
+        // 5. Source audio en plein écran (Audio source badge)
+        TrackSourceSection(
+            enabled = fullPlayerSourceEnabled,
+            onEnabledChange = {
+                fullPlayerSourceEnabled = it
+                prefs.setFullPlayerSourceIndicatorEnabled(it)
+            }
+        )
     }
 }
 
@@ -394,7 +404,9 @@ private fun PlayerSlidersSection(
                 onClick = { onShowRemainingTimeChanged(!showRemainingTime) },
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .settingHighlight("pref_show_remaining_time", shape = RoundedCornerShape(16.dp))
             ) {
                 Row(
                     modifier = Modifier
@@ -448,7 +460,12 @@ private fun PlayerSlidersSection(
 
             // The volume control: where it sits, and its own style (or the seek bar's).
             Text(str("pref_volume_slider_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .settingHighlight("pref_vertical_volume_slider", shape = RoundedCornerShape(16.dp))
+            ) {
                 VolumeOrientationCard(str("volume_horizontal"), vertical = false, isSelected = !verticalVolumeSlider, style = volumeStyle ?: sliderStyle, modifier = Modifier.weight(1f)) {
                     onVolumeOrientationChanged(false)
                 }
@@ -736,6 +753,22 @@ private fun PlayerAdvancedSection(
     }
 }
 
+@Composable
+private fun TrackSourceSection(
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+) {
+    SettingsItem(
+        shape = RoundedCornerShape(24.dp),
+        title = str("pref_full_player_source_title"),
+        subtitle = str("pref_full_player_source_desc"),
+        icon = Icons.Rounded.GraphicEq,
+        hasSwitch = true,
+        switchState = enabled,
+        onSwitchChange = onEnabledChange,
+        highlightKey = "pref_full_player_source"
+    )
+}
 
 /** Screensaver toggle — dims the full-screen player after a period of inactivity. */
 @Composable
@@ -743,46 +776,16 @@ private fun ScreensaverSection(
     enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    SettingsItem(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.DarkMode,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.width(14.dp))
-                Column {
-                    Text(
-                        text = str("pref_screensaver_title"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = str("pref_screensaver_desc"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            com.alananasss.kittytune.ui.common.SettingsSwitch(checked = enabled, onCheckedChange = onEnabledChange)
-        }
-    }
+        title = str("pref_screensaver_title"),
+        subtitle = str("pref_screensaver_desc"),
+        icon = Icons.Rounded.DarkMode,
+        hasSwitch = true,
+        switchState = enabled,
+        onSwitchChange = onEnabledChange,
+        highlightKey = "pref_screensaver"
+    )
 }
 
 private fun sliderStyleKey(style: PlayerSliderStyle): String = when (style) {

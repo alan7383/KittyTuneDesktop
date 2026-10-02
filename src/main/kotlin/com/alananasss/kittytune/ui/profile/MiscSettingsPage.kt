@@ -99,6 +99,7 @@ fun MiscSettingsPage(navController: NavController, playerViewModel: PlayerViewMo
                         autoUpdate = it
                         prefs.setAutoUpdateEnabled(it)
                     },
+                    highlightKey = "pref_auto_update",
                 )
             },
         ),
