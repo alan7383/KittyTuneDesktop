@@ -199,6 +199,9 @@ private fun HomeFeed(
     navController: NavController,
 ) {
     val history by vm.historyFlow.collectAsState(initial = emptyList())
+    val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    val showHomeYourMix by prefs.showHomeYourMixFlow().collectAsState(initial = prefs.getShowHomeYourMix())
+    val showHomeListeningStats by prefs.showHomeListeningStatsFlow().collectAsState(initial = prefs.getShowHomeListeningStats())
 
     val contextHistory = remember(history) {
         history.filter { it.id != "playlist:0" && !it.title.equals("history", ignoreCase = true) }
@@ -373,13 +376,17 @@ private fun HomeFeed(
             }
 
             // "Your Mix" card
-            item {
-                StartMixingCard(playerViewModel)
+            if (showHomeYourMix) {
+                item {
+                    StartMixingCard(playerViewModel)
+                }
             }
 
             // "Listening Stats" card just below Your mix
-            item {
-                ListeningStatsCard(navController)
+            if (showHomeListeningStats) {
+                item {
+                    ListeningStatsCard(navController)
+                }
             }
 
             // Section carousels
