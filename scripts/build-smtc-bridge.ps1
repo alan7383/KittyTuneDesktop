@@ -111,13 +111,41 @@ if (-not $projection) {
 }
 if (-not $projection) { throw "System.Runtime.WindowsRuntime.dll not found in GAC or Reference Assemblies" }
 
+$interopCandidates = @(
+    (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.InteropServices.WindowsRuntime\v4.0_4.0.0.0__b03f5f7f11d50a3a\System.Runtime.InteropServices.WindowsRuntime.dll'),
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.InteropServices.WindowsRuntime.dll",
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5.1\System.Runtime.InteropServices.WindowsRuntime.dll",
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\Facades\System.Runtime.InteropServices.WindowsRuntime.dll",
+    "$env:ProgramFiles\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.InteropServices.WindowsRuntime.dll"
+)
+$interop = $null
+foreach ($cand in $interopCandidates) {
+    if (Test-Path $cand) {
+        $interop = $cand
+        break
+    }
+}
+if (-not $interop) {
+    $found = Get-ChildItem (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.InteropServices.WindowsRuntime') -Filter 'System.Runtime.InteropServices.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) { $interop = $found.FullName }
+}
+if (-not $interop) {
+    $refDir = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework"
+    if (Test-Path $refDir) {
+        $found = Get-ChildItem $refDir -Filter 'System.Runtime.InteropServices.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $interop = $found.FullName }
+    }
+}
+if (-not $interop) { $interop = "System.Runtime.InteropServices.WindowsRuntime.dll" }
+
 Write-Host "Using Windows.winmd: $winmd"
 Write-Host "Using System.Runtime.WindowsRuntime: $projection"
+Write-Host "Using System.Runtime.InteropServices.WindowsRuntime: $interop"
 
 Write-Host "Compiling WindowsSmtcBridge.cs (SDK $sdkVersion)"
 & $csc /nologo /target:winexe /platform:anycpu32bitpreferred `
     /win32icon:$icon /out:$outExe `
-    /r:$winmd /r:$projection /r:System.Runtime.dll $source
+    /r:$winmd /r:$projection /r:$interop /r:System.Runtime.dll $source
 if ($LASTEXITCODE -ne 0) { throw "csc failed with exit code $LASTEXITCODE" }
 if (-not (Test-Path $outExe)) { throw "csc reported success but $outExe is missing" }
 
