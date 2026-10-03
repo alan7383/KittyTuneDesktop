@@ -97,6 +97,20 @@ class WindowsFullScreenTest {
         org.junit.Assert.assertTrue((fsStyle and com.sun.jna.platform.win32.WinUser.WS_VISIBLE) != 0)
     }
 
+    @Test
+    fun testRestoredStyleClearsMaximizeAndPopup() {
+        val originalMaximizedStyle = com.sun.jna.platform.win32.WinUser.WS_OVERLAPPEDWINDOW or
+                com.sun.jna.platform.win32.WinUser.WS_MAXIMIZE or
+                com.sun.jna.platform.win32.WinUser.WS_VISIBLE
+
+        val restoredStyle = (originalMaximizedStyle and com.sun.jna.platform.win32.WinUser.WS_POPUP.inv() and com.sun.jna.platform.win32.WinUser.WS_MAXIMIZE.inv()) or
+                (com.sun.jna.platform.win32.WinUser.WS_CAPTION or com.sun.jna.platform.win32.WinUser.WS_THICKFRAME or com.sun.jna.platform.win32.WinUser.WS_OVERLAPPEDWINDOW)
+
+        org.junit.Assert.assertEquals("WS_MAXIMIZE must be stripped in restored style", 0, restoredStyle and com.sun.jna.platform.win32.WinUser.WS_MAXIMIZE)
+        org.junit.Assert.assertEquals("WS_POPUP must be stripped in restored style", 0, restoredStyle and com.sun.jna.platform.win32.WinUser.WS_POPUP)
+        org.junit.Assert.assertTrue("WS_CAPTION must be present in restored style", (restoredStyle and com.sun.jna.platform.win32.WinUser.WS_CAPTION) != 0)
+    }
+
     /**
      * The reported bug: with the full player open, clicking another monitor minimised the app. That is
      * what AWT's exclusive full screen does on purpose when its window loses focus, which is why Windows

@@ -43,6 +43,7 @@ object WindowsFullScreen {
 
     private var originalStyle: Int = 0
     private var savedBounds: Rectangle? = null
+    private var savedWindowPlacement: WinUser.WINDOWPLACEMENT? = null
     private var wasMaximized: Boolean = false
 
     @Volatile
@@ -121,17 +122,23 @@ object WindowsFullScreen {
             }
 
             originalStyle = User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE)
-            if (window is Frame) {
-                wasMaximized = (window.extendedState and Frame.MAXIMIZED_BOTH) != 0
-                // Normalize window state before applying monitor bounds so Win32 does not constrain it to work area
-                if (wasMaximized) {
-                    window.extendedState = Frame.NORMAL
-                }
-                // Taken after un-maximising, so a maximized window also remembers its normal size: that is the
-                // rectangle it restores through on the way back to maximized.
-                savedBounds = window.bounds
+
+            // Save Win32 window placement (captures accurate restore rectangle even when maximized)
+            val wp = WinUser.WINDOWPLACEMENT()
+            wp.length = wp.size()
+            if (User32.INSTANCE.GetWindowPlacement(hwnd, wp).booleanValue()) {
+                savedWindowPlacement = wp
+                wasMaximized = (wp.showCmd == WinUser.SW_SHOWMAXIMIZED) ||
+                    (window is Frame && (window.extendedState and Frame.MAXIMIZED_BOTH) != 0)
+                val r = wp.rcNormalPosition
+                savedBounds = Rectangle(r.left, r.top, r.right - r.left, r.bottom - r.top)
             } else {
+                wasMaximized = (window is Frame && (window.extendedState and Frame.MAXIMIZED_BOTH) != 0)
                 savedBounds = window.bounds
+            }
+
+            if (window is Frame && wasMaximized) {
+                window.extendedState = Frame.NORMAL
             }
 
             // Find monitor where the window currently is (supports multi-monitor setups seamlessly)
@@ -144,7 +151,15 @@ object WindowsFullScreen {
             val monW = mi.rcMonitor.right - mi.rcMonitor.left
             val monH = mi.rcMonitor.bottom - mi.rcMonitor.top
 
-            val fsStyle = (originalStyle and (WinUser.WS_CAPTION or WinUser.WS_THICKFRAME or WinUser.WS_OVERLAPPEDWINDOW).inv()) or WinUser.WS_POPUP
+            // Strip caption, sizing borders, and any residual maximize flags before making it a popup
+            val fsStyle = (originalStyle and (
+                WinUser.WS_CAPTION or
+                WinUser.WS_THICKFRAME or
+                WinUser.WS_OVERLAPPEDWINDOW or
+                WinUser.WS_MAXIMIZE or
+                WinUser.WS_MINIMIZE
+            ).inv()) or WinUser.WS_POPUP
+
             User32.INSTANCE.SetWindowLong(hwnd, WinUser.GWL_STYLE, fsStyle)
             User32.INSTANCE.SetWindowPos(
                 hwnd,
@@ -178,38 +193,88 @@ object WindowsFullScreen {
             // Notify Explorer shell that window is no longer fullscreen
             markFullscreenWindow(hwnd, false)
 
-            // Restore original Win32 window style
-            if (originalStyle != 0) {
-                User32.INSTANCE.SetWindowLong(hwnd, WinUser.GWL_STYLE, originalStyle)
-            }
+            // Release topmost immediately
+            User32.INSTANCE.SetWindowPos(
+                hwnd,
+                HWND_NOTOPMOST,
+                0, 0, 0, 0,
+                WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_NOACTIVATE
+            )
+
+            // Restore original Win32 window style, ensuring WS_POPUP and WS_MAXIMIZE are stripped first
+            val baseStyle = if (originalStyle != 0) originalStyle else (WinUser.WS_OVERLAPPEDWINDOW or WinUser.WS_CLIPCHILDREN or WinUser.WS_CLIPSIBLINGS)
+            val restoredStyle = (baseStyle and WinUser.WS_POPUP.inv() and WinUser.WS_MAXIMIZE.inv()) or
+                (WinUser.WS_CAPTION or WinUser.WS_THICKFRAME or WinUser.WS_OVERLAPPEDWINDOW)
+            User32.INSTANCE.SetWindowLong(hwnd, WinUser.GWL_STYLE, restoredStyle)
+
+            val hMon = User32.INSTANCE.MonitorFromWindow(hwnd, WinUser.MONITOR_DEFAULTTONEAREST)
+            val mi = WinUser.MONITORINFO()
+            User32.INSTANCE.GetMonitorInfo(hMon, mi)
 
             val shouldMaximize = restorePlacement == WindowPlacement.Maximized || wasMaximized
             if (shouldMaximize && window is Frame) {
-                // The restored style only takes effect with SWP_FRAMECHANGED. Maximizing before that maximized a
-                // window Windows still took for a caption-less popup, and a popup maximizes over the whole
-                // monitor: leaving full screen put the window on top of the taskbar. So the frame change goes
-                // first, onto the normal rectangle, and the maximize after it lands on the work area.
-                val normal = savedBounds ?: fallbackBounds ?: window.bounds
+                val wp = savedWindowPlacement
+                if (wp != null) {
+                    wp.showCmd = WinUser.SW_SHOWMAXIMIZED
+                    User32.INSTANCE.SetWindowPlacement(hwnd, wp)
+                } else {
+                    val normal = savedBounds ?: fallbackBounds ?: window.bounds
+                    User32.INSTANCE.SetWindowPos(
+                        hwnd,
+                        HWND_NOTOPMOST,
+                        normal.x, normal.y, normal.width, normal.height,
+                        WinUser.SWP_FRAMECHANGED or WinUser.SWP_NOACTIVATE
+                    )
+                    User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_RESTORE)
+                    User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_MAXIMIZE)
+                }
                 User32.INSTANCE.SetWindowPos(
                     hwnd,
                     HWND_NOTOPMOST,
-                    normal.x, normal.y, normal.width, normal.height,
-                    WinUser.SWP_FRAMECHANGED or WinUser.SWP_NOACTIVATE
+                    0, 0, 0, 0,
+                    WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_NOZORDER or WinUser.SWP_FRAMECHANGED
                 )
-                User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_MAXIMIZE)
                 window.extendedState = Frame.MAXIMIZED_BOTH
+                if (window is androidx.compose.ui.awt.ComposeWindow) {
+                    window.placement = WindowPlacement.Maximized
+                }
             } else {
                 if (window is Frame) {
                     window.extendedState = Frame.NORMAL
                 }
-                val targetBounds = savedBounds ?: fallbackBounds ?: window.bounds
+                val rawBounds = savedBounds ?: fallbackBounds ?: window.bounds
+                val workW = mi.rcWork.right - mi.rcWork.left
+                val workH = mi.rcWork.bottom - mi.rcWork.top
+                var targetW = rawBounds.width.coerceIn(minOf(600, workW), workW)
+                var targetH = rawBounds.height.coerceIn(minOf(400, workH), workH)
+                var targetX = rawBounds.x
+                var targetY = rawBounds.y
+
+                // Ensure the window never spills outside the usable desktop area (above the taskbar)
+                if (targetX + targetW > mi.rcWork.right) targetX = mi.rcWork.right - targetW
+                if (targetX < mi.rcWork.left) targetX = mi.rcWork.left
+                if (targetY + targetH > mi.rcWork.bottom) targetY = mi.rcWork.bottom - targetH
+                if (targetY < mi.rcWork.top) targetY = mi.rcWork.top
+
+                val wp = savedWindowPlacement
+                if (wp != null) {
+                    wp.showCmd = WinUser.SW_SHOWNORMAL
+                    wp.rcNormalPosition.left = targetX
+                    wp.rcNormalPosition.top = targetY
+                    wp.rcNormalPosition.right = targetX + targetW
+                    wp.rcNormalPosition.bottom = targetY + targetH
+                    User32.INSTANCE.SetWindowPlacement(hwnd, wp)
+                }
                 User32.INSTANCE.SetWindowPos(
                     hwnd,
                     HWND_NOTOPMOST,
-                    targetBounds.x, targetBounds.y, targetBounds.width, targetBounds.height,
+                    targetX, targetY, targetW, targetH,
                     WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
                 )
-                window.setBounds(targetBounds.x, targetBounds.y, targetBounds.width, targetBounds.height)
+                window.setBounds(targetX, targetY, targetW, targetH)
+                if (window is androidx.compose.ui.awt.ComposeWindow) {
+                    window.placement = WindowPlacement.Floating
+                }
             }
 
             // Ensure AWT device full screen is definitely null
@@ -222,6 +287,7 @@ object WindowsFullScreen {
             window.repaint()
             isFullScreen = false
             savedBounds = null
+            savedWindowPlacement = null
             wasMaximized = false
             true
         }.getOrElse { false }
