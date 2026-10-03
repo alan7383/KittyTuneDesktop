@@ -61,7 +61,7 @@ internal fun LazyListScope.spotifyCreditsSection(
         }
     }
 
-    val writers = credits?.roles?.firstOrNull { it.roleTitle.isWritersRole() }?.artists.orEmpty()
+    val writers = credits?.roles?.firstOrNull { it.roleTitle.isWritersRole() }?.artists.orEmpty().mergeCreditArtists()
     val composer = track.publisherMetadata?.composer?.takeIf { it.isNotBlank() }
     if (writers.isNotEmpty()) item(key = "credits_writers") {
         CreditsCard(str("spotify_credits_writers")) {
@@ -74,7 +74,7 @@ internal fun LazyListScope.spotifyCreditsSection(
     val producers = credits?.roles
         ?.filter { it.roleTitle.contains("Producer", true) || it.roleTitle.contains("Production", true) }
         ?.flatMap { it.artists }
-        ?.distinctBy { it.name }
+        ?.mergeCreditArtists()
         .orEmpty()
     if (producers.isNotEmpty()) item(key = "credits_producers") {
         CreditsCard(str("spotify_credits_producers")) {
@@ -103,9 +103,9 @@ private fun performerArtists(track: Track, credits: SpotifyCredits?): List<Spoti
     val role = credits?.roles?.firstOrNull { role ->
         role.roleTitle.contains("Performer", true) || role.roleTitle.contains("Artist", true)
     }
-    role?.artists?.takeIf { it.isNotEmpty() }?.let { return it }
+    role?.artists?.takeIf { it.isNotEmpty() }?.let { return it.mergeCreditArtists() }
 
-    val refs = track.artists.orEmpty()
+    val refs = track.artists.orEmpty().distinctBy { it.id.ifBlank { it.name } }
     return refs.map { ref ->
         SpotifyCreditArtist(
             id = ref.id,
@@ -115,6 +115,27 @@ private fun performerArtists(track: Track, credits: SpotifyCredits?): List<Spoti
             subroles = listOf(if (refs.size > 1 && ref !== refs.first()) "Featured Artist" else "Main Artist")
         )
     }
+}
+
+internal fun List<SpotifyCreditArtist>.mergeCreditArtists(): List<SpotifyCreditArtist> {
+    val merged = mutableListOf<SpotifyCreditArtist>()
+    for (art in this) {
+        val existingIndex = merged.indexOfFirst {
+            (it.id.isNotBlank() && it.id == art.id) ||
+            (it.name.isNotBlank() && it.name.equals(art.name, ignoreCase = true))
+        }
+        if (existingIndex >= 0) {
+            val existing = merged[existingIndex]
+            val combinedSubroles = (existing.subroles + art.subroles).distinct()
+            merged[existingIndex] = existing.copy(
+                subroles = combinedSubroles,
+                imageUri = existing.imageUri ?: art.imageUri
+            )
+        } else {
+            merged.add(art)
+        }
+    }
+    return merged
 }
 
 private fun String.isWritersRole(): Boolean =
@@ -134,7 +155,9 @@ private fun ReleaseDetailsCard(vm: PlayerViewModel, track: Track) {
         }
     }
     CreditsCard(title = null) {
-        releaseDate?.takeIf { it.isNotBlank() }?.let { DetailInfoRow(str("detail_release_date"), formatReleaseDate(it)) }
+        releaseDate?.takeIf { it.isNotBlank() && formatReleaseDate(it) != str("detail_unknown") }?.let {
+            DetailInfoRow(str("detail_release_date"), formatReleaseDate(it))
+        }
         meta?.albumTitle?.let { DetailInfoRow(str("profile_tab_albums"), it) }
         DetailInfoRow(str("detail_duration"), makeTimeString(track.durationMs ?: 0L))
         meta?.publisher?.let { DetailInfoRow(str("spotify_credits_sources"), it) }

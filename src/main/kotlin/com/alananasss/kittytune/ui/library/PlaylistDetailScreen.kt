@@ -600,8 +600,9 @@ fun PlaylistDetailScreen(
                             isAlbum = true
                             playlistTitle = album.name
                             playlistCover = album.artworkUrl
-                            val firstArtist = album.artists.firstOrNull()
-                            playlistArtists = album.artists
+                            val uniqueArtists = album.artists.distinctBy { it.id.ifBlank { it.name } }
+                            val firstArtist = uniqueArtists.firstOrNull()
+                            playlistArtists = uniqueArtists
                             playlistUser = User(
                                 id = kotlin.math.abs(firstArtist?.id?.hashCode()?.toLong() ?: 0L),
                                 username = album.artistName,
@@ -1358,10 +1359,11 @@ fun PlaylistDetailScreen(
                                     .clickable(interactionSource = ownerInteraction, indication = null) {
                                         val owner = playlistUser!!
                                         val ownerUrn = owner.urn ?: ""
+                                        val uniqueArtists = playlistArtists.distinctBy { it.id.ifBlank { it.name } }
                                         when {
                                             // A record credited to several artists asks which one to open.
-                                            playlistArtists.count { it.id.isNotBlank() } > 1 ->
-                                                playerViewModel.navigateToArtistChoice(playlistArtists, owner.id)
+                                            uniqueArtists.count { it.id.isNotBlank() } > 1 ->
+                                                playerViewModel.navigateToArtistChoice(uniqueArtists, owner.id)
                                             ownerUrn.startsWith("spotify:artist:") ->
                                                 playerViewModel.navigateToSpotifyArtist(ownerUrn.removePrefix("spotify:artist:"))
                                             else -> playerViewModel.navigateToArtist(owner.id)
