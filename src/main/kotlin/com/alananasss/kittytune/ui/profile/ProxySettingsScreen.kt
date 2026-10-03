@@ -187,24 +187,13 @@ fun ProxySettingsScreen(
         )
     }
 
-    val scrollState = com.alananasss.kittytune.ui.common.rememberRestorableScrollState()
-    SettingsScaffold(
-        title = str("proxy_settings_title"),
-        onBackClick = onBackClick,
-        scrollState = scrollState
-    ) { innerPadding ->
-        ScrollableColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = scrollState,
-            hideScrollbar = false,
-            contentPadding = innerPadding
+    val content = @Composable {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
-            ) {
                 // Info Banner
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -915,10 +904,29 @@ fun ProxySettingsScreen(
                                 }
                             }
                         }
-                    }
                 }
             }
         }
+    }
+
+    if (onBackClick != null) {
+        val scrollState = com.alananasss.kittytune.ui.common.rememberRestorableScrollState()
+        SettingsScaffold(
+            title = str("proxy_settings_title"),
+            onBackClick = onBackClick,
+            scrollState = scrollState
+        ) { innerPadding ->
+            ScrollableColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = scrollState,
+                hideScrollbar = false,
+                contentPadding = innerPadding
+            ) {
+                content()
+            }
+        }
+    } else {
+        content()
     }
 }
 

@@ -283,6 +283,7 @@ private fun pickImageFile(title: String): java.io.File? =
 fun RightPanelSettingsPage() {
     val prefs = remember { PlayerPreferences() }
     var hiddenTabs by remember { mutableStateOf(prefs.getHiddenPanelTabs()) }
+    var hiddenTrackStats by remember { mutableStateOf(prefs.getHiddenPanelTrackStats()) }
     var infoPanelHalf by remember { mutableStateOf(prefs.getInfoPanelHalf()) }
     var showInfoHalfDialog by remember { mutableStateOf(false) }
 
@@ -325,6 +326,32 @@ fun RightPanelSettingsPage() {
                     onSwitchChange = if (isLastShown) null else { value ->
                         hiddenTabs = if (value) hiddenTabs - key else hiddenTabs + key
                         prefs.setHiddenPanelTabs(hiddenTabs)
+                    },
+                )
+            }
+        },
+    )
+
+    SettingsGroup(
+        title = str("panel_track_stats_title"),
+        items = listOf(
+            Triple(PlayerPreferences.PANEL_STAT_PLAYS, "detail_stats_plays", Icons.Rounded.PlayArrow),
+            Triple(PlayerPreferences.PANEL_STAT_LIKES, "detail_stats_likes", Icons.Rounded.Favorite),
+            Triple(PlayerPreferences.PANEL_STAT_REPOSTS, "detail_stats_reposts", Icons.Rounded.Repeat),
+            Triple(PlayerPreferences.PANEL_STAT_COMMENTS, "menu_comments", Icons.Rounded.Comment),
+            Triple(PlayerPreferences.PANEL_STAT_INFO, "detail_track_title", Icons.Rounded.Info),
+        ).map { (key, labelKey, icon) ->
+            { shape ->
+                val shown = key !in hiddenTrackStats
+                SettingsItem(
+                    shape = shape,
+                    title = str(labelKey),
+                    icon = icon,
+                    hasSwitch = true,
+                    switchState = shown,
+                    onSwitchChange = { value ->
+                        hiddenTrackStats = if (value) hiddenTrackStats - key else hiddenTrackStats + key
+                        prefs.setHiddenPanelTrackStats(hiddenTrackStats)
                     },
                 )
             }

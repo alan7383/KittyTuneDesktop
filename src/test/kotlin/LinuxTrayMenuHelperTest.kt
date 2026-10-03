@@ -38,4 +38,11 @@ class LinuxTrayMenuHelperTest {
         // MouseListener must be registered
         assertTrue(icon.mouseListeners.isNotEmpty(), "Mouse listener must be registered on TrayIcon")
     }
+
+    @Test
+    fun testWaylandEnvironmentDetection() {
+        val waylandEnv = System.getenv("WAYLAND_DISPLAY") != null ||
+            System.getenv("XDG_SESSION_TYPE")?.equals("wayland", ignoreCase = true) == true
+        assertEquals(waylandEnv, com.alananasss.kittytune.core.LinuxWindowHelper.isWayland)
+    }
 }

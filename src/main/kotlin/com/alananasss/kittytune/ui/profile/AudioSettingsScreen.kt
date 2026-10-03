@@ -7,18 +7,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Equalizer
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.*
-import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.rounded.Equalizer
-import androidx.compose.material.icons.rounded.Info
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,38 +28,138 @@ import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.SplitSettingsItem
-import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 
+/**
+ * Audio Settings: separated into clean sub-page folders (Playback, Sound & Output, Transitions, Sleep Timer).
+ */
 @Composable
 fun AudioSettingsScreen(
     onBackClick: (() -> Unit)? = null,
     playerViewModel: PlayerViewModel
 ) {
-    val prefs = remember { PlayerPreferences() }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        AudioPlaybackPage(playerViewModel)
+        Spacer(Modifier.height(16.dp))
+        AudioQualityPage(playerViewModel)
+        Spacer(Modifier.height(16.dp))
+        AudioTransitionsPage(playerViewModel)
+        Spacer(Modifier.height(16.dp))
+        AudioSleepTimerPage()
+    }
+}
 
+/**
+ * Audio → Playback: autoplay, continuous playback, queue persistence, seek step, speed.
+ */
+@Composable
+fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
+    val prefs = remember { PlayerPreferences() }
     var autoplayEnabled by remember { mutableStateOf(prefs.getAutoplayEnabled()) }
     var continuousPlaybackEnabled by remember { mutableStateOf(prefs.getContinuousPlaybackEnabled()) }
     var stopOnTaskClear by remember { mutableStateOf(prefs.getStopOnTaskClear()) }
     var persistentQueueEnabled by remember { mutableStateOf(prefs.getPersistentQueueEnabled()) }
     var savePositionEnabled by remember { mutableStateOf(prefs.getSavePositionEnabled()) }
-    var audioQuality by remember { mutableStateOf(prefs.getAudioQuality()) }
-
     var youtubeFallbackEnabled by remember { mutableStateOf(prefs.getYouTubeFallbackEnabled()) }
-    var fadeEnabled by remember { mutableStateOf(prefs.getSleepTimerFadeEnabled()) }
-    var fadeDuration by remember { mutableStateOf(prefs.getSleepTimerFadeDuration()) }
+    var seekWheelSeconds by remember { mutableStateOf(prefs.getSeekWheelSeconds()) }
+    var showSeekWheelDialog by remember { mutableStateOf(false) }
+
+    if (showSeekWheelDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showSeekWheelDialog = false },
+            title = { Text(str("pref_seek_wheel_step")) },
+            text = {
+                Column {
+                    Text(
+                        str("pref_seek_wheel_step_sub"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        str("pref_seek_wheel_step_value", seekWheelSeconds.toInt().toString()),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Slider(
+                        value = seekWheelSeconds,
+                        onValueChange = {
+                            seekWheelSeconds = kotlin.math.round(it)
+                            prefs.setSeekWheelSeconds(seekWheelSeconds)
+                        },
+                        valueRange = PlayerPreferences.SEEK_WHEEL_SECONDS_MIN..PlayerPreferences.SEEK_WHEEL_SECONDS_MAX,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSeekWheelDialog = false }) { Text(str("btn_ok")) }
+            }
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SettingsGroupTitle(str("settings_cat_playback"))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            val isGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
+            val totalVisibleItems = if (!isGuest) 10 else 9
+
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) }, highlightKey = "pref_autoplay")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) }, highlightKey = "pref_continuous_playback")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 2), title = str("pref_stop_on_task_clear"), hasSwitch = true, switchState = stopOnTaskClear, onSwitchChange = { stopOnTaskClear = it; prefs.setStopOnTaskClear(it) }, highlightKey = "pref_stop_on_task_clear")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 3), title = str("pref_persist_queue"), subtitle = str("pref_persist_queue_sub"), hasSwitch = true, switchState = persistentQueueEnabled, onSwitchChange = { persistentQueueEnabled = it; prefs.setPersistentQueueEnabled(it) }, highlightKey = "pref_persist_queue")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 4), title = str("pref_queue_preserve_upcoming"), subtitle = str("pref_queue_preserve_upcoming_sub"), hasSwitch = true, switchState = playerViewModel.isQueuePreserveUpcomingEnabled, onSwitchChange = { playerViewModel.toggleQueuePreserveUpcoming(it) }, highlightKey = "pref_queue_preserve_upcoming")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) }, highlightKey = "pref_save_position")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) }, highlightKey = "pref_youtube_fallback")
+            SettingsItem(shape = getSettingsShape(totalVisibleItems, 7), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) }, highlightKey = "pref_precise_speed")
+
+            if (!isGuest) {
+                var scHistorySyncEnabled by remember { mutableStateOf(prefs.getSoundCloudHistorySyncEnabled()) }
+                SettingsItem(
+                    shape = getSettingsShape(totalVisibleItems, 8),
+                    title = str("pref_sc_sync_title"),
+                    subtitle = str("pref_sc_sync_sub"),
+                    hasSwitch = true,
+                    switchState = scHistorySyncEnabled,
+                    onSwitchChange = {
+                        scHistorySyncEnabled = it
+                        prefs.setSoundCloudHistorySyncEnabled(it)
+                    }
+                )
+            }
+
+            SettingsItem(
+                shape = getSettingsShape(totalVisibleItems, if (!isGuest) 9 else 8),
+                title = str("pref_seek_wheel_step"),
+                subtitle = str(
+                    "pref_seek_wheel_step_value",
+                    seekWheelSeconds.let { s ->
+                        val rounded = kotlin.math.round(s)
+                        if (rounded == s) rounded.toInt().toString() else s.toString()
+                    },
+                ),
+                onClick = { showSeekWheelDialog = true }
+            )
+        }
+    }
+}
+
+/**
+ * Audio → Sound & Output: output device, quality bitrate, mono audio, loudness normalization.
+ */
+@Composable
+fun AudioQualityPage(playerViewModel: PlayerViewModel) {
+    val prefs = remember { PlayerPreferences() }
+    var audioQuality by remember { mutableStateOf(prefs.getAudioQuality()) }
+    var currentDevice by remember { mutableStateOf(prefs.getAudioDevice()) }
+    var systemDefaultSinkDesc by remember { mutableStateOf<String?>(null) }
 
     var showQualityDialog by remember { mutableStateOf(false) }
-    var showFadeDurationDialog by remember { mutableStateOf(false) }
-    var showSeekWheelDialog by remember { mutableStateOf(false) }
-    var seekWheelSeconds by remember { mutableStateOf(prefs.getSeekWheelSeconds()) }
-
     var showDeviceDialog by remember { mutableStateOf(false) }
-    var currentDevice by remember { mutableStateOf(prefs.getAudioDevice()) }
+    var showNormDialog by remember { mutableStateOf(false) }
+    var showNormalizationInfoDialog by remember { mutableStateOf(false) }
 
-    // Track the current system default sink (updated every 2s to react to KDE/system changes)
-    var systemDefaultSinkDesc by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
         var lastSystemDefaultId: String? = null
         while (isActive) {
@@ -75,15 +173,12 @@ fun AudioSettingsScreen(
 
             systemDefaultSinkDesc = newDefaultDesc
 
-            // If the system default changed externally (e.g., user changed it in KDE),
-            // auto-follow: reset currentDevice to "" so it follows the system
             if (newDefaultId != null && newDefaultId != lastSystemDefaultId && lastSystemDefaultId != null) {
                 currentDevice = ""
                 prefs.setAudioDevice("")
                 playerViewModel.changeOutputDevice("")
             }
             lastSystemDefaultId = newDefaultId
-
             delay(2000)
         }
     }
@@ -91,11 +186,9 @@ fun AudioSettingsScreen(
     val availableDevices = remember {
         val isLinux = System.getProperty("os.name").lowercase().contains("linux")
         if (isLinux) {
-            // On Linux: use pactl to get real device names (same as KDE/GNOME audio settings)
             val sinks = com.alananasss.kittytune.util.LinuxAudioManager.getOutputSinks()
             if (sinks.isNotEmpty()) return@remember sinks.map { it.id to it.description }
         }
-        // Fallback: Java Sound (Windows, macOS, or Linux without pactl)
         val list = mutableListOf<Pair<String, String>>()
         try {
             val mixerInfos = javax.sound.sampled.AudioSystem.getMixerInfo()
@@ -116,26 +209,92 @@ fun AudioSettingsScreen(
         list
     }
 
-    var crossfadeEnabled by remember { mutableStateOf(prefs.getCrossfadeEnabled()) }
-    var crossfadeDuration by remember { mutableStateOf(prefs.getCrossfadeDuration()) }
-    var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
+    if (showQualityDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showQualityDialog = false },
+            title = { Text(str("pref_quality")) },
+            text = {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { audioQuality = "HIGH"; prefs.setAudioQuality("HIGH"); showQualityDialog = false }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = audioQuality == "HIGH", onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column { Text(str("quality_high"), fontWeight = FontWeight.SemiBold); Text(str("quality_high_sub"), style = MaterialTheme.typography.bodySmall) }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { audioQuality = "LOW"; prefs.setAudioQuality("LOW"); showQualityDialog = false }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = audioQuality == "LOW", onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column { Text(str("quality_low"), fontWeight = FontWeight.SemiBold); Text(str("quality_low_sub"), style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showQualityDialog = false }) { Text(str("btn_cancel")) } }
+        )
+    }
 
-    var automixEnabled by remember { mutableStateOf(prefs.getAutomixEnabled()) }
-    var automixOverlapMode by remember { mutableStateOf(prefs.getAutomixOverlapMode()) }
-    var automixStartOffsetMode by remember { mutableStateOf(prefs.getAutomixStartOffsetMode()) }
-    var automixStartOffsetCustomSec by remember { mutableStateOf(prefs.getAutomixStartOffsetCustomSec()) }
-    var automixTempoMatch by remember { mutableStateOf(prefs.getAutomixTempoMatchEnabled()) }
-    var automixHarmonicMix by remember { mutableStateOf(prefs.getAutomixHarmonicMixEnabled()) }
-    var automixDynamicMix by remember { mutableStateOf(prefs.getAutomixDynamicMixPointsEnabled()) }
-    var automixBassDucking by remember { mutableStateOf(prefs.getAutomixBassDuckingEnabled()) }
-    var automixDebugOverlay by remember { mutableStateOf(prefs.getAutomixDebugOverlayEnabled()) }
-    var showAutomixOverlapDialog by remember { mutableStateOf(false) }
-    var showAutomixStartOffsetDialog by remember { mutableStateOf(false) }
+    if (showDeviceDialog) {
+        EscapableAlertDialog(
+            onDismissRequest = { showDeviceDialog = false },
+            title = { Text(str("pref_audio_device_title")) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                currentDevice = ""
+                                playerViewModel.changeOutputDevice("")
+                                showDeviceDialog = false
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = currentDevice == "", onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(str("pref_audio_device_default"))
+                            if (currentDevice.isEmpty() && systemDefaultSinkDesc != null) {
+                                Text(
+                                    text = systemDefaultSinkDesc!!,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
 
-    var showNormDialog by remember { mutableStateOf(false) }
-    var showNormalizationInfoDialog by remember { mutableStateOf(false) }
-    var showFullPlayerBgDialog by remember { mutableStateOf(false) }
-    var showFullPlayerCoverZoomDialog by remember { mutableStateOf(false) }
+                    availableDevices.forEach { (devId, devLabel) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    currentDevice = devId
+                                    playerViewModel.changeOutputDevice(devId)
+                                    showDeviceDialog = false
+                                }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = currentDevice == devId, onClick = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(devLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDeviceDialog = false }) { Text(str("btn_cancel")) } }
+        )
+    }
 
     if (showNormDialog) {
         EscapableAlertDialog(
@@ -247,70 +406,79 @@ fun AudioSettingsScreen(
         )
     }
 
-    if (showSeekWheelDialog) {
-        EscapableAlertDialog(
-            onDismissRequest = { showSeekWheelDialog = false },
-            title = { Text(str("pref_seek_wheel_step")) },
-            text = {
-                Column {
-                    Text(
-                        str("pref_seek_wheel_step_sub"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        str("pref_seek_wheel_step_value", seekWheelSeconds.toInt().toString()),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Slider(
-                        value = seekWheelSeconds,
-                        onValueChange = {
-                            seekWheelSeconds = kotlin.math.round(it)
-                            prefs.setSeekWheelSeconds(seekWheelSeconds)
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SettingsGroupTitle(str("settings_audio_quality_title"))
+        SettingsGroup(
+            items = listOf(
+                { shape ->
+                    SettingsItem(
+                        shape = shape,
+                        title = str("pref_audio_device_title"),
+                        subtitle = if (currentDevice.isEmpty()) {
+                            systemDefaultSinkDesc ?: str("pref_audio_device_default")
+                        } else {
+                            availableDevices.firstOrNull { it.first == currentDevice }?.second
+                                ?: com.alananasss.kittytune.util.LinuxAudioManager.cleanName(currentDevice)
                         },
-                        valueRange = PlayerPreferences.SEEK_WHEEL_SECONDS_MIN..PlayerPreferences.SEEK_WHEEL_SECONDS_MAX,
-                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showDeviceDialog = true }
+                    )
+                },
+                { shape ->
+                    SettingsItem(
+                        shape = shape,
+                        title = str("pref_quality"),
+                        subtitle = if (audioQuality == "HIGH") str("quality_high") else str("quality_low"),
+                        onClick = { showQualityDialog = true }
+                    )
+                },
+                { shape ->
+                    SettingsItem(
+                        shape = shape,
+                        title = str("pref_audio_mono"),
+                        subtitle = str("pref_audio_mono_sub"),
+                        hasSwitch = true,
+                        switchState = playerViewModel.effectsState.isMonoEnabled,
+                        onSwitchChange = { playerViewModel.toggleMono() },
+                        highlightKey = "pref_audio_mono"
+                    )
+                },
+                { shape ->
+                    SplitSettingsItem(
+                        shape = shape,
+                        title = str("pref_norm_title"),
+                        subtitle = str("pref_norm_sub"),
+                        onClick = { showNormDialog = true },
+                        switchState = playerViewModel.effectsState.isNormalizationEnabled,
+                        onSwitchChange = { playerViewModel.toggleNormalization(it) },
+                        highlightKey = "pref_norm"
                     )
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showSeekWheelDialog = false }) { Text(str("btn_ok")) }
-            }
+            )
         )
     }
+}
 
-    if (showFadeDurationDialog) {
-        EscapableAlertDialog(
-            onDismissRequest = { showFadeDurationDialog = false },
-            title = { Text(str("sleep_timer_fade_title")) },
-            text = {
-                Column {
-                    Text(
-                        text = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Slider(
-                        value = fadeDuration.toFloat(),
-                        onValueChange = {
-                            fadeDuration = it.toInt()
-                            prefs.setSleepTimerFadeDuration(it.toInt())
-                        },
-                        valueRange = PlayerPreferences.SLEEP_TIMER_FADE_DURATION_MIN.toFloat()..PlayerPreferences.SLEEP_TIMER_FADE_DURATION_MAX.toFloat(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showFadeDurationDialog = false }) {
-                    Text(str("btn_ok"))
-                }
-            }
-        )
-    }
+/**
+ * Audio → Transitions & Mix: crossfade, automix overlap, start offset, tempo match, harmonic mix, bass ducking.
+ */
+@Composable
+fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
+    val prefs = remember { PlayerPreferences() }
+    var crossfadeEnabled by remember { mutableStateOf(prefs.getCrossfadeEnabled()) }
+    var crossfadeDuration by remember { mutableStateOf(prefs.getCrossfadeDuration()) }
+    var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
+
+    var automixEnabled by remember { mutableStateOf(prefs.getAutomixEnabled()) }
+    var automixOverlapMode by remember { mutableStateOf(prefs.getAutomixOverlapMode()) }
+    var automixStartOffsetMode by remember { mutableStateOf(prefs.getAutomixStartOffsetMode()) }
+    var automixStartOffsetCustomSec by remember { mutableStateOf(prefs.getAutomixStartOffsetCustomSec()) }
+    var automixTempoMatch by remember { mutableStateOf(prefs.getAutomixTempoMatchEnabled()) }
+    var automixHarmonicMix by remember { mutableStateOf(prefs.getAutomixHarmonicMixEnabled()) }
+    var automixDynamicMix by remember { mutableStateOf(prefs.getAutomixDynamicMixPointsEnabled()) }
+    var automixBassDucking by remember { mutableStateOf(prefs.getAutomixBassDuckingEnabled()) }
+    var automixDebugOverlay by remember { mutableStateOf(prefs.getAutomixDebugOverlayEnabled()) }
+    var showAutomixOverlapDialog by remember { mutableStateOf(false) }
+    var showAutomixStartOffsetDialog by remember { mutableStateOf(false) }
 
     if (showCrossfadeDurationDialog) {
         EscapableAlertDialog(
@@ -330,15 +498,14 @@ fun AudioSettingsScreen(
                             crossfadeDuration = it.toInt()
                             prefs.setCrossfadeDuration(it.toInt())
                         },
-                        valueRange = 1f..15f,
+                        valueRange = 1f..12f,
+                        steps = 10,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showCrossfadeDurationDialog = false }) {
-                    Text(str("btn_ok"))
-                }
+                TextButton(onClick = { showCrossfadeDurationDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }
@@ -460,525 +627,257 @@ fun AudioSettingsScreen(
         )
     }
 
-    if (showFullPlayerBgDialog) {
-        EscapableAlertDialog(
-            onDismissRequest = { showFullPlayerBgDialog = false },
-            title = { Text(str("full_player_bg_style")) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.entries.forEach { style ->
-                        val name = when (style) {
-                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC -> str("full_player_bg_apple_music")
-                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.BLUR -> str("full_player_bg_blur")
-                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.GRADIENT -> str("full_player_bg_gradient")
-                            com.alananasss.kittytune.data.local.FullPlayerBgStyle.PURE_BLACK -> str("full_player_bg_pure_black")
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SettingsGroupTitle(str("pref_crossfade_title"))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            val fadeBottomRadius by animateDpAsState(
+                targetValue = if (crossfadeEnabled) 4.dp else 24.dp,
+                label = "CrossfadeCornerAnimation"
+            )
+
+            SettingsItem(
+                shape = RoundedCornerShape(
+                    topStart = 24.dp,
+                    topEnd = 24.dp,
+                    bottomStart = fadeBottomRadius,
+                    bottomEnd = fadeBottomRadius
+                ),
+                title = str("pref_crossfade_title"),
+                subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
+                hasSwitch = true,
+                switchState = crossfadeEnabled,
+                onSwitchChange = { 
+                    crossfadeEnabled = it
+                    prefs.setCrossfadeEnabled(it)
+                },
+                highlightKey = "pref_crossfade"
+            )
+
+            AnimatedVisibility(
+                visible = crossfadeEnabled,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                SettingsItem(
+                    shape = RoundedCornerShape(
+                        topStart = 4.dp,
+                        topEnd = 4.dp,
+                        bottomStart = 24.dp,
+                        bottomEnd = 24.dp
+                    ),
+                    title = str("label_duration"),
+                    subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
+                    onClick = { showCrossfadeDurationDialog = true }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        val automixOverlapLabel = when (automixOverlapMode) {
+            1 -> str(com.alananasss.kittytune.R.string.automix_overlap_2bars)
+            2 -> str(com.alananasss.kittytune.R.string.automix_overlap_4bars)
+            3 -> str(com.alananasss.kittytune.R.string.automix_overlap_8bars)
+            4 -> str(com.alananasss.kittytune.R.string.automix_overlap_custom)
+            else -> str(com.alananasss.kittytune.R.string.automix_overlap_auto)
+        }
+        val automixStartOffsetLabel = when (automixStartOffsetMode) {
+            PlayerPreferences.AUTOMIX_START_OFFSET_BEGINNING -> str(com.alananasss.kittytune.R.string.automix_start_offset_beginning)
+            PlayerPreferences.AUTOMIX_START_OFFSET_CUSTOM -> "${str(com.alananasss.kittytune.R.string.automix_start_offset_custom)} (${automixStartOffsetCustomSec}s)"
+            else -> str(com.alananasss.kittytune.R.string.automix_start_offset_auto)
+        }
+
+        SettingsGroupTitle(str(com.alananasss.kittytune.R.string.automix))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            val automixBottomRadius by animateDpAsState(
+                targetValue = if (automixEnabled) 4.dp else 24.dp,
+                label = "AutomixCornerAnimation"
+            )
+
+            SettingsItem(
+                shape = RoundedCornerShape(
+                    topStart = 24.dp,
+                    topEnd = 24.dp,
+                    bottomStart = automixBottomRadius,
+                    bottomEnd = automixBottomRadius
+                ),
+                title = str(com.alananasss.kittytune.R.string.automix),
+                subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
+                hasSwitch = true,
+                switchState = automixEnabled,
+                onSwitchChange = { 
+                    automixEnabled = it
+                    prefs.setAutomixEnabled(it)
+                },
+                highlightKey = "pref_automix"
+            )
+
+            AnimatedVisibility(
+                visible = automixEnabled,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    SettingsItem(
+                        shape = RoundedCornerShape(4.dp),
+                        title = str(com.alananasss.kittytune.R.string.automix_overlap_mode),
+                        subtitle = automixOverlapLabel,
+                        onClick = { showAutomixOverlapDialog = true }
+                    )
+                    SettingsItem(
+                        shape = RoundedCornerShape(4.dp),
+                        title = str(com.alananasss.kittytune.R.string.automix_start_offset),
+                        subtitle = automixStartOffsetLabel,
+                        onClick = { showAutomixStartOffsetDialog = true }
+                    )
+                    SettingsItem(
+                        shape = RoundedCornerShape(4.dp),
+                        title = str(com.alananasss.kittytune.R.string.automix_tempo_match),
+                        subtitle = str(com.alananasss.kittytune.R.string.automix_tempo_match_desc),
+                        hasSwitch = true,
+                        switchState = automixTempoMatch,
+                        onSwitchChange = {
+                            automixTempoMatch = it
+                            prefs.setAutomixTempoMatchEnabled(it)
                         }
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    playerViewModel.updateFullPlayerBgStyle(style)
-                                    showFullPlayerBgDialog = false
-                                }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = playerViewModel.fullPlayerBgStyle == style,
-                                onClick = null
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(name)
-                            // Only while it is the style in use: the aside is about the background you are
-                            // looking at, not about an option in a list.
-                            if (style == com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC &&
-                                playerViewModel.fullPlayerBgStyle == style
-                            ) {
-                                Spacer(Modifier.width(4.dp))
-                                com.alananasss.kittytune.ui.common.FunFactDot(
-                                    str("full_player_bg_apple_music_fact")
-                                )
-                            }
+                    )
+                    SettingsItem(
+                        shape = RoundedCornerShape(4.dp),
+                        title = str(com.alananasss.kittytune.R.string.automix_harmonic_mix),
+                        subtitle = str(com.alananasss.kittytune.R.string.automix_harmonic_mix_desc),
+                        hasSwitch = true,
+                        switchState = automixHarmonicMix,
+                        onSwitchChange = {
+                            automixHarmonicMix = it
+                            prefs.setAutomixHarmonicMixEnabled(it)
                         }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showFullPlayerBgDialog = false }) {
-                    Text(str("btn_cancel"))
+                    )
+                    SettingsItem(
+                        shape = RoundedCornerShape(4.dp),
+                        title = str(com.alananasss.kittytune.R.string.automix_dynamic_mix),
+                        subtitle = str(com.alananasss.kittytune.R.string.automix_dynamic_mix_desc),
+                        hasSwitch = true,
+                        switchState = automixDynamicMix,
+                        onSwitchChange = {
+                            automixDynamicMix = it
+                            prefs.setAutomixDynamicMixPointsEnabled(it)
+                        }
+                    )
+                    SettingsItem(
+                        shape = RoundedCornerShape(4.dp),
+                        title = str(com.alananasss.kittytune.R.string.automix_bass_ducking),
+                        subtitle = str(com.alananasss.kittytune.R.string.automix_bass_ducking_desc),
+                        hasSwitch = true,
+                        switchState = automixBassDucking,
+                        onSwitchChange = {
+                            automixBassDucking = it
+                            prefs.setAutomixBassDuckingEnabled(it)
+                        }
+                    )
+                    SettingsItem(
+                        shape = RoundedCornerShape(
+                            topStart = 4.dp,
+                            topEnd = 4.dp,
+                            bottomStart = 24.dp,
+                            bottomEnd = 24.dp
+                        ),
+                        title = str(com.alananasss.kittytune.R.string.automix_debug),
+                        subtitle = str(com.alananasss.kittytune.R.string.automix_debug_desc),
+                        hasSwitch = true,
+                        switchState = automixDebugOverlay,
+                        onSwitchChange = {
+                            automixDebugOverlay = it
+                            prefs.setAutomixDebugOverlayEnabled(it)
+                        }
+                    )
                 }
             }
-        )
+        }
     }
+}
 
-    if (showFullPlayerCoverZoomDialog) {
+/**
+ * Audio → Sleep Timer: fade on/off, fade duration slider.
+ */
+@Composable
+fun AudioSleepTimerPage() {
+    val prefs = remember { PlayerPreferences() }
+    var fadeEnabled by remember { mutableStateOf(prefs.getSleepTimerFadeEnabled()) }
+    var fadeDuration by remember { mutableStateOf(prefs.getSleepTimerFadeDuration()) }
+    var showFadeDurationDialog by remember { mutableStateOf(false) }
+
+    if (showFadeDurationDialog) {
         EscapableAlertDialog(
-            onDismissRequest = { showFullPlayerCoverZoomDialog = false },
-            title = { Text(str("full_player_cover_zoom")) },
+            onDismissRequest = { showFadeDurationDialog = false },
+            title = { Text(str("sleep_timer_fade_title")) },
             text = {
                 Column {
                     Text(
-                        "${(playerViewModel.fullPlayerCoverScale * 100).toInt()}%",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
+                        text = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(Modifier.height(16.dp))
                     Slider(
-                        value = playerViewModel.fullPlayerCoverScale,
-                        onValueChange = { playerViewModel.updateFullPlayerCoverScale(it) },
-                        valueRange = 0.6f..1.4f,
-                        steps = 15,
+                        value = fadeDuration.toFloat(),
+                        onValueChange = {
+                            fadeDuration = it.toInt()
+                            prefs.setSleepTimerFadeDuration(it.toInt())
+                        },
+                        valueRange = 5f..60f,
+                        steps = 10,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFullPlayerCoverZoomDialog = false }) {
-                    Text(str("btn_ok"))
-                }
+                TextButton(onClick = { showFadeDurationDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }
 
-    if (showQualityDialog) {
-        EscapableAlertDialog(
-            onDismissRequest = { showQualityDialog = false },
-            title = { Text(str("pref_quality")) },
-            text = {
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { audioQuality = "HIGH"; prefs.setAudioQuality("HIGH"); showQualityDialog = false }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = audioQuality == "HIGH", onClick = null)
-                        Spacer(Modifier.width(8.dp))
-                        Column { Text(str("quality_high"), fontWeight = FontWeight.SemiBold); Text(str("quality_high_sub"), style = MaterialTheme.typography.bodySmall) }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { audioQuality = "LOW"; prefs.setAudioQuality("LOW"); showQualityDialog = false }.padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = audioQuality == "LOW", onClick = null)
-                        Spacer(Modifier.width(8.dp))
-                        Column { Text(str("quality_low"), fontWeight = FontWeight.SemiBold); Text(str("quality_low_sub"), style = MaterialTheme.typography.bodySmall) }
-                    }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        SettingsGroupTitle(str("sleep_timer_title"))
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            val fadeBottomRadius by animateDpAsState(
+                targetValue = if (fadeEnabled) 4.dp else 24.dp,
+                label = "FadeCornerAnimation"
+            )
+
+            SettingsItem(
+                shape = RoundedCornerShape(
+                    topStart = 24.dp,
+                    topEnd = 24.dp,
+                    bottomStart = fadeBottomRadius,
+                    bottomEnd = fadeBottomRadius
+                ),
+                title = str("sleep_timer_fade_title"),
+                subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
+                hasSwitch = true,
+                switchState = fadeEnabled,
+                onSwitchChange = { 
+                    fadeEnabled = it
+                    prefs.setSleepTimerFadeEnabled(it)
                 }
-            },
-            confirmButton = { TextButton(onClick = { showQualityDialog = false }) { Text(str("btn_cancel")) } }
-        )
-    }
+            )
 
-    if (showDeviceDialog) {
-        EscapableAlertDialog(
-            onDismissRequest = { showDeviceDialog = false },
-            title = { Text(str("pref_audio_device_title")) },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 400.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                currentDevice = ""
-                                playerViewModel.changeOutputDevice("")
-                                showDeviceDialog = false
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = currentDevice == "", onClick = null)
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text(str("pref_audio_device_default"))
-                            if (currentDevice.isEmpty() && systemDefaultSinkDesc != null) {
-                                Text(
-                                    text = systemDefaultSinkDesc!!,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-
-                    availableDevices.forEach { (devId, devLabel) ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    currentDevice = devId
-                                    playerViewModel.changeOutputDevice(devId)
-                                    showDeviceDialog = false
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = currentDevice == devId, onClick = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(devLabel, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showDeviceDialog = false }) { Text(str("btn_cancel")) } }
-        )
-    }
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-            Box {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    SettingsGroupTitle(str("settings_cat_playback"))
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val isNormEnabled = playerViewModel.effectsState.isNormalizationEnabled
-                        val isGuest = com.alananasss.kittytune.data.TokenManager.isGuestMode()
-                        val totalVisibleItems = if (!isGuest) 11 else 10
-
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 0), title = str("pref_autoplay"), subtitle = str("pref_autoplay_sub"), hasSwitch = true, switchState = autoplayEnabled, onSwitchChange = { autoplayEnabled = it; prefs.setAutoplayEnabled(it) }, highlightKey = "pref_autoplay")
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 1), title = str("pref_continuous_playback"), subtitle = str("pref_continuous_playback_sub"), hasSwitch = true, switchState = continuousPlaybackEnabled, onSwitchChange = { continuousPlaybackEnabled = it; prefs.setContinuousPlaybackEnabled(it) }, highlightKey = "pref_continuous_playback")
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 2), title = str("pref_stop_on_task_clear"), hasSwitch = true, switchState = stopOnTaskClear, onSwitchChange = { stopOnTaskClear = it; prefs.setStopOnTaskClear(it) }, highlightKey = "pref_stop_on_task_clear")
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 3), title = str("pref_persist_queue"), subtitle = str("pref_persist_queue_sub"), hasSwitch = true, switchState = persistentQueueEnabled, onSwitchChange = { persistentQueueEnabled = it; prefs.setPersistentQueueEnabled(it) }, highlightKey = "pref_persist_queue")
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 4), title = str("pref_queue_preserve_upcoming"), subtitle = str("pref_queue_preserve_upcoming_sub"), hasSwitch = true, switchState = playerViewModel.isQueuePreserveUpcomingEnabled, onSwitchChange = { playerViewModel.toggleQueuePreserveUpcoming(it) }, highlightKey = "pref_queue_preserve_upcoming")
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 5), title = str("pref_save_position"), subtitle = str("pref_save_position_sub"), hasSwitch = true, switchState = savePositionEnabled, onSwitchChange = { savePositionEnabled = it; prefs.setSavePositionEnabled(it) }, highlightKey = "pref_save_position")
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 6), title = str("pref_youtube_fallback"), subtitle = str("pref_youtube_fallback_sub"), hasSwitch = true, switchState = youtubeFallbackEnabled, onSwitchChange = { youtubeFallbackEnabled = it; prefs.setYouTubeFallbackEnabled(it) }, highlightKey = "pref_youtube_fallback")
-                        SettingsItem(shape = getSettingsShape(totalVisibleItems, 7), title = str("pref_precise_speed"), subtitle = str("pref_precise_speed_sub"), hasSwitch = true, switchState = playerViewModel.isPreciseSpeedEnabled, onSwitchChange = { playerViewModel.togglePreciseSpeedEnabled(it) }, highlightKey = "pref_precise_speed")
-                        
-                        SplitSettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, 8),
-                            title = str("pref_norm_title"),
-                            subtitle = str("pref_norm_sub"),
-                            onClick = { showNormDialog = true },
-                            switchState = isNormEnabled,
-                            onSwitchChange = { playerViewModel.toggleNormalization(it) },
-                            highlightKey = "pref_norm"
-                        )
-
-                        if (!isGuest) {
-                            var scHistorySyncEnabled by remember { mutableStateOf(prefs.getSoundCloudHistorySyncEnabled()) }
-                            SettingsItem(
-                                shape = getSettingsShape(totalVisibleItems, 9),
-                                title = str("pref_sc_sync_title"),
-                                subtitle = str("pref_sc_sync_sub"),
-                                hasSwitch = true,
-                                switchState = scHistorySyncEnabled,
-                                onSwitchChange = {
-                                    scHistorySyncEnabled = it
-                                    prefs.setSoundCloudHistorySyncEnabled(it)
-                                }
-                            )
-                        }
-
-                        // Last, because the wheel over the progress bar works out of the box and this
-                        // only changes how far a notch goes (issue #33).
-                        SettingsItem(
-                            shape = getSettingsShape(totalVisibleItems, if (!isGuest) 10 else 9),
-                            title = str("pref_seek_wheel_step"),
-                            subtitle = str(
-                                "pref_seek_wheel_step_value",
-                                seekWheelSeconds.let { s ->
-                                    val rounded = kotlin.math.round(s)
-                                    if (rounded == s) rounded.toInt().toString() else s.toString()
-                                },
-                            ),
-                            onClick = { showSeekWheelDialog = true }
-                        )
-                    }
-                }
-            }
-            
-            Box {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    SettingsGroupTitle(str("pref_crossfade_title"))
-                    
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val fadeBottomRadius by animateDpAsState(
-                            targetValue = if (crossfadeEnabled) 4.dp else 24.dp,
-                            label = "CrossfadeCornerAnimation"
-                        )
-
-                        SettingsItem(
-                            shape = RoundedCornerShape(
-                                topStart = 24.dp,
-                                topEnd = 24.dp,
-                                bottomStart = fadeBottomRadius,
-                                bottomEnd = fadeBottomRadius
-                            ),
-                            title = str("pref_crossfade_title"),
-                            subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
-                            hasSwitch = true,
-                            switchState = crossfadeEnabled,
-                            onSwitchChange = { 
-                                crossfadeEnabled = it
-                                prefs.setCrossfadeEnabled(it)
-                            },
-                            highlightKey = "pref_crossfade"
-                        )
-
-                        AnimatedVisibility(
-                            visible = crossfadeEnabled,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            SettingsItem(
-                                shape = RoundedCornerShape(
-                                    topStart = 4.dp,
-                                    topEnd = 4.dp,
-                                    bottomStart = 24.dp,
-                                    bottomEnd = 24.dp
-                                ),
-                                title = str("label_duration"),
-                                subtitle = str("pref_crossfade_duration").replace("%d", crossfadeDuration.toString()),
-                                onClick = { showCrossfadeDurationDialog = true }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Box {
-                val automixOverlapLabel = when (automixOverlapMode) {
-                    1 -> str(com.alananasss.kittytune.R.string.automix_overlap_2bars)
-                    2 -> str(com.alananasss.kittytune.R.string.automix_overlap_4bars)
-                    3 -> str(com.alananasss.kittytune.R.string.automix_overlap_8bars)
-                    4 -> str(com.alananasss.kittytune.R.string.automix_overlap_custom)
-                    else -> str(com.alananasss.kittytune.R.string.automix_overlap_auto)
-                }
-                val automixStartOffsetLabel = when (automixStartOffsetMode) {
-                    PlayerPreferences.AUTOMIX_START_OFFSET_BEGINNING -> str(com.alananasss.kittytune.R.string.automix_start_offset_beginning)
-                    PlayerPreferences.AUTOMIX_START_OFFSET_CUSTOM -> "${str(com.alananasss.kittytune.R.string.automix_start_offset_custom)} (${automixStartOffsetCustomSec}s)"
-                    else -> str(com.alananasss.kittytune.R.string.automix_start_offset_auto)
-                }
-
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    SettingsGroupTitle(str(com.alananasss.kittytune.R.string.automix))
-
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val automixBottomRadius by animateDpAsState(
-                            targetValue = if (automixEnabled) 4.dp else 24.dp,
-                            label = "AutomixCornerAnimation"
-                        )
-
-                        SettingsItem(
-                            shape = RoundedCornerShape(
-                                topStart = 24.dp,
-                                topEnd = 24.dp,
-                                bottomStart = automixBottomRadius,
-                                bottomEnd = automixBottomRadius
-                            ),
-                            title = str(com.alananasss.kittytune.R.string.automix),
-                            subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
-                            hasSwitch = true,
-                            switchState = automixEnabled,
-                            onSwitchChange = { 
-                                automixEnabled = it
-                                prefs.setAutomixEnabled(it)
-                            },
-                            highlightKey = "pref_automix"
-                        )
-
-                        AnimatedVisibility(
-                            visible = automixEnabled,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                SettingsItem(
-                                    shape = RoundedCornerShape(4.dp),
-                                    title = str(com.alananasss.kittytune.R.string.automix_overlap_mode),
-                                    subtitle = automixOverlapLabel,
-                                    onClick = { showAutomixOverlapDialog = true }
-                                )
-                                SettingsItem(
-                                    shape = RoundedCornerShape(4.dp),
-                                    title = str(com.alananasss.kittytune.R.string.automix_start_offset),
-                                    subtitle = automixStartOffsetLabel,
-                                    onClick = { showAutomixStartOffsetDialog = true }
-                                )
-                                SettingsItem(
-                                    shape = RoundedCornerShape(4.dp),
-                                    title = str(com.alananasss.kittytune.R.string.automix_tempo_match),
-                                    subtitle = str(com.alananasss.kittytune.R.string.automix_tempo_match_desc),
-                                    hasSwitch = true,
-                                    switchState = automixTempoMatch,
-                                    onSwitchChange = {
-                                        automixTempoMatch = it
-                                        prefs.setAutomixTempoMatchEnabled(it)
-                                    }
-                                )
-                                SettingsItem(
-                                    shape = RoundedCornerShape(4.dp),
-                                    title = str(com.alananasss.kittytune.R.string.automix_harmonic_mix),
-                                    subtitle = str(com.alananasss.kittytune.R.string.automix_harmonic_mix_desc),
-                                    hasSwitch = true,
-                                    switchState = automixHarmonicMix,
-                                    onSwitchChange = {
-                                        automixHarmonicMix = it
-                                        prefs.setAutomixHarmonicMixEnabled(it)
-                                    }
-                                )
-                                SettingsItem(
-                                    shape = RoundedCornerShape(4.dp),
-                                    title = str(com.alananasss.kittytune.R.string.automix_dynamic_mix),
-                                    subtitle = str(com.alananasss.kittytune.R.string.automix_dynamic_mix_desc),
-                                    hasSwitch = true,
-                                    switchState = automixDynamicMix,
-                                    onSwitchChange = {
-                                        automixDynamicMix = it
-                                        prefs.setAutomixDynamicMixPointsEnabled(it)
-                                    }
-                                )
-                                SettingsItem(
-                                    shape = RoundedCornerShape(4.dp),
-                                    title = str(com.alananasss.kittytune.R.string.automix_bass_ducking),
-                                    subtitle = str(com.alananasss.kittytune.R.string.automix_bass_ducking_desc),
-                                    hasSwitch = true,
-                                    switchState = automixBassDucking,
-                                    onSwitchChange = {
-                                        automixBassDucking = it
-                                        prefs.setAutomixBassDuckingEnabled(it)
-                                    }
-                                )
-                                SettingsItem(
-                                    shape = RoundedCornerShape(
-                                        topStart = 4.dp,
-                                        topEnd = 4.dp,
-                                        bottomStart = 24.dp,
-                                        bottomEnd = 24.dp
-                                    ),
-                                    title = str(com.alananasss.kittytune.R.string.automix_debug),
-                                    subtitle = str(com.alananasss.kittytune.R.string.automix_debug_desc),
-                                    hasSwitch = true,
-                                    switchState = automixDebugOverlay,
-                                    onSwitchChange = {
-                                        automixDebugOverlay = it
-                                        prefs.setAutomixDebugOverlayEnabled(it)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Box {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                    SettingsGroupTitle(str("sleep_timer_title"))
-                    
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        val fadeBottomRadius by animateDpAsState(
-                            targetValue = if (fadeEnabled) 4.dp else 24.dp,
-                            label = "FadeCornerAnimation"
-                        )
-
-                        SettingsItem(
-                            shape = RoundedCornerShape(
-                                topStart = 24.dp,
-                                topEnd = 24.dp,
-                                bottomStart = fadeBottomRadius,
-                                bottomEnd = fadeBottomRadius
-                            ),
-                            title = str("sleep_timer_fade_title"),
-                            subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
-                            hasSwitch = true,
-                            switchState = fadeEnabled,
-                            onSwitchChange = { 
-                                fadeEnabled = it
-                                prefs.setSleepTimerFadeEnabled(it)
-                            }
-                        )
-
-                        AnimatedVisibility(
-                            visible = fadeEnabled,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            SettingsItem(
-                                shape = RoundedCornerShape(
-                                    topStart = 4.dp,
-                                    topEnd = 4.dp,
-                                    bottomStart = 24.dp,
-                                    bottomEnd = 24.dp
-                                ),
-                                title = str("label_duration"),
-                                subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
-                                onClick = { showFadeDurationDialog = true }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Box {
-                SettingsGroup(
-                    title = str("settings_cat_audio"),
-                    items = listOf(
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_audio_device_title"),
-                                subtitle = if (currentDevice.isEmpty()) {
-                                    systemDefaultSinkDesc ?: str("pref_audio_device_default")
-                                } else {
-                                    availableDevices.firstOrNull { it.first == currentDevice }?.second
-                                        ?: com.alananasss.kittytune.util.LinuxAudioManager.cleanName(currentDevice)
-                                },
-                                onClick = { showDeviceDialog = true }
-                            )
-                        },
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_quality"),
-                                subtitle = if (audioQuality == "HIGH") str("quality_high") else str("quality_low"),
-                                onClick = { showQualityDialog = true }
-                            )
-                        },
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("pref_audio_mono"),
-                                subtitle = str("pref_audio_mono_sub"),
-                                hasSwitch = true,
-                                switchState = playerViewModel.effectsState.isMonoEnabled,
-                                onSwitchChange = { playerViewModel.toggleMono() },
-                                highlightKey = "pref_audio_mono"
-                            )
-                        }
-                    )
-                )
-            }
-
-            Box {
-                SettingsGroup(
-                    title = str("full_player_section_title"),
-                    items = listOf(
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("full_player_bg_style"),
-                                subtitle = when (playerViewModel.fullPlayerBgStyle) {
-                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.APPLE_MUSIC -> str("full_player_bg_apple_music")
-                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.BLUR -> str("full_player_bg_blur")
-                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.GRADIENT -> str("full_player_bg_gradient")
-                                    com.alananasss.kittytune.data.local.FullPlayerBgStyle.PURE_BLACK -> str("full_player_bg_pure_black")
-                                },
-                                onClick = { showFullPlayerBgDialog = true }
-                            )
-                        },
-                        { shape ->
-                            SettingsItem(
-                                shape = shape,
-                                title = str("full_player_cover_zoom"),
-                                subtitle = "${(playerViewModel.fullPlayerCoverScale * 100).toInt()}%",
-                                onClick = { showFullPlayerCoverZoomDialog = true }
-                            )
-                        }
-                    )
+            AnimatedVisibility(
+                visible = fadeEnabled,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                SettingsItem(
+                    shape = RoundedCornerShape(
+                        topStart = 4.dp,
+                        topEnd = 4.dp,
+                        bottomStart = 24.dp,
+                        bottomEnd = 24.dp
+                    ),
+                    title = str("label_duration"),
+                    subtitle = str("sleep_timer_fade_subtitle").replace("%1\$d", fadeDuration.toString()),
+                    onClick = { showFadeDurationDialog = true }
                 )
             }
         }
     }
+}
