@@ -1,0 +1,44 @@
+# Compiles the SMTC bridge on every push/PR so a C# regression is caught before a release build,
+# rather than at release time.
+name: SMTC bridge check
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/main/resources/native/WindowsSmtcBridge.cs'
+      - 'scripts/build-smtc-bridge.ps1'
+      - '.github/workflows/smtc-bridge-check.yml'
+  pull_request:
+    paths:
+      - 'src/main/resources/native/WindowsSmtcBridge.cs'
+      - 'scripts/build-smtc-bridge.ps1'
+      - '.github/workflows/smtc-bridge-check.yml'
+  workflow_dispatch:
+
+jobs:
+  compile-bridge:
+    name: Compile SMTC bridge on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile bridge
+        run: powershell -ExecutionPolicy Bypass -File scripts/build-smtc-bridge.ps1 -OutDir "$env:RUNNER_TEMP\bridge"
+        shell: powershell
+
+      - name: Smoke-test the built exe
+        run: |
+          $exe = "$env:RUNNER_TEMP\bridge\WindowsSmtcBridge.exe"
+          if (-not (Test-Path $exe)) { throw "bridge exe missing: $exe" }
+          # The bridge reads its protocol from stdin and exits when stdin closes. Piping QUIT
+          # directly proves the exe starts, wires up an SMTC session, and speaks the protocol.
+          $quit = "$env:RUNNER_TEMP\bridge\quit.txt"
+          Set-Content -Path $quit -Value "QUIT"
+          $out = Get-Content $quit | & $exe
+          if ($LASTEXITCODE -ne 0) { throw "bridge exited with code $LASTEXITCODE" }
+          if ($out -notcontains 'READY') { throw "bridge did not report READY: $out" }
+          Write-Host "Bridge reported READY: OK"
+        shell: powershell

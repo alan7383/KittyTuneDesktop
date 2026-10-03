@@ -36,6 +36,11 @@ class WindowsSmtcService(
 
     init {
         if (System.getProperty("os.name").lowercase().contains("win")) {
+            runCatching {
+                com.sun.jna.platform.win32.Shell32.INSTANCE.SetCurrentProcessExplicitAppUserModelID(
+                    com.sun.jna.WString(APP_USER_MODEL_ID)
+                )
+            }
             runCatching { start() }.onFailure { e ->
                 println("Windows SMTC unavailable: ${e.message}")
                 close()
@@ -45,7 +50,16 @@ class WindowsSmtcService(
 
     private fun start() {
         val exe = extractBridge() ?: return
-        val p = ProcessBuilder(exe.absolutePath).redirectErrorStream(true).start()
+        // Our own launcher path, so the bridge can give Windows's flyout a shortcut to resolve the
+        // session's app identity from (see WindowsSmtcBridge.cs). Dev runs from gradle have no
+        // launcher exe; the bridge then only patches whatever shortcut already exists.
+        val launcher = System.getProperty("jpackage.app-path")?.takeIf {
+            it.substringAfterLast('/').substringAfterLast('\\').equals("KittyTune.exe", ignoreCase = true)
+        } ?: ProcessHandle.current().info().command().orElse(null)
+            ?.takeIf { it.substringAfterLast('/').substringAfterLast('\\').equals("KittyTune.exe", ignoreCase = true) }
+        val p = ProcessBuilder(
+            mutableListOf(exe.absolutePath).also { if (launcher != null) it.add(launcher) },
+        ).redirectErrorStream(true).start()
         process = p
         writer = PrintWriter(p.outputStream.bufferedWriter(StandardCharsets.UTF_8), true)
         thread(isDaemon = true, name = "WindowsSmtc-Reader") {
@@ -81,7 +95,10 @@ class WindowsSmtcService(
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }.take(12)
         val target = File(File(System.getProperty("java.io.tmpdir"), "kittytune_smtc"), hash).resolve("KittyTune.exe")
         if (target.isFile && target.length() == bytes.size.toLong()) return target
+        // Set executable on the temp copy too, not only on dev-mode resources, so a fresh hash-dir
+        // never starts non-executable.
         target.parentFile.mkdirs()
+        target.setExecutable(true)
         target.writeBytes(bytes)
         return target
     }
@@ -114,8 +131,9 @@ class WindowsSmtcService(
         mainScope.cancel()
     }
 
-    private companion object {
-        const val BRIDGE_RESOURCE = "WindowsSmtcBridge.exe"
+    companion object {
+        const val APP_USER_MODEL_ID = "KittyTune.KittyTune"
+        private const val BRIDGE_RESOURCE = "WindowsSmtcBridge.exe"
         val CONTROL_CHARS = Regex("[\\t\\r\\n]")
     }
 }

@@ -18,6 +18,7 @@ kotlin-js-store/
 *.wav
 *.py
 *.ps1
+!scripts/build-smtc-bridge.ps1
 *.txt
 context_dump.txt
 *.msi
