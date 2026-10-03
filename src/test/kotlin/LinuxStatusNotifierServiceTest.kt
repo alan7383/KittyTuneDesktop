@@ -60,6 +60,9 @@ class LinuxStatusNotifierServiceTest {
         val activateLatch = CountDownLatch(1)
         val contextMenuLatch = CountDownLatch(1)
         val miniPlayerLatch = CountDownLatch(1)
+        val playPauseLatch = CountDownLatch(1)
+        val nextLatch = CountDownLatch(1)
+        val prevLatch = CountDownLatch(1)
         var isMiniPlayerVisible = false
         var menuX = 0
         var menuY = 0
@@ -69,6 +72,23 @@ class LinuxStatusNotifierServiceTest {
             serviceSuffix = suffix,
             iconName = "kittytune",
             isMiniPlayerVisible = { isMiniPlayerVisible },
+            nowPlaying = {
+                com.alananasss.kittytune.ui.tray.TrayNowPlaying(
+                    title = "Test Song",
+                    artist = "Test Artist",
+                    artworkUrl = null,
+                    isPlaying = true
+                )
+            },
+            onPlayPause = {
+                playPauseLatch.countDown()
+            },
+            onNext = {
+                nextLatch.countDown()
+            },
+            onPrevious = {
+                prevLatch.countDown()
+            },
             onActivate = {
                 activateLatch.countDown()
             },
@@ -105,7 +125,16 @@ class LinuxStatusNotifierServiceTest {
             assertTrue(contextMenuLatch.await(3, TimeUnit.SECONDS), "ContextMenu should be received over D-Bus")
             assertTrue(menuX == 789 && menuY == 999, "Coordinates over D-Bus must match: got ($menuX, $menuY)")
 
-            // Test native DBusMenu (com.canonical.dbusmenu) as used by KDE Plasma
+            // Test Menu property on StatusNotifierItem object
+            val remoteProps = clientConn.getRemoteObject(
+                busName,
+                "/StatusNotifierItem",
+                org.freedesktop.dbus.interfaces.Properties::class.java
+            )
+            val menuPath = remoteProps.Get<org.freedesktop.dbus.DBusPath>("org.kde.StatusNotifierItem", "Menu")
+            assertEquals("/MenuBar", menuPath.path, "Menu property must point to /MenuBar")
+
+            // Test native DBusMenu (com.canonical.dbusmenu) as used by KDE Plasma / Waybar
             val remoteMenu = clientConn.getRemoteObject(
                 busName,
                 "/MenuBar",
@@ -117,10 +146,25 @@ class LinuxStatusNotifierServiceTest {
             assertEquals(0, layout.root.id, "Root id must be 0")
             assertTrue(layout.root.children.isNotEmpty(), "Menu must have items")
 
-            // Simulate clicking Item 2 (Toggle Mini-Player) in KDE native menu
+            // Test GetGroupProperties & GetProperty on remoteMenu
+            val groupProps = remoteMenu.GetGroupProperties(listOf(1, 2), listOf("label"))
+            assertTrue(groupProps.isNotEmpty(), "Group properties should not be empty")
+
+            val prop = remoteMenu.GetProperty(1, "label")
+            assertNotNull(prop, "Property should be retrieved")
+
+            // Simulate clicking Item 2 (Toggle Mini-Player) in native menu
             remoteMenu.Event(2, "clicked", Variant(0), UInt32(0))
             assertTrue(miniPlayerLatch.await(3, TimeUnit.SECONDS), "Mini player toggle must be invoked from DBusMenu")
             assertTrue(isMiniPlayerVisible, "Mini player state should have toggled to true")
+
+            // Simulate clicking playback items
+            remoteMenu.Event(11, "clicked", Variant(0), UInt32(0))
+            remoteMenu.Event(12, "clicked", Variant(0), UInt32(0))
+            remoteMenu.Event(13, "clicked", Variant(0), UInt32(0))
+            assertTrue(playPauseLatch.await(3, TimeUnit.SECONDS), "PlayPause should be invoked from DBusMenu")
+            assertTrue(nextLatch.await(3, TimeUnit.SECONDS), "Next should be invoked from DBusMenu")
+            assertTrue(prevLatch.await(3, TimeUnit.SECONDS), "Previous should be invoked from DBusMenu")
 
             clientConn.disconnect()
         } finally {

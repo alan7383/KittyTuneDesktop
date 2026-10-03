@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.core
 
+import org.freedesktop.dbus.DBusPath
 import org.freedesktop.dbus.Struct
 import org.freedesktop.dbus.Tuple
 import org.freedesktop.dbus.annotations.DBusInterfaceName
@@ -55,10 +56,12 @@ interface StatusNotifierItemInterface : DBusInterface {
     fun Activate(x: Int, y: Int)
     fun SecondaryActivate(x: Int, y: Int)
     fun Scroll(delta: Int, orientation: String)
+    fun ProvideXdgActivationToken(token: String)
 
     class NewIcon(path: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewIcon")
     class NewToolTip(path: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewToolTip")
     class NewStatus(path: String, status: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewStatus", status)
+    class NewMenu(path: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewMenu")
 }
 
 /**
@@ -77,10 +80,14 @@ class LinuxStatusNotifierService(
     private val serviceSuffix: String = ProcessHandle.current().pid().toString(),
     private var iconName: String = "kittytune",
     private val isMiniPlayerVisible: () -> Boolean = { false },
+    private val nowPlaying: () -> com.alananasss.kittytune.ui.tray.TrayNowPlaying? = { null },
+    private val onPlayPause: () -> Unit = {},
+    private val onNext: () -> Unit = {},
+    private val onPrevious: () -> Unit = {},
     private val onActivate: () -> Unit,
     private val onToggleMiniPlayer: () -> Unit = {},
     private val onExit: () -> Unit = {},
-    private val onContextMenu: (x: Int, y: Int) -> Unit
+    private val onContextMenu: (x: Int, y: Int) -> Unit = { _, _ -> }
 ) : Closeable {
 
     private var connection: DBusConnection? = null
@@ -184,19 +191,25 @@ class LinuxStatusNotifierService(
 
         override fun Scroll(delta: Int, orientation: String) {}
 
+        override fun ProvideXdgActivationToken(token: String) {
+            runCatching { System.setProperty("XDG_ACTIVATION_TOKEN", token) }
+        }
+
         override fun isRemote(): Boolean = false
         override fun getObjectPath(): String = "/StatusNotifierItem"
 
         @Suppress("UNCHECKED_CAST")
         override fun <A> Get(interface_name: String, property_name: String): A {
-            return GetAll(interface_name)[property_name]?.value as A
+            val all = GetAll(interface_name)
+            val prop = all[property_name] ?: GetAll("org.kde.StatusNotifierItem")[property_name]
+            return prop?.value as A
         }
 
         override fun <A> Set(interface_name: String, property_name: String, value: A) {}
 
         override fun GetAll(interface_name: String): Map<String, Variant<*>> {
             val map = HashMap<String, Variant<*>>()
-            if (interface_name == "org.kde.StatusNotifierItem") {
+            if (interface_name == "org.kde.StatusNotifierItem" || interface_name.isEmpty()) {
                 map["Category"] = Variant("ApplicationStatus", "s")
                 map["Id"] = Variant("KittyTune", "s")
                 map["Title"] = Variant("KittyTune", "s")
@@ -204,8 +217,8 @@ class LinuxStatusNotifierService(
                 map["WindowId"] = Variant(0, "i")
                 map["IconName"] = Variant(iconName, "s")
                 map["IconThemePath"] = Variant(iconThemePath, "s")
-                // No Menu property — KDE falls back to calling ContextMenu(x, y)
-                // directly on right-click, which opens the custom Compose menu.
+                map["Menu"] = Variant(DBusPath("/MenuBar"), "o")
+                map["ItemIsMenu"] = Variant(false, "b")
             }
             return map
         }
@@ -227,6 +240,85 @@ class LinuxStatusNotifierService(
             propertyNames: List<String>
         ): DBusMenuLayout<UInt32, DBusMenuItem> {
             val rootProps = mapOf("children-display" to Variant("submenu", "s"))
+            val children = mutableListOf<Variant<*>>()
+
+            val currentNowPlaying = nowPlaying()
+            if (currentNowPlaying != null) {
+                val title = currentNowPlaying.title.orEmpty().trim()
+                val artist = currentNowPlaying.artist.orEmpty().trim()
+                val headerText = listOfNotNull(title.takeIf { it.isNotBlank() }, artist.takeIf { it.isNotBlank() }).joinToString(" — ")
+                if (headerText.isNotBlank()) {
+                    children.add(
+                        Variant(
+                            DBusMenuItem(
+                                10,
+                                mapOf(
+                                    "label" to Variant(headerText, "s"),
+                                    "enabled" to Variant(false, "b")
+                                ),
+                                emptyList()
+                            ),
+                            "(ia{sv}av)"
+                        )
+                    )
+                }
+
+                val playPauseText = if (currentNowPlaying.isPlaying) str("action_pause") else str("action_play")
+                children.add(
+                    Variant(
+                        DBusMenuItem(
+                            11,
+                            mapOf(
+                                "label" to Variant(playPauseText, "s"),
+                                "enabled" to Variant(true, "b")
+                            ),
+                            emptyList()
+                        ),
+                        "(ia{sv}av)"
+                    )
+                )
+
+                children.add(
+                    Variant(
+                        DBusMenuItem(
+                            12,
+                            mapOf(
+                                "label" to Variant(str("player_next"), "s"),
+                                "enabled" to Variant(true, "b")
+                            ),
+                            emptyList()
+                        ),
+                        "(ia{sv}av)"
+                    )
+                )
+
+                children.add(
+                    Variant(
+                        DBusMenuItem(
+                            13,
+                            mapOf(
+                                "label" to Variant(str("player_previous"), "s"),
+                                "enabled" to Variant(true, "b")
+                            ),
+                            emptyList()
+                        ),
+                        "(ia{sv}av)"
+                    )
+                )
+
+                children.add(
+                    Variant(
+                        DBusMenuItem(
+                            14,
+                            mapOf(
+                                "type" to Variant("separator", "s")
+                            ),
+                            emptyList()
+                        ),
+                        "(ia{sv}av)"
+                    )
+                )
+            }
 
             val itemShowWindow = DBusMenuItem(
                 1,
@@ -264,20 +356,42 @@ class LinuxStatusNotifierService(
                 emptyList()
             )
 
-            val children = listOf(
-                Variant(itemShowWindow, "(ia{sv}av)"),
-                Variant(itemMiniPlayer, "(ia{sv}av)"),
-                Variant(itemSeparator, "(ia{sv}av)"),
-                Variant(itemExit, "(ia{sv}av)")
-            )
+            children.add(Variant(itemShowWindow, "(ia{sv}av)"))
+            children.add(Variant(itemMiniPlayer, "(ia{sv}av)"))
+            children.add(Variant(itemSeparator, "(ia{sv}av)"))
+            children.add(Variant(itemExit, "(ia{sv}av)"))
 
             val root = DBusMenuItem(0, rootProps, children)
             return DBusMenuLayout(UInt32(revision.get().toLong()), root)
         }
 
-        override fun GetGroupProperties(ids: List<Int>, propertyNames: List<String>): List<DBusMenuItemProperties> = emptyList()
+        override fun GetGroupProperties(ids: List<Int>, propertyNames: List<String>): List<DBusMenuItemProperties> {
+            val layout = GetLayout(0, -1, propertyNames)
+            val result = mutableListOf<DBusMenuItemProperties>()
+            fun collect(item: DBusMenuItem) {
+                if (ids.isEmpty() || ids.contains(item.id)) {
+                    val filteredProps = if (propertyNames.isEmpty()) {
+                        item.properties
+                    } else {
+                        item.properties.filterKeys { propertyNames.contains(it) }
+                    }
+                    result.add(DBusMenuItemProperties(item.id, filteredProps))
+                }
+                for (v in item.children) {
+                    val child = v.value as? DBusMenuItem
+                    if (child != null) {
+                        collect(child)
+                    }
+                }
+            }
+            collect(layout.root)
+            return result
+        }
 
-        override fun GetProperty(id: Int, name: String): Variant<*> = Variant("", "s")
+        override fun GetProperty(id: Int, name: String): Variant<*> {
+            val group = GetGroupProperties(listOf(id), listOf(name))
+            return group.firstOrNull()?.properties?.get(name) ?: Variant("", "s")
+        }
 
         override fun Event(id: Int, eventId: String, data: Variant<*>, timestamp: UInt32) {
             if (eventId == "clicked") {
@@ -288,6 +402,18 @@ class LinuxStatusNotifierService(
                         notifyUpdated()
                     }
                     4 -> dispatchToMain { onExit() }
+                    11 -> dispatchToMain {
+                        onPlayPause()
+                        notifyUpdated()
+                    }
+                    12 -> dispatchToMain {
+                        onNext()
+                        notifyUpdated()
+                    }
+                    13 -> dispatchToMain {
+                        onPrevious()
+                        notifyUpdated()
+                    }
                 }
             }
         }
@@ -299,14 +425,16 @@ class LinuxStatusNotifierService(
 
         @Suppress("UNCHECKED_CAST")
         override fun <A> Get(interface_name: String, property_name: String): A {
-            return GetAll(interface_name)[property_name]?.value as A
+            val all = GetAll(interface_name)
+            val prop = all[property_name] ?: GetAll("com.canonical.dbusmenu")[property_name]
+            return prop?.value as A
         }
 
         override fun <A> Set(interface_name: String, property_name: String, value: A) {}
 
         override fun GetAll(interface_name: String): Map<String, Variant<*>> {
             val map = HashMap<String, Variant<*>>()
-            if (interface_name == "com.canonical.dbusmenu") {
+            if (interface_name == "com.canonical.dbusmenu" || interface_name.isEmpty()) {
                 map["Version"] = Variant(UInt32(3), "u")
                 map["Status"] = Variant("normal", "s")
                 map["TextDirection"] = Variant("ltr", "s")
