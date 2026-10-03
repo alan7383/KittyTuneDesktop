@@ -69,19 +69,33 @@ import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.alananasss.kittytune.utils.makeTimeString
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.rounded.GraphicEq
 import com.alananasss.kittytune.R
 import com.alananasss.kittytune.audio.automix.AutomixManager
 import com.alananasss.kittytune.core.stringResource
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.sp
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
@@ -232,72 +246,51 @@ fun PlayerBar(
                                     overflow = TextOverflow.Ellipsis,
                                 )
 
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    ArtistLinkText(
+                                        track = track,
+                                        onArtistClick = { vm.navigateToTrackArtist(it) },
+                                        text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (track.user?.verified == true) {
+                                        Spacer(Modifier.width(3.dp))
+                                        Icon(
+                                            Icons.Rounded.Verified,
+                                            null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                    }
+                                }
+
+                                // Automix chip — slides in below the artist name when a mix is active
                                 val isAutomixing by AutomixManager.isAutomixing.collectAsState()
                                 val mixBeatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
                                 val isCrossfading = MusicManager.isCrossfadingOut
-                                // Derived, so the bar recomposes when this flips (once a track), not
-                                // on every position tick.
-                                val isNearingEnd by remember(vm) {
-                                    androidx.compose.runtime.derivedStateOf {
-                                        val remainingMs = if (vm.duration > 0) vm.duration - vm.currentPosition else Long.MAX_VALUE
-                                        remainingMs in 0L..20_000L
-                                    }
-                                }
-                                val isTransitionActive = (isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)) && isNearingEnd
+                                val automixDebug by AutomixManager.automixDebugInfo.collectAsState()
+                                val mixProgress by AutomixManager.mixProgress.collectAsState()
+                                val isMixActive = isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)
 
-                                val nextTrack = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
-                                val isDifferentTrack = vm.repeatMode == RepeatMode.ONE || (nextTrack != null && nextTrack.id != track.id)
-                                val nextTitle = nextTrack?.title?.trim()?.takeIf { it.isNotEmpty() && isDifferentTrack }
+                                val nextTrackForChip = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
+                                val isDifferentNext = vm.repeatMode == RepeatMode.ONE || (nextTrackForChip != null && nextTrackForChip.id != track.id)
+                                val nextTitleForChip = nextTrackForChip?.title?.trim()?.takeIf { it.isNotEmpty() && isDifferentNext }
+                                val beatMs = automixDebug?.outBpm?.takeIf { it > 0f }?.let { 60_000f / it } ?: 500f
 
-                                AnimatedContent(
-                                    targetState = isTransitionActive && nextTitle != null,
-                                    transitionSpec = {
-                                        (fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 2 })
-                                            .togetherWith(fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 2 })
-                                    },
-                                    label = "TrackSubtitleTransition"
-                                ) { showTransition ->
-                                    if (showTransition && nextTitle != null) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.GraphicEq,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(13.dp)
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.automix_mix_into, nextTitle),
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                ),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    } else {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            ArtistLinkText(
-                                                track = track,
-                                                onArtistClick = { vm.navigateToTrackArtist(it) },
-                                                text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
-                                                style = MaterialTheme.typography.bodySmall,
-                                                modifier = Modifier.weight(1f, fill = false)
-                                            )
-                                            if (track.user?.verified == true) {
-                                                Spacer(Modifier.width(3.dp))
-                                                Icon(
-                                                    Icons.Rounded.Verified,
-                                                    null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-                                        }
-                                    }
+                                AnimatedVisibility(
+                                    visible = isMixActive,
+                                    enter = fadeIn(tween(300)) + expandVertically(tween(250, easing = FastOutSlowInEasing)),
+                                    exit = fadeOut(tween(500)) + shrinkVertically(tween(400, easing = FastOutSlowInEasing)),
+                                ) {
+                                    AutomixChip(
+                                        isAutomixing = isAutomixing,
+                                        isCrossfading = isCrossfading,
+                                        mixBeatsLeft = mixBeatsLeft,
+                                        mixProgress = mixProgress,
+                                        nextTitle = nextTitleForChip,
+                                        beatMs = beatMs,
+                                    )
                                 }
                             }
                         }
@@ -550,6 +543,7 @@ fun PlayerBar(
                     onVolumeChangeFinished = { vm.persistVolume() },
                     onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
                     onToggleMute = { vm.toggleMute() },
+                    shapes = iconShapes,
                 )
             }
         }
@@ -624,6 +618,111 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                 .padding(horizontal = 4.dp, vertical = 2.dp),
         )
     }
+}
+
+/**
+ * Compact M3 SuggestionChip in the left track-info panel.
+ *
+ * Shows the current automix state without pushing the center transport panel:
+ * - Countdown: "Mix dans 4" with a tempo-synced beat flash
+ * - Active mix: "Mixing" or "Mixing → Next Track" with a gentle glow
+ */
+@Composable
+private fun AutomixChip(
+    isAutomixing: Boolean,
+    isCrossfading: Boolean,
+    mixBeatsLeft: Int?,
+    mixProgress: Float,
+    nextTitle: String?,
+    beatMs: Float,
+    modifier: Modifier = Modifier,
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val isMixPhase = isAutomixing || isCrossfading
+
+    val infiniteTransition = rememberInfiniteTransition(label = "AutomixChipAnim")
+
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(650, easing = FastOutSlowInEasing),
+            repeatMode = AnimRepeatMode.Reverse
+        ), label = "ChipGlow"
+    )
+    val beatAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 0.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(beatMs.toInt().coerceIn(150, 800), easing = LinearEasing),
+            repeatMode = AnimRepeatMode.Restart
+        ), label = "ChipBeat"
+    )
+    val iconAlpha = if (isMixPhase) glowAlpha else beatAlpha
+
+    // "→ Next" fades in once the crossfade is 30% done
+    val nextAlpha by animateFloatAsState(
+        targetValue = if (isMixPhase && nextTitle != null && mixProgress > 0.3f)
+            ((mixProgress - 0.3f) / 0.35f).coerceIn(0f, 1f) else 0f,
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "ChipNextAlpha"
+    )
+
+    // Label text: animate between countdown and active-mix states
+    val chipLabel = when {
+        isMixPhase && nextTitle != null && nextAlpha > 0.01f -> "${stringResource(R.string.automixing)}  →  $nextTitle"
+        isMixPhase -> stringResource(R.string.automixing)
+        mixBeatsLeft != null -> stringResource(R.string.automix_mix_in, mixBeatsLeft)
+        else -> stringResource(R.string.automixing)
+    }
+
+    SuggestionChip(
+        onClick = {},
+        label = {
+            AnimatedContent(
+                targetState = chipLabel,
+                transitionSpec = {
+                    (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 2 })
+                        .togetherWith(fadeOut(tween(150)) + slideOutVertically(tween(150)) { -it / 2 })
+                },
+                label = "ChipLabel"
+            ) { label ->
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp,
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = 200.dp)
+                )
+            }
+        },
+        icon = {
+            Icon(
+                imageVector = Icons.Rounded.GraphicEq,
+                contentDescription = null,
+                tint = primaryColor.copy(alpha = iconAlpha),
+                modifier = Modifier.size(SuggestionChipDefaults.IconSize)
+            )
+        },
+        colors = SuggestionChipDefaults.suggestionChipColors(
+            containerColor = if (isMixPhase)
+                primaryColor.copy(alpha = 0.12f * glowAlpha)
+            else
+                primaryColor.copy(alpha = 0.08f),
+            labelColor = primaryColor.copy(alpha = if (isMixPhase) glowAlpha else beatAlpha),
+        ),
+        border = SuggestionChipDefaults.suggestionChipBorder(
+            enabled = true,
+            borderColor = if (isMixPhase)
+                primaryColor.copy(alpha = 0.35f * glowAlpha)
+            else
+                primaryColor.copy(alpha = 0.18f),
+            borderWidth = 1.dp,
+        ),
+        modifier = modifier
+    )
 }
 
 /**
@@ -702,7 +801,7 @@ private fun ExpressiveToggleButton(
  * a two-hour set.
  */
 @Composable
-private fun Modifier.seekWheel(
+internal fun Modifier.seekWheel(
     positionMs: () -> Long,
     durationMs: () -> Long,
     stepSeconds: () -> Float,
@@ -752,7 +851,7 @@ private fun rememberPlayerBarButtons(): Set<String> {
 
 /** Reactive read of how far a wheel notch over the progress bar moves the playhead. */
 @Composable
-private fun rememberSeekWheelSeconds(): Float {
+internal fun rememberSeekWheelSeconds(): Float {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) { PlayerPreferences().getSeekWheelSeconds() }
 }
@@ -779,7 +878,7 @@ private fun rememberVerticalVolumeSlider(): Boolean {
  * Reactive read of the "slider style" setting; recomposes when the pref changes.
  */
 @Composable
-private fun rememberPlayerSliderStyle(): com.alananasss.kittytune.data.local.PlayerSliderStyle {
+internal fun rememberPlayerSliderStyle(): com.alananasss.kittytune.data.local.PlayerSliderStyle {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) {
         com.alananasss.kittytune.data.local.PlayerPreferences().getPlayerSliderStyle()
