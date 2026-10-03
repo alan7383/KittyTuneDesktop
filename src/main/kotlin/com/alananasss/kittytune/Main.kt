@@ -329,9 +329,28 @@ fun main(args: Array<String>) {
                 isRestoringFromFullScreen = true
                 try {
                     // On Windows the window never left Compose's placement; WindowsFullScreen.exit restores
-                    // it natively from inside the window. Restoring here as well raced that restore and
-                    // left the frame at whichever size landed last.
+                    // it natively from inside the window. Synchronize Compose's windowState cleanly so the
+                    // internal Skiko surface re-measures properly above the taskbar.
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                        val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
+                            ?: androidx.compose.ui.window.WindowPlacement.Floating
+                        if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                            windowState.placement = androidx.compose.ui.window.WindowPlacement.Maximized
+                        } else {
+                            windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                            val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
+                            val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
+                            val metrics = getScreenMetricsDp(null, reqX, reqY)
+                            val clamped = clampFloatingBounds(
+                                savedFloatingSize.width.value.toInt(),
+                                savedFloatingSize.height.value.toInt(),
+                                reqX,
+                                reqY,
+                                metrics.usableBoundsDp
+                            )
+                            windowState.size = DpSize(clamped.width.dp, clamped.height.dp)
+                            windowState.position = androidx.compose.ui.window.WindowPosition(clamped.x.dp, clamped.y.dp)
+                        }
                         kotlinx.coroutines.delay(300)
                         return@LaunchedEffect
                     }

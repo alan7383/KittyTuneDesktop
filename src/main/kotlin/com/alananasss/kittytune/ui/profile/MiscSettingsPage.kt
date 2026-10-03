@@ -19,6 +19,16 @@ import com.alananasss.kittytune.ui.player.PlayerViewModel
 /** Settings → Other: the language, how the app starts and updates, and Discord. */
 @Composable
 fun MiscSettingsPage(navController: NavController, playerViewModel: PlayerViewModel) {
+    MiscGeneralPage()
+    MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum)
+    MiscDiscordPage(navController, playerViewModel)
+}
+
+/**
+ * Other → General: language selection, start screen, and auto-update toggle.
+ */
+@Composable
+fun MiscGeneralPage() {
     val prefs = remember { PlayerPreferences() }
     var appLanguage by remember { mutableStateOf(prefs.getAppLanguage()) }
     var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
@@ -104,8 +114,13 @@ fun MiscSettingsPage(navController: NavController, playerViewModel: PlayerViewMo
             },
         ),
     )
+}
 
-    MainCategoryTitle(str("pref_discord_title"), Icons.Rounded.Forum)
+/**
+ * Other → Discord: Discord rich presence settings and login.
+ */
+@Composable
+fun MiscDiscordPage(navController: NavController, playerViewModel: PlayerViewModel) {
     DiscordSettingsScreen(
         onBackClick = null,
         onNavigateToLogin = { navController.navigate("discord_login") },

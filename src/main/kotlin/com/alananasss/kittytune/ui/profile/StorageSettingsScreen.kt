@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SdStorage
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,38 +36,42 @@ import java.io.File
 private val cacheLimitsMb = listOf(256, 512, 1024, 2048, 5120, 10240)
 
 /**
- * Storage: the audio cache (on/off, its limit, its size), the cover cache, downloaded music with a list of
- * what takes the space, where downloads go, and backups.
+ * Storage: the audio cache, cover cache, downloaded music, and backups.
  */
 @Composable
 fun StorageSettingsScreen() {
-    val prefs = remember { PlayerPreferences() }
-    val scope = rememberCoroutineScope()
+    Column(modifier = Modifier.fillMaxWidth()) {
+        StorageCachePage()
+        Spacer(Modifier.height(16.dp))
+        StorageDownloadsPage()
+        Spacer(Modifier.height(16.dp))
+        StorageBackupPage()
+        Spacer(Modifier.height(16.dp))
+        LocalMediaSettingsScreen(onBackClick = null)
+    }
+}
 
+/**
+ * Storage → Cache: audio cache toggle, limit, size and image cache cleanup.
+ */
+@Composable
+fun StorageCachePage() {
+    val scope = rememberCoroutineScope()
     var cacheEnabled by remember { mutableStateOf(AudioCache.isEnabled) }
     var cacheLimitMb by remember { mutableIntStateOf(AudioCache.maxMegabytes) }
     var audioCacheBytes by remember { mutableLongStateOf(0L) }
     var imageCacheBytes by remember { mutableLongStateOf(0L) }
-    var downloadsBytes by remember { mutableLongStateOf(0L) }
-    val downloads by AppDatabase.downloadDao.getAllTracks().collectAsState(initial = emptyList())
-    val downloaded = downloads.filter { it.localAudioPath.isNotEmpty() }
-    var downloadLocation by remember { mutableStateOf(prefs.getDownloadLocation() ?: AppDirs.defaultDownloadDir.absolutePath) }
-
     var showLimitDialog by remember { mutableStateOf(false) }
-    var showDownloadsDialog by remember { mutableStateOf(false) }
-    var confirmDeleteAll by remember { mutableStateOf(false) }
-    var backupMessage by remember { mutableStateOf<String?>(null) }
 
     fun refreshSizes() {
         scope.launch {
             withContext(Dispatchers.IO) {
                 audioCacheBytes = AudioCache.sizeBytes()
                 imageCacheBytes = AppDirs.sizeOf(AppDirs.imageCacheDir)
-                downloadsBytes = AppDirs.sizeOf(File(downloadLocation))
             }
         }
     }
-    LaunchedEffect(downloadLocation, downloads.size) { refreshSizes() }
+    LaunchedEffect(Unit) { refreshSizes() }
 
     if (showLimitDialog) {
         ChoiceDialog(
@@ -81,27 +84,6 @@ fun StorageSettingsScreen() {
                 refreshSizes()
             },
             onDismiss = { showLimitDialog = false },
-        )
-    }
-    if (showDownloadsDialog) DownloadsDialog(downloaded) { showDownloadsDialog = false }
-    if (confirmDeleteAll) {
-        EscapableAlertDialog(
-            onDismissRequest = { confirmDeleteAll = false },
-            title = { Text(str("pref_storage_downloads_clear")) },
-            text = { Text(str("storage_delete_all_confirm", downloaded.size)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmDeleteAll = false
-                    scope.launch {
-                        withContext(Dispatchers.IO) {
-                            AppDatabase.downloadDao.deleteAll()
-                            File(downloadLocation).listFiles()?.forEach { it.deleteRecursively() }
-                        }
-                        refreshSizes()
-                    }
-                }) { Text(str("btn_delete"), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { confirmDeleteAll = false }) { Text(str("btn_cancel")) } },
         )
     }
 
@@ -152,6 +134,53 @@ fun StorageSettingsScreen() {
             }
         },
     )
+}
+
+/**
+ * Storage → Downloads: downloaded music list, download directory picker, delete all downloads.
+ */
+@Composable
+fun StorageDownloadsPage() {
+    val prefs = remember { PlayerPreferences() }
+    val scope = rememberCoroutineScope()
+    var downloadsBytes by remember { mutableLongStateOf(0L) }
+    val downloads by AppDatabase.downloadDao.getAllTracks().collectAsState(initial = emptyList())
+    val downloaded = downloads.filter { it.localAudioPath.isNotEmpty() }
+    var downloadLocation by remember { mutableStateOf(prefs.getDownloadLocation() ?: AppDirs.defaultDownloadDir.absolutePath) }
+
+    var showDownloadsDialog by remember { mutableStateOf(false) }
+    var confirmDeleteAll by remember { mutableStateOf(false) }
+
+    fun refreshSizes() {
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                downloadsBytes = AppDirs.sizeOf(File(downloadLocation))
+            }
+        }
+    }
+    LaunchedEffect(downloadLocation, downloads.size) { refreshSizes() }
+
+    if (showDownloadsDialog) DownloadsDialog(downloaded) { showDownloadsDialog = false }
+    if (confirmDeleteAll) {
+        EscapableAlertDialog(
+            onDismissRequest = { confirmDeleteAll = false },
+            title = { Text(str("pref_storage_downloads_clear")) },
+            text = { Text(str("storage_delete_all_confirm", downloaded.size)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteAll = false
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            AppDatabase.downloadDao.deleteAll()
+                            File(downloadLocation).listFiles()?.forEach { it.deleteRecursively() }
+                        }
+                        refreshSizes()
+                    }
+                }) { Text(str("btn_delete"), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteAll = false }) { Text(str("btn_cancel")) } },
+        )
+    }
 
     SettingsGroup(
         title = str("pref_storage_downloads"),
@@ -190,6 +219,15 @@ fun StorageSettingsScreen() {
             },
         ),
     )
+}
+
+/**
+ * Storage → Backup & Restore: export or import app data and settings.
+ */
+@Composable
+fun StorageBackupPage() {
+    val scope = rememberCoroutineScope()
+    var backupMessage by remember { mutableStateOf<String?>(null) }
 
     SettingsGroup(
         title = str("storage_group_backup"),
@@ -229,10 +267,6 @@ fun StorageSettingsScreen() {
     backupMessage?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary, modifier = Modifier.padding(horizontal = 32.dp))
     }
-
-    Spacer(Modifier.height(16.dp))
-    MainCategoryTitle(str("pref_local_title"), Icons.Filled.SdStorage)
-    LocalMediaSettingsScreen(onBackClick = null)
 }
 
 @Composable
@@ -252,76 +286,85 @@ private fun CleanableRow(shape: androidx.compose.ui.graphics.Shape, title: Strin
     }
 }
 
-/** Every downloaded track, largest first, each removable on its own. */
 @Composable
 private fun DownloadsDialog(tracks: List<LocalTrack>, onDismiss: () -> Unit) {
-    val sized by produceState(initialValue = emptyList<Pair<LocalTrack, Long>>(), tracks) {
-        value = withContext(Dispatchers.IO) {
-            tracks.map { it to File(it.localAudioPath).length() }.sortedByDescending { it.second }
-        }
-    }
-    EscapableAlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("${str("storage_downloaded_music")} · ${tracks.size}", fontWeight = FontWeight.SemiBold) },
-        text = {
-            if (tracks.isEmpty()) {
-                Text(str("storage_no_downloads"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                LazyColumn(Modifier.widthIn(min = 380.dp, max = 560.dp).heightIn(max = 480.dp)) {
-                    items(sized, key = { it.first.id }) { (track, bytes) ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).padding(horizontal = 4.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AsyncImage(
-                                model = track.localArtworkPath.takeIf { File(it).exists() }?.let(::File) ?: track.artworkUrl,
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(track.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(track.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            Text(formatBytes(bytes), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            IconButton(onClick = { DownloadManager.deleteTrack(track.id) }) {
-                                Icon(Icons.Rounded.DeleteOutline, contentDescription = str("btn_delete"))
+    com.alananasss.kittytune.core.BackHandler(onBack = onDismiss)
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+        ) {
+            Column(Modifier.padding(20.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(str("storage_downloaded_music"), style = MaterialTheme.typography.headlineSmall)
+                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = null) }
+                }
+                Spacer(Modifier.height(12.dp))
+                if (tracks.isEmpty()) {
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Text(str("storage_downloaded_empty"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(tracks, key = { it.id }) { track ->
+                            val file = File(track.localAudioPath)
+                            val size = if (file.exists()) formatBytes(file.length()) else "—"
+                            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                AsyncImage(
+                                    model = track.artworkUrl.ifBlank { track.localArtworkPath },
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.size(44.dp).clip(RoundedCornerShape(8.dp)),
+                                )
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(track.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(track.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text(size, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                IconButton(onClick = { DownloadManager.deleteTrack(track.id) }) {
+                                    Icon(Icons.Rounded.Delete, contentDescription = str("btn_delete"), tint = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
-    )
+        }
+    }
 }
 
-internal fun formatBytes(bytes: Long): String = when {
-    bytes >= 1024L * 1024 * 1024 -> "%.1f GB".format(bytes / (1024.0 * 1024 * 1024))
-    bytes >= 1024L * 1024 -> "${bytes / (1024 * 1024)} MB"
-    bytes >= 1024 -> "${bytes / 1024} KB"
-    else -> "$bytes B"
+private fun formatBytes(bytes: Long): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f KB", bytes / 1024f)
+    bytes < 1024 * 1024 * 1024 -> String.format(java.util.Locale.US, "%.1f MB", bytes / (1024f * 1024f))
+    else -> String.format(java.util.Locale.US, "%.2f GB", bytes / (1024f * 1024f * 1024f))
 }
 
-private fun pickDirectory(title: String, current: File): File? {
-    val chooser = javax.swing.JFileChooser(current).apply {
+private fun pickDirectory(title: String, initial: File?): File? {
+    val chooser = javax.swing.JFileChooser().apply {
         dialogTitle = title
         fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
+        isAcceptAllFileFilterUsed = false
+        initial?.let { currentDirectory = if (it.isDirectory) it else it.parentFile }
     }
     return if (chooser.showOpenDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
 
-private fun pickSaveFile(title: String, suggestedName: String): File? {
-    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.SAVE).apply { file = suggestedName }
-    dialog.isVisible = true
-    return dialog.files.firstOrNull()
+private fun pickSaveFile(title: String, defaultName: String): File? {
+    val chooser = javax.swing.JFileChooser().apply {
+        dialogTitle = title
+        selectedFile = File(defaultName)
+    }
+    return if (chooser.showSaveDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }
 
 private fun pickOpenFile(title: String): File? {
-    val dialog = java.awt.FileDialog(null as java.awt.Frame?, title, java.awt.FileDialog.LOAD).apply {
-        setFilenameFilter { _, name -> name.endsWith(".backup", true) || name.endsWith(".json", true) }
+    val chooser = javax.swing.JFileChooser().apply {
+        dialogTitle = title
+        fileSelectionMode = javax.swing.JFileChooser.FILES_ONLY
     }
-    dialog.isVisible = true
-    return dialog.files.firstOrNull()
+    return if (chooser.showOpenDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
 }

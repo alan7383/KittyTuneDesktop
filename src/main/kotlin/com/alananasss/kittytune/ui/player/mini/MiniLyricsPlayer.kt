@@ -134,16 +134,15 @@ private class WindowDragHandler(
     private var windowStartX = 0
     private var windowStartY = 0
     private var isDraggingInternal = false
+    private var isNativeMoveActive = false
 
     private val dragMotionListener = object : java.awt.event.MouseMotionAdapter() {
         override fun mouseDragged(e: java.awt.event.MouseEvent) {
-            val dx = e.xOnScreen - dragStartMouseX
-            val dy = e.yOnScreen - dragStartMouseY
-            val newX = windowStartX + dx
-            val newY = windowStartY + dy
-            if (window.x != newX || window.y != newY) {
-                window.setLocation(newX, newY)
-            }
+            if (isNativeMoveActive) return
+            val curPointer = java.awt.MouseInfo.getPointerInfo()?.location
+            val curX = curPointer?.x ?: e.xOnScreen
+            val curY = curPointer?.y ?: e.yOnScreen
+            onPointerMove(curX, curY)
         }
     }
 
@@ -177,14 +176,27 @@ private class WindowDragHandler(
         window.addWindowFocusListener(focusListener)
 
         val nativeStarted = com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
+        isNativeMoveActive = nativeStarted
         if (!nativeStarted) {
             window.addMouseMotionListener(dragMotionListener)
+        }
+    }
+
+    fun onPointerMove(xRoot: Int, yRoot: Int) {
+        if (!isDraggingInternal || isNativeMoveActive) return
+        val dx = xRoot - dragStartMouseX
+        val dy = yRoot - dragStartMouseY
+        val newX = windowStartX + dx
+        val newY = windowStartY + dy
+        if (window.x != newX || window.y != newY) {
+            window.setLocation(newX, newY)
         }
     }
 
     fun stopDrag() {
         if (!isDraggingInternal) return
         isDraggingInternal = false
+        isNativeMoveActive = false
         window.removeMouseListener(dragMouseListener)
         window.removeMouseMotionListener(dragMotionListener)
         window.removeWindowFocusListener(focusListener)
@@ -411,6 +423,9 @@ fun MiniLyricsPlayerWindow(
                 onDragStart = { isDragging = true },
                 onDragEnd = {
                     isDragging = false
+                    runCatching {
+                        windowState.position = WindowPosition((window.x / density.density).dp, (window.y / density.density).dp)
+                    }
                     saveCurrentBounds()
                     com.alananasss.kittytune.core.Prefs.flush()
                 }
@@ -509,8 +524,9 @@ fun MiniLyricsPlayerWindow(
                                     val down = awaitFirstDown(requireUnconsumed = true)
                                     if (down.type == PointerType.Mouse && currentEvent.buttons.isPrimaryPressed) {
                                         val awtEvent = currentEvent.nativeEvent as? java.awt.event.MouseEvent
-                                        val xRoot = awtEvent?.xOnScreen ?: (window.x + down.position.x.toInt())
-                                        val yRoot = awtEvent?.yOnScreen ?: (window.y + down.position.y.toInt())
+                                        val mouseLoc = java.awt.MouseInfo.getPointerInfo()?.location
+                                        val xRoot = mouseLoc?.x ?: awtEvent?.xOnScreen ?: (window.x + down.position.x.toInt())
+                                        val yRoot = mouseLoc?.y ?: awtEvent?.yOnScreen ?: (window.y + down.position.y.toInt())
                                         dragHandler.startDrag(xRoot, yRoot)
                                         while (true) {
                                             val event = awaitPointerEvent()
@@ -518,6 +534,11 @@ fun MiniLyricsPlayerWindow(
                                                 dragHandler.stopDrag()
                                                 break
                                             }
+                                            val curMouse = java.awt.MouseInfo.getPointerInfo()?.location
+                                            val curAwt = event.nativeEvent as? java.awt.event.MouseEvent
+                                            val curX = curMouse?.x ?: curAwt?.xOnScreen ?: (window.x + (event.changes.firstOrNull()?.position?.x?.toInt() ?: 0))
+                                            val curY = curMouse?.y ?: curAwt?.yOnScreen ?: (window.y + (event.changes.firstOrNull()?.position?.y?.toInt() ?: 0))
+                                            dragHandler.onPointerMove(curX, curY)
                                         }
                                     }
                                 }

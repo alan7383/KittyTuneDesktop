@@ -96,19 +96,31 @@ fun SyncSettingsScreen(onBackClick: (() -> Unit)? = null) {
 /** The sync page's content, shared by its own screen and the Devices category of the settings. */
 @Composable
 fun SyncSettingsContent() {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        SyncDevicesPage()
+        SyncOptionsPage()
+        SyncAdvancedPage()
+    }
+}
+
+/**
+ * Devices → Paired devices: sync status card, pairing dialog, and device list.
+ */
+@Composable
+fun SyncDevicesPage() {
     val scope = rememberCoroutineScope()
 
     var devices by remember { mutableStateOf(SyncPeers.all()) }
     var pairing by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
-    var showAdvanced by remember { mutableStateOf(false) }
 
     val isSyncing by SyncScheduler.isSyncing.collectAsState()
     val lastSyncAtMs by SyncScheduler.lastSyncAtMs.collectAsState()
 
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
-    var syncLikesEnabled by remember { mutableStateOf(playerPrefs.getSyncLikesEnabled()) }
-    var syncListensEnabled by remember { mutableStateOf(playerPrefs.getSyncListensEnabled()) }
     var showDisclaimerDialog by remember { mutableStateOf(!playerPrefs.isSyncDisclaimerDismissed()) }
 
     if (showDisclaimerDialog) {
@@ -174,8 +186,6 @@ fun SyncSettingsContent() {
         )
     }
 
-    // Re-read after anything that could have changed the list, including an exchange a paired phone
-    // started on its own while this screen was open.
     LaunchedEffect(lastSyncAtMs, pairing) { devices = SyncPeers.all() }
 
     if (pairing) {
@@ -196,8 +206,6 @@ fun SyncSettingsContent() {
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // The one sentence worth keeping from the old screen: it is the answer to "where does my
-        // listening history go", and no arrangement of controls says it.
         Text(
             str("sync_intro"),
             style = MaterialTheme.typography.bodyMedium,
@@ -217,8 +225,6 @@ fun SyncSettingsContent() {
             },
         )
 
-        // Sized to its label rather than to the window. Pairing happens once per device, so a
-        // full-width slab overstated it next to the card that actually carries the state.
         Button(
             onClick = { pairing = true },
             shapes = ButtonDefaults.shapes(),
@@ -251,7 +257,23 @@ fun SyncSettingsContent() {
                 )
             }
         }
+    }
+}
 
+/**
+ * Devices → Sync Data: choose what data (listens, likes) to synchronize between devices.
+ */
+@Composable
+fun SyncOptionsPage() {
+    val scope = rememberCoroutineScope()
+    val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
+    var syncLikesEnabled by remember { mutableStateOf(playerPrefs.getSyncLikesEnabled()) }
+    var syncListensEnabled by remember { mutableStateOf(playerPrefs.getSyncListensEnabled()) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         SettingsGroupTitle(str("sync_what_title"))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SettingsItem(
@@ -264,7 +286,6 @@ fun SyncSettingsContent() {
                 onSwitchChange = { enabled ->
                     syncListensEnabled = enabled
                     playerPrefs.setSyncListensEnabled(enabled)
-                    // Anything that arrived while it was off is still in the log; bring it in now.
                     if (enabled) scope.launch { com.alananasss.kittytune.data.sync.SyncApply.reconcile() }
                 },
             )
@@ -290,24 +311,32 @@ fun SyncSettingsContent() {
         }
 
         SyncHistorySection()
+    }
+}
 
-        Spacer(Modifier.height(8.dp))
-        TextButton(onClick = { showAdvanced = !showAdvanced }) {
-            Icon(
-                if (showAdvanced) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
-                null,
-                modifier = Modifier.size(18.dp),
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(str("sync_advanced"))
-        }
-        AnimatedVisibility(visible = showAdvanced) {
-            AdvancedSection(
-                onForgetAll = {
-                    SyncPeers.forgetAll()
-                    devices = SyncPeers.all()
-                },
-                onStatus = { status = it },
+/**
+ * Devices → Advanced: port, listener, address and troubleshooting controls.
+ */
+@Composable
+fun SyncAdvancedPage() {
+    var status by remember { mutableStateOf<String?>(null) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        AdvancedSection(
+            onForgetAll = {
+                SyncPeers.forgetAll()
+            },
+            onStatus = { status = it },
+        )
+        status?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
     }
