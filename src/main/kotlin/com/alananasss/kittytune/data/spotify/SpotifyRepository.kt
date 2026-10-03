@@ -237,6 +237,7 @@ object SpotifyRepository {
             val coverUrl = extractCoverArt(albumUnion.optJSONObject("coverArt"))
             val dateStr = albumUnion.optJSONObject("date")?.optStringOrNull("isoString")
             val artists = parseArtistList(albumUnion.optJSONObject("artists")?.optJSONArray("items"))
+                .distinctBy { it.id.ifBlank { it.name } }
 
             val tracksList = mutableListOf<SpotifyTrack>()
             val tracksV2 = albumUnion.optJSONObject("tracksV2")
@@ -640,6 +641,7 @@ object SpotifyRepository {
                 if (totalTracks == 1) "SINGLE" else if (totalTracks in 2..6) "EP" else "ALBUM"
             }
             val artists = parseArtistList(releaseNode.optJSONObject("artists")?.optJSONArray("items"))
+                .distinctBy { it.id.ifBlank { it.name } }
                 .ifEmpty { listOf(SpotifyArtistRef(id = "", name = defaultArtist)) }
 
             list.add(
@@ -682,6 +684,7 @@ object SpotifyRepository {
             val name = data.optString("name", "Unknown Album")
             val coverUrl = extractCoverArt(data.optJSONObject("coverArt"))
             val artists = parseArtistList(data.optJSONObject("artists")?.optJSONArray("items"))
+                .distinctBy { it.id.ifBlank { it.name } }
             val dateStr = data.optJSONObject("date")?.optString("year")
 
             list.add(
@@ -940,7 +943,23 @@ object SpotifyRepository {
                             }
                         }
                     }
-                    roles.add(SpotifyCreditRole(roleTitle = roleTitle, artists = artistsList))
+                    val mergedArtists = mutableListOf<SpotifyCreditArtist>()
+                    for (art in artistsList) {
+                        val existingIdx = mergedArtists.indexOfFirst {
+                            (it.id.isNotBlank() && it.id == art.id) ||
+                            (it.name.isNotBlank() && it.name.equals(art.name, ignoreCase = true))
+                        }
+                        if (existingIdx >= 0) {
+                            val existing = mergedArtists[existingIdx]
+                            mergedArtists[existingIdx] = existing.copy(
+                                subroles = (existing.subroles + art.subroles).distinct(),
+                                imageUri = existing.imageUri ?: art.imageUri
+                            )
+                        } else {
+                            mergedArtists.add(art)
+                        }
+                    }
+                    roles.add(SpotifyCreditRole(roleTitle = roleTitle, artists = mergedArtists))
                 }
             }
 
@@ -1040,11 +1059,13 @@ object SpotifyRepository {
             artistsList.addAll(parseArtistList(generalArtists))
         }
 
+        val uniqueArtists = artistsList.distinctBy { it.id.ifBlank { it.name } }
+
         return SpotifyTrack(
             id = id,
             name = name,
             durationMs = durationMs,
-            artists = artistsList,
+            artists = uniqueArtists,
             albumName = albumName,
             albumId = albumId,
             artworkUrl = artworkUrl,
@@ -1086,7 +1107,7 @@ object SpotifyRepository {
                 )
             }
         }
-        return list
+        return list.distinctBy { it.id.ifBlank { it.name } }
     }
 
     private fun extractCoverArt(coverArtNode: JSONObject?): String? {

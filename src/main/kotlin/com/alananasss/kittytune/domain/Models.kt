@@ -441,7 +441,9 @@
         }
 
         val displayArtist: String
-            get() = artists?.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.name }?.takeIf { it.isNotBlank() }
+            get() = artists?.takeIf { it.isNotEmpty() }
+                ?.distinctBy { it.id.ifBlank { it.name } }
+                ?.joinToString(", ") { it.name }?.takeIf { it.isNotBlank() }
                 ?: publisherMetadata?.artist?.takeIf { it.isNotBlank() }
                 ?: user?.username?.takeIf { it.isNotBlank() }
                 ?: ""
