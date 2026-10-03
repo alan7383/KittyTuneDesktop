@@ -193,6 +193,13 @@ object LinuxWindowHelper {
         } else null
     }
 
+    val isWayland: Boolean by lazy {
+        isLinux && (
+            System.getenv("WAYLAND_DISPLAY") != null ||
+            System.getenv("XDG_SESSION_TYPE")?.equals("wayland", ignoreCase = true) == true
+        )
+    }
+
     /**
      * Attempts to initiate a native, hardware-accelerated window drag through the host OS window manager
      * (EWMH _NET_WM_MOVERESIZE on Linux/KDE/GNOME, WM_SYSCOMMAND on Windows).
@@ -214,7 +221,7 @@ object LinuxWindowHelper {
     }
 
     fun startNativeMoveLinux(window: Window, xOnScreen: Int, yOnScreen: Int): Boolean {
-        if (!isLinux) return false
+        if (!isLinux || isWayland) return false
         return runCatching {
             if (!window.isDisplayable) return false
             val windowId = Native.getWindowID(window)
