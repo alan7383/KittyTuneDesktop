@@ -147,8 +147,8 @@ fun WavySliderExpressive(
     val dynamicGapSize = remember {
         derivedStateOf {
             val fraction = thumbInteractionFraction
-            val idleGap = 6.dp
-            val draggingGap = currentHalfWidth.value + 1.2.dp
+            val idleGap = thumbRadius + 4.dp
+            val draggingGap = currentHalfWidth.value + 2.dp
             idleGap + (draggingGap - idleGap) * fraction
         }
     }
