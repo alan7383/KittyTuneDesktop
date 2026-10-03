@@ -38,6 +38,7 @@ import com.alananasss.kittytune.data.local.*
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
+import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.pressScale
 import com.materialkolor.PaletteStyle
@@ -195,6 +196,7 @@ fun ThemesSettingsPage(onOpenCustomTheme: () -> Unit) {
     )
 
     CoversSettingsGroup()
+    HomeScreenCardsSettingsGroup()
 }
 
 /** The theme choices of the mode row: the three modes plus AMOLED, which is Dark with true black. */
@@ -301,9 +303,12 @@ private fun pickFontFile(title: String): java.io.File? =
  * of the track and playlist menus.
  */
 @Composable
-fun PlayerDesignSettingsPage() {
+fun PlayerDesignSettingsPage(playerViewModel: PlayerViewModel? = null) {
     // Shape, sliders and volume, the bar's buttons and the scroll step.
-    PlayerDesignContent(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    PlayerDesignContent(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        playerViewModel = playerViewModel
+    )
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         MenuTilesSection(str("menu_tiles_track"), PlayerPreferences.MENU_TRACK, com.alananasss.kittytune.ui.main.MenuTiles.TRACK)
         MenuTilesSection(str("menu_tiles_playlist"), PlayerPreferences.MENU_PLAYLIST, com.alananasss.kittytune.ui.main.MenuTiles.PLAYLIST)
@@ -363,6 +368,50 @@ internal fun CoversSettingsGroup() {
                 )
             }
         },
+    )
+}
+
+/** Home screen cards: Your mix and Listening statistics, matching KittyTune Android. */
+@Composable
+internal fun HomeScreenCardsSettingsGroup() {
+    val prefs = remember { PlayerPreferences() }
+    var showHomeListeningStats by remember { mutableStateOf(prefs.getShowHomeListeningStats()) }
+    var showHomeYourMix by remember { mutableStateOf(prefs.getShowHomeYourMix()) }
+
+    SettingsGroup(
+        title = str("pref_home_cards_group_title"),
+        items = listOf(
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("listening_stats_title"),
+                    subtitle = str("pref_home_listening_stats_desc"),
+                    icon = Icons.Rounded.BarChart,
+                    hasSwitch = true,
+                    switchState = showHomeListeningStats,
+                    onSwitchChange = {
+                        showHomeListeningStats = it
+                        prefs.setShowHomeListeningStats(it)
+                    },
+                    highlightKey = "pref_home_listening_stats",
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("mix_title"),
+                    subtitle = str("pref_home_your_mix_desc"),
+                    icon = Icons.Rounded.AutoAwesome,
+                    hasSwitch = true,
+                    switchState = showHomeYourMix,
+                    onSwitchChange = {
+                        showHomeYourMix = it
+                        prefs.setShowHomeYourMix(it)
+                    },
+                    highlightKey = "pref_home_your_mix",
+                )
+            },
+        ),
     )
 }
 

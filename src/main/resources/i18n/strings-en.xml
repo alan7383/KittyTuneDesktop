@@ -960,6 +960,9 @@
     <string name="listening_stats_subtitle">Your listening habits</string>
     <string name="listening_stats_time_listened">Time Listened</string>
     <string name="listening_stats_title">Listening Stats</string>
+    <string name="pref_home_cards_group_title">Home screen cards</string>
+    <string name="pref_home_listening_stats_desc">Show listening statistics card on the home screen</string>
+    <string name="pref_home_your_mix_desc">Show personalized mix card on the home screen</string>
     <string name="mix_title">Your mix</string>
     <string name="mix_subtitle">Built from what you actually play, not what you already liked.</string>
     <string name="mix_start">Start mixing</string>
@@ -1161,6 +1164,7 @@
     <string name="pref_screensaver_title">Auto Screensaver</string>
     <string name="pref_screensaver_desc">Switches to focus mode after 60s of inactivity in full screen</string>
     <string name="screensaver_focus_mode">Screensaver &amp; Focus Mode</string>
+    <string name="screensaver_timeout_title">Inactivity delay</string>
     <string name="screensaver_tap_to_wake">Move mouse or click anywhere to exit</string>
     <string name="screensaver_session_stats">Session stats</string>
     <string name="player_previous">Previous track</string>
@@ -1487,6 +1491,7 @@
     <string name="menu_tiles_playlist">Playlist menu</string>
     <string name="panel_tabs_title">Tabs shown</string>
     <string name="panel_tabs_desc">Hide the ones you never open. At least one stays.</string>
+    <string name="panel_track_stats_title">Track stats shown</string>
     <string name="queue_up_next">Up next</string>
     <string name="queue_remove">Remove from queue</string>
     <string name="queue_played">Already played</string>
@@ -2725,4 +2730,35 @@
     <string name="pref_full_player_source_title">Audio source indicator</string>
     <string name="pref_full_player_source_desc">Display platform logo (YouTube, SoundCloud, etc.) for the playing track</string>
     <string name="audio_source_tooltip">Audio from %s</string>
+
+    <!-- Settings subpage folders -->
+    <string name="settings_audio_playback_sub">Autoplay, queue, resumption and speed</string>
+    <string name="settings_audio_quality_title">Sound &amp; Output</string>
+    <string name="settings_audio_quality_sub">Audio quality, device and volume normalization</string>
+    <string name="settings_audio_transitions_title">Transitions &amp; Mix</string>
+    <string name="settings_audio_transitions_sub">Crossfade and DJ automix</string>
+    <string name="settings_audio_sleep_sub">Fade out duration and sleep options</string>
+
+    <string name="sources_services_sub">SoundCloud, Qobuz, TIDAL, Deezer, Yandex</string>
+    <string name="sources_order_sub">Provider priority order and music import</string>
+    <string name="lyrics_sources_title">Lyrics Providers</string>
+    <string name="lyrics_sources_sub">Order and enabled lyrics sources</string>
+
+    <string name="storage_cache_sub">Audio and image cache limits and cleanup</string>
+    <string name="storage_downloads_sub">Downloaded tracks and storage location</string>
+    <string name="storage_local_files_sub">Scanned folders and local library</string>
+    <string name="storage_backup_sub">Export and import app settings and data</string>
+
+    <string name="sync_paired_devices_title">Paired Devices</string>
+    <string name="sync_paired_devices_sub">Sync status, connect and manage devices</string>
+    <string name="sync_options_title">Sync Data</string>
+    <string name="sync_options_sub">Choose what to sync between devices</string>
+    <string name="sync_advanced_title">Advanced Sync</string>
+    <string name="sync_advanced_sub">Connection details, port and troubleshooting</string>
+
+    <string name="network_proxy_sub">HTTP and SOCKS5 proxy configuration</string>
+    <string name="network_zapret_sub">Circumvent traffic restrictions and DPI</string>
+
+    <string name="misc_general_sub">Language, startup screen and updates</string>
+    <string name="misc_discord_sub">Show what you are listening to on Discord</string>
 </resources>
