@@ -75,7 +75,7 @@ fun PlayerDesignScreen(
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(Modifier.fillMaxWidth().widthIn(max = 860.dp)) { PlayerDesignContent() }
+            Box(Modifier.fillMaxWidth().widthIn(max = 860.dp)) { PlayerDesignContent(playerViewModel = playerViewModel) }
             Spacer(Modifier.height(40.dp))
         }
     }
@@ -83,7 +83,10 @@ fun PlayerDesignScreen(
 
 /** The player's shape, sliders, bar buttons and scroll step; shared by its own screen and the settings page. */
 @Composable
-fun PlayerDesignContent(modifier: Modifier = Modifier) {
+fun PlayerDesignContent(
+    modifier: Modifier = Modifier,
+    playerViewModel: PlayerViewModel? = null
+) {
     val prefs = remember { PlayerPreferences() }
 
     var playerBarStyle by remember { mutableStateOf(prefs.getPlayerBarStyle()) }
@@ -95,6 +98,11 @@ fun PlayerDesignContent(modifier: Modifier = Modifier) {
     var seekWheelSeconds by remember { mutableFloatStateOf(prefs.getSeekWheelSeconds()) }
     var showRemainingTime by remember { mutableStateOf(prefs.getShowRemainingTime()) }
     var fullPlayerSourceEnabled by remember { mutableStateOf(prefs.getFullPlayerSourceIndicatorEnabled()) }
+    var localScreensaverEnabled by remember { mutableStateOf(prefs.getFullPlayerScreensaverEnabled()) }
+    var localScreensaverTimeout by remember { mutableIntStateOf(prefs.getFullPlayerScreensaverTimeout()) }
+
+    val currentScreensaverEnabled = playerViewModel?.fullPlayerScreensaverEnabled ?: localScreensaverEnabled
+    val currentScreensaverTimeout = playerViewModel?.fullPlayerScreensaverTimeoutSeconds ?: localScreensaverTimeout
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -172,6 +180,20 @@ fun PlayerDesignContent(modifier: Modifier = Modifier) {
             onEnabledChange = {
                 fullPlayerSourceEnabled = it
                 prefs.setFullPlayerSourceIndicatorEnabled(it)
+            }
+        )
+
+        // 6. Écran de veille automatique (Screensaver / sleep mode)
+        ScreensaverSection(
+            enabled = currentScreensaverEnabled,
+            onEnabledChange = { enabled ->
+                localScreensaverEnabled = enabled
+                playerViewModel?.updateFullPlayerScreensaverEnabled(enabled) ?: prefs.setFullPlayerScreensaverEnabled(enabled)
+            },
+            timeoutSeconds = currentScreensaverTimeout,
+            onTimeoutChange = { timeout ->
+                localScreensaverTimeout = timeout
+                playerViewModel?.updateFullPlayerScreensaverTimeout(timeout) ?: prefs.setFullPlayerScreensaverTimeout(timeout)
             }
         )
     }
@@ -770,22 +792,194 @@ private fun TrackSourceSection(
     )
 }
 
-/** Screensaver toggle — dims the full-screen player after a period of inactivity. */
+/** Screensaver toggle and inactivity delay slider — dims the full-screen player after a period of inactivity. */
 @Composable
 private fun ScreensaverSection(
     enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
+    timeoutSeconds: Int,
+    onTimeoutChange: (Int) -> Unit,
 ) {
-    SettingsItem(
+    // Preset steps for inactivity timeout (in seconds): 15s, 30s, 45s, 60s (1m), 90s, 120s (2m), 180s (3m), 300s (5m)
+    val steps = remember { listOf(15, 30, 45, 60, 90, 120, 180, 300) }
+
+    fun formatDuration(sec: Int): String = when {
+        sec < 60 -> "${sec}s"
+        sec % 60 == 0 -> "${sec / 60} min"
+        else -> "${sec / 60}m ${sec % 60}s"
+    }
+
+    fun formatSubtitle(sec: Int): String {
+        val formatted = formatDuration(sec)
+        val template = str("pref_screensaver_desc")
+        val regex = Regex("""60\s*(s|sec|сек|с|mp|giây)?""", RegexOption.IGNORE_CASE)
+        return if (regex.containsMatchIn(template)) {
+            template.replace(regex, formatted)
+        } else {
+            "$template ($formatted)"
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .settingHighlight("pref_screensaver", shape = RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
-        title = str("pref_screensaver_title"),
-        subtitle = str("pref_screensaver_desc"),
-        icon = Icons.Rounded.DarkMode,
-        hasSwitch = true,
-        switchState = enabled,
-        onSwitchChange = onEnabledChange,
-        highlightKey = "pref_screensaver"
-    )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    modifier = Modifier.size(42.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Rounded.DarkMode,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
+                Spacer(Modifier.width(16.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = str("pref_screensaver_title"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = if (enabled) formatSubtitle(timeoutSeconds) else str("pref_screensaver_desc"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = onEnabledChange
+                )
+            }
+
+            AnimatedVisibility(
+                visible = enabled,
+                enter = androidx.compose.animation.expandVertically() + fadeIn(),
+                exit = androidx.compose.animation.shrinkVertically() + fadeOut(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = str("screensaver_timeout_title"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = formatDuration(timeoutSeconds),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    // Slider mapping to discrete steps
+                    val currentStepIndex = remember(timeoutSeconds, steps) {
+                        val idx = steps.indexOf(timeoutSeconds)
+                        if (idx >= 0) idx.toFloat()
+                        else {
+                            steps.indices.minByOrNull { kotlin.math.abs(steps[it] - timeoutSeconds) }?.toFloat() ?: 3f
+                        }
+                    }
+
+                    var sliderPos by remember(currentStepIndex) { mutableFloatStateOf(currentStepIndex) }
+
+                    Slider(
+                        value = sliderPos,
+                        onValueChange = { newPos ->
+                            sliderPos = newPos
+                            val snappedIndex = newPos.roundToInt().coerceIn(0, steps.lastIndex)
+                            val targetTimeout = steps[snappedIndex]
+                            if (targetTimeout != timeoutSeconds) {
+                                onTimeoutChange(targetTimeout)
+                            }
+                        },
+                        valueRange = 0f..(steps.lastIndex).toFloat(),
+                        steps = steps.size - 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    // Quick-select preset pills
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val presets = listOf(30, 60, 120, 300)
+                        presets.forEach { presetSeconds ->
+                            val isSelected = timeoutSeconds == presetSeconds
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        onTimeoutChange(presetSeconds)
+                                        sliderPos = steps.indexOf(presetSeconds).toFloat()
+                                    }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = formatDuration(presetSeconds),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private fun sliderStyleKey(style: PlayerSliderStyle): String = when (style) {

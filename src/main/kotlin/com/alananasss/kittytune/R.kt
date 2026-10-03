@@ -1107,6 +1107,7 @@ object R {
         const val pref_screensaver_title = "pref_screensaver_title"
         const val pref_screensaver_desc = "pref_screensaver_desc"
         const val screensaver_focus_mode = "screensaver_focus_mode"
+        const val screensaver_timeout_title = "screensaver_timeout_title"
         const val screensaver_tap_to_wake = "screensaver_tap_to_wake"
         const val screensaver_session_stats = "screensaver_session_stats"
         const val lyrics_searching = "lyrics_searching"

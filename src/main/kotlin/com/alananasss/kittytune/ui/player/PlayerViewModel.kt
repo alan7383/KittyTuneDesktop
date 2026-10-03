@@ -3005,7 +3005,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun navigableArtists(
         artists: List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>?
     ): List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef> =
-        artists.orEmpty().filter { it.id.isNotBlank() }.distinctBy { it.id }
+        artists.orEmpty().filter { it.id.isNotBlank() }.distinctBy { it.id.ifBlank { it.name } }
 
     fun dismissSelectArtistDialog() {
         showSelectArtistDialog = false

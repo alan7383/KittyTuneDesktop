@@ -960,6 +960,9 @@
     <string name="listening_stats_subtitle">Vos habitudes musicales</string>
     <string name="listening_stats_time_listened">Temps écouté</string>
     <string name="listening_stats_title">Stats d\'écoute</string>
+    <string name="pref_home_cards_group_title">Cartes de l\'écran d\'accueil</string>
+    <string name="pref_home_listening_stats_desc">Afficher la carte des statistiques d\'écoute sur l\'accueil</string>
+    <string name="pref_home_your_mix_desc">Afficher la carte du mix personnalisé sur l\'accueil</string>
     <string name="mix_title">Ton mix</string>
     <string name="mix_subtitle">Construit à partir de ce que tu écoutes vraiment, pas de ce que tu as déjà aimé.</string>
     <string name="mix_start">Lancer le mix</string>
@@ -1161,6 +1164,7 @@
     <string name="pref_screensaver_title">Écran de veille automatique</string>
     <string name="pref_screensaver_desc">Passe en mode concentration après 60s d\'inactivité en plein écran</string>
     <string name="screensaver_focus_mode">Mode Écran de veille / Concentration</string>
+    <string name="screensaver_timeout_title">Délai d\'inactivité</string>
     <string name="screensaver_tap_to_wake">Bougez la souris ou cliquez pour quitter la veille</string>
     <string name="screensaver_session_stats">Stats de session</string>
     <string name="player_previous">Piste précédente</string>
@@ -1489,6 +1493,7 @@
     <string name="menu_tiles_playlist">Menu de la playlist</string>
     <string name="panel_tabs_title">Onglets affichés</string>
     <string name="panel_tabs_desc">Masquez ceux que vous n'ouvrez jamais. Il en reste au moins un.</string>
+    <string name="panel_track_stats_title">Statistiques affichées</string>
     <string name="queue_up_next">À suivre</string>
     <string name="queue_remove">Retirer de la file</string>
     <string name="queue_played">Déjà joué</string>
@@ -2726,4 +2731,35 @@
     <string name="pref_full_player_source_title">Indicateur de source audio</string>
     <string name="pref_full_player_source_desc">Afficher le logo de la plateforme (YouTube, SoundCloud, etc.) pour le morceau en lecture</string>
     <string name="audio_source_tooltip">Audio venant de %s</string>
+
+    <!-- Settings subpage folders -->
+    <string name="settings_audio_playback_sub">Lecture auto, file d\'attente, reprise et vitesse</string>
+    <string name="settings_audio_quality_title">Son &amp; Sortie</string>
+    <string name="settings_audio_quality_sub">Qualité audio, périphérique et normalisation</string>
+    <string name="settings_audio_transitions_title">Transitions &amp; Mixage</string>
+    <string name="settings_audio_transitions_sub">Fondu enchaîné et mixage DJ automix</string>
+    <string name="settings_audio_sleep_sub">Durée du fondu et options de veille</string>
+
+    <string name="sources_services_sub">SoundCloud, Qobuz, TIDAL, Deezer, Yandex</string>
+    <string name="sources_order_sub">Ordre des sources audio et import de musique</string>
+    <string name="lyrics_sources_title">Fournisseurs de paroles</string>
+    <string name="lyrics_sources_sub">Ordre et sources de paroles activées</string>
+
+    <string name="storage_cache_sub">Limites et nettoyage du cache audio et images</string>
+    <string name="storage_downloads_sub">Musique téléchargée et emplacement</string>
+    <string name="storage_local_files_sub">Dossiers analysés et bibliothèque locale</string>
+    <string name="storage_backup_sub">Exporter et importer les données et réglages</string>
+
+    <string name="sync_paired_devices_title">Appareils jumelés</string>
+    <string name="sync_paired_devices_sub">État de synchronisation et gestion des appareils</string>
+    <string name="sync_options_title">Données synchronisées</string>
+    <string name="sync_options_sub">Choisir les données à synchroniser entre appareils</string>
+    <string name="sync_advanced_title">Synchronisation avancée</string>
+    <string name="sync_advanced_sub">Détails de connexion, port et dépannage</string>
+
+    <string name="network_proxy_sub">Configuration du proxy HTTP et SOCKS5</string>
+    <string name="network_zapret_sub">Contournement des restrictions et blocages DPI</string>
+
+    <string name="misc_general_sub">Langue, écran de démarrage et mises à jour</string>
+    <string name="misc_discord_sub">Afficher la musique en cours sur Discord</string>
 </resources>
