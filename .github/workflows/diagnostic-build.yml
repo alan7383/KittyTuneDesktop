@@ -34,6 +34,12 @@ jobs:
         run: git update-index --chmod=+x gradlew
         shell: bash
 
+      # Same source-built SMTC bridge as the release build, so the diagnostic build differs from a
+      # release by launcher flags alone.
+      - name: Build SMTC bridge from source
+        run: powershell -ExecutionPolicy Bypass -File scripts/build-smtc-bridge.ps1
+        shell: powershell
+
       # -PmemDiag is the whole difference from a release build: it adds
       # -XX:NativeMemoryTracking=summary and -Dkittytune.memlog=true to the launcher options.
       - name: Build portable app with memory diagnostics

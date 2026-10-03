@@ -25,6 +25,13 @@ jobs:
         run: git update-index --chmod=+x gradlew
         shell: bash
 
+      # The SMTC bridge ships as a prebuilt exe; this keeps it built from the source in the tree.
+      # Without it, the "Unknown Application" fix (issue #66) would live in the .cs and never in the
+      # binary users get.
+      - name: Build SMTC bridge from source
+        run: powershell -ExecutionPolicy Bypass -File scripts/build-smtc-bridge.ps1
+        shell: powershell
+
       - name: Build Windows MSI & Portable App
         run: .\gradlew.bat packageReleaseMsi createReleaseDistributable
 
