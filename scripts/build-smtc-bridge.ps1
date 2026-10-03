@@ -62,15 +62,57 @@ $sdkVersion = (Get-ChildItem (Join-Path $installedRoot 'Include') -Directory |
     Select-Object -First 1).Name
 if (-not $sdkVersion) { throw 'Windows SDK include dir not found' }
 
-$winmd = Join-Path $installedRoot "Include\$sdkVersion\um\windows.winmd"
-$projection = Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime\v4.0_4.0.0.0__b77a5c561934e089\System.Runtime.WindowsRuntime.dll'
-if (-not (Test-Path $projection)) {
-    $projCandidates = Get-ChildItem (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime') -Filter 'System.Runtime.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue
-    if ($projCandidates) { $projection = $projCandidates[0].FullName }
+# In Windows SDK 10/11, Windows.winmd is located under UnionMetadata
+$winmdCandidates = @(
+    (Join-Path $installedRoot "UnionMetadata\$sdkVersion\Windows.winmd"),
+    (Join-Path $installedRoot "UnionMetadata\$sdkVersion\Facade\Windows.winmd"),
+    (Join-Path $installedRoot "UnionMetadata\Windows.winmd")
+)
+$winmd = $null
+foreach ($cand in $winmdCandidates) {
+    if (Test-Path $cand) {
+        $winmd = $cand
+        break
+    }
 }
-foreach ($required in @($winmd, $projection)) {
-    if (-not (Test-Path $required)) { throw "Required reference not found: $required" }
+if (-not $winmd -and (Test-Path (Join-Path $installedRoot 'UnionMetadata'))) {
+    $found = Get-ChildItem (Join-Path $installedRoot 'UnionMetadata') -Filter 'Windows.winmd' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) { $winmd = $found.FullName }
 }
+if (-not $winmd) {
+    $sysWinmd = Join-Path $env:windir 'System32\WinMetadata\Windows.winmd'
+    if (Test-Path $sysWinmd) { $winmd = $sysWinmd }
+}
+if (-not $winmd) { throw "Windows.winmd not found in SDK ($installedRoot) or System32" }
+
+$projCandidates = @(
+    (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime\v4.0_4.0.0.0__b77a5c561934e089\System.Runtime.WindowsRuntime.dll'),
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.WindowsRuntime.dll",
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5.1\System.Runtime.WindowsRuntime.dll",
+    "$env:ProgramFiles\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.WindowsRuntime.dll"
+)
+$projection = $null
+foreach ($cand in $projCandidates) {
+    if (Test-Path $cand) {
+        $projection = $cand
+        break
+    }
+}
+if (-not $projection) {
+    $found = Get-ChildItem (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime') -Filter 'System.Runtime.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) { $projection = $found.FullName }
+}
+if (-not $projection) {
+    $refDir = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework"
+    if (Test-Path $refDir) {
+        $found = Get-ChildItem $refDir -Filter 'System.Runtime.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $projection = $found.FullName }
+    }
+}
+if (-not $projection) { throw "System.Runtime.WindowsRuntime.dll not found in GAC or Reference Assemblies" }
+
+Write-Host "Using Windows.winmd: $winmd"
+Write-Host "Using System.Runtime.WindowsRuntime: $projection"
 
 Write-Host "Compiling WindowsSmtcBridge.cs (SDK $sdkVersion)"
 & $csc /nologo /target:winexe /platform:anycpu32bitpreferred `
