@@ -48,11 +48,12 @@ data class SpotifyTrack(
     val publisher: String? = null
 ) {
     val artistName: String
-        get() = artists.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" }
+        get() = artists.distinctBy { it.id.ifBlank { it.name } }.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" }
 
     fun toTrack(): Track {
         val stableId = abs(id.hashCode().toLong() shl 16 or (id.reversed().hashCode().toLong() and 0xFFFFL))
-        val firstArtist = artists.firstOrNull()
+        val uniqueArtists = artists.distinctBy { it.id.ifBlank { it.name } }
+        val firstArtist = uniqueArtists.firstOrNull()
         return Track(
             id = stableId,
             title = name,
@@ -80,7 +81,7 @@ data class SpotifyTrack(
             streamable = isPlayable,
             playCount = playCount,
             playbackCount = (playCount?.coerceAtMost(Int.MAX_VALUE.toLong())?.toInt() ?: 0),
-            artists = artists
+            artists = uniqueArtists
         )
     }
 }
@@ -96,7 +97,7 @@ data class SpotifyAlbum(
     val tracks: List<SpotifyTrack> = emptyList()
 ) {
     val artistName: String
-        get() = artists.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" }
+        get() = artists.distinctBy { it.id.ifBlank { it.name } }.joinToString(", ") { it.name }.ifBlank { "Unknown Artist" }
 
     val formattedSubtitle: String
         get() {
