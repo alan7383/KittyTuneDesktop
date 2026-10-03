@@ -75,9 +75,9 @@ namespace KittyTuneSmtc {
                 smtc.IsStopEnabled = true;
                 smtc.IsNextEnabled = true;
                 smtc.IsPreviousEnabled = true;
-                smtc.add_ButtonPressed(new TypedEventHandler<SystemMediaTransportControls, SystemMediaTransportControlsButtonPressedEventArgs>(OnButtonPressed));
-                smtc.add_PlaybackPositionChangeRequested(new TypedEventHandler<SystemMediaTransportControls, PlaybackPositionChangeRequestedEventArgs>((sender, e) =>
-                    Send("SEEK:" + (long)e.RequestedPlaybackPosition.TotalMilliseconds)));
+                smtc.ButtonPressed += OnButtonPressed;
+                smtc.PlaybackPositionChangeRequested += (sender, e) =>
+                    Send("SEEK:" + (long)e.RequestedPlaybackPosition.TotalMilliseconds);
             } catch (Exception ex) {
                 Send("ERROR:" + ex.Message);
                 return 1;
