@@ -169,12 +169,27 @@ fun main(args: Array<String>) {
         var useSniTray by remember { mutableStateOf(isLinux) }
 
         if (isLinux) {
+            var activeSniService by remember { mutableStateOf<com.alananasss.kittytune.core.LinuxStatusNotifierService?>(null) }
+
             androidx.compose.runtime.DisposableEffect(appIconVariant) {
                 runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
                 val iconBaseName = if (appIconVariant == "og") "kittytune" else "kittytune-$appIconVariant"
                 val service = com.alananasss.kittytune.core.LinuxStatusNotifierService(
                     iconName = iconBaseName,
                     isMiniPlayerVisible = { playerViewModel.isMiniPlayerVisible },
+                    nowPlaying = {
+                        val track = playerViewModel.currentTrack ?: return@LinuxStatusNotifierService null
+                        val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+                        com.alananasss.kittytune.ui.tray.TrayNowPlaying(
+                            title = track.title,
+                            artist = artist,
+                            artworkUrl = track.artworkUrl,
+                            isPlaying = playerViewModel.isPlaying
+                        )
+                    },
+                    onPlayPause = { playerViewModel.togglePlayPause() },
+                    onNext = { playerViewModel.playNext() },
+                    onPrevious = { playerViewModel.smartPrevious() },
                     onActivate = { showMainWindow() },
                     onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
                     onExit = {
@@ -187,10 +202,16 @@ fun main(args: Array<String>) {
                 )
                 val started = service.start()
                 useSniTray = started
+                if (started) activeSniService = service
 
                 onDispose {
+                    activeSniService = null
                     service.close()
                 }
+            }
+
+            androidx.compose.runtime.LaunchedEffect(playerViewModel.currentTrack, playerViewModel.isPlaying, playerViewModel.isMiniPlayerVisible, activeSniService) {
+                activeSniService?.notifyMenuUpdated()
             }
         }
 
