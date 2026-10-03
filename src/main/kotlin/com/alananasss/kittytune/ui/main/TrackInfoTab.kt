@@ -816,65 +816,85 @@ internal fun formatReleaseDate(raw: String?): String {
  * One line for the date and the genre, not two rows twelve dp apart, and no labels: a calendar before a
  * date and a note before a genre say the same thing in no horizontal space at all.
  */
+@OptIn(ExperimentalLayoutApi::class)
 private fun LazyListScope.trackTagsAndDetails(
     vm: PlayerViewModel,
     displayTrack: com.alananasss.kittytune.domain.Track,
     scope: kotlinx.coroutines.CoroutineScope,
 ) {
     item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
-                val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
-                val genre = displayTrack.genre
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
+            val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
+            val genre = displayTrack.genre
+            val isDateValid = !dateRaw.isNullOrBlank() && releaseDateStr != str("detail_unknown")
+            val hasGenre = !genre.isNullOrBlank()
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+            if (isDateValid || hasGenre) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        Icons.Rounded.CalendarToday,
-                        contentDescription = str("detail_release_date"),
-                        modifier = Modifier.size(14.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = releaseDateStr,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-
-                    if (!genre.isNullOrBlank()) {
-                        Text(
-                            text = "·",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                        Row(
-                            modifier = Modifier
-                                .clickable { vm.navigateToTag(genre) }
-                                .weight(1f, fill = false),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    if (isDateValid) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         ) {
-                            Icon(
-                                Icons.Rounded.MusicNote,
-                                contentDescription = str("detail_genre"),
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            // Ellipsized rather than wrapping: a long genre string must not be what
-                            // turns this one line back into two.
-                            Text(
-                                text = genre,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Rounded.CalendarToday,
+                                    contentDescription = str("detail_release_date"),
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = releaseDateStr,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
+
+                    if (hasGenre) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { vm.navigateToTag(genre) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Rounded.MusicNote,
+                                    contentDescription = str("detail_genre"),
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = genre,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
+            }
                 
                 if (!displayTrack.tagList.isNullOrBlank()) {
                     val tags = parseTags(displayTrack.tagList)

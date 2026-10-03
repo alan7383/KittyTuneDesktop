@@ -227,6 +227,19 @@ class PlayerPreferences {
         const val PANEL_TAB_LYRICS = "lyrics"
         const val PANEL_TAB_EFFECTS = "effects"
 
+        private const val KEY_PANEL_TRACK_STATS_HIDDEN = "now_playing_track_stats_hidden"
+
+        const val PANEL_STAT_PLAYS = "plays"
+        const val PANEL_STAT_LIKES = "likes"
+        const val PANEL_STAT_REPOSTS = "reposts"
+        const val PANEL_STAT_COMMENTS = "comments"
+        const val PANEL_STAT_INFO = "info"
+
+        val DEFAULT_HIDDEN_PANEL_TRACK_STATS = setOf(PANEL_STAT_INFO)
+
+        const val KEY_SHOW_HOME_LISTENING_STATS = "show_home_listening_stats"
+        const val KEY_SHOW_HOME_YOUR_MIX = "show_home_your_mix"
+
         private const val KEY_LIBRARY_TILES_HIDDEN = "library_tiles_hidden"
 
         const val LIBRARY_TILE_LIKES = "likes"
@@ -709,6 +722,18 @@ class PlayerPreferences {
     fun setContinuousPlaybackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_CONTINUOUS_PLAYBACK, enabled)
     fun getListeningStatsEnabled(): Boolean = Prefs.getBoolean(KEY_LISTENING_STATS_ENABLED, true)
     fun setListeningStatsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LISTENING_STATS_ENABLED, enabled)
+
+    // ─── Home Screen Cards Preferences ──────────────────────────────────────────
+
+    fun getShowHomeListeningStats(): Boolean = Prefs.getBoolean(KEY_SHOW_HOME_LISTENING_STATS, true)
+    fun setShowHomeListeningStats(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_HOME_LISTENING_STATS, enabled)
+    fun showHomeListeningStatsFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_LISTENING_STATS, true)
+    fun getShowHomeListeningStatsFlow(): Flow<Boolean> = showHomeListeningStatsFlow()
+
+    fun getShowHomeYourMix(): Boolean = Prefs.getBoolean(KEY_SHOW_HOME_YOUR_MIX, false)
+    fun setShowHomeYourMix(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_HOME_YOUR_MIX, enabled)
+    fun showHomeYourMixFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_YOUR_MIX, false)
+    fun getShowHomeYourMixFlow(): Flow<Boolean> = showHomeYourMixFlow()
     fun getAudioQuality(): String = Prefs.getString(KEY_AUDIO_QUALITY, "HIGH") ?: "HIGH"
     fun setAudioQuality(quality: String) = Prefs.putString(KEY_AUDIO_QUALITY, quality)
     fun getPersistentQueueEnabled(): Boolean = Prefs.getBoolean(KEY_PERSISTENT_QUEUE, true)
@@ -1218,6 +1243,23 @@ class PlayerPreferences {
     fun hiddenPanelTabsFlow(): Flow<Set<String>> =
         Prefs.stringFlow(KEY_PANEL_TABS_HIDDEN, null).map { raw ->
             raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
+        }
+
+    /**
+     * Which of the track stat buttons (plays, likes, reposts, comments, info) under the song header in the
+     * right-side panel are hidden. [PANEL_STAT_INFO] is hidden by default.
+     */
+    fun getHiddenPanelTrackStats(): Set<String> {
+        val raw = Prefs.getString(KEY_PANEL_TRACK_STATS_HIDDEN, null) ?: return DEFAULT_HIDDEN_PANEL_TRACK_STATS
+        return raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    fun setHiddenPanelTrackStats(stats: Set<String>) =
+        Prefs.putString(KEY_PANEL_TRACK_STATS_HIDDEN, stats.joinToString(","))
+
+    fun hiddenPanelTrackStatsFlow(): Flow<Set<String>> =
+        Prefs.stringFlow(KEY_PANEL_TRACK_STATS_HIDDEN, null).map { raw ->
+            raw?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet() ?: DEFAULT_HIDDEN_PANEL_TRACK_STATS
         }
 
     /**

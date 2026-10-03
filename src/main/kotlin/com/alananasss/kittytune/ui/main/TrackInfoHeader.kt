@@ -23,10 +23,14 @@ import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.viewableCover
@@ -149,31 +154,54 @@ private fun TitleAndArtist(
 }
 
 /**
- * Plays, likes, reposts and comments, and a round button into the track's page. Likes and reposts open
- * the matching list on that page. Local files (negative ids) have none of these, so they get the button only.
+ * Plays, likes, reposts and comments. Likes and reposts open
+ * the matching list on that page.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SoundCloudStats(vm: PlayerViewModel, track: Track) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FlowRow(
-            modifier = Modifier.weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (track.id > 0) {
-                StatPill(Icons.Rounded.PlayArrow, compactCount(track.playbackCount.toLong()))
-                StatPill(Icons.Rounded.Favorite, compactCount(track.likesCount.toLong())) {
-                    vm.navigateToTrackDetails(track.id, 0)
-                }
-                StatPill(Icons.Rounded.Repeat, compactCount(track.repostsCount.toLong())) {
-                    vm.navigateToTrackDetails(track.id, 1)
-                }
-                StatPill(Icons.Rounded.Comment, compactCount(track.commentCount.toLong()))
+    if (track.id <= 0) return
+    val hiddenStats = rememberHiddenPanelTrackStats()
+    val showPlays = PlayerPreferences.PANEL_STAT_PLAYS !in hiddenStats
+    val showLikes = PlayerPreferences.PANEL_STAT_LIKES !in hiddenStats
+    val showReposts = PlayerPreferences.PANEL_STAT_REPOSTS !in hiddenStats
+    val showComments = PlayerPreferences.PANEL_STAT_COMMENTS !in hiddenStats
+    val showInfo = PlayerPreferences.PANEL_STAT_INFO !in hiddenStats
+
+    if (!showPlays && !showLikes && !showReposts && !showComments && !showInfo) return
+
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        if (showPlays) {
+            StatPill(Icons.Rounded.PlayArrow, compactCount(track.playbackCount.toLong()))
+        }
+        if (showLikes) {
+            StatPill(Icons.Rounded.Favorite, compactCount(track.likesCount.toLong())) {
+                vm.navigateToTrackDetails(track.id, 0)
             }
         }
-        FilledTonalIconButton(onClick = { vm.navigateToTrackDetails(track.id, 0) }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Rounded.Info, contentDescription = str("detail_track_title"), modifier = Modifier.size(18.dp))
+        if (showReposts) {
+            StatPill(Icons.Rounded.Repeat, compactCount(track.repostsCount.toLong())) {
+                vm.navigateToTrackDetails(track.id, 1)
+            }
+        }
+        if (showComments) {
+            StatPill(Icons.Rounded.Comment, compactCount(track.commentCount.toLong()))
+        }
+        if (showInfo) {
+            FilledTonalIconButton(
+                onClick = { vm.navigateToTrackDetails(track.id, 0) },
+                shapes = IconButtonDefaults.shapes(),
+                modifier = Modifier.size(28.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.Info,
+                    contentDescription = str("detail_track_title"),
+                    modifier = Modifier.size(15.dp)
+                )
+            }
         }
     }
 }
@@ -181,16 +209,26 @@ private fun SoundCloudStats(vm: PlayerViewModel, track: Track) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SpotifyStats(track: Track) {
+    val hiddenStats = rememberHiddenPanelTrackStats()
+    val showPlays = PlayerPreferences.PANEL_STAT_PLAYS !in hiddenStats
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         StatPill(label = str("music_provider_spotify"), tint = SpotifyGreen)
         val streams = track.playCount ?: track.playbackCount.takeIf { it > 0 }?.toLong()
-        if (streams != null && streams > 0) {
+        if (showPlays && streams != null && streams > 0) {
             StatPill(Icons.Rounded.PlayArrow, compactCount(streams) + " " + str("spotify_streams_formatted"))
         }
         if (track.publisherMetadata?.explicit == true) StatPill(label = "E")
+    }
+}
+
+@Composable
+private fun rememberHiddenPanelTrackStats(): Set<String> {
+    val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
+    return remember(prefsSnapshot) {
+        PlayerPreferences().getHiddenPanelTrackStats()
     }
 }
 
