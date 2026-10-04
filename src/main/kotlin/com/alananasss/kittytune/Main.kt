@@ -546,21 +546,19 @@ fun main(args: Array<String>) {
                     wasFullScreenInWindow = false
                     runCatching { window.isAlwaysOnTop = wasAlwaysOnTop }
                     val gc = window.graphicsConfiguration
-                    val scaleX = gc?.defaultTransform?.scaleX?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
-                    val scaleY = gc?.defaultTransform?.scaleY?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
                     val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
                     val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                    val usable = getUsableDesktopBounds(gc, reqX?.let { (it * scaleX).toInt() }, reqY?.let { (it * scaleY).toInt() })
-                    val clampedPixels = clampFloatingBounds(
-                        (savedFloatingSize.width.value * scaleX).toInt(),
-                        (savedFloatingSize.height.value * scaleY).toInt(),
-                        reqX?.let { (it * scaleX).toInt() },
-                        reqY?.let { (it * scaleY).toInt() },
+                    val usable = getUsableDesktopBounds(gc, reqX, reqY)
+                    val clamped = clampFloatingBounds(
+                        savedFloatingSize.width.value.toInt(),
+                        savedFloatingSize.height.value.toInt(),
+                        reqX,
+                        reqY,
                         usable
                     )
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         javax.swing.SwingUtilities.invokeLater {
-                            com.alananasss.kittytune.data.theme.WindowsFullScreen.exit(window, savedPlacement, clampedPixels)
+                            com.alananasss.kittytune.data.theme.WindowsFullScreen.exit(window, savedPlacement, clamped)
                         }
                     } else {
                         runCatching {
@@ -582,7 +580,7 @@ fun main(args: Array<String>) {
                                 window.extendedState = java.awt.Frame.NORMAL
                                 javax.swing.SwingUtilities.invokeLater {
                                     runCatching {
-                                        window.setBounds(clampedPixels.x, clampedPixels.y, clampedPixels.width, clampedPixels.height)
+                                        window.setBounds(clamped.x, clamped.y, clamped.width, clamped.height)
                                         window.revalidate()
                                         window.repaint()
                                     }
