@@ -314,6 +314,15 @@ java {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     compilerOptions.freeCompilerArgs.addAll("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api", "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
+    // Compose stability diagnostics for the perf issue: which composables the compiler
+    // could NOT make skippable (recomposition risk). Reports land in build/compose-*.
+    // See build/compose-reports/<module>-compose-metrics.txt after compiling.
+    val composeMetricsDir = layout.buildDirectory.dir("compose-metrics").get().asFile.apply { mkdirs() }
+    val composeReportsDir = layout.buildDirectory.dir("compose-reports").get().asFile.apply { mkdirs() }
+    compilerOptions.freeCompilerArgs.addAll(
+        "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${composeMetricsDir.absolutePath}",
+        "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${composeReportsDir.absolutePath}"
+    )
 }
 
 // Auto-generate BuildConfig.kt from the project version so it's always in sync.
