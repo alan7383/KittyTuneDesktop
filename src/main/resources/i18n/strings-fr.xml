@@ -1508,6 +1508,10 @@
     <string name="recognition_listening_desc">Captez la musique autour de vous</string>
     <string name="recognition_processing">Analyse en cours&#8230;</string>
     <string name="recognition_tap_to_identify">Appuyez pour identifier cette musique</string>
+    <string name="recognition_tap_to_identify_device">Appuyez pour identifier depuis vos applis</string>
+    <string name="recognition_listening_device_desc">Captez la musique lue sur cet appareil</string>
+    <string name="recognition_source_mic">Microphone</string>
+    <string name="recognition_source_device">Cet appareil</string>
     <string name="recognition_track_not_found">Titre introuvable</string>
     <string name="recognize_music">Détecter la musique</string>
     <string name="repost_success">Titre republié !</string>

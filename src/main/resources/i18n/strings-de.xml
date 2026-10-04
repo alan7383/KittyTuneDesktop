@@ -1652,6 +1652,10 @@
     <string name="date_today">Heute</string>
     <string name="date_yesterday">Gestern</string>
     <string name="recognition_tap_to_identify">Tippen, um Musik zu erkennen</string>
+    <string name="recognition_tap_to_identify_device">Tippen, um aus Apps zu erkennen</string>
+    <string name="recognition_listening_device_desc">Musik aus Apps auf diesem Gerät erkennen</string>
+    <string name="recognition_source_mic">Mikrofon</string>
+    <string name="recognition_source_device">Dieses Gerät</string>
     <string name="recognition_listening">Höre zu&#8230;</string>
     <string name="recognition_listening_desc">Musik in deiner Umgebung erkennen</string>
     <string name="recognition_processing">Wird analysiert&#8230;</string>

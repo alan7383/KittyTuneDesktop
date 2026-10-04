@@ -1506,6 +1506,10 @@
     <string name="recognition_listening_desc">Listen to music around you</string>
     <string name="recognition_processing">Analyzing&#8230;</string>
     <string name="recognition_tap_to_identify">Tap to identify music</string>
+    <string name="recognition_tap_to_identify_device">Tap to identify from apps</string>
+    <string name="recognition_listening_device_desc">Listen to music from apps on this device</string>
+    <string name="recognition_source_mic">Microphone</string>
+    <string name="recognition_source_device">This device</string>
     <string name="recognition_track_not_found">Track not found</string>
     <string name="recognize_music">Detect Music</string>
     <string name="repost_success">Track reposted!</string>

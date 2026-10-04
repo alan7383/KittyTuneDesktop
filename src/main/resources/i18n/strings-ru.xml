@@ -1506,6 +1506,10 @@
     <string name="recognition_listening_desc">Прослушивание музыки вокруг вас</string>
     <string name="recognition_processing">Анализирую&#8230;</string>
     <string name="recognition_tap_to_identify">Коснитесь, чтобы распознать песню</string>
+    <string name="recognition_tap_to_identify_device">Коснитесь, чтобы распознать из приложений</string>
+    <string name="recognition_listening_device_desc">Распознавание музыки из приложений на этом устройстве</string>
+    <string name="recognition_source_mic">Микрофон</string>
+    <string name="recognition_source_device">Это устройство</string>
     <string name="recognition_track_not_found">Трек не найден</string>
     <string name="recognize_music">Распознать музыку</string>
     <string name="repost_success">Репост опубликован!</string>
