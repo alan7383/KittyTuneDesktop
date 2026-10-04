@@ -127,9 +127,13 @@ class WindowsFullScreenTest {
     @Test
     fun borderlessFullScreenSurvivesFocusLossAndRestoresBounds() {
         assumeTrue(WindowsFullScreen.isWindows && !GraphicsEnvironment.isHeadless())
-        val start = Rectangle(120, 120, 900, 600)
+        val monitorBounds = onEdt { GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration.bounds }
+        val startW = minOf(900, (monitorBounds.width * 0.7).toInt().coerceAtLeast(200))
+        val startH = minOf(600, (monitorBounds.height * 0.7).toInt().coerceAtLeast(150))
+        val start = Rectangle(monitorBounds.x + 40, monitorBounds.y + 40, startW, startH)
         val app = onEdt { JFrame("fs-test").apply { bounds = start; isVisible = true } }
-        val other = onEdt { JFrame("other").apply { setBounds(40, 40, 200, 150); isVisible = true } }
+        val other = onEdt { JFrame("other").apply { setBounds(monitorBounds.x + 10, monitorBounds.y + 10, 150, 100); isVisible = true } }
+        val initialBounds = onEdt { app.bounds }
         try {
             val hwnd = WindowsFullScreen.handleOf(app)!!
             val framedStyle = User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE)
@@ -142,8 +146,8 @@ class WindowsFullScreenTest {
             Thread.sleep(300)
             assertFalse("focus loss must not minimise", onEdt { app.extendedState and java.awt.Frame.ICONIFIED != 0 })
 
-            assertTrue(onEdt { WindowsFullScreen.exit(app, WindowPlacement.Floating, start) })
-            assertEquals(start, onEdt { app.bounds })
+            assertTrue(onEdt { WindowsFullScreen.exit(app, WindowPlacement.Floating, initialBounds) })
+            assertEquals(initialBounds, onEdt { app.bounds })
             assertEquals("frame restored", framedStyle, User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE))
             assertFalse(WindowsFullScreen.isFullScreen)
         } finally {

@@ -170,15 +170,6 @@ object WindowsFullScreen {
             ).inv()) or WinUser.WS_POPUP
 
             User32.INSTANCE.SetWindowLong(hwnd, WinUser.GWL_STYLE, fsStyle)
-            User32.INSTANCE.SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                monX, monY, monW, monH,
-                WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
-            )
-
-            // Explicitly notify Explorer shell that this window is fullscreen
-            markFullscreenWindow(hwnd, true)
 
             // Set AWT bounds using user-space coordinates from GraphicsConfiguration.
             // Win32 GetMonitorInfo returns physical pixels; passing physical pixels directly to
@@ -194,6 +185,17 @@ object WindowsFullScreen {
             window.setBounds(targetX, targetY, targetW, targetH)
             window.revalidate()
             window.repaint()
+
+            // Ensure native window pos exactly matches physical monitor rectangle (avoids 1px rounding discrepancies)
+            User32.INSTANCE.SetWindowPos(
+                hwnd,
+                HWND_TOPMOST,
+                monX, monY, monW, monH,
+                WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
+            )
+
+            // Explicitly notify Explorer shell that this window is fullscreen
+            markFullscreenWindow(hwnd, true)
 
             isFullScreen = true
             true
