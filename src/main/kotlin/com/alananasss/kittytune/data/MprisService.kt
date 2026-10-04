@@ -369,6 +369,7 @@ class MprisService(
         fun buildMetadata(track: Track?): HashMap<String, Variant<*>> {
             val meta = HashMap<String, Variant<*>>()
             if (track == null) {
+                // Plasma rejects metadata without a trackid, even when nothing is loaded.
                 meta["mpris:trackid"] = Variant(DBusPath(NO_TRACK_PATH), "o")
                 return meta
             }
