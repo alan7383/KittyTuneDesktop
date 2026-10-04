@@ -33,12 +33,21 @@ jobs:
         run: |
           $exe = "$env:RUNNER_TEMP\bridge\WindowsSmtcBridge.exe"
           if (-not (Test-Path $exe)) { throw "bridge exe missing: $exe" }
-          # The bridge reads its protocol from stdin and exits when stdin closes. Piping QUIT
-          # directly proves the exe starts, wires up an SMTC session, and speaks the protocol.
+          # The bridge reads its protocol from stdin and exits when stdin closes.
+          # We use Start-Process with redirection so winexe processes are waited on deterministically.
           $quit = "$env:RUNNER_TEMP\bridge\quit.txt"
+          $stdout = "$env:RUNNER_TEMP\bridge\stdout.txt"
+          $stderr = "$env:RUNNER_TEMP\bridge\stderr.txt"
           Set-Content -Path $quit -Value "QUIT"
-          $out = Get-Content $quit | & $exe
-          if ($LASTEXITCODE -ne 0) { throw "bridge exited with code $LASTEXITCODE" }
-          if ($out -notcontains 'READY') { throw "bridge did not report READY: $out" }
+
+          $p = Start-Process -FilePath $exe -RedirectStandardInput $quit -RedirectStandardOutput $stdout -RedirectStandardError $stderr -Wait -PassThru
+          $out = if (Test-Path $stdout) { Get-Content $stdout } else { @() }
+          $err = if (Test-Path $stderr) { Get-Content $stderr } else { @() }
+          Write-Host "Process exit code: $($p.ExitCode)"
+          Write-Host "STDOUT: $out"
+          if ($err) { Write-Host "STDERR: $err" }
+
+          if ($p.ExitCode -ne 0) { throw "bridge exited with code $($p.ExitCode): $out $err" }
+          if ($out -notcontains 'READY') { throw "bridge did not report READY: $out $err" }
           Write-Host "Bridge reported READY: OK"
         shell: powershell
