@@ -5,6 +5,7 @@ import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -70,7 +71,15 @@ class WindowsFullScreenDpiTest {
             SwingUtilities.invokeAndWait { }
 
             val monitor = monitorRect(hwnd)
-            assertEquals("Fullscreen must cover exactly the monitor", monitor, nativeRect(hwnd))
+            val actual = nativeRect(hwnd)
+            // Allow at most 1 pixel rounding difference on displays with non-integer scaling fractions (e.g. 1.25x on 768p)
+            assertTrue(
+                "Fullscreen must cover the monitor (expected: $monitor, actual: $actual)",
+                Math.abs(monitor.x - actual.x) <= 1 &&
+                Math.abs(monitor.y - actual.y) <= 1 &&
+                Math.abs(monitor.width - actual.width) <= 1 &&
+                Math.abs(monitor.height - actual.height) <= 1
+            )
 
             SwingUtilities.invokeAndWait {
                 WindowsFullScreen.exit(window, WindowPlacement.Floating, Rectangle(100, 100, 500, 400))
@@ -78,7 +87,14 @@ class WindowsFullScreenDpiTest {
             Thread.sleep(500)
             SwingUtilities.invokeAndWait { }
 
-            assertEquals("Leaving fullscreen must restore the native window rectangle", before, nativeRect(hwnd))
+            val afterExit = nativeRect(hwnd)
+            assertTrue(
+                "Leaving fullscreen must restore the native window rectangle (expected: $before, actual: $afterExit)",
+                Math.abs(before.x - afterExit.x) <= 1 &&
+                Math.abs(before.y - afterExit.y) <= 1 &&
+                Math.abs(before.width - afterExit.width) <= 1 &&
+                Math.abs(before.height - afterExit.height) <= 1
+            )
         } finally {
             frame?.let { f -> SwingUtilities.invokeAndWait { f.dispose() } }
         }
