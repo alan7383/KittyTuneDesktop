@@ -3,8 +3,10 @@ package com.alananasss.kittytune.ui.profile
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +43,7 @@ import com.alananasss.kittytune.data.local.PlayerBarStyle
 import com.alananasss.kittytune.ui.common.settingHighlight
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.local.PlayerSliderStyle
+import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.ScrollableColumn
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
@@ -802,6 +805,7 @@ private fun ScreensaverSection(
 ) {
     // Preset steps for inactivity timeout (in seconds): 15s, 30s, 45s, 60s (1m), 90s, 120s (2m), 180s (3m), 300s (5m)
     val steps = remember { listOf(15, 30, 45, 60, 90, 120, 180, 300) }
+    val presetOptions = remember { listOf(30, 60, 120, 300) }
 
     fun formatDuration(sec: Int): String = when {
         sec < 60 -> "${sec}s"
@@ -820,73 +824,49 @@ private fun ScreensaverSection(
         }
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .settingHighlight("pref_screensaver", shape = RoundedCornerShape(24.dp)),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+    val bottomRadius by animateDpAsState(
+        targetValue = if (enabled) 4.dp else 24.dp,
+        label = "ScreensaverCornerAnimation"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        SettingsItem(
+            shape = RoundedCornerShape(
+                topStart = 24.dp,
+                topEnd = 24.dp,
+                bottomStart = bottomRadius,
+                bottomEnd = bottomRadius
+            ),
+            title = str("pref_screensaver_title"),
+            subtitle = if (enabled) formatSubtitle(timeoutSeconds) else str("pref_screensaver_desc"),
+            icon = Icons.Rounded.DarkMode,
+            hasSwitch = true,
+            switchState = enabled,
+            onSwitchChange = onEnabledChange,
+            highlightKey = "pref_screensaver"
+        )
+
+        AnimatedVisibility(
+            visible = enabled,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    modifier = Modifier.size(42.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.secondaryContainer
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Rounded.DarkMode,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-
-                Spacer(Modifier.width(16.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = str("pref_screensaver_title"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = if (enabled) formatSubtitle(timeoutSeconds) else str("pref_screensaver_desc"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Spacer(Modifier.width(8.dp))
-
-                Switch(
-                    checked = enabled,
-                    onCheckedChange = onEnabledChange
-                )
-            }
-
-            AnimatedVisibility(
-                visible = enabled,
-                enter = androidx.compose.animation.expandVertically() + fadeIn(),
-                exit = androidx.compose.animation.shrinkVertically() + fadeOut(),
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 4.dp,
+                    topEnd = 4.dp,
+                    bottomStart = 24.dp,
+                    bottomEnd = 24.dp
+                ),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -913,7 +893,26 @@ private fun ScreensaverSection(
                         }
                     }
 
-                    // Slider mapping to discrete steps
+                    // Connected button group for preset options (30s, 1 min, 2 min, 5 min)
+                    ExpressiveConnectedButtonGroup(
+                        options = presetOptions,
+                        selectedOption = if (timeoutSeconds in presetOptions) timeoutSeconds else null,
+                        onOptionSelected = { chosen ->
+                            onTimeoutChange(chosen)
+                        },
+                        fillMaxWidth = true,
+                        labelProvider = { sec ->
+                            Text(
+                                text = formatDuration(sec),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (timeoutSeconds == sec) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    )
+
+                    // Discrete slider for fine-grained adjustment
                     val currentStepIndex = remember(timeoutSeconds, steps) {
                         val idx = steps.indexOf(timeoutSeconds)
                         if (idx >= 0) idx.toFloat()
@@ -923,6 +922,9 @@ private fun ScreensaverSection(
                     }
 
                     var sliderPos by remember(currentStepIndex) { mutableFloatStateOf(currentStepIndex) }
+                    LaunchedEffect(currentStepIndex) {
+                        sliderPos = currentStepIndex
+                    }
 
                     Slider(
                         value = sliderPos,
@@ -938,44 +940,6 @@ private fun ScreensaverSection(
                         steps = steps.size - 2,
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    // Quick-select preset pills
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val presets = listOf(30, 60, 120, 300)
-                        presets.forEach { presetSeconds ->
-                            val isSelected = timeoutSeconds == presetSeconds
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                                ),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        onTimeoutChange(presetSeconds)
-                                        sliderPos = steps.indexOf(presetSeconds).toFloat()
-                                    }
-                            ) {
-                                Box(
-                                    modifier = Modifier.padding(vertical = 8.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = formatDuration(presetSeconds),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
