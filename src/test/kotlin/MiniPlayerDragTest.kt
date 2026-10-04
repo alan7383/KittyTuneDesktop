@@ -51,14 +51,15 @@ class MiniPlayerDragTest {
                 f.setBounds(100, 100, 400, 90)
                 f.isVisible = true
             }
+            val window = frame ?: error("Frame was not created")
             assertTrue(
                 "A posted move on a live peer must report success",
-                LinuxWindowHelper.startNativeMoveWindows(frame!!)
+                LinuxWindowHelper.startNativeMoveWindows(window)
             )
-            SwingUtilities.invokeAndWait { frame!!.dispose() }
+            SwingUtilities.invokeAndWait { window.dispose() }
             assertFalse(
                 "A disposed peer must report failure, never a phantom success",
-                LinuxWindowHelper.startNativeMoveWindows(frame!!)
+                LinuxWindowHelper.startNativeMoveWindows(window)
             )
         } finally {
             frame?.let { f -> SwingUtilities.invokeAndWait { runCatching { f.dispose() } } }
