@@ -146,7 +146,8 @@ class AudioEngine {
     private var line: SourceDataLine? = null
     private val scope = CoroutineScope(Dispatchers.Default)
 
-    private var currentUrl: String? = null
+    var currentUrl: String? = null
+        private set
     private var currentHeaders: Map<String, String> = emptyMap()
     private var hlsAdapter: HlsStreamAdapter? = null
 
@@ -396,11 +397,16 @@ class AudioEngine {
     @Synchronized
     fun stop() {
         stopInternal()
+        currentUrl = null
+        currentHeaders = emptyMap()
+        positionMs = 0L
+        durationMs = 0L
+        seekRequestMs = -1L
         setState(State.IDLE)
     }
 
     fun release() {
-        stopInternal()
+        stop()
         scope.coroutineContext[Job]?.cancel()
     }
 
@@ -898,6 +904,7 @@ class AudioEngine {
             }
         } catch (t: Throwable) {
             if (!stopFlag && activeWorkerId == workerId) {
+                setStateAsync(State.IDLE)
                 onError?.invoke(t)
             }
         } finally {
