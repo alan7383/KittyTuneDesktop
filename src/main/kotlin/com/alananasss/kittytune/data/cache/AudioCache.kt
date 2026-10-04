@@ -33,6 +33,12 @@ object AudioCache {
     private val queue = Channel<Track>(capacity = 8, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
 
     init {
+        // Crash leftovers: a download killed mid-store leaves its .part behind, and trim()
+        // ignores those by design. Nothing can be in flight this early, so drop them all.
+        scope.launch {
+            dir.listFiles { f -> f.isFile && f.extension == "part" }
+                ?.forEach { runCatching { it.delete() } }
+        }
         scope.launch {
             for (track in queue) runCatching { store(track) }.onFailure { Logger.w("AudioCache", "Could not cache ${track.id}: ${it.message}") }
         }
@@ -54,7 +60,8 @@ object AudioCache {
     /** The cached file for [trackId], marked as just used; null when it is not cached or caching is off. */
     fun lookup(trackId: Long): File? {
         if (!isEnabled) return null
-        val file = dir.listFiles { f -> f.nameWithoutExtension == trackId.toString() }?.firstOrNull() ?: return null
+        val file = dir.listFiles { f -> f.nameWithoutExtension == trackId.toString() && isCompleteCacheFile(f) }
+            ?.firstOrNull() ?: return null
         file.setLastModified(System.currentTimeMillis())
         return file
     }
@@ -106,3 +113,11 @@ object AudioCache {
         }
     }
 }
+
+/**
+ * Only finished downloads are servable: store() writes to `<id>.part` and renames on
+ * success, so a `.part` (or an empty file) handed to the decoder is an instant
+ * avformat_open_input failure — and the error path retried that same file forever.
+ */
+internal fun isCompleteCacheFile(file: java.io.File): Boolean =
+    file.isFile && file.extension != "part" && file.length() > 0
