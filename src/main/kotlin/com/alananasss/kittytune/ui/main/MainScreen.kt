@@ -399,8 +399,9 @@ fun MainScreen(
             val hoverScope = rememberCoroutineScope()
             var exitHoverJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
             var wasHoverExpandedOnDragStart by remember { mutableStateOf(false) }
+            var isHoverSuppressedUntilExit by remember { mutableStateOf(false) }
 
-            val isHoverExpanded = libraryViewModel.isSidebarCollapsed && isHoverExpandEnabled &&
+            val isHoverExpanded = libraryViewModel.isSidebarCollapsed && isHoverExpandEnabled && !isHoverSuppressedUntilExit &&
                     (isSidebarHovered || libraryViewModel.isSidebarPopupOpen || (draggingSidebar && wasHoverExpandedOnDragStart))
 
             // Keep hover active while a popup/dropdown is open, and grant a 600ms grace period on close
@@ -452,11 +453,12 @@ fun MainScreen(
                                     androidx.compose.ui.input.pointer.PointerEventType.Move -> {
                                         exitHoverJob?.cancel()
                                         exitHoverJob = null
-                                        if (!isSidebarHovered) {
+                                        if (!isHoverSuppressedUntilExit && !isSidebarHovered) {
                                             isSidebarHovered = true
                                         }
                                     }
                                     androidx.compose.ui.input.pointer.PointerEventType.Exit -> {
+                                        isHoverSuppressedUntilExit = false
                                         if (!libraryViewModel.isSidebarPopupOpen && !draggingSidebar) {
                                             exitHoverJob?.cancel()
                                             exitHoverJob = hoverScope.launch {
@@ -484,6 +486,19 @@ fun MainScreen(
                     libraryViewModel = libraryViewModel,
                     playerViewModel = playerViewModel,
                     homeViewModel = homeViewModel,
+                    onToggleCollapse = {
+                        val isVisuallyCollapsed = animatedSidebarWidth < ((libraryViewModel.sidebarWidth + com.alananasss.kittytune.ui.library.SIDEBAR_COLLAPSED_WIDTH) / 2).dp
+                        if (isVisuallyCollapsed) {
+                            isHoverSuppressedUntilExit = false
+                            libraryViewModel.expandSidebar()
+                        } else {
+                            isHoverSuppressedUntilExit = true
+                            exitHoverJob?.cancel()
+                            exitHoverJob = null
+                            isSidebarHovered = false
+                            libraryViewModel.collapseSidebar()
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(sidebarWidth)

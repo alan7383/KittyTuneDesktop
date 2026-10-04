@@ -122,6 +122,7 @@ fun Sidebar(
     libraryViewModel: LibraryViewModel,
     playerViewModel: PlayerViewModel,
     homeViewModel: HomeViewModel? = null,
+    onToggleCollapse: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -213,6 +214,7 @@ fun Sidebar(
                 playerViewModel.showLyricsSheet = false
                 navController.navigate("upload")
             },
+            onToggleCollapse = onToggleCollapse,
             modifier = Modifier.weight(1f),
         )
 
@@ -468,6 +470,7 @@ fun LibraryPanel(
     onImport: () -> Unit = {},
     onHistory: () -> Unit = {},
     onUpload: () -> Unit = {},
+    onToggleCollapse: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -549,6 +552,7 @@ fun LibraryPanel(
                 onImport = onImport,
                 onHistory = onHistory,
                 onUpload = onUpload,
+                onToggleCollapse = onToggleCollapse,
             )
 
             // One slot for both: the search row recedes in it and the rail's actions arrive in it. They
@@ -952,6 +956,7 @@ private fun LibraryHeader(
     onImport: () -> Unit,
     onHistory: () -> Unit,
     onUpload: () -> Unit = {},
+    onToggleCollapse: (() -> Unit)? = null,
 ) {
     var showCreateMenu by remember { mutableStateOf(false) }
     TrackSidebarPopup(showCreateMenu, libraryViewModel)
@@ -1023,14 +1028,25 @@ private fun LibraryHeader(
         } else {
             // One control for both directions now that there is one layout: the same icon in the same
             // place, saying which way it will go.
+            val isVisuallyCollapsed = collapse > 0.5f
             val toggleTip =
-                if (libraryViewModel.isSidebarCollapsed) str("lib_open_tooltip")
+                if (isVisuallyCollapsed) str("lib_open_tooltip")
                 else str("lib_collapse_tooltip")
             Tip(toggleTip) {
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { libraryViewModel.toggleSidebarCollapsed() }
+                        .clickable {
+                            if (onToggleCollapse != null) {
+                                onToggleCollapse()
+                            } else {
+                                if (isVisuallyCollapsed) {
+                                    libraryViewModel.expandSidebar()
+                                } else {
+                                    libraryViewModel.collapseSidebar()
+                                }
+                            }
+                        }
                         .padding(horizontal = 4.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
