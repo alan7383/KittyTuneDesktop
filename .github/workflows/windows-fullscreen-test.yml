@@ -1,0 +1,43 @@
+# Runs the Windows fullscreen tests on a real Windows machine, at 100% and at a simulated 150% display scale.
+#
+# Why this exists: fullscreen spilling over onto a second monitor (issue #66) only happens on Windows, and
+# only when display scaling is above 100%, so it cannot be reproduced from a Linux machine or a plain
+# `gradlew test`. A windows-latest runner is a real Windows VM with a desktop session, and `-PuiScale`
+# makes AWT behave as on a scaled display. The test asserts on the native window rectangle.
+#
+# Run it from the Actions tab, or `gh workflow run windows-fullscreen-test.yml`.
+name: Windows fullscreen test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fullscreen:
+    name: Fullscreen bounds (${{ matrix.scale }}x)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scale: ['1', '1.25', '1.5', '2']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Run fullscreen tests at ${{ matrix.scale }}x
+        run: .\gradlew.bat :test --tests "WindowsFullScreen*" -PuiScale=${{ matrix.scale }} -i
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullscreen-test-report-${{ matrix.scale }}x
+          path: build/reports/tests/test
+          retention-days: 14

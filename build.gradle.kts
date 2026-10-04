@@ -109,6 +109,12 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
+// `-PuiScale=1.5` runs the tests as on a display scaled to 150%. AWT reads the property once at start-up,
+// which is why it is a JVM argument of the test task and not something a test could set for itself.
+tasks.withType<Test>().configureEach {
+    providers.gradleProperty("uiScale").orNull?.let { systemProperty("sun.java2d.uiScale", it) }
+}
+
 compose.desktop {
     application {
         mainClass = "com.alananasss.kittytune.MainKt"
