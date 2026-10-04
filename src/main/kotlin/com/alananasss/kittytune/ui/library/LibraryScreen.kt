@@ -76,6 +76,7 @@ fun LibraryScreen(
     libraryViewModel: LibraryViewModel = viewModel()
 ) {
 
+    com.alananasss.kittytune.ui.debug.TraceRecompositions("LibraryScreen")
     val listState = rememberLazyGridState()
     // collapse fab text when scrolling
     val fabExpanded by remember {

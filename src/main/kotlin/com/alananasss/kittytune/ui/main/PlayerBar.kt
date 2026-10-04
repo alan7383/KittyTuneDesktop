@@ -133,6 +133,7 @@ fun PlayerBar(
     /** Floating only: told where the pill itself is, which the content uses to keep clear of it. */
     onBarPlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
 ) {
+    com.alananasss.kittytune.ui.debug.TraceRecompositions("PlayerBar")
     val vm = playerViewModel
     val track = vm.currentTrack
     val visibleButtons = rememberPlayerBarButtons()

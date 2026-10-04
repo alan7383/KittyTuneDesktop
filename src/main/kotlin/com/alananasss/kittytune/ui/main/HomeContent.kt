@@ -164,6 +164,7 @@ fun HomeContent(
     playerViewModel: PlayerViewModel,
     navController: NavController,
 ) {
+    com.alananasss.kittytune.ui.debug.TraceRecompositions("HomeContent")
     val vm = homeViewModel
     val mode = when {
         vm.isSearching -> HomeMode.SEARCH

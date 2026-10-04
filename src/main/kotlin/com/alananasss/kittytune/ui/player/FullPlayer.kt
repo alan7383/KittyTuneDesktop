@@ -140,6 +140,7 @@ import com.alananasss.kittytune.ui.utils.fadingEdge
  */
 @Composable
 fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
+    com.alananasss.kittytune.ui.debug.TraceRecompositions("FullPlayer")
     val track = viewModel.currentTrack
     var showText by remember { mutableStateOf(true) }
     var showQuickSettings by remember { mutableStateOf(false) }

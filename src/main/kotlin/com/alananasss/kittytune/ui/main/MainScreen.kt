@@ -112,6 +112,7 @@ private const val FULLSCREEN_EXIT_MS = 220
 fun MainScreen(
     playerViewModel: PlayerViewModel = viewModel { PlayerViewModel(AppInstance.application) },
 ) {
+    com.alananasss.kittytune.ui.debug.TraceRecompositions("MainScreen")
     val homeViewModel: HomeViewModel = viewModel { HomeViewModel(AppInstance.application) }
     val libraryViewModel: LibraryViewModel = viewModel { LibraryViewModel(AppInstance.application) }
 

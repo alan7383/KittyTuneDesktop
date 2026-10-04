@@ -125,6 +125,7 @@ fun Sidebar(
     onToggleCollapse: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    com.alananasss.kittytune.ui.debug.TraceRecompositions("Sidebar")
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
