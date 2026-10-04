@@ -74,7 +74,7 @@ fun rememberDominantColor(url: String?, defaultColor: Color = MaterialTheme.colo
     LaunchedEffect(url) {
         if (url != null) {
             val extracted = withContext(Dispatchers.IO) {
-                ArtworkPalette.load(url)?.let { ArtworkPalette.dominantColor(it, preferLight = false) }
+                ArtworkPalette.dominantColorCached(url, preferLight = false)
             }
             if (extracted != null) color.value = extracted
         }
