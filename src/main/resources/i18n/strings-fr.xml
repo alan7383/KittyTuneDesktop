@@ -2148,6 +2148,8 @@
     <string name="user_type_verified_artist">Artiste vérifié</string>
     <string name="lyrics_badge_line_sync">Synchronisé à la ligne</string>
     <string name="lyrics_badge_word_sync">Synchronisé au mot</string>
+    <string name="lyrics_badge_plain">Texte brut</string>
+    <string name="lyrics_provider_all">Tous les fournisseurs</string>
     <string name="pref_dynamic_theme_sub">Colorer l'application d'après la pochette du morceau en cours</string>
     <string name="pref_lyrics_autoscroll">Faire défiler les paroles non synchronisées</string>
     <string name="pref_lyrics_autoscroll_sub">Les paroles sans horodatage défilent seules ; la molette reprend toujours la main</string>

@@ -2150,6 +2150,8 @@
     <string name="user_type_verified_artist">Hitelesített előadó</string>
     <string name="lyrics_badge_line_sync">Soronkénti időzítés</string>
     <string name="lyrics_badge_word_sync">Szavankénti időzítés</string>
+    <string name="lyrics_badge_plain">Egyszerű szöveg</string>
+    <string name="lyrics_provider_all">Minden forrás</string>
     <string name="pref_dynamic_theme_sub">Az alkalmazás színei az aktuális szám borítójából</string>
     <string name="pref_lyrics_autoscroll">Időzítés nélküli dalszöveg görgetése</string>
     <string name="pref_lyrics_autoscroll_sub">Az időzítés nélküli dalszöveg magától görög; az egérgörgő mindig felülírja</string>

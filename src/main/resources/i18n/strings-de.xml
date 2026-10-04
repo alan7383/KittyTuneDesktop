@@ -2740,6 +2740,8 @@
     <string name="listening_stats_disclaimer">Diese Statistiken basieren auf dem Wiedergabe-Algorithmus von KittyTune und spiegeln möglicherweise nicht deine vollständige externe Hörhistorie wider.</string>
     <string name="lyrics_badge_line_sync">Zeilensynchron</string>
     <string name="lyrics_badge_word_sync">Wortsynchron</string>
+    <string name="lyrics_badge_plain">Klartext</string>
+    <string name="lyrics_provider_all">Alle Quellen</string>
     <string name="lyrics_exit_fullscreen">Vollbild beenden</string>
     <string name="pref_screensaver_title">Automatischer Bildschirmschoner</string>
     <string name="pref_screensaver_desc">Wechselt nach 60 s Inaktivität im Vollbildmodus in den Fokusmodus</string>
