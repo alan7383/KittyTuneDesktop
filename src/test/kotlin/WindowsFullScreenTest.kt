@@ -6,13 +6,21 @@ import java.awt.GraphicsEnvironment
 import java.awt.Rectangle
 import javax.swing.JFrame
 import javax.swing.SwingUtilities
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 
 class WindowsFullScreenTest {
+
+    @Before
+    @After
+    fun resetState() {
+        WindowsFullScreen.resetForTesting()
+    }
 
     @Test
     fun testNullWindowHandling() {

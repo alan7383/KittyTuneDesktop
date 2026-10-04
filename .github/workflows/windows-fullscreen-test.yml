@@ -32,7 +32,7 @@ jobs:
           cache: 'gradle'
 
       - name: Run fullscreen tests at ${{ matrix.scale }}x
-        run: .\gradlew.bat :test --tests "WindowsFullScreen*" -PuiScale=${{ matrix.scale }} -i
+        run: .\gradlew.bat :test --tests "WindowsFullScreen*" "-PuiScale=${{ matrix.scale }}" -i
 
       - name: Upload test report
         if: always()

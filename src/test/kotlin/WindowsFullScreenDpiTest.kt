@@ -3,9 +3,11 @@ import androidx.compose.ui.window.WindowPlacement
 import com.sun.jna.platform.win32.User32
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
@@ -22,6 +24,12 @@ import javax.swing.SwingUtilities
  * `-PuiScale=1.5` to exercise the scaled case on a machine that is at 100%.
  */
 class WindowsFullScreenDpiTest {
+
+    @Before
+    @After
+    fun resetState() {
+        WindowsFullScreen.resetForTesting()
+    }
 
     private fun nativeRect(hwnd: WinDef.HWND): Rectangle {
         val r = WinDef.RECT()
