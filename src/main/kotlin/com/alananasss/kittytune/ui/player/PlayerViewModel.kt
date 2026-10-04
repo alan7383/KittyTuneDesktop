@@ -1122,6 +1122,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var prefetchWarmJob: Job? = null
     private var discordJob: Job? = null
     private var discordRpc: com.alananasss.kittytune.data.DiscordRPC? = null
+    /** Consecutive engine failures on the current track, bounding the retry in onPlayerError. */
+    private var consecutivePlayerErrors = 0
+    private var lastPlayerErrorTrackId: Long? = null
     private var mprisService: com.alananasss.kittytune.data.MprisService? = null
     private var windowsSmtcService: com.alananasss.kittytune.data.WindowsSmtcService? = null
 
@@ -1139,6 +1142,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         /** What [Track.fullResArtwork] falls back to when a track has no cover at all. */
         private const val PLACEHOLDER_ARTWORK_PREFIX = "https://picsum.photos"
+
+        /**
+         * Consecutive retries of one track after an engine error. Past this, the track is
+         * skipped instead of retried: a file that failed to open three times will not open
+         * on the fourth, and each attempt costs a fresh resolve plus several seconds.
+         */
+        private const val MAX_CONSECUTIVE_PLAYER_RETRIES = 3
 
         /**
          * How often the queue's prefetched stream URLs are topped up. Well under the few
@@ -1209,6 +1219,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             // baseline rather than a jump (issue #33).
             if (isPlayingState) listenSession?.onPlaying(currentPosition) else listenSession?.onPaused()
             if (isPlayingState) {
+                consecutivePlayerErrors = 0
+                lastPlayerErrorTrackId = null
                 startProgressUpdate()
                 SoundCloudTelemetryTracker.onTrackResumed(currentPosition)
             } else {
@@ -1266,12 +1278,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             currentTrack?.let { StreamResolver.evictStream(it.id) }
 
+            // The same dead file retried forever is the "Player error" spam every 2 s: an
+            // undecodable local file never heals, so consecutive failures on one track fall
+            // through to the skip below instead of retrying without end.
+            val failingId = currentTrack?.id
+            consecutivePlayerErrors =
+                if (failingId != null && failingId == lastPlayerErrorTrackId) consecutivePlayerErrors + 1
+                else 1
+            lastPlayerErrorTrackId = failingId
+
             val msg = (error.message ?: "").lowercase()
             val isRetryable = msg.contains("403") || msg.contains("401") ||
                     msg.contains("network") || msg.contains("timeout") ||
                     msg.contains("connection") || msg.contains("format")
 
-            if (isRetryable) {
+            if (isRetryable && consecutivePlayerErrors <= MAX_CONSECUTIVE_PLAYER_RETRIES) {
                 if (currentQueueIndex >= 0 && currentQueueIndex < _queue.size) {
                     viewModelScope.launch {
                         player.playWhenReady = false
