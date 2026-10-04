@@ -731,7 +731,7 @@ fun ModernProfileHeader(
                 if (showVideo && !artistVideoUrl.isNullOrBlank()) {
                     CanvasVideo(
                         canvasUrl = artistVideoUrl,
-                        isPlaying = true,
+                        isPlaying = playerViewModel.isPlaying,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
