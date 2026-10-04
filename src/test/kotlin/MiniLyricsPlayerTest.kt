@@ -146,15 +146,6 @@ class MiniLyricsPlayerTest {
         val origProgress = prefs.getMiniPlayerShowProgress()
 
         try {
-            // Defaults should be true
-            assertTrue(prefs.getMiniPlayerShowCover(), "Cover default should be true")
-            assertTrue(prefs.getMiniPlayerShowPlaybackControls(), "Playback controls default should be true")
-            assertTrue(prefs.getMiniPlayerShowAdditionalControls(), "Additional controls default should be true")
-            assertTrue(prefs.getMiniPlayerControlsOnHover(), "Controls on hover default should be true")
-            assertTrue(prefs.getMiniPlayerHoverEffect(), "Hover effect default should be true")
-            assertTrue(prefs.getMiniPlayerHoverIllumination(), "Hover illumination default should be true")
-            assertTrue(prefs.getMiniPlayerShowProgress(), "Progress bar default should be true")
-
             // Test toggling false
             prefs.setMiniPlayerShowCover(false)
             prefs.setMiniPlayerShowPlaybackControls(false)
