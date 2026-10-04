@@ -398,9 +398,10 @@ fun MainScreen(
             var isSidebarHovered by remember { mutableStateOf(false) }
             val hoverScope = rememberCoroutineScope()
             var exitHoverJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+            var wasHoverExpandedOnDragStart by remember { mutableStateOf(false) }
 
             val isHoverExpanded = libraryViewModel.isSidebarCollapsed && isHoverExpandEnabled &&
-                    (isSidebarHovered || libraryViewModel.isSidebarPopupOpen) && !draggingSidebar
+                    (isSidebarHovered || libraryViewModel.isSidebarPopupOpen || (draggingSidebar && wasHoverExpandedOnDragStart))
 
             // Keep hover active while a popup/dropdown is open, and grant a 600ms grace period on close
             // so that if the cursor is still resting on the sidebar, it stays open.
@@ -456,7 +457,7 @@ fun MainScreen(
                                         }
                                     }
                                     androidx.compose.ui.input.pointer.PointerEventType.Exit -> {
-                                        if (!libraryViewModel.isSidebarPopupOpen) {
+                                        if (!libraryViewModel.isSidebarPopupOpen && !draggingSidebar) {
                                             exitHoverJob?.cancel()
                                             exitHoverJob = hoverScope.launch {
                                                 kotlinx.coroutines.delay(400L)
@@ -502,15 +503,30 @@ fun MainScreen(
                     .draggable(
                         orientation = androidx.compose.foundation.gestures.Orientation.Horizontal,
                         state = androidx.compose.foundation.gestures.rememberDraggableState { deltaPx ->
-                            libraryViewModel.sidebarDragBy(with(density) { deltaPx.toDp().value })
+                            libraryViewModel.sidebarDragBy(
+                                deltaDp = with(density) { deltaPx.toDp().value },
+                                isHoverExpanded = wasHoverExpandedOnDragStart
+                            )
                         },
                         onDragStarted = {
+                            wasHoverExpandedOnDragStart = isHoverExpanded
                             draggingSidebar = true
-                            libraryViewModel.sidebarDragStart()
+                            exitHoverJob?.cancel()
+                            exitHoverJob = null
+                            libraryViewModel.sidebarDragStart(isHoverExpanded = isHoverExpanded)
                         },
                         onDragStopped = {
+                            val wasHover = wasHoverExpandedOnDragStart
                             draggingSidebar = false
-                            libraryViewModel.sidebarDragEnd()
+                            wasHoverExpandedOnDragStart = false
+                            libraryViewModel.sidebarDragEnd(keepCollapsed = wasHover)
+                            if (wasHover && !libraryViewModel.isSidebarPopupOpen) {
+                                exitHoverJob?.cancel()
+                                exitHoverJob = hoverScope.launch {
+                                    kotlinx.coroutines.delay(400L)
+                                    isSidebarHovered = false
+                                }
+                            }
                         }
                     ),
                 contentAlignment = Alignment.Center

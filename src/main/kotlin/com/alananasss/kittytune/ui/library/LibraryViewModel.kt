@@ -329,23 +329,30 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
 
     private var sidebarDragRaw = 0f
 
-    fun sidebarDragStart() {
-        sidebarDragRaw = if (isSidebarCollapsed) SIDEBAR_COLLAPSED_WIDTH else sidebarWidth
+    fun sidebarDragStart(isHoverExpanded: Boolean = false) {
+        sidebarDragRaw = if (isSidebarCollapsed && !isHoverExpanded) SIDEBAR_COLLAPSED_WIDTH else sidebarWidth
     }
 
-    fun sidebarDragBy(deltaDp: Float) {
+    fun sidebarDragBy(deltaDp: Float, isHoverExpanded: Boolean = false) {
         sidebarDragRaw = (sidebarDragRaw + deltaDp).coerceIn(0f, SIDEBAR_MAX_WIDTH)
         if (sidebarDragRaw < SIDEBAR_SNAP_THRESHOLD) {
             isSidebarCollapsed = true
         } else {
-            isSidebarCollapsed = false
+            if (!isHoverExpanded) {
+                isSidebarCollapsed = false
+            }
             sidebarWidth = sidebarDragRaw.coerceIn(SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH)
         }
     }
 
-    fun sidebarDragEnd() {
+    fun sidebarDragEnd(keepCollapsed: Boolean = false) {
         prefs.putInt("sidebar_width", sidebarWidth.toInt())
-        prefs.putBoolean("sidebar_collapsed", isSidebarCollapsed)
+        if (keepCollapsed && sidebarDragRaw >= SIDEBAR_SNAP_THRESHOLD) {
+            isSidebarCollapsed = true
+            prefs.putBoolean("sidebar_collapsed", true)
+        } else {
+            prefs.putBoolean("sidebar_collapsed", isSidebarCollapsed)
+        }
     }
 
     fun toggleSidebarCollapsed() {
