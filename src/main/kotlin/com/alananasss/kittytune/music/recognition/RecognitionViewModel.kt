@@ -8,10 +8,13 @@ import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Track
 import com.metrolist.shazamkit.Shazam
 import com.metrolist.shazamkit.models.RecognitionResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 sealed class RecognitionState {
@@ -34,6 +37,8 @@ class RecognitionViewModel : ViewModel() {
 
     private val audioRecorder = AudioRecorder()
     private val api by lazy { RetrofitClient.create() }
+    private var activeControl: RecordControl? = null
+    private var recognitionJob: Job? = null
 
     @Volatile
     private var isChecking = false
@@ -99,11 +104,13 @@ class RecognitionViewModel : ViewModel() {
             return
         }
 
-        viewModelScope.launch(Dispatchers.Main) {
+        recognitionJob?.cancel()
+        recognitionJob = viewModelScope.launch(Dispatchers.Main) {
             try {
                 _state.value = RecognitionState.Recording
                 
                 val control = RecordControl()
+                activeControl = control
                 var finalSuccess: RecognitionState.Success? = null
                 isChecking = false
                 
@@ -124,7 +131,8 @@ class RecognitionViewModel : ViewModel() {
                                             finalSuccess = result
                                             control.shouldStop = true
                                             launch(Dispatchers.Main) {
-                                                updateToSuccess(result)
+                                                // Still the live run (not canceled/restarted since)?
+                                                if (control === activeControl) updateToSuccess(result)
                                             }
                                         }
                                     }
@@ -135,6 +143,10 @@ class RecognitionViewModel : ViewModel() {
                         }
                     }
                 )
+
+                // Canceled while capture was still draining (blocking read / parec loop):
+                // bail out instead of running the final check that would land on Error.
+                if (!isActive || control.shouldStop || control !== activeControl) return@launch
 
                 if (pcmData.size < 1000 && finalSuccess == null && _state.value !is RecognitionState.Success) {
                     if (_state.value !is RecognitionState.Success) {
@@ -147,27 +159,43 @@ class RecognitionViewModel : ViewModel() {
                     val durationOfChunk = pcmData.size / (16000 * 2) * 1000L
                     val result = checkRecognition(pcmData, durationOfChunk)
                     if (result != null) {
-                        updateToSuccess(result)
+                        if (control === activeControl) updateToSuccess(result)
                     } else {
+                        if (control !== activeControl) return@launch
                         if (_state.value !is RecognitionState.Success) {
                             _state.value = RecognitionState.Error(str("recognition_track_not_found"))
                         }
                     }
                 } else if (finalSuccess != null) {
-                    updateToSuccess(finalSuccess)
+                    if (control === activeControl) updateToSuccess(finalSuccess)
                 }
 
+            } catch (e: CancellationException) {
+                // Recognition canceled (back button / bloomed button tap): like Android,
+                // never surface this as an error.
+                throw e
             } catch (e: Exception) {
                 println("ERROR: Error during audio recognition: ${e.message}")
                 if (_state.value !is RecognitionState.Success) {
                     _state.value = RecognitionState.Error(e.message ?: "Unknown error")
                 }
+            } finally {
+                activeControl = null
             }
         }
     }
 
-    fun reset() {
+    /** Matches Android: tapping the bloomed button (or back) stops capture and returns to idle. */
+    fun cancelRecognition() {
+        activeControl?.shouldStop = true
+        activeControl = null
+        recognitionJob?.cancel()
+        recognitionJob = null
         _state.value = RecognitionState.Idle
+    }
+
+    fun reset() {
+        cancelRecognition()
     }
 }
 

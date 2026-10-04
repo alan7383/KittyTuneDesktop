@@ -1510,6 +1510,10 @@
     <string name="recognition_listening_desc">Zene hallgatása a környezetében</string>
     <string name="recognition_processing">Elemzés&#8230;</string>
     <string name="recognition_tap_to_identify">Koppintson a zene azonosításához</string>
+    <string name="recognition_tap_to_identify_device">Koppintson az alkalmazásokból történő felismeréshez</string>
+    <string name="recognition_listening_device_desc">Zene hallgatása az eszközön futó alkalmazásokból</string>
+    <string name="recognition_source_mic">Mikrofon</string>
+    <string name="recognition_source_device">Ez az eszköz</string>
     <string name="recognition_track_not_found">A zeneszám nem található</string>
     <string name="recognize_music">Zene felismerése</string>
     <string name="repost_success">Szám újraközölve!</string>

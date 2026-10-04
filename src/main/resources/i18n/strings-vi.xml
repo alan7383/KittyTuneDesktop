@@ -1506,6 +1506,10 @@
     <string name="date_today">Hôm nay</string>
     <string name="date_yesterday">Hôm qua</string>
     <string name="recognition_tap_to_identify">Chạm để nhận diện bài hát</string>
+    <string name="recognition_tap_to_identify_device">Chạm để nhận diện từ ứng dụng</string>
+    <string name="recognition_listening_device_desc">Nghe nhạc phát từ các ứng dụng trên thiết bị này</string>
+    <string name="recognition_source_mic">Microphone</string>
+    <string name="recognition_source_device">Thiết bị này</string>
     <string name="recognition_listening">Đang lắng nghe&#8230;</string>
     <string name="recognition_listening_desc">Đang nghe giai điệu xung quanh bạn</string>
     <string name="recognition_processing">Đang phân tích&#8230;</string>
