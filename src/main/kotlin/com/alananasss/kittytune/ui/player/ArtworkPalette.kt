@@ -19,6 +19,9 @@ object ArtworkPalette {
             .build()
     }
 
+    /** Extracted colours by URL, so scrolling a list does not re-download and re-decode per card. */
+    private val colorCache = PaletteCache()
+
     fun load(url: String): BufferedImage? = try {
         if (url.startsWith("http")) {
             val req = Request.Builder().url(url).build()
@@ -30,6 +33,18 @@ object ArtworkPalette {
         }
     } catch (_: Exception) {
         null
+    }
+
+    /**
+     * [dominantColor] memoised by URL. Extraction downloads and decodes the full image,
+     * so a second view of the same artwork must not pay for it again.
+     */
+    fun dominantColorCached(url: String, preferLight: Boolean): Color? {
+        val key = "$preferLight|$url"
+        colorCache.get(key)?.let { return it }
+        val extracted = load(url)?.let { dominantColor(it, preferLight = preferLight) } ?: return null
+        colorCache.put(key, extracted)
+        return extracted
     }
 
     /**
@@ -231,4 +246,28 @@ object ArtworkPalette {
 
         return Color(red = r / 255f, green = gg / 255f, blue = b / 255f)
     }
+}
+
+/**
+ * Tiny access-ordered memo for extracted colours: colours are bytes, images are megabytes,
+ * so this is what makes repeat views free while the image itself is never retained.
+ */
+internal class PaletteCache(private val maxSize: Int = 512) {
+    private val map = LinkedHashMap<String, Color>(64, 0.75f, true)
+
+    @Synchronized
+    fun get(key: String): Color? = map[key]
+
+    @Synchronized
+    fun put(key: String, value: Color) {
+        map[key] = value
+        if (map.size > maxSize) {
+            val eldest = map.entries.iterator()
+            eldest.next()
+            eldest.remove()
+        }
+    }
+
+    @Synchronized
+    fun size(): Int = map.size
 }
