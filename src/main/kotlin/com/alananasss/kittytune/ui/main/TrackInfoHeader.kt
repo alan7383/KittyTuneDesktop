@@ -67,6 +67,7 @@ internal fun TrackInfoHeader(
     isSpotifyTrack: Boolean,
     isCompact: Boolean,
     isUltraCompact: Boolean,
+    onCommentsClick: () -> Unit = {},
 ) {
     val isCurrentTrack = track.id == vm.currentTrack?.id ||
         (track.title == vm.currentTrack?.title && track.user?.username == vm.currentTrack?.user?.username)
@@ -109,7 +110,7 @@ internal fun TrackInfoHeader(
             TitleAndArtist(vm, track, isSpotifyTrack, isLarge = true)
         }
 
-        if (isSpotifyTrack) SpotifyStats(track) else SoundCloudStats(vm, track)
+        if (isSpotifyTrack) SpotifyStats(track) else SoundCloudStats(vm, track, onCommentsClick)
     }
 }
 
@@ -155,11 +156,12 @@ private fun TitleAndArtist(
 
 /**
  * Plays, likes, reposts and comments. Likes and reposts open
- * the matching list on that page.
+ * the matching list on that page; comments switches to the comments
+ * half and scrolls it into view.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SoundCloudStats(vm: PlayerViewModel, track: Track) {
+private fun SoundCloudStats(vm: PlayerViewModel, track: Track, onCommentsClick: () -> Unit) {
     if (track.id <= 0) return
     val hiddenStats = rememberHiddenPanelTrackStats()
     val showPlays = PlayerPreferences.PANEL_STAT_PLAYS !in hiddenStats
@@ -188,7 +190,9 @@ private fun SoundCloudStats(vm: PlayerViewModel, track: Track) {
             }
         }
         if (showComments) {
-            StatPill(Icons.Rounded.Comment, compactCount(track.commentCount.toLong()))
+            StatPill(Icons.Rounded.Comment, compactCount(track.commentCount.toLong())) {
+                onCommentsClick()
+            }
         }
         if (showInfo) {
             FilledTonalIconButton(
