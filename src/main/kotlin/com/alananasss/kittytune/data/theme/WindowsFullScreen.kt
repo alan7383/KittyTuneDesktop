@@ -50,6 +50,14 @@ object WindowsFullScreen {
     var isFullScreen: Boolean = false
         private set
 
+    fun resetForTesting() {
+        isFullScreen = false
+        savedBounds = null
+        savedWindowPlacement = null
+        wasMaximized = false
+        originalStyle = 0
+    }
+
     /** Native handle of an AWT window, or null before it has been realised. */
     fun handleOf(window: Window?): WinDef.HWND? {
         if (window == null || !window.isDisplayable) return null
@@ -171,10 +179,18 @@ object WindowsFullScreen {
             // Explicitly notify Explorer shell that this window is fullscreen
             markFullscreenWindow(hwnd, true)
 
-            // No window.setBounds here: monX/monY/monW/monH are physical pixels from Win32, while AWT bounds
-            // are DPI-scaled user units. Passing them through made the window `scale` times too large at
-            // >100% display scaling, so it spilled onto neighbouring monitors. SetWindowPos above already
-            // sized the native window and AWT picks the new bounds up from the resulting WM_WINDOWPOSCHANGED.
+            // Set AWT bounds using user-space coordinates from GraphicsConfiguration.
+            // Win32 GetMonitorInfo returns physical pixels; passing physical pixels directly to
+            // AWT's setBounds causes AWT to multiply by scale (e.g. 1.5x), enlarging the window
+            // beyond the monitor and spilling onto the second screen (issue #66).
+            val gc = window.graphicsConfiguration
+            val userBounds = gc?.bounds
+            val targetX = userBounds?.x ?: monX
+            val targetY = userBounds?.y ?: monY
+            val targetW = userBounds?.width ?: monW
+            val targetH = userBounds?.height ?: monH
+
+            window.setBounds(targetX, targetY, targetW, targetH)
             window.revalidate()
             window.repaint()
 
@@ -204,10 +220,15 @@ object WindowsFullScreen {
                 WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_NOACTIVATE
             )
 
-            // Restore original Win32 window style, ensuring WS_POPUP and WS_MAXIMIZE are stripped first
-            val baseStyle = if (originalStyle != 0) originalStyle else (WinUser.WS_OVERLAPPEDWINDOW or WinUser.WS_CLIPCHILDREN or WinUser.WS_CLIPSIBLINGS)
-            val restoredStyle = (baseStyle and WinUser.WS_POPUP.inv() and WinUser.WS_MAXIMIZE.inv()) or
-                (WinUser.WS_CAPTION or WinUser.WS_THICKFRAME or WinUser.WS_OVERLAPPEDWINDOW)
+            // Restore original Win32 window style
+            val restoredStyle = if ((originalStyle and WinUser.WS_CAPTION) != 0) {
+                (originalStyle and WinUser.WS_POPUP.inv() and WinUser.WS_MAXIMIZE.inv()) or
+                    (WinUser.WS_CAPTION or WinUser.WS_THICKFRAME or WinUser.WS_OVERLAPPEDWINDOW)
+            } else if (originalStyle != 0) {
+                originalStyle
+            } else {
+                WinUser.WS_OVERLAPPEDWINDOW or WinUser.WS_CLIPCHILDREN or WinUser.WS_CLIPSIBLINGS
+            }
             User32.INSTANCE.SetWindowLong(hwnd, WinUser.GWL_STYLE, restoredStyle)
 
             val hMon = User32.INSTANCE.MonitorFromWindow(hwnd, WinUser.MONITOR_DEFAULTTONEAREST)
@@ -274,8 +295,14 @@ object WindowsFullScreen {
                     targetX, targetY, targetW, targetH,
                     WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
                 )
-                // Native physical-pixel bounds were applied by SetWindowPos; see enter() for why AWT's
-                // DPI-scaled setBounds must not be fed them.
+                val gc = window.graphicsConfiguration
+                val scaleX = gc?.defaultTransform?.scaleX?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
+                val scaleY = gc?.defaultTransform?.scaleY?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
+                val userTargetX = (targetX / scaleX).toInt()
+                val userTargetY = (targetY / scaleY).toInt()
+                val userTargetW = (targetW / scaleX).toInt()
+                val userTargetH = (targetH / scaleY).toInt()
+                window.setBounds(userTargetX, userTargetY, userTargetW, userTargetH)
                 if (window is androidx.compose.ui.awt.ComposeWindow) {
                     window.placement = WindowPlacement.Floating
                 }

@@ -1,11 +1,13 @@
 import androidx.compose.ui.window.WindowPlacement
 import com.alananasss.kittytune.data.theme.WindowsFullScreen
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
@@ -13,6 +15,12 @@ import java.awt.Rectangle
 import javax.swing.SwingUtilities
 
 class WindowsFullScreenIntegrationTest {
+
+    @Before
+    @After
+    fun resetState() {
+        WindowsFullScreen.resetForTesting()
+    }
 
     @Test
     fun testPlatformDetection() {
