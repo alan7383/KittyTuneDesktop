@@ -28,10 +28,15 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -129,23 +134,19 @@ fun SettingsItem(
     val isHighlighted = SettingsHighlightManager.isHighlighted(highlightKey)
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val highlightAlpha = remember { Animatable(0f) }
+    var itemCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val baseColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val highlightOverlay = remember(primaryColor) { primaryColor.copy(alpha = 0.26f) }
     val highlightedBaseColor = remember(highlightOverlay, baseColor) { highlightOverlay.compositeOver(baseColor) }
 
-    val isScrolling = SettingsHighlightManager.isScrollingToTarget
-
-    LaunchedEffect(isHighlighted, isScrolling) {
+    LaunchedEffect(isHighlighted) {
         if (isHighlighted) {
-            if (isScrolling) {
-                delay(900)
-                SettingsHighlightManager.isScrollingToTarget = false
-            }
-            delay(150)
+            // Short 50ms delay for initial layout pass to settle coordinates
+            delay(50)
             try {
-                bringIntoViewRequester.bringIntoView()
+                bringIntoViewRequester.bringIntoViewCentered(itemCoordinates)
             } catch (_: Exception) {}
 
             highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
@@ -188,7 +189,8 @@ fun SettingsItem(
         shape = shape,
         modifier = Modifier
             .fillMaxWidth()
-            .bringIntoViewRequester(bringIntoViewRequester),
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onGloballyPositioned { itemCoordinates = it },
         interactionSource = interactionSource
     ) {
         Row(
@@ -356,23 +358,19 @@ fun SplitSettingsItem(
     val isHighlighted = SettingsHighlightManager.isHighlighted(highlightKey)
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val highlightAlpha = remember { Animatable(0f) }
+    var itemCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val baseColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val highlightOverlay = remember(primaryColor) { primaryColor.copy(alpha = 0.26f) }
     val highlightedBaseColor = remember(highlightOverlay, baseColor) { highlightOverlay.compositeOver(baseColor) }
 
-    val isScrolling = SettingsHighlightManager.isScrollingToTarget
-
-    LaunchedEffect(isHighlighted, isScrolling) {
+    LaunchedEffect(isHighlighted) {
         if (isHighlighted) {
-            if (isScrolling) {
-                delay(900)
-                SettingsHighlightManager.isScrollingToTarget = false
-            }
-            delay(150)
+            // Short 50ms delay for initial layout pass to settle coordinates
+            delay(50)
             try {
-                bringIntoViewRequester.bringIntoView()
+                bringIntoViewRequester.bringIntoViewCentered(itemCoordinates)
             } catch (_: Exception) {}
 
             highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
@@ -399,6 +397,7 @@ fun SplitSettingsItem(
         modifier = Modifier
             .fillMaxWidth()
             .bringIntoViewRequester(bringIntoViewRequester)
+            .onGloballyPositioned { itemCoordinates = it }
     ) {
         Row(
             modifier = Modifier

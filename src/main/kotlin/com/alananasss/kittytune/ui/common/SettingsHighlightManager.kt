@@ -19,11 +19,38 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.delay
+
+/**
+ * Scrolls the container so that the requested item is positioned near the center of the viewport,
+ * rather than stopped at the top or bottom edge.
+ */
+suspend fun BringIntoViewRequester.bringIntoViewCentered(coordinates: LayoutCoordinates?) {
+    if (coordinates != null && coordinates.isAttached) {
+        val rootCoords = try { coordinates.findRootCoordinates() } catch (_: Exception) { null }
+        val viewportHeight = rootCoords?.size?.height?.toFloat() ?: 800f
+        val itemHeight = coordinates.size.height.toFloat()
+        val itemWidth = coordinates.size.width.toFloat()
+        val verticalPadding = ((viewportHeight - itemHeight) / 2f).coerceAtLeast(0f)
+        val centeredRect = Rect(
+            left = 0f,
+            top = -verticalPadding,
+            right = itemWidth,
+            bottom = itemHeight + verticalPadding
+        )
+        bringIntoView(centeredRect)
+    } else {
+        bringIntoView()
+    }
+}
 
 /**
  * Manages target item highlighting when navigating from settings search,
@@ -56,7 +83,7 @@ object SettingsHighlightManager {
 
 /**
  * Modifier that can be attached to any Composable setting card, row or container.
- * When highlighted via [SettingsHighlightManager], it automatically scrolls into view
+ * When highlighted via [SettingsHighlightManager], it automatically scrolls into view (centered)
  * and pulses 3 times before smoothly fading out.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -71,13 +98,14 @@ fun Modifier.settingHighlight(
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val highlightAlpha = remember { Animatable(0f) }
     val primaryColor = MaterialTheme.colorScheme.primary
+    var itemCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
     LaunchedEffect(isHighlighted) {
         if (isHighlighted) {
-            // Short delay to let screen transition and layout settle
-            delay(150)
+            // Short 50ms delay for initial layout pass to settle coordinates
+            delay(50)
             try {
-                bringIntoViewRequester.bringIntoView()
+                bringIntoViewRequester.bringIntoViewCentered(itemCoordinates)
             } catch (_: Exception) {}
 
             highlightAlpha.animateTo(1f, tween(200, easing = LinearEasing))
@@ -93,6 +121,7 @@ fun Modifier.settingHighlight(
 
     this
         .bringIntoViewRequester(bringIntoViewRequester)
+        .onGloballyPositioned { itemCoordinates = it }
         .drawWithContent {
             drawContent()
             if (highlightAlpha.value > 0f) {
