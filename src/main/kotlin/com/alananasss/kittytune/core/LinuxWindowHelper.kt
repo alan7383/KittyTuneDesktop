@@ -289,7 +289,10 @@ object LinuxWindowHelper {
 
     interface ExtendedUser32 : com.sun.jna.Library {
         fun ReleaseCapture(): Boolean
-        fun PostMessage(hWnd: WinDef.HWND, msg: Int, wParam: WinDef.WPARAM, lParam: WinDef.LPARAM): Boolean
+        // NOTE: the W suffix is load-bearing. user32 only exports PostMessageA/W;
+        // a plain "PostMessage" lookup throws UnsatisfiedLinkError on first call,
+        // which used to silently kill every native move (see MiniPlayerDragTest).
+        fun PostMessageW(hWnd: WinDef.HWND, msg: Int, wParam: WinDef.WPARAM, lParam: WinDef.LPARAM): Boolean
     }
 
     private val extendedUser32: ExtendedUser32? by lazy {
@@ -312,7 +315,7 @@ object LinuxWindowHelper {
             val WM_SYSCOMMAND = 0x0112
             val SC_MOVE = 0xF010
             val HTCAPTION = 0x0002
-            interop.PostMessage(hwnd, WM_SYSCOMMAND, WinDef.WPARAM((SC_MOVE or HTCAPTION).toLong()), WinDef.LPARAM(0))
+            interop.PostMessageW(hwnd, WM_SYSCOMMAND, WinDef.WPARAM((SC_MOVE or HTCAPTION).toLong()), WinDef.LPARAM(0))
         }.getOrDefault(false)
     }
 }
