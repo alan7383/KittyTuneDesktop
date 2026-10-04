@@ -131,17 +131,18 @@ object WindowsFullScreen {
 
             originalStyle = User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE)
 
-            // Save Win32 window placement (captures accurate restore rectangle even when maximized)
+            // Save Win32 window placement (captures accurate restore placement even when maximized)
             val wp = WinUser.WINDOWPLACEMENT()
             wp.length = wp.size()
             if (User32.INSTANCE.GetWindowPlacement(hwnd, wp).booleanValue()) {
                 savedWindowPlacement = wp
                 wasMaximized = (wp.showCmd == WinUser.SW_SHOWMAXIMIZED) ||
                     (window is Frame && (window.extendedState and Frame.MAXIMIZED_BOTH) != 0)
-                val r = wp.rcNormalPosition
-                savedBounds = Rectangle(r.left, r.top, r.right - r.left, r.bottom - r.top)
             } else {
                 wasMaximized = (window is Frame && (window.extendedState and Frame.MAXIMIZED_BOTH) != 0)
+            }
+
+            if (!wasMaximized || savedBounds == null) {
                 savedBounds = window.bounds
             }
 
@@ -266,43 +267,14 @@ object WindowsFullScreen {
                 if (window is Frame) {
                     window.extendedState = Frame.NORMAL
                 }
-                val rawBounds = savedBounds ?: fallbackBounds ?: window.bounds
-                val workW = mi.rcWork.right - mi.rcWork.left
-                val workH = mi.rcWork.bottom - mi.rcWork.top
-                var targetW = rawBounds.width.coerceIn(minOf(600, workW), workW)
-                var targetH = rawBounds.height.coerceIn(minOf(400, workH), workH)
-                var targetX = rawBounds.x
-                var targetY = rawBounds.y
-
-                // Ensure the window never spills outside the usable desktop area (above the taskbar)
-                if (targetX + targetW > mi.rcWork.right) targetX = mi.rcWork.right - targetW
-                if (targetX < mi.rcWork.left) targetX = mi.rcWork.left
-                if (targetY + targetH > mi.rcWork.bottom) targetY = mi.rcWork.bottom - targetH
-                if (targetY < mi.rcWork.top) targetY = mi.rcWork.top
-
-                val wp = savedWindowPlacement
-                if (wp != null) {
-                    wp.showCmd = WinUser.SW_SHOWNORMAL
-                    wp.rcNormalPosition.left = targetX
-                    wp.rcNormalPosition.top = targetY
-                    wp.rcNormalPosition.right = targetX + targetW
-                    wp.rcNormalPosition.bottom = targetY + targetH
-                    User32.INSTANCE.SetWindowPlacement(hwnd, wp)
-                }
+                val targetBounds = savedBounds ?: fallbackBounds ?: window.bounds
                 User32.INSTANCE.SetWindowPos(
                     hwnd,
                     HWND_NOTOPMOST,
-                    targetX, targetY, targetW, targetH,
-                    WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
+                    0, 0, 0, 0,
+                    WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_NOZORDER or WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
                 )
-                val gc = window.graphicsConfiguration
-                val scaleX = gc?.defaultTransform?.scaleX?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
-                val scaleY = gc?.defaultTransform?.scaleY?.toFloat()?.coerceAtLeast(1.0f) ?: 1.0f
-                val userTargetX = (targetX / scaleX).toInt()
-                val userTargetY = (targetY / scaleY).toInt()
-                val userTargetW = (targetW / scaleX).toInt()
-                val userTargetH = (targetH / scaleY).toInt()
-                window.setBounds(userTargetX, userTargetY, userTargetW, userTargetH)
+                window.setBounds(targetBounds.x, targetBounds.y, targetBounds.width, targetBounds.height)
                 if (window is androidx.compose.ui.awt.ComposeWindow) {
                     window.placement = WindowPlacement.Floating
                 }
