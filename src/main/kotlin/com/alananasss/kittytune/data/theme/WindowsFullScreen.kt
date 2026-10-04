@@ -171,7 +171,10 @@ object WindowsFullScreen {
             // Explicitly notify Explorer shell that this window is fullscreen
             markFullscreenWindow(hwnd, true)
 
-            window.setBounds(monX, monY, monW, monH)
+            // No window.setBounds here: monX/monY/monW/monH are physical pixels from Win32, while AWT bounds
+            // are DPI-scaled user units. Passing them through made the window `scale` times too large at
+            // >100% display scaling, so it spilled onto neighbouring monitors. SetWindowPos above already
+            // sized the native window and AWT picks the new bounds up from the resulting WM_WINDOWPOSCHANGED.
             window.revalidate()
             window.repaint()
 
@@ -271,7 +274,8 @@ object WindowsFullScreen {
                     targetX, targetY, targetW, targetH,
                     WinUser.SWP_FRAMECHANGED or WinUser.SWP_SHOWWINDOW
                 )
-                window.setBounds(targetX, targetY, targetW, targetH)
+                // Native physical-pixel bounds were applied by SetWindowPos; see enter() for why AWT's
+                // DPI-scaled setBounds must not be fed them.
                 if (window is androidx.compose.ui.awt.ComposeWindow) {
                     window.placement = WindowPlacement.Floating
                 }
