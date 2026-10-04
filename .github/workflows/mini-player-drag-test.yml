@@ -1,0 +1,41 @@
+# Runs the mini-player drag tests on a real Windows machine.
+#
+# Why this exists: the mini-player drag goes through Win32 (SC_MOVE posted to the
+# live HWND, with a manual setLocation fallback). The fallback-engages logic and
+# the truthful post result can only be exercised against a real Windows window
+# manager, not from Linux or headless CI. A windows-latest runner is a real
+# Windows VM with a desktop session, so undecorated frames can be shown and the
+# native move actually posted.
+#
+# Run it from the Actions tab, or `gh workflow run mini-player-drag-test.yml`.
+name: Mini-player drag test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  drag:
+    name: Mini-player drag (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Run mini-player drag tests
+        run: .\gradlew.bat :test --tests "*MiniPlayerDragTest*" -i
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mini-player-drag-test-report
+          path: build/reports/tests/test
+          retention-days: 14
