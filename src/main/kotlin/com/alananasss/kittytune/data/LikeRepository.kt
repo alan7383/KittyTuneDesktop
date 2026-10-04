@@ -87,13 +87,22 @@ object LikeRepository {
     private fun writeUnlikeMarks(marks: Collection<UnlikeMark>) =
         putStringSet(KEY_LOCALLY_UNLIKED_IDS, marks.map { "${it.trackId}:${it.atMs}" }.toSet())
 
-    private fun addToBlacklist(trackId: Long) {
-        val kept = readUnlikeMarks().filterNot { it.trackId == trackId }
-        writeUnlikeMarks(kept + UnlikeMark(trackId, System.currentTimeMillis()))
+    private fun addToBlacklist(trackId: Long) = addToBlacklist(listOf(trackId))
+
+    private fun addToBlacklist(trackIds: Collection<Long>) {
+        if (trackIds.isEmpty()) return
+        val ids = trackIds.toSet()
+        val kept = readUnlikeMarks().filterNot { it.trackId in ids }
+        val now = System.currentTimeMillis()
+        writeUnlikeMarks(kept + ids.map { UnlikeMark(it, now) })
     }
 
-    private fun removeFromBlacklist(trackId: Long) {
-        writeUnlikeMarks(readUnlikeMarks().filterNot { it.trackId == trackId })
+    private fun removeFromBlacklist(trackId: Long) = removeFromBlacklist(listOf(trackId))
+
+    private fun removeFromBlacklist(trackIds: Collection<Long>) {
+        if (trackIds.isEmpty()) return
+        val ids = trackIds.toSet()
+        writeUnlikeMarks(readUnlikeMarks().filterNot { it.trackId in ids })
     }
 
     private fun getBlacklist(): Set<Long> {
@@ -511,7 +520,10 @@ object LikeRepository {
      */
     fun applyRemoteLikesBatch(tracks: List<Pair<Track, Long>>) {
         if (tracks.isEmpty()) return
-        tracks.forEach { removeFromBlacklist(it.first.id) }
+        // One prefs read+write for the whole batch: the per-track version rewrote the
+        // entire preferences file once per id, which is the write storm a big first
+        // sync showed in the profiler.
+        removeFromBlacklist(tracks.map { it.first.id })
         _likedTracks.update { current ->
             val trackMap = current.associateBy { it.id }.toMutableMap()
             val now = System.currentTimeMillis()
@@ -551,7 +563,7 @@ object LikeRepository {
      */
     fun applyRemoteUnlikesBatch(trackIds: Set<Long>) {
         if (trackIds.isEmpty()) return
-        trackIds.forEach { addToBlacklist(it) }
+        addToBlacklist(trackIds)
         _likedTracks.update { it.filterNot { t -> t.id in trackIds } }
         scheduleSave()
     }
