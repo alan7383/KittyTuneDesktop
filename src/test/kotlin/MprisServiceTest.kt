@@ -72,6 +72,31 @@ class MprisServiceTest {
             }.getOrDefault(false)
             assumeTrue("no D-Bus session bus (run under dbus-run-session)", busAvailable)
 
+            // A live app (or a leaked previous run) owns the well-known name on shared
+            // buses: every call below would then hit THAT instance and fail confusingly
+            // (foreign track ids, callbacks never arriving). Bail out loudly instead.
+            val nameTaken = runCatching {
+                val probe = DBusConnectionBuilder.forSessionBus().build()
+                try {
+                    val daemon = probe.getRemoteObject(
+                        "org.freedesktop.DBus",
+                        "/org/freedesktop/DBus",
+                        org.freedesktop.dbus.interfaces.DBus::class.java,
+                        false,
+                    )
+                    val taken = daemon.NameHasOwner(BUS)
+                    val owner = runCatching { daemon.GetNameOwner(BUS) }.getOrDefault("<none>")
+                    println("MPRIS-TEST probe: bus=${System.getenv("DBUS_SESSION_BUS_ADDRESS")} taken=$taken owner=$owner")
+                    taken
+                } finally {
+                    runCatching { probe.disconnect() }
+                }
+            }.getOrDefault(false)
+            assumeTrue(
+                "bus name $BUS already owned — is the app running? use dbus-run-session",
+                !nameTaken,
+            )
+
             service = MprisService(
                 onRaise = { events.offer("raise") },
                 onPlay = { events.offer("play") },

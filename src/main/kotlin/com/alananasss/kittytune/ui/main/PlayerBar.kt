@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -82,6 +83,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.rounded.GraphicEq
 import com.alananasss.kittytune.R
@@ -143,6 +146,20 @@ fun PlayerBar(
     val floatLook = rememberFloatingBarLook()
     // In the pill every hover and press is a circle, like the pill itself; the stock shape is a squircle.
     val iconShapes = if (isFloating) IconButtonShapes(androidx.compose.foundation.shape.CircleShape, androidx.compose.foundation.shape.CircleShape) else IconButtonDefaults.shapes()
+
+    // Automix badge state — rendered as a floating badge straddling the bar's top edge
+    // (issue #66 item 12: in the playback panel, not the artist section).
+    val isAutomixing by AutomixManager.isAutomixing.collectAsState()
+    val mixBeatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
+    val isCrossfading = MusicManager.isCrossfadingOut
+    val automixDebug by AutomixManager.automixDebugInfo.collectAsState()
+    val mixProgress by AutomixManager.mixProgress.collectAsState()
+    val isMixActive = isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)
+
+    val nextTrackForChip = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
+    val isDifferentNext = vm.repeatMode == RepeatMode.ONE || (nextTrackForChip != null && nextTrackForChip.id != track?.id)
+    val nextTitleForChip = nextTrackForChip?.title?.trim()?.takeIf { it.isNotEmpty() && isDifferentNext }
+    val beatMs = automixDebug?.outBpm?.takeIf { it > 0f }?.let { 60_000f / it } ?: 500f
 
     Box(modifier, contentAlignment = Alignment.Center) {
     Surface(
@@ -264,34 +281,6 @@ fun PlayerBar(
                                             modifier = Modifier.size(12.dp)
                                         )
                                     }
-                                }
-
-                                // Automix chip — slides in below the artist name when a mix is active
-                                val isAutomixing by AutomixManager.isAutomixing.collectAsState()
-                                val mixBeatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
-                                val isCrossfading = MusicManager.isCrossfadingOut
-                                val automixDebug by AutomixManager.automixDebugInfo.collectAsState()
-                                val mixProgress by AutomixManager.mixProgress.collectAsState()
-                                val isMixActive = isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)
-
-                                val nextTrackForChip = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
-                                val isDifferentNext = vm.repeatMode == RepeatMode.ONE || (nextTrackForChip != null && nextTrackForChip.id != track.id)
-                                val nextTitleForChip = nextTrackForChip?.title?.trim()?.takeIf { it.isNotEmpty() && isDifferentNext }
-                                val beatMs = automixDebug?.outBpm?.takeIf { it > 0f }?.let { 60_000f / it } ?: 500f
-
-                                AnimatedVisibility(
-                                    visible = isMixActive,
-                                    enter = fadeIn(tween(300)) + expandVertically(tween(250, easing = FastOutSlowInEasing)),
-                                    exit = fadeOut(tween(500)) + shrinkVertically(tween(400, easing = FastOutSlowInEasing)),
-                                ) {
-                                    AutomixChip(
-                                        isAutomixing = isAutomixing,
-                                        isCrossfading = isCrossfading,
-                                        mixBeatsLeft = mixBeatsLeft,
-                                        mixProgress = mixProgress,
-                                        nextTitle = nextTitleForChip,
-                                        beatMs = beatMs,
-                                    )
                                 }
                             }
                         }
@@ -549,6 +538,27 @@ fun PlayerBar(
             }
         }
     }
+        // Floating badge: zero layout impact, never covers the transport or the seek bar.
+        AnimatedContent(
+            targetState = isMixActive,
+            transitionSpec = {
+                (fadeIn(tween(300)) + scaleIn(tween(300, easing = FastOutSlowInEasing), initialScale = 0.85f))
+                    .togetherWith(fadeOut(tween(300)) + scaleOut(tween(250), targetScale = 0.9f))
+            },
+            label = "automix_badge",
+            modifier = Modifier.align(Alignment.TopCenter).offset(y = (-15).dp),
+        ) { active ->
+            if (active) {
+                AutomixChip(
+                    isAutomixing = isAutomixing,
+                    isCrossfading = isCrossfading,
+                    mixBeatsLeft = mixBeatsLeft,
+                    mixProgress = mixProgress,
+                    nextTitle = nextTitleForChip,
+                    beatMs = beatMs,
+                )
+            }
+        }
     }
 }
 }
@@ -622,9 +632,9 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
 }
 
 /**
- * Compact M3 SuggestionChip in the left track-info panel.
+ * Compact M3 SuggestionChip in the center playback panel, below the transport buttons.
  *
- * Shows the current automix state without pushing the center transport panel:
+ * Shows the current automix state without pushing the track info: (issue #66 item 12)
  * - Countdown: "Mix dans 4" with a tempo-synced beat flash
  * - Active mix: "Mixing" or "Mixing → Next Track" with a gentle glow
  */
@@ -689,13 +699,13 @@ private fun AutomixChip(
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 200.dp)
+                    modifier = Modifier.widthIn(max = 220.dp)
                 )
             }
         },
@@ -703,26 +713,22 @@ private fun AutomixChip(
             Icon(
                 imageVector = Icons.Rounded.GraphicEq,
                 contentDescription = null,
-                tint = primaryColor.copy(alpha = iconAlpha),
+                tint = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.size(SuggestionChipDefaults.IconSize)
             )
         },
         colors = SuggestionChipDefaults.suggestionChipColors(
-            containerColor = if (isMixPhase)
-                primaryColor.copy(alpha = 0.12f * glowAlpha)
-            else
-                primaryColor.copy(alpha = 0.08f),
-            labelColor = primaryColor.copy(alpha = if (isMixPhase) glowAlpha else beatAlpha),
+            containerColor = MaterialTheme.colorScheme.primary,
+            labelColor = MaterialTheme.colorScheme.onPrimary,
         ),
-        border = SuggestionChipDefaults.suggestionChipBorder(
-            enabled = true,
-            borderColor = if (isMixPhase)
-                primaryColor.copy(alpha = 0.35f * glowAlpha)
-            else
-                primaryColor.copy(alpha = 0.18f),
-            borderWidth = 1.dp,
-        ),
-        modifier = modifier
+        border = null,
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.shadow(
+            elevation = 12.dp * iconAlpha,
+            shape = RoundedCornerShape(14.dp),
+            spotColor = primaryColor,
+            ambientColor = primaryColor,
+        )
     )
 }
 
