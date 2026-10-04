@@ -44,6 +44,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.material.icons.Icons
@@ -124,17 +125,22 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import java.awt.Cursor
 
-private class WindowDragHandler(
+internal class WindowDragHandler(
     private val window: java.awt.Window,
     private val onDragStart: () -> Unit,
     private val onDragEnd: () -> Unit,
 ) {
+    internal val isDragging: Boolean get() = isDraggingInternal
+
     private var dragStartMouseX = 0
     private var dragStartMouseY = 0
     private var windowStartX = 0
     private var windowStartY = 0
     private var isDraggingInternal = false
     private var isNativeMoveActive = false
+    private var pendingMoveX = 0
+    private var pendingMoveY = 0
+    private var lastManualMoveNs = 0L
 
     private val dragMotionListener = object : java.awt.event.MouseMotionAdapter() {
         override fun mouseDragged(e: java.awt.event.MouseEvent) {
@@ -164,10 +170,16 @@ private class WindowDragHandler(
     }
 
     fun startDrag(xRoot: Int, yRoot: Int) {
-        if (isDraggingInternal) return
+        // A fresh primary press proves any previous button is up: a missed release
+        // (eaten by a native move loop, lost focus dance) must never latch dragging
+        // on forever — that wedged state read as "can't drag, click or move at all".
+        if (isDraggingInternal) stopDrag()
         isDraggingInternal = true
         dragStartMouseX = xRoot
         dragStartMouseY = yRoot
+        pendingMoveX = xRoot
+        pendingMoveY = yRoot
+        lastManualMoveNs = 0L
         windowStartX = window.x
         windowStartY = window.y
         onDragStart()
@@ -177,6 +189,14 @@ private class WindowDragHandler(
 
         val nativeStarted = com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
         isNativeMoveActive = nativeStarted
+        if (!loggedDragPath) {
+            loggedDragPath = true
+            println(
+                "MiniPlayer: drag via " +
+                    if (nativeStarted) "native WM move" else "manual fallback" +
+                    " (wayland=${com.alananasss.kittytune.core.LinuxWindowHelper.isWayland})"
+            )
+        }
         if (!nativeStarted) {
             window.addMouseMotionListener(dragMotionListener)
         }
@@ -184,10 +204,21 @@ private class WindowDragHandler(
 
     fun onPointerMove(xRoot: Int, yRoot: Int) {
         if (!isDraggingInternal || isNativeMoveActive) return
-        val dx = xRoot - dragStartMouseX
-        val dy = yRoot - dragStartMouseY
-        val newX = windowStartX + dx
-        val newY = windowStartY + dy
+        pendingMoveX = xRoot
+        pendingMoveY = yRoot
+        // Frame-paced placements: motion events (Compose loop + AWT listener) arrive by
+        // the hundred per second, and every setLocation is a compositor round-trip that
+        // re-targets its move animation. Flushing at most once per frame with the latest
+        // position keeps tracking 1:1 instead of swimming around the cursor.
+        val now = System.nanoTime()
+        if (now - lastManualMoveNs < MANUAL_MOVE_MIN_INTERVAL_NS) return
+        lastManualMoveNs = now
+        flushPendingMove()
+    }
+
+    private fun flushPendingMove() {
+        val newX = windowStartX + (pendingMoveX - dragStartMouseX)
+        val newY = windowStartY + (pendingMoveY - dragStartMouseY)
         if (window.x != newX || window.y != newY) {
             window.setLocation(newX, newY)
         }
@@ -195,6 +226,8 @@ private class WindowDragHandler(
 
     fun stopDrag() {
         if (!isDraggingInternal) return
+        // Land exactly under the cursor: the throttle above may hold back the tail.
+        if (!isNativeMoveActive) flushPendingMove()
         isDraggingInternal = false
         isNativeMoveActive = false
         window.removeMouseListener(dragMouseListener)
@@ -207,6 +240,11 @@ private class WindowDragHandler(
         stopDrag()
     }
 }
+
+private var loggedDragPath = false
+
+/** At most one manual placement per frame: faster only churns the compositor. */
+private const val MANUAL_MOVE_MIN_INTERVAL_NS = 16_000_000L
 
 /**
  * A floating mini-player for lyrics that stays on top of windows.
@@ -260,6 +298,10 @@ fun MiniLyricsPlayerWindow(
 
     var isPinned by remember { mutableStateOf(true) }
     var isDragging by remember { mutableStateOf(false) }
+    // Starts hidden: the type and transparency are set before the first map, so tiling
+    // compositors (Hyprland) manage the window as a floating utility from the start
+    // instead of tiling a briefly-NORMAL window that can never be dragged afterwards.
+    var windowReady by remember { mutableStateOf(false) }
 
     // Debounced, and never mid-drag: a drag moves the window a hundred times a second.
     LaunchedEffect(windowState.position, windowState.size, isElongated, isDragging) {
@@ -279,7 +321,8 @@ fun MiniLyricsPlayerWindow(
         }
     }
 
-    val closeMiniPlayer = {
+    val closeMiniPlayer = { reason: String ->
+        println("MiniPlayer: closing (reason=$reason)")
         val pos = windowState.position
         val curX = if (isElongated) prefs.getMiniPlayerElongatedX() else prefs.getMiniPlayerX()
         val curY = if (isElongated) prefs.getMiniPlayerElongatedY() else prefs.getMiniPlayerY()
@@ -300,15 +343,35 @@ fun MiniLyricsPlayerWindow(
     val isFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen
 
     Window(
-        onCloseRequest = closeMiniPlayer,
+        onCloseRequest = { closeMiniPlayer("os-close-request") },
         state = windowState,
-        visible = !isFullScreen,
+        visible = !isFullScreen && windowReady,
         alwaysOnTop = isPinned,
         undecorated = true,
         transparent = true,
         resizable = true,
         title = "KittyTune Mini Player",
     ) {
+        // Pre-map setup while the window is still hidden (see windowReady above):
+        // type, transparency and show-time styling land before the compositor ever
+        // maps the window, which is what makes tiling WMs float it as a utility.
+        DisposableEffect(window) {
+            runCatching { window.type = java.awt.Window.Type.UTILITY }
+            runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
+            val shownListener = object : java.awt.event.ComponentAdapter() {
+                override fun componentShown(e: java.awt.event.ComponentEvent?) {
+                    if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                        com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
+                    } else {
+                        com.alananasss.kittytune.core.LinuxWindowHelper.configureUtilityWindow(window)
+                    }
+                }
+            }
+            window.addComponentListener(shownListener)
+            windowReady = true
+            onDispose { window.removeComponentListener(shownListener) }
+        }
+
         val density = LocalDensity.current
         val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
         val customDensity = remember(density, uiScale) {
@@ -523,11 +586,19 @@ fun MiniLyricsPlayerWindow(
                                 awaitEachGesture {
                                     val down = awaitFirstDown(requireUnconsumed = true)
                                     if (down.type == PointerType.Mouse && currentEvent.buttons.isPrimaryPressed) {
-                                        val awtEvent = currentEvent.nativeEvent as? java.awt.event.MouseEvent
-                                        val mouseLoc = java.awt.MouseInfo.getPointerInfo()?.location
-                                        val xRoot = mouseLoc?.x ?: awtEvent?.xOnScreen ?: (window.x + down.position.x.toInt())
-                                        val yRoot = mouseLoc?.y ?: awtEvent?.yOnScreen ?: (window.y + down.position.y.toInt())
-                                        dragHandler.startDrag(xRoot, yRoot)
+                                        // A plain click must never touch the window manager: posting a
+                                        // native move (or grabbing listeners) on every press made clicks
+                                        // jitter the window and risked wedging the EDT in a move loop.
+                                        // Only once the pointer travelled past the slop is this a drag.
+                                        val slop = awaitTouchSlopOrCancellation(down.id) { change, _ ->
+                                            change.consume()
+                                            val cur = java.awt.MouseInfo.getPointerInfo()?.location
+                                            val awt = currentEvent.nativeEvent as? java.awt.event.MouseEvent
+                                            val xRoot = cur?.x ?: awt?.xOnScreen ?: (window.x + change.position.x.toInt())
+                                            val yRoot = cur?.y ?: awt?.yOnScreen ?: (window.y + change.position.y.toInt())
+                                            dragHandler.startDrag(xRoot, yRoot)
+                                        }
+                                        if (slop == null) return@awaitEachGesture
                                         while (true) {
                                             val event = awaitPointerEvent()
                                             if (event.changes.all { !it.pressed }) {
@@ -635,7 +706,7 @@ fun MiniLyricsPlayerWindow(
                                         danger = true,
                                         onClick = {
                                             contextMenuVisible = false
-                                            closeMiniPlayer()
+                                            closeMiniPlayer("context-menu-hide")
                                         },
                                     )
                                 }

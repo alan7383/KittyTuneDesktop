@@ -221,14 +221,32 @@ object LinuxWindowHelper {
     }
 
     fun startNativeMoveLinux(window: Window, xOnScreen: Int, yOnScreen: Int): Boolean {
-        if (!isLinux || isWayland) return false
+        if (!isLinux) return false
+        // No native move under Wayland: compositors there do not honour _NET_WM_MOVERESIZE
+        // for XWayland windows — Hyprland advertises it in _NET_SUPPORTED but its XWM
+        // message handler has no case for it ("Unhandled message", dropped). Claiming
+        // success would disable the manual fallback below, leaving the window frozen.
+        // The manual path (XMoveWindow -> ConfigureRequest) IS honoured for floating
+        // windows (CWindow::onConfigureRequest applies the position), so return false
+        // and let it engage.
+        if (isWayland) return false
         return runCatching {
-            if (!window.isDisplayable) return false
+            if (!window.isDisplayable) {
+                println("MiniPlayer: native move unavailable (window not displayable)")
+                return false
+            }
             val windowId = Native.getWindowID(window)
-            if (windowId == 0L) return false
+            if (windowId == 0L) {
+                println("MiniPlayer: native move unavailable (no X11 window id)")
+                return false
+            }
 
             val x11 = X11.INSTANCE
-            val display = x11.XOpenDisplay(null) ?: return false
+            val display = x11.XOpenDisplay(null)
+            if (display == null) {
+                println("MiniPlayer: native move unavailable (cannot open X display)")
+                return false
+            }
             try {
                 val win = X11.Window(windowId)
                 val root = x11.XDefaultRootWindow(display)
@@ -264,6 +282,8 @@ object LinuxWindowHelper {
             } finally {
                 x11.XCloseDisplay(display)
             }
+        }.onFailure {
+            println("MiniPlayer: native move failed (${it.message})")
         }.getOrDefault(false)
     }
 
@@ -282,14 +302,17 @@ object LinuxWindowHelper {
         if (!isWindows) return false
         return runCatching {
             if (!window.isDisplayable) return false
+            // A null interop (JNA unavailable in this runtime) must report failure so
+            // the manual fallback drag engages — never claim a move that was not posted,
+            // or the window silently stops moving at all.
+            val interop = extendedUser32 ?: return false
             val hwnd = WinDef.HWND(Native.getWindowPointer(window))
             if (hwnd.pointer == null || hwnd.pointer == Pointer.NULL) return false
-            extendedUser32?.ReleaseCapture()
+            interop.ReleaseCapture()
             val WM_SYSCOMMAND = 0x0112
             val SC_MOVE = 0xF010
             val HTCAPTION = 0x0002
-            extendedUser32?.PostMessage(hwnd, WM_SYSCOMMAND, WinDef.WPARAM((SC_MOVE or HTCAPTION).toLong()), WinDef.LPARAM(0))
-            true
+            interop.PostMessage(hwnd, WM_SYSCOMMAND, WinDef.WPARAM((SC_MOVE or HTCAPTION).toLong()), WinDef.LPARAM(0))
         }.getOrDefault(false)
     }
 }

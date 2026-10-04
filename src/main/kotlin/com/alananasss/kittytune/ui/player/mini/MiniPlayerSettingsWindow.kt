@@ -76,6 +76,9 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit) {
         state = state,
         undecorated = true,
         transparent = true,
+        // Above its own mini player: that window is TOPMOST while pinned, so a normal
+        // settings window could open underneath it and take clicks meant for it.
+        alwaysOnTop = true,
         resizable = false,
         title = str("mini_player_settings_title"),
         onKeyEvent = { event ->
