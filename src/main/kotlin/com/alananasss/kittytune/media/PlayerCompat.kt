@@ -332,9 +332,48 @@ class Player {
     fun setMediaItem(item: MediaItem, startPositionMs: Long = 0L) {
         releasePrebuffered()
         crossfadeJob?.cancel()
+        isCrossfadingOut = false
+        fadingEngine?.stop()
+        fadingEngine?.release()
+        fadingEngine = null
         items.clear()
         items.add(item)
         currentIndex = 0
+
+        val uriStr = item.uri
+        val isDirectUrl = uriStr != null && (
+            uriStr.startsWith("http://") ||
+            uriStr.startsWith("https://") ||
+            uriStr.startsWith("file:") ||
+            uriStr.startsWith("metrofuse-deezer://") ||
+            java.io.File(uriStr).exists()
+        ) && !SignedUrl.isExpired(uriStr)
+
+        if (isDirectUrl && uriStr != null) {
+            val url = if (uriStr.startsWith("metrofuse-deezer://")) {
+                com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProxy.getPlayableUrlFromDeezerUri(uriStr)
+            } else {
+                uriStr
+            }
+            val headers = buildHeaders(item.track)
+            val track = item.track
+            if (track != null) {
+                val cached = com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(track.id)
+                if (cached != null) {
+                    activeEngine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
+                } else {
+                    activeEngine.clearTrackLoudness()
+                }
+            } else {
+                activeEngine.clearTrackLoudness()
+            }
+            activeEngine.setVolume(volumeAmplitude)
+            activeEngine.setTrackGainDb(trackGainDb)
+            activeEngine.setMediaItem(url, headers, startPositionMs)
+        } else {
+            activeEngine.stop()
+        }
+
         loadCurrent(startPositionMs, false, 0L)
         listeners.forEach { it.onMediaItemTransition(currentMediaItem, MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) }
     }
@@ -352,6 +391,10 @@ class Player {
         crossfadeJob?.cancel()
         resolveJob?.cancel()
         
+        fadingEngine?.stop()
+        fadingEngine?.release()
+        fadingEngine = null
+
         val oldEngine = activeEngine
         unbindEngine(oldEngine)
 
@@ -418,6 +461,10 @@ class Player {
                     } ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
 
                     if (rawUrl == null) {
+                        oldEngine.stop()
+                        oldEngine.release()
+                        fadingEngine = null
+                        isCrossfadingOut = false
                         listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
                         return@launch
                     }
@@ -495,13 +542,17 @@ class Player {
                         if (fadingEngine != oldEngine) break
                         if (!isActive) break
 
-                        while (!newEngine.isPlaying && isActive && newEngine.state == AudioEngine.State.BUFFERING) {
+                        var bufferWait = 0
+                        while (!newEngine.isPlaying && isActive && newEngine.state == AudioEngine.State.BUFFERING && bufferWait < 50) {
                             delay(100)
+                            bufferWait++
                         }
                         // Paused mid-fade: hold the fade where it is, so it resumes rather than having finished
                         // in silence.
-                        while (!playWhenReady && isActive) {
+                        var pauseWait = 0
+                        while (!playWhenReady && isActive && pauseWait < 600) {
                             delay(50)
+                            pauseWait++
                         }
 
                         if (oldEngine.state == AudioEngine.State.ENDED || oldEngine.state == AudioEngine.State.IDLE) {
@@ -529,6 +580,7 @@ class Player {
                     }
                 }
             } finally {
+                isCrossfadingOut = false
                 try {
                     if (fadingEngine == oldEngine) {
                         newEngine.setVolume(volumeAmplitude)
@@ -584,6 +636,7 @@ class Player {
         crossfadeJob?.cancel()
         resolveJob?.cancel()
         releasePrebuffered()
+        isCrossfadingOut = false
         fadingEngine?.stop()
         fadingEngine?.release()
         fadingEngine = null
@@ -593,7 +646,9 @@ class Player {
         crossfadeJob?.cancel()
         resolveJob?.cancel()
         releasePrebuffered()
+        isCrossfadingOut = false
         fadingEngine?.release()
+        fadingEngine = null
         activeEngine.release()
     }
 
@@ -623,6 +678,10 @@ class Player {
             }
                 ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
             if (rawUrl == null) {
+                activeEngine.stop()
+                fadingEngine?.stop()
+                fadingEngine?.release()
+                fadingEngine = null
                 listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
                 return@launch
             }
@@ -656,9 +715,16 @@ class Player {
             
             activeEngine.setVolume(volumeAmplitude)
             activeEngine.setTrackGainDb(trackGainDb)
-            activeEngine.setMediaItem(url, headers, startPositionMs)
-            activeEngine.prepare()
-            if (playWhenReady) activeEngine.play()
+            if (activeEngine.currentUrl != url) {
+                activeEngine.setMediaItem(url, headers, startPositionMs)
+                activeEngine.prepare()
+                if (playWhenReady) activeEngine.play()
+            } else {
+                if (activeEngine.state == AudioEngine.State.IDLE) {
+                    activeEngine.prepare()
+                    if (playWhenReady) activeEngine.play()
+                }
+            }
         }
     }
 
@@ -677,3 +743,6 @@ class Player {
         fadingEngine?.applyEffects(state)
     }
 }
+
+typealias PlayerCompat = Player
+

@@ -4360,11 +4360,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         val uniqueTracks = tracks.map { it.copy() }
 
-        val mediaItems = uniqueTracks.map { track ->
-            buildMediaItem(track, null, null)
-        }
-        player.addMediaItems(mediaItems)
-
         _queue.addAll(uniqueTracks)
         _originalQueue.addAll(uniqueTracks)
         updateQueueState()
@@ -5101,15 +5096,19 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             if (resolvedUrl == null) {
                 // Not downloaded, resolve from network / streamCache
-                val resolved = StreamResolver.resolveStreamWithDrm(trackToPlay)
-                resolvedStream = resolved
-                resolvedUrl = resolved?.url
-                resolvedMimeType = resolved?.mimeType
+                try {
+                    val resolved = StreamResolver.resolveStreamWithDrm(trackToPlay)
+                    resolvedStream = resolved
+                    resolvedUrl = resolved?.url
+                    resolvedMimeType = resolved?.mimeType
 
-                // Cache DRM token if present (streaming JWT)
-                if (resolved?.isDrmProtected == true && resolved.licenseAuthToken != null) {
-                    MusicManager.putDrmToken(trackToPlay.id, resolved.licenseAuthToken)
-                    println("DRM token pre-cached for track ${trackToPlay.id}")
+                    // Cache DRM token if present (streaming JWT)
+                    if (resolved?.isDrmProtected == true && resolved.licenseAuthToken != null) {
+                        MusicManager.putDrmToken(trackToPlay.id, resolved.licenseAuthToken)
+                        println("DRM token pre-cached for track ${trackToPlay.id}")
+                    }
+                } catch (e: Exception) {
+                    Logger.e("PlayerViewModel", "Failed to resolve stream for track ${trackToPlay.id}: ${e.message}")
                 }
             }
 
@@ -5121,6 +5120,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             if (resolvedUrl == null) {
                 withContext(Dispatchers.Main) {
+                    MusicManager.stop()
                     if (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
                         isLoading = true
                         isPlaying = false
