@@ -360,6 +360,16 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         prefs.putBoolean("sidebar_collapsed", isSidebarCollapsed)
     }
 
+    fun collapseSidebar() {
+        isSidebarCollapsed = true
+        prefs.putBoolean("sidebar_collapsed", true)
+    }
+
+    fun expandSidebar() {
+        isSidebarCollapsed = false
+        prefs.putBoolean("sidebar_collapsed", false)
+    }
+
     fun createPlaylist(title: String, isPublic: Boolean, onCreated: (Long) -> Unit = {}) {
         val name = title.trim()
         if (name.isEmpty() || isCreatingPlaylist) return

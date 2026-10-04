@@ -58,4 +58,15 @@ class SidebarHoverExpandResizeTest {
         vm.sidebarDragEnd(keepCollapsed = false)
         assertTrue(vm.isSidebarCollapsed, "Should save collapsed state")
     }
+
+    @Test
+    fun `collapseSidebar and expandSidebar explicitly set collapsed state`() {
+        val vm = LibraryViewModel(Application())
+
+        vm.collapseSidebar()
+        assertTrue(vm.isSidebarCollapsed)
+
+        vm.expandSidebar()
+        assertFalse(vm.isSidebarCollapsed)
+    }
 }
