@@ -32,6 +32,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Color
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
@@ -116,6 +117,9 @@ fun TrackInfoTab(vm: PlayerViewModel) {
 
     val displayTrack = fullTrack ?: currentTrack
 
+    val listState = rememberLazyListState()
+    var commentsScrollRequest by remember { mutableStateOf(0) }
+
     val organizedComments = remember(vm.commentsList.toList()) {
         val list = mutableListOf<Comment>()
         for (comment in vm.commentsList) {
@@ -151,6 +155,34 @@ fun TrackInfoTab(vm: PlayerViewModel) {
     var showLyricsHalf by remember { mutableStateOf(playerPrefs.infoPanelOpensOnLyrics()) }
     val lyricsHalf = isSpotifyTrack || showLyricsHalf
 
+    val selectHalf: (Boolean) -> Unit = {
+        showLyricsHalf = it
+        // Written whatever the setting says. Someone who switches the setting to
+        // "last choice" later should find the choice they had already been making.
+        playerPrefs.setInfoPanelLastLyrics(it)
+    }
+
+    // Index of the Comments/Lyrics toggle for SoundCloud tracks: header + tags/details
+    // are always one item each, then the conditional social-proof and description items.
+    // The comments pill (which only exists for SoundCloud) scrolls here.
+    val commentsToggleIndex = remember(displayTrack, vm.socialLikerUser) {
+        var index = 2
+        if (vm.socialLikerUser != null) index++
+        if (!displayTrack.description.isNullOrBlank()) index++
+        index
+    }
+
+    val onCommentsClick: () -> Unit = {
+        if (lyricsHalf) selectHalf(false)
+        commentsScrollRequest++
+    }
+
+    LaunchedEffect(commentsScrollRequest, lyricsHalf) {
+        if (commentsScrollRequest == 0 || lyricsHalf) return@LaunchedEffect
+        listState.animateScrollToItem(commentsToggleIndex)
+        commentsScrollRequest = 0
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val panelHeight = maxHeight
         val isCompact = lyricsHalf && panelHeight < 780.dp
@@ -168,11 +200,12 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             // container it also pushed the scrollbar 16.dp inwards, which parked it against the text
             // instead of at the panel edge (issue #33).
             Modifier.fillMaxSize(),
+            state = listState,
             verticalArrangement = Arrangement.spacedBy(if (isCompact) 12.dp else 18.dp),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
         ) {
             item {
-                TrackInfoHeader(vm, displayTrack, isSpotifyTrack, isCompact, isUltraCompact)
+                TrackInfoHeader(vm, displayTrack, isSpotifyTrack, isCompact, isUltraCompact, onCommentsClick)
             }
 
         if (isSpotifyTrack) spotifyCreditsSection(vm, displayTrack, spotifyCredits)
@@ -256,10 +289,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                 lyricsSelected = lyricsHalf,
                 commentCount = displayTrack.commentCount ?: organizedComments.size,
                 onSelect = {
-                    showLyricsHalf = it
-                    // Written whatever the setting says. Someone who switches the setting to
-                    // "last choice" later should find the choice they had already been making.
-                    playerPrefs.setInfoPanelLastLyrics(it)
+                    selectHalf(it)
                 },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
             )
