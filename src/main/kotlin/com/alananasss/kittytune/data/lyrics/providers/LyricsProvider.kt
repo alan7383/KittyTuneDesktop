@@ -19,7 +19,7 @@ enum class PreferredLyricsProvider(val displayName: String) {
 
     companion object {
         fun fromName(name: String?): PreferredLyricsProvider? =
-            entries.find { it.name.equals(name, ignoreCase = true) }
+            entries.find { it.name.equals(name, ignoreCase = true) || it.displayName.equals(name, ignoreCase = true) }
     }
 }
 

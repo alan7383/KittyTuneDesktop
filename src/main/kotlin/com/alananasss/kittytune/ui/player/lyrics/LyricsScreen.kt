@@ -945,6 +945,7 @@ import kotlin.math.roundToInt
                 val (enabled, disabled) = all.partition { viewModel.playerPrefs.getLyricsProviderEnabled(it) }
                 enabled + disabled
             }
+            val isAllSelected = viewModel.manualSearchProvider.equals("ALL", ignoreCase = true)
             val currentProvider = allProviders.firstOrNull { it.name.equals(viewModel.manualSearchProvider, ignoreCase = true) }
             var providerExpanded by remember { mutableStateOf(false) }
 
@@ -959,7 +960,7 @@ import kotlin.math.roundToInt
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                 ) {
                     Text(
-                        text = currentProvider?.displayName ?: "Auto",
+                        text = if (isAllSelected) str("lyrics_provider_all").ifBlank { "All Sources" } else (currentProvider?.displayName ?: viewModel.manualSearchProvider),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -978,6 +979,29 @@ import kotlin.math.roundToInt
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                     tonalElevation = 2.dp,
                 ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = str("lyrics_provider_all").ifBlank { "All Sources" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isAllSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isAllSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        },
+                        onClick = {
+                            providerExpanded = false
+                            viewModel.searchLyricsManual(query, "ALL")
+                        },
+                        leadingIcon = if (isAllSelected) ({
+                            Icon(
+                                Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }) else null
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     allProviders.forEach { provider ->
                         val isActive = viewModel.manualSearchProvider.equals(provider.name, ignoreCase = true)
                         DropdownMenuItem(
@@ -1042,43 +1066,123 @@ import kotlin.math.roundToInt
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                modifier = Modifier.padding(14.dp)
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(result.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(result.artistName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    if (!result.albumName.isNullOrEmpty()) {
-                                        Text(result.albumName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = result.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = result.artistName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (!result.albumName.isNullOrEmpty()) {
+                                            Text(
+                                                text = result.albumName,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        if (result.durationSec > 0.0) {
+                                            Text(
+                                                makeTimeString((result.durationSec * 1000).toLong()),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Spacer(Modifier.height(4.dp))
+                                        }
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            // Badge du fournisseur
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = result.provider,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+
+                                            // Badge de synchronisation
+                                            if (result.hasLineSync || result.hasWordSync) {
+                                                Surface(
+                                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ) {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Icon(
+                                                            if (result.hasWordSync) Icons.Rounded.Verified else Icons.Rounded.Timer,
+                                                            contentDescription = null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(12.dp)
+                                                        )
+                                                        Spacer(Modifier.width(3.dp))
+                                                        Text(
+                                                            text = if (result.hasWordSync) str("lyrics_badge_word_sync").ifBlank { "Word-sync" } else str("lyrics_badge_line_sync").ifBlank { "Synced" },
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                                        )
+                                                    }
+                                                }
+                                            } else {
+                                                Surface(
+                                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                                    shape = RoundedCornerShape(6.dp)
+                                                ) {
+                                                    Text(
+                                                        text = str("lyrics_badge_plain").ifBlank { "Plain text" },
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                                Spacer(Modifier.width(8.dp))
-                                Column(horizontalAlignment = Alignment.End) {
-                                    if (result.durationSec > 0.0) {
+
+                                if (!result.previewText.isNullOrBlank()) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.6f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
                                         Text(
-                                            makeTimeString((result.durationSec * 1000).toLong()),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            text = result.previewText,
+                                            style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                         )
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        if (result.hasLineSync) {
-                                            Icon(
-                                                Icons.Rounded.Timer,
-                                                str("lyrics_badge_line_sync"),
-                                                tint = MaterialTheme.colorScheme.tertiary,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                        if (result.hasWordSync) {
-                                            Icon(
-                                                Icons.Rounded.Verified,
-                                                str("lyrics_badge_word_sync"),
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
                                     }
                                 }
                             }

@@ -2146,6 +2146,8 @@
     <string name="user_type_verified_artist">Verified Artist</string>
     <string name="lyrics_badge_line_sync">Line-by-line timings</string>
     <string name="lyrics_badge_word_sync">Word-by-word timings</string>
+    <string name="lyrics_badge_plain">Plain text</string>
+    <string name="lyrics_provider_all">All Sources</string>
     <string name="pref_dynamic_theme_sub">Colour the app from the current track's artwork</string>
     <string name="pref_lyrics_autoscroll">Scroll unsynced lyrics</string>
     <string name="pref_lyrics_autoscroll_sub">Lyrics with no timings scroll on their own; your scroll wheel always takes over</string>
