@@ -445,8 +445,8 @@ private fun VolumeTrack(
 
             val currentHalfAlongTrack = lerp(thumbRadiusPx, stroke * 0.6f, thumbInteractionFraction)
             val dynamicGap = with(density) {
-                val idleGap = thumbRadiusPx + 4.dp.toPx()
-                val draggingGap = currentHalfAlongTrack + 2.dp.toPx()
+                val idleGap = 5.dp.toPx()
+                val draggingGap = currentHalfAlongTrack + 1.2.dp.toPx()
                 idleGap + (draggingGap - idleGap) * thumbInteractionFraction
             } * (1.0f + 0.1573f * animatedAmplitude * animatedAmplitude)
 
