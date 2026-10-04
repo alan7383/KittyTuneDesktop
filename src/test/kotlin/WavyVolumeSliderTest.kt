@@ -84,5 +84,19 @@ class WavyVolumeSliderTest {
             "PlayerBar must pass iconShapes to VolumeControl",
         )
     }
+
+    @Test
+    fun `wavy slider connects track to thumb without idle gap`() {
+        val wavyExpressiveSource = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/player/slider/WavySliderExpressive.kt").readText()
+        assertTrue(
+            wavyExpressiveSource.contains("val idleGap = 6.dp"),
+            "WavySliderExpressive must maintain idleGap at 6.dp so track connects to 8.dp thumb",
+        )
+        val volumeSource = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/main/VolumeControl.kt").readText()
+        assertTrue(
+            volumeSource.contains("val idleGap = 5.dp.toPx()"),
+            "VolumeControl must maintain idleGap at 5.dp so track connects to 7.dp thumb",
+        )
+    }
 }
 
