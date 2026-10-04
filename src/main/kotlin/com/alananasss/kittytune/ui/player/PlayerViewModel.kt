@@ -214,6 +214,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val newVol = if (v <= 0.001f) 0f else v.coerceIn(0f, 1f)
         volume = newVol
         MusicManager.setVolume(newVol)
+        mprisService?.updateVolume(newVol.toDouble())
     }
 
     /** Called when the user finishes a volume interaction; persists across restarts. */
@@ -1220,7 +1221,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         override fun onPlaybackStateChanged(state: Int) {
             if (state == Player.STATE_READY) {
                 isLoading = false
-                if (MusicManager.player.duration > 0) duration = MusicManager.player.duration
+                if (MusicManager.player.duration > 0) {
+                    // The engine length backfills tracks whose API metadata had none: push it
+                    // so mpris:length appears instead of staying missing for the whole track.
+                    if (duration != MusicManager.player.duration) {
+                        duration = MusicManager.player.duration
+                        updateMprisMedia()
+                    }
+                }
                 pendingSeekPosition?.let { MusicManager.player.seekTo(it); pendingSeekPosition = null }
             }
             if (state == Player.STATE_BUFFERING) isLoading = true
@@ -1607,8 +1615,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 onPlay = { play() },
                 onPause = { pause() },
                 onPlayPause = { togglePlayPause() },
-                onNext = { playNext() },
-                onPrevious = { smartPrevious() },
+                onNext = { mprisNext() },
+                onPrevious = { mprisPrevious() },
+                onStop = { pause(); seekTo(0) },
                 onSeek = { seekTo(it) },
                 onVolume = { v -> updateVolume(v.toFloat()) },
                 onShuffle = { s -> if (s != shuffleEnabled) toggleShuffle() },
@@ -3498,7 +3507,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true, isCrossfade: Boolean = false) {
+    private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true, isCrossfade: Boolean = false, autoPlay: Boolean = true) {
         if (index < 0 || index >= _queue.size) {
             currentContext = null; return
         }
@@ -3521,7 +3530,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         hasPushedRecentlyPlayed = false
         currentTrack = trackToPlay; MusicManager.currentTrack = trackToPlay
 
-        playRobustly(index, autoPlay = true, isCrossfade = isCrossfade)
+        playRobustly(index, autoPlay = autoPlay, isCrossfade = isCrossfade)
+
+        // A paused prepare emits no engine state change, so nothing else would announce
+        // the new track: push it here. Delta-suppressed when nothing actually changed.
+        updateMprisMedia()
 
         trackInitJob?.cancel()
         trackInitJob = viewModelScope.launch {
@@ -3560,6 +3573,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             loadLyrics(finalTrack)
             loadSocialProof(finalTrack)
             saveStateAsync(saveQueue = false)
+            // Hydration backfills title/artwork the queue entry lacked: re-announce it.
+            updateMprisMedia()
 
             SoundCloudTelemetryTracker.onTrackStarted(
                 track = finalTrack,
@@ -3577,7 +3592,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun playNext(manual: Boolean = true, isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), ignoreRepeatOne: Boolean = false) {
+    fun playNext(manual: Boolean = true, isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), ignoreRepeatOne: Boolean = false, autoPlay: Boolean = true) {
         if (isAutoplayRadioLoading) return
 
         if (manual) {
@@ -3595,6 +3610,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         if (!manual && !playerPrefs.getContinuousPlaybackEnabled()) {
             MusicManager.player.pause()
             MusicManager.player.seekTo(0)
+            currentPosition = 0L
+            updateMprisMedia()
             saveStateAsync()
             return
         }
@@ -3603,10 +3620,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val nextIndex = currentQueueIndex + 1
 
         if (nextIndex < _queue.size) {
-            playTrackAtIndex(nextIndex, addToHistory = false, isCrossfade = isCrossfade)
+            playTrackAtIndex(nextIndex, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
         } else {
             if (repeatMode == RepeatMode.ALL) {
-                playTrackAtIndex(0, addToHistory = false, isCrossfade = isCrossfade)
+                playTrackAtIndex(0, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
             } else {
                 val autoPlayEnabled = playerPrefs.getAutoplayEnabled()
                 val isSpotify = isSpotifyTrack(currentTrack)
@@ -3624,16 +3641,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                         val newNextIndex = currentQueueIndex + 1
                         if (newNextIndex < _queue.size) {
-                            playTrackAtIndex(newNextIndex, addToHistory = false, isCrossfade = isCrossfade)
+                            playTrackAtIndex(newNextIndex, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
                         } else {
                             MusicManager.player.pause()
                             MusicManager.player.seekTo(0)
+                            currentPosition = 0L
+                            updateMprisMedia()
                             saveStateAsync()
                         }
                     }
                 } else {
                     MusicManager.player.pause()
                     MusicManager.player.seekTo(0)
+                    currentPosition = 0L
+                    updateMprisMedia()
                 }
             }
         }
@@ -3795,27 +3816,46 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun smartPrevious(isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled()) {
+    fun smartPrevious(isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), autoPlay: Boolean = true) {
         if (player.currentPosition > 3000) {
             flushListenSession("MANUAL_REPLAY")
             // The same track from the top is a new listen, not a continuation of the old one.
             beginListenSession(currentTrack)
             currentPosition = 0L
             player.seekTo(0)
-            player.play()
-            isPlaying = true
+            if (autoPlay) {
+                player.play()
+                isPlaying = true
+            }
         } else {
             currentTrack?.let { track ->
                 flushListenSession("SKIP_PREVIOUS")
             }
             val prev = currentQueueIndex - 1
             if (prev >= 0) {
-                playTrackAtIndex(prev, addToHistory = false, isCrossfade = isCrossfade)
+                playTrackAtIndex(prev, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
             } else {
                 currentPosition = 0L
                 player.seekTo(0)
             }
         }
+        // Restarts and rewinds emit no engine state change when paused: refresh the baseline.
+        updateMprisMedia()
+    }
+
+    /**
+     * MPRIS Next/Previous: a paused or stopped player stays that way, per spec —
+     * unlike the on-screen buttons, which always start playback. Crossfading a paused
+     * source is meaningless, so it is only used when actually playing.
+     */
+    fun mprisNext() {
+        if (isPlaying) playNext(manual = true)
+        else playNext(manual = true, isCrossfade = false, autoPlay = false)
+    }
+
+    fun mprisPrevious() {
+        if (isPlaying) smartPrevious()
+        else smartPrevious(isCrossfade = false, autoPlay = false)
     }
 
     fun play() {
@@ -5221,7 +5261,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     } else {
                         isLoading = false
                         isPlaying = false
-                        if (allowSkipOnFailure) playNext(manual = false, ignoreRepeatOne = true)
+                        if (allowSkipOnFailure) playNext(manual = false, ignoreRepeatOne = true, autoPlay = autoPlay)
                     }
                 }
                 return@launch
