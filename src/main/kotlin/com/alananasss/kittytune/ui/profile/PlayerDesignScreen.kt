@@ -30,12 +30,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import com.alananasss.kittytune.core.str
@@ -177,28 +179,39 @@ fun PlayerDesignContent(
             }
         )
 
-        // 5. Source audio en plein écran (Audio source badge)
-        TrackSourceSection(
-            enabled = fullPlayerSourceEnabled,
-            onEnabledChange = {
-                fullPlayerSourceEnabled = it
-                prefs.setFullPlayerSourceIndicatorEnabled(it)
-            }
-        )
+        // 5. Options plein écran (Source audio & Écran de veille)
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            TrackSourceSection(
+                shape = RoundedCornerShape(
+                    topStart = 24.dp,
+                    topEnd = 24.dp,
+                    bottomStart = 4.dp,
+                    bottomEnd = 4.dp
+                ),
+                enabled = fullPlayerSourceEnabled,
+                onEnabledChange = {
+                    fullPlayerSourceEnabled = it
+                    prefs.setFullPlayerSourceIndicatorEnabled(it)
+                }
+            )
 
-        // 6. Écran de veille automatique (Screensaver / sleep mode)
-        ScreensaverSection(
-            enabled = currentScreensaverEnabled,
-            onEnabledChange = { enabled ->
-                localScreensaverEnabled = enabled
-                playerViewModel?.updateFullPlayerScreensaverEnabled(enabled) ?: prefs.setFullPlayerScreensaverEnabled(enabled)
-            },
-            timeoutSeconds = currentScreensaverTimeout,
-            onTimeoutChange = { timeout ->
-                localScreensaverTimeout = timeout
-                playerViewModel?.updateFullPlayerScreensaverTimeout(timeout) ?: prefs.setFullPlayerScreensaverTimeout(timeout)
-            }
-        )
+            ScreensaverSection(
+                topRadius = 4.dp,
+                enabled = currentScreensaverEnabled,
+                onEnabledChange = { enabled ->
+                    localScreensaverEnabled = enabled
+                    playerViewModel?.updateFullPlayerScreensaverEnabled(enabled) ?: prefs.setFullPlayerScreensaverEnabled(enabled)
+                },
+                timeoutSeconds = currentScreensaverTimeout,
+                onTimeoutChange = { timeout ->
+                    localScreensaverTimeout = timeout
+                    playerViewModel?.updateFullPlayerScreensaverTimeout(timeout) ?: prefs.setFullPlayerScreensaverTimeout(timeout)
+                }
+            )
+        }
     }
 }
 
@@ -782,9 +795,10 @@ private fun PlayerAdvancedSection(
 private fun TrackSourceSection(
     enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
+    shape: Shape = RoundedCornerShape(24.dp),
 ) {
     SettingsItem(
-        shape = RoundedCornerShape(24.dp),
+        shape = shape,
         title = str("pref_full_player_source_title"),
         subtitle = str("pref_full_player_source_desc"),
         icon = Icons.Rounded.GraphicEq,
@@ -802,6 +816,7 @@ private fun ScreensaverSection(
     onEnabledChange: (Boolean) -> Unit,
     timeoutSeconds: Int,
     onTimeoutChange: (Int) -> Unit,
+    topRadius: Dp = 24.dp,
 ) {
     // Preset steps for inactivity timeout (in seconds): 15s, 30s, 45s, 60s (1m), 90s, 120s (2m), 180s (3m), 300s (5m)
     val steps = remember { listOf(15, 30, 45, 60, 90, 120, 180, 300) }
@@ -835,8 +850,8 @@ private fun ScreensaverSection(
     ) {
         SettingsItem(
             shape = RoundedCornerShape(
-                topStart = 24.dp,
-                topEnd = 24.dp,
+                topStart = topRadius,
+                topEnd = topRadius,
                 bottomStart = bottomRadius,
                 bottomEnd = bottomRadius
             ),
