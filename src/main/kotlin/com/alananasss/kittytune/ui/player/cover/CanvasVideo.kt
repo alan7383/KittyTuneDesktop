@@ -18,7 +18,9 @@ import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.alananasss.kittytune.data.cover.HlsVariantResolver
 import com.alananasss.kittytune.utils.Logger
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -26,6 +28,12 @@ import org.bytedeco.ffmpeg.global.avutil
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.Java2DFrameConverter
 import kotlin.math.max
+
+/** Decodes are app-wide and shared: every CanvasVideo showing one URL splits one stream. */
+private val canvasHubScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+private val canvasHub = SharedDecodeHub<ImageBitmap>(canvasHubScope) { url, emit ->
+    decodeCanvasFrames(url, emit)
+}
 
 @Composable
 fun CanvasVideo(
@@ -44,75 +52,18 @@ fun CanvasVideo(
 
     LaunchedEffect(canvasUrl, isPlaying) {
         if (canvasUrl.isBlank() || !isPlaying) return@LaunchedEffect
-
-        withContext(Dispatchers.IO) {
-            // Silence FFmpeg low-level C logging
-            runCatching { avutil.av_log_set_level(avutil.AV_LOG_ERROR) }
-
-            // Resolve master HLS playlist to single optimal stream to avoid probing all 20+ variants
-            val streamUrl = HlsVariantResolver.resolveOptimalVariant(canvasUrl)
-            val isApple = streamUrl.contains("apple.com") || streamUrl.contains("itunes.apple.com")
-
-            var grabber: FFmpegFrameGrabber? = null
-            var converter: Java2DFrameConverter? = null
-            try {
-                grabber = openCanvasGrabber(streamUrl, isApple, decodeSize = null)
-
-                // A canvas is ambience, always drawn downscaled: decoding it full-res feeds
-                // full-size frames through H.264, a Java2D conversion and a Skia upload for
-                // nothing. Probe once, reopen scaled when worth it.
-                val probed = grabber.imageWidth to grabber.imageHeight
-                val longest = max(probed.first, probed.second)
-                if (probed.first > 0 && probed.second > 0 && longest > CANVAS_MAX_DECODE_DIM) {
-                    val scale = CANVAS_MAX_DECODE_DIM.toDouble() / longest
-                    runCatching { grabber.stop() }
-                    runCatching { grabber.release() }
-                    grabber = openCanvasGrabber(
-                        streamUrl, isApple,
-                        decodeSize = (probed.first * scale).toInt() to (probed.second * scale).toInt(),
-                    )
-                }
-
-                converter = Java2DFrameConverter()
-                val fps = grabber.frameRate.takeIf { it > 0 && it.isFinite() } ?: 30.0
-                val targetFrameDelayMs = max(CANVAS_TARGET_FRAME_DELAY_MS, (1000.0 / fps).toLong())
-
-                while (isActive && isPlaying) {
-                    val frameStart = System.currentTimeMillis()
-                    var frame = grabber.grabImage()
-                    if (frame == null) {
-                        // Loop video
-                        runCatching {
-                            grabber.setTimestamp(0)
-                        }.onFailure {
-                            runCatching { grabber.restart() }
-                        }
-                        frame = grabber.grabImage()
-                        if (frame == null) break
-                    }
-
-                    val bufferedImage = converter.convert(frame)
-                    if (bufferedImage != null) {
-                        val composeBitmap = bufferedImage.toComposeImageBitmap()
-                        currentBitmap = composeBitmap
-                        if (!isVideoReady) {
-                            isVideoReady = true
-                        }
-                    }
-
-                    val elapsed = System.currentTimeMillis() - frameStart
-                    val sleepMs = max(4L, targetFrameDelayMs - elapsed)
-                    delay(sleepMs)
-                }
-            } catch (e: Exception) {
-                Logger.w("CanvasVideo", "Error decoding canvas video: ${e.message}")
-            } finally {
-                runCatching { converter?.close() }
-                runCatching {
-                    grabber?.stop()
-                    grabber?.release()
+        // StateFlow replays the latest frame, so resuming shows an image immediately
+        // instead of flashing the placeholder while the decoder spins back up.
+        val frames = canvasHub.flowFor(canvasUrl)
+        try {
+            frames.collect { frame ->
+                if (frame != null) {
+                    currentBitmap = frame
+                    isVideoReady = true
                 }
             }
+        } finally {
+            canvasHub.release(canvasUrl)
         }
     }
 
@@ -126,6 +77,78 @@ fun CanvasVideo(
                     .fillMaxSize()
                     .alpha(alpha)
             )
+        }
+    }
+}
+
+/**
+ * The single decode behind every viewer of [canvasUrl]: open, downscale, then emit frames
+ * until cancelled. Errors end the job; the hub drops it so the next viewer starts fresh.
+ */
+private suspend fun CoroutineScope.decodeCanvasFrames(canvasUrl: String, emit: (ImageBitmap?) -> Unit) {
+    withContext(Dispatchers.IO) {
+        // Silence FFmpeg low-level C logging
+        runCatching { avutil.av_log_set_level(avutil.AV_LOG_ERROR) }
+
+        // Resolve master HLS playlist to single optimal stream to avoid probing all 20+ variants
+        val streamUrl = HlsVariantResolver.resolveOptimalVariant(canvasUrl)
+        val isApple = streamUrl.contains("apple.com") || streamUrl.contains("itunes.apple.com")
+
+        var grabber: FFmpegFrameGrabber? = null
+        var converter: Java2DFrameConverter? = null
+        try {
+            grabber = openCanvasGrabber(streamUrl, isApple, decodeSize = null)
+
+            // A canvas is ambience, always drawn downscaled: decoding it full-res feeds
+            // full-size frames through H.264, a Java2D conversion and a Skia upload for
+            // nothing. Probe once, reopen scaled when worth it.
+            val probed = grabber.imageWidth to grabber.imageHeight
+            val longest = max(probed.first, probed.second)
+            if (probed.first > 0 && probed.second > 0 && longest > CANVAS_MAX_DECODE_DIM) {
+                val scale = CANVAS_MAX_DECODE_DIM.toDouble() / longest
+                runCatching { grabber.stop() }
+                runCatching { grabber.release() }
+                grabber = openCanvasGrabber(
+                    streamUrl, isApple,
+                    decodeSize = (probed.first * scale).toInt() to (probed.second * scale).toInt(),
+                )
+            }
+
+            converter = Java2DFrameConverter()
+            val fps = grabber.frameRate.takeIf { it > 0 && it.isFinite() } ?: 30.0
+            val targetFrameDelayMs = max(CANVAS_TARGET_FRAME_DELAY_MS, (1000.0 / fps).toLong())
+
+            while (isActive) {
+                val frameStart = System.currentTimeMillis()
+                var frame = grabber.grabImage()
+                if (frame == null) {
+                    // Loop video
+                    runCatching {
+                        grabber.setTimestamp(0)
+                    }.onFailure {
+                        runCatching { grabber.restart() }
+                    }
+                    frame = grabber.grabImage()
+                    if (frame == null) break
+                }
+
+                val bufferedImage = converter.convert(frame)
+                if (bufferedImage != null) {
+                    emit(bufferedImage.toComposeImageBitmap())
+                }
+
+                val elapsed = System.currentTimeMillis() - frameStart
+                val sleepMs = max(4L, targetFrameDelayMs - elapsed)
+                delay(sleepMs)
+            }
+        } catch (e: Exception) {
+            Logger.w("CanvasVideo", "Error decoding canvas video: ${e.message}")
+        } finally {
+            runCatching { converter?.close() }
+            runCatching {
+                grabber?.stop()
+                grabber?.release()
+            }
         }
     }
 }
