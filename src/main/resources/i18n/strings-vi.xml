@@ -558,6 +558,15 @@
     <string name="lyrics_mode_plain">Văn bản thuần</string>
     <string name="lyrics_copy_text">Sao chép văn bản</string>
     <string name="lyrics_sync">Đồng bộ</string>
+    <string name="lyrics_sync_drift_title">Lời bị lệch dần về cuối?</string>
+    <string name="lyrics_sync_pin_start">Ghim đầu tại đây</string>
+    <string name="lyrics_sync_pin_end">Ghim cuối tại đây</string>
+    <string name="lyrics_sync_point_start">Đầu %1$s</string>
+    <string name="lyrics_sync_point_end">Cuối %1$s</string>
+    <string name="lyrics_sync_single">Quay lại một độ lệch</string>
+    <string name="lyrics_sync_drift_hint">Đồng bộ phần đầu rồi ghim lại, sau đó ghim một điểm gần cuối và đồng bộ ở đó. Độ lệch thay đổi đều giữa hai điểm.</string>
+    <string name="lyrics_sync_drift_active">%1$s tại %2$s, %3$s tại %4$s, thay đổi đều ở giữa. Các nút phía trên chỉnh điểm gần bạn hơn.</string>
+    <string name="lyrics_sync_end_too_close">Điểm cuối phải cách điểm đầu ít nhất 20 giây</string>
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
     <!-- MENUS & CONTEXT                                                                  -->
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->

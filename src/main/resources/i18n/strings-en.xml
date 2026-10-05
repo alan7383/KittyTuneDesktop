@@ -1013,6 +1013,15 @@
     <string name="lyrics_no_data">No lyrics available</string>
     <string name="lyrics_search_hint">Search lyrics&#8230;</string>
     <string name="lyrics_sync">Synchro</string>
+    <string name="lyrics_sync_drift_title">Drifting apart by the end?</string>
+    <string name="lyrics_sync_pin_start">Pin start here</string>
+    <string name="lyrics_sync_pin_end">Pin end here</string>
+    <string name="lyrics_sync_point_start">Start %1$s</string>
+    <string name="lyrics_sync_point_end">End %1$s</string>
+    <string name="lyrics_sync_single">Back to one offset</string>
+    <string name="lyrics_sync_drift_hint">Sync the start and pin it, then pin a point near the end and sync it there. The offset changes evenly in between.</string>
+    <string name="lyrics_sync_drift_active">%1$s at %2$s, %3$s at %4$s, evenly in between. The buttons above change the point nearer to where you are.</string>
+    <string name="lyrics_sync_end_too_close">Pin the end at least 20 seconds after the start</string>
     <string name="lyrics_wrong">Wrong lyrics?</string>
     <string name="me_artist">Me</string>
     <string name="menu_add_playlist">Add to playlist</string>

@@ -1013,6 +1013,15 @@
     <string name="lyrics_no_data">Aucune parole disponible</string>
     <string name="lyrics_search_hint">Chercher paroles&#8230;</string>
     <string name="lyrics_sync">Synchro</string>
+    <string name="lyrics_sync_drift_title">Les paroles se décalent vers la fin ?</string>
+    <string name="lyrics_sync_pin_start">Début ici</string>
+    <string name="lyrics_sync_pin_end">Fin ici</string>
+    <string name="lyrics_sync_point_start">Début %1$s</string>
+    <string name="lyrics_sync_point_end">Fin %1$s</string>
+    <string name="lyrics_sync_single">Revenir à un seul décalage</string>
+    <string name="lyrics_sync_drift_hint">Synchronisez le début et épinglez-le, puis épinglez un point vers la fin et synchronisez-le là. Le décalage évolue régulièrement entre les deux.</string>
+    <string name="lyrics_sync_drift_active">%1$s à %2$s, %3$s à %4$s, régulièrement entre les deux. Les boutons au-dessus modifient le point le plus proche.</string>
+    <string name="lyrics_sync_end_too_close">La fin doit être au moins 20 secondes après le début</string>
     <string name="lyrics_wrong">Paroles incorrectes ?</string>
     <string name="me_artist">Moi</string>
     <string name="menu_add_playlist">Ajouter à une playlist</string>

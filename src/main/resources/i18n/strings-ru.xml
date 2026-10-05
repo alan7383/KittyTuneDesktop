@@ -1013,6 +1013,15 @@
     <string name="lyrics_no_data">Текст недоступен</string>
     <string name="lyrics_search_hint">Поиск текста &#8230;</string>
     <string name="lyrics_sync">Синхронизация</string>
+    <string name="lyrics_sync_drift_title">Текст расходится к концу?</string>
+    <string name="lyrics_sync_pin_start">Начало здесь</string>
+    <string name="lyrics_sync_pin_end">Конец здесь</string>
+    <string name="lyrics_sync_point_start">Начало %1$s</string>
+    <string name="lyrics_sync_point_end">Конец %1$s</string>
+    <string name="lyrics_sync_single">Вернуть один сдвиг</string>
+    <string name="lyrics_sync_drift_hint">Синхронизируйте начало и закрепите его, потом закрепите точку ближе к концу и синхронизируйте там. Между ними сдвиг меняется плавно.</string>
+    <string name="lyrics_sync_drift_active">%1$s на %2$s, %3$s на %4$s, плавно между ними. Кнопки выше меняют ближайшую к вам точку.</string>
+    <string name="lyrics_sync_end_too_close">Конец должен быть хотя бы на 20 секунд позже начала</string>
     <string name="lyrics_wrong">Неверный текст песни?</string>
     <string name="me_artist">Я</string>
     <string name="menu_add_playlist">Добавить в плейлист</string>

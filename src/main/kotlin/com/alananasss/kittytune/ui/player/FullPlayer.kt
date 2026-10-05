@@ -383,7 +383,7 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             QuietButton(
                 icon = Icons.Rounded.Tune,
                 label = str("pref_lyrics_title"),
-                tint = if (viewModel.lyricsOffset != 0L) palette.bright else palette.dim,
+                tint = if (!viewModel.lyricsSync.isNone) palette.bright else palette.dim,
                 onClick = { showQuickSettings = true },
             )
             QuietButton(

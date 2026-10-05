@@ -119,6 +119,9 @@ class DownloadDao(private val db: AppDatabase) {
         trackId = rs.getLong("trackId"),
         offsetMs = rs.getLong("offsetMs"),
         updatedAt = rs.getLong("updatedAt"),
+        anchorMs = rs.getLong("anchorMs"),
+        endAtMs = rs.getLong("endAtMs").takeUnless { rs.wasNull() },
+        endOffsetMs = rs.getLong("endOffsetMs").takeUnless { rs.wasNull() },
     )
 
     private fun statsSnapshot(rs: ResultSet) = StatsSnapshot(
@@ -556,8 +559,8 @@ class DownloadDao(private val db: AppDatabase) {
     )
 
     suspend fun putLyricsOffset(row: LyricsOffsetRow) = db.exec(
-        "INSERT OR REPLACE INTO lyrics_offset(trackId,offsetMs,updatedAt) VALUES(?,?,?)",
-        row.trackId, row.offsetMs, row.updatedAt,
+        "INSERT OR REPLACE INTO lyrics_offset(trackId,offsetMs,updatedAt,anchorMs,endAtMs,endOffsetMs) VALUES(?,?,?,?,?,?)",
+        row.trackId, row.offsetMs, row.updatedAt, row.anchorMs, row.endAtMs, row.endOffsetMs,
     )
 
     suspend fun deleteLyricsOffset(trackId: Long) =

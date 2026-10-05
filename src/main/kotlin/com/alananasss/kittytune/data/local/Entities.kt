@@ -203,6 +203,11 @@ data class LyricsOffsetRow(
     val trackId: Long,
     val offsetMs: Long,
     val updatedAt: Long,
+    /** Where in the track [offsetMs] applies; only matters with a second point. */
+    val anchorMs: Long = 0L,
+    /** The second point of a two-point sync, or null for a single offset (see LyricsSync). */
+    val endAtMs: Long? = null,
+    val endOffsetMs: Long? = null,
 )
 
 // table: library_folders

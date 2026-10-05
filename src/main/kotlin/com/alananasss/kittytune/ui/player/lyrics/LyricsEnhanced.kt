@@ -275,7 +275,7 @@ fun LyricsEnhanced(
                                 userAlignment = userAlignment,
                                 currentPosition = playbackSyncPosition,
                                 onLineClicked = { line ->
-                                    val target = line.start.toLong() - viewModel.lyricsOffset
+                                    val target = line.start.toLong() - viewModel.lyricsOffsetAtLyricTime(line.start.toLong())
                                     if (viewModel.duration > 0L && target >= viewModel.duration) return@KaraokeLyricsView
                                     val finalTarget = target.coerceAtLeast(0L)
                                     playbackPositionMs.longValue = finalTarget

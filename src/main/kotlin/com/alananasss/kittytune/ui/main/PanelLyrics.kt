@@ -244,7 +244,7 @@ private fun PanelSyncedLyrics(
                     onClick = {
                         LyricsUtils.seekTargetFor(
                             line = line,
-                            lyricsOffsetMs = vm.lyricsOffset,
+                            lyricsOffsetMs = vm.lyricsOffsetAtLyricTime(line.startTime),
                             durationMs = vm.duration,
                         )?.let(vm::seekTo)
                     },
