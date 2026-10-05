@@ -185,8 +185,10 @@ fun TrackInfoTab(vm: PlayerViewModel) {
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val panelHeight = maxHeight
-        val isCompact = lyricsHalf && panelHeight < 780.dp
-        val isUltraCompact = lyricsHalf && panelHeight < 580.dp
+        // The header's size follows the panel's height alone. Tied to the lyrics half as well, it went small
+        // on Lyrics and back to full size on Comments, and everything under it jumped at each switch (issue #66).
+        val isCompact = panelHeight < 780.dp
+        val isUltraCompact = panelHeight < 580.dp
 
         val dynamicLyricsHeight = when {
             !lyricsHalf -> LYRICS_HALF_HEIGHT
@@ -298,7 +300,6 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         // Sorting and writing, in one row: a round sort button, then one long field with the send button
         // inside it (SoundCloud only).
         if (!isSpotifyTrack && !lyricsHalf) item {
-            var isSortMenuExpanded by remember { mutableStateOf(false) }
             var newCommentText by remember { mutableStateOf("") }
             val send = {
                 if (newCommentText.isNotBlank()) {
@@ -311,27 +312,16 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box {
-                    FilledTonalIconButton(onClick = { isSortMenuExpanded = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = str("sorted_by", str(vm.commentSort.labelResId)))
-                    }
-                    DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
-                        CommentSort.values().forEach { sortOption ->
-                            DropdownMenuItem(
-                                text = { Text(str(sortOption.labelResId)) },
-                                onClick = {
-                                    vm.onCommentSortChanged(sortOption)
-                                    isSortMenuExpanded = false
-                                },
-                                trailingIcon = {
-                                    if (sortOption == vm.commentSort) {
-                                        Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
+                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                    options = CommentSort.entries,
+                    selected = vm.commentSort,
+                    onSelect = vm::onCommentSortChanged,
+                    icon = { it.icon },
+                    label = { str(it.labelResId) },
+                    tooltip = { str("sorted_by", str(it.labelResId)) },
+                    size = 48.dp,
+                    iconSize = 22.dp,
+                )
                 OutlinedTextField(
                     value = newCommentText,
                     onValueChange = { newCommentText = it },

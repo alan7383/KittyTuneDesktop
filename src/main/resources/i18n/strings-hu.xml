@@ -919,6 +919,7 @@
     <string name="lib_view_grid">Rács</string>
     <string name="lib_view_list">Lista</string>
     <string name="lib_view_mode">Megjelenítési mód</string>
+    <string name="lib_menu_show">Megjelenítés</string>
     <string name="libraries_count_format">%1$d Könyvtár</string>
     <string name="license_unknown">Ismeretlen licenc</string>
     <string name="listening_stats_avg_listen">Átl. hallgatás</string>

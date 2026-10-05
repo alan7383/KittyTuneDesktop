@@ -915,6 +915,7 @@
     <string name="lib_view_grid">Сетка</string>
     <string name="lib_view_list">Список</string>
     <string name="lib_view_mode">Режим отображения</string>
+    <string name="lib_menu_show">Показывать</string>
     <string name="libraries_count_format">%1$d библиотек</string>
     <string name="license_unknown">Неизвестная лицензия</string>
     <string name="listening_stats_avg_listen">Среднее время трека</string>

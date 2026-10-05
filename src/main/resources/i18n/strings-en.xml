@@ -915,6 +915,7 @@
     <string name="lib_view_grid">Grid</string>
     <string name="lib_view_list">List</string>
     <string name="lib_view_mode">View mode</string>
+    <string name="lib_menu_show">Show</string>
     <string name="libraries_count_format">%1$d Libraries</string>
     <string name="license_unknown">Unknown license</string>
     <string name="listening_stats_avg_listen">Avg. Listen</string>

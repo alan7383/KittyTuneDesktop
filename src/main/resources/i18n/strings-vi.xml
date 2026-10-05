@@ -2592,6 +2592,7 @@
     <string name="lyrics_fullscreen">Toàn màn hình</string>
     <string name="lyrics_style_focus">Tiêu điểm (Focus)</string>
     <string name="lyrics_style_focus_sub">Các dòng khác mờ đi rõ rệt và hơi nhòe.</string>
+    <string name="lib_menu_show">Hiển thị</string>
     <string name="lyrics_style_scale">Phóng to (Scale)</string>
     <string name="lyrics_style_scale_focus">Phóng to + Tiêu điểm</string>
     <string name="lyrics_style_scale_focus_sub">Các dòng không hoạt động đồng thời thu nhỏ lại và làm mờ.</string>
