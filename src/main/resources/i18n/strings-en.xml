@@ -1116,6 +1116,8 @@
     <string name="vk_import_paste">Paste</string>
     <string name="vk_import_load">Find</string>
     <string name="vk_import_note">Tracks are looked up on SoundCloud and YouTube Music by title, artist and length. No VK login needed.</string>
+    <string name="vk_import_platform">VK Music</string>
+    <string name="vk_import_platform_sub">Playlists and albums by link, no sign-in</string>
     <string name="vk_import_not_vk">That is not a VK link.</string>
     <string name="vk_import_not_playlist">There is no playlist in this link. Open the playlist in VK and copy its link.</string>
     <string name="vk_import_private">VK will not open this playlist: it is private, or the link has no access key. In VK, press Share, then Copy link, and paste that here.</string>

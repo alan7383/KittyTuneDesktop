@@ -1074,6 +1074,8 @@
     <string name="vk_import_paste">Dán</string>
     <string name="vk_import_load">Tìm</string>
     <string name="vk_import_note">Các bài hát được tìm trên SoundCloud và YouTube Music theo tên, nghệ sĩ và thời lượng. Không cần đăng nhập VK.</string>
+    <string name="vk_import_platform">VK Music</string>
+    <string name="vk_import_platform_sub">Danh sách phát và album qua liên kết, không cần đăng nhập</string>
     <string name="vk_import_not_vk">Đây không phải liên kết VK.</string>
     <string name="vk_import_not_playlist">Liên kết này không chứa playlist. Hãy mở playlist trong VK và sao chép liên kết của nó.</string>
     <string name="vk_import_private">VK không mở playlist này: playlist ở chế độ riêng tư, hoặc liên kết thiếu khóa truy cập. Trong VK, nhấn Chia sẻ, rồi Sao chép liên kết và dán vào đây.</string>

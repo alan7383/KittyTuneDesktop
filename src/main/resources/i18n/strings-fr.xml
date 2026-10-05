@@ -1116,6 +1116,8 @@
     <string name="vk_import_paste">Coller</string>
     <string name="vk_import_load">Rechercher</string>
     <string name="vk_import_note">Les titres sont recherchés sur SoundCloud et YouTube Music par titre, artiste et durée. Pas besoin de se connecter à VK.</string>
+    <string name="vk_import_platform">VK Musique</string>
+    <string name="vk_import_platform_sub">Playlists et albums par lien, sans connexion</string>
     <string name="vk_import_not_vk">Ce n’est pas un lien VK.</string>
     <string name="vk_import_not_playlist">Ce lien ne mène à aucune playlist. Ouvrez la playlist dans VK et copiez son lien.</string>
     <string name="vk_import_private">VK n’ouvre pas cette playlist : elle est privée, ou le lien n’a pas de clé d’accès. Dans VK, appuyez sur Partager, puis Copier le lien, et collez-le ici.</string>

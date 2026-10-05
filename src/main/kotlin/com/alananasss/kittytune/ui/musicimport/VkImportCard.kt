@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,14 +74,18 @@ import com.alananasss.kittytune.data.vk.VkPlaylist
  * found — and a list of what could not, so nothing goes missing silently (issue #66).
  */
 @Composable
-fun VkImportCard(onOpenPlaylist: (Long) -> Unit, modifier: Modifier = Modifier) {
+fun VkImportCard(
+    onOpenPlaylist: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+) {
     val state by VkImportSession.state.collectAsState()
     var link by remember { mutableStateOf("") }
     val clipboard = LocalClipboardManager.current
 
     Surface(
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = containerColor,
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -236,6 +241,18 @@ private fun DoneSection(done: VkImportState.Done, onOpenPlaylist: (Long) -> Unit
                 }
             }
         }
+    }
+}
+
+/** The import card in a dialog, opened from the VK row of the platform list. */
+@Composable
+fun VkImportDialog(onDismiss: () -> Unit, onOpenPlaylist: (Long) -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        VkImportCard(
+            onOpenPlaylist = onOpenPlaylist,
+            modifier = Modifier.widthIn(max = 560.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        )
     }
 }
 

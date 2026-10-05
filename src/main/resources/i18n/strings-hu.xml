@@ -1120,6 +1120,8 @@
     <string name="vk_import_paste">Beillesztés</string>
     <string name="vk_import_load">Keresés</string>
     <string name="vk_import_note">A számokat cím, előadó és hossz alapján keressük a SoundCloudon és a YouTube Musicon. Nem kell bejelentkezni a VK-ba.</string>
+    <string name="vk_import_platform">VK Zene</string>
+    <string name="vk_import_platform_sub">Lejátszási listák és albumok linkkel, bejelentkezés nélkül</string>
     <string name="vk_import_not_vk">Ez nem VK link.</string>
     <string name="vk_import_not_playlist">Ebben a linkben nincs lejátszási lista. Nyisd meg a listát a VK-ban, és másold ki a linkjét.</string>
     <string name="vk_import_private">A VK nem nyitja meg ezt a listát: privát, vagy a linkben nincs hozzáférési kulcs. A VK-ban nyomj a Megosztás, majd a Link másolása gombra, és illeszd be ide.</string>

@@ -1116,6 +1116,8 @@
     <string name="vk_import_paste">Вставить</string>
     <string name="vk_import_load">Найти</string>
     <string name="vk_import_note">Треки ищутся в SoundCloud и YouTube Music по названию, исполнителю и длительности. Входить в VK не нужно.</string>
+    <string name="vk_import_platform">VK Музыка</string>
+    <string name="vk_import_platform_sub">Плейлисты и альбомы по ссылке, без входа</string>
     <string name="vk_import_not_vk">Это не ссылка на VK.</string>
     <string name="vk_import_not_playlist">В ссылке нет плейлиста. Откройте плейлист в VK и скопируйте ссылку на него.</string>
     <string name="vk_import_private">VK не открывает этот плейлист: он закрыт или в ссылке нет ключа доступа. В VK нажмите «Поделиться» → «Скопировать ссылку» и вставьте её сюда.</string>
