@@ -231,14 +231,12 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        AsyncImage(
-                            model = socialLiker.avatarUrl?.replace("large", "t500x500"),
-                            contentDescription = null,
+                        com.alananasss.kittytune.ui.common.UserAvatar(
+                            url = socialLiker.avatarUrl,
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentScale = ContentScale.Crop
                         )
                         val totalLikes = displayTrack.likesCount ?: 1
                         val otherCount = (totalLikes - 1).coerceAtLeast(0)
@@ -561,9 +559,8 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AsyncImage(
-                model = comment.user?.avatarUrl?.replace("large", "t500x500"),
-                contentDescription = null,
+            com.alananasss.kittytune.ui.common.UserAvatar(
+                url = comment.user?.avatarUrl,
                 modifier = Modifier.size(if (isReply) 28.dp else 36.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable { comment.user?.id?.let { vm.navigateToArtist(it) } }
             )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

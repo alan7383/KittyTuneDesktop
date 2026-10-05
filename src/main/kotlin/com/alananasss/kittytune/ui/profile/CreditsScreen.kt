@@ -390,6 +390,7 @@ private fun ContributorCard(
                     AsyncImage(
                         model = person.avatarUrl,
                         contentDescription = person.name,
+                        error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(CircleShape),

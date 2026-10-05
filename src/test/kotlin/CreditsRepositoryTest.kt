@@ -46,7 +46,7 @@ class CreditsRepositoryTest {
         assertTrue(withAvatar.isNotEmpty())
         withAvatar.forEach {
             assertTrue(
-                it.endsWith(".png"),
+                it.substringBefore('?').endsWith(".png"),
                 "A GitHub avatar is the login plus .png: $it",
             )
         }

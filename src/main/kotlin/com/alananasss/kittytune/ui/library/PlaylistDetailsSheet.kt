@@ -130,11 +130,9 @@ fun PlaylistDetailsSheet(
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 modifier = Modifier.size(24.dp)
                             ) {
-                                AsyncImage(
-                                    model = creator.avatarUrl,
-                                    contentDescription = null,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                com.alananasss.kittytune.ui.common.UserAvatar(
+                                    url = creator.avatarUrl,
+                                    modifier = Modifier.fillMaxSize(),
                                 )
                             }
                             Spacer(Modifier.width(8.dp))

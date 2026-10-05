@@ -915,11 +915,10 @@ private fun CinematicPlaylistCard(playlist: Playlist, onClick: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (playlist.user?.avatarUrl != null) {
-                        AsyncImage(
-                            model = playlist.user?.avatarUrl,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp).clip(CircleShape)
+                    if (playlist.user != null) {
+                        com.alananasss.kittytune.ui.common.UserAvatar(
+                            url = playlist.user?.avatarUrl,
+                            modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                     }
