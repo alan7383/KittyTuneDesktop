@@ -23,6 +23,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
@@ -48,6 +49,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.outlined.HeartBroken
 import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.DarkMode
@@ -584,28 +586,13 @@ private fun CentredLyricsLayout(
                 LyricsOnCoverColour(viewModel, palette)
             }
             Spacer(Modifier.height(12.dp))
-            Row(
-                Modifier.widthIn(max = CENTRED_LYRICS_MAX_WIDTH).fillMaxWidth().padding(horizontal = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            // Only the transport, centred under the words. Split three ways beside a thumbnail and the credit it
+            // was squeezed into a third of the row (issue #66); the words are the subject here, and the song is
+            // one tap on the lyrics button away, which brings the cover and the credit back.
+            Box(
+                Modifier.widthIn(max = CENTRED_CONTROLS_MAX_WIDTH).fillMaxWidth().padding(horizontal = 24.dp),
             ) {
-                Box(Modifier.size(72.dp)) {
-                    AnimatedArtwork(
-                        artworkUrl = track.fullResArtwork,
-                        animatedCoverUrl = viewModel.currentAnimatedCoverUrl,
-                        isPlaying = viewModel.isPlaying,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .shadow(12.dp, RoundedCornerShape(10.dp), clip = false)
-                            .clip(RoundedCornerShape(10.dp)),
-                    )
-                }
-                Box(Modifier.weight(1f)) { TrackCredit(viewModel = viewModel, palette = palette) }
-                Box(Modifier.weight(1.3f)) {
-                    FullPlayerControls(viewModel = viewModel, palette = palette, showText = showText, onToggleText = onToggleText)
-                }
+                FullPlayerControls(viewModel = viewModel, palette = palette, showText = showText, onToggleText = onToggleText)
             }
         }
     }
@@ -613,6 +600,9 @@ private fun CentredLyricsLayout(
 
 /** Wide enough for a long line at a large size, narrow enough that the eye does not travel across a 4K screen. */
 private val CENTRED_LYRICS_MAX_WIDTH = 1100.dp
+
+/** The transport under centred lyrics: as wide as it is under a cover. */
+private val CENTRED_CONTROLS_MAX_WIDTH = 520.dp
 
 /**
  * The cover alone with one line under it — the line being sung, replaced as the next one starts. The lyrics
@@ -1519,14 +1509,51 @@ private val COVER_MAX_ALONE = 620.dp
 @Composable
 private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) {
     val track = viewModel.currentTrack ?: return
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
+    val align = viewModel.fullPlayerInfoAlign
+    // Centred text lets the heart go either side; at an edge it takes the other one (issue #66).
+    val heartAtStart = when (align) {
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.START -> false
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.END -> true
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.CENTER ->
+            viewModel.fullPlayerHeartSide == com.alananasss.kittytune.data.local.FullPlayerHeartSide.START
+    }
+    val textAlign = when (align) {
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.START -> androidx.compose.ui.text.style.TextAlign.Start
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.CENTER -> androidx.compose.ui.text.style.TextAlign.Center
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.END -> androidx.compose.ui.text.style.TextAlign.End
+    }
+    val rowArrangement = when (align) {
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.START -> Arrangement.Start
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.CENTER -> Arrangement.Center
+        com.alananasss.kittytune.data.local.FullPlayerInfoAlign.END -> Arrangement.End
+    }
+
+    val buttons: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            QuietButton(
+                icon = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                label = str("player_like"),
+                tint = if (viewModel.isLiked) MaterialTheme.colorScheme.primary else palette.dim,
+                size = 22.dp,
+                onClick = { viewModel.toggleLike() },
+            )
+            if (viewModel.isYourMixActive) {
+                QuietButton(
+                    icon = Icons.Outlined.HeartBroken,
+                    label = str("mix_dislike"),
+                    tint = palette.dim,
+                    size = 22.dp,
+                    onClick = { viewModel.dislikeCurrentTrackInMix() },
+                )
+            }
+        }
+    }
+    val text: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                horizontalArrangement = rowArrangement,
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 androidx.compose.material3.Text(
                     text = track.title ?: "",
@@ -1535,7 +1562,8 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
                     color = palette.bright,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
+                    textAlign = textAlign,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 if (viewModel.fullPlayerSourceIndicatorEnabled) {
                     com.alananasss.kittytune.ui.common.TrackSourceInlineDot(
@@ -1559,29 +1587,36 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
                 color = palette.dim,
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-        }
-
-        Spacer(Modifier.width(8.dp))
-        QuietButton(
-            icon = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-            label = str("player_like"),
-            tint = if (viewModel.isLiked) MaterialTheme.colorScheme.primary else palette.dim,
-            size = 22.dp,
-            onClick = { viewModel.toggleLike() },
-        )
-        if (viewModel.isYourMixActive) {
-            Spacer(Modifier.width(6.dp))
-            QuietButton(
-                icon = Icons.Outlined.HeartBroken,
-                label = str("mix_dislike"),
-                tint = palette.dim,
-                size = 22.dp,
-                onClick = { viewModel.dislikeCurrentTrackInMix() },
+                textAlign = textAlign,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
+
+    // The heart's glyph sits flush with the edge of the cover and the bar, not a touch target's padding in.
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        if (align == com.alananasss.kittytune.data.local.FullPlayerInfoAlign.CENTER) {
+            // Centred on the cover itself, not on what is left beside the heart: the same room is kept
+            // free on both sides.
+            text(Modifier.fillMaxWidth().padding(horizontal = CREDIT_BUTTON_ROOM))
+        } else {
+            text(
+                Modifier.fillMaxWidth().padding(
+                    start = if (heartAtStart) CREDIT_BUTTON_ROOM else 0.dp,
+                    end = if (heartAtStart) 0.dp else CREDIT_BUTTON_ROOM,
+                )
+            )
+        }
+        Box(
+            Modifier
+                .align(if (heartAtStart) Alignment.CenterStart else Alignment.CenterEnd)
+                .offset(x = if (heartAtStart) -QUIET_BUTTON_INSET else QUIET_BUTTON_INSET)
+        ) { buttons() }
+    }
 }
+
+/** Room the credit leaves for the heart (and the mix's dislike button beside it) on its side. */
+private val CREDIT_BUTTON_ROOM = 48.dp
 
 /**
  * The progress bar and the transport, as quiet as the reference has them.
@@ -1609,51 +1644,50 @@ private fun FullPlayerControls(
 
         Spacer(Modifier.height(8.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        // The middle three are centred on the bar itself, and the two outer glyphs sit flush with its ends,
+        // like the times above them. Weighted spacers between buttons of unequal size left the pause button a
+        // few pixels off centre and the outer icons a touch target's padding in from the edges, which is what
+        // read as crooked (issue #66).
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             QuietButton(
                 icon = Icons.Rounded.MoreHoriz,
                 label = str("btn_more"),
                 tint = palette.dim,
                 onClick = { viewModel.currentTrack?.let { viewModel.showTrackOptions(it, fromPlayer = true) } },
+                modifier = Modifier.align(Alignment.CenterStart).offset(x = -QUIET_BUTTON_INSET),
             )
-
-            // The transport keeps the middle of the cover's width whatever sits either side of it, which is
-            // why these are weighted spacers rather than an even distribution: in the reference the pause
-            // button is centred under the sleeve, not centred between its two neighbours.
-            Spacer(Modifier.weight(1f))
-            QuietButton(
-                icon = Icons.Rounded.SkipPrevious,
-                label = str("player_previous"),
-                tint = palette.bright,
-                size = 26.dp,
-                onClick = { viewModel.smartPrevious() },
-            )
-            Spacer(Modifier.width(14.dp))
-            QuietButton(
-                icon = if (viewModel.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                label = str("player_play_pause"),
-                tint = palette.bright,
-                size = 30.dp,
-                onClick = { viewModel.togglePlayPause() },
-            )
-            Spacer(Modifier.width(14.dp))
-            QuietButton(
-                icon = Icons.Rounded.SkipNext,
-                label = str("player_next"),
-                tint = palette.bright,
-                size = 26.dp,
-                onClick = { viewModel.playNext() },
-            )
-            Spacer(Modifier.weight(1f))
-
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                QuietButton(
+                    icon = Icons.Rounded.SkipPrevious,
+                    label = str("player_previous"),
+                    tint = palette.bright,
+                    size = 28.dp,
+                    onClick = { viewModel.smartPrevious() },
+                )
+                QuietButton(
+                    icon = if (viewModel.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                    label = str("player_play_pause"),
+                    tint = palette.bright,
+                    size = 34.dp,
+                    onClick = { viewModel.togglePlayPause() },
+                )
+                QuietButton(
+                    icon = Icons.Rounded.SkipNext,
+                    label = str("player_next"),
+                    tint = palette.bright,
+                    size = 28.dp,
+                    onClick = { viewModel.playNext() },
+                )
+            }
             QuietButton(
                 icon = Icons.Rounded.Lyrics,
                 label = str("player_lyrics"),
                 tint = if (showText) palette.bright else palette.dim,
                 onClick = onToggleText,
+                modifier = Modifier.align(Alignment.CenterEnd).offset(x = QUIET_BUTTON_INSET),
             )
         }
 
@@ -1665,7 +1699,11 @@ private fun FullPlayerControls(
 /**
  * The full player's volume: the same styled track as the player bar's — plain, slim, wavy or squiggly, with
  * the dot that jumps when grabbed and the wave that moves only while music plays — in the artwork's colours.
- * The wheel works anywhere on the row.
+ *
+ * Laid out like the seek bar above it: a quiet speaker at one end and a loud one at the other, their glyphs flush
+ * with the bar's ends, so the two bars line up. The percentage that used to sit at the right end made the track
+ * shorter than the seek bar and off centre (issue #66). The quiet speaker mutes, the loud one steps the volume
+ * up. The wheel works anywhere on the row.
  */
 @Composable
 private fun FullPlayerVolumeBar(
@@ -1673,6 +1711,7 @@ private fun FullPlayerVolumeBar(
     palette: FullPlayerPalette,
 ) {
     val volume = viewModel.volume.coerceIn(0f, 1f)
+    val isMuted = volume <= 0.001f
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1689,15 +1728,14 @@ private fun FullPlayerVolumeBar(
                 }
             },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        val isMuted = volume <= 0.001f
         QuietButton(
             icon = com.alananasss.kittytune.ui.main.volumeIcon(volume),
             label = if (isMuted) "Unmute" else str("volume_title"),
             tint = if (isMuted) palette.dim.copy(alpha = 0.45f) else palette.dim,
             size = 18.dp,
-            onClick = { viewModel.toggleMute() }
+            onClick = { viewModel.toggleMute() },
+            modifier = Modifier.offset(x = -VOLUME_BUTTON_INSET),
         )
         com.alananasss.kittytune.ui.main.StyledVolumeTrack(
             volume = volume,
@@ -1709,15 +1747,25 @@ private fun FullPlayerVolumeBar(
             onVolumeChangeFinished = { viewModel.persistVolume() },
             modifier = Modifier.weight(1f),
         )
-        androidx.compose.material3.Text(
-            text = com.alananasss.kittytune.ui.main.volumePercentLabel(volume),
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isMuted) palette.dim.copy(alpha = 0.45f) else palette.dim,
-            textAlign = androidx.compose.ui.text.style.TextAlign.End,
-            modifier = Modifier.width(36.dp)
+        QuietButton(
+            icon = Icons.AutoMirrored.Rounded.VolumeUp,
+            label = str("volume_title"),
+            tint = palette.dim,
+            size = 18.dp,
+            onClick = {
+                viewModel.updateVolume((volume + 0.1f).coerceAtMost(1f))
+                viewModel.persistVolume()
+            },
+            modifier = Modifier.offset(x = VOLUME_BUTTON_INSET),
         )
     }
 }
+
+/** Space between a [QuietButton]'s touch target and its glyph, on each side. */
+private val QUIET_BUTTON_INSET = 9.dp
+
+/** The same for the volume row's 18 dp speakers. */
+private val VOLUME_BUTTON_INSET = 9.dp
 
 /** One glyph, no container, no ripple worth noticing. */
 @Composable
@@ -1727,11 +1775,12 @@ private fun QuietButton(
     tint: Color,
     size: androidx.compose.ui.unit.Dp = 20.dp,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     androidx.compose.material3.IconButton(
         onClick = onClick,
         shapes = IconButtonDefaults.shapes(),
-        modifier = Modifier.size(size + 18.dp),
+        modifier = modifier.size(size + QUIET_BUTTON_INSET * 2),
     ) {
         androidx.compose.material3.Icon(
             icon,

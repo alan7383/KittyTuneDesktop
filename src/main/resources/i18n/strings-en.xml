@@ -2327,6 +2327,11 @@
     <string name="full_player_layout_left">Text left</string>
     <string name="full_player_layout_centred">Centred</string>
     <string name="full_player_layout_single_line">One line</string>
+    <string name="full_player_info_align">Title and artist</string>
+    <string name="full_player_heart_side">Heart</string>
+    <string name="full_player_align_left">Left</string>
+    <string name="full_player_align_centre">Centre</string>
+    <string name="full_player_align_right">Right</string>
     <string name="full_player_bg_apple_music_fact">Fun fact: this background is not a lookalike. It is Apple Music's own effect, worked out from reverse-engineering analyses, right down to the album art stacked, twisted and blurred.</string>
     <string name="full_player_bg_blur">Blur</string>
     <string name="full_player_bg_gradient">Gradient</string>

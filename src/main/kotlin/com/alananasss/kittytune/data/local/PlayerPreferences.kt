@@ -65,6 +65,12 @@ enum class FullPlayerBgStyle { APPLE_MUSIC, BLUR, GRADIENT, PURE_BLACK }
  */
 enum class FullPlayerLayout { LYRICS_RIGHT, LYRICS_LEFT, LYRICS_CENTRED, COVER_AND_LINE }
 
+/** Where the full player sets the title and artist under the cover. The heart goes on the other side. */
+enum class FullPlayerInfoAlign { START, CENTER, END }
+
+/** Which side the heart sits on when the title and artist are centred. */
+enum class FullPlayerHeartSide { START, END }
+
 enum class PlayerBarStyle { DEFAULT, ROUNDED, FLOATING }
 
 enum class TrackSourceBadgeStyle { ICON_AND_TEXT, ICON_ONLY, TEXT_ONLY, HIDDEN }
@@ -164,6 +170,8 @@ class PlayerPreferences {
         const val MINI_PLAYER_ELONGATED_DEFAULT_WIDTH = 500
         private const val KEY_FULL_PLAYER_BG_STYLE = "full_player_bg_style"
         private const val KEY_FULL_PLAYER_LAYOUT = "full_player_layout"
+        private const val KEY_FULL_PLAYER_INFO_ALIGN = "full_player_info_align"
+        private const val KEY_FULL_PLAYER_HEART_SIDE = "full_player_heart_side"
 
         /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
         private const val LEGACY_ORBS_STYLE = "ORBS"
@@ -857,6 +865,16 @@ class PlayerPreferences {
         FullPlayerLayout.entries.firstOrNull { it.name == Prefs.getString(KEY_FULL_PLAYER_LAYOUT, null) }
             ?: FullPlayerLayout.LYRICS_RIGHT
     fun setFullPlayerLayout(layout: FullPlayerLayout) = Prefs.putString(KEY_FULL_PLAYER_LAYOUT, layout.name)
+
+    fun getFullPlayerInfoAlign(): FullPlayerInfoAlign =
+        FullPlayerInfoAlign.entries.firstOrNull { it.name == Prefs.getString(KEY_FULL_PLAYER_INFO_ALIGN, null) }
+            ?: FullPlayerInfoAlign.START
+    fun setFullPlayerInfoAlign(align: FullPlayerInfoAlign) = Prefs.putString(KEY_FULL_PLAYER_INFO_ALIGN, align.name)
+
+    fun getFullPlayerHeartSide(): FullPlayerHeartSide =
+        FullPlayerHeartSide.entries.firstOrNull { it.name == Prefs.getString(KEY_FULL_PLAYER_HEART_SIDE, null) }
+            ?: FullPlayerHeartSide.END
+    fun setFullPlayerHeartSide(side: FullPlayerHeartSide) = Prefs.putString(KEY_FULL_PLAYER_HEART_SIDE, side.name)
 
     fun getFullPlayerCoverScale(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_SCALE, 1.0f).coerceIn(0.6f, 1.4f)
     fun setFullPlayerCoverScale(scale: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_SCALE, scale.coerceIn(0.6f, 1.4f))

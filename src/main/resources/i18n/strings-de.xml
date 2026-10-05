@@ -2728,6 +2728,11 @@
     <string name="full_player_layout_left">Text links</string>
     <string name="full_player_layout_centred">Zentriert</string>
     <string name="full_player_layout_single_line">Eine Zeile</string>
+    <string name="full_player_info_align">Titel und Künstler</string>
+    <string name="full_player_heart_side">Herz</string>
+    <string name="full_player_align_left">Links</string>
+    <string name="full_player_align_centre">Mitte</string>
+    <string name="full_player_align_right">Rechts</string>
     <string name="full_player_bg_apple_music_fact">Interessanter Fakt: Dieser Hintergrund ist keine Nachahmung. Es ist der echte Effekt von Apple Music, rekonstruiert durch Reverse-Engineering, bis hin zu den gestapelten, verdrehten und weichgezeichneten Covern.</string>
     <string name="full_player_bg_blur">Weichzeichnen</string>
     <string name="full_player_bg_gradient">Farbverlauf</string>

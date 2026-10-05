@@ -2563,6 +2563,11 @@
     <string name="full_player_layout_left">Lời bên trái</string>
     <string name="full_player_layout_centred">Ở giữa</string>
     <string name="full_player_layout_single_line">Một dòng</string>
+    <string name="full_player_info_align">Tên bài và nghệ sĩ</string>
+    <string name="full_player_heart_side">Trái tim</string>
+    <string name="full_player_align_left">Trái</string>
+    <string name="full_player_align_centre">Giữa</string>
+    <string name="full_player_align_right">Phải</string>
     <string name="full_player_bg_apple_music_fact">Thú vị: hình nền này không phải là bản sao mô phỏng thông thường. Nó tái tạo trực tiếp hiệu ứng của Apple Music qua phân tích kỹ thuật ngược, từ các lớp ảnh bìa xếp chồng, xoay góc đến làm mờ.</string>
     <string name="full_player_bg_blur">Làm mờ</string>
     <string name="full_player_bg_gradient">Chuyển sắc (Gradient)</string>
