@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,6 +50,17 @@ fun MusicImportScreen(
         }
     }
 
+    var showVkImport by remember { mutableStateOf(false) }
+    if (showVkImport) {
+        VkImportDialog(
+            onDismiss = { showVkImport = false },
+            onOpenPlaylist = {
+                showVkImport = false
+                onOpenPlaylist(it)
+            },
+        )
+    }
+
     val scrollState = androidx.compose.foundation.rememberScrollState()
     SettingsScaffold(
         title = stringResource(R.string.music_import_title),
@@ -65,9 +77,6 @@ fun MusicImportScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // VK needs no account of any kind, so it is offered before the SoundCloud login too.
-                    VkImportCard(onOpenPlaylist = onOpenPlaylist)
-                    Spacer(modifier = Modifier.height(32.dp))
                     Icon(
                         imageVector = Icons.Rounded.AccountCircle,
                         contentDescription = null,
@@ -94,6 +103,9 @@ fun MusicImportScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
                     }
+                    // VK needs no account of any kind, so it is offered without the SoundCloud login too.
+                    Spacer(modifier = Modifier.height(24.dp))
+                    SettingsGroup(items = listOf { shape -> VkImportItem(shape) { showVkImport = true } })
                 }
             } else {
                 com.alananasss.kittytune.ui.common.ScrollableColumn(
@@ -102,10 +114,6 @@ fun MusicImportScreen(
                     hideScrollbar = true,
                     contentPadding = innerPadding
                 ) {
-                    VkImportCard(
-                        onOpenPlaylist = onOpenPlaylist,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
                     Text(
                         text = stringResource(R.string.music_import_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
@@ -115,7 +123,7 @@ fun MusicImportScreen(
                     
                     SettingsGroup(
                         title = stringResource(R.string.music_import_platforms_header),
-                        items = viewModel.platforms.map { platform ->
+                        items = viewModel.platforms.map<MusicApi, @Composable (androidx.compose.ui.graphics.Shape) -> Unit> { platform ->
                             { shape ->
                                 val visual = platform.visual()
                                 SettingsItem(
@@ -141,7 +149,7 @@ fun MusicImportScreen(
                                     }
                                 )
                             }
-                        }
+                        } + listOf { shape -> VkImportItem(shape) { showVkImport = true } }
                     )
 
                     Text(
@@ -167,4 +175,23 @@ fun MusicApi.labelRes(): String = when (this) {
     MusicApi.TIDAL -> R.string.music_provider_tidal
     MusicApi.AMAZON_MUSIC -> R.string.music_provider_amazon_music
     MusicApi.BOOMPLAY -> R.string.music_provider_boomplay
+}
+
+/** VK sits in the platform list like the others; it opens a link field instead of a sign-in. */
+@Composable
+private fun VkImportItem(shape: androidx.compose.ui.graphics.Shape, onClick: () -> Unit) {
+    val state by VkImportSession.state.collectAsState()
+    SettingsItem(
+        shape = shape,
+        title = com.alananasss.kittytune.core.str("vk_import_platform"),
+        subtitle = com.alananasss.kittytune.core.str("vk_import_platform_sub"),
+        icon = Icons.Rounded.Link,
+        // An import keeps running with the dialog closed; this says so and is the way back to it.
+        trailingContent = if (state is VkImportState.Importing || state is VkImportState.Loading) {
+            { CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp) }
+        } else {
+            null
+        },
+        onClick = onClick,
+    )
 }

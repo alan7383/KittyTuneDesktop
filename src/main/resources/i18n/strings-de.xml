@@ -1152,6 +1152,8 @@
     <string name="vk_import_paste">Einfügen</string>
     <string name="vk_import_load">Suchen</string>
     <string name="vk_import_note">Titel werden auf SoundCloud und YouTube Music nach Titel, Künstler und Länge gesucht. Keine VK-Anmeldung nötig.</string>
+    <string name="vk_import_platform">VK Musik</string>
+    <string name="vk_import_platform_sub">Playlists und Alben per Link, ohne Anmeldung</string>
     <string name="vk_import_not_vk">Das ist kein VK-Link.</string>
     <string name="vk_import_not_playlist">Dieser Link enthält keine Playlist. Öffne die Playlist in VK und kopiere ihren Link.</string>
     <string name="vk_import_private">VK öffnet diese Playlist nicht: Sie ist privat oder der Link hat keinen Zugriffsschlüssel. Tippe in VK auf Teilen, dann Link kopieren, und füge ihn hier ein.</string>
