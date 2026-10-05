@@ -2588,6 +2588,7 @@
     <string name="storage_downloaded_summary">Titres : %1$d · %2$s — cliquez pour voir</string>
     <string name="storage_delete_all_confirm">Supprimer les %1$d titres téléchargés ?</string>
     <string name="storage_no_downloads">Rien de téléchargé</string>
+    <string name="storage_downloaded_empty">Rien de téléchargé</string>
     <string name="storage_group_backup">Sauvegarde</string>
     <string name="storage_backup_create">Créer une sauvegarde</string>
     <string name="storage_backup_create_sub">Bibliothèque, playlists, likes, historique, stats et réglages</string>
@@ -2754,6 +2755,7 @@
     <string name="storage_cache_sub">Limites et nettoyage du cache audio et images</string>
     <string name="storage_downloads_sub">Musique téléchargée et emplacement</string>
     <string name="storage_local_files_sub">Dossiers analysés et bibliothèque locale</string>
+    <string name="local_media_title">Fichiers Locaux</string>
     <string name="storage_backup_sub">Exporter et importer les données et réglages</string>
 
     <string name="sync_paired_devices_title">Appareils jumelés</string>
@@ -2765,6 +2767,7 @@
 
     <string name="network_proxy_sub">Configuration du proxy HTTP et SOCKS5</string>
     <string name="network_zapret_sub">Contournement des restrictions et blocages DPI</string>
+    <string name="zapret_title">Zapret</string>
 
     <string name="misc_general_sub">Langue, écran de démarrage et mises à jour</string>
     <string name="misc_discord_sub">Afficher la musique en cours sur Discord</string>

@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerPreferences
-import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.Slider
@@ -408,53 +407,43 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
 
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         SettingsGroupTitle(str("settings_audio_quality_title"))
-        SettingsGroup(
-            items = listOf(
-                { shape ->
-                    SettingsItem(
-                        shape = shape,
-                        title = str("pref_audio_device_title"),
-                        subtitle = if (currentDevice.isEmpty()) {
-                            systemDefaultSinkDesc ?: str("pref_audio_device_default")
-                        } else {
-                            availableDevices.firstOrNull { it.first == currentDevice }?.second
-                                ?: com.alananasss.kittytune.util.LinuxAudioManager.cleanName(currentDevice)
-                        },
-                        onClick = { showDeviceDialog = true }
-                    )
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            SettingsItem(
+                shape = getSettingsShape(4, 0),
+                title = str("pref_audio_device_title"),
+                subtitle = if (currentDevice.isEmpty()) {
+                    systemDefaultSinkDesc ?: str("pref_audio_device_default")
+                } else {
+                    availableDevices.firstOrNull { it.first == currentDevice }?.second
+                        ?: com.alananasss.kittytune.util.LinuxAudioManager.cleanName(currentDevice)
                 },
-                { shape ->
-                    SettingsItem(
-                        shape = shape,
-                        title = str("pref_quality"),
-                        subtitle = if (audioQuality == "HIGH") str("quality_high") else str("quality_low"),
-                        onClick = { showQualityDialog = true }
-                    )
-                },
-                { shape ->
-                    SettingsItem(
-                        shape = shape,
-                        title = str("pref_audio_mono"),
-                        subtitle = str("pref_audio_mono_sub"),
-                        hasSwitch = true,
-                        switchState = playerViewModel.effectsState.isMonoEnabled,
-                        onSwitchChange = { playerViewModel.toggleMono() },
-                        highlightKey = "pref_audio_mono"
-                    )
-                },
-                { shape ->
-                    SplitSettingsItem(
-                        shape = shape,
-                        title = str("pref_norm_title"),
-                        subtitle = str("pref_norm_sub"),
-                        onClick = { showNormDialog = true },
-                        switchState = playerViewModel.effectsState.isNormalizationEnabled,
-                        onSwitchChange = { playerViewModel.toggleNormalization(it) },
-                        highlightKey = "pref_norm"
-                    )
-                }
+                onClick = { showDeviceDialog = true }
             )
-        )
+            SettingsItem(
+                shape = getSettingsShape(4, 1),
+                title = str("pref_quality"),
+                subtitle = if (audioQuality == "HIGH") str("quality_high") else str("quality_low"),
+                onClick = { showQualityDialog = true }
+            )
+            SettingsItem(
+                shape = getSettingsShape(4, 2),
+                title = str("pref_audio_mono"),
+                subtitle = str("pref_audio_mono_sub"),
+                hasSwitch = true,
+                switchState = playerViewModel.effectsState.isMonoEnabled,
+                onSwitchChange = { playerViewModel.toggleMono() },
+                highlightKey = "pref_audio_mono"
+            )
+            SplitSettingsItem(
+                shape = getSettingsShape(4, 3),
+                title = str("pref_norm_title"),
+                subtitle = str("pref_norm_sub"),
+                onClick = { showNormDialog = true },
+                switchState = playerViewModel.effectsState.isNormalizationEnabled,
+                onSwitchChange = { playerViewModel.toggleNormalization(it) },
+                highlightKey = "pref_norm"
+            )
+        }
     }
 }
 
