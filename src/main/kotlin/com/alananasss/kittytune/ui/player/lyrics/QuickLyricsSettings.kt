@@ -63,6 +63,8 @@ import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.FullPlayerBgStyle
+import com.alananasss.kittytune.data.local.FullPlayerHeartSide
+import com.alananasss.kittytune.data.local.FullPlayerInfoAlign
 import com.alananasss.kittytune.data.local.FullPlayerLayout
 import com.alananasss.kittytune.data.local.LyricsAlignment
 import com.alananasss.kittytune.data.local.LyricsFont
@@ -262,6 +264,29 @@ private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, is
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                 labelProvider = { ChoiceLabel(layoutLabel(it)) },
             )
+        }
+        ChoiceRow(icon = Icons.Rounded.FormatAlignCenter, title = str("full_player_info_align")) {
+            ExpressiveConnectedButtonGroup(
+                options = FullPlayerInfoAlign.entries,
+                selectedOption = viewModel.fullPlayerInfoAlign,
+                onOptionSelected = { viewModel.updateFullPlayerInfoAlign(it) },
+                fillMaxWidth = true,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                labelProvider = { ChoiceLabel(infoAlignLabel(it)) },
+            )
+        }
+        // Only centred text leaves the heart a choice; at either edge it takes the other one.
+        AnimatedVisibility(viewModel.fullPlayerInfoAlign == FullPlayerInfoAlign.CENTER) {
+            ChoiceRow(icon = Icons.Rounded.Favorite, title = str("full_player_heart_side")) {
+                ExpressiveConnectedButtonGroup(
+                    options = FullPlayerHeartSide.entries,
+                    selectedOption = viewModel.fullPlayerHeartSide,
+                    onOptionSelected = { viewModel.updateFullPlayerHeartSide(it) },
+                    fillMaxWidth = true,
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                    labelProvider = { ChoiceLabel(heartSideLabel(it)) },
+                )
+            }
         }
         SliderRow(
             icon = Icons.Rounded.ZoomIn,
@@ -789,6 +814,19 @@ private fun bgStyleLabel(style: FullPlayerBgStyle): String = when (style) {
     FullPlayerBgStyle.BLUR -> str("full_player_bg_blur")
     FullPlayerBgStyle.GRADIENT -> str("full_player_bg_gradient")
     FullPlayerBgStyle.PURE_BLACK -> str("full_player_bg_pure_black")
+}
+
+@Composable
+private fun infoAlignLabel(align: FullPlayerInfoAlign): String = when (align) {
+    FullPlayerInfoAlign.START -> str("full_player_align_left")
+    FullPlayerInfoAlign.CENTER -> str("full_player_align_centre")
+    FullPlayerInfoAlign.END -> str("full_player_align_right")
+}
+
+@Composable
+private fun heartSideLabel(side: FullPlayerHeartSide): String = when (side) {
+    FullPlayerHeartSide.START -> str("full_player_align_left")
+    FullPlayerHeartSide.END -> str("full_player_align_right")
 }
 
 @Composable

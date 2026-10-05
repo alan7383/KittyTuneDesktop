@@ -2331,6 +2331,11 @@
     <string name="full_player_layout_left">Szöveg balra</string>
     <string name="full_player_layout_centred">Középen</string>
     <string name="full_player_layout_single_line">Egy sor</string>
+    <string name="full_player_info_align">Cím és előadó</string>
+    <string name="full_player_heart_side">Szív</string>
+    <string name="full_player_align_left">Balra</string>
+    <string name="full_player_align_centre">Középen</string>
+    <string name="full_player_align_right">Jobbra</string>
     <string name="full_player_bg_apple_music_fact">Vicces tény: ez a háttér nem utánzat. Ez az Apple Music igazi effektje, visszafejtési elemzések alapján rekonstruálva, egészen az egymásra rétegezett, megcsavart és elmosott borítóig.</string>
     <string name="full_player_bg_blur">Elmosás</string>
     <string name="full_player_bg_gradient">Színátmenet</string>

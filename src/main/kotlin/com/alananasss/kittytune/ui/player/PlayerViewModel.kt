@@ -196,6 +196,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var fullPlayerLayout by mutableStateOf(playerPrefs.getFullPlayerLayout())
         private set
+    var fullPlayerInfoAlign by mutableStateOf(playerPrefs.getFullPlayerInfoAlign())
+        private set
+    var fullPlayerHeartSide by mutableStateOf(playerPrefs.getFullPlayerHeartSide())
+        private set
     var fullPlayerCoverScale by mutableFloatStateOf(playerPrefs.getFullPlayerCoverScale())
         private set
     var fullPlayerLyricsAlign by mutableStateOf(playerPrefs.getFullPlayerLyricsAlign())
@@ -4170,6 +4174,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateFullPlayerLayout(layout: com.alananasss.kittytune.data.local.FullPlayerLayout) {
         fullPlayerLayout = layout
         playerPrefs.setFullPlayerLayout(layout)
+    }
+
+    fun updateFullPlayerInfoAlign(align: com.alananasss.kittytune.data.local.FullPlayerInfoAlign) {
+        fullPlayerInfoAlign = align
+        playerPrefs.setFullPlayerInfoAlign(align)
+    }
+
+    fun updateFullPlayerHeartSide(side: com.alananasss.kittytune.data.local.FullPlayerHeartSide) {
+        fullPlayerHeartSide = side
+        playerPrefs.setFullPlayerHeartSide(side)
     }
 
     fun updateFullPlayerCoverScale(scale: Float) {

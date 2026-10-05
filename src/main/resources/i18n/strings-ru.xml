@@ -2327,6 +2327,11 @@
     <string name="full_player_layout_left">Текст слева</string>
     <string name="full_player_layout_centred">По центру</string>
     <string name="full_player_layout_single_line">Одна строка</string>
+    <string name="full_player_info_align">Название и исполнитель</string>
+    <string name="full_player_heart_side">Сердечко</string>
+    <string name="full_player_align_left">Слева</string>
+    <string name="full_player_align_centre">По центру</string>
+    <string name="full_player_align_right">Справа</string>
     <string name="full_player_bg_apple_music_fact">Интересный факт: этот фон не имитация. Это настоящий эффект Apple Music, восстановленный по результатам реверс-инжиниринга, вплоть до наложенной в несколько слоёв, закрученной и размытой обложки.</string>
     <string name="full_player_bg_blur">Размытие</string>
     <string name="full_player_bg_gradient">Градиент</string>

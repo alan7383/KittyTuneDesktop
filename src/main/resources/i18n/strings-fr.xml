@@ -2329,6 +2329,11 @@
     <string name="full_player_layout_left">Texte à gauche</string>
     <string name="full_player_layout_centred">Centré</string>
     <string name="full_player_layout_single_line">Une ligne</string>
+    <string name="full_player_info_align">Titre et artiste</string>
+    <string name="full_player_heart_side">Cœur</string>
+    <string name="full_player_align_left">À gauche</string>
+    <string name="full_player_align_centre">Au centre</string>
+    <string name="full_player_align_right">À droite</string>
     <string name="full_player_bg_apple_music_fact">Fun fact : ce fond n’est pas une imitation. C’est le vrai effet d’Apple Music, reconstitué à partir des analyses de reverse engineering, jusqu’à la pochette empilée, tordue et floutée.</string>
     <string name="full_player_bg_blur">Flou</string>
     <string name="full_player_bg_gradient">Dégradé</string>
