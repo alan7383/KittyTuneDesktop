@@ -2587,6 +2587,7 @@
     <string name="storage_downloaded_summary">Tracks: %1$d · %2$s — click to see them</string>
     <string name="storage_delete_all_confirm">Delete all %1$d downloaded tracks from the disk?</string>
     <string name="storage_no_downloads">Nothing downloaded yet</string>
+    <string name="storage_downloaded_empty">Nothing downloaded yet</string>
     <string name="storage_group_backup">Backup</string>
     <string name="storage_backup_create">Create a backup</string>
     <string name="storage_backup_create_sub">Library, playlists, likes, history, statistics and settings in one file</string>
@@ -2753,6 +2754,7 @@
     <string name="storage_cache_sub">Audio and image cache limits and cleanup</string>
     <string name="storage_downloads_sub">Downloaded tracks and storage location</string>
     <string name="storage_local_files_sub">Scanned folders and local library</string>
+    <string name="local_media_title">Local Files</string>
     <string name="storage_backup_sub">Export and import app settings and data</string>
 
     <string name="sync_paired_devices_title">Paired Devices</string>
@@ -2764,6 +2766,7 @@
 
     <string name="network_proxy_sub">HTTP and SOCKS5 proxy configuration</string>
     <string name="network_zapret_sub">Circumvent traffic restrictions and DPI</string>
+    <string name="zapret_title">Zapret</string>
 
     <string name="misc_general_sub">Language, startup screen and updates</string>
     <string name="misc_discord_sub">Show what you are listening to on Discord</string>

@@ -2589,6 +2589,7 @@
     <string name="storage_downloaded_summary">Számok: %1$d · %2$s — kattintson a listáért</string>
     <string name="storage_delete_all_confirm">Törli mind a(z) %1$d letöltött számot?</string>
     <string name="storage_no_downloads">Még nincs letöltés</string>
+    <string name="storage_downloaded_empty">Még nincs letöltés</string>
     <string name="storage_group_backup">Biztonsági mentés</string>
     <string name="storage_backup_create">Mentés készítése</string>
     <string name="storage_backup_create_sub">Könyvtár, lejátszási listák, kedvelések, előzmények, statisztika, beállítások</string>
@@ -2755,6 +2756,7 @@
     <string name="storage_cache_sub">Hang- és képgyorsítótár korlátok és törlés</string>
     <string name="storage_downloads_sub">Letöltött zeneszámok és tárolási hely</string>
     <string name="storage_local_files_sub">Beolvasott mappák és helyi könyvtár</string>
+    <string name="local_media_title">Helyi Fájlok</string>
     <string name="storage_backup_sub">Alkalmazásbeállítások és adatok exportálása, importálása</string>
 
     <string name="sync_paired_devices_title">Párosított eszközök</string>
@@ -2766,6 +2768,7 @@
 
     <string name="network_proxy_sub">HTTP és SOCKS5 proxy beállítása</string>
     <string name="network_zapret_sub">Hálózati korlátozások és DPI megkerülése</string>
+    <string name="zapret_title">Zapret</string>
 
     <string name="misc_general_sub">Nyelv, kezdőképernyő és frissítések</string>
     <string name="misc_discord_sub">A hallgatott zene megjelenítése a Discordon</string>

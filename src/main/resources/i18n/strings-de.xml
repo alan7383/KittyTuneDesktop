@@ -3201,6 +3201,7 @@
     <string name="storage_downloaded_summary">Titel: %1$d · %2$s — zum Anzeigen klicken</string>
     <string name="storage_delete_all_confirm">Alle %1$d heruntergeladenen Titel löschen?</string>
     <string name="storage_no_downloads">Noch nichts heruntergeladen</string>
+    <string name="storage_downloaded_empty">Noch nichts heruntergeladen</string>
     <string name="storage_group_backup">Sicherung</string>
     <string name="storage_backup_create">Sicherung erstellen</string>
     <string name="storage_backup_create_sub">Bibliothek, Playlists, Likes, Verlauf, Statistik und Einstellungen</string>
@@ -3366,6 +3367,7 @@
     <string name="storage_cache_sub">Audio- und Bild-Cache-Limits und Bereinigung</string>
     <string name="storage_downloads_sub">Heruntergeladene Titel und Speicherort</string>
     <string name="storage_local_files_sub">Gescannte Ordner und lokale Bibliothek</string>
+    <string name="local_media_title">Lokale Dateien</string>
     <string name="storage_backup_sub">App-Einstellungen und Daten exportieren und importieren</string>
 
     <string name="sync_paired_devices_title">Gekoppelte Geräte</string>
@@ -3377,6 +3379,7 @@
 
     <string name="network_proxy_sub">HTTP- und SOCKS5-Proxy-Konfiguration</string>
     <string name="network_zapret_sub">Einschränkungen und DPI umgehen</string>
+    <string name="zapret_title">Zapret</string>
 
     <string name="misc_general_sub">Sprache, Startbildschirm und Aktualisierungen</string>
     <string name="misc_discord_sub">Zeigen, was du gerade auf Discord hörst</string>

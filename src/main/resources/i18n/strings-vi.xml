@@ -3037,6 +3037,7 @@
     <string name="storage_downloaded_summary">Bài: %1$d · %2$s — bấm để xem</string>
     <string name="storage_delete_all_confirm">Xóa toàn bộ %1$d bài đã tải?</string>
     <string name="storage_no_downloads">Chưa tải gì</string>
+    <string name="storage_downloaded_empty">Chưa tải gì</string>
     <string name="storage_group_backup">Sao lưu</string>
     <string name="storage_backup_create">Tạo bản sao lưu</string>
     <string name="storage_backup_create_sub">Thư viện, playlist, lượt thích, lịch sử, thống kê và cài đặt</string>
@@ -3202,6 +3203,7 @@
     <string name="storage_cache_sub">Giới hạn và dọn dẹp bộ nhớ đệm âm thanh, hình ảnh</string>
     <string name="storage_downloads_sub">Các bài hát đã tải xuống và vị trí lưu trữ</string>
     <string name="storage_local_files_sub">Thư mục đã quét và thư viện cục bộ</string>
+    <string name="local_media_title">Tệp cục bộ</string>
     <string name="storage_backup_sub">Xuất và nhập cài đặt cùng dữ liệu ứng dụng</string>
 
     <string name="sync_paired_devices_title">Thiết bị đã ghép đôi</string>
@@ -3213,6 +3215,7 @@
 
     <string name="network_proxy_sub">Cấu hình proxy HTTP và SOCKS5</string>
     <string name="network_zapret_sub">Vượt qua các hạn chế lưu lượng và DPI</string>
+    <string name="zapret_title">Zapret</string>
 
     <string name="misc_general_sub">Ngôn ngữ, màn hình khởi động và cập nhật</string>
     <string name="misc_discord_sub">Hiển thị nhạc đang nghe trên Discord</string>

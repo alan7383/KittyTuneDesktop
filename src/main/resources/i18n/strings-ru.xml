@@ -2586,6 +2586,7 @@
     <string name="storage_downloaded_summary">Треков: %1$d · %2$s — нажмите, чтобы посмотреть</string>
     <string name="storage_delete_all_confirm">Удалить с диска все скачанные треки (%1$d)?</string>
     <string name="storage_no_downloads">Пока ничего не скачано</string>
+    <string name="storage_downloaded_empty">Пока ничего не скачано</string>
     <string name="storage_group_backup">Резервная копия</string>
     <string name="storage_backup_create">Создать резервную копию</string>
     <string name="storage_backup_create_sub">Библиотека, плейлисты, лайки, история, статистика и настройки в одном файле</string>
@@ -2752,6 +2753,7 @@
     <string name="storage_cache_sub">Лимиты кэша аудио и изображений, очистка</string>
     <string name="storage_downloads_sub">Скачанные треки и место хранения</string>
     <string name="storage_local_files_sub">Сканируемые папки и локальная библиотека</string>
+    <string name="local_media_title">Локальные файлы</string>
     <string name="storage_backup_sub">Экспорт и импорт настроек и данных приложения</string>
 
     <string name="sync_paired_devices_title">Подключенные устройства</string>
@@ -2763,6 +2765,7 @@
 
     <string name="network_proxy_sub">Конфигурация HTTP и SOCKS5 прокси</string>
     <string name="network_zapret_sub">Обход ограничений трафика и DPI</string>
+    <string name="zapret_title">Zapret</string>
 
     <string name="misc_general_sub">Язык, начальный экран и обновления</string>
     <string name="misc_discord_sub">Отображение играющего трека в Discord</string>
