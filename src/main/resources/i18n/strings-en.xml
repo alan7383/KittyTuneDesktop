@@ -2556,6 +2556,10 @@
     <string name="listening_stats_active_days">Days with music: %1$d</string>
     <string name="listening_stats_since">%1$s – today</string>
     <string name="zapret_sub">Bypassing blocks: KittyTune checks which of its services are blocked and adds their domains to zapret\'s user list.</string>
+    <string name="lyrics_quick_tab_look">Look</string>
+    <string name="lyrics_quick_tab_layout">Layout</string>
+    <string name="lyrics_quick_tab_features">Features</string>
+    <string name="lyrics_quick_scrolling">Scrolling</string>
     <string name="zapret_folder">Zapret folder</string>
     <string name="zapret_folder_none">Not chosen</string>
     <string name="zapret_detect">Find</string>

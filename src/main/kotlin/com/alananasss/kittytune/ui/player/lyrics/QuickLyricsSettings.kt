@@ -1,0 +1,812 @@
+package com.alananasss.kittytune.ui.player.lyrics
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
+import androidx.compose.material.icons.automirrored.rounded.FormatAlignRight
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.min
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.core.EscapableAlertDialog
+import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.FullPlayerBgStyle
+import com.alananasss.kittytune.data.local.FullPlayerLayout
+import com.alananasss.kittytune.data.local.LyricsAlignment
+import com.alananasss.kittytune.data.local.LyricsFont
+import com.alananasss.kittytune.data.local.LyricsUiStyle
+import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.ui.common.FunFactDot
+import com.alananasss.kittytune.ui.common.SettingsSwitch
+import com.alananasss.kittytune.ui.common.Slider
+import com.alananasss.kittytune.ui.player.LyricsProvider
+import com.alananasss.kittytune.ui.player.PlayerViewModel
+import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import kotlin.math.roundToInt
+
+/** The panel's caps: it takes 94% of the window up to these, and scrolls inside itself past them. */
+private val PANEL_MAX_WIDTH = 680.dp
+private val PANEL_MAX_HEIGHT = 900.dp
+
+/** The three groups the settings are sorted into. */
+private enum class QuickTab(val labelKey: String, val icon: ImageVector) {
+    LOOK("lyrics_quick_tab_look", Icons.Rounded.Palette),
+    LAYOUT("lyrics_quick_tab_layout", Icons.Rounded.FormatSize),
+    FEATURES("lyrics_quick_tab_features", Icons.Rounded.Tune),
+}
+
+/**
+ * The lyrics settings at hand, from the gear in any lyrics view.
+ *
+ * This used to be two columns of some twenty cards in no particular order, each built by hand and each a
+ * little different, with the setting people come here for most (the sync offset) buried in the middle and the
+ * manual search at the very bottom of the right-hand column (issue #66). Now the two things you open it for
+ * are at the top, and everything else is sorted into three tabs — how the lyrics look, how they are laid out,
+ * and what they do — out of the same four row types, each with its icon.
+ *
+ * What is edited depends on the view it was opened from: full screen, side panel, or the central view.
+ */
+@Composable
+fun QuickLyricsSettingsDialog(
+    viewModel: PlayerViewModel,
+    isFullScreen: Boolean = false,
+    isSidebar: Boolean = false,
+    onDismiss: () -> Unit,
+) {
+    val knobs = remember(viewModel, isFullScreen, isSidebar) { ModeKnobs(viewModel, isFullScreen, isSidebar) }
+    var tab by rememberSaveable { mutableStateOf(QuickTab.LOOK) }
+    var showLanguagePicker by remember { mutableStateOf(false) }
+
+    if (showLanguagePicker) {
+        TranslationLanguageDialog(viewModel, onDismiss = { showLanguagePicker = false })
+    }
+
+    BackHandler(onBack = onDismiss)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        BoxWithConstraints {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .width(min(PANEL_MAX_WIDTH, maxWidth * 0.94f))
+                    .heightIn(max = min(PANEL_MAX_HEIGHT, maxHeight * 0.94f)),
+            ) {
+                Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)) {
+                    Header(onDismiss)
+                    Spacer(Modifier.height(16.dp))
+                    SyncCard(viewModel)
+                    Spacer(Modifier.height(10.dp))
+                    FilledTonalButton(
+                        onClick = {
+                            onDismiss()
+                            viewModel.isSearchingLyrics = true
+                        },
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                    ) {
+                        Icon(Icons.Rounded.Search, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("lyrics_manual_search"), fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    ExpressiveConnectedButtonGroup(
+                        options = QuickTab.entries,
+                        selectedOption = tab,
+                        onOptionSelected = { tab = it },
+                        fillMaxWidth = true,
+                        iconProvider = { Icon(it.icon, null, modifier = Modifier.size(18.dp)) },
+                        labelProvider = {
+                            Text(str(it.labelKey), style = MaterialTheme.typography.labelLarge, maxLines = 1, softWrap = false)
+                        },
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    AnimatedContent(
+                        targetState = tab,
+                        transitionSpec = { fadeIn(tween(180, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
+                        modifier = Modifier.weight(1f, fill = false),
+                        label = "quickLyricsTab",
+                    ) { shown ->
+                        Column(
+                            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            when (shown) {
+                                QuickTab.LOOK -> LookTab(viewModel, knobs, isFullScreen)
+                                QuickTab.LAYOUT -> LayoutTab(viewModel, knobs)
+                                QuickTab.FEATURES -> FeaturesTab(viewModel, isFullScreen, onPickLanguage = { showLanguagePicker = true })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Header(onDismiss: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RowIcon(Icons.Rounded.Lyrics, large = true)
+        Spacer(Modifier.width(14.dp))
+        Text(
+            str("pref_lyrics_title"),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) {
+            Icon(Icons.Rounded.Close, str("btn_close"))
+        }
+    }
+}
+
+/** The offset is what this panel is opened for most, so it sits first, always visible, with its value. */
+@Composable
+private fun SyncCard(viewModel: PlayerViewModel) {
+    val offsetMs = viewModel.lyricsOffset
+    QuickCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RowIcon(Icons.Rounded.Timer)
+            Spacer(Modifier.width(14.dp))
+            Text(str("lyrics_sync"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            ValuePill(
+                text = (if (offsetMs > 0) "+" else "") + String.format("%.2fs", offsetMs / 1000f),
+                isActive = offsetMs != 0L,
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        ) {
+            val steps = listOf(-1000L to "−1s", -100L to "−0.1s", 0L to "0", 100L to "+0.1s", 1000L to "+1s")
+            steps.forEachIndexed { index, (delta, label) ->
+                ToggleButton(
+                    checked = delta == 0L && offsetMs == 0L,
+                    onCheckedChange = { if (delta == 0L) viewModel.resetLyricsOffset() else viewModel.adjustLyricsOffset(delta) },
+                    shapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        steps.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
+                }
+            }
+        }
+    }
+}
+
+// ─── Tabs ────────────────────────────────────────────────────────
+
+@Composable
+private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, isFullScreen: Boolean) {
+    if (isFullScreen) {
+        ChoiceRow(
+            icon = Icons.Rounded.Wallpaper,
+            title = str("full_player_bg_style"),
+            aside = if (viewModel.fullPlayerBgStyle == FullPlayerBgStyle.APPLE_MUSIC) {
+                { FunFactDot(str("full_player_bg_apple_music_fact")) }
+            } else null,
+        ) {
+            ExpressiveConnectedButtonGroup(
+                options = FullPlayerBgStyle.entries,
+                selectedOption = viewModel.fullPlayerBgStyle,
+                onOptionSelected = { viewModel.updateFullPlayerBgStyle(it) },
+                fillMaxWidth = true,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                labelProvider = { ChoiceLabel(bgStyleLabel(it)) },
+            )
+        }
+        ChoiceRow(icon = Icons.Rounded.Dashboard, title = str("full_player_layout")) {
+            ExpressiveConnectedButtonGroup(
+                options = FullPlayerLayout.entries,
+                selectedOption = viewModel.fullPlayerLayout,
+                onOptionSelected = { viewModel.updateFullPlayerLayout(it) },
+                fillMaxWidth = true,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                labelProvider = { ChoiceLabel(layoutLabel(it)) },
+            )
+        }
+        SliderRow(
+            icon = Icons.Rounded.ZoomIn,
+            title = str("full_player_cover_zoom"),
+            value = viewModel.fullPlayerCoverScale,
+            valueText = "${(viewModel.fullPlayerCoverScale * 100).roundToInt()}%",
+            range = 0.6f..1.4f,
+            steps = 15,
+            onChange = { viewModel.updateFullPlayerCoverScale(it) },
+            onReset = { viewModel.updateFullPlayerCoverScale(1f) },
+        )
+    }
+    ChoiceRow(icon = Icons.Rounded.AutoAwesome, title = str("pref_lyrics_ui_style_title")) {
+        ExpressiveConnectedButtonGroup(
+            options = LyricsUiStyle.entries,
+            selectedOption = knobs.uiStyle,
+            onOptionSelected = { knobs.uiStyle = it },
+            fillMaxWidth = true,
+            labelProvider = {
+                ChoiceLabel(if (it == LyricsUiStyle.ENHANCED) str("pref_lyrics_ui_style_enhanced") else str("pref_lyrics_ui_style_classic"))
+            },
+        )
+    }
+    AnimatedVisibility(knobs.uiStyle != LyricsUiStyle.CLASSIC) {
+        SwitchRow(
+            icon = Icons.Rounded.BlurOn,
+            title = str("pref_lyrics_line_blur_title"),
+            subtitle = str("pref_lyrics_line_blur_desc"),
+            checked = knobs.lineBlur,
+            onChange = { knobs.lineBlur = it },
+        )
+    }
+    AnimatedVisibility(knobs.uiStyle == LyricsUiStyle.CLASSIC) {
+        ChoiceRow(icon = Icons.Rounded.Subtitles, title = str("pref_lyrics_display_style")) {
+            LyricsDisplayStylePicker(selected = knobs.displayStyle, onSelect = { knobs.displayStyle = it })
+        }
+    }
+    ChoiceRow(icon = Icons.Rounded.TextFields, title = str("pref_lyrics_font_title")) {
+        val fonts = listOf(LyricsFont.APPLE, LyricsFont.APP_DEFAULT)
+        ExpressiveConnectedButtonGroup(
+            options = fonts,
+            selectedOption = viewModel.lyricsFont,
+            onOptionSelected = { viewModel.updateLyricsFont(it) },
+            fillMaxWidth = true,
+            labelProvider = {
+                ChoiceLabel(if (it == LyricsFont.APPLE) str("pref_lyrics_font_apple_short") else str("pref_lyrics_font_app_default_short"))
+            },
+        )
+    }
+}
+
+@Composable
+private fun ColumnScope.LayoutTab(viewModel: PlayerViewModel, knobs: ModeKnobs) {
+    SliderRow(
+        icon = Icons.Rounded.FormatSize,
+        title = str("pref_lyrics_size"),
+        value = knobs.fontSize,
+        valueText = "${knobs.fontSize.roundToInt()} sp",
+        range = 12f..100f,
+        steps = 43,
+        onChange = { knobs.fontSize = it },
+        onReset = { knobs.fontSize = knobs.defaultFontSize },
+    )
+    ChoiceRow(icon = Icons.Rounded.FormatAlignCenter, title = str("pref_lyrics_align")) {
+        ExpressiveConnectedButtonGroup(
+            options = listOf(LyricsAlignment.LEFT, LyricsAlignment.CENTER, LyricsAlignment.RIGHT),
+            selectedOption = knobs.alignment,
+            onOptionSelected = { knobs.alignment = it },
+            fillMaxWidth = true,
+            iconProvider = {
+                val icon = when (it) {
+                    LyricsAlignment.LEFT -> Icons.AutoMirrored.Rounded.FormatAlignLeft
+                    LyricsAlignment.CENTER -> Icons.Rounded.FormatAlignCenter
+                    LyricsAlignment.RIGHT -> Icons.AutoMirrored.Rounded.FormatAlignRight
+                }
+                Icon(icon, null, modifier = Modifier.size(16.dp))
+            },
+            labelProvider = {
+                ChoiceLabel(
+                    when (it) {
+                        LyricsAlignment.LEFT -> str("align_left")
+                        LyricsAlignment.CENTER -> str("align_center_simple")
+                        LyricsAlignment.RIGHT -> str("align_right")
+                    }
+                )
+            },
+        )
+    }
+    // The fine spacing only exists in the Apple-style view; the classic one lays its lines out itself.
+    AnimatedVisibility(knobs.uiStyle == LyricsUiStyle.ENHANCED) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SliderRow(
+                icon = Icons.Rounded.FormatLineSpacing,
+                title = str("pref_lyrics_line_spacing_title"),
+                value = knobs.lineSpacing,
+                valueText = "${knobs.lineSpacing.roundToInt()} dp",
+                range = 0f..knobs.maxLineSpacing,
+                steps = (knobs.maxLineSpacing / 2f).toInt() - 1,
+                onChange = { knobs.lineSpacing = it },
+                onReset = { knobs.lineSpacing = 0f },
+            )
+            SliderRow(
+                icon = Icons.Rounded.ZoomOutMap,
+                title = str("pref_lyrics_active_scale_title"),
+                subtitle = str("pref_lyrics_active_scale_desc"),
+                value = knobs.activeScale,
+                valueText = "${(knobs.activeScale * 100).roundToInt()}%",
+                range = 1f..1.3f,
+                steps = 5,
+                onChange = { knobs.activeScale = it },
+                onReset = { knobs.activeScale = 1f },
+            )
+            SliderRow(
+                icon = Icons.Rounded.SwapHoriz,
+                title = str("pref_lyrics_horizontal_margin_title"),
+                value = knobs.horizontalMargin,
+                valueText = "${knobs.horizontalMargin.roundToInt()} dp",
+                range = 0f..knobs.maxHorizontalMargin,
+                steps = (knobs.maxHorizontalMargin / 8f).toInt() - 1,
+                onChange = { knobs.horizontalMargin = it },
+                onReset = { knobs.horizontalMargin = 0f },
+            )
+            SliderRow(
+                icon = Icons.Rounded.VerticalAlignCenter,
+                title = str("pref_lyrics_vertical_offset_title"),
+                value = knobs.verticalOffset,
+                valueText = "${(knobs.verticalOffset * 100).roundToInt()}%",
+                range = 0.2f..0.6f,
+                steps = 19,
+                onChange = { knobs.verticalOffset = it },
+                onReset = { knobs.verticalOffset = 0.38f },
+            )
+        }
+    }
+    TextButton(
+        onClick = { knobs.resetTypography() },
+        modifier = Modifier.align(Alignment.End),
+    ) {
+        Icon(Icons.Rounded.RestartAlt, null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(str("pref_lyrics_reset_typography"))
+    }
+}
+
+@Composable
+private fun ColumnScope.FeaturesTab(viewModel: PlayerViewModel, isFullScreen: Boolean, onPickLanguage: () -> Unit) {
+    val prefs = remember { PlayerPreferences() }
+    var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
+    var translationOn by remember { mutableStateOf(prefs.getLyricsTranslationEnabled()) }
+
+    SectionTitle(str("lyrics_content_title"))
+    SwitchRow(
+        icon = Icons.Rounded.Mic,
+        title = str("pref_lyrics_word_sync"),
+        subtitle = str("pref_lyrics_word_sync_sub"),
+        checked = viewModel.isWordSyncEnabled,
+        onChange = { viewModel.toggleWordSync(it) },
+    )
+    AnimatedVisibility(viewModel.isWordSyncEnabled) {
+        SwitchRow(
+            icon = Icons.Rounded.AutoAwesome,
+            title = str("pref_lyrics_apple_effect"),
+            subtitle = str("pref_lyrics_apple_effect_sub"),
+            checked = viewModel.isAppleMusicEffectEnabled,
+            onChange = { viewModel.toggleAppleMusicEffect(it) },
+        )
+    }
+    SwitchRow(
+        icon = Icons.Rounded.Groups,
+        title = str("pref_lyrics_duet_title"),
+        subtitle = str("pref_lyrics_duet_desc"),
+        checked = viewModel.isDuetViewEnabled,
+        onChange = { viewModel.toggleDuetView(it) },
+    )
+    SwitchRow(
+        icon = Icons.Rounded.Abc,
+        title = str("pref_lyrics_romanization"),
+        subtitle = str("pref_lyrics_romanization_sub"),
+        checked = viewModel.isRomanizationEnabled,
+        onChange = { viewModel.toggleRomanization(it) },
+    )
+    SwitchRow(
+        icon = Icons.Rounded.Translate,
+        title = str("pref_lyrics_translation_title"),
+        subtitle = str("pref_lyrics_translation_sub"),
+        checked = translationOn,
+        onChange = {
+            translationOn = it
+            viewModel.toggleLyricsTranslation(it)
+        },
+    )
+    AnimatedVisibility(translationOn) {
+        ClickRow(
+            icon = Icons.Rounded.Language,
+            title = str("pref_lyrics_translation_lang"),
+            value = prefs.getLyricsTranslationLang().uppercase(),
+            onClick = onPickLanguage,
+        )
+    }
+
+    SectionTitle(str("pref_lyrics_providers_category"))
+    ChoiceRow(icon = Icons.Rounded.CloudQueue, title = str("pref_lyrics_provider_title")) {
+        ExpressiveConnectedButtonGroup(
+            options = listOf(LyricsProvider.MAX_QUALITY, LyricsProvider.OPEN_SOURCE),
+            selectedOption = viewModel.lyricsProvider,
+            onOptionSelected = { viewModel.updateLyricsProvider(it) },
+            fillMaxWidth = true,
+            labelProvider = { ChoiceLabel(if (it == LyricsProvider.MAX_QUALITY) "Musixmatch" else "LrcLib") },
+        )
+    }
+    SwitchRow(
+        icon = Icons.Rounded.FolderOpen,
+        title = str("pref_lyrics_local"),
+        subtitle = str("pref_lyrics_local_sub"),
+        checked = preferLocal,
+        onChange = {
+            preferLocal = it
+            prefs.setLyricsPreferLocal(it)
+        },
+    )
+
+    SectionTitle(str("lyrics_quick_scrolling"))
+    if (viewModel.isPlainAutoScrollEnabled) {
+        // One slider for both scopes: the switch under it decides whether the number belongs to this song or
+        // to every song (issue #33).
+        val perTrack = viewModel.trackAutoScrollSpeed != null
+        val speed = viewModel.effectivePlainAutoScrollSpeed
+        SliderRow(
+            icon = Icons.Rounded.Speed,
+            title = str("pref_lyrics_autoscroll_speed"),
+            value = speed,
+            valueText = autoScrollSpeedText(speed),
+            range = 0.25f..4f,
+            steps = 14,
+            onChange = { if (perTrack) viewModel.setTrackAutoScrollSpeed(it) else viewModel.updatePlainAutoScrollSpeed(it) },
+            onReset = { if (perTrack) viewModel.setTrackAutoScrollSpeed(1.5f) else viewModel.updatePlainAutoScrollSpeed(1.5f) },
+        )
+        SwitchRow(
+            icon = Icons.Rounded.MusicNote,
+            title = str("pref_lyrics_speed_this_track"),
+            subtitle = str("pref_lyrics_speed_this_track_sub"),
+            checked = perTrack,
+            onChange = { on -> if (on) viewModel.setTrackAutoScrollSpeed(speed) else viewModel.clearTrackAutoScrollSpeed() },
+        )
+    }
+    SliderRow(
+        icon = Icons.Rounded.Mouse,
+        title = str("pref_lyrics_wheel_step"),
+        subtitle = str("pref_lyrics_wheel_step_sub"),
+        value = viewModel.lyricsWheelLines,
+        valueText = str("pref_lyrics_wheel_step_value", wheelLinesText(viewModel.lyricsWheelLines)),
+        range = PlayerPreferences.LYRICS_WHEEL_LINES_MIN..PlayerPreferences.LYRICS_WHEEL_LINES_MAX,
+        steps = 21,
+        onChange = { viewModel.updateLyricsWheelLines(it) },
+        onReset = { viewModel.updateLyricsWheelLines(3f) },
+    )
+
+    if (isFullScreen) {
+        SectionTitle(str("lyrics_mode_fullscreen"))
+        SwitchRow(
+            icon = Icons.Rounded.DarkMode,
+            title = str("pref_screensaver_title"),
+            subtitle = str("pref_screensaver_desc"),
+            checked = viewModel.fullPlayerScreensaverEnabled,
+            onChange = { viewModel.updateFullPlayerScreensaverEnabled(it) },
+        )
+        SwitchRow(
+            icon = Icons.Rounded.GraphicEq,
+            title = str("pref_full_player_source_title"),
+            subtitle = str("pref_full_player_source_desc"),
+            checked = viewModel.fullPlayerSourceIndicatorEnabled,
+            onChange = { viewModel.updateFullPlayerSourceIndicatorEnabled(it) },
+        )
+    }
+}
+
+// ─── Rows ────────────────────────────────────────────────────────
+
+@Composable
+private fun QuickCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), content = content)
+    }
+}
+
+@Composable
+private fun RowIcon(icon: ImageVector, large: Boolean = false) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.size(if (large) 44.dp else 38.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(if (large) 24.dp else 20.dp))
+        }
+    }
+}
+
+@Composable
+private fun ValuePill(text: String, isActive: Boolean = true) {
+    Surface(
+        shape = CircleShape,
+        color = if (isActive) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = if (isActive) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+    )
+}
+
+@Composable
+private fun ChoiceLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+@Composable
+private fun RowTitle(icon: ImageVector, title: String, subtitle: String?, trailing: @Composable () -> Unit = {}) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RowIcon(icon)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        trailing()
+    }
+}
+
+@Composable
+private fun SwitchRow(icon: ImageVector, title: String, subtitle: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Surface(
+        onClick = { onChange(!checked) },
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            RowTitle(icon, title, subtitle) {
+                Spacer(Modifier.width(10.dp))
+                SettingsSwitch(checked = checked, onCheckedChange = onChange)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClickRow(icon: ImageVector, title: String, value: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            RowTitle(icon, title, null) {
+                ValuePill(value)
+                Icon(Icons.Rounded.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChoiceRow(
+    icon: ImageVector,
+    title: String,
+    aside: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    QuickCard {
+        RowTitle(icon, title, null) { aside?.invoke() }
+        Spacer(Modifier.height(10.dp))
+        content()
+    }
+}
+
+@Composable
+private fun SliderRow(
+    icon: ImageVector,
+    title: String,
+    value: Float,
+    valueText: String,
+    range: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onChange: (Float) -> Unit,
+    onReset: () -> Unit,
+    subtitle: String? = null,
+) {
+    QuickCard {
+        RowTitle(icon, title, subtitle) {
+            ValuePill(valueText)
+            IconButton(onClick = onReset, modifier = Modifier.size(32.dp)) {
+                Icon(Icons.Rounded.RestartAlt, str("pref_lyrics_reset"), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Slider(
+            value = value.coerceIn(range.start, range.endInclusive),
+            onValueChange = onChange,
+            valueRange = range,
+            steps = steps.coerceAtLeast(0),
+            modifier = Modifier.fillMaxWidth().padding(start = 52.dp, top = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun TranslationLanguageDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
+    val prefs = remember { PlayerPreferences() }
+    var selected by remember { mutableStateOf(prefs.getLyricsTranslationLang()) }
+    val systemCode = java.util.Locale.getDefault().language
+    val languages = remember {
+        val all = java.util.Locale.getISOLanguages()
+            .map { code ->
+                val locale = java.util.Locale(code)
+                code to locale.getDisplayLanguage(locale).replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+            }
+            .filter { it.second.isNotBlank() && it.first.length == 2 }
+            .distinctBy { it.first }
+            .sortedBy { it.second }
+        val system = all.find { it.first == systemCode }
+        listOfNotNull(system?.let { it.first to "${it.second} (${str("theme_system")})" }) + all.filter { it.first != systemCode }
+    }
+    EscapableAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(str("pref_lyrics_translation_lang")) },
+        text = {
+            LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp)) {
+                items(languages) { (code, name) ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            selected = code
+                            viewModel.setLyricsTranslationLanguage(code)
+                            onDismiss()
+                        }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selected == code, onClick = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(name)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } },
+    )
+}
+
+// ─── The view being edited ───────────────────────────────────────
+
+/** The settings that exist once per lyrics view, read and written for the view the panel was opened from. */
+private class ModeKnobs(private val vm: PlayerViewModel, private val isFullScreen: Boolean, private val isSidebar: Boolean) {
+    private fun <T> pick(fullScreen: T, sidebar: T, central: T): T = when {
+        isFullScreen -> fullScreen
+        isSidebar -> sidebar
+        else -> central
+    }
+
+    val defaultFontSize: Float get() = pick(42f, 22f, 42f)
+    val maxLineSpacing: Float get() = pick(64f, 48f, 48f)
+    val maxHorizontalMargin: Float get() = pick(160f, 64f, 64f)
+
+    var fontSize: Float
+        get() = pick(vm.lyricsFullScreenFontSize, vm.lyricsSidebarFontSize, vm.lyricsFontSize)
+        set(v) = pick({ vm.updateLyricsFullScreenFontSize(v) }, { vm.updateLyricsSidebarFontSize(v) }, { vm.updateLyricsFontSize(v) })()
+
+    var uiStyle: LyricsUiStyle
+        get() = pick(vm.lyricsFullScreenUiStyle, vm.lyricsSidebarUiStyle, vm.lyricsUiStyle)
+        set(v) = pick({ vm.updateLyricsFullScreenUiStyle(v) }, { vm.updateLyricsSidebarUiStyle(v) }, { vm.updateLyricsUiStyle(v) })()
+
+    var alignment: LyricsAlignment
+        get() = pick(vm.lyricsFullScreenAlignment, vm.lyricsSidebarAlignment, vm.lyricsAlignment)
+        set(v) = pick({ vm.updateLyricsFullScreenAlignment(v) }, { vm.updateLyricsSidebarAlignment(v) }, { vm.updateLyricsAlignment(v) })()
+
+    var displayStyle: com.alananasss.kittytune.data.local.LyricsDisplayStyle
+        get() = pick(vm.lyricsFullScreenDisplayStyle, vm.lyricsSidebarDisplayStyle, vm.lyricsDisplayStyle)
+        set(v) = pick({ vm.updateLyricsFullScreenDisplayStyle(v) }, { vm.updateLyricsSidebarDisplayStyle(v) }, { vm.updateLyricsDisplayStyle(v) })()
+
+    var lineSpacing: Float
+        get() = pick(vm.lyricsFullScreenLineSpacing, vm.lyricsSidebarLineSpacing, vm.lyricsLineSpacing)
+        set(v) = pick({ vm.updateLyricsFullScreenLineSpacing(v) }, { vm.updateLyricsSidebarLineSpacing(v) }, { vm.updateLyricsLineSpacing(v) })()
+
+    var horizontalMargin: Float
+        get() = pick(vm.lyricsFullScreenHorizontalMargin, vm.lyricsSidebarHorizontalMargin, vm.lyricsHorizontalMargin)
+        set(v) = pick({ vm.updateLyricsFullScreenHorizontalMargin(v) }, { vm.updateLyricsSidebarHorizontalMargin(v) }, { vm.updateLyricsHorizontalMargin(v) })()
+
+    var verticalOffset: Float
+        get() = pick(vm.lyricsFullScreenVerticalOffset, vm.lyricsSidebarVerticalOffset, vm.lyricsVerticalOffset)
+        set(v) = pick({ vm.updateLyricsFullScreenVerticalOffset(v) }, { vm.updateLyricsSidebarVerticalOffset(v) }, { vm.updateLyricsVerticalOffset(v) })()
+
+    var activeScale: Float
+        get() = pick(vm.lyricsFullScreenActiveScale, vm.lyricsSidebarActiveScale, vm.lyricsActiveScale)
+        set(v) = pick({ vm.updateLyricsFullScreenActiveScale(v) }, { vm.updateLyricsSidebarActiveScale(v) }, { vm.updateLyricsActiveScale(v) })()
+
+    var lineBlur: Boolean
+        get() = pick(vm.lyricsFullScreenLineBlurEnabled, vm.lyricsSidebarLineBlurEnabled, vm.lyricsLineBlurEnabled)
+        set(v) = pick({ vm.updateLyricsFullScreenLineBlurEnabled(v) }, { vm.updateLyricsSidebarLineBlurEnabled(v) }, { vm.updateLyricsLineBlurEnabled(v) })()
+
+    fun resetTypography() = vm.resetLyricsTypography(isFullScreen = isFullScreen, isSidebar = isSidebar)
+}
+
+@Composable
+private fun bgStyleLabel(style: FullPlayerBgStyle): String = when (style) {
+    FullPlayerBgStyle.APPLE_MUSIC -> str("full_player_bg_apple_music")
+    FullPlayerBgStyle.BLUR -> str("full_player_bg_blur")
+    FullPlayerBgStyle.GRADIENT -> str("full_player_bg_gradient")
+    FullPlayerBgStyle.PURE_BLACK -> str("full_player_bg_pure_black")
+}
+
+@Composable
+private fun layoutLabel(layout: FullPlayerLayout): String = when (layout) {
+    FullPlayerLayout.LYRICS_RIGHT -> str("full_player_layout_right")
+    FullPlayerLayout.LYRICS_LEFT -> str("full_player_layout_left")
+    FullPlayerLayout.LYRICS_CENTRED -> str("full_player_layout_centred")
+    FullPlayerLayout.COVER_AND_LINE -> str("full_player_layout_single_line")
+}
+
+/** "3" rather than "3.0", and "2.5" when it is not whole. */
+private fun wheelLinesText(lines: Float): String {
+    val rounded = kotlin.math.round(lines * 2f) / 2f
+    return if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()
+}
+
+/** "1.25×", with a decimal only when there is one. */
+private fun autoScrollSpeedText(speed: Float): String {
+    val rounded = kotlin.math.round(speed * 100f) / 100f
+    return (if (rounded % 1f == 0f) rounded.toInt().toString() else rounded.toString()) + "×"
+}

@@ -64,6 +64,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
+import com.alananasss.kittytune.ui.player.lyrics.revealWhenPlaced
+import com.alananasss.kittytune.ui.player.lyrics.LyricsScrolling
+import kotlinx.coroutines.delay
 
 internal data class FocusState(
     val firstIndex: Int,
@@ -318,6 +321,20 @@ fun KaraokeLyricsView(
         }
     }
 
+    // The blur stays off for as long as the reader is reading by hand, not only while the wheel turns: it
+    // came back the moment the scroll stopped, over the very lines just scrolled to (issue #66). It returns
+    // after the same grace the other views give before following the song again.
+    val isUserScrolling by remember { derivedStateOf { listState.isScrollInProgress && !scrollInCode.value } }
+    var isReadingByHand by remember { mutableStateOf(false) }
+    LaunchedEffect(isUserScrolling) {
+        if (isUserScrolling) {
+            isReadingByHand = true
+        } else if (isReadingByHand) {
+            delay(LyricsScrolling.MANUAL_GRACE_MS)
+            isReadingByHand = false
+        }
+    }
+
     LaunchedEffect(
         lyrics,
         stableOffsetPx,
@@ -328,13 +345,16 @@ fun KaraokeLyricsView(
             if (firstIndex in lyrics.lines.indices) {
                 val now = System.currentTimeMillis()
                 val timeDelta = now - lastScrollTime
+                // The first placement is a jump, never a glide down from line one: there is no reader
+                // following a line yet, and the glide is what drew lines arriving one under another.
+                val isFirstPlacement = lastFocusedIndex < 0
                 val indexDelta = if (lastFocusedIndex >= 0) kotlin.math.abs(firstIndex - lastFocusedIndex) else 0
                 lastFocusedIndex = firstIndex
 
                 val items = listState.layoutInfo.visibleItemsInfo
                 val targetItem = items.firstOrNull { it.index == firstIndex }
                 val isRapidClick = timeDelta < 280L
-                val isLargeJump = indexDelta > 3
+                val isLargeJump = indexDelta > 3 || isFirstPlacement
                 val shouldSnap = scrubbing || isRapidClick || isLargeJump
 
                 lastScrollTime = now
@@ -382,6 +402,7 @@ fun KaraokeLyricsView(
                 state = listState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .revealWhenPlaced(listState, lyricsFocusState.firstIndex)
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
                         }
@@ -516,11 +537,11 @@ fun KaraokeLyricsView(
 
                             val blurRadiusState = animateFloatAsState(
                                 targetValue = (
-                                        if (!useBlurEffect) 0f
-                                        else if (distanceWeightState.value > 0 && (!listState.isScrollInProgress || scrollInCode.value)) {
+                                        if (!useBlurEffect || isReadingByHand) 0f
+                                        else if (distanceWeightState.value > 0) {
                                             distanceWeightState.value * blurDelta
                                         } else 0f),
-                                animationSpec = tween(300),
+                                animationSpec = tween(if (isReadingByHand) 250 else 600),
                             )
 
                             when (line) {

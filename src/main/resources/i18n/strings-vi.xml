@@ -3006,6 +3006,10 @@
     <string name="listening_stats_active_days">Số ngày nghe nhạc: %1$d</string>
     <string name="listening_stats_since">%1$s – hôm nay</string>
     <string name="zapret_sub">Vượt chặn: KittyTune kiểm tra dịch vụ nào bị chặn và thêm tên miền vào danh sách người dùng của zapret.</string>
+    <string name="lyrics_quick_tab_look">Giao diện</string>
+    <string name="lyrics_quick_tab_layout">Bố cục</string>
+    <string name="lyrics_quick_tab_features">Tính năng</string>
+    <string name="lyrics_quick_scrolling">Cuộn</string>
     <string name="zapret_folder">Thư mục zapret</string>
     <string name="zapret_folder_none">Chưa chọn</string>
     <string name="zapret_detect">Tìm</string>

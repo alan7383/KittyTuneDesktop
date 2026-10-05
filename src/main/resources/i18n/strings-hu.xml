@@ -2558,6 +2558,10 @@
     <string name="listening_stats_active_days">Zenés napok: %1$d</string>
     <string name="listening_stats_since">%1$s – ma</string>
     <string name="zapret_sub">Blokkolás megkerülése: a KittyTune ellenőrzi, mely szolgáltatások blokkoltak, és felveszi a domainjeiket a zapret listájába.</string>
+    <string name="lyrics_quick_tab_look">Megjelenés</string>
+    <string name="lyrics_quick_tab_layout">Elrendezés</string>
+    <string name="lyrics_quick_tab_features">Funkciók</string>
+    <string name="lyrics_quick_scrolling">Görgetés</string>
     <string name="zapret_folder">Zapret mappa</string>
     <string name="zapret_folder_none">Nincs kiválasztva</string>
     <string name="zapret_detect">Keresés</string>
