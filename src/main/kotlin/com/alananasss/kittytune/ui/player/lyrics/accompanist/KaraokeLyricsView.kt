@@ -66,6 +66,7 @@ import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
 import com.alananasss.kittytune.ui.player.lyrics.revealWhenPlaced
 import com.alananasss.kittytune.ui.player.lyrics.LyricsScrolling
+import com.alananasss.kittytune.ui.player.lyrics.glideToLine
 import kotlinx.coroutines.delay
 
 internal data class FocusState(
@@ -332,6 +333,17 @@ fun KaraokeLyricsView(
         } else if (isReadingByHand) {
             delay(LyricsScrolling.MANUAL_GRACE_MS)
             isReadingByHand = false
+            // And back to the line being sung, gliding, rather than waiting for the next line to start: on a
+            // pause that never happened, and the view stayed where the reader had left it (issue #66).
+            val focus = lyricsFocusState.firstIndex
+            if (focus in lyrics.lines.indices) {
+                scrollInCode.value = true
+                try {
+                    listState.glideToLine(focus) { (-stableOffsetPx - keepAliveZonePx).toInt() }
+                } finally {
+                    scrollInCode.value = false
+                }
+            }
         }
     }
 
@@ -402,7 +414,7 @@ fun KaraokeLyricsView(
                 state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .revealWhenPlaced(listState, lyricsFocusState.firstIndex)
+                        .revealWhenPlaced(listState, lyricsFocusState.firstIndex, contentKey = lyrics)
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
                         }

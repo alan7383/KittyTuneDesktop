@@ -454,13 +454,13 @@ fun buildSyncedLyrics(
                     )
                 )
             } else if (isDuetEnabled && effectiveSinger == LyricSinger.SINGER_2) {
-                val syllables = listOf(
-                    KaraokeSyllable(
-                        content = cleanText,
-                        start = entry.startTime.toInt(),
-                        end = lineEnd,
-                        phonetic = null
-                    )
+                // Word by word, so the line can wrap. As one syllable holding the whole line it could not break
+                // anywhere, and a long right-aligned line ran off the left edge of the screen (issue #66).
+                val syllables = buildWrappingKaraokeSyllables(
+                    content = cleanText,
+                    romanizedText = "",
+                    start = entry.startTime.toInt(),
+                    end = lineEnd,
                 )
                 lines.add(
                     KaraokeLine.MainKaraokeLine(

@@ -111,19 +111,11 @@ fun PanelLyrics(
             }
         }
         !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier, style)
-        vm.isLyricsLoading -> Column(
-            modifier = modifier.fillMaxWidth().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
-        ) {
-            androidx.compose.material3.ContainedLoadingIndicator()
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = str("lyrics_searching"),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        vm.isLyricsLoading -> com.alananasss.kittytune.ui.player.lyrics.LyricsSearchingIndicator(
+            fontFamily = com.alananasss.kittytune.ui.theme.rememberLyricsFontFamily(vm.lyricsFont),
+            modifier = modifier.fillMaxWidth(),
+            large = style.isFullScreen,
+        )
         else -> Column(
             modifier = modifier.fillMaxWidth().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -212,7 +204,7 @@ private fun PanelSyncedLyrics(
         val anchorPx =
             (viewportPx * (effectiveStyle.anchorFraction - effectiveStyle.topInsetFraction).coerceAtLeast(0f)).toInt()
 
-        val readingByHand = FollowActiveLine(listState, activeIndex, anchorPx)
+        val readingByHand = FollowActiveLine(listState, activeIndex, anchorPx, contentKey = lines)
         val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
 
         // Interpolated between the player's four-per-second reports, so the word fill in the panel is as
@@ -224,7 +216,7 @@ private fun PanelSyncedLyrics(
         ) + vm.lyricsOffset
 
         LazyColumn(
-            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex),
+            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex, contentKey = lines),
             state = listState,
             contentPadding = PaddingValues(
                 start = effectiveStyle.startPadding,
@@ -483,7 +475,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
         LazyColumn(
             Modifier
                 .fillMaxSize()
-                .revealWhenPlaced(listState, activeIndex = -1)
+                .revealWhenPlaced(listState, activeIndex = -1, contentKey = lines)
                 .lyricsWheel(
                     listState = listState,
                     scope = scope,
