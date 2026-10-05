@@ -2617,7 +2617,8 @@
     <string name="pref_screensaver_desc">Chuyển sang chế độ tập trung sau 60 giây không hoạt động ở chế độ toàn màn hình</string>
     <string name="screensaver_focus_mode">Chế độ bảo vệ màn hình &amp; tập trung</string>
     <string name="screensaver_timeout_title">Thời gian chờ không hoạt động</string>
-    <string name="screensaver_tap_to_wake">Di chuyển chuột hoặc nhấp để thoát</string>
+    <string name="screensaver_tap_to_wake">Nhấp chuột hoặc nhấn Space để thoát</string>
+    <string name="screensaver_since_sleep">Kể từ khi vào chế độ nghỉ</string>
     <string name="screensaver_session_stats">Thống kê phiên</string>
     <string name="lyrics_fullscreen">Toàn màn hình</string>
     <string name="lyrics_style_focus">Tiêu điểm (Focus)</string>

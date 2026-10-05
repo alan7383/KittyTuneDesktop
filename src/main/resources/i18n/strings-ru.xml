@@ -1190,7 +1190,8 @@
     <string name="pref_screensaver_desc">Переходит в режим концентрации после 60 с бездействия на весь экран</string>
     <string name="screensaver_focus_mode">Режим заставки и концентрации</string>
     <string name="screensaver_timeout_title">Время бездействия</string>
-    <string name="screensaver_tap_to_wake">Подвиньте мышь или кликните для выхода</string>
+    <string name="screensaver_tap_to_wake">Нажмите кнопку мыши или пробел, чтобы выйти</string>
+    <string name="screensaver_since_sleep">С момента перехода в режим сна</string>
     <string name="screensaver_session_stats">Статистика сессии</string>
     <string name="player_previous">Предыдущий трек</string>
     <string name="player_play_pause">Воспроизведение / пауза</string>
