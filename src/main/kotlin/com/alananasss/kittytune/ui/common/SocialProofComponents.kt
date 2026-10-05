@@ -1,6 +1,5 @@
 package com.alananasss.kittytune.ui.common
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,12 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -34,7 +28,6 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.LikeRepository
 import com.alananasss.kittytune.data.SocialProofRepository
 import com.alananasss.kittytune.domain.Track
-import coil3.compose.AsyncImage
 import com.alananasss.kittytune.domain.User
 
 /**
@@ -59,42 +52,20 @@ fun MiniSocialProofAvatars(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         displayLikers.forEachIndexed { index, user ->
-            val avatarUrl = user.avatarUrl?.replace("large", "t500x500")
-
             Box(
                 modifier = Modifier
                     // First liker on top, so the stack reads left to right.
                     .zIndex((displayLikers.size - index).toFloat())
                     .size(16.dp)
                     .clip(CircleShape)
-                    .background(FALLBACK_AVATAR_COLOR)
                     .border(1.dp, borderColor, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                if (!avatarUrl.isNullOrBlank()) {
-                    AsyncImage(
-                        model = avatarUrl,
-                        contentDescription = user.username,
-                        modifier = Modifier.fillMaxSize().clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                    )
-                } else {
-                    Text(
-                        text = user.username?.firstOrNull()?.uppercase() ?: "?",
-                        style = TextStyle(
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        ),
-                    )
-                }
+                UserAvatar(url = user.avatarUrl, contentDescription = user.username, modifier = Modifier.fillMaxSize())
             }
         }
     }
 }
-
-/** Deliberately not a theme colour: it stands in for a photo, not for a piece of the palette. */
-private val FALLBACK_AVATAR_COLOR = Color(0xFF00897B)
 
 /**
  * The markers that tell you your own relationship to a track, as they appear on the second line of

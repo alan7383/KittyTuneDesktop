@@ -494,13 +494,9 @@ private fun ReposterRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.clickable(onClick = onClick),
     ) {
-        AsyncImage(
-            model = reposter.avatarUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape),
+        com.alananasss.kittytune.ui.common.UserAvatar(
+            url = reposter.avatarUrl,
+            modifier = Modifier.size(20.dp),
         )
         Icon(
             Icons.Rounded.Repeat,
