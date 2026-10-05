@@ -416,6 +416,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         private set
     var lyricsLrcBounceEnabled by mutableStateOf(playerPrefs.getLyricsLrcBounceEnabled())
         private set
+    var lyricsSplitBackingVocals by mutableStateOf(playerPrefs.getLyricsSplitBackingVocals())
+        private set
+    var lyricsRevealWords by mutableStateOf(playerPrefs.getLyricsRevealWords())
+        private set
     var lyricsBounceFactor by mutableFloatStateOf(playerPrefs.getLyricsBounceFactor())
         private set
     var lyricsGlowFactor by mutableFloatStateOf(playerPrefs.getLyricsGlowFactor())
@@ -490,6 +494,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun updateLyricsLrcBounceEnabled(enabled: Boolean) {
         lyricsLrcBounceEnabled = enabled
         playerPrefs.setLyricsLrcBounceEnabled(enabled)
+    }
+
+    fun updateLyricsSplitBackingVocals(enabled: Boolean) {
+        lyricsSplitBackingVocals = enabled
+        playerPrefs.setLyricsSplitBackingVocals(enabled)
+    }
+
+    fun updateLyricsRevealWords(enabled: Boolean) {
+        lyricsRevealWords = enabled
+        playerPrefs.setLyricsRevealWords(enabled)
     }
 
     fun updateLyricsBounceFactor(factor: Float) {
