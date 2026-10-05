@@ -472,6 +472,10 @@
     <string name="dialog_delete_playlist_from_lib_title">Retirer de la bibliothèque ?</string>
     <string name="dialog_delete_playlist_msg">Cette action est irréversible</string>
     <string name="menu_delete_playlist">Supprimer la playlist</string>
+    <string name="playlist_menu_change_cover">Changer la couverture</string>
+    <string name="playlist_menu_download">Tout télécharger</string>
+    <string name="playlist_menu_cancel_download">Arrêter le téléchargement</string>
+    <string name="playlist_menu_remove_download">Supprimer le téléchargement</string>
     <string name="dialog_delete_playlist_title">Supprimer la playlist ?</string>
     <string name="dialog_font_roundness">Arrondi (ROND) : %1$d</string>
     <string name="dialog_font_settings_title">Réglages de la police</string>

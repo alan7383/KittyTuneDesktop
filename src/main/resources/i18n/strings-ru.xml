@@ -472,6 +472,10 @@
     <string name="dialog_delete_playlist_from_lib_title">Удалить из библиотеки?</string>
     <string name="dialog_delete_playlist_msg">Это действие нельзя будет отменить</string>
     <string name="menu_delete_playlist">Удалить плейлист</string>
+    <string name="playlist_menu_change_cover">Изменить обложку</string>
+    <string name="playlist_menu_download">Скачать всё</string>
+    <string name="playlist_menu_cancel_download">Остановить загрузку</string>
+    <string name="playlist_menu_remove_download">Удалить загрузку</string>
     <string name="dialog_delete_playlist_title">Удалить плейлист?</string>
     <string name="dialog_font_roundness">Округлость (ROND): %1$d</string>
     <string name="dialog_font_settings_title">Настройки шрифта</string>

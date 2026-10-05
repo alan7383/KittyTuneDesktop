@@ -265,6 +265,10 @@
     <string name="dialog_delete_playlist_msg">Hành động này không thể hoàn tác</string>
     <string name="dialog_delete_playlist_from_lib_title">Xóa khỏi thư viện?</string>
     <string name="menu_delete_playlist">Xóa danh sách phát</string>
+    <string name="playlist_menu_change_cover">Đổi ảnh bìa</string>
+    <string name="playlist_menu_download">Tải xuống tất cả</string>
+    <string name="playlist_menu_cancel_download">Dừng tải xuống</string>
+    <string name="playlist_menu_remove_download">Xóa bản tải xuống</string>
     <string name="lib_create_folder_title">Thư mục mới</string>
     <string name="lib_create_folder_hint">Tên thư mục</string>
     <string name="lib_folder">Thư mục</string>

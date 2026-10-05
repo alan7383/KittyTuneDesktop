@@ -290,6 +290,10 @@
     <string name="dialog_delete_playlist_msg">Diese Aktion kann nicht rückgängig gemacht werden</string>
     <string name="dialog_delete_playlist_from_lib_title">Aus der Bibliothek entfernen?</string>
     <string name="menu_delete_playlist">Playlist löschen</string>
+    <string name="playlist_menu_change_cover">Cover ändern</string>
+    <string name="playlist_menu_download">Alle herunterladen</string>
+    <string name="playlist_menu_cancel_download">Download stoppen</string>
+    <string name="playlist_menu_remove_download">Download entfernen</string>
 
     <string name="lib_create_folder_title">Neuer Ordner</string>
     <string name="lib_create_folder_hint">Ordnername</string>
