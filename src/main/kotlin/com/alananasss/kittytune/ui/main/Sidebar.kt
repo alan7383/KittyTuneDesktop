@@ -1323,7 +1323,9 @@ private fun LibraryCategoryButton(libraryViewModel: LibraryViewModel) {
     var expanded by remember { mutableStateOf(false) }
     TrackSidebarPopup(expanded, libraryViewModel)
     val all = str("search_filter_all")
-    val categories = buildList {
+    // null is "All": no filter is a choice with a name and an icon of its own, like the others.
+    val categories = buildList<Pair<String?, ImageVector>> {
+        add(null to Icons.Rounded.LibraryMusic)
         add(str("lib_playlists") to Icons.Rounded.QueueMusic)
         add(str("lib_albums") to Icons.Rounded.Album)
         add(str("lib_artists") to Icons.Rounded.Person)
@@ -1332,66 +1334,19 @@ private fun LibraryCategoryButton(libraryViewModel: LibraryViewModel) {
             add(str("lib_your_uploads") to Icons.Rounded.CloudUpload)
         }
     }
-    val selected = libraryViewModel.selectedFilter
+    val selected = categories.firstOrNull { it.first == libraryViewModel.selectedFilter } ?: categories.first()
 
-    Box {
-        Tip(str("lib_filter_tooltip")) {
-            TextButton(
-                onClick = { expanded = true },
-                shapes = ButtonDefaults.shapes(),
-                contentPadding = PaddingValues(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-            ) {
-                Text(
-                    text = selected ?: all,
-                    style = MaterialTheme.typography.labelMedium,
-                    // Single line and truncated rather than wrapped: this sits in a row that follows the
-                    // panel's width, and a label that wraps takes the row's height with it.
-                    softWrap = false,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (selected == null) MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.onSurface,
-                )
-                Icon(
-                    Icons.Rounded.ArrowDropDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(all) },
-                leadingIcon = { CategoryCheck(isSelected = selected == null) },
-                onClick = {
-                    expanded = false
-                    libraryViewModel.selectedFilter = null
-                },
-            )
-            categories.forEach { (label, icon) ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    leadingIcon = {
-                        if (selected == label) CategoryCheck(isSelected = true)
-                        else Icon(icon, contentDescription = null)
-                    },
-                    onClick = {
-                        expanded = false
-                        libraryViewModel.selectedFilter = label
-                    },
-                )
-            }
-        }
-    }
-}
-
-/** The tick that says which one is live, or the space it would take, so the labels stay in a column. */
-@Composable
-private fun CategoryCheck(isSelected: Boolean) {
-    if (isSelected) Icon(Icons.Rounded.Check, contentDescription = null)
-    else Spacer(Modifier.size(24.dp))
+    com.alananasss.kittytune.ui.common.IconChoiceButton(
+        options = categories,
+        selected = selected,
+        onSelect = { libraryViewModel.selectedFilter = it.first },
+        icon = { it.second },
+        label = { it.first ?: all },
+        tooltip = { str("lib_filter_tooltip") + ": " + (it.first ?: all) },
+        size = 32.dp,
+        iconSize = 18.dp,
+        onExpandedChange = { expanded = it },
+    )
 }
 
 private fun viewModeIcon(mode: LibraryViewMode): ImageVector = when (mode) {
@@ -1408,6 +1363,12 @@ private fun viewModeLabel(mode: LibraryViewMode): String = when (mode) {
     LibraryViewMode.GRID -> str("lib_view_grid")
 }
 
+/**
+ * What the library shows, in what order and how: one button, with the view mode's icon on it.
+ *
+ * It used to read "Recent" whatever was chosen, over a menu offering "All / Created / Liked" with no "Recent"
+ * among them (issue #66). The menu is now three headed groups of the same rows every filter menu uses.
+ */
 @Composable
 private fun SortAndViewMenuButton(libraryViewModel: LibraryViewModel) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -1415,95 +1376,50 @@ private fun SortAndViewMenuButton(libraryViewModel: LibraryViewModel) {
     val shouldShowOwnershipFilter = libraryViewModel.selectedFilter == null ||
             libraryViewModel.selectedFilter == str("lib_playlists") ||
             libraryViewModel.selectedFilter == str("lib_albums")
+    val ownership = listOf(
+        Triple(OwnershipFilter.ALL, str("filter_all"), Icons.Rounded.LibraryMusic),
+        Triple(OwnershipFilter.CREATED, str("filter_created"), Icons.Rounded.Edit),
+        Triple(OwnershipFilter.LIKED, str("filter_liked"), Icons.Rounded.Favorite),
+    )
+    val sortLabel = if (libraryViewModel.isSortDescending) str("sort_recently_added") else str("sort_first_added")
+    val tooltip = listOfNotNull(
+        ownership.first { it.first == libraryViewModel.ownershipFilter }.second.takeIf { shouldShowOwnershipFilter },
+        sortLabel,
+        viewModeLabel(libraryViewModel.viewMode),
+    ).joinToString(" · ")
 
-    val label = if (shouldShowOwnershipFilter && libraryViewModel.ownershipFilter != OwnershipFilter.ALL) {
-        when (libraryViewModel.ownershipFilter) {
-            OwnershipFilter.CREATED -> str("filter_created")
-            OwnershipFilter.LIKED -> str("filter_liked")
-            OwnershipFilter.ALL -> str("lib_recents")
-        }
-    } else str("lib_recents")
-
-    Box {
-        Surface(
-            modifier = Modifier.clickable { menuOpen = true },
-            shape = RoundedCornerShape(8.dp),
-            color = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(text = label, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                Spacer(Modifier.width(6.dp))
-                Icon(viewModeIcon(libraryViewModel.viewMode), contentDescription = str("lib_view_mode"), modifier = Modifier.size(16.dp))
-            }
-        }
-
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-        ) {
-            if (shouldShowOwnershipFilter) {
-                val options = listOf(
-                    OwnershipFilter.ALL to str("filter_all"),
-                    OwnershipFilter.CREATED to str("filter_created"),
-                    OwnershipFilter.LIKED to str("filter_liked"),
-                )
-                options.forEach { (filter, text) ->
-                    DropdownMenuItem(
-                        text = { Text(text) },
-                        trailingIcon = {
-                            if (libraryViewModel.ownershipFilter == filter) {
-                                Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            }
-                        },
-                        onClick = {
-                            libraryViewModel.ownershipFilter = filter
-                            menuOpen = false
-                        },
-                    )
+    com.alananasss.kittytune.ui.common.IconMenuButton(
+        icon = viewModeIcon(libraryViewModel.viewMode),
+        tooltip = tooltip,
+        size = 32.dp,
+        iconSize = 18.dp,
+        onExpandedChange = { menuOpen = it },
+    ) { dismiss ->
+        if (shouldShowOwnershipFilter) {
+            com.alananasss.kittytune.ui.common.ChoiceMenuHeader(str("lib_menu_show"))
+            ownership.forEach { (filter, text, icon) ->
+                com.alananasss.kittytune.ui.common.ChoiceMenuItem(text, icon, libraryViewModel.ownershipFilter == filter) {
+                    libraryViewModel.ownershipFilter = filter
+                    dismiss()
                 }
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
             }
-
-            DropdownMenuItem(
-                text = { Text(str("sort_date_added")) },
-                trailingIcon = {
-                    Icon(
-                        if (libraryViewModel.isSortDescending) Icons.Rounded.ArrowDownward else Icons.Rounded.ArrowUpward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                onClick = { libraryViewModel.isSortDescending = !libraryViewModel.isSortDescending },
-            )
-
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
-
-            Text(
-                str("lib_view_mode"),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-            )
-            Row(
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                LibraryViewMode.entries.forEach { mode ->
-                    Tip(viewModeLabel(mode)) {
-                        FilledIconToggleButton(
-                            checked = libraryViewModel.viewMode == mode,
-                            onCheckedChange = { libraryViewModel.viewMode = mode },
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(viewModeIcon(mode), contentDescription = viewModeLabel(mode), modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
+        }
+        com.alananasss.kittytune.ui.common.ChoiceMenuHeader(str("lib_sort_by_title"))
+        com.alananasss.kittytune.ui.common.ChoiceMenuItem(str("sort_recently_added"), Icons.Rounded.ArrowDownward, libraryViewModel.isSortDescending) {
+            libraryViewModel.isSortDescending = true
+            dismiss()
+        }
+        com.alananasss.kittytune.ui.common.ChoiceMenuItem(str("sort_first_added"), Icons.Rounded.ArrowUpward, !libraryViewModel.isSortDescending) {
+            libraryViewModel.isSortDescending = false
+            dismiss()
+        }
+        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+        com.alananasss.kittytune.ui.common.ChoiceMenuHeader(str("lib_view_mode"))
+        LibraryViewMode.entries.forEach { mode ->
+            com.alananasss.kittytune.ui.common.ChoiceMenuItem(viewModeLabel(mode), viewModeIcon(mode), libraryViewModel.viewMode == mode) {
+                libraryViewModel.viewMode = mode
+                dismiss()
             }
         }
     }

@@ -1,5 +1,9 @@
 package com.alananasss.kittytune.ui.player
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Timeline
+import androidx.compose.material.icons.rounded.Update
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.Application
 import androidx.compose.runtime.*
@@ -50,10 +54,14 @@ import kotlin.time.Duration.Companion.milliseconds
 import com.alananasss.kittytune.data.lyrics.providers.*
 import com.alananasss.kittytune.data.lyrics.clients.*
 
-enum class CommentSort(val value: String, val labelResId: String) {
-    NEWEST("newest", "sort_newest"),
-    TIMESTAMP("track-timestamp", "sort_timestamp"),
-    OLDEST("oldest", "sort_oldest"),
+enum class CommentSort(
+    val value: String,
+    val labelResId: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+) {
+    NEWEST("newest", "sort_newest", Icons.Rounded.Update),
+    TIMESTAMP("track-timestamp", "sort_timestamp", Icons.Rounded.Timeline),
+    OLDEST("oldest", "sort_oldest", Icons.Rounded.History),
 }
 
 enum class LyricsMode { SYNCED, PLAIN }

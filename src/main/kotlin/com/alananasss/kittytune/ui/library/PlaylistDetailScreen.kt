@@ -394,8 +394,6 @@ fun PlaylistDetailScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showOptionsMenu by remember { mutableStateOf(false) }
-    var showSortMenu by remember { mutableStateOf(false) }
-    var showViewModeMenu by remember { mutableStateOf(false) }
     var showDetailsSheet by remember { mutableStateOf(false) }
 
     var playlistSearchQuery by remember { mutableStateOf("") }
@@ -1756,85 +1754,34 @@ fun PlaylistDetailScreen(
                                             focusManager.clearFocus()
                                         }
                                 )
-                                Box {
-                                    FilledTonalIconButton(onClick = { showSortMenu = true }) {
-                                        Icon(Icons.Rounded.Sort, str("btn_options"))
-                                    }
-                                    DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                                        val options = listOf(
-                                            TrackSortBy.FIRST_ADDED to str("sort_first_added"),
-                                            TrackSortBy.RECENTLY_ADDED to str("sort_recently_added"),
-                                            TrackSortBy.TITLE_AZ to str("sort_title_az"),
-                                            TrackSortBy.ARTIST_AZ to str("sort_artist_az")
-                                        )
-                                        options.forEach { (sortType, label) ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        label,
-                                                        fontWeight = if (playlistSortBy == sortType) FontWeight.Bold else FontWeight.Normal,
-                                                        color = if (playlistSortBy == sortType) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                },
-                                                trailingIcon = {
-                                                    if (playlistSortBy == sortType) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
-                                                },
-                                                onClick = { playlistSortBy = sortType; showSortMenu = false }
-                                            )
-                                        }
-                                    }
-                                }
-                                // Spotify-style view mode picker (Compact / List)
-                                Box {
-                                    val viewMode = TrackViewModePref.mode
-                                    TextButton(
-                                        onClick = { showViewModeMenu = true },
-                                        shape = CircleShape,
-                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    ) {
-                                        Text(
-                                            if (viewMode == TrackViewMode.COMPACT) str("view_mode_compact") else str("view_mode_list"),
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Icon(
-                                            if (viewMode == TrackViewMode.COMPACT) Icons.Rounded.Menu else Icons.AutoMirrored.Rounded.FormatListBulleted,
-                                            str("lib_view_mode"),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                    DropdownMenu(expanded = showViewModeMenu, onDismissRequest = { showViewModeMenu = false }) {
-                                        Text(
-                                            str("lib_view_mode"),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                        )
-                                        val modes = listOf(
-                                            Triple(TrackViewMode.COMPACT, str("view_mode_compact"), Icons.Rounded.Menu),
-                                            Triple(TrackViewMode.LIST, str("view_mode_list"), Icons.AutoMirrored.Rounded.FormatListBulleted)
-                                        )
-                                        modes.forEach { (mode, label, icon) ->
-                                            val selected = viewMode == mode
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        label,
-                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                },
-                                                leadingIcon = {
-                                                    Icon(icon, null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                                },
-                                                trailingIcon = {
-                                                    if (selected) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
-                                                },
-                                                onClick = { TrackViewModePref.set(mode); showViewModeMenu = false }
-                                            )
-                                        }
-                                    }
-                                }
+                                // The same buttons every list's sort and view use: the icon of what is chosen, its name
+                                // in the tooltip, the options with their icons in the menu (issue #66).
+                                val sortOptions = listOf(
+                                    Triple(TrackSortBy.FIRST_ADDED, str("sort_first_added"), Icons.Rounded.ArrowUpward),
+                                    Triple(TrackSortBy.RECENTLY_ADDED, str("sort_recently_added"), Icons.Rounded.ArrowDownward),
+                                    Triple(TrackSortBy.TITLE_AZ, str("sort_title_az"), Icons.Rounded.SortByAlpha),
+                                    Triple(TrackSortBy.ARTIST_AZ, str("sort_artist_az"), Icons.Rounded.Person),
+                                )
+                                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                                    options = sortOptions,
+                                    selected = sortOptions.firstOrNull { it.first == playlistSortBy } ?: sortOptions.first(),
+                                    onSelect = { playlistSortBy = it.first },
+                                    icon = { it.third },
+                                    label = { it.second },
+                                    tooltip = { str("lib_sort_by_title") + ": " + it.second },
+                                )
+                                val viewModes = listOf(
+                                    Triple(TrackViewMode.COMPACT, str("view_mode_compact"), Icons.Rounded.Menu),
+                                    Triple(TrackViewMode.LIST, str("view_mode_list"), Icons.AutoMirrored.Rounded.FormatListBulleted),
+                                )
+                                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                                    options = viewModes,
+                                    selected = viewModes.firstOrNull { it.first == TrackViewModePref.mode } ?: viewModes.first(),
+                                    onSelect = { TrackViewModePref.set(it.first) },
+                                    icon = { it.third },
+                                    label = { it.second },
+                                    tooltip = { str("lib_view_mode") + ": " + it.second },
+                                )
                             }
                             Spacer(Modifier.height(8.dp))
                         }

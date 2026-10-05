@@ -1238,46 +1238,14 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                 }
             }
 
-            var isSortMenuExpanded by remember { mutableStateOf(false) }
-            Box {
-                OutlinedButton(
-                    onClick = { isSortMenuExpanded = true },
-                    shapes = ButtonDefaults.shapes(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = str("sorted_by", str(viewModel.commentSort.labelResId)),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-
-                DropdownMenu(
-                    expanded = isSortMenuExpanded,
-                    onDismissRequest = { isSortMenuExpanded = false }
-                ) {
-                    CommentSort.values().forEach { sortOption ->
-                        DropdownMenuItem(
-                            text = { Text(str(sortOption.labelResId)) },
-                            onClick = {
-                                viewModel.onCommentSortChanged(sortOption)
-                                isSortMenuExpanded = false
-                            },
-                            trailingIcon = {
-                                if (sortOption == viewModel.commentSort) {
-                                    Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+            com.alananasss.kittytune.ui.common.IconChoiceButton(
+                options = CommentSort.entries,
+                selected = viewModel.commentSort,
+                onSelect = viewModel::onCommentSortChanged,
+                icon = { it.icon },
+                label = { str(it.labelResId) },
+                tooltip = { str("sorted_by", str(it.labelResId)) },
+            )
         }
 
         Spacer(Modifier.height(8.dp))

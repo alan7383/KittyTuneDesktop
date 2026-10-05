@@ -915,6 +915,7 @@
     <string name="lib_view_grid">Grille</string>
     <string name="lib_view_list">Liste</string>
     <string name="lib_view_mode">Mode d\'affichage</string>
+    <string name="lib_menu_show">Afficher</string>
     <string name="libraries_count_format">%1$d Bibliothèques</string>
     <string name="license_unknown">Licence inconnue</string>
     <string name="listening_stats_avg_listen">Durée moy.</string>
