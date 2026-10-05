@@ -626,7 +626,7 @@ class AudioEngine {
         resumePosMs: Long,
         maxAttempts: Int = Int.MAX_VALUE
     ): Pair<FFmpegFrameGrabber?, String?> {
-        oldGrabber?.releaseQuietly()
+        oldGrabber?.releaseUnlockedQuietly()
 
         var currentUrlToTry = url
         var attempt = 0
@@ -646,7 +646,7 @@ class AudioEngine {
             var newG: FFmpegFrameGrabber? = null
             try {
                 newG = createGrabber(currentUrlToTry, headers, resumePosMs)
-                newG.start()
+                newG.startUnlocked()
                 val isHls = currentUrlToTry.contains(".m3u8")
                 if (!isHls && resumePosMs > 0) {
                     try {
@@ -665,7 +665,7 @@ class AudioEngine {
             } catch (e: Exception) {
                 Logger.e("AudioEngine", "Reopen attempt $attempt failed (${e.message}).")
             }
-            newG?.releaseQuietly()
+            newG?.releaseUnlockedQuietly()
 
             val backoffMs = (attempt * 400L).coerceAtMost(2000L)
             try {
@@ -696,7 +696,7 @@ class AudioEngine {
                 // Both halves can fail on a dead URL: an HLS playlist 403s while the grabber is
                 // still being built, a progressive one only on start().
                 opening = createGrabber(activeUrl, headers, positionMs)
-                opening.start()
+                opening.startUnlocked()
                 grabber = opening
             } catch (e: Exception) {
                 // A dead URL that slipped past the check above (unsigned, or the CDN disagrees
@@ -760,11 +760,11 @@ class AudioEngine {
                     var seekFrame: Frame? = null
                     if (!urlExpired) try {
                         if (isHls) {
-                            grabber?.releaseQuietly()
+                            grabber?.releaseUnlockedQuietly()
                             grabber = null
 
                             grabber = createGrabber(activeUrl, headers, seek)
-                            grabber.start()
+                            grabber.startUnlocked()
                             seekFrame = try { grabber.grabSamples() } catch (_: Exception) { null }
                             seekOk = seekFrame != null
                         } else {
@@ -908,7 +908,7 @@ class AudioEngine {
                 onError?.invoke(t)
             }
         } finally {
-            grabber?.releaseQuietly()
+            grabber?.releaseUnlockedQuietly()
             closeLineInstance(localLine)
         }
     }
