@@ -49,6 +49,18 @@ enum class CreditFilter {
 fun CreditsScreen(
     onBackClick: (() -> Unit)? = null
 ) {
+    SettingsScaffold(
+        title = str(R.string.about_credits_title),
+        onBackClick = onBackClick
+    ) { innerPadding ->
+        CreditsContent(Modifier.padding(innerPadding))
+    }
+}
+
+/** The credits themselves, without a screen around them, so settings can show them in its own pane (issue #66). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CreditsContent(modifier: Modifier = Modifier) {
     val uriHandler = LocalUriHandler.current
 
     // Data, not code: see resources/credits.json. Adding someone is a one-line edit.
@@ -65,173 +77,120 @@ fun CreditsScreen(
         }
     }
 
-    SettingsScaffold(
-        title = str(R.string.about_credits_title),
-        onBackClick = onBackClick
-    ) { innerPadding ->
-        Box(
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.TopCenter
+                .widthIn(max = 900.dp),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .widthIn(max = 900.dp),
-                contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                // Discreet Subtitle Header
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                modifier = Modifier.size(40.dp),
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Favorite,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.width(14.dp))
-
-                            Text(
-                                text = str(R.string.about_credits_subtitle),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-
-                // Category Filter: Expressive Connected Button Group
-                item {
-                    ExpressiveConnectedButtonGroup(
-                        options = CreditFilter.entries,
-                        selectedOption = selectedFilter,
-                        onOptionSelected = { filter ->
-                            selectedFilter = filter
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        fillMaxWidth = true,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        iconProvider = { filter ->
-                            val icon = when (filter) {
-                                CreditFilter.ALL -> Icons.Rounded.Groups
-                                CreditFilter.DEV -> Icons.Rounded.Code
-                                CreditFilter.TRANSLATION -> Icons.Rounded.Language
-                                CreditFilter.COMMUNITY -> Icons.Rounded.Forum
-                            }
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        labelProvider = { filter ->
-                            val count = when (filter) {
-                                CreditFilter.ALL -> contributors.size
-                                CreditFilter.DEV -> contributors.count { it.category == ContributorCategory.DEV }
-                                CreditFilter.TRANSLATION -> contributors.count { it.category == ContributorCategory.TRANSLATION }
-                                CreditFilter.COMMUNITY -> contributors.count { it.category == ContributorCategory.COMMUNITY }
-                            }
-                            val label = when (filter) {
-                                CreditFilter.ALL -> str(R.string.about_credits_filter_all)
-                                CreditFilter.DEV -> str(R.string.about_credits_filter_dev)
-                                CreditFilter.TRANSLATION -> str(R.string.about_credits_filter_translation)
-                                CreditFilter.COMMUNITY -> str(R.string.about_credits_filter_community)
-                            }
-                            Text(
-                                text = "$label ($count)",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (selectedFilter == filter) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+            // Discreet Subtitle Header
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                     )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(40.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Favorite,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.width(14.dp))
+
+                        Text(
+                            text = str(R.string.about_credits_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
+            }
 
-                // Contributors display
-                if (selectedFilter == CreditFilter.ALL) {
-                    // Section: Development
-                    val devList = contributors.filter { it.category == ContributorCategory.DEV }
-                    if (devList.isNotEmpty()) {
-                        item {
-                            CreditsSectionHeader(
-                                icon = Icons.Rounded.Code,
-                                title = str(R.string.about_credits_dev_section),
-                                count = devList.size
-                            )
+            // Category Filter: Expressive Connected Button Group
+            item {
+                ExpressiveConnectedButtonGroup(
+                    options = CreditFilter.entries,
+                    selectedOption = selectedFilter,
+                    onOptionSelected = { filter ->
+                        selectedFilter = filter
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    fillMaxWidth = true,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    iconProvider = { filter ->
+                        val icon = when (filter) {
+                            CreditFilter.ALL -> Icons.Rounded.Groups
+                            CreditFilter.DEV -> Icons.Rounded.Code
+                            CreditFilter.TRANSLATION -> Icons.Rounded.Language
+                            CreditFilter.COMMUNITY -> Icons.Rounded.Forum
                         }
-                        items(devList, key = { it.name }) { person ->
-                            ContributorCard(
-                                person = person,
-                                onClick = { uriHandler.openUri(person.url) }
-                            )
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    labelProvider = { filter ->
+                        val count = when (filter) {
+                            CreditFilter.ALL -> contributors.size
+                            CreditFilter.DEV -> contributors.count { it.category == ContributorCategory.DEV }
+                            CreditFilter.TRANSLATION -> contributors.count { it.category == ContributorCategory.TRANSLATION }
+                            CreditFilter.COMMUNITY -> contributors.count { it.category == ContributorCategory.COMMUNITY }
                         }
+                        val label = when (filter) {
+                            CreditFilter.ALL -> str(R.string.about_credits_filter_all)
+                            CreditFilter.DEV -> str(R.string.about_credits_filter_dev)
+                            CreditFilter.TRANSLATION -> str(R.string.about_credits_filter_translation)
+                            CreditFilter.COMMUNITY -> str(R.string.about_credits_filter_community)
+                        }
+                        Text(
+                            text = "$label ($count)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (selectedFilter == filter) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
+                )
+            }
 
-                    // Section: Translations
-                    val transList = contributors.filter { it.category == ContributorCategory.TRANSLATION }
-                    if (transList.isNotEmpty()) {
-                        item {
-                            Spacer(Modifier.height(4.dp))
-                            CreditsSectionHeader(
-                                icon = Icons.Rounded.Language,
-                                title = str(R.string.about_credits_translation_section),
-                                count = transList.size
-                            )
-                        }
-                        items(transList, key = { it.name }) { person ->
-                            ContributorCard(
-                                person = person,
-                                onClick = { uriHandler.openUri(person.url) }
-                            )
-                        }
+            // Contributors display
+            if (selectedFilter == CreditFilter.ALL) {
+                // Section: Development
+                val devList = contributors.filter { it.category == ContributorCategory.DEV }
+                if (devList.isNotEmpty()) {
+                    item {
+                        CreditsSectionHeader(
+                            icon = Icons.Rounded.Code,
+                            title = str(R.string.about_credits_dev_section),
+                            count = devList.size
+                        )
                     }
-
-                    // Section: Community & QA
-                    val commList = contributors.filter { it.category == ContributorCategory.COMMUNITY }
-                    if (commList.isNotEmpty()) {
-                        item {
-                            Spacer(Modifier.height(4.dp))
-                            CreditsSectionHeader(
-                                icon = Icons.Rounded.Forum,
-                                title = str(R.string.about_credits_community_section),
-                                count = commList.size
-                            )
-                        }
-                        items(commList, key = { it.name }) { person ->
-                            ContributorCard(
-                                person = person,
-                                onClick = { uriHandler.openUri(person.url) }
-                            )
-                        }
-                    }
-                } else {
-                    // Flat filtered list
-                    items(filteredContributors, key = { it.name }) { person ->
+                    items(devList, key = { it.name }) { person ->
                         ContributorCard(
                             person = person,
                             onClick = { uriHandler.openUri(person.url) }
@@ -239,61 +198,107 @@ fun CreditsScreen(
                     }
                 }
 
-                // CTA Section: "Want to contribute?"
-                item {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = str(R.string.about_credits_contribute_section),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+                // Section: Translations
+                val transList = contributors.filter { it.category == ContributorCategory.TRANSLATION }
+                if (transList.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(4.dp))
+                        CreditsSectionHeader(
+                            icon = Icons.Rounded.Language,
+                            title = str(R.string.about_credits_translation_section),
+                            count = transList.size
+                        )
+                    }
+                    items(transList, key = { it.name }) { person ->
+                        ContributorCard(
+                            person = person,
+                            onClick = { uriHandler.openUri(person.url) }
+                        )
+                    }
                 }
 
-                // CTA Crowdin
-                item {
-                    ContributeActionCard(
-                        mark = rememberVectorPainter(Icons.Rounded.Language),
-                        title = str(R.string.about_credits_crowdin_title),
-                        subtitle = str(R.string.about_credits_crowdin_desc),
-                        badge = "Crowdin",
-                        onClick = { uriHandler.openUri("https://crowdin.com/project/kittytune") }
+                // Section: Community & QA
+                val commList = contributors.filter { it.category == ContributorCategory.COMMUNITY }
+                if (commList.isNotEmpty()) {
+                    item {
+                        Spacer(Modifier.height(4.dp))
+                        CreditsSectionHeader(
+                            icon = Icons.Rounded.Forum,
+                            title = str(R.string.about_credits_community_section),
+                            count = commList.size
+                        )
+                    }
+                    items(commList, key = { it.name }) { person ->
+                        ContributorCard(
+                            person = person,
+                            onClick = { uriHandler.openUri(person.url) }
+                        )
+                    }
+                }
+            } else {
+                // Flat filtered list
+                items(filteredContributors, key = { it.name }) { person ->
+                    ContributorCard(
+                        person = person,
+                        onClick = { uriHandler.openUri(person.url) }
                     )
                 }
+            }
 
-                // CTA Discord
-                item {
-                    ContributeActionCard(
-                        mark = painterResource("drawable/ic_discord.xml"),
-                        title = str(R.string.about_credits_discord_title),
-                        subtitle = str(R.string.about_credits_discord_desc),
-                        badge = "Discord",
-                        onClick = { uriHandler.openUri("https://discord.gg/thyHQH9jV9") }
-                    )
-                }
+            // CTA Section: "Want to contribute?"
+            item {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = str(R.string.about_credits_contribute_section),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                )
+            }
 
-                // CTA GitHub
-                item {
-                    ContributeActionCard(
-                        mark = rememberVectorPainter(Icons.Rounded.Code),
-                        title = str(R.string.about_credits_github_title),
-                        subtitle = str(R.string.about_credits_github_desc),
-                        badge = "GitHub",
-                        onClick = { uriHandler.openUri("https://github.com/alan7383/kittytune") }
-                    )
-                }
+            // CTA Crowdin
+            item {
+                ContributeActionCard(
+                    mark = rememberVectorPainter(Icons.Rounded.Language),
+                    title = str(R.string.about_credits_crowdin_title),
+                    subtitle = str(R.string.about_credits_crowdin_desc),
+                    badge = "Crowdin",
+                    onClick = { uriHandler.openUri("https://crowdin.com/project/kittytune") }
+                )
+            }
 
-                // CTA Ko-fi
-                item {
-                    ContributeActionCard(
-                        mark = rememberVectorPainter(Icons.Rounded.VolunteerActivism),
-                        title = str(R.string.about_credits_kofi_title),
-                        subtitle = str(R.string.about_credits_kofi_desc),
-                        badge = "Ko-fi",
-                        onClick = { uriHandler.openUri("https://ko-fi.com/alan7383") }
-                    )
-                }
+            // CTA Discord
+            item {
+                ContributeActionCard(
+                    mark = painterResource("drawable/ic_discord.xml"),
+                    title = str(R.string.about_credits_discord_title),
+                    subtitle = str(R.string.about_credits_discord_desc),
+                    badge = "Discord",
+                    onClick = { uriHandler.openUri("https://discord.gg/thyHQH9jV9") }
+                )
+            }
+
+            // CTA GitHub
+            item {
+                ContributeActionCard(
+                    mark = rememberVectorPainter(Icons.Rounded.Code),
+                    title = str(R.string.about_credits_github_title),
+                    subtitle = str(R.string.about_credits_github_desc),
+                    badge = "GitHub",
+                    onClick = { uriHandler.openUri("https://github.com/alan7383/kittytune") }
+                )
+            }
+
+            // CTA Ko-fi
+            item {
+                ContributeActionCard(
+                    mark = rememberVectorPainter(Icons.Rounded.VolunteerActivism),
+                    title = str(R.string.about_credits_kofi_title),
+                    subtitle = str(R.string.about_credits_kofi_desc),
+                    badge = "Ko-fi",
+                    onClick = { uriHandler.openUri("https://ko-fi.com/alan7383") }
+                )
             }
         }
     }

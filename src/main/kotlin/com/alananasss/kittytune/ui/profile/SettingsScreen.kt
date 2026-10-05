@@ -83,10 +83,8 @@ fun SettingsScreen(
                     searchQuery = ""
                     SettingsNavigation.go(SettingsPlace(it))
                 },
-                onCredits = {
-                    searchQuery = ""
-                    navController.navigate("credits")
-                },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
             )
             Spacer(Modifier.width(8.dp))
             AnimatedContent(
@@ -113,6 +111,10 @@ fun SettingsScreen(
                     onBack = if (shown.subPage != null) ({ SettingsNavigation.up() }) else onBackClick,
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
+                    // Wide windows have the field above the categories; a narrow column has no room for it.
+                    showsSearchField = !isWide,
+                    // The credits are a lazy list of their own and cannot sit inside the pane's scroll.
+                    isScrollable = searchQuery.isNotBlank() || shown.category != SettingsCategory.CREDITS,
                 ) {
                     if (searchQuery.isNotBlank()) {
                         SettingsSearchResults(
@@ -147,7 +149,13 @@ internal enum class SettingsCategory(val titleKey: String, val icon: ImageVector
     SYNC("settings_cat_sync", Icons.Rounded.Devices),
     NETWORK("pref_proxy_title", Icons.Rounded.Dns),
     MISC("settings_cat_misc", Icons.Rounded.Tune),
+
+    /** Listed apart, at the foot of the column, but opened in the pane like any other (issue #66). */
+    CREDITS("about_credits", Icons.Rounded.Groups),
 }
+
+/** The categories listed at the top of the column; [SettingsCategory.CREDITS] has its own place at the bottom. */
+private val listedCategories = SettingsCategory.entries - SettingsCategory.CREDITS
 
 /** Pages opened inside a category. */
 internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: String? = null, val icon: ImageVector? = null) {
@@ -275,6 +283,7 @@ private fun SettingsPageContent(
             SettingsCategory.SYNC -> CategoryFolderGroup(syncPages, onOpen)
             SettingsCategory.NETWORK -> CategoryFolderGroup(networkPages, onOpen)
             SettingsCategory.MISC -> CategoryFolderGroup(miscPages, onOpen)
+            SettingsCategory.CREDITS -> CreditsContent(Modifier.fillMaxSize())
         }
         // Interface subpages
         SettingsSubPage.THEMES -> ThemesSettingsPage(onOpenCustomTheme = { onOpen(SettingsSubPage.CUSTOM_THEME) })
@@ -339,9 +348,10 @@ private fun SettingsPane(
     onBack: (() -> Unit)?,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    showsSearchField: Boolean,
+    isScrollable: Boolean,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier
@@ -368,50 +378,66 @@ private fun SettingsPane(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(16.dp))
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                placeholder = {
-                    Text(str("search_settings_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            onSearchQueryChange("")
-                            focusManager.clearFocus()
-                        }) {
-                            Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = CircleShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                ),
-                modifier = Modifier
-                    .width(320.dp)
-                    .trackTextInput()
-                    .escapeDismisses {
-                        onSearchQueryChange("")
-                        focusManager.clearFocus()
-                    },
-            )
+            if (showsSearchField) {
+                Spacer(Modifier.width(16.dp))
+                SettingsSearchField(searchQuery, onSearchQueryChange, Modifier.width(320.dp))
+            }
         }
-        com.alananasss.kittytune.ui.common.ScrollableColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = androidx.compose.runtime.key(location) { rememberScrollState() },
-            contentPadding = PaddingValues(bottom = 80.dp),
-            content = content,
-        )
+        if (isScrollable) {
+            com.alananasss.kittytune.ui.common.ScrollableColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = androidx.compose.runtime.key(location) { rememberScrollState() },
+                contentPadding = PaddingValues(bottom = 80.dp),
+                content = content,
+            )
+        } else {
+            Column(Modifier.fillMaxSize(), content = content)
+        }
     }
+}
+
+/** The settings search: a pill-shaped field that clears on Escape or with its own close button. */
+@Composable
+private fun SettingsSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = {
+            Text(str("search_settings_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingIcon = {
+            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = {
+                    onQueryChange("")
+                    focusManager.clearFocus()
+                }) {
+                    Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+            }
+        },
+        singleLine = true,
+        shape = CircleShape,
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedBorderColor = Color.Transparent,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+        ),
+        modifier = modifier
+            .trackTextInput()
+            .escapeDismisses {
+                onQueryChange("")
+                focusManager.clearFocus()
+            },
+    )
 }
 
 internal data class SettingsSearchItem(
@@ -886,7 +912,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             },
             highlightKey = "pref_discord",
         ),
-        SettingsSearchItem(str("about_credits"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Groups, route = "credits", keywords = listOf("credits", "about", "authors", "team", "crédits", "о программе", "авторы")),
+        SettingsSearchItem(str("about_credits"), null, SettingsCategory.CREDITS, SettingsPlace(SettingsCategory.CREDITS), Icons.Rounded.Groups, keywords = listOf("credits", "about", "authors", "team", "crédits", "о программе", "авторы")),
     )
 }
 
@@ -979,13 +1005,22 @@ private fun CategoryList(
     selected: SettingsCategory,
     isWide: Boolean,
     onSelect: (SettingsCategory) -> Unit,
-    onCredits: () -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
 ) {
     Column(
         Modifier.width(if (isWide) 240.dp else 92.dp).fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (isWide) {
+            // Above the title, in the column the eye and the pointer are already in. At the far right of the
+            // pane it was the one control on the page that meant travelling away from everything else
+            // (issue #66).
+            SettingsSearchField(
+                searchQuery,
+                onSearchQueryChange,
+                Modifier.fillMaxWidth().padding(top = 6.dp),
+            )
             Text(
                 str("settings_title"),
                 style = MaterialTheme.typography.headlineSmall,
@@ -995,7 +1030,7 @@ private fun CategoryList(
         } else {
             Spacer(Modifier.height(12.dp))
         }
-        SettingsCategory.entries.forEach { entry ->
+        listedCategories.forEach { entry ->
             CategoryItem(
                 label = str(entry.titleKey),
                 icon = entry.icon,
@@ -1006,11 +1041,11 @@ private fun CategoryList(
         }
         Spacer(Modifier.weight(1f))
         CategoryItem(
-            label = str("about_credits"),
-            icon = Icons.Rounded.Groups,
-            isSelected = false,
+            label = str(SettingsCategory.CREDITS.titleKey),
+            icon = SettingsCategory.CREDITS.icon,
+            isSelected = selected == SettingsCategory.CREDITS,
             isWide = isWide,
-            onClick = onCredits,
+            onClick = { onSelect(SettingsCategory.CREDITS) },
         )
     }
 }
