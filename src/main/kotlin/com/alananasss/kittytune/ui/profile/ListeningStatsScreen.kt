@@ -98,7 +98,10 @@ fun ListeningStatsScreen(
         AnimatedContent(
             targetState = report?.takeIf { !viewModel.isLoading }?.let { it to style },
             transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(90)) },
-            contentKey = { it?.let { (r, s) -> r.window to s } },
+            // Keyed on where the span starts, not on the whole window: a window runs up to "now", so every
+            // listen that finished while the screen was open gave it a new key, and the whole page was built
+            // again under the pointer, hover lost and charts growing in from zero (issue #66).
+            contentKey = { it?.let { (r, s) -> r.window.startMs to s } },
             modifier = Modifier.fillMaxSize(),
             label = "statsBody",
         ) { shown ->

@@ -270,7 +270,11 @@ compose.desktop {
                 "jdk.jfr",
                 "jdk.unsupported",
                 "jdk.unsupported.desktop",
-                "jdk.security.auth"
+                "jdk.security.auth",
+                // Day and month names in any language but English. Without it the trimmed runtime only
+                // knows the root locale, so the listening stats read "Mon Tue" and "October" in Russian
+                // while a run from the full JDK looked fine (issue #66).
+                "jdk.localedata"
             )
 
             // "Open with KittyTune" and the music entry in the OS's default-apps settings. Neither

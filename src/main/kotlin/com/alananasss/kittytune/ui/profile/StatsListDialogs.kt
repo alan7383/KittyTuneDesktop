@@ -56,13 +56,25 @@ private fun StatsListDialog(
             modifier = Modifier.widthIn(min = 420.dp, max = 640.dp).fillMaxWidth(0.9f).heightIn(max = 720.dp).fillMaxHeight(0.86f),
         ) {
             Column(Modifier.fillMaxSize().padding(top = 20.dp)) {
-                Row(Modifier.padding(start = 24.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = false))
-                    Spacer(Modifier.width(10.dp))
-                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-                        Text(count.toString(), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
+                // The title and its count share everything left of the close button. Weighting the title and a
+                // spacer against each other split that space in half: the title wrapped at half the width even
+                // with room to spare, and the half it did not use pushed the close button off the corner
+                // (issue #66).
+                Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                            Text(count.toString(), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
+                        }
                     }
-                    Spacer(Modifier.weight(1f))
                     IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = str("btn_close")) }
                 }
                 Spacer(Modifier.height(12.dp))
