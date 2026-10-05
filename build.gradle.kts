@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.4.0"
+version = "1.4.1"
 
 repositories {
     google()
@@ -230,7 +230,11 @@ compose.desktop {
                 TargetFormat.AppImage
             )
             packageName = "KittyTune"
-            packageVersion = "1.3.9"
+            // Must track the project version: the MSI ProductVersion has to increase with
+            // every release, otherwise Windows Installer refuses the upgrade with
+            // "Another version of this product is already installed" (issue #73).
+            // Never hardcode this again — it drifted (1.3.9) while version moved to 1.4.0.
+            packageVersion = project.version.toString()
             description = "KittyTuneDesktop"
             vendor = "KittyTune"
 
