@@ -155,6 +155,20 @@ compose.desktop {
         jvmArgs += "-Xmx2g"
         jvmArgs += "-XX:+UseG1GC"
         jvmArgs += "-XX:MaxGCPauseMillis=50"
+        // Measured idle on the home screen with native memory tracking (issue #66), 505 MB private at the
+        // start of this: the rest of G1's footprint is per-thread. Two workers and one marking thread
+        // instead of one per core took its bookkeeping from 56 to 39 MB; at the few hundred megabytes of heap
+        // this app has, a young pause with two workers is still a few milliseconds against the output line's
+        // 200 ms buffer. SerialGC and ParallelGC were measured too: Serial saves more, but its full
+        // collections stop the world, which is the stutter G1 was chosen to end, and Parallel saves nothing.
+        jvmArgs += "-XX:ParallelGCThreads=2"
+        jvmArgs += "-XX:ConcGCThreads=1"
+        // Start small and grow on demand. The default first commit is 1/64 of physical RAM, 256 MB on a
+        // 16 GB machine, for an app whose live data at idle is about 45 MB.
+        jvmArgs += "-Xms16m"
+        // 8-byte object headers instead of 12 (JEP 519, a product option from JDK 25): every object in the
+        // heap gets smaller, measured at about 15 MB less heap at idle and more with a large library.
+        if (buildJdk >= 25) jvmArgs += "-XX:+UseCompactObjectHeaders"
         // Give the pages back, but never by stopping the world (issue #33).
         //
         // This used to also carry `-XX:MinHeapFreeRatio=10 -XX:MaxHeapFreeRatio=30`, to stop the system
@@ -185,9 +199,9 @@ compose.desktop {
         jvmArgs += "-XX:G1PeriodicGCInterval=60000"
         jvmArgs += "-XX:+G1PeriodicGCInvokesConcurrent"
         // And if anything asks for a collection by hand, it is served concurrently rather than as a full
-        // pause. Nothing in this app calls System.gc(), so today this costs nothing; it is here so that a
-        // dependency, or a well-meaning line added later, cannot quietly reintroduce the pause that took
-        // three diagnostic builds to find. (The diagnostic build's own class histogram is unaffected — a
+        // pause. The app asks for one itself once it has been minimised for a while (TrimMemoryWhileHidden),
+        // to hand the heap back while nobody is looking; this flag is what keeps that, or a dependency
+        // doing the same, from reintroducing the pause that took three diagnostic builds to find. (The diagnostic build's own class histogram is unaffected — a
         // heap inspection still collects for real, which is what makes its numbers live ones.)
         jvmArgs += "-XX:+ExplicitGCInvokesConcurrent"
         // Thousands of tracks repeat the same artist names, genres and CDN prefixes. Deduplicating

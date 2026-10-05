@@ -88,6 +88,9 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
     }
 }
 
+/** How long the main window stays built after being closed to the tray, so a quick reopen is instant. */
+private const val DROP_HIDDEN_WINDOW_AFTER_MS = 20_000L
+
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
 fun main(args: Array<String>) {
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
@@ -123,6 +126,23 @@ fun main(args: Array<String>) {
             com.alananasss.kittytune.core.AppIconRuntime.loadTrayPainter(appIconVariant) ?: appIcon
         }
         var isWindowVisible by remember { mutableStateOf(true) }
+
+        // Whether the main window exists at all. Closed to the tray it used to be merely hidden, keeping its
+        // whole interface, its GPU surfaces and every screen's state alive: measured, the app held the same
+        // half a gigabyte in the tray as with the window open (issue #66). Playback, the mini player and the
+        // tray menu live outside the window, so once it has been away for a while it is dropped and built
+        // again when it is opened. Its size and position are hoisted below and survive that.
+        var isWindowComposed by remember { mutableStateOf(true) }
+        LaunchedEffect(isWindowVisible) {
+            if (isWindowVisible) {
+                com.alananasss.kittytune.core.restoreMemorySizing()
+                isWindowComposed = true
+            } else {
+                kotlinx.coroutines.delay(DROP_HIDDEN_WINDOW_AFTER_MS)
+                isWindowComposed = false
+                com.alananasss.kittytune.core.releaseMemoryNow()
+            }
+        }
 
         fun showMainWindow() {
             isWindowVisible = true
@@ -414,7 +434,7 @@ fun main(args: Array<String>) {
         // full player had been clicked with the mouse it kept the focus, and Space then paused on the press and
         // played again on the release — the pause that "only works every other time".
         val shortcutKeysHeld = remember { mutableSetOf<Key>() }
-        Window(
+        if (isWindowComposed) Window(
             visible = isWindowVisible,
             onCloseRequest = {
                     if (stopOnTaskClear) {
@@ -607,6 +627,7 @@ fun main(args: Array<String>) {
             )
 
             val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
+            com.alananasss.kittytune.core.TrimMemoryWhileHidden(window)
 
             CompositionLocalProvider(
                 LocalDensity provides customDensity,
