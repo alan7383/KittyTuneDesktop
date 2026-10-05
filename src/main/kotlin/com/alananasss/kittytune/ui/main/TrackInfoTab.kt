@@ -614,22 +614,14 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                 loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
             }
 
-            var isTargetLanguage by remember(comment.body, langCode) { mutableStateOf(false) }
-            LaunchedEffect(comment.body, langCode) {
-                val cleanText = comment.body.replace(Regex("[^\\p{L}\\p{Nd}\\s]"), "").trim()
-                if (cleanText.isBlank()) {
-                    isTargetLanguage = true
-                } else {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val language = com.alananasss.kittytune.util.LanguageDetection.identifyLanguage(cleanText)
-                        if (language == langCode || language == "und") {
-                            isTargetLanguage = true
-                        }
-                    }
+            // Hidden until the detector has answered, so it never flashes up on a comment already in the reader's language.
+            val needsTranslation by androidx.compose.runtime.produceState(false, comment.body, langCode) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.alananasss.kittytune.util.LanguageDetection.needsTranslation(comment.body, langCode)
                 }
             }
 
-            if (translatedText == null && !isTranslating && !isTargetLanguage) {
+            if (translatedText == null && !isTranslating && needsTranslation) {
                 Text(
                     text = str("comment_translate", langName),
                     style = MaterialTheme.typography.labelMedium,
