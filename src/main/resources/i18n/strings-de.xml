@@ -2781,7 +2781,8 @@
     <string name="pref_screensaver_desc">Wechselt nach 60 s Inaktivität im Vollbildmodus in den Fokusmodus</string>
     <string name="screensaver_focus_mode">Bildschirmschoner- &amp; Fokusmodus</string>
     <string name="screensaver_timeout_title">Inaktivitätsverzögerung</string>
-    <string name="screensaver_tap_to_wake">Maus bewegen oder klicken zum Beenden</string>
+    <string name="screensaver_tap_to_wake">Klicken oder Leertaste drücken zum Beenden</string>
+    <string name="screensaver_since_sleep">Seit dem Ruhemodus</string>
     <string name="screensaver_session_stats">Sitzungsstatistiken</string>
     <string name="lyrics_fullscreen">Vollbild</string>
     <string name="lyrics_style_focus">Fokus</string>

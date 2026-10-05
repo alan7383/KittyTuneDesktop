@@ -56,6 +56,7 @@ class ScreensaverFocusModeTest {
             "screensaver_timeout_title",
             "screensaver_tap_to_wake",
             "screensaver_session_stats",
+            "screensaver_since_sleep",
         )
 
         for (lang in languages) {
@@ -91,13 +92,13 @@ class ScreensaverFocusModeTest {
 
     @Test
     fun testScreensaverTrackInfoStability() {
-        val fullPlayerSource = File("src/main/kotlin/com/alananasss/kittytune/ui/player/FullPlayer.kt").readText()
+        val fullPlayerSource = File("src/main/kotlin/com/alananasss/kittytune/ui/player/SleepScreen.kt").readText()
         assertTrue(
             fullPlayerSource.contains("label = \"screensaverTrackInfo\""),
             "Screensaver overlay must bind track info to screensaverTrackInfo",
         )
         assertTrue(
-            fullPlayerSource.contains("targetState = track.id"),
+            fullPlayerSource.contains("contentKey = { it.id }"),
             "Screensaver overlay must animate only when track.id changes",
         )
         assertTrue(
