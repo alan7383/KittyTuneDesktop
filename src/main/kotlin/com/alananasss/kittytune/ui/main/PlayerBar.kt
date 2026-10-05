@@ -1,5 +1,11 @@
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.player.cover.AnimatedArtwork
 import com.alananasss.kittytune.ui.player.slider.PlayerSlider
@@ -16,7 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.material.icons.outlined.ThumbDown
+import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -31,8 +37,8 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.outlined.HeartBroken
-import androidx.compose.material.icons.outlined.QueueMusic
-import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Tune
 
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,39 +69,21 @@ import androidx.compose.material3.ripple
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import java.awt.Cursor
-import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.alananasss.kittytune.utils.makeTimeString
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode as AnimRepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.rounded.GraphicEq
-import com.alananasss.kittytune.R
-import com.alananasss.kittytune.audio.automix.AutomixManager
-import com.alananasss.kittytune.core.stringResource
+import com.alananasss.kittytune.ui.player.slider.mixGlow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.sp
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SuggestionChipDefaults
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.PointerMatcher
@@ -177,17 +165,10 @@ fun PlayerBar(
             val barWidth = maxWidth
             val isCompact = barWidth < 900.dp
             val isVeryCompact = barWidth < 740.dp
-            val centerMax = when {
-                barWidth >= 1100.dp -> 560.dp
-                barWidth >= 850.dp -> 440.dp
-                barWidth >= 700.dp -> 360.dp
-                else -> 280.dp
-            }
-            val centerMin = when {
-                barWidth >= 850.dp -> 300.dp
-                barWidth >= 700.dp -> 240.dp
-                else -> 180.dp
-            }
+            // Proportional to the bar's width rather than stepped at a few widths. The steps were where the
+            // transport visibly jumped narrower while a window was being resized (issue #66).
+            val centerMax = lerpByWidth(barWidth, from = 700.dp to 280.dp, to = 1100.dp to 560.dp)
+            val centerMin = lerpByWidth(barWidth, from = 700.dp to 180.dp, to = 850.dp to 300.dp)
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = if (isFloating) 18.dp else 12.dp),
@@ -216,7 +197,11 @@ fun PlayerBar(
                                 .clickable { onOpenFullPlayer() }
                                 .padding(4.dp),
                         ) {
-                            val artworkSize = if (isVeryCompact) 48.dp else if (isFloating) 52.dp else 56.dp
+                            val artworkSize by animateDpAsState(
+                                if (isVeryCompact) 48.dp else if (isFloating) 52.dp else 56.dp,
+                                tween(BAR_MORPH_MS, easing = FastOutSlowInEasing),
+                                label = "barArtwork",
+                            )
                             val artworkShape = RoundedCornerShape(if (isFloating) 26.dp else 8.dp)
 
                             Box(modifier = Modifier.size(artworkSize)) {
@@ -237,8 +222,16 @@ fun PlayerBar(
                                         .offset(x = 2.dp, y = 2.dp)
                                 )
                             }
-                            Spacer(Modifier.width(if (isVeryCompact) 8.dp else 12.dp))
-                            Column(Modifier.weight(1f, fill = false).widthIn(max = if (isCompact) 180.dp else 260.dp)) {
+                            val artworkGap by animateDpAsState(
+                                if (isVeryCompact) 8.dp else 12.dp, tween(BAR_MORPH_MS), label = "barArtworkGap",
+                            )
+                            val titleMaxWidth by animateDpAsState(
+                                if (isCompact) 180.dp else 260.dp,
+                                tween(BAR_MORPH_MS, easing = FastOutSlowInEasing),
+                                label = "barTitleWidth",
+                            )
+                            Spacer(Modifier.width(artworkGap))
+                            Column(Modifier.weight(1f, fill = false).widthIn(max = titleMaxWidth)) {
                                 Text(
                                     text = track.title.orEmpty(),
                                     style = MaterialTheme.typography.bodyMedium,
@@ -266,33 +259,6 @@ fun PlayerBar(
                                     }
                                 }
 
-                                // Automix chip — slides in below the artist name when a mix is active
-                                val isAutomixing by AutomixManager.isAutomixing.collectAsState()
-                                val mixBeatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
-                                val isCrossfading = MusicManager.isCrossfadingOut
-                                val automixDebug by AutomixManager.automixDebugInfo.collectAsState()
-                                val mixProgress by AutomixManager.mixProgress.collectAsState()
-                                val isMixActive = isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)
-
-                                val nextTrackForChip = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
-                                val isDifferentNext = vm.repeatMode == RepeatMode.ONE || (nextTrackForChip != null && nextTrackForChip.id != track.id)
-                                val nextTitleForChip = nextTrackForChip?.title?.trim()?.takeIf { it.isNotEmpty() && isDifferentNext }
-                                val beatMs = automixDebug?.outBpm?.takeIf { it > 0f }?.let { 60_000f / it } ?: 500f
-
-                                AnimatedVisibility(
-                                    visible = isMixActive,
-                                    enter = fadeIn(tween(300)) + expandVertically(tween(250, easing = FastOutSlowInEasing)),
-                                    exit = fadeOut(tween(500)) + shrinkVertically(tween(400, easing = FastOutSlowInEasing)),
-                                ) {
-                                    AutomixChip(
-                                        isAutomixing = isAutomixing,
-                                        isCrossfading = isCrossfading,
-                                        mixBeatsLeft = mixBeatsLeft,
-                                        mixProgress = mixProgress,
-                                        nextTitle = nextTitleForChip,
-                                        beatMs = beatMs,
-                                    )
-                                }
                             }
                         }
                         if (PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons) {
@@ -313,7 +279,7 @@ fun PlayerBar(
                                     onClick = { vm.dislikeCurrentTrackInMix() }
                                 ) {
                                     Icon(
-                                        androidx.compose.material.icons.Icons.Outlined.ThumbDown,
+                                        androidx.compose.material.icons.Icons.Rounded.ThumbDown,
                                         contentDescription = str("mix_dislike"),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(20.dp),
@@ -489,7 +455,13 @@ fun PlayerBar(
                         )
                     }
                 }
-                if (!isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons) {
+                // Buttons that make way for a narrow window fold away rather than vanishing in one frame, which
+                // shoved everything beside them sideways mid-resize (issue #66).
+                AnimatedVisibility(
+                    visible = !isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons,
+                    enter = barButtonEnter,
+                    exit = barButtonExit,
+                ) {
                     Tip(str("mini_player_title")) {
                         IconButton(
                             shapes = iconShapes,
@@ -511,7 +483,7 @@ fun PlayerBar(
                         onClick = onToggleNowPlaying,
                     ) {
                         Icon(
-                            Icons.Outlined.Tune,
+                            Icons.Rounded.Tune,
                             contentDescription = null,
                             tint = if (isNowPlayingOpen) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -521,13 +493,17 @@ fun PlayerBar(
                 }
                 // The panel this opens also has a queue tab, so hiding this button costs the queue
                 // a click rather than access to it (issue #33).
-                if (!isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons) {
+                AnimatedVisibility(
+                    visible = !isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons,
+                    enter = barButtonEnter,
+                    exit = barButtonExit,
+                ) {
                     IconButton(
                         shapes = iconShapes,
                         onClick = onOpenQueue,
                     ) {
                         Icon(
-                            Icons.Outlined.QueueMusic,
+                            Icons.AutoMirrored.Rounded.QueueMusic,
                             contentDescription = null,
                             tint = if (isQueueOpen) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -554,6 +530,18 @@ fun PlayerBar(
 }
 
 
+/** How long the player bar takes to settle into a new width's layout. */
+private const val BAR_MORPH_MS = 280
+
+private val barButtonEnter = fadeIn(tween(BAR_MORPH_MS)) + expandHorizontally(tween(BAR_MORPH_MS, easing = FastOutSlowInEasing))
+private val barButtonExit = fadeOut(tween(BAR_MORPH_MS / 2)) + shrinkHorizontally(tween(BAR_MORPH_MS, easing = FastOutSlowInEasing))
+
+/** A size that follows the bar's width linearly between two points and holds at either end. */
+private fun lerpByWidth(width: Dp, from: Pair<Dp, Dp>, to: Pair<Dp, Dp>): Dp {
+    val t = ((width - from.first) / (to.first - from.first)).coerceIn(0f, 1f)
+    return from.second + (to.second - from.second) * t
+}
+
 /**
  * Elapsed time, seek bar and duration.
  *
@@ -568,6 +556,11 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     var scrubPosition by remember { mutableFloatStateOf(0f) }
     val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition
     val duration = vm.duration.coerceAtLeast(1L)
+    val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
+    val isScrubbingNow = scrubbing || vm.isScrubbing
+    val shownFraction = if (isScrubbingNow) position.toFloat() / duration
+    else mix.shownFraction(position.toFloat() / duration)
+    val glowColor = MaterialTheme.colorScheme.primary
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -576,7 +569,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         PlayerSlider(
-            value = position.toFloat().coerceIn(0f, duration.toFloat()),
+            value = (shownFraction * duration).coerceIn(0f, duration.toFloat()),
             onValueChange = {
                 scrubbing = true
                 scrubPosition = it
@@ -592,6 +585,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 8.dp)
+                .mixGlow(mix, glowColor) { shownFraction }
                 .seekWheel(
                     positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
                     durationMs = { vm.duration },
@@ -619,111 +613,6 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                 .padding(horizontal = 4.dp, vertical = 2.dp),
         )
     }
-}
-
-/**
- * Compact M3 SuggestionChip in the left track-info panel.
- *
- * Shows the current automix state without pushing the center transport panel:
- * - Countdown: "Mix dans 4" with a tempo-synced beat flash
- * - Active mix: "Mixing" or "Mixing → Next Track" with a gentle glow
- */
-@Composable
-private fun AutomixChip(
-    isAutomixing: Boolean,
-    isCrossfading: Boolean,
-    mixBeatsLeft: Int?,
-    mixProgress: Float,
-    nextTitle: String?,
-    beatMs: Float,
-    modifier: Modifier = Modifier,
-) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val isMixPhase = isAutomixing || isCrossfading
-
-    val infiniteTransition = rememberInfiniteTransition(label = "AutomixChipAnim")
-
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(650, easing = FastOutSlowInEasing),
-            repeatMode = AnimRepeatMode.Reverse
-        ), label = "ChipGlow"
-    )
-    val beatAlpha by infiniteTransition.animateFloat(
-        initialValue = 1f, targetValue = 0.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(beatMs.toInt().coerceIn(150, 800), easing = LinearEasing),
-            repeatMode = AnimRepeatMode.Restart
-        ), label = "ChipBeat"
-    )
-    val iconAlpha = if (isMixPhase) glowAlpha else beatAlpha
-
-    // "→ Next" fades in once the crossfade is 30% done
-    val nextAlpha by animateFloatAsState(
-        targetValue = if (isMixPhase && nextTitle != null && mixProgress > 0.3f)
-            ((mixProgress - 0.3f) / 0.35f).coerceIn(0f, 1f) else 0f,
-        animationSpec = tween(500, easing = FastOutSlowInEasing),
-        label = "ChipNextAlpha"
-    )
-
-    // Label text: animate between countdown and active-mix states
-    val chipLabel = when {
-        isMixPhase && nextTitle != null && nextAlpha > 0.01f -> "${stringResource(R.string.automixing)}  →  $nextTitle"
-        isMixPhase -> stringResource(R.string.automixing)
-        mixBeatsLeft != null -> stringResource(R.string.automix_mix_in, mixBeatsLeft)
-        else -> stringResource(R.string.automixing)
-    }
-
-    SuggestionChip(
-        onClick = {},
-        label = {
-            AnimatedContent(
-                targetState = chipLabel,
-                transitionSpec = {
-                    (fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 2 })
-                        .togetherWith(fadeOut(tween(150)) + slideOutVertically(tween(150)) { -it / 2 })
-                },
-                label = "ChipLabel"
-            ) { label ->
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.8.sp,
-                    ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 200.dp)
-                )
-            }
-        },
-        icon = {
-            Icon(
-                imageVector = Icons.Rounded.GraphicEq,
-                contentDescription = null,
-                tint = primaryColor.copy(alpha = iconAlpha),
-                modifier = Modifier.size(SuggestionChipDefaults.IconSize)
-            )
-        },
-        colors = SuggestionChipDefaults.suggestionChipColors(
-            containerColor = if (isMixPhase)
-                primaryColor.copy(alpha = 0.12f * glowAlpha)
-            else
-                primaryColor.copy(alpha = 0.08f),
-            labelColor = primaryColor.copy(alpha = if (isMixPhase) glowAlpha else beatAlpha),
-        ),
-        border = SuggestionChipDefaults.suggestionChipBorder(
-            enabled = true,
-            borderColor = if (isMixPhase)
-                primaryColor.copy(alpha = 0.35f * glowAlpha)
-            else
-                primaryColor.copy(alpha = 0.18f),
-            borderWidth = 1.dp,
-        ),
-        modifier = modifier
-    )
 }
 
 /**

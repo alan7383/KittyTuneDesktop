@@ -23,10 +23,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.OpenInFull
 import androidx.compose.material.icons.rounded.Settings
@@ -116,7 +115,7 @@ fun NowPlayingPanel(
                             onClick = { tabMenuOpen = true },
                         ) {
                             Icon(
-                                Icons.Outlined.Settings,
+                                Icons.Rounded.Settings,
                                 contentDescription = str("panel_tabs_title"),
                                 modifier = Modifier.size(17.dp),
                             )
@@ -291,8 +290,8 @@ private fun PanelTabRow(
 private fun PanelTabIcon(tab: NowPlayingTab) {
     val modifier = Modifier.size(TAB_ICON_SIZE)
     when (tab) {
-        NowPlayingTab.TRACK -> Icon(Icons.Outlined.Info, null, modifier)
-        NowPlayingTab.QUEUE -> Icon(Icons.AutoMirrored.Outlined.QueueMusic, null, modifier)
+        NowPlayingTab.TRACK -> Icon(Icons.Rounded.Info, null, modifier)
+        NowPlayingTab.QUEUE -> Icon(Icons.AutoMirrored.Rounded.QueueMusic, null, modifier)
         // The same drawing the player bar's lyrics button uses, so the two are recognisably one
         // feature rather than two icons for it.
         NowPlayingTab.LYRICS -> Icon(

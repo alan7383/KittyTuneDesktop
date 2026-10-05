@@ -63,11 +63,19 @@ class WavyVolumeSliderTest {
     }
 
     @Test
-    fun `volume hover control speaker icon does not use primary accent tint`() {
+    fun `speaker icon is lit only while sound is on`() {
         val volumeControlSource = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/main/VolumeControl.kt").readText()
+        // Unconditionally accented, a muted speaker looked switched on (issue #66, first report); never accented,
+        // muting barely showed (second report). The accent has to follow the mute state.
         assertTrue(
             !volumeControlSource.contains("tint = MaterialTheme.colorScheme.primary"),
-            "VolumeControl must not tint the speaker or mute icon with primary accent color",
+            "VolumeControl must not tint the speaker or mute icon with the accent unconditionally",
+        )
+        assertTrue(
+            volumeControlSource.contains(
+                "if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary"
+            ),
+            "The speaker must be accented while sound is on and greyed out when muted",
         )
     }
 

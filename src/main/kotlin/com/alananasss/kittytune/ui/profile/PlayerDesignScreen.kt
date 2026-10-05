@@ -15,13 +15,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.TextSnippet
-import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -629,14 +628,14 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL,
             label = str("player_button_panel"),
             desc = str("player_button_panel_desc"),
-            mark = rememberVectorPainter(Icons.Outlined.Tune),
+            mark = rememberVectorPainter(Icons.Rounded.Tune),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE,
             label = str("player_button_queue"),
             desc = str("player_button_queue_desc"),
-            mark = rememberVectorPainter(Icons.Outlined.QueueMusic),
+            mark = rememberVectorPainter(Icons.AutoMirrored.Rounded.QueueMusic),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons
         ),
         ButtonConfigItem(
