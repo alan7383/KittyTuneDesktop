@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.ui.main
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -121,19 +122,33 @@ internal fun VolumeControl(
     androidx.compose.runtime.CompositionLocalProvider(LocalWaveMoving provides isPlaying) {
     BoxWithConstraints(contentAlignment = Alignment.Center) {
         val roomForTrack = maxWidth - INLINE_OVERHEAD
-        if (preferVertical || roomForTrack < MIN_TRACK_WIDTH) {
-            VolumeHoverControl(volume, style, onVolumeChange, onVolumeChangeFinished, onVolumeScrolled, onToggleMute, shapes = shapes)
-        } else {
-            InlineVolumeControl(
-                volume = volume,
-                style = style,
-                trackWidth = roomForTrack.coerceAtMost(MAX_TRACK_WIDTH),
-                onVolumeChange = onVolumeChange,
-                onVolumeChangeFinished = onVolumeChangeFinished,
-                onVolumeScrolled = onVolumeScrolled,
-                onToggleMute = onToggleMute,
-                shapes = shapes,
-            )
+        // The inline track folds into the speaker button when the window gets too narrow for it, and unfolds
+        // again, instead of swapping in a single frame (issue #66).
+        androidx.compose.animation.AnimatedContent(
+            targetState = preferVertical || roomForTrack < MIN_TRACK_WIDTH,
+            transitionSpec = {
+                (androidx.compose.animation.fadeIn(tween(220, delayMillis = 80)) +
+                    androidx.compose.animation.scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = 0.85f)) togetherWith
+                    androidx.compose.animation.fadeOut(tween(120)) using
+                    androidx.compose.animation.SizeTransform(clip = false) { _, _ -> tween(300, easing = FastOutSlowInEasing) }
+            },
+            contentAlignment = Alignment.CenterEnd,
+            label = "volumeLayout",
+        ) { usesPopup ->
+            if (usesPopup) {
+                VolumeHoverControl(volume, style, onVolumeChange, onVolumeChangeFinished, onVolumeScrolled, onToggleMute, shapes = shapes)
+            } else {
+                InlineVolumeControl(
+                    volume = volume,
+                    style = style,
+                    trackWidth = roomForTrack.coerceAtMost(MAX_TRACK_WIDTH),
+                    onVolumeChange = onVolumeChange,
+                    onVolumeChangeFinished = onVolumeChangeFinished,
+                    onVolumeScrolled = onVolumeScrolled,
+                    onToggleMute = onToggleMute,
+                    shapes = shapes,
+                )
+            }
         }
     }
     }
@@ -184,7 +199,7 @@ private fun InlineVolumeControl(
     shapes: IconButtonShapes = IconButtonDefaults.shapes(),
 ) {
     val isMuted = volume <= 0.001f
-    val iconColor = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
+    val iconColor = speakerTint(isMuted)
     Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(
             onClick = onToggleMute,
@@ -673,7 +688,7 @@ private fun VolumeHoverControl(
 
     val isMuted = volume <= 0.001f
     val levelIcon = volumeIcon(volume)
-    val iconColor = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant
+    val iconColor = speakerTint(isMuted)
 
     Box {
         IconButton(
@@ -741,7 +756,7 @@ private fun VolumeHoverControl(
                             Icon(
                                 levelIcon,
                                 contentDescription = if (isMuted) "Unmute" else "Mute",
-                                tint = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = iconColor,
                                 modifier = Modifier.size(18.dp),
                             )
                         }
@@ -751,6 +766,15 @@ private fun VolumeHoverControl(
         }
     }
 }
+
+/**
+ * The speaker is a toggle, so it is drawn like the bar's other toggles: lit in the accent while sound is on,
+ * greyed out once muted. Both states used to be shades of grey, close enough that muting barely showed on
+ * the button that did it (issue #66).
+ */
+@Composable
+private fun speakerTint(isMuted: Boolean): Color =
+    if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary
 
 /** Places a popup directly above its anchor, horizontally centred and clamped to the window. */
 private object AboveAnchorCentered : PopupPositionProvider {

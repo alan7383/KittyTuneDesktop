@@ -58,6 +58,7 @@ import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Lyrics
+import com.alananasss.kittytune.ui.player.slider.mixGlow
 import com.alananasss.kittytune.ui.player.lyrics.SearchLyricsDialog
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Pause
@@ -1762,10 +1763,14 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
 
     val position = if (scrubbing || viewModel.isScrubbing) scrubPosition.toLong() else viewModel.currentPosition
     val played = position.coerceIn(0L, duration)
+    // A mix shows on the bar itself, as in the player bar; see MixTransition.
+    val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
+    val shownFraction = if (scrubbing || viewModel.isScrubbing) played.toFloat() / duration
+    else mix.shownFraction(played.toFloat() / duration)
 
     Column(Modifier.fillMaxWidth()) {
         com.alananasss.kittytune.ui.player.slider.PlayerSlider(
-            value = played.toFloat(),
+            value = shownFraction * duration,
             onValueChange = {
                 scrubbing = true
                 scrubPosition = it
@@ -1785,6 +1790,7 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
             ),
             modifier = Modifier
                 .fillMaxWidth()
+                .mixGlow(mix, palette.bright) { shownFraction }
                 .seekWheel(
                     positionMs = { if (scrubbing || viewModel.isScrubbing) scrubPosition.toLong() else viewModel.currentPosition },
                     durationMs = { viewModel.duration },
@@ -1802,7 +1808,6 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TimeLabel(com.alananasss.kittytune.utils.makeTimeString(played), palette)
-            com.alananasss.kittytune.ui.player.automix.AutomixBadge(textColor = palette.bright)
             // Counting down or total duration, switchable by clicking and synced with settings.
             TimeLabel(
                 text = if (showRemaining) "-" + com.alananasss.kittytune.utils.makeTimeString((duration - played).coerceAtLeast(0L)) else com.alananasss.kittytune.utils.makeTimeString(duration),
