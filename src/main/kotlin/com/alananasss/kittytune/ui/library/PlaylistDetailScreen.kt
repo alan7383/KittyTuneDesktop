@@ -828,7 +828,14 @@ fun PlaylistDetailScreen(
                 playlistId == "likes" -> {
                     playlistTitle = str("lib_liked_tracks")
                     defaultIcon = Icons.Rounded.Favorite
-                    playlistUser = try {
+                    // The profile the library cached, when there is one: asking the API for it every time put
+                    // the "By <you>" line a round-trip behind the rest of the header, popping in last on every
+                    // visit (issue #66).
+                    val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+                    val cachedUsername = prefs.getCachedUsername()
+                    playlistUser = playerViewModel.currentUser ?: if (cachedUsername != null && prefs.getCachedUserId() > 0) {
+                        User(prefs.getCachedUserId(), cachedUsername, null)
+                    } else try {
                         api.getMe()
                     } catch (e: Exception) {
                         User(0, str("me_artist"), null)

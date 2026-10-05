@@ -1,6 +1,10 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.utils.SoundCloudLocalizationUtils
 import androidx.compose.material3.ButtonDefaults
@@ -270,10 +274,20 @@ private fun HomeFeed(
             // Quick tiles: recently played contexts (3 rows x 3 cols or 2 rows x 3 cols with pagination)
             if (contextHistory.isNotEmpty()) {
                 item {
-                    val pageItems = contextHistory.drop(currentPage * pageSize).take(pageSize)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pageItems.chunked(3).forEach { rowItems ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Always the three rows a wide window shows. The third folds away when the window narrows
+                    // to two and unfolds when it widens, rather than six tiles jumping into place (issue #66).
+                    val pageItems = contextHistory.drop(currentPage * pageSize).take(9)
+                    Column {
+                        pageItems.chunked(3).forEachIndexed { rowIndex, rowItems ->
+                            AnimatedVisibility(
+                                visible = rowIndex * 3 < pageSize,
+                                enter = fadeIn(tween(260, delayMillis = 60)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
+                                exit = fadeOut(tween(140)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
+                            ) {
+                            Row(
+                                modifier = Modifier.padding(top = if (rowIndex > 0) 8.dp else 0.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
                                 rowItems.forEach { entry ->
                                     val isLikes = entry.id == "likes" || entry.numericId == -1L || entry.id == "pin_likes" ||
                                             entry.title.equals("Titres Likés", ignoreCase = true) ||
@@ -370,6 +384,7 @@ private fun HomeFeed(
                                     }
                                 }
                                 repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
+                            }
                             }
                         }
                     }

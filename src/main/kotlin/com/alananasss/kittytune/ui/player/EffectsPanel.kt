@@ -3,7 +3,6 @@ package com.alananasss.kittytune.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -19,8 +18,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.onClick
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -505,11 +502,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val pinnedTiles = remember(viewModel.pinnedAudioFx, allEffects) {
         viewModel.pinnedAudioFx.mapNotNull { id -> allEffects.find { it.id == id } }
     }
-    val pages = remember(pinnedTiles) {
-        if (pinnedTiles.isEmpty()) emptyList() else pinnedTiles.chunked(6)
-    }
-    val pagerState = rememberPagerState(pageCount = { maxOf(1, pages.size) })
-    val coroutineScope = rememberCoroutineScope()
 
     if (showStudioEditSheet) {
         AudioFxStudioSheet(
@@ -636,57 +628,9 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                     )
                 }
-
-                if (pages.size > 1) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                                }
-                            },
-                            enabled = pagerState.currentPage > 0,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.NavigateBefore,
-                                contentDescription = "Previous Page",
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Text(
-                            text = "${pagerState.currentPage + 1}/${pages.size}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                                }
-                            },
-                            enabled = pagerState.currentPage < pages.lastIndex,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.NavigateNext,
-                                contentDescription = "Next Page",
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                }
             }
 
-            if (pages.isEmpty()) {
+            if (pinnedTiles.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -700,109 +644,31 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     )
                 }
             } else {
-                val rowHeightDp = 84.dp
-                val rowSpacingDp = 12.dp
-
-                val calculatePageHeight: (Int) -> Dp = { pageIdx ->
-                    val itemsCount = pages.getOrNull(pageIdx)?.size ?: 0
-                    if (itemsCount == 0) 0.dp else {
-                        val rows = (itemsCount + 1) / 2
-                        rowHeightDp * rows + rowSpacingDp * (rows - 1)
-                    }
-                }
-
-                val currentPage = pagerState.currentPage
-                val offsetFraction = pagerState.currentPageOffsetFraction
-                val targetPage = if (offsetFraction > 0f) {
-                    (currentPage + 1).coerceAtMost(pages.lastIndex)
-                } else if (offsetFraction < 0f) {
-                    (currentPage - 1).coerceAtLeast(0)
-                } else {
-                    currentPage
-                }
-
-                val currentHeight = calculatePageHeight(currentPage)
-                val targetHeight = calculatePageHeight(targetPage)
-                val fraction = abs(offsetFraction).coerceIn(0f, 1f)
-                val pagerHeight = currentHeight + (targetHeight - currentHeight) * fraction
-
-                HorizontalPager(
-                    state = pagerState,
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(pagerHeight)
-                ) { pageIndex ->
-                    val pageItems = pages.getOrElse(pageIndex) { emptyList() }
-                    val pageOffset = abs((pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction)
-                    val pageAlpha = (1f - pageOffset * 0.35f).coerceIn(0f, 1f)
-                    val pageScale = (1f - pageOffset * 0.04f).coerceIn(0.95f, 1f)
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                alpha = pageAlpha
-                                scaleX = pageScale
-                                scaleY = pageScale
+                // Every pinned effect at once, in the panel's own scroll. They used to be split into pages of
+                // six, which on a full screen meant flipping pages with half the screen empty below, and in a
+                // window meant two ways of moving through one list (issue #66).
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    pinnedTiles.chunked(2).forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowItems.forEach { fx ->
+                                FxTile(
+                                    label = str(fx.titleKey),
+                                    icon = fx.icon,
+                                    isActive = fx.isActive(viewModel.effectsState),
+                                    onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
+                                    onLongClick = fx.onOpenDialog,
+                                    modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
+                                    activeColor = fx.activeColor(),
+                                    activeContentColor = fx.activeContentColor(),
+                                    tooltip = fx.tooltip(),
+                                )
                             }
-                    ) {
-                        pageItems.chunked(2).forEach { rowItems ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                rowItems.forEach { fx ->
-                                    FxTile(
-                                        label = str(fx.titleKey),
-                                        icon = fx.icon,
-                                        isActive = fx.isActive(viewModel.effectsState),
-                                        onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
-                                        onLongClick = fx.onOpenDialog,
-                                        modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
-                                        activeColor = fx.activeColor(),
-                                        activeContentColor = fx.activeContentColor(),
-                                        tooltip = fx.tooltip(),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (pages.size > 1) {
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        repeat(pages.size) { iteration ->
-                            val isSelected = pagerState.currentPage == iteration
-                            val indicatorWidth by animateDpAsState(
-                                targetValue = if (isSelected) 22.dp else 6.dp,
-                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                                label = "indicatorWidth"
-                            )
-                            val indicatorColor by animateColorAsState(
-                                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                animationSpec = tween(200),
-                                label = "indicatorColor"
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .height(6.dp)
-                                    .width(indicatorWidth)
-                                    .clip(CircleShape)
-                                    .background(indicatorColor)
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(iteration)
-                                        }
-                                    }
-                            )
                         }
                     }
                 }
