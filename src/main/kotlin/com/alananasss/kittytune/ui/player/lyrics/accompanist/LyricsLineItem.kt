@@ -58,26 +58,12 @@ fun LyricsLineItem(
         else -> 0f
     }
 
+    // The hover highlight lives outside the blurred layer. Inside it, the blur smeared the highlight's
+    // rounded rectangle with clamped edges, and what showed on hovering a blurred line was a "+" rather
+    // than a box (issue #66).
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                scaleX = scaleState
-                scaleY = scaleState
-                alpha = alphaState
-                transformOrigin = TransformOrigin(originX, 1f)
-                this.blendMode = blendMode
-                compositingStrategy = CompositingStrategy.Offscreen
-
-                val radius = blurRadius()
-                if (radius > 0f) {
-                    renderEffect = BlurEffect(
-                        radiusX = radius,
-                        radiusY = radius,
-                        edgeTreatment = TileMode.Clamp
-                    )
-                }
-            }
             .then(
                 if (isInteractive) Modifier.clip(RoundedCornerShape(8.dp))
                     .combinedClickable(
@@ -87,6 +73,28 @@ fun LyricsLineItem(
                 else Modifier
             )
     ) {
-        content()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = scaleState
+                    scaleY = scaleState
+                    alpha = alphaState
+                    transformOrigin = TransformOrigin(originX, 1f)
+                    this.blendMode = blendMode
+                    compositingStrategy = CompositingStrategy.Offscreen
+
+                    val radius = blurRadius()
+                    if (radius > 0f) {
+                        renderEffect = BlurEffect(
+                            radiusX = radius,
+                            radiusY = radius,
+                            edgeTreatment = TileMode.Clamp
+                        )
+                    }
+                }
+        ) {
+            content()
+        }
     }
 }

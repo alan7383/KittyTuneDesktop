@@ -2557,6 +2557,10 @@
     <string name="listening_stats_active_days">Jours avec musique : %1$d</string>
     <string name="listening_stats_since">%1$s – aujourd’hui</string>
     <string name="zapret_sub">Contournement : KittyTune vérifie quels services sont bloqués et ajoute leurs domaines à la liste utilisateur de zapret.</string>
+    <string name="lyrics_quick_tab_look">Apparence</string>
+    <string name="lyrics_quick_tab_layout">Disposition</string>
+    <string name="lyrics_quick_tab_features">Fonctions</string>
+    <string name="lyrics_quick_scrolling">Défilement</string>
     <string name="zapret_folder">Dossier zapret</string>
     <string name="zapret_folder_none">Non choisi</string>
     <string name="zapret_detect">Trouver</string>

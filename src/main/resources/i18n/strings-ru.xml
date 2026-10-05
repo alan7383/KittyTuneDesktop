@@ -2555,6 +2555,10 @@
     <string name="listening_stats_active_days">Дней с музыкой: %1$d</string>
     <string name="listening_stats_since">%1$s — сегодня</string>
     <string name="zapret_sub">Обход блокировок: KittyTune проверит, какие сервисы заблокированы, и допишет их домены в пользовательский список zapret.</string>
+    <string name="lyrics_quick_tab_look">Вид</string>
+    <string name="lyrics_quick_tab_layout">Расположение</string>
+    <string name="lyrics_quick_tab_features">Функции</string>
+    <string name="lyrics_quick_scrolling">Прокрутка</string>
     <string name="zapret_folder">Папка zapret</string>
     <string name="zapret_folder_none">Не выбрана</string>
     <string name="zapret_detect">Найти</string>

@@ -64,6 +64,7 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricLineStyling
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
 import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
 import com.alananasss.kittytune.ui.player.lyrics.FollowPlainLyrics
+import com.alananasss.kittytune.ui.player.lyrics.revealWhenPlaced
 import com.alananasss.kittytune.ui.player.lyrics.lyricsWheel
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import kotlinx.coroutines.isActive
@@ -223,7 +224,7 @@ private fun PanelSyncedLyrics(
         ) + vm.lyricsOffset
 
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex),
             state = listState,
             contentPadding = PaddingValues(
                 start = effectiveStyle.startPadding,
@@ -243,6 +244,7 @@ private fun PanelSyncedLyrics(
                     // distance is zero for all of them until the song reaches the words.
                     distance = if (focusIndex < 0) 0 else index - focusIndex,
                     isSung = index == activeIndex,
+                    isReadingByHand = readingByHand,
                     positionMs = smoothPosition,
                     // Shared with the full screen, which had its own copy of this and got it
                     // differently wrong — see [LyricsUtils.seekTargetFor] for what the clamp does
@@ -276,6 +278,7 @@ private fun PanelLyricLine(
     style: PanelLyricsStyle,
     distance: Int,
     isSung: Boolean,
+    isReadingByHand: Boolean,
     positionMs: Float,
     onClick: () -> Unit,
 ) {
@@ -289,7 +292,9 @@ private fun PanelLyricLine(
         // Softer than the full screen's: this text is a third of the size, and the radius that reads as
         // depth behind a headline turns a panel line into a smudge.
         focusBlur = if (style.isFullScreen) 3.dp else 1.dp,
-        blurEnabled = if (style.isFullScreen) vm.lyricsFullScreenLineBlurEnabled else vm.lyricsSidebarLineBlurEnabled,
+        // Off while reading by hand, so the lines scrolled to can be read; see the full screen's copy.
+        blurEnabled = !isReadingByHand &&
+            if (style.isFullScreen) vm.lyricsFullScreenLineBlurEnabled else vm.lyricsSidebarLineBlurEnabled,
     )
 
     val scale by animateFloatAsState(treatment.scale, tween(260), label = "panelLyricScale")
@@ -478,6 +483,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
         LazyColumn(
             Modifier
                 .fillMaxSize()
+                .revealWhenPlaced(listState, activeIndex = -1)
                 .lyricsWheel(
                     listState = listState,
                     scope = scope,

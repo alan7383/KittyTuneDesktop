@@ -1,5 +1,8 @@
 package com.alananasss.kittytune.ui.player.lyrics
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.PressInteraction
@@ -13,13 +16,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.floor
 
 /**
@@ -421,5 +430,47 @@ internal fun Modifier.lyricsWheel(
                 else -> Unit
             }
         }
+    }
+}
+
+/** How long the whole list takes to fade in once it is in place. */
+private const val REVEAL_MS = 420
+
+/** The most a list waits to be placed before it is shown regardless, so a slow layout never hides the words. */
+private const val REVEAL_PLACEMENT_TIMEOUT_MS = 700L
+
+/**
+ * Keeps a lyrics list invisible until it shows the line being sung, then fades it in as one block.
+ *
+ * A list is born at line one and only afterwards moved to where the song is. That move, and the lines
+ * settling around it, used to be on screen: a line at the top first, then three more appearing under it,
+ * "like mush", every time the lyrics were opened (issue #66). Nothing of that is worth seeing, so the list
+ * stays transparent until [activeIndex] is laid out and no scroll is running, and then rises in gently.
+ *
+ * @param activeIndex the line the list is being placed on, or a negative value when there is none
+ *   (plain text, or before the first line), in which case the list fades in as soon as it has content.
+ */
+@Composable
+internal fun Modifier.revealWhenPlaced(listState: LazyListState, activeIndex: Int): Modifier {
+    val alpha = remember(listState) { Animatable(0f) }
+    val currentActiveIndex by rememberUpdatedState(activeIndex)
+    val risePx = with(LocalDensity.current) { 14.dp.toPx() }
+    LaunchedEffect(listState) {
+        withTimeoutOrNull(REVEAL_PLACEMENT_TIMEOUT_MS) {
+            snapshotFlow {
+                val layout = listState.layoutInfo
+                val target = currentActiveIndex
+                layout.totalItemsCount > 0 &&
+                    !listState.isScrollInProgress &&
+                    (target < 0 || layout.visibleItemsInfo.any { it.index == target })
+            }.first { it }
+            // One frame more, for the lines that move with the list to land where it put them.
+            withFrameNanos { }
+        }
+        alpha.animateTo(1f, tween(REVEAL_MS, easing = FastOutSlowInEasing))
+    }
+    return graphicsLayer {
+        this.alpha = alpha.value
+        translationY = (1f - alpha.value) * risePx
     }
 }
