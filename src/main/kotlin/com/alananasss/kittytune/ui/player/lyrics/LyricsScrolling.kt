@@ -150,6 +150,7 @@ internal fun FollowActiveLine(
     activeIndex: Int,
     anchorPx: Int = 0,
     centred: Boolean = false,
+    contentKey: Any? = null,
 ): Boolean {
     var lastManualScrollMs by remember { mutableStateOf(0L) }
     var readingByHand by remember { mutableStateOf(false) }
@@ -173,7 +174,9 @@ internal fun FollowActiveLine(
      * starts, not because anybody scrolled it there. The scroll below reads it to decide between
      * putting the list where the song is and animating it there.
      */
-    var placed by remember(listState) { mutableStateOf(false) }
+    // Keyed on the lyrics too: a list kept across tracks would otherwise glide the next song's words in from
+    // line one instead of placing them (issue #66).
+    var placed by remember(listState, contentKey) { mutableStateOf(false) }
 
     // Drags and presses only — a programmatic scroll emits nothing here, which is the whole point.
     LaunchedEffect(listState) {
@@ -193,7 +196,7 @@ internal fun FollowActiveLine(
     }
 
     // Keyed on the line alone. Keying it on the manual timestamp is what made it cancel itself.
-    LaunchedEffect(activeIndex, anchorPx) {
+    LaunchedEffect(activeIndex, anchorPx, contentKey) {
         if (activeIndex < 0) return@LaunchedEffect
 
         // Re-read each time round: a second scroll during the wait extends it rather than being ignored.
@@ -221,7 +224,7 @@ internal fun FollowActiveLine(
             // *is* placed, the animation is the point — that is the song moving from one line to the
             // next, and it should glide.
             if (placed) {
-                listState.animateScrollToItem(activeIndex, followOffset(listState, activeIndex, anchorPx, centred))
+                listState.glideToLine(activeIndex) { followOffset(listState, activeIndex, anchorPx, centred) }
             } else {
                 listState.scrollToItem(activeIndex, -anchorPx)
                 // A snap remeasures at once, so the line is laid out now and can be centred before the
@@ -233,7 +236,40 @@ internal fun FollowActiveLine(
             autoScrolling = false
         }
     }
+
+    // Back to the line being sung as soon as the reader lets go. Following used to wait for the next line to
+    // start, so on a pause, or in a long line, the view stayed wherever it had been scrolled to while the blur
+    // came back over it (issue #66).
+    val currentActive by rememberUpdatedState(activeIndex)
+    LaunchedEffect(readingByHand) {
+        if (readingByHand || !placed || currentActive < 0) return@LaunchedEffect
+        autoScrolling = true
+        try {
+            listState.glideToLine(currentActive) { followOffset(listState, currentActive, anchorPx, centred) }
+        } finally {
+            autoScrolling = false
+        }
+    }
     return readingByHand
+}
+
+/** How many lines short of a far-away line a glide starts, so it reads as movement rather than a jump. */
+private const val GLIDE_RUN_UP_LINES = 3
+
+/**
+ * Scrolls to [index] with a glide however far away it is.
+ *
+ * [LazyListState.animateScrollToItem] only animates to a line it can measure; anything further away it
+ * reaches with a jump at the end, which is what returning from a long scroll looked like. A line that is not
+ * on screen is first brought within a few lines, then the rest is animated.
+ */
+internal suspend fun LazyListState.glideToLine(index: Int, offset: () -> Int) {
+    val visible = layoutInfo.visibleItemsInfo.any { it.index == index }
+    if (!visible) {
+        val runUp = if (firstVisibleItemIndex < index) index - GLIDE_RUN_UP_LINES else index + GLIDE_RUN_UP_LINES
+        scrollToItem(runUp.coerceIn(0, (layoutInfo.totalItemsCount - 1).coerceAtLeast(0)))
+    }
+    animateScrollToItem(index, offset())
 }
 
 /**
@@ -451,11 +487,14 @@ private const val REVEAL_PLACEMENT_TIMEOUT_MS = 700L
  *   (plain text, or before the first line), in which case the list fades in as soon as it has content.
  */
 @Composable
-internal fun Modifier.revealWhenPlaced(listState: LazyListState, activeIndex: Int): Modifier {
+internal fun Modifier.revealWhenPlaced(listState: LazyListState, activeIndex: Int, contentKey: Any? = null): Modifier {
     val alpha = remember(listState) { Animatable(0f) }
     val currentActiveIndex by rememberUpdatedState(activeIndex)
     val risePx = with(LocalDensity.current) { 14.dp.toPx() }
-    LaunchedEffect(listState) {
+    // Again for every new set of lyrics, not just when the view opens: a list kept across tracks showed the
+    // next song's lines arriving piece by piece (issue #66).
+    LaunchedEffect(listState, contentKey) {
+        alpha.snapTo(0f)
         withTimeoutOrNull(REVEAL_PLACEMENT_TIMEOUT_MS) {
             snapshotFlow {
                 val layout = listState.layoutInfo

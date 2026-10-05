@@ -253,7 +253,7 @@ import kotlin.math.roundToInt
                     } else {
                         if (viewModel.lyricsLines.isEmpty() && viewModel.rawPlainLyrics.isNullOrBlank()) {
                             if (viewModel.isLyricsLoading) {
-                                SearchingLyricsState()
+                                SearchingLyricsState(viewModel)
                             } else {
                                 EmptyLyricsState(onManualSearch = { viewModel.isSearchingLyrics = true })
                             }
@@ -433,7 +433,7 @@ import kotlin.math.roundToInt
     
         // Reading along by hand wins for a while; the panel's copy of the lyrics follows the same
         // rule, which is why this lives in one place (issue #33).
-        val readingByHand = FollowActiveLine(listState, activeIndex, centred = true)
+        val readingByHand = FollowActiveLine(listState, activeIndex, centred = true, contentKey = lyrics)
         val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
     
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -446,7 +446,7 @@ import kotlin.math.roundToInt
                 contentPadding = PaddingValues(top = topPadding, bottom = halfHeight),
                 modifier = Modifier
                     .fillMaxSize()
-                    .revealWhenPlaced(listState, activeIndex)
+                    .revealWhenPlaced(listState, activeIndex, contentKey = lyrics)
                     .fadingEdge(fadeBrush),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
@@ -724,7 +724,7 @@ import kotlin.math.roundToInt
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .revealWhenPlaced(listState, activeIndex = -1)
+                    .revealWhenPlaced(listState, activeIndex = -1, contentKey = lines)
                     .fadingEdge(fadeBrush)
                     .lyricsWheel(
                         listState = listState,
@@ -768,20 +768,9 @@ import kotlin.math.roundToInt
     }
     
     @Composable
-    fun SearchingLyricsState() {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            ContainedLoadingIndicator()
-            Spacer(Modifier.height(20.dp))
-            Text(
-                str("lyrics_searching"),
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
-            )
+    fun SearchingLyricsState(viewModel: PlayerViewModel) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            LyricsSearchingIndicator(com.alananasss.kittytune.ui.theme.rememberLyricsFontFamily(viewModel.lyricsFont))
         }
     }
 
