@@ -1029,7 +1029,8 @@ fun MainScreen(
                                 onAuthRequested = { provider ->
                                     navController.navigate("music_import_auth/$provider")
                                 },
-                                onLoginClick = { navController.navigate("login") }
+                                onLoginClick = { navController.navigate("login") },
+                                onOpenPlaylist = { id -> playerViewModel.navigateToPlaylistId = id.toString() },
                             )
                         }
                         composable("music_import_auth/{provider}") { backStackEntry ->

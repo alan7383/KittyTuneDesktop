@@ -115,6 +115,12 @@ object AppDatabase {
             try {
                 st.execute("ALTER TABLE downloaded_playlists ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
             } catch (_: Exception) {}
+            // A saved track's source and page, for tracks that are not SoundCloud's (see LocalTrack.source).
+            for (column in listOf("source TEXT", "permalinkUrl TEXT")) {
+                try {
+                    st.execute("ALTER TABLE downloaded_tracks ADD COLUMN $column")
+                } catch (_: Exception) {}
+            }
             st.execute("UPDATE library_folders SET parentFolderId = NULL WHERE parentFolderId = 0")
             st.execute("UPDATE library_item_meta SET folderId = NULL WHERE folderId = 0")
 

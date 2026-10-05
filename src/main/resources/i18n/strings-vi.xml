@@ -1068,6 +1068,24 @@
     <string name="restore_success">Khôi phục hoàn tất. Vui lòng khởi động lại ứng dụng</string>
     <!-- MUSIC IMPORT (Transfer your gems) -->
     <string name="music_import_title">Chuyển kho nhạc của bạn</string>
+    <string name="vk_import_title">Nhập từ VK Music</string>
+    <string name="vk_import_sub">Dán liên kết tới playlist hoặc album</string>
+    <string name="vk_import_hint">Liên kết playlist VK</string>
+    <string name="vk_import_paste">Dán</string>
+    <string name="vk_import_load">Tìm</string>
+    <string name="vk_import_note">Các bài hát được tìm trên SoundCloud và YouTube Music theo tên, nghệ sĩ và thời lượng. Không cần đăng nhập VK.</string>
+    <string name="vk_import_not_vk">Đây không phải liên kết VK.</string>
+    <string name="vk_import_not_playlist">Liên kết này không chứa playlist. Hãy mở playlist trong VK và sao chép liên kết của nó.</string>
+    <string name="vk_import_private">VK không mở playlist này: playlist ở chế độ riêng tư, hoặc liên kết thiếu khóa truy cập. Trong VK, nhấn Chia sẻ, rồi Sao chép liên kết và dán vào đây.</string>
+    <string name="vk_import_empty">Playlist này trống.</string>
+    <string name="vk_import_failed">Không thể kết nối VK: %1$s</string>
+    <string name="vk_import_tracks">%1$d bài hát</string>
+    <string name="vk_import_start">Nhập playlist</string>
+    <string name="vk_import_progress">Đang tìm bài hát: %1$d / %2$d · đã tìm thấy %3$d</string>
+    <string name="vk_import_done">Xong: %1$d / %2$d bài hát trong playlist “%3$s”</string>
+    <string name="vk_import_missing">Không tìm thấy (%1$d)</string>
+    <string name="vk_import_open">Mở playlist</string>
+    <string name="vk_import_another">Nhập playlist khác</string>
     <string name="music_import_settings_subtitle">Nhập danh sách phát và bài hát yêu thích từ nền tảng khác</string>
     <string name="music_import_subtitle">Chuyển toàn bộ danh sách phát và bài hát đã thích từ dịch vụ âm nhạc khác sang SoundCloud.</string>
     <string name="music_import_platforms_header">Chọn nền tảng âm nhạc</string>
@@ -2574,6 +2592,7 @@
     <string name="lib_view_grid">Lưới</string>
     <string name="lib_view_list">Danh sách</string>
     <string name="lib_view_mode">Chế độ xem</string>
+    <string name="lib_menu_show">Hiển thị</string>
     <string name="listening_stats_all_artists">Tất cả nghệ sĩ</string>
     <string name="listening_stats_all_plays">Tất cả lượt nghe</string>
     <string name="listening_stats_all_tracks">Tất cả bài hát</string>
@@ -2592,7 +2611,6 @@
     <string name="lyrics_fullscreen">Toàn màn hình</string>
     <string name="lyrics_style_focus">Tiêu điểm (Focus)</string>
     <string name="lyrics_style_focus_sub">Các dòng khác mờ đi rõ rệt và hơi nhòe.</string>
-    <string name="lib_menu_show">Hiển thị</string>
     <string name="lyrics_style_scale">Phóng to (Scale)</string>
     <string name="lyrics_style_scale_focus">Phóng to + Tiêu điểm</string>
     <string name="lyrics_style_scale_focus_sub">Các dòng không hoạt động đồng thời thu nhỏ lại và làm mờ.</string>
@@ -2988,6 +3006,10 @@
     <string name="lyrics_mode_sidebar">Bảng bên</string>
     <string name="lyrics_mode_sidebar_sub">Lời bài hát trong bảng đang phát</string>
     <string name="lyrics_content_title">Nội dung</string>
+    <string name="lyrics_quick_tab_look">Giao diện</string>
+    <string name="lyrics_quick_tab_layout">Bố cục</string>
+    <string name="lyrics_quick_tab_features">Tính năng</string>
+    <string name="lyrics_quick_scrolling">Cuộn</string>
     <string name="settings_cat_sync">Thiết bị</string>
     <string name="listening_stats_period_week_short">Tuần</string>
     <string name="listening_stats_period_month_short">Tháng</string>
@@ -3007,10 +3029,6 @@
     <string name="listening_stats_active_days">Số ngày nghe nhạc: %1$d</string>
     <string name="listening_stats_since">%1$s – hôm nay</string>
     <string name="zapret_sub">Vượt chặn: KittyTune kiểm tra dịch vụ nào bị chặn và thêm tên miền vào danh sách người dùng của zapret.</string>
-    <string name="lyrics_quick_tab_look">Giao diện</string>
-    <string name="lyrics_quick_tab_layout">Bố cục</string>
-    <string name="lyrics_quick_tab_features">Tính năng</string>
-    <string name="lyrics_quick_scrolling">Cuộn</string>
     <string name="zapret_folder">Thư mục zapret</string>
     <string name="zapret_folder_none">Chưa chọn</string>
     <string name="zapret_detect">Tìm</string>

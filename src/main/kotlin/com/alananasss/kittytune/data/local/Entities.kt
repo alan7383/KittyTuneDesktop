@@ -15,7 +15,14 @@ data class LocalTrack(
     val duration: Long,
     val localAudioPath: String,
     val localArtworkPath: String,
-    val downloadedAt: Long = System.currentTimeMillis()
+    val downloadedAt: Long = System.currentTimeMillis(),
+    /**
+     * Where the track plays from, and its page there, for anything that is not a SoundCloud track. Without
+     * them a YouTube track saved into a playlist came back as a SoundCloud id that did not exist, and never
+     * played (issue #66). Null for SoundCloud, which the id alone identifies.
+     */
+    val source: String? = null,
+    val permalinkUrl: String? = null,
 )
 
 // table: downloaded_playlists
