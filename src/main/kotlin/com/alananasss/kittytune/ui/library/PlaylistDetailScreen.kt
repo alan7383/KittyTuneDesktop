@@ -1459,33 +1459,20 @@ fun PlaylistDetailScreen(
                                 Spacer(Modifier.width(8.dp))
                             }
 
-                            if ((isLocalPlaylist || isUserCreated) && !isYoutubeRadio) {
-                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { 
-                                    if (isUserCreated) showEditDialog = true else showRenameDialog = true 
-                                }) {
-                                    Icon(Icons.Outlined.Edit, str("profile_edit"))
-                                }
-                                IconButton(onClick = {
-                                    val dialog = FileDialog(null as Frame?, str("storage_change_btn"), FileDialog.LOAD)
-                                    dialog.setFilenameFilter { _, name ->
-                                        name.endsWith(".png", true) || name.endsWith(".jpg", true) || name.endsWith(".jpeg", true) || name.endsWith(".webp", true)
-                                    }
-                                    dialog.isVisible = true
-                                    val file = dialog.files.firstOrNull()
-                                    if (file != null && currentIdLong != 0L) DownloadManager.updatePlaylistCover(currentIdLong, file, title = playlistTitle, artist = playlistUser?.username)
-                                }) {
-                                    Icon(Icons.Outlined.Image, str("storage_change_btn"))
-                                }
-                            }
+                            // Play and shuffle are the page's two buttons; the heart is the one thing about a
+                            // playlist you flip often. Editing, the cover, downloading and deleting are rarer
+                            // and live in the menu, where a row of five mismatched icons used to sit (issue #66).
+                            val canEdit = (isLocalPlaylist || isUserCreated) && !isYoutubeRadio
+                            val canDownload = !isYoutubeRadio && playlistId != "downloads" && tracksToDisplay.isNotEmpty()
+                            val canDelete = !isYoutubeRadio && stableId != 0L &&
+                                playlistId != "likes" && playlistId != "downloads" && playlistId != "local_files"
 
-                            if (playlistId != "downloads" && playlistId != "likes" && playlistId != "local_files") {
-                                if (isUserCreated) {
-                                    IconButton(onClick = { showDeleteDialog = true }) {
-                                        Icon(Icons.Default.Delete, str("btn_delete"), tint = MaterialTheme.colorScheme.error)
-                                    }
-                                } else {
-                                    val isPlaylistLiked = likedPlaylistsRepo.contains(stableId)
-                                    IconButton(onClick = {
+                            if (playlistId != "downloads" && playlistId != "likes" && playlistId != "local_files" && !isUserCreated) {
+                                val isPlaylistLiked = likedPlaylistsRepo.contains(stableId)
+                                FilledTonalIconButton(
+                                    shapes = IconButtonDefaults.shapes(),
+                                    modifier = Modifier.size(44.dp),
+                                    onClick = {
                                         if (!isPlaylistLiked) {
                                             val targetPlaylist = Playlist(
                                                 id = stableId,
@@ -1513,51 +1500,20 @@ fun PlaylistDetailScreen(
                                                 playlistUrn
                                             )
                                         }
-                                    }) {
-                                        if (isPlaylistLiked) Icon(Icons.Rounded.Favorite, str("lib_liked_tracks"), tint = MaterialTheme.colorScheme.primary)
-                                        else Icon(Icons.Outlined.FavoriteBorder, str("menu_add_playlist"))
-                                    }
+                                    },
+                                ) {
+                                    if (isPlaylistLiked) Icon(Icons.Rounded.Favorite, str("lib_liked_tracks"), tint = MaterialTheme.colorScheme.primary)
+                                    else Icon(Icons.Outlined.FavoriteBorder, str("menu_add_playlist"))
                                 }
+                                Spacer(Modifier.width(8.dp))
                             }
 
-                            if (!isYoutubeRadio && playlistId != "downloads" && tracksToDisplay.isNotEmpty()) {
-                                IconButton(onClick = {
-                                    val targetBatchId = if (playlistId == "likes") DownloadManager.LIKES_BATCH_ID else stableId
-                                    if (isPlaylistDownloading) {
-                                        DownloadManager.cancelBatch(targetBatchId)
-                                    } else if (isFullyDownloaded) {
-                                        showRemoveDownloadDialog = true
-                                    } else {
-                                        if (playlistId == "likes") {
-                                            DownloadManager.downloadBatch(tracksToDisplay.toList(), DownloadManager.LIKES_BATCH_ID)
-                                        } else if (stableId != 0L) {
-                                            val fakePlaylist = Playlist(
-                                                id = stableId,
-                                                title = playlistTitle,
-                                                artworkUrl = playlistCover,
-                                                calculatedArtworkUrl = null,
-                                                trackCount = tracks.size,
-                                                user = playlistUser,
-                                                tracks = null,
-                                                permalinkUrl = playlistPermalinkUrl,
-                                                urn = playlistUrn,
-                                                isAlbum = isAlbum
-                                            )
-                                            DownloadManager.downloadPlaylist(fakePlaylist, tracks.toList())
-                                        }
-                                    }
-                                }) {
-                                    when {
-                                        isPlaylistDownloading -> Icon(Icons.Rounded.Close, str("btn_cancel"))
-                                        isFullyDownloaded -> Icon(Icons.Rounded.Delete, str("btn_delete"), tint = MaterialTheme.colorScheme.error)
-                                        else -> Icon(Icons.Rounded.Download, str("btn_download"))
-                                    }
-                                }
-                            }
-
-                            // Overflow menu: queue actions + share
                             Box {
-                                IconButton(onClick = { showOptionsMenu = true }) {
+                                FilledTonalIconButton(
+                                    onClick = { showOptionsMenu = true },
+                                    shapes = IconButtonDefaults.shapes(),
+                                    modifier = Modifier.size(44.dp),
+                                ) {
                                     Icon(Icons.Default.MoreVert, str("btn_options"))
                                 }
                                 DropdownMenu(expanded = showOptionsMenu, onDismissRequest = { showOptionsMenu = false }) {
@@ -1594,6 +1550,83 @@ fun PlaylistDetailScreen(
                                             }
                                         )
                                     }
+                                    if (canEdit) {
+                                        HorizontalDivider()
+                                        DropdownMenuItem(
+                                            text = { Text(str("profile_edit")) },
+                                            leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                if (isUserCreated) showEditDialog = true else showRenameDialog = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(str("playlist_menu_change_cover")) },
+                                            leadingIcon = { Icon(Icons.Outlined.Image, null) },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                val dialog = FileDialog(null as Frame?, str("storage_change_btn"), FileDialog.LOAD)
+                                                dialog.setFilenameFilter { _, name ->
+                                                    name.endsWith(".png", true) || name.endsWith(".jpg", true) || name.endsWith(".jpeg", true) || name.endsWith(".webp", true)
+                                                }
+                                                dialog.isVisible = true
+                                                val file = dialog.files.firstOrNull()
+                                                if (file != null && currentIdLong != 0L) DownloadManager.updatePlaylistCover(currentIdLong, file, title = playlistTitle, artist = playlistUser?.username)
+                                            }
+                                        )
+                                    }
+                                    if (canDownload) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    str(
+                                                        when {
+                                                            isPlaylistDownloading -> "playlist_menu_cancel_download"
+                                                            isFullyDownloaded -> "playlist_menu_remove_download"
+                                                            else -> "playlist_menu_download"
+                                                        }
+                                                    )
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    when {
+                                                        isPlaylistDownloading -> Icons.Rounded.Close
+                                                        isFullyDownloaded -> Icons.Rounded.DownloadDone
+                                                        else -> Icons.Rounded.Download
+                                                    },
+                                                    null,
+                                                )
+                                            },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                val targetBatchId = if (playlistId == "likes") DownloadManager.LIKES_BATCH_ID else stableId
+                                                if (isPlaylistDownloading) {
+                                                    DownloadManager.cancelBatch(targetBatchId)
+                                                } else if (isFullyDownloaded) {
+                                                    showRemoveDownloadDialog = true
+                                                } else {
+                                                    if (playlistId == "likes") {
+                                                        DownloadManager.downloadBatch(tracksToDisplay.toList(), DownloadManager.LIKES_BATCH_ID)
+                                                    } else if (stableId != 0L) {
+                                                        val fakePlaylist = Playlist(
+                                                            id = stableId,
+                                                            title = playlistTitle,
+                                                            artworkUrl = playlistCover,
+                                                            calculatedArtworkUrl = null,
+                                                            trackCount = tracks.size,
+                                                            user = playlistUser,
+                                                            tracks = null,
+                                                            permalinkUrl = playlistPermalinkUrl,
+                                                            urn = playlistUrn,
+                                                            isAlbum = isAlbum
+                                                        )
+                                                        DownloadManager.downloadPlaylist(fakePlaylist, tracks.toList())
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
                                     val isSystemPlaylist = playlistId.startsWith("system_playlist:")
                                     if (!isLocalPlaylist && (currentIdLong > 0 || isSystemPlaylist) && !isYoutubeRadio &&
                                         !playlistId.startsWith("station") && playlistId != "likes" &&
@@ -1622,12 +1655,11 @@ fun PlaylistDetailScreen(
                                             }
                                         )
                                     }
-                                    if (!isYoutubeRadio && stableId != 0L &&
-                                        playlistId != "likes" && playlistId != "downloads" && playlistId != "local_files"
-                                    ) {
+                                    if (canDelete) {
+                                        HorizontalDivider()
                                         DropdownMenuItem(
-                                            text = { Text(str(if (isUserCreated) "menu_delete_playlist" else "dialog_delete_playlist_from_lib_title")) },
-                                            leadingIcon = { Icon(Icons.Rounded.Delete, null) },
+                                            text = { Text(str(if (isUserCreated) "menu_delete_playlist" else "dialog_delete_playlist_from_lib_title"), color = MaterialTheme.colorScheme.error) },
+                                            leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
                                             onClick = {
                                                 showOptionsMenu = false
                                                 showDeleteDialog = true
