@@ -109,7 +109,7 @@ fun NowPlayingPanel(
                     modifier = Modifier.weight(1f),
                 )
                 Box {
-                    Tip(str("panel_tabs_title")) {
+                    Tip(str("panel_tabs_title"), instant = true) {
                         IconButton(
                             shapes = IconButtonDefaults.shapes(),
                             onClick = { tabMenuOpen = true },
@@ -192,7 +192,7 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Same glyph and same label as the gear on the full screen, because it opens the same dialog.
-                Tip(str("pref_lyrics_title")) {
+                Tip(str("pref_lyrics_title"), instant = true) {
                     IconButton(
                         onClick = { showQuickSettings = true },
                         shapes = IconButtonDefaults.shapes(),
@@ -280,7 +280,7 @@ private fun PanelTabRow(
                 }
                 // Only where the icon is on its own. A tooltip repeating a label you can already
                 // read is noise.
-                if (compact) Tip(labels[i]) { tab() } else tab()
+                if (compact) Tip(labels[i], instant = true) { tab() } else tab()
             }
         }
     }
