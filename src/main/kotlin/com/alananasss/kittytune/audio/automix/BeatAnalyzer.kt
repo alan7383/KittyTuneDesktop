@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.audio.automix
 
 import com.alananasss.kittytune.utils.Logger
+import com.alananasss.kittytune.audio.ANALYSIS_RW_TIMEOUT_US
 import com.alananasss.kittytune.audio.releaseQuietly
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.Frame
@@ -180,6 +181,7 @@ object BeatAnalyzer {
                     setOption("reconnect_on_network_error", "1")
                 }
                 setOption("timeout", "8000000") // 8s network timeout
+                setOption("rw_timeout", ANALYSIS_RW_TIMEOUT_US)
                 sampleRate = 44100
                 audioChannels = 1
                 sampleMode = FrameGrabber.SampleMode.FLOAT
