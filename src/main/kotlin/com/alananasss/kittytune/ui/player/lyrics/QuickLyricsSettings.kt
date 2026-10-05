@@ -556,6 +556,20 @@ private fun ColumnScope.FeaturesTab(viewModel: PlayerViewModel, isFullScreen: Bo
         onChange = { viewModel.toggleDuetView(it) },
     )
     SwitchRow(
+        icon = Icons.Rounded.RecordVoiceOver,
+        title = str("pref_lyrics_backing_title"),
+        subtitle = str("pref_lyrics_backing_sub"),
+        checked = viewModel.lyricsSplitBackingVocals,
+        onChange = { viewModel.updateLyricsSplitBackingVocals(it) },
+    )
+    SwitchRow(
+        icon = Icons.Rounded.Animation,
+        title = str("pref_lyrics_reveal_words_title"),
+        subtitle = str("pref_lyrics_reveal_words_sub"),
+        checked = viewModel.lyricsRevealWords,
+        onChange = { viewModel.updateLyricsRevealWords(it) },
+    )
+    SwitchRow(
         icon = Icons.Rounded.Abc,
         title = str("pref_lyrics_romanization"),
         subtitle = str("pref_lyrics_romanization_sub"),

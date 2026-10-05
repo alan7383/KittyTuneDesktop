@@ -130,8 +130,10 @@ fun LyricsEnhanced(
         else -> viewModel.lyricsAlignment
     }
 
-    val syncedLyrics = remember(lines.toList(), isWordSyncedFormat, isDuetActive, userAlignment) {
-        buildSyncedLyrics(lines, isWordSyncedFormat, isDuetActive, userAlignment)
+    val splitBacking = viewModel.lyricsSplitBackingVocals
+    val revealWords = viewModel.lyricsRevealWords
+    val syncedLyrics = remember(lines.toList(), isWordSyncedFormat, isDuetActive, userAlignment, splitBacking, revealWords) {
+        buildSyncedLyrics(lines, isWordSyncedFormat, isDuetActive, userAlignment, splitBacking, revealWords)
     }
 
     val leadMs = if (isWordSyncedFormat) WORD_SYNC_LEAD_MS else LRC_LEAD_MS
@@ -312,7 +314,11 @@ fun buildSyncedLyrics(
     entries: List<LyricLine>,
     isWordSynced: Boolean,
     isDuetEnabled: Boolean = false,
-    userAlignment: LyricsAlignment = LyricsAlignment.LEFT
+    userAlignment: LyricsAlignment = LyricsAlignment.LEFT,
+    /** Backing vocals in round brackets go on a line of their own; see [splitBackingVocals]. */
+    splitBacking: Boolean = false,
+    /** Line-timed lines light up word by word as they start; see [revealSyllables]. */
+    revealWords: Boolean = false,
 ): SyncedLyrics {
     if (entries.isEmpty()) return SyncedLyrics(emptyList())
     val lines = mutableListOf<ISyncedLine>()
@@ -453,33 +459,62 @@ fun buildSyncedLyrics(
                         phonetic = entry.romanization?.takeIf { it.isNotBlank() }
                     )
                 )
-            } else if (isDuetEnabled && effectiveSinger == LyricSinger.SINGER_2) {
-                // Word by word, so the line can wrap. As one syllable holding the whole line it could not break
-                // anywhere, and a long right-aligned line ran off the left edge of the screen (issue #66).
-                val syllables = buildWrappingKaraokeSyllables(
-                    content = cleanText,
-                    romanizedText = "",
-                    start = entry.startTime.toInt(),
-                    end = lineEnd,
-                )
-                lines.add(
-                    KaraokeLine.MainKaraokeLine(
-                        syllables = syllables,
-                        translation = cleanTranslation,
-                        alignment = KaraokeAlignment.End,
-                        start = entry.startTime.toInt(),
-                        end = lineEnd
-                    )
-                )
             } else {
-                lines.add(
-                    SyncedLine(
-                        content = cleanText,
-                        translation = cleanTranslation,
-                        start = entry.startTime.toInt(),
-                        end = lineEnd
+                val lineStart = entry.startTime.toInt()
+                val isRightDuet = isDuetEnabled && effectiveSinger == LyricSinger.SINGER_2
+                val (mainText, backing) = if (splitBacking) splitBackingVocals(cleanText) else cleanText to null
+                if (!isRightDuet && backing == null && !revealWords) {
+                    lines.add(
+                        SyncedLine(
+                            content = cleanText,
+                            translation = cleanTranslation,
+                            start = lineStart,
+                            end = lineEnd
+                        )
                     )
-                )
+                } else {
+                    val lineAlignment = if (isRightDuet) KaraokeAlignment.End else alignment
+                    val syllables = when {
+                        revealWords -> revealSyllables(mainText, lineStart, lineEnd)
+                        // Word by word, so the line can wrap. As one syllable holding the whole line it could not
+                        // break anywhere, and a long right-aligned line ran off the left edge (issue #66).
+                        isRightDuet && backing == null -> buildWrappingKaraokeSyllables(
+                            content = cleanText,
+                            romanizedText = "",
+                            start = lineStart,
+                            end = lineEnd,
+                        )
+                        else -> instantSyllables(mainText, lineStart, lineEnd)
+                    }
+                    // Sung over the same line, so it shows while the line does, smaller and under it.
+                    val backingLine = backing?.let { text ->
+                        val backingStart = if (revealWords) {
+                            (lineStart + revealDurationMs(mainText)).coerceAtMost(lineEnd - 1)
+                        } else {
+                            lineStart
+                        }
+                        KaraokeLine.AccompanimentKaraokeLine(
+                            syllables = if (revealWords) revealSyllables(text, backingStart, lineEnd)
+                            else instantSyllables(text, lineStart, lineEnd),
+                            translation = null,
+                            alignment = lineAlignment,
+                            start = lineStart,
+                            end = lineEnd,
+                            phonetic = null,
+                        )
+                    }
+                    lines.add(
+                        KaraokeLine.MainKaraokeLine(
+                            syllables = syllables,
+                            translation = cleanTranslation,
+                            alignment = lineAlignment,
+                            start = lineStart,
+                            end = lineEnd,
+                            phonetic = null,
+                            accompanimentLines = backingLine?.let(::listOf),
+                        )
+                    )
+                }
             }
         }
     }

@@ -319,6 +319,8 @@ class PlayerPreferences {
         private const val KEY_LYRICS_FULLSCREEN_LINE_BLUR = "lyrics_fullscreen_line_blur_enabled"
         private const val KEY_LYRICS_SIDEBAR_LINE_BLUR = "lyrics_sidebar_line_blur_enabled"
         private const val KEY_LYRICS_LRC_BOUNCE_ENABLED = "lyrics_lrc_bounce_enabled"
+        private const val KEY_LYRICS_SPLIT_BACKING_VOCALS = "lyrics_split_backing_vocals"
+        private const val KEY_LYRICS_REVEAL_WORDS = "lyrics_reveal_words"
         private const val KEY_LYRICS_BOUNCE_FACTOR = "lyrics_bounce_factor"
         private const val KEY_LYRICS_GLOW_FACTOR = "lyrics_glow_factor"
         private const val KEY_LYRICS_FILL_TRANSITION_WIDTH = "lyrics_fill_transition_width"
@@ -1046,6 +1048,14 @@ class PlayerPreferences {
     fun setLyricsSidebarLineBlurEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_SIDEBAR_LINE_BLUR, enabled)
 
     fun getLyricsLrcBounceEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, true)
+
+    /** Backing vocals in round brackets drawn as their own smaller line under the sung one. */
+    fun getLyricsSplitBackingVocals(): Boolean = Prefs.getBoolean(KEY_LYRICS_SPLIT_BACKING_VOCALS, true)
+    fun setLyricsSplitBackingVocals(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_SPLIT_BACKING_VOCALS, enabled)
+
+    /** Lines timed by the line only light up word by word as they start, instead of all at once. */
+    fun getLyricsRevealWords(): Boolean = Prefs.getBoolean(KEY_LYRICS_REVEAL_WORDS, false)
+    fun setLyricsRevealWords(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_REVEAL_WORDS, enabled)
     fun setLyricsLrcBounceEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, enabled)
 
     fun getLyricsBounceFactor(): Float = Prefs.getFloat(KEY_LYRICS_BOUNCE_FACTOR, 1.0f)
