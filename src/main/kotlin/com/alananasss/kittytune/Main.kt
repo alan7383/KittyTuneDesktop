@@ -348,29 +348,12 @@ fun main(args: Array<String>) {
                 isAppFullScreen = false
                 isRestoringFromFullScreen = true
                 try {
-                    // On Windows the window never left Compose's placement; WindowsFullScreen.exit restores
-                    // it natively from inside the window. Synchronize Compose's windowState cleanly so the
-                    // internal Skiko surface re-measures properly above the taskbar.
+                    // On Windows the window never left Compose's placement, and WindowsFullScreen.exit restores it
+                    // natively from inside the window (see below). Compose is told only after that, with what the
+                    // window already is. Setting it here as well raced the native restore: Compose shrank the
+                    // still borderless window to its floating size, or maximized it, before the frame came back,
+                    // and the window was seen going small and then big again (issue #66).
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
-                        val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
-                            ?: androidx.compose.ui.window.WindowPlacement.Floating
-                        if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
-                            windowState.placement = androidx.compose.ui.window.WindowPlacement.Maximized
-                        } else {
-                            windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
-                            val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
-                            val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                            val metrics = getScreenMetricsDp(null, reqX, reqY)
-                            val clamped = clampFloatingBounds(
-                                savedFloatingSize.width.value.toInt(),
-                                savedFloatingSize.height.value.toInt(),
-                                reqX,
-                                reqY,
-                                metrics.usableBoundsDp
-                            )
-                            windowState.size = DpSize(clamped.width.dp, clamped.height.dp)
-                            windowState.position = androidx.compose.ui.window.WindowPosition(clamped.x.dp, clamped.y.dp)
-                        }
                         kotlinx.coroutines.delay(300)
                         return@LaunchedEffect
                     }
@@ -579,6 +562,15 @@ fun main(args: Array<String>) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         javax.swing.SwingUtilities.invokeLater {
                             com.alananasss.kittytune.data.theme.WindowsFullScreen.exit(window, savedPlacement, clamped)
+                            // Now that the window is restored, Compose learns where it is. These match the window,
+                            // so applying them changes nothing on screen.
+                            if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                                windowState.placement = androidx.compose.ui.window.WindowPlacement.Maximized
+                            } else {
+                                windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                                windowState.size = DpSize(window.width.dp, window.height.dp)
+                                windowState.position = androidx.compose.ui.window.WindowPosition(window.x.dp, window.y.dp)
+                            }
                         }
                     } else {
                         runCatching {
