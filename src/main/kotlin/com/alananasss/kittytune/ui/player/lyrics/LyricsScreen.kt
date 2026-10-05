@@ -557,7 +557,7 @@ import kotlin.math.roundToInt
                                 // forget the offset that its own highlight applies.
                                 LyricsUtils.seekTargetFor(
                                     line = line,
-                                    lyricsOffsetMs = viewModel.lyricsOffset,
+                                    lyricsOffsetMs = viewModel.lyricsOffsetAtLyricTime(line.startTime),
                                     durationMs = viewModel.duration,
                                 )?.let(viewModel::seekTo)
                             }

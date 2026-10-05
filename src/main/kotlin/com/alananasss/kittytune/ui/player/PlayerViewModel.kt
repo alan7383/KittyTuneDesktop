@@ -818,8 +818,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     var lyricsMode by mutableStateOf(LyricsMode.SYNCED)
     var rawPlainLyrics by mutableStateOf<String?>(null)
-    var lyricsOffset by mutableLongStateOf(0L)
+    /** How the lyrics are shifted against the audio, one offset or two points (see [LyricsSync]). */
+    var lyricsSync by mutableStateOf(com.alananasss.kittytune.data.LyricsSync.NONE)
         private set
+
+    /** The lyrics offset at the playhead: what to add to [currentPosition] to get the lyrics' time. */
+    val lyricsOffset: Long get() = lyricsSync.offsetAt(currentPosition)
+
+    /** The offset that applies where the lyrics reach [lyricTimeMs], for seeking to a line. */
+    fun lyricsOffsetAtLyricTime(lyricTimeMs: Long): Long =
+        lyricTimeMs - lyricsSync.audioPositionFor(lyricTimeMs)
     var showLyricsOffsetControls by mutableStateOf(false)
 
     var rightPanelWidth by mutableFloatStateOf(playerPrefs.getRightPanelWidth())
@@ -1995,18 +2003,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private fun loadLyrics(track: Track) {
         lyricsJob?.cancel()
         lyricsLines.clear()
-        lyricsOffset = 0L
+        lyricsSync = com.alananasss.kittytune.data.LyricsSync.NONE
         // Cleared before it is read, so a track with no speed of its own cannot inherit the last
         // track's for the moment it takes to answer.
         trackAutoScrollSpeed = null
         viewModelScope.launch(Dispatchers.IO) {
             val speed = com.alananasss.kittytune.data.LyricsScrollSpeedRepository.get(track.id)
-            val offset = com.alananasss.kittytune.data.LyricsOffsetRepository.get(track.id)
+            val sync = com.alananasss.kittytune.data.LyricsOffsetRepository.get(track.id)
             withContext(Dispatchers.Main) {
                 // Only if we are still on the track that asked.
                 if (currentTrack?.id == track.id) {
                     trackAutoScrollSpeed = speed
-                    lyricsOffset = offset
+                    lyricsSync = sync
                 }
             }
         }
@@ -2436,23 +2444,40 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         currentTrack?.let { loadLyrics(it) }
     }
 
+    /** Nudges the offset here: the single one, or with two points the one nearer the playhead. */
     fun adjustLyricsOffset(amount: Long) {
-        updateLyricsOffset(lyricsOffset + amount)
+        updateLyricsSync(lyricsSync.adjustedAt(currentPosition, amount))
     }
 
     fun resetLyricsOffset() {
-        updateLyricsOffset(0L)
+        updateLyricsSync(com.alananasss.kittytune.data.LyricsSync.NONE)
     }
 
-    fun updateLyricsOffset(offset: Long) {
-        lyricsOffset = offset
+    /** Puts the first sync point at the playhead, keeping the offset the lyrics have there. */
+    fun pinLyricsSyncStart() {
+        updateLyricsSync(lyricsSync.withStartAt(currentPosition))
+    }
+
+    /**
+     * Puts the second sync point at the playhead. Returns false, changing nothing, when it is too close to the
+     * first one or the two would make the lyrics drift implausibly fast.
+     */
+    fun pinLyricsSyncEnd(): Boolean {
+        val pinned = lyricsSync.withEndAt(currentPosition) ?: return false
+        updateLyricsSync(pinned)
+        return true
+    }
+
+    /** Back to a single offset, the one the lyrics have at the playhead. */
+    fun clearLyricsSyncEnd() {
+        updateLyricsSync(lyricsSync.singleAt(currentPosition))
+    }
+
+    private fun updateLyricsSync(sync: com.alananasss.kittytune.data.LyricsSync) {
+        lyricsSync = sync
         val trackId = currentTrack?.id ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            if (offset == 0L) {
-                com.alananasss.kittytune.data.LyricsOffsetRepository.remove(trackId)
-            } else {
-                com.alananasss.kittytune.data.LyricsOffsetRepository.put(trackId, offset)
-            }
+            com.alananasss.kittytune.data.LyricsOffsetRepository.put(trackId, sync)
         }
     }
 

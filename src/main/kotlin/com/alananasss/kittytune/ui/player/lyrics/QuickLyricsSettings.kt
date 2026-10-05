@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignLeft
 import androidx.compose.material.icons.automirrored.rounded.FormatAlignRight
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -38,6 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -231,7 +233,99 @@ private fun SyncCard(viewModel: PlayerViewModel) {
                 }
             }
         }
+        Spacer(Modifier.height(14.dp))
+        DriftSync(viewModel)
     }
+}
+
+/**
+ * Two points for lyrics that drift apart over the song (issue #66): synced at the start, seconds off by the end.
+ *
+ * Pinning keeps whatever offset the lyrics have at that moment, so the steps are the natural ones: sync the start
+ * with the buttons above and pin it, go near the end, pin it, sync it there. Between the points the offset moves
+ * evenly. Once both are set, the buttons above change the point nearer to where you are, so fixing the end later
+ * does not undo the start.
+ */
+@Composable
+private fun DriftSync(viewModel: PlayerViewModel) {
+    val sync = viewModel.lyricsSync
+    val format = { ms: Long -> (if (ms > 0) "+" else "") + String.format("%.1f s", ms / 1000f) }
+    Text(
+        str("lyrics_sync_drift_title"),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Spacer(Modifier.height(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        val startSet = sync.isTwoPoint || sync.anchorMs > 0L
+        OutlinedButton(
+            onClick = { viewModel.pinLyricsSyncStart() },
+            shapes = ButtonDefaults.shapes(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(Icons.Rounded.PushPin, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                if (startSet) str("lyrics_sync_point_start", com.alananasss.kittytune.utils.makeTimeString(sync.anchorMs))
+                else str("lyrics_sync_pin_start"),
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
+        }
+        val endAt = sync.endAtMs
+        val tooClose = str("lyrics_sync_end_too_close")
+        if (endAt != null) {
+            Button(
+                onClick = { if (!viewModel.pinLyricsSyncEnd()) com.alananasss.kittytune.core.Toaster.show(tooClose) },
+                shapes = ButtonDefaults.shapes(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Rounded.PushPin, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    str("lyrics_sync_point_end", com.alananasss.kittytune.utils.makeTimeString(endAt)),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+            }
+        } else {
+            OutlinedButton(
+                onClick = { if (!viewModel.pinLyricsSyncEnd()) com.alananasss.kittytune.core.Toaster.show(tooClose) },
+                shapes = ButtonDefaults.shapes(),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(Icons.Rounded.PushPin, null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(str("lyrics_sync_pin_end"), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            }
+        }
+        AnimatedVisibility(sync.isTwoPoint) {
+            com.alananasss.kittytune.ui.common.Tip(str("lyrics_sync_single")) {
+                IconButton(onClick = { viewModel.clearLyricsSyncEnd() }, shapes = IconButtonDefaults.shapes()) {
+                    Icon(Icons.Rounded.Close, str("lyrics_sync_single"))
+                }
+            }
+        }
+    }
+    Spacer(Modifier.height(6.dp))
+    Text(
+        text = if (sync.isTwoPoint) {
+            str(
+                "lyrics_sync_drift_active",
+                format(sync.offsetMs),
+                com.alananasss.kittytune.utils.makeTimeString(sync.anchorMs),
+                format(sync.endOffsetMs ?: 0L),
+                com.alananasss.kittytune.utils.makeTimeString(sync.endAtMs ?: 0L),
+            )
+        } else {
+            str("lyrics_sync_drift_hint")
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────

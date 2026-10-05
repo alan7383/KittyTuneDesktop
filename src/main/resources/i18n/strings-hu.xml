@@ -1017,6 +1017,15 @@
     <string name="lyrics_no_data">Nincs dalszöveg</string>
     <string name="lyrics_search_hint">Keresés&#8230;</string>
     <string name="lyrics_sync">Szinkron</string>
+    <string name="lyrics_sync_drift_title">A végére elcsúszik a szöveg?</string>
+    <string name="lyrics_sync_pin_start">Kezdet itt</string>
+    <string name="lyrics_sync_pin_end">Vég itt</string>
+    <string name="lyrics_sync_point_start">Kezdet %1$s</string>
+    <string name="lyrics_sync_point_end">Vég %1$s</string>
+    <string name="lyrics_sync_single">Vissza egy eltolásra</string>
+    <string name="lyrics_sync_drift_hint">Szinkronizálja és rögzítse a kezdetet, majd rögzítsen egy pontot a vége felé, és ott szinkronizáljon. Köztük az eltolás egyenletesen változik.</string>
+    <string name="lyrics_sync_drift_active">%1$s itt: %2$s, %3$s itt: %4$s, köztük egyenletesen. A fenti gombok a közelebbi pontot módosítják.</string>
+    <string name="lyrics_sync_end_too_close">A vég legalább 20 másodperccel a kezdet után legyen</string>
     <string name="lyrics_wrong">Hibás szöveg?</string>
     <string name="me_artist">Én</string>
     <string name="menu_add_playlist">Hozzáadás playlisthez</string>

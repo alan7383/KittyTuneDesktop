@@ -595,6 +595,15 @@
     <string name="lyrics_mode_plain">Einfach</string>
     <string name="lyrics_copy_text">Text kopieren</string>
     <string name="lyrics_sync">Synchro</string>
+    <string name="lyrics_sync_drift_title">Läuft der Text zum Ende hin auseinander?</string>
+    <string name="lyrics_sync_pin_start">Anfang hier</string>
+    <string name="lyrics_sync_pin_end">Ende hier</string>
+    <string name="lyrics_sync_point_start">Anfang %1$s</string>
+    <string name="lyrics_sync_point_end">Ende %1$s</string>
+    <string name="lyrics_sync_single">Zurück zu einem Versatz</string>
+    <string name="lyrics_sync_drift_hint">Den Anfang synchronisieren und anheften, dann einen Punkt gegen Ende anheften und dort synchronisieren. Dazwischen ändert sich der Versatz gleichmäßig.</string>
+    <string name="lyrics_sync_drift_active">%1$s bei %2$s, %3$s bei %4$s, gleichmäßig dazwischen. Die Tasten oben ändern den näheren Punkt.</string>
+    <string name="lyrics_sync_end_too_close">Das Ende muss mindestens 20 Sekunden nach dem Anfang liegen</string>
 
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
     <!-- MENUS & CONTEXT                                                                  -->
