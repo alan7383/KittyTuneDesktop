@@ -1146,6 +1146,24 @@
 
     <!-- MUSIC IMPORT (Transfer your gems) -->
     <string name="music_import_title">Übertrage deine Schätze</string>
+    <string name="vk_import_title">Aus VK Musik importieren</string>
+    <string name="vk_import_sub">Link zu einer Playlist oder einem Album einfügen</string>
+    <string name="vk_import_hint">Link zu einer VK-Playlist</string>
+    <string name="vk_import_paste">Einfügen</string>
+    <string name="vk_import_load">Suchen</string>
+    <string name="vk_import_note">Titel werden auf SoundCloud und YouTube Music nach Titel, Künstler und Länge gesucht. Keine VK-Anmeldung nötig.</string>
+    <string name="vk_import_not_vk">Das ist kein VK-Link.</string>
+    <string name="vk_import_not_playlist">Dieser Link enthält keine Playlist. Öffne die Playlist in VK und kopiere ihren Link.</string>
+    <string name="vk_import_private">VK öffnet diese Playlist nicht: Sie ist privat oder der Link hat keinen Zugriffsschlüssel. Tippe in VK auf Teilen, dann Link kopieren, und füge ihn hier ein.</string>
+    <string name="vk_import_empty">Diese Playlist ist leer.</string>
+    <string name="vk_import_failed">VK ist nicht erreichbar: %1$s</string>
+    <string name="vk_import_tracks">%1$d Titel</string>
+    <string name="vk_import_start">Playlist importieren</string>
+    <string name="vk_import_progress">Titel werden gesucht: %1$d von %2$d · %3$d gefunden</string>
+    <string name="vk_import_done">Fertig: %1$d von %2$d Titeln in der Playlist „%3$s“</string>
+    <string name="vk_import_missing">Nicht gefunden (%1$d)</string>
+    <string name="vk_import_open">Playlist öffnen</string>
+    <string name="vk_import_another">Weitere importieren</string>
     <string name="music_import_settings_subtitle">Playlists und Likes von einer anderen Musikplattform importieren</string>
     <string name="music_import_subtitle">Übertrage deine Playlists und gelikten Songs von einem anderen Musikdienst zu SoundCloud.</string>
     <string name="music_import_platforms_header">Wähle deine Musikplattform</string>
@@ -2738,6 +2756,7 @@
     <string name="lib_view_grid">Raster</string>
     <string name="lib_view_list">Liste</string>
     <string name="lib_view_mode">Ansichtsmodus</string>
+    <string name="lib_menu_show">Anzeigen</string>
     <string name="listening_stats_all_artists">Alle Künstler</string>
     <string name="listening_stats_all_plays">Alle Wiedergaben</string>
     <string name="listening_stats_all_tracks">Alle Titel</string>
@@ -2756,7 +2775,6 @@
     <string name="lyrics_fullscreen">Vollbild</string>
     <string name="lyrics_style_focus">Fokus</string>
     <string name="lyrics_style_focus_sub">Die anderen Zeilen verblassen deutlich und werden leicht unscharf.</string>
-    <string name="lib_menu_show">Anzeigen</string>
     <string name="lyrics_style_scale">Skalieren</string>
     <string name="lyrics_style_scale_focus">Skalieren + Fokus</string>
     <string name="lyrics_style_scale_focus_sub">Inaktive Zeilen verkleinern sich und werden gleichzeitig unscharf.</string>
@@ -3152,6 +3170,10 @@
     <string name="lyrics_mode_sidebar">Seitenleiste</string>
     <string name="lyrics_mode_sidebar_sub">Liedtext in der Wiedergabeleiste</string>
     <string name="lyrics_content_title">Inhalt</string>
+    <string name="lyrics_quick_tab_look">Aussehen</string>
+    <string name="lyrics_quick_tab_layout">Layout</string>
+    <string name="lyrics_quick_tab_features">Funktionen</string>
+    <string name="lyrics_quick_scrolling">Scrollen</string>
     <string name="settings_cat_sync">Geräte</string>
     <string name="listening_stats_period_week_short">Woche</string>
     <string name="listening_stats_period_month_short">Monat</string>
@@ -3171,10 +3193,6 @@
     <string name="listening_stats_active_days">Tage mit Musik: %1$d</string>
     <string name="listening_stats_since">%1$s – heute</string>
     <string name="zapret_sub">Sperren umgehen: KittyTune prüft, welche Dienste gesperrt sind, und trägt ihre Domains in die Benutzerliste von zapret ein.</string>
-    <string name="lyrics_quick_tab_look">Aussehen</string>
-    <string name="lyrics_quick_tab_layout">Layout</string>
-    <string name="lyrics_quick_tab_features">Funktionen</string>
-    <string name="lyrics_quick_scrolling">Scrollen</string>
     <string name="zapret_folder">Zapret-Ordner</string>
     <string name="zapret_folder_none">Nicht gewählt</string>
     <string name="zapret_detect">Finden</string>

@@ -19,6 +19,8 @@ class DownloadDao(private val db: AppDatabase) {
         localAudioPath = rs.getString("localAudioPath"),
         localArtworkPath = rs.getString("localArtworkPath"),
         downloadedAt = rs.getLong("downloadedAt"),
+        source = rs.getString("source"),
+        permalinkUrl = rs.getString("permalinkUrl"),
     )
 
     private fun playlist(rs: ResultSet) = LocalPlaylist(
@@ -141,13 +143,13 @@ class DownloadDao(private val db: AppDatabase) {
 
     // --- tracks ----------------------------------------------------------------------------
     suspend fun insertTrack(t: LocalTrack) = db.exec(
-        "INSERT OR IGNORE INTO downloaded_tracks(id,title,artist,artworkUrl,duration,localAudioPath,localArtworkPath,downloadedAt) VALUES(?,?,?,?,?,?,?,?)",
-        t.id, t.title, t.artist, t.artworkUrl, t.duration, t.localAudioPath, t.localArtworkPath, t.downloadedAt,
+        "INSERT OR IGNORE INTO downloaded_tracks(id,title,artist,artworkUrl,duration,localAudioPath,localArtworkPath,downloadedAt,source,permalinkUrl) VALUES(?,?,?,?,?,?,?,?,?,?)",
+        t.id, t.title, t.artist, t.artworkUrl, t.duration, t.localAudioPath, t.localArtworkPath, t.downloadedAt, t.source, t.permalinkUrl,
     )
 
     suspend fun updateTrack(t: LocalTrack) = db.exec(
-        "UPDATE downloaded_tracks SET title=?,artist=?,artworkUrl=?,duration=?,localAudioPath=?,localArtworkPath=?,downloadedAt=? WHERE id=?",
-        t.title, t.artist, t.artworkUrl, t.duration, t.localAudioPath, t.localArtworkPath, t.downloadedAt, t.id,
+        "UPDATE downloaded_tracks SET title=?,artist=?,artworkUrl=?,duration=?,localAudioPath=?,localArtworkPath=?,downloadedAt=?,source=?,permalinkUrl=? WHERE id=?",
+        t.title, t.artist, t.artworkUrl, t.duration, t.localAudioPath, t.localArtworkPath, t.downloadedAt, t.source, t.permalinkUrl, t.id,
     )
 
     suspend fun getTrack(trackId: Long): LocalTrack? =

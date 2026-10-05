@@ -26,6 +26,7 @@ fun MusicImportScreen(
     onPlatformSelected: (String) -> Unit,
     onAuthRequested: (String) -> Unit,
     onLoginClick: () -> Unit = {},
+    onOpenPlaylist: (Long) -> Unit = {},
     viewModel: MusicImportViewModel = viewModel { MusicImportViewModel(AppInstance.application) }
 ) {
     val isLoggedIn = TokenManager.hasAccessToken() && !TokenManager.isGuestMode()
@@ -64,6 +65,9 @@ fun MusicImportScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
+                    // VK needs no account of any kind, so it is offered before the SoundCloud login too.
+                    VkImportCard(onOpenPlaylist = onOpenPlaylist)
+                    Spacer(modifier = Modifier.height(32.dp))
                     Icon(
                         imageVector = Icons.Rounded.AccountCircle,
                         contentDescription = null,
@@ -98,6 +102,10 @@ fun MusicImportScreen(
                     hideScrollbar = true,
                     contentPadding = innerPadding
                 ) {
+                    VkImportCard(
+                        onOpenPlaylist = onOpenPlaylist,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
                     Text(
                         text = stringResource(R.string.music_import_subtitle),
                         style = MaterialTheme.typography.bodyMedium,

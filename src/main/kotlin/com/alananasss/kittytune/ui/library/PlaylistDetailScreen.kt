@@ -968,7 +968,9 @@ fun PlaylistDetailScreen(
                                 artworkUrl = local.localArtworkPath.ifEmpty { local.artworkUrl },
                                 durationMs = local.duration,
                                 user = User(0, local.artist, null),
-                                likedAt = addedAtMap[local.id]?.takeIf { it > 0 }
+                                likedAt = addedAtMap[local.id]?.takeIf { it > 0 },
+                                source = local.source ?: "soundcloud",
+                                permalinkUrl = local.permalinkUrl,
                             )
                         })
                     } else {
