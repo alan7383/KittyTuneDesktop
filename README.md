@@ -106,22 +106,8 @@ No heavy web wrappers or Electron bloat here. Just a fast, lightweight JVM clien
 <br>
 
 <p align="center">
-  <img src="images/lyrics_preview.gif" width="850" style="border-radius: 12px;" alt="Apple-Style Synchronized Lyrics">
+  <img src="images/lyrics_preview.gif" width="800" style="border-radius: 12px;" alt="Apple-Style Synchronized Lyrics">
   <br><em>synchronized lyrics — real-time karaoke tracking, accompanist animations, and duet singer split.</em>
-</p>
-
-<br>
-
-<p align="center">
-  <img src="images/effects_studio.png" width="850" style="border-radius: 12px;" alt="Audio FX Studio">
-  <br><em>audio fx studio — 30+ modular dsp effects, bass boost, 8d audio, and rain mixer.</em>
-</p>
-
-<br>
-
-<p align="center">
-  <img src="images/mini_player.png" width="750" style="border-radius: 12px;" alt="Mini Player">
-  <br><em>floating mini-player — transparent elongated bar with hover controls and live lyrics.</em>
 </p>
 
 <br>
