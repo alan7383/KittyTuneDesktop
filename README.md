@@ -192,7 +192,7 @@ pre-built binaries for linux, windows, and macos are available on the [**release
 #### **arch linux**
 
 ##### **option 1: aur (recommended)**
-the package [**`kitty-tune-bin`**](https://aur.archlinux.org/packages/kitty-tune-bin) is available on the Arch User Repository (AUR), maintained by [@Felitendo](https://github.com/Felitendo).
+the package [**`kitty-tune-bin`**](https://aur.archlinux.org/packages/kitty-tune-bin) is available on the Arch User Repository (AUR), maintained by [@Felitendo](https://git.felo.gg/Felitendo).
 
 install with **yay**:
 ```bash
@@ -205,7 +205,7 @@ paru -S kitty-tune-bin
 ```
 
 > [!NOTE]
-> The AUR package is maintained independently by Felitendo. As with any AUR package, you can inspect the [`PKGBUILD`](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=kitty-tune-bin) before installing.
+> The AUR package is maintained independently by [Felitendo](https://git.felo.gg/Felitendo). As with any AUR package, you can inspect the [`PKGBUILD`](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=kitty-tune-bin) before installing.
 
 ##### **option 2: official pacman package (`.pkg.tar.zst`)**
 download the latest `.pkg.tar.zst` archive directly from [**releases**](https://github.com/alan7383/KittyTuneDesktop/releases) and install via `pacman`:
