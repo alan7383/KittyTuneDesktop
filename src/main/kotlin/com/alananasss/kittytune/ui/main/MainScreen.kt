@@ -140,6 +140,8 @@ fun MainScreen(
         playerViewModel.navigateToPlaylistId?.let { destinationId ->
             val targetRoute = when {
                 destinationId == "history" -> "history"
+                destinationId == "home" -> "home"
+                destinationId == "charts" -> "charts"
                 destinationId == "upload" -> "upload"
                 destinationId == "recognition" -> "recognition"
                 destinationId == "recognition_history" -> "recognition_history"
