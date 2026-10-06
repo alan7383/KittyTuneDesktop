@@ -1,24 +1,21 @@
 <p align="center">
-  <img src="scratch/banner_real_kittytune_font.png" width="100%" alt="KittyTune Desktop Banner">
-</p>
-
-<h1 align="center">KittyTune Desktop (・∀・)ﾉ</h1>
-
-<p align="center">
-  <a href="https://github.com/alan7383/KittyTuneDesktop/releases">
-    <img src="https://img.shields.io/github/v/tag/alan7383/KittyTuneDesktop?style=for-the-badge&logo=github&color=orange" alt="Release">
-  </a>
-  <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin Badge">
-  <img src="https://img.shields.io/badge/Compose_Desktop-1.12.0-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose Desktop Badge">
-  <img src="https://img.shields.io/badge/Linux_(Primary)_|_Win_|_macOS-000000?style=for-the-badge&logo=linux&logoColor=white" alt="Platform Badge">
-  <a href="https://github.com/alan7383/KittyTuneDesktop/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/alan7383/KittyTuneDesktop?style=for-the-badge&logo=github" alt="License">
-  </a>
+  <a href="https://alan7383.github.io/kittytune-website/download" title="Download KittyTune"><img src="images/banner.png" alt="KittyTune Desktop - click to download"></a>
 </p>
 
 <p align="center">
-  <strong>A lightweight, native desktop music player for Linux, Windows, and macOS.</strong><br>
-  SoundCloud-first streaming with full account sync, lossless upgrades (Qobuz, TIDAL, Deezer), Apple-style karaoke lyrics, DJ Automix & a 30+ audio effects studio.
+  <a href="https://github.com/alan7383/KittyTuneDesktop/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-gray?style=for-the-badge&logo=github" alt="License"></a>
+  <a href="https://github.com/alan7383/KittyTuneDesktop/releases"><img src="https://img.shields.io/github/v/tag/alan7383/KittyTuneDesktop?style=for-the-badge&label=Release&color=gray&logo=github" alt="Release"></a>
+  <a href="https://github.com/alan7383/KittyTuneDesktop/stargazers"><img src="https://img.shields.io/github/stars/alan7383/KittyTuneDesktop?style=for-the-badge&label=Stars&color=gray&logo=github" alt="Stars"></a>
+  <a href="https://ko-fi.com/alan7383"><img src="https://img.shields.io/badge/Ko--fi-gray?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://discord.gg/thyHQH9jV9"><img src="https://img.shields.io/badge/Discord-gray?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+<p align="center">
+  <a href="https://alan7383.github.io/kittytune-website/download" title="Download KittyTune"><img src=".github/assets/download-kittytune.svg" alt="Download KittyTune" width="240"/></a>
+</p>
+
+<p align="center">
+  <sub>[!] <b>KittyTune Desktop is in active beta</b> - some features may be incomplete. Found a bug? Feel free to <a href="https://github.com/alan7383/KittyTuneDesktop/issues">open an issue</a>!</sub><br/>
+  <sub>[&gt;] <b>Looking for Android?</b> KittyTune is also available for <b>Android</b> on <a href="https://github.com/alan7383/kittytune"><b>KittyTune</b></a>.</sub>
 </p>
 
 ---
