@@ -83,4 +83,11 @@ class LyricsSearchInputTest {
         val merged = ManualLyricsSearch.merge(listOf(stranger), listOf(right), target)
         assertEquals("1", merged.first().id)
     }
+
+    @Test
+    fun `run-together words and hyphens get spaced variants`() {
+        val variants = LyricsMatcher.queryVariants("NEWYORK 9mice", "9mice - New-York")
+        assertTrue("NEW YORK 9mice".lowercase() in variants.map { it.lowercase() }, "variants were $variants")
+        assertTrue("New York 9mice" in LyricsMatcher.queryVariants("New-York 9mice", "x"))
+    }
 }

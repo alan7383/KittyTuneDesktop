@@ -67,6 +67,9 @@ enum class CommentSort(
 
 enum class LyricsMode { SYNCED, PLAIN }
 
+/** How long a lyrics source gets before the others are judged without it. */
+private const val LYRICS_SOURCE_TIMEOUT_MS = 7_000L
+
 /** How long after a seek the automix waits before it may start a mix. */
 private const val MIX_AFTER_SEEK_MS = 2_000L
 
@@ -1956,6 +1959,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             if (rawArtist != uploaderArtist && rawArtist != parsedArtist) withArtist(parsedTitle, rawArtist)
         }
 
+        // Each query again with its hyphens spaced: "New-York" is two words to LrcLib's search.
+        queries.toList().forEach { q ->
+            val spaced = q.replace(Regex("""[-–—]+"""), " ").replace(Regex("""\s+"""), " ").trim()
+            if (spaced != q) queries.add(spaced)
+        }
+
         return queries.filter { it.length > 2 }.toList()
     }
 
@@ -2300,50 +2309,63 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             .filter { playerPrefs.getLyricsProviderEnabled(it) }
             .ifEmpty { DefaultLyricsProviderOrder }
 
-        var best: LyricsCandidate? = null
-
-        for (providerId in orderedProviders) {
-            if (!isActive) return@coroutineScope null
-
-            val candidate = when (providerId) {
-                PreferredLyricsProvider.MUSIXMATCH -> {
-                    val query = queries.firstOrNull() ?: "${target.title} ${target.artist}".trim()
-                    searchMusixmatchCandidates(query, target, trackDurationMs, variant).firstOrNull()
+        // Every source is asked at once, and the best answer wins: word timings, then line timings, then plain
+        // text, among results that are about this song. Asked one after another and stopped at the first usable
+        // answer, a plain text from the first source beat line-timed lyrics from the fifth (issue #66).
+        suspend fun candidateFrom(providerId: PreferredLyricsProvider): LyricsCandidate? {
+        return when (providerId) {
+            PreferredLyricsProvider.MUSIXMATCH -> {
+                val query = queries.firstOrNull() ?: "${target.title} ${target.artist}".trim()
+                var found: LyricsCandidate? = null
+                for (spelling in LyricsMatcher.queryVariants(query, track.title.orEmpty())) {
+                    found = searchMusixmatchCandidates(spelling, target, trackDurationMs, variant).firstOrNull()
+                    if (found != null) break
                 }
-                PreferredLyricsProvider.LRCLIB -> {
-                    // The whole title first, then each song of a two-song title on its own.
-                    val lrcLibQueries = (listOfNotNull(queries.firstOrNull()) +
-                        LyricsMatcher.titleParts(target.title).map { "$it ${target.artist}".trim() })
-                        .ifEmpty { listOf("${target.title} ${target.artist}".trim()) }
-                    var found: LyricsCandidate? = null
-                    for (query in lrcLibQueries) {
-                        found = searchLrcLibCandidates(query, target, trackDurationMs)
-                            .filter { it.isUsable }
-                            .maxByOrNull { it.rank }
-                        if (found != null) break
-                    }
-                    found
-                }
-                PreferredLyricsProvider.GENIUS -> {
-                    null
-                }
-                else -> {
-                    searchGenericProviderCandidate(
-                        prefProvider = providerId,
-                        target = target,
-                        trackDurationMs = trackDurationMs,
-                        trackId = track.id.toString(),
-                        albumTitle = track.publisherMetadata?.albumTitle,
-                    )
-                }
+                found
             }
-
-            if (candidate != null && candidate.isUsable) {
-                best = candidate
-                break
+            PreferredLyricsProvider.LRCLIB -> {
+                // The whole title first, then each song of a two-song title on its own.
+                val lrcLibQueries = (queries.firstOrNull()?.let { LyricsMatcher.queryVariants(it, track.title.orEmpty()) }.orEmpty() +
+                    LyricsMatcher.titleParts(target.title).map { "$it ${target.artist}".trim() })
+                    .ifEmpty { listOf("${target.title} ${target.artist}".trim()) }
+                var found: LyricsCandidate? = null
+                for (query in lrcLibQueries) {
+                    found = searchLrcLibCandidates(query, target, trackDurationMs)
+                        .filter { it.isUsable }
+                        .maxByOrNull { it.rank }
+                    if (found != null) break
+                }
+                found
+            }
+            PreferredLyricsProvider.GENIUS -> {
+                null
+            }
+            else -> {
+                searchGenericProviderCandidate(
+                    prefProvider = providerId,
+                    target = target,
+                    trackDurationMs = trackDurationMs,
+                    trackId = track.id.toString(),
+                    albumTitle = track.publisherMetadata?.albumTitle,
+                )
             }
         }
+        }
 
+        val answers = orderedProviders.map { providerId ->
+            async(Dispatchers.IO) {
+                withTimeoutOrNull(LYRICS_SOURCE_TIMEOUT_MS) { runCatching { candidateFrom(providerId) }.getOrNull() }
+            }
+        }.awaitAll()
+        val preferred = orderedProviders.withIndex().associate { (i, p) -> p to i }
+        var best: LyricsCandidate? = answers.withIndex()
+            .mapNotNull { (i, c) -> c?.takeIf { it.isUsable }?.let { i to it } }
+            .maxWithOrNull(
+                compareBy<Pair<Int, LyricsCandidate>> { (_, c) -> if (c.matchScore >= LyricsMatcher.CONFIDENT_MATCH) 1 else 0 }
+                    .thenBy { (_, c) -> c.syncTier }
+                    .thenBy { (_, c) -> c.rank }
+                    .thenByDescending { (i, _) -> i }
+            )?.second
 
         if (best == null && playerPrefs.getLyricsProviderEnabled(PreferredLyricsProvider.GENIUS)) {
             best = searchGeniusCandidate(queries, target)
@@ -2670,6 +2692,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val effectiveArtist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
         val searchTrack = LyricsSearchTrack(
             id = track.id.toString(),
+            title = track.title.orEmpty(),
             artist = effectiveArtist.trim(),
             album = track.publisherMetadata?.albumTitle,
             durationMs = track.durationMs ?: 0L,
