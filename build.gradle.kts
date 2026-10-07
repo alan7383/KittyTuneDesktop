@@ -8,7 +8,10 @@ plugins {
 }
 
 group = "com.alananasss"
-version = "1.4.1"
+version = "1.4.10"
+
+// Each version has its own package directory, so a build cannot overwrite a running release.
+val desktopDistributionDirectory = layout.buildDirectory.dir("compose/binaries/${project.version}")
 
 repositories {
     google()
@@ -53,6 +56,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("org.java-websocket:Java-WebSocket:1.6.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
 
     val ktorVersion = "3.6.0"
@@ -222,6 +226,7 @@ compose.desktop {
         }
 
         nativeDistributions {
+            outputBaseDir.set(desktopDistributionDirectory)
             targetFormats(
                 TargetFormat.Dmg,
                 TargetFormat.Msi,
@@ -318,15 +323,15 @@ java {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     compilerOptions.freeCompilerArgs.addAll("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api", "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
-    // Compose stability diagnostics for the perf issue: which composables the compiler
-    // could NOT make skippable (recomposition risk). Reports land in build/compose-*.
-    // See build/compose-reports/<module>-compose-metrics.txt after compiling.
-    val composeMetricsDir = layout.buildDirectory.dir("compose-metrics").get().asFile.apply { mkdirs() }
-    val composeReportsDir = layout.buildDirectory.dir("compose-reports").get().asFile.apply { mkdirs() }
-    compilerOptions.freeCompilerArgs.addAll(
-        "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${composeMetricsDir.absolutePath}",
-        "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${composeReportsDir.absolutePath}"
-    )
+    // Diagnostic reports are opt-in. The upstream raw metrics compiler arguments
+    // fail with an invalid filename on Windows in this Kotlin/Gradle combination.
+}
+
+composeCompiler {
+    if (providers.gradleProperty("composeReports").orNull == "true") {
+        reportsDestination.set(layout.buildDirectory.dir("compose-reports"))
+        metricsDestination.set(layout.buildDirectory.dir("compose-metrics"))
+    }
 }
 
 // Auto-generate BuildConfig.kt from the project version so it's always in sync.
@@ -355,7 +360,7 @@ tasks.named("compileKotlin") { dependsOn(generateBuildConfig) }
 
 val compileNativeDSP by tasks.registering(Exec::class) {
     val cppDir = project.file("src/main/cpp")
-    val outDir = project.file("src/main/resources/native")
+    val outDir = layout.buildDirectory.dir("generated/native-resources/native").get().asFile
     
     doFirst { outDir.mkdirs() }
     
@@ -368,19 +373,66 @@ val compileNativeDSP by tasks.registering(Exec::class) {
     val outFile = File(outDir, "libkittytune_audio_dsp.$libExt")
     
     val javaHome = System.getProperty("java.home")
-    val compiler = if (isWin) "g++" else "g++" // assuming MSYS2 or MinGW on Windows, or just gcc/clang
-    
-    commandLine(
-        compiler, "-shared", "-fPIC", "-O3",
-        "-I$javaHome/include",
-        "-I$javaHome/include/$osIncludeDir",
-        "-I${File(cppDir, "ebur128/queue").absolutePath}",
-        File(cppDir, "KittyTuneAudioDSP.cpp").absolutePath,
-        File(cppDir, "ebur128/ebur128.c").absolutePath,
-        "-o", outFile.absolutePath
-    )
+    inputs.dir(cppDir)
+    inputs.file("scripts/build-native-windows.ps1")
+    inputs.property("javaHome", javaHome)
+    outputs.file(outFile)
+    if (isWin) {
+        commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+            "-File", project.file("scripts/build-native-windows.ps1").absolutePath,
+            "-JavaHome", javaHome, "-OutputDirectory", outDir.absolutePath)
+    } else {
+        commandLine(
+            "g++", "-shared", "-fPIC", "-O3",
+            "-I$javaHome/include", "-I$javaHome/include/$osIncludeDir",
+            "-I${File(cppDir, "ebur128/queue").absolutePath}",
+            File(cppDir, "KittyTuneAudioDSP.cpp").absolutePath,
+            File(cppDir, "ebur128/ebur128.c").absolutePath,
+            "-o", outFile.absolutePath
+        )
+    }
 }
 
-tasks.named("processResources") {
+tasks.named<ProcessResources>("processResources") {
     dependsOn(compileNativeDSP)
+    from(layout.buildDirectory.dir("generated/native-resources")) {
+        include("native/*.dll", "native/*.so", "native/*.dylib")
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Background-only checks: no windows, tray, media keys, or real user profile.
+tasks.register<Test>("headlessTest") {
+    description = "Runs deterministic desktop regressions without opening windows or playing sound."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("java.awt.headless", "true")
+    val profile = layout.buildDirectory.dir("test-profile").get().asFile
+    systemProperty("user.home", File(profile, "home").absolutePath)
+    environment("APPDATA", File(profile, "roaming").absolutePath)
+    environment("LOCALAPPDATA", File(profile, "local").absolutePath)
+    systemProperty("java.io.tmpdir", File(profile, "tmp").absolutePath)
+    doFirst { listOf("home", "roaming", "local", "tmp").forEach { File(profile, it).mkdirs() } }
+    maxHeapSize = "768m"
+    maxParallelForks = 1
+    filter {
+        listOf("SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
+            "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
+            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "SyncPlaybackTest", "ConnectWireTest", "ConnectSocketListenerTest", "ConnectHandoffTest",
+            "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
+            "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest"
+        ).forEach(::includeTestsMatching)
+    }
+}
+
+tasks.register<Zip>("zipWindowsPortable") {
+    description = "Packages a Windows app including its Java runtime; no installer or system Java needed."
+    group = "distribution"
+    dependsOn("createReleaseDistributable")
+    from(desktopDistributionDirectory.map { it.dir("main-release/app") })
+    destinationDirectory.set(layout.projectDirectory.dir("release"))
+    archiveFileName.set("KittyTune-${project.version}-Windows-Portable-x64.zip")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
 }

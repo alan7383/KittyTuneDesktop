@@ -563,6 +563,15 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
         destroyNative()
     }
 
+    /** Release the JNI analyser when its audio engine is discarded. Late PCM calls
+     * fall back to copying input after this; nativeLock prevents a use-after-free. */
+    fun release() {
+        synchronized(nativeLock) {
+            enabled = false
+            destroyNative()
+        }
+    }
+
     override fun queueInput(inputBuffer: ByteBuffer) {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return

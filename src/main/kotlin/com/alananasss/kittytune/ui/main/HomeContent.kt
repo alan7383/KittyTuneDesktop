@@ -2513,7 +2513,7 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
     val currentStation = stations.getOrElse(selectedStationIndex) { stations.first() }
 
     val isMixActive = playerViewModel.isYourMixActive
-    val isMixPlaying = isMixActive && playerViewModel.isPlaying
+    val isMixPlaying = isMixActive && playerViewModel.uiIsPlaying
 
     fun start(recipe: com.alananasss.kittytune.data.mix.MixEngine.Recipe) {
         if (state is MixState.Building) return

@@ -344,7 +344,7 @@ private fun ArtistPickerRow(
 
 @Composable
 private fun MenuSheetContent(viewModel: PlayerViewModel) {
-    val track = viewModel.trackForMenu ?: viewModel.currentTrack ?: return
+    val track = viewModel.trackForMenu ?: viewModel.uiCurrentTrack ?: return
     val downloadProgress by DownloadManager.downloadProgress.collectAsState()
     val storageTrigger by DownloadManager.storageTrigger.collectAsState()
     val likedTracks by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
@@ -451,20 +451,20 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                         id = "shuffle",
                         icon = Icons.Rounded.Shuffle,
                         text = str("menu_shuffle"),
-                        tint = activeColor.takeIf { viewModel.shuffleEnabled },
+                        tint = activeColor.takeIf { viewModel.uiShuffleEnabled },
                     ) { viewModel.toggleShuffle() }
                 )
                 add(
                     MenuOptionItem(
                         id = "repeat",
-                        icon = if (viewModel.repeatMode == RepeatMode.ONE) Icons.Rounded.RepeatOne
+                        icon = if (viewModel.uiRepeatMode == RepeatMode.ONE) Icons.Rounded.RepeatOne
                         else Icons.Rounded.Repeat,
-                        text = when (viewModel.repeatMode) {
+                        text = when (viewModel.uiRepeatMode) {
                             RepeatMode.ALL -> str("menu_repeat_all")
                             RepeatMode.ONE -> str("menu_repeat_one")
                             else -> str("menu_repeat")
                         },
-                        tint = activeColor.takeIf { viewModel.repeatMode != RepeatMode.NONE },
+                        tint = activeColor.takeIf { viewModel.uiRepeatMode != RepeatMode.NONE },
                     ) { viewModel.toggleRepeatMode() }
                 )
             }
@@ -1151,7 +1151,7 @@ internal suspend fun loadPlaylistTracksForMenu(
 
 @Composable
 private fun CommentsSheetContent(viewModel: PlayerViewModel) {
-    val track = viewModel.selectedTrackForSheet ?: viewModel.trackForMenu ?: viewModel.currentTrack
+    val track = viewModel.selectedTrackForSheet ?: viewModel.trackForMenu ?: viewModel.uiCurrentTrack
     var newCommentText by remember { mutableStateOf("") }
     val isPosting = viewModel.isPostingComment
 

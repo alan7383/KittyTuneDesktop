@@ -731,7 +731,7 @@ fun ModernProfileHeader(
                 if (showVideo && !artistVideoUrl.isNullOrBlank()) {
                     CanvasVideo(
                         canvasUrl = artistVideoUrl,
-                        isPlaying = playerViewModel.isPlaying,
+                        isPlaying = playerViewModel.uiIsPlaying,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -1292,7 +1292,7 @@ fun FullListScreen(
 
                     com.alananasss.kittytune.ui.library.TrackTableItem(
                         track = track,
-                        currentlyPlayingTrack = playerViewModel.currentTrack,
+                        currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
                         index = index,
                         isDownloading = isDownloading,
                         isDownloaded = isDownloaded,
@@ -1344,7 +1344,7 @@ fun ProfileTrackItem(
 
     com.alananasss.kittytune.ui.library.TrackTableItem(
         track = track,
-        currentlyPlayingTrack = playerViewModel.currentTrack,
+        currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
         index = index,
         isDownloading = isDownloading,
         isDownloaded = isDownloaded,

@@ -39,7 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
+import com.alananasss.kittytune.ui.theme.withUiScale
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -375,10 +375,7 @@ fun MiniLyricsPlayerWindow(
         val density = LocalDensity.current
         val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
         val customDensity = remember(density, uiScale) {
-            Density(
-                density = density.density * uiScale,
-                fontScale = density.fontScale * uiScale
-            )
+            density.withUiScale(uiScale)
         }
 
         // Exact physical pixel limits for window sizing and OS window manager hints
@@ -839,10 +836,10 @@ private fun MiniLyricsContent(
     transparentBg: Boolean = false,
     isDragging: Boolean = false,
 ) {
-    val track = viewModel.currentTrack
-    val isPlaying = viewModel.isPlaying
+    val track = viewModel.uiCurrentTrack
+    val isPlaying = viewModel.uiIsPlaying
     val lyrics = viewModel.lyricsLines
-    val rawPosition = viewModel.currentPosition
+    val rawPosition = viewModel.uiCurrentPosition
     val smoothPosition = com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition(
         positionMs = rawPosition,
         isPlaying = isPlaying,
@@ -983,9 +980,9 @@ private fun MiniLyricsContent(
                                     shapes = IconButtonDefaults.shapes()
                                 ) {
                                     Icon(
-                                        imageVector = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                        imageVector = if (viewModel.uiIsLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                                         contentDescription = "Like",
-                                        tint = if (viewModel.isLiked) MaterialTheme.colorScheme.primary
+                                        tint = if (viewModel.uiIsLiked) MaterialTheme.colorScheme.primary
                                                else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -1047,8 +1044,8 @@ private fun MiniLyricsContent(
         }
 
         // Progress bar along the bottom edge
-        if (showProgress && viewModel.duration > 0) {
-            val progress = (adjustedPosition / viewModel.duration).coerceIn(0f, 1f)
+        if (showProgress && viewModel.uiDuration > 0) {
+            val progress = (adjustedPosition / viewModel.uiDuration).coerceIn(0f, 1f)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -1085,10 +1082,10 @@ private fun MiniLyricsElongatedContent(
     transparentBg: Boolean = false,
     isDragging: Boolean = false,
 ) {
-    val track = viewModel.currentTrack
-    val isPlaying = viewModel.isPlaying
+    val track = viewModel.uiCurrentTrack
+    val isPlaying = viewModel.uiIsPlaying
     val lyrics = viewModel.lyricsLines
-    val rawPosition = viewModel.currentPosition
+    val rawPosition = viewModel.uiCurrentPosition
     val smoothPosition = com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition(
         positionMs = rawPosition,
         isPlaying = isPlaying,
@@ -1223,9 +1220,9 @@ private fun MiniLyricsElongatedContent(
                                 shapes = IconButtonDefaults.shapes()
                             ) {
                                 Icon(
-                                    imageVector = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                    imageVector = if (viewModel.uiIsLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                                     contentDescription = "Like",
-                                    tint = if (viewModel.isLiked) MaterialTheme.colorScheme.primary
+                                    tint = if (viewModel.uiIsLiked) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp)
                                 )
@@ -1286,8 +1283,8 @@ private fun MiniLyricsElongatedContent(
         }
 
         // Hairline progress bar along the bottom edge
-        if (showProgress && viewModel.duration > 0) {
-            val progress = (adjustedPosition / viewModel.duration).coerceIn(0f, 1f)
+        if (showProgress && viewModel.uiDuration > 0) {
+            val progress = (adjustedPosition / viewModel.uiDuration).coerceIn(0f, 1f)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier

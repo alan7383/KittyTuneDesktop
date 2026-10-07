@@ -2232,7 +2232,9 @@
     <string name="trim_field_start">Начало</string>
     <string name="trim_field_end">Конец</string>
     <string name="sync_title">Синхронизация устройств</string>
-    <string name="sync_intro">Ваши устройства обмениваются историей прослушивания напрямую по локальной сети. Ничего никуда не загружается, аккаунт не нужен.</string>
+    <string name="sync_intro">Ваши устройства обмениваются историей, избранным и состоянием плеера напрямую по локальной сети. Данные никуда не выгружаются, аккаунт не нужен.</string>
+    <string name="sync_playback_title">Очередь и позиция воспроизведения</string>
+    <string name="sync_playback_sub">Продолжать последний трек и очередь при открытии другого устройства</string>
     <string name="sync_this_device">Это устройство</string>
     <string name="sync_device_name">Имя</string>
     <string name="sync_listener">Принимать подключения</string>

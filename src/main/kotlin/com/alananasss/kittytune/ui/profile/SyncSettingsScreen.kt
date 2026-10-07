@@ -51,6 +51,7 @@ import com.alananasss.kittytune.data.sync.SyncClient
 import com.alananasss.kittytune.data.sync.SyncDiscovery
 import com.alananasss.kittytune.data.sync.SyncLog
 import com.alananasss.kittytune.data.sync.SyncPeers
+import com.alananasss.kittytune.data.sync.SyncPlayback
 import com.alananasss.kittytune.data.sync.SyncScheduler
 import com.alananasss.kittytune.data.sync.SyncService
 import com.alananasss.kittytune.ui.common.QrCode
@@ -100,6 +101,7 @@ fun SyncSettingsContent() {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        ConnectPanel()
         SyncDevicesPage()
         SyncOptionsPage()
         SyncAdvancedPage()
@@ -269,6 +271,7 @@ fun SyncOptionsPage() {
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
     var syncLikesEnabled by remember { mutableStateOf(playerPrefs.getSyncLikesEnabled()) }
     var syncListensEnabled by remember { mutableStateOf(playerPrefs.getSyncListensEnabled()) }
+    var syncPlaybackEnabled by remember { mutableStateOf(SyncPlayback.enabled) }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
@@ -277,7 +280,7 @@ fun SyncOptionsPage() {
         SettingsGroupTitle(str("sync_what_title"))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SettingsItem(
-                shape = getSettingsShape(2, 0),
+                shape = getSettingsShape(3, 0),
                 title = str("sync_listens_title"),
                 subtitle = str("sync_listens_sub"),
                 icon = Icons.Rounded.BarChart,
@@ -290,7 +293,7 @@ fun SyncOptionsPage() {
                 },
             )
             SettingsItem(
-                shape = getSettingsShape(2, 1),
+                shape = getSettingsShape(3, 1),
                 title = str("sync_likes_title"),
                 subtitle = str("sync_likes_sub"),
                 icon = Icons.Rounded.Favorite,
@@ -306,6 +309,19 @@ fun SyncOptionsPage() {
                             SyncScheduler.triggerImmediateSync("sync likes enabled")
                         }
                     }
+                },
+            )
+            SettingsItem(
+                shape = getSettingsShape(3, 2),
+                title = str("sync_playback_title"),
+                subtitle = str("sync_playback_sub"),
+                icon = Icons.Rounded.SyncAlt,
+                hasSwitch = true,
+                switchState = syncPlaybackEnabled,
+                onSwitchChange = { enabled ->
+                    syncPlaybackEnabled = enabled
+                    SyncPlayback.enabled = enabled
+                    if (enabled) SyncScheduler.triggerImmediateSync("playback enabled")
                 },
             )
         }

@@ -15,7 +15,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Density
+import com.alananasss.kittytune.ui.theme.withUiScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.CompositionLocalProvider
@@ -140,16 +140,8 @@ fun main(args: Array<String>) {
             }
         }
 
-        // Zapret, once: find it if it is running, and add the domains of whichever services are blocked.
-        LaunchedEffect(Unit) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runCatching {
-                    val zapret = com.alananasss.kittytune.data.zapret.ZapretManager
-                    if (zapret.folder == null) zapret.detect()?.let { zapret.folder = it }
-                    zapret.autoConfigureOnce()
-                }
-            }
-        }
+        // Network helper configuration is an explicit action in Settings. Starting
+        // the player must not rewrite a running helper's lists or restart services.
 
         LaunchedEffect(Unit) {
             com.alananasss.kittytune.core.OpenFileRequests.requests.collect { files ->
@@ -505,6 +497,16 @@ fun main(args: Array<String>) {
         ) {
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
 
+            androidx.compose.runtime.DisposableEffect(window) {
+                val listener = object : java.awt.event.WindowAdapter() {
+                    override fun windowGainedFocus(event: java.awt.event.WindowEvent?) {
+                        playerViewModel.refreshSyncedPlaybackOnForeground()
+                    }
+                }
+                window.addWindowFocusListener(listener)
+                onDispose { window.removeWindowFocusListener(listener) }
+            }
+
             // Set dark background immediately on the AWT window before composition to prevent white flash on Win32/DirectX resize
             runCatching {
                 val darkBg = java.awt.Color(0x13, 0x13, 0x13)
@@ -601,10 +603,7 @@ fun main(args: Array<String>) {
             val prefs = remember { PlayerPreferences() }
             val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
             val currentDensity = LocalDensity.current
-            val customDensity = Density(
-                density = currentDensity.density * uiScale,
-                fontScale = currentDensity.fontScale * uiScale
-            )
+            val customDensity = currentDensity.withUiScale(uiScale)
 
             val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
 

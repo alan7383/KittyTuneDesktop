@@ -24,4 +24,4 @@ rootProject.name = "KittyTuneWindows"
 include(":shazamkit")
 include(":kizzy")
 include(":innertube")
-include(":website")
+// The website has a separate toolchain and is not needed for the desktop player.

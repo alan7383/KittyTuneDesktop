@@ -1876,7 +1876,7 @@ fun PlaylistDetailScreen(
                             if (TrackViewModePref.mode == TrackViewMode.COMPACT) {
                                 TrackCompactItem(
                                     track = track,
-                                    currentlyPlayingTrack = playerViewModel.currentTrack,
+                                    currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
                                     index = index,
                                     isDownloading = isDownloading,
                                     isDownloaded = isDownloaded,
@@ -1897,7 +1897,7 @@ fun PlaylistDetailScreen(
                             } else {
                                 TrackTableItem(
                                     track = track,
-                                    currentlyPlayingTrack = playerViewModel.currentTrack,
+                                    currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
                                     index = index,
                                     isDownloading = isDownloading,
                                     isDownloaded = isDownloaded,

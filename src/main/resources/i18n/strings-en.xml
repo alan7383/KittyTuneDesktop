@@ -2232,7 +2232,9 @@
     <string name="trim_field_start">Start</string>
     <string name="trim_field_end">End</string>
     <string name="sync_title">Device sync</string>
-    <string name="sync_intro">Your devices exchange listening history directly over your local network. Nothing is uploaded anywhere, and there is no account.</string>
+    <string name="sync_intro">Your devices exchange listening history, favorites, and playback state directly over your local network. Nothing is uploaded anywhere, and there is no account.</string>
+    <string name="sync_playback_title">Queue and playback position</string>
+    <string name="sync_playback_sub">Continue the latest track and queue when opening another device</string>
     <string name="sync_this_device">This device</string>
     <string name="sync_device_name">Name</string>
     <string name="sync_listener">Accept connections</string>

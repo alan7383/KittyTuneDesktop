@@ -114,6 +114,7 @@ object SyncService {
             created.executor = null
             created.start()
             server = created
+            ConnectLanServer.start()
             // Findable for exactly as long as it is reachable. Announcing an address that nothing
             // answers on is the failure mode this whole beacon exists to remove (issue #33).
             SyncDiscovery.startResponder()
@@ -122,6 +123,7 @@ object SyncService {
 
     @Synchronized
     fun stop() {
+        ConnectLanServer.stop()
         server?.stop(0)
         server = null
         SyncDiscovery.stopResponder()
@@ -188,6 +190,8 @@ object SyncService {
         val applied = SyncLog.merge(request.events)
         // Awaited, so the marks and the count we report describe work that has actually happened.
         SyncApply.applyNow(applied)
+        SyncPlayback.accept(request.playback)
+        ConnectManager.importRelayUrl(request.relayUrl)
         SyncLog.setPeerMarks(request.deviceId, request.marks)
 
         // The caller hands over how to call it back, which is what makes the pairing mutual: after one
@@ -211,6 +215,8 @@ object SyncService {
             marks = SyncLog.marks(),
             events = SyncMerge.eventsToSend(SyncLog.all(), request.marks, request.deviceId),
             callback = selfPairing().takeIf { isRunning },
+            playback = SyncPlayback.current(),
+            relayUrl = ConnectManager.relayUrl.ifBlank { null },
         )
     }
 
@@ -282,4 +288,7 @@ data class SyncExchange(
      * pairing — both of which leave the pairing one-directional rather than breaking it.
      */
     val callback: PairingPayload? = null,
+    /** Latest queue/playhead, absent when talking to an older client. */
+    val playback: PlaybackSnapshot? = null,
+    val relayUrl: String? = null,
 )

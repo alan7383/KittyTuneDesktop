@@ -73,6 +73,76 @@ data class UnifiedLyricResult(
 
 class PlayerViewModel(application: Application) : AndroidViewModel(application) {
 
+    private var remotePeer by mutableStateOf<ConnectPeerState?>(null)
+    private var remotePosition by mutableLongStateOf(0L)
+    private var remoteScrubPosition by mutableLongStateOf(0L)
+    private var remoteTicker: Job? = null
+    private var remoteVolumeJob: Job? = null
+    private var applyingConnectCommand = false
+    val playbackDeviceLabel: String?
+        get() = ConnectManager.selectedDevice.value?.let { id ->
+            val peer = remotePeer
+            val name = peer?.name ?: com.alananasss.kittytune.data.sync.SyncPeers.find(id)?.label.orEmpty()
+            val ru = java.util.Locale.getDefault().language == "ru"
+            if (peer?.connected == true) (if (ru) "Играет на " else "Playing on ") + name
+            else name + if (ru) " · Не в сети" else " · Offline"
+        }
+    val uiIsLiked: Boolean get() = if (remotePeer?.snapshot != null) uiCurrentTrack?.let { LikeRepository.isTrackLiked(it.id) } == true else isLiked
+    var uiCurrentTrack: Track?
+        get() = remotePeer?.snapshot?.let { it.queue.getOrNull(it.currentIndex) } ?: currentTrack
+        set(value) { currentTrack = value }
+    var uiIsPlaying: Boolean
+        get() = if (ConnectManager.selectedDevice.value != null) remotePeer?.connected == true && remotePeer?.snapshot?.isPlaying == true else isPlaying
+        set(value) { isPlaying = value }
+    var uiDuration: Long
+        get() = remotePeer?.snapshot?.let { it.queue.getOrNull(it.currentIndex)?.durationMs ?: 0L } ?: duration
+        set(value) { duration = value }
+    var uiCurrentPosition: Long
+        get() = if (remotePeer?.snapshot != null) { if (isScrubbing) remoteScrubPosition else remotePosition } else currentPosition
+        set(value) { if (remotePeer?.snapshot != null) remoteScrubPosition = value else currentPosition = value }
+    var uiQueueState: List<Track>
+        get() = remotePeer?.snapshot?.queue ?: queueState
+        set(value) { queueState = value }
+    var uiCurrentQueueIndex: Int
+        get() = remotePeer?.snapshot?.currentIndex ?: currentQueueIndex
+        set(value) { currentQueueIndex = value }
+    var uiShuffleEnabled: Boolean
+        get() = remotePeer?.snapshot?.shuffleEnabled ?: shuffleEnabled
+        set(value) { shuffleEnabled = value }
+    var uiRepeatMode: RepeatMode
+        get() = remotePeer?.snapshot?.repeatMode?.let { runCatching { RepeatMode.valueOf(it) }.getOrDefault(RepeatMode.NONE) } ?: repeatMode
+        set(value) { repeatMode = value }
+
+    private fun routeRemote(action: String, value: Long = 0, value2: Long = 0): Boolean {
+        if (applyingConnectCommand) return false
+        val id = ConnectManager.selectedDevice.value ?: return false
+        ConnectManager.command(id, action, value, value2 = value2)
+        return true
+    }
+
+    private fun observeConnectPlayer() {
+        viewModelScope.launch {
+            ConnectManager.feedback.collect { message ->
+                if (message.isNotBlank() && message != "✓") _uiEvent.emit(message)
+            }
+        }
+        viewModelScope.launch {
+            combine(ConnectManager.peers, ConnectManager.selectedDevice, ConnectManager.visible) { peers, id, visible ->
+                Triple(id, id?.let(peers::get), visible)
+            }.collect { (id, peer, visible) ->
+                if (id != null && isPlaying) MusicManager.player.pause()
+                remotePeer = peer
+                remotePosition = peer?.position() ?: 0L
+                remoteTicker?.cancel()
+                if (visible && peer?.connected == true && peer.snapshot?.isPlaying == true) {
+                    remoteTicker = viewModelScope.launch {
+                        while (isActive) { if (!isScrubbing) remotePosition = peer.position(); delay(250) }
+                    }
+                }
+            }
+        }
+    }
+
     private val gson = Gson()
     private val lyricsOverridesPrefs =
         com.alananasss.kittytune.core.NamedPrefs("lyrics_overrides")
@@ -164,6 +234,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     val isAutomixing = com.alananasss.kittytune.audio.automix.AutomixManager.isAutomixing
     val mixBeatsLeft = com.alananasss.kittytune.audio.automix.AutomixManager.mixBeatsLeft
     private var isRestoringSession = true
+    private var syncPlaybackReady = false
+    private var lastAppliedRemotePlaybackAtMs = 0L
 
     private var playerInitialized = false
     val player: ExoPlayer
@@ -210,15 +282,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var volumeBeforeMute: Float = 1.0f
     private var volumePersistJob: Job? = null
 
+    val uiVolume: Float get() = remotePeer?.snapshot?.volume ?: volume
     fun updateVolume(v: Float) {
+        if (!applyingConnectCommand && ConnectManager.selectedDevice.value != null) {
+            val id = ConnectManager.selectedDevice.value!!
+            remoteVolumeJob?.cancel()
+            remoteVolumeJob = viewModelScope.launch {
+                delay(120)
+                ConnectManager.command(id, "volume", (v.coerceIn(0f, 1f) * 1000).toLong())
+            }
+            return
+        }
         val newVol = if (v <= 0.001f) 0f else v.coerceIn(0f, 1f)
         volume = newVol
         MusicManager.setVolume(newVol)
+        ConnectManager.publish(connectSnapshot())
         mprisService?.updateVolume(newVol.toDouble())
     }
 
     /** Called when the user finishes a volume interaction; persists across restarts. */
     fun persistVolume() {
+        if (!applyingConnectCommand && ConnectManager.selectedDevice.value != null) return
         volumePersistJob?.cancel()
         volumePersistJob = null
         playerPrefs.saveVolume(volume)
@@ -229,6 +313,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * file, so writing once per wheel notch would stutter the UI.
      */
     fun persistVolumeSoon() {
+        if (!applyingConnectCommand && ConnectManager.selectedDevice.value != null) return
         volumePersistJob?.cancel()
         volumePersistJob = viewModelScope.launch {
             delay(400)
@@ -237,6 +322,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleMute() {
+        if (routeRemote("volume", if (uiVolume > 0.001f) 0 else 1000)) return
         if (volume > 0.001f) {
             volumeBeforeMute = volume
             updateVolume(0f)
@@ -246,12 +332,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun volumeUp(delta: Float = 0.1f) {
-        updateVolume(volume + delta)
+        updateVolume(uiVolume + delta)
         persistVolume()
     }
 
     fun volumeDown(delta: Float = 0.1f) {
-        updateVolume(volume - delta)
+        updateVolume(uiVolume - delta)
         persistVolume()
     }
 
@@ -1594,8 +1680,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         } catch (_: Exception) {
         }
 
+        ConnectManager.configure(::connectSnapshot, ::handleConnectCommand)
+        observeConnectPlayer()
         restoreSession()
         syncWithCurrentPlayback()
+        viewModelScope.launch {
+            SyncPlayback.latest.collect { snapshot ->
+                if (syncPlaybackReady && SyncPlayback.enabled && snapshot != null &&
+                    snapshot.deviceId != SyncLog.deviceId && snapshot.isPlaying && isPlaying && !ConnectManager.hasLivePeer()) {
+                    MusicManager.player.pause()
+                }
+            }
+        }
 
         // Publish the restored track right away. The OS media integrations used to start on the first
         // playback change, so after a launch the media keys and the Windows flyout did nothing until
@@ -1716,6 +1812,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        remoteTicker?.cancel()
+        remoteVolumeJob?.cancel()
         super.onCleared()
         closeDiscordRpc()
         try {
@@ -3444,9 +3542,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         tracks: List<Track>,
         startIndex: Int = 0,
         context: PlaybackContext? = null,
-        maintainPlayerState: Boolean = false
+        maintainPlayerState: Boolean = false,
+        autoPlay: Boolean = true,
     ) {
+        if (!applyingConnectCommand && autoPlay && ConnectManager.selectedDevice.value != null && tracks.isNotEmpty()) {
+            val index = startIndex.coerceIn(0, tracks.lastIndex)
+            val start = if (tracks.size > 500) (index - 250).coerceIn(0, tracks.size - 500) else 0
+            val state = PlaybackSnapshot(SyncLog.deviceId, System.currentTimeMillis(), tracks.drop(start).take(500),
+                index - start, pendingSeekPosition ?: 0L, true, false, uiRepeatMode.name)
+            ConnectManager.command(ConnectManager.selectedDevice.value!!, "transfer", state = state)
+            pendingSeekPosition = null
+            return
+        }
+
         if (tracks.isEmpty()) return
+        SyncPlayback.claimLocal()
         if (!maintainPlayerState) {
             isPlayerExpanded = false
         }
@@ -3466,10 +3576,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 tracks.filterIndexed { index, _ -> index != effectiveStartIndex }.shuffled()
             _queue.add(clickedTrack)
             _queue.addAll(rest)
-            playTrackAtIndex(0, addToHistory = (context == null || isHistoryContext))
+            playTrackAtIndex(0, addToHistory = (context == null || isHistoryContext), autoPlay = autoPlay)
         } else {
             _queue.addAll(tracks)
-            playTrackAtIndex(effectiveStartIndex, addToHistory = (context == null || isHistoryContext))
+            playTrackAtIndex(effectiveStartIndex, addToHistory = (context == null || isHistoryContext), autoPlay = autoPlay)
         }
 
         updateQueueState(); saveStateAsync(saveQueue = true)
@@ -3519,6 +3629,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun skipToQueueItem(index: Int) {
+        if (routeRemote("queue", index.toLong())) return
         if (isQueuePreserveUpcomingEnabled && index > currentQueueIndex && currentQueueIndex >= 0 && index < _queue.size) {
             val targetIndex = currentQueueIndex + 1
             moveQueueItem(index, targetIndex)
@@ -3614,6 +3725,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun playNext(manual: Boolean = true, isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), ignoreRepeatOne: Boolean = false, autoPlay: Boolean = true) {
+        if (manual && routeRemote("next")) return
         if (isAutoplayRadioLoading) return
 
         if (manual) {
@@ -3838,6 +3950,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun smartPrevious(isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), autoPlay: Boolean = true) {
+        if (routeRemote("previous")) return
         if (player.currentPosition > 3000) {
             flushListenSession("MANUAL_REPLAY")
             // The same track from the top is a new listen, not a continuation of the old one.
@@ -3884,6 +3997,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun pause() {
+        if (routeRemote("pause")) return
         if (isPlaying) togglePlayPause()
     }
 
@@ -3896,6 +4010,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleShuffle() {
+        if (routeRemote("shuffle", if (uiShuffleEnabled) 0 else 1)) return
         shuffleEnabled = !shuffleEnabled;
         if (shuffleEnabled) applyShuffle() else revertShuffle();
         updateQueueState();
@@ -3934,6 +4049,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleRepeatMode() {
+        if (routeRemote("repeat", when (uiRepeatMode) { RepeatMode.NONE -> 1; RepeatMode.ALL -> 2; RepeatMode.ONE -> 0 })) return
         repeatMode = when (repeatMode) {
             RepeatMode.NONE -> RepeatMode.ALL
             RepeatMode.ALL -> RepeatMode.ONE
@@ -3956,6 +4072,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun moveQueueItem(from: Int, to: Int) {
+        if (routeRemote("move", from.toLong(), to.toLong())) return
         if (from == to) return
 
         if (from < queueState.size && to < queueState.size) {
@@ -3995,6 +4112,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun removeTrackFromQueue(index: Int) {
+        if (routeRemote("remove", index.toLong())) return
         if (index !in _queue.indices) return
 
         val trackToRemove = _queue[index]
@@ -4055,6 +4173,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun togglePlayPause() {
+        if (routeRemote(if (uiIsPlaying) "pause" else "play")) return
+        SyncPlayback.claimLocal()
         if (player.isPlaying) {
             player.pause()
             saveStateAsync(savePositionOnly = true)
@@ -4083,6 +4203,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * from the very beginning" for anyone whose track came in without a duration (issue #33).
      */
     fun seekTo(position: Long) {
+        if (routeRemote("seek", position)) { isScrubbing = false; return }
+        SyncPlayback.claimLocal()
         val known = duration.takeIf { it > 0L }
         val target =
             if (known != null) position.coerceIn(0L, known) else position.coerceAtLeast(0L)
@@ -4116,6 +4238,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun toggleLike() {
+        if (remotePeer?.snapshot != null) { uiCurrentTrack?.let { toggleTrackLike(it) }; return }
         val t = currentTrack ?: return
         isLiked = !isLiked
 
@@ -4501,6 +4624,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun addToQueue(tracks: List<Track>) {
+        if (!applyingConnectCommand && ConnectManager.selectedDevice.value != null && tracks.isNotEmpty()) {
+            ConnectManager.command(ConnectManager.selectedDevice.value!!, "append", state = PlaybackSnapshot(
+                SyncLog.deviceId, System.currentTimeMillis(), tracks.take(500), 0, 0, false, false, "NONE"))
+            return
+        }
+
         if (tracks.isEmpty()) return
 
         val uniqueTracks = tracks.map { it.copy() }
@@ -4529,8 +4658,102 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { _uiEvent.emit(msg) }
     }
 
+    /** Captured on the UI thread; a live controller never overwrites the local player. */
+    private fun connectSnapshot(): PlaybackSnapshot? {
+        if (queueState.isEmpty() || currentQueueIndex !in queueState.indices) return null
+        val start = if (queueState.size > 500) (currentQueueIndex - 250).coerceIn(0, queueState.size - 500) else 0
+        return PlaybackSnapshot(SyncLog.deviceId, System.currentTimeMillis(), queueState.drop(start).take(500),
+            currentQueueIndex - start, currentPosition.coerceAtLeast(0L), isPlaying, shuffleEnabled, repeatMode.name, volume = volume)
+    }
+
+    private suspend fun handleConnectCommand(command: ConnectMessage) {
+        require(SyncPlayback.enabled) { "Playback sync is disabled" }
+        applyingConnectCommand = true
+        ConnectManager.activateLocalRenderer()
+        try {
+        SyncPlayback.claimLocal()
+        when (command.action) {
+            "play" -> { if (!isPlaying) togglePlayPause() }
+            "pause" -> pause()
+            "next" -> playNext(manual = true)
+            "previous" -> smartPrevious()
+            "volume" -> { updateVolume(command.value.coerceIn(0, 1000) / 1000f); persistVolume() }
+            "seek" -> seekTo(command.value.coerceAtLeast(0L))
+            "shuffle" -> if (shuffleEnabled != (command.value == 1L)) toggleShuffle()
+            "repeat" -> {
+                val target = when (command.value) { 0L -> RepeatMode.NONE; 1L -> RepeatMode.ALL; 2L -> RepeatMode.ONE; else -> error("Invalid repeat mode") }
+                repeatMode = target
+                applyRepeatMode()
+            }
+            "queue", "remove" -> {
+                val state = connectSnapshot() ?: error("Queue is empty")
+                require(command.value in state.queue.indices.map { it.toLong() }) { "Invalid queue item" }
+                val start = if (queueState.size > 500) (currentQueueIndex - 250).coerceIn(0, queueState.size - 500) else 0
+                val index = command.value.toInt() + start
+                if (command.action == "queue") skipToQueueItem(index) else {
+                    require(index != currentQueueIndex) { "Cannot remove the playing track" }
+                    removeTrackFromQueue(index)
+                }
+            }
+            "move" -> {
+                val state = connectSnapshot() ?: error("Queue is empty")
+                require(command.value in 0L until state.queue.size.toLong() && command.value2 in 0L until state.queue.size.toLong())
+                val start = if (queueState.size > 500) (currentQueueIndex - 250).coerceIn(0, queueState.size - 500) else 0
+                moveQueueItem(command.value.toInt() + start, command.value2.toInt() + start)
+            }
+            "append" -> {
+                val tracks = command.state?.queue ?: error("No tracks")
+                require(tracks.size in 1..500 && tracks.none { it.source == "local" })
+                addToQueue(tracks)
+            }
+            "transfer" -> {
+                ConnectManager.selectDevice(null)
+                val remote = requireNotNull(command.state) { "No playback state" }
+                require(remote.queue.size in 1..500 && remote.currentIndex in remote.queue.indices) { "Invalid queue" }
+                require(remote.positionMs >= 0 && remote.repeatMode in listOf("NONE", "ALL", "ONE")) { "Invalid playback state" }
+                val track = remote.queue[remote.currentIndex]
+                require(track.source != "local") { "Local files are unavailable on another device" }
+                val portable = remote.queue.filter { it.source != "local" }
+                val index = portable.indexOfFirst { it.id == track.id }
+                require(index >= 0)
+                shuffleEnabled = false
+                pendingSeekPosition = remote.positionMs
+                playPlaylist(portable, index, maintainPlayerState = true, autoPlay = remote.isPlaying)
+                currentPosition = remote.positionMs
+                shuffleEnabled = remote.shuffleEnabled
+                repeatMode = RepeatMode.valueOf(remote.repeatMode)
+                applyRepeatMode()
+                kotlinx.coroutines.withTimeout(20_000) {
+                    while (player.activeEngine.state != com.alananasss.kittytune.audio.AudioEngine.State.READY ||
+                        player.currentMediaItem?.mediaId?.removePrefix("yt_") != track.id.toString()) {
+                        kotlinx.coroutines.delay(100)
+                    }
+                }
+                player.seekTo(remote.positionMs)
+                currentPosition = remote.positionMs
+            }
+            else -> error("Unknown player command")
+        }
+        saveStateAsync(saveQueue = true)
+        } finally { applyingConnectCommand = false }
+    }
+
     private fun saveStateAsync(saveQueue: Boolean = false, savePositionOnly: Boolean = false) {
         if (isRestoringSession) return
+        ConnectManager.publish(connectSnapshot())
+        if (syncPlaybackReady) {
+            val q = queueState.toList()
+            val index = q.indexOfFirst { it.id == currentTrack?.id }
+            if (index >= 0) {
+                val position = currentPosition
+                val playing = isPlaying
+                val shuffle = shuffleEnabled
+                val repeat = repeatMode.name
+                viewModelScope.launch(Dispatchers.IO) {
+                    SyncPlayback.publish(q, index, position, playing, shuffle, repeat)
+                }
+            }
+        }
         val t = currentTrack
         val p = currentPosition
         val c = currentContext
@@ -4933,6 +5156,49 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             } catch (_: Exception) {
                 withContext(Dispatchers.Main) { isRestoringSession = false }
             }
+            restoreSyncedPlayback()
+        }
+    }
+
+    /** Refresh when a backgrounded window becomes active again. */
+    fun refreshSyncedPlaybackOnForeground() {
+        if (!syncPlaybackReady || !SyncPlayback.enabled) return
+        viewModelScope.launch { restoreSyncedPlayback() }
+    }
+
+    /** An active local play always takes precedence over a remote restore. */
+    private suspend fun restoreSyncedPlayback() {
+        runCatching { SyncScheduler.syncAll("playback restore") }
+        withContext(Dispatchers.Main) {
+            val wasReady = syncPlaybackReady
+            var appliedRemote = false
+            val remote = SyncPlayback.current()?.takeIf {
+                it.deviceId != SyncLog.deviceId && it.updatedAtMs > lastAppliedRemotePlaybackAtMs
+            }
+            if (!isPlaying && remote != null) {
+                val track = remote.queue.getOrNull(remote.currentIndex)
+                if (track != null && track.source != "local") {
+                    val portable = remote.queue.filter { it.source != "local" }
+                    val index = portable.indexOfFirst { it.id == track.id }
+                    if (index >= 0) {
+                        val shouldPlay = false // Live playback moves only through an explicit device selection.
+                        val position = if (shouldPlay) remote.projectedPosition(System.currentTimeMillis())
+                            else remote.positionMs
+                        shuffleEnabled = false // preserve the sender's exact queue order
+                        pendingSeekPosition = position
+                        playPlaylist(portable, index, autoPlay = shouldPlay)
+                        currentPosition = position
+                        appliedRemote = true
+                        lastAppliedRemotePlaybackAtMs = remote.updatedAtMs
+                        shuffleEnabled = remote.shuffleEnabled
+                        repeatMode = runCatching { RepeatMode.valueOf(remote.repeatMode) }
+                            .getOrDefault(RepeatMode.NONE)
+                        applyRepeatMode()
+                    }
+                }
+            }
+            syncPlaybackReady = true
+            if (!appliedRemote && !wasReady) saveStateAsync(saveQueue = true)
         }
     }
 

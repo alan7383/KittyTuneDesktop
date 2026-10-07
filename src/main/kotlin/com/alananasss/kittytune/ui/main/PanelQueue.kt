@@ -100,8 +100,8 @@ private const val PAST_COLLAPSE_THRESHOLD = 3
 @Composable
 internal fun QueueList(vm: PlayerViewModel) {
     val listState = rememberLazyListState()
-    val queue = vm.queueState
-    val currentIndex = vm.currentQueueIndex
+    val queue = vm.uiQueueState
+    val currentIndex = vm.uiCurrentQueueIndex
     val keys = remember(queue) { queueItemKeys(queue) }
 
     // Compacted for having been heard, not for sitting at a lower index. Jumping ahead to the sixth
@@ -148,7 +148,7 @@ internal fun QueueList(vm: PlayerViewModel) {
     AnchorCurrentQueueItem(
         listState = listState,
         currentIndex = currentIndex,
-        currentTrackId = vm.currentTrack?.id,
+        currentTrackId = vm.uiCurrentTrack?.id,
         currentKey = currentKey,
         targetIndex = targetListIndex,
     )
@@ -315,7 +315,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
             .then(if (isPast && !isHovered) Modifier.alpha(PAST_ROW_ALPHA) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        QueueCover(track, size = if (isPast) 28.dp else 44.dp, isCurrent = isCurrent, isPlaying = vm.isPlaying)
+        QueueCover(track, size = if (isPast) 28.dp else 44.dp, isCurrent = isCurrent, isPlaying = vm.uiIsPlaying)
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(

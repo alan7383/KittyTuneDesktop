@@ -84,6 +84,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Devices
 import com.alananasss.kittytune.R
 import com.alananasss.kittytune.audio.automix.AutomixManager
 import com.alananasss.kittytune.core.stringResource
@@ -121,6 +122,7 @@ fun PlayerBar(
     onToggleNowPlaying: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenLyrics: () -> Unit,
+    onOpenDevices: () -> Unit = {},
     /**
      * The cover and the credit at the bottom left. It opened the side panel on its Info tab; it opens the
      * whole player now — "I think you can do this when you click on it, the player opens in full"
@@ -135,7 +137,7 @@ fun PlayerBar(
 ) {
     com.alananasss.kittytune.ui.debug.TraceRecompositions("PlayerBar")
     val vm = playerViewModel
-    val track = vm.currentTrack
+    val track = vm.uiCurrentTrack
     val visibleButtons = rememberPlayerBarButtons()
     val showLyricsButton = rememberShowLyricsButton()
     val barStyle = rememberPlayerBarStyle()
@@ -223,7 +225,7 @@ fun PlayerBar(
                                 AnimatedArtwork(
                                     artworkUrl = track.fullResArtwork,
                                     animatedCoverUrl = vm.currentAnimatedCoverUrl,
-                                    isPlaying = vm.isPlaying,
+                                    isPlaying = vm.uiIsPlaying,
                                     contentDescription = null,
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -248,7 +250,15 @@ fun PlayerBar(
                                 )
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    ArtistLinkText(
+                                    val deviceLabel = vm.playbackDeviceLabel
+                                    if (deviceLabel != null) Text(
+                                        text = deviceLabel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    ) else ArtistLinkText(
                                         track = track,
                                         onArtistClick = { vm.navigateToTrackArtist(it) },
                                         text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
@@ -274,8 +284,8 @@ fun PlayerBar(
                                 val mixProgress by AutomixManager.mixProgress.collectAsState()
                                 val isMixActive = isAutomixing || isCrossfading || (mixBeatsLeft != null && mixBeatsLeft!! > 0)
 
-                                val nextTrackForChip = if (vm.repeatMode == RepeatMode.ONE) track else vm.queue.getOrNull(vm.currentQueueIndex + 1)
-                                val isDifferentNext = vm.repeatMode == RepeatMode.ONE || (nextTrackForChip != null && nextTrackForChip.id != track.id)
+                                val nextTrackForChip = if (vm.uiRepeatMode == RepeatMode.ONE) track else vm.uiQueueState.getOrNull(vm.uiCurrentQueueIndex + 1)
+                                val isDifferentNext = vm.uiRepeatMode == RepeatMode.ONE || (nextTrackForChip != null && nextTrackForChip.id != track.id)
                                 val nextTitleForChip = nextTrackForChip?.title?.trim()?.takeIf { it.isNotEmpty() && isDifferentNext }
                                 val beatMs = automixDebug?.outBpm?.takeIf { it > 0f }?.let { 60_000f / it } ?: 500f
 
@@ -299,9 +309,9 @@ fun PlayerBar(
                             Spacer(Modifier.width(8.dp))
                             IconButton(shapes = iconShapes, onClick = { vm.toggleLike() }) {
                                 Icon(
-                                    if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    if (vm.uiIsLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                                     contentDescription = str("player_like"),
-                                    tint = if (vm.isLiked) MaterialTheme.colorScheme.primary
+                                    tint = if (vm.uiIsLiked) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -338,7 +348,7 @@ fun PlayerBar(
                     val transportGap = if (isFloating) 12.dp else 6.dp
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons) {
                         ExpressiveToggleButton(
-                            selected = vm.shuffleEnabled,
+                            selected = vm.uiShuffleEnabled,
                             icon = Icons.Filled.Shuffle,
                             contentDescription = "Shuffle",
                             onClick = { vm.toggleShuffle() },
@@ -426,7 +436,7 @@ fun PlayerBar(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            if (vm.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            if (vm.uiIsPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
                         )
@@ -454,8 +464,8 @@ fun PlayerBar(
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons) {
                         Spacer(Modifier.width(transportGap))
                         ExpressiveToggleButton(
-                            selected = vm.repeatMode != RepeatMode.NONE,
-                            icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
+                            selected = vm.uiRepeatMode != RepeatMode.NONE,
+                            icon = if (vm.uiRepeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
                             else Icons.Filled.Repeat,
                             contentDescription = "Repeat",
                             onClick = { vm.toggleRepeatMode() },
@@ -536,10 +546,15 @@ fun PlayerBar(
                     }
                 }
 
+                Tip(if (java.util.Locale.getDefault().language == "ru") "Устройства" else "Devices") {
+                    IconButton(onClick = onOpenDevices) {
+                        Icon(Icons.Rounded.Devices, contentDescription = "Playback devices")
+                    }
+                }
                 VolumeControl(
-                    volume = vm.volume,
+                    volume = vm.uiVolume,
                     preferVertical = verticalVolumeSlider,
-                    isPlaying = vm.isPlaying,
+                    isPlaying = vm.uiIsPlaying,
                     onVolumeChange = { vm.updateVolume(it) },
                     onVolumeChangeFinished = { vm.persistVolume() },
                     onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
@@ -566,8 +581,8 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     val sliderStyle = rememberPlayerSliderStyle()
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
-    val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition
-    val duration = vm.duration.coerceAtLeast(1L)
+    val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.uiCurrentPosition
+    val duration = vm.uiDuration.coerceAtLeast(1L)
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -587,14 +602,14 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                 scrubbing = false
             },
             sliderStyle = sliderStyle,
-            isPlaying = vm.isPlaying,
+            isPlaying = vm.uiIsPlaying,
             valueRange = 0f..duration.toFloat(),
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 8.dp)
                 .seekWheel(
-                    positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
-                    durationMs = { vm.duration },
+                    positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.uiCurrentPosition },
+                    durationMs = { vm.uiDuration },
                     stepSeconds = { seekWheelSeconds },
                     onSeek = { target ->
                         // Straight to the player rather than through the scrub state: a
