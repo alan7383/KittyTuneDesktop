@@ -3434,4 +3434,8 @@
     <string name="lyrics_sync_tap_title">Drücken, sobald die nächste Zeile zu hören ist</string>
     <string name="lyrics_sync_tap_button">Jetzt</string>
     <string name="search_showing_results_for">Ergebnisse für „%1$s“</string>
+    <string name="chart_kind_country">Dein Land</string>
+    <string name="home_releases_this_friday">Neu diesen Freitag · seit %1$s</string>
+    <string name="home_releases_last_friday">Letzter Freitag · %1$s</string>
+    <string name="home_releases_earlier">Früher</string>
 </resources>

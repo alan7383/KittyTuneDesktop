@@ -36,7 +36,23 @@
      * order, which `/resolve` hands back whole. So the genre row belongs to [ChartKind.TOP] and the
      * trending feed has no genre to pick.
      */
-    enum class ChartKind { TOP, TRENDING }
+    enum class ChartKind {
+        /**
+         * What is played most where the listener is: Deezer's chart for the country its servers see the
+         * request come from. SoundCloud publishes charts for a handful of countries only, so its own were a
+         * US list for everyone else (issue #66).
+         */
+        COUNTRY,
+        TOP,
+        TRENDING,
+    }
+
+    /** The label key for a chart kind. */
+    fun ChartKind.labelKey(): String = when (this) {
+        ChartKind.COUNTRY -> "chart_kind_country"
+        ChartKind.TOP -> "chart_kind_top"
+        ChartKind.TRENDING -> "chart_kind_trending"
+    }
 
     /**
      * A chart playlist, by the slug SoundCloud publishes it under.
@@ -60,14 +76,14 @@
         var isLoading by mutableStateOf(false)
 
         // ── The song chart ──
-        var chartKind by mutableStateOf(ChartKind.TOP)
+        var chartKind by mutableStateOf(ChartKind.COUNTRY)
         var chartGenre by mutableStateOf(chartGenres.first())
         val chartEntries = mutableStateListOf<ChartEntry>()
         var isChartLoading by mutableStateOf(false)
 
         init {
             loadCountryCharts(0)
-            loadChart(ChartKind.TOP, chartGenres.first())
+            loadChart(ChartKind.COUNTRY, chartGenres.first())
         }
 
         /**

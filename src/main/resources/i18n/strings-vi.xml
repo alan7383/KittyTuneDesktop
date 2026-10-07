@@ -3270,4 +3270,8 @@
     <string name="lyrics_sync_tap_title">Nhấn khi nghe dòng tiếp theo</string>
     <string name="lyrics_sync_tap_button">Ngay bây giờ</string>
     <string name="search_showing_results_for">Hiển thị kết quả cho “%1$s”</string>
+    <string name="chart_kind_country">Quốc gia của bạn</string>
+    <string name="home_releases_this_friday">Phát hành thứ Sáu này · từ %1$s</string>
+    <string name="home_releases_last_friday">Thứ Sáu tuần trước · %1$s</string>
+    <string name="home_releases_earlier">Trước đó</string>
 </resources>

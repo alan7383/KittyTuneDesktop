@@ -2820,4 +2820,8 @@
     <string name="lyrics_sync_tap_title">Нажмите, когда зазвучит следующая строка</string>
     <string name="lyrics_sync_tap_button">Сейчас</string>
     <string name="search_showing_results_for">Показаны результаты для «%1$s»</string>
+    <string name="chart_kind_country">Твоя страна</string>
+    <string name="home_releases_this_friday">Новинки этой пятницы · с %1$s</string>
+    <string name="home_releases_last_friday">Прошлая пятница · %1$s</string>
+    <string name="home_releases_earlier">Раньше</string>
 </resources>

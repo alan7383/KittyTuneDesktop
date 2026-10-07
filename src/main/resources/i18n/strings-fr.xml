@@ -2822,4 +2822,8 @@
     <string name="lyrics_sync_tap_title">Appuyez quand la ligne suivante commence</string>
     <string name="lyrics_sync_tap_button">Maintenant</string>
     <string name="search_showing_results_for">Résultats pour « %1$s »</string>
+    <string name="chart_kind_country">Ton pays</string>
+    <string name="home_releases_this_friday">Sorties de ce vendredi · depuis le %1$s</string>
+    <string name="home_releases_last_friday">Vendredi dernier · %1$s</string>
+    <string name="home_releases_earlier">Plus tôt</string>
 </resources>

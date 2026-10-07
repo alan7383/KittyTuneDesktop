@@ -109,8 +109,7 @@ fun SearchLanding(
                         startIndex = index,
                         context = PlaybackContext(
                             displayText = str(
-                                if (vm.chartPreviewKind == ChartKind.TOP) "chart_kind_top"
-                                else "chart_kind_trending"
+                                vm.chartPreviewKind.labelKey()
                             ),
                             navigationId = "charts",
                         ),
@@ -131,28 +130,41 @@ fun SearchLanding(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = CONTENT_PADDING),
                     )
-                    Spacer(Modifier.height(10.dp))
-                    ScrollableLazyRow(
-                        contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        fadeColor = MaterialTheme.colorScheme.surface,
-                    ) {
-                        items(vm.likedArtistUpdates.size) { index ->
-                            val track = vm.likedArtistUpdates[index]
-                            LandingTrackCard(
-                                track = track,
-                                isCurrent = playerViewModel.currentTrack?.id == track.id,
-                                onClick = {
-                                    playerViewModel.playPlaylist(
-                                        tracks = vm.likedArtistUpdates.toList(),
-                                        startIndex = index,
-                                        context = PlaybackContext(
-                                            displayText = str("home_from_your_artists"),
-                                            navigationId = "home",
-                                        ),
-                                    )
-                                },
-                            )
+                    // Split by release Friday, the way new music comes out: this Friday's, last Friday's, and
+                    // the rest, each song with its date (issue #66).
+                    val groups = remember(vm.likedArtistUpdates.toList()) { ReleaseWeeks.group(vm.likedArtistUpdates.toList()) }
+                    groups.forEach { group ->
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = releaseWeekTitle(group),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = CONTENT_PADDING),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        ScrollableLazyRow(
+                            contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            fadeColor = MaterialTheme.colorScheme.surface,
+                        ) {
+                            items(group.tracks.size) { index ->
+                                val track = group.tracks[index]
+                                LandingTrackCard(
+                                    track = track,
+                                    isCurrent = playerViewModel.currentTrack?.id == track.id,
+                                    releaseDate = ReleaseWeeks.releaseDateOf(track),
+                                    onClick = {
+                                        playerViewModel.playPlaylist(
+                                            tracks = group.tracks,
+                                            startIndex = index,
+                                            context = PlaybackContext(
+                                                displayText = str("home_from_your_artists"),
+                                                navigationId = "home",
+                                            ),
+                                        )
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -449,6 +461,7 @@ private fun LandingTrackCard(
     track: Track,
     isCurrent: Boolean,
     onClick: () -> Unit,
+    releaseDate: java.time.LocalDate? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -491,6 +504,27 @@ private fun LandingTrackCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (releaseDate != null) {
+            Text(
+                text = ReleaseWeeks.shortDate(releaseDate, com.alananasss.kittytune.core.Strings.resolvedLanguage),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** "This Friday's releases · since 3 Oct", "Last Friday", "Earlier". */
+@Composable
+private fun releaseWeekTitle(group: ReleaseWeeks.Group): String {
+    val language = com.alananasss.kittytune.core.Strings.resolvedLanguage
+    return when (group.week) {
+        ReleaseWeeks.Week.THIS_FRIDAY ->
+            str("home_releases_this_friday", ReleaseWeeks.shortDate(group.since!!, language))
+        ReleaseWeeks.Week.LAST_FRIDAY ->
+            str("home_releases_last_friday", ReleaseWeeks.shortDate(group.since!!, language))
+        ReleaseWeeks.Week.EARLIER -> str("home_releases_earlier")
     }
 }
 
