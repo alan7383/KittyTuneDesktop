@@ -2819,4 +2819,6 @@
     <string name="lyrics_search_now_showing">Affiché : %1$s</string>
     <string name="lyrics_search_progress">%1$d trouvés, %2$d sources cherchent encore</string>
     <string name="lyrics_search_clear">Effacer</string>
+    <string name="lyrics_sync_tap_title">Appuyez quand la ligne suivante commence</string>
+    <string name="lyrics_sync_tap_button">Maintenant</string>
 </resources>

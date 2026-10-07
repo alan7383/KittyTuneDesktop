@@ -9,6 +9,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -76,7 +77,7 @@ import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.FunFactDot
 import com.alananasss.kittytune.ui.common.SettingsSwitch
 import com.alananasss.kittytune.ui.common.Slider
-import com.alananasss.kittytune.ui.player.LyricsProvider
+import com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import kotlin.math.roundToInt
@@ -113,9 +114,16 @@ fun QuickLyricsSettingsDialog(
     val knobs = remember(viewModel, isFullScreen, isSidebar) { ModeKnobs(viewModel, isFullScreen, isSidebar) }
     var tab by rememberSaveable { mutableStateOf(QuickTab.LOOK) }
     var showLanguagePicker by remember { mutableStateOf(false) }
+    var showSourceOrder by remember { mutableStateOf(false) }
 
     if (showLanguagePicker) {
         TranslationLanguageDialog(viewModel, onDismiss = { showLanguagePicker = false })
+    }
+    if (showSourceOrder) {
+        com.alananasss.kittytune.ui.profile.LyricsProviderOrderDialog(
+            prefs = viewModel.playerPrefs,
+            onDismiss = { showSourceOrder = false },
+        )
     }
 
     BackHandler(onBack = onDismiss)
@@ -129,9 +137,14 @@ fun QuickLyricsSettingsDialog(
                     .width(min(PANEL_MAX_WIDTH, maxWidth * 0.94f))
                     .heightIn(max = min(PANEL_MAX_HEIGHT, maxHeight * 0.94f)),
             ) {
-                Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)) {
-                    Header(onDismiss)
+                Column(Modifier.padding(start = 24.dp, end = 12.dp, top = 20.dp, bottom = 20.dp)) {
+                    Box(Modifier.padding(end = 12.dp)) { Header(onDismiss) }
                     Spacer(Modifier.height(16.dp))
+                    // Everything under the title scrolls as one, beside a scrollbar. Only the tab's content used to
+                    // scroll, in what room the sync card and the tabs left it, with no bar to show there was more.
+                    val scroll = rememberScrollState()
+                    Box(Modifier.weight(1f, fill = false)) {
+                    Column(Modifier.padding(end = 12.dp).verticalScroll(scroll)) {
                     SyncCard(viewModel)
                     Spacer(Modifier.height(10.dp))
                     FilledTonalButton(
@@ -161,19 +174,29 @@ fun QuickLyricsSettingsDialog(
                     AnimatedContent(
                         targetState = tab,
                         transitionSpec = { fadeIn(tween(180, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
-                        modifier = Modifier.weight(1f, fill = false),
                         label = "quickLyricsTab",
                     ) { shown ->
                         Column(
-                            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                            modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             when (shown) {
                                 QuickTab.LOOK -> LookTab(viewModel, knobs, isFullScreen)
                                 QuickTab.LAYOUT -> LayoutTab(viewModel, knobs)
-                                QuickTab.FEATURES -> FeaturesTab(viewModel, isFullScreen, onPickLanguage = { showLanguagePicker = true })
+                                QuickTab.FEATURES -> FeaturesTab(
+                                    viewModel,
+                                    isFullScreen,
+                                    onPickLanguage = { showLanguagePicker = true },
+                                    onOpenSources = { showSourceOrder = true },
+                                )
                             }
                         }
+                    }
+                    }
+                    androidx.compose.foundation.VerticalScrollbar(
+                        adapter = androidx.compose.foundation.rememberScrollbarAdapter(scroll),
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    )
                     }
                 }
             }
@@ -233,10 +256,62 @@ private fun SyncCard(viewModel: PlayerViewModel) {
                 }
             }
         }
+        TapSync(viewModel)
         Spacer(Modifier.height(14.dp))
         DriftSync(viewModel)
     }
 }
+
+/**
+ * Sync by ear: the next line is shown, and pressing the button the moment it is heard lines the lyrics up with
+ * the song, whatever they were off by. The steps above are for the last tenths of a second; finding a
+ * three-second offset with them took a dozen presses and a guess at which way to go (issue #66).
+ */
+@Composable
+private fun TapSync(viewModel: PlayerViewModel) {
+    val lines = viewModel.lyricsLines
+    if (lines.isEmpty()) return
+    val lyricsTime = viewModel.currentPosition + viewModel.lyricsOffset
+    val target = remember(lines.toList(), lyricsTime / TAP_TARGET_STEP_MS) {
+        val current = LyricsUtils.activeLineIndex(lines, lyricsTime)
+        lines.drop(current + 1).firstOrNull { !it.isInstrumental && it.text.isNotBlank() }
+    } ?: return
+    Spacer(Modifier.height(14.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                str("lyrics_sync_tap_title"),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            AnimatedContent(
+                targetState = target.text,
+                transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
+                label = "tapSyncLine",
+            ) { text ->
+                Text(
+                    text = "«$text»",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        FilledTonalButton(
+            onClick = { viewModel.syncLyricsLineToNow(target) },
+            shapes = ButtonDefaults.shapes(),
+        ) {
+            Icon(Icons.Rounded.TouchApp, null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(str("lyrics_sync_tap_button"), fontWeight = FontWeight.SemiBold, maxLines = 1)
+        }
+    }
+}
+
+/** How often the line offered for tap sync is re-picked: often enough to follow the song, not every tick. */
+private const val TAP_TARGET_STEP_MS = 500L
 
 /**
  * Two points for lyrics that drift apart over the song (issue #66): synced at the start, seconds off by the end.
@@ -526,7 +601,12 @@ private fun ColumnScope.LayoutTab(viewModel: PlayerViewModel, knobs: ModeKnobs) 
 }
 
 @Composable
-private fun ColumnScope.FeaturesTab(viewModel: PlayerViewModel, isFullScreen: Boolean, onPickLanguage: () -> Unit) {
+private fun ColumnScope.FeaturesTab(
+    viewModel: PlayerViewModel,
+    isFullScreen: Boolean,
+    onPickLanguage: () -> Unit,
+    onOpenSources: () -> Unit,
+) {
     val prefs = remember { PlayerPreferences() }
     var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
     var translationOn by remember { mutableStateOf(prefs.getLyricsTranslationEnabled()) }
@@ -596,15 +676,15 @@ private fun ColumnScope.FeaturesTab(viewModel: PlayerViewModel, isFullScreen: Bo
     }
 
     SectionTitle(str("pref_lyrics_providers_category"))
-    ChoiceRow(icon = Icons.Rounded.CloudQueue, title = str("pref_lyrics_provider_title")) {
-        ExpressiveConnectedButtonGroup(
-            options = listOf(LyricsProvider.MAX_QUALITY, LyricsProvider.OPEN_SOURCE),
-            selectedOption = viewModel.lyricsProvider,
-            onOptionSelected = { viewModel.updateLyricsProvider(it) },
-            fillMaxWidth = true,
-            labelProvider = { ChoiceLabel(if (it == LyricsProvider.MAX_QUALITY) "Musixmatch" else "LrcLib") },
-        )
-    }
+    // The same list as in the lyrics settings: every source, in the order they are tried, each switchable.
+    // Here used to be a choice between two of them, Musixmatch and LrcLib.
+    val enabledSources = PreferredLyricsProvider.entries.count { prefs.getLyricsProviderEnabled(it) }
+    ClickRow(
+        icon = Icons.Rounded.SwapVert,
+        title = str("pref_lyrics_order"),
+        value = "$enabledSources / ${PreferredLyricsProvider.entries.size}",
+        onClick = onOpenSources,
+    )
     SwitchRow(
         icon = Icons.Rounded.FolderOpen,
         title = str("pref_lyrics_local"),
