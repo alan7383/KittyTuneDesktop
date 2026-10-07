@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lyrics
@@ -79,6 +80,7 @@ import com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider
 import com.alananasss.kittytune.ui.common.ShimmerBox
 import com.alananasss.kittytune.ui.common.ShimmerLine
 import com.alananasss.kittytune.ui.common.escapeDismisses
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import com.alananasss.kittytune.ui.player.ManualLyricsSearch
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.UnifiedLyricResult
@@ -134,8 +136,12 @@ private fun SearchField(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
     ) {
+        // Back, on the left: the clear button inside the field is the only cross on the row.
+        IconButton(onClick = onClose, shapes = IconButtonDefaults.shapes()) {
+            Icon(Icons.AutoMirrored.Rounded.ArrowBack, str("btn_close"), tint = MaterialTheme.colorScheme.onSurface)
+        }
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
@@ -160,10 +166,6 @@ private fun SearchField(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
         )
-        Spacer(Modifier.width(4.dp))
-        IconButton(onClick = onClose, shapes = IconButtonDefaults.shapes()) {
-            Icon(Icons.Rounded.Close, str("btn_close"), tint = MaterialTheme.colorScheme.onSurface)
-        }
     }
 }
 
@@ -178,10 +180,15 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
     }
     val selected = viewModel.manualSearchProvider
     val isAll = selected.equals(ManualLyricsSearch.ALL, ignoreCase = true)
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
+    // Dragged with the mouse, turned with the wheel and arrowed at the ends like every other row, and inset the
+    // same as the search field above it (issue #66).
+    val chipsState = androidx.compose.foundation.lazy.rememberLazyListState()
+    com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+        state = chipsState,
+        contentPadding = PaddingValues(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
+        fadeColor = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth().horizontalMouseSwipe(chipsState),
     ) {
         item(key = ManualLyricsSearch.ALL) {
             SourceChip(
