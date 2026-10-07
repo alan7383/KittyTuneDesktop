@@ -13,6 +13,7 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 /** The track a manual lyrics search is for, as far as the providers need to know it. */
 internal data class LyricsSearchTrack(
     val id: String,
+    val title: String,
     val artist: String,
     val album: String?,
     val durationMs: Long,
@@ -40,15 +41,23 @@ internal object ManualLyricsSearch {
         provider: PreferredLyricsProvider,
         query: String,
         track: LyricsSearchTrack,
-    ): List<UnifiedLyricResult> = runCatching {
-        when (provider) {
-            PreferredLyricsProvider.LRCLIB -> searchLrcLib(query, track)
-            PreferredLyricsProvider.GENIUS -> searchGenius(query)
-            PreferredLyricsProvider.MUSIXMATCH -> searchMusixmatch(query)
-            PreferredLyricsProvider.SIMPMUSIC -> searchSimpMusic(query)
-            else -> searchByTitle(provider, query, track)
+    ): List<UnifiedLyricResult> {
+        // The query as typed, then with its punctuation spaced and run-together words spelled out: "NEWYORK" found
+        // nothing on LrcLib or Musixmatch and "NEW YORK" found it at once (issue #66).
+        for (variant in LyricsMatcher.queryVariants(query, track.title)) {
+            val found = runCatching {
+                when (provider) {
+                    PreferredLyricsProvider.LRCLIB -> searchLrcLib(variant, track)
+                    PreferredLyricsProvider.GENIUS -> searchGenius(variant)
+                    PreferredLyricsProvider.MUSIXMATCH -> searchMusixmatch(variant)
+                    PreferredLyricsProvider.SIMPMUSIC -> searchSimpMusic(variant)
+                    else -> searchByTitle(provider, variant, track)
+                }
+            }.getOrDefault(emptyList())
+            if (found.isNotEmpty()) return found
         }
-    }.getOrDefault(emptyList())
+        return emptyList()
+    }
 
     /**
      * [incoming] added to [current], with repeats dropped and the whole list ordered: the right song first,
@@ -68,7 +77,13 @@ internal object ManualLyricsSearch {
             .groupBy { duplicateKey(it) }
             .values
             .map { copies -> copies.minBy { lengthMiss(it, targetSec) } }
-            .sortedByDescending { rank(it, target) }
+            // Word timings first, then line timings, then plain text, whoever the source is; within a kind the
+            // closest to this song. An unrelated song never outranks the right one by its timings alone.
+            .sortedWith(
+                compareByDescending<UnifiedLyricResult> { isAboutThisSong(it, target) }
+                    .thenByDescending { syncTier(it) }
+                    .thenByDescending { rank(it, target) },
+            )
     }
 
     fun syncTier(result: UnifiedLyricResult): Int = when {
@@ -99,6 +114,9 @@ internal object ManualLyricsSearch {
     private fun lengthMiss(result: UnifiedLyricResult, targetSec: Double): Double =
         if (result.durationSec <= 0.0 || targetSec <= 0.0) Double.MAX_VALUE / 2
         else kotlin.math.abs(result.durationSec - targetSec)
+
+    private fun isAboutThisSong(result: UnifiedLyricResult, target: LyricsMatcher.Target): Boolean =
+        LyricsMatcher.titleSimilarity(result.name, target) >= LyricsMatcher.CONFIDENT_MATCH
 
     private fun rank(result: UnifiedLyricResult, target: LyricsMatcher.Target): Float {
         val score = LyricsMatcher.score(result.name, result.artistName, result.durationSec, target)
