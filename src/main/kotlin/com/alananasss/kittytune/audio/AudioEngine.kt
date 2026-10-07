@@ -853,9 +853,15 @@ class AudioEngine {
                 }
 
                 if (paused) {
+                    // A line left running with nothing written to it underruns, and on some Windows drivers
+                    // an underrun replays the last bit of the buffer: a short fragment of the song every few
+                    // seconds for as long as it stayed paused (issue #66). Stopped, it holds still, and the
+                    // buffer is picked up where it stopped when playback resumes.
+                    localLine?.let { if (it.isRunning) it.stop() }
                     Thread.sleep(20)
                     continue
                 }
+                localLine?.let { if (!it.isRunning) it.start() }
 
                 var frame: Frame? = null
                 try {

@@ -434,7 +434,7 @@ import kotlin.math.roundToInt
     
         // Reading along by hand wins for a while; the panel's copy of the lyrics follows the same
         // rule, which is why this lives in one place (issue #33).
-        val readingByHand = FollowActiveLine(listState, activeIndex, centred = true, contentKey = lyrics)
+        val readingByHand = FollowActiveLine(listState, activeIndex, centred = true, contentKey = lyrics.size to lyrics.firstOrNull()?.startTime)
         val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
     
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -447,7 +447,7 @@ import kotlin.math.roundToInt
                 contentPadding = PaddingValues(top = topPadding, bottom = halfHeight),
                 modifier = Modifier
                     .fillMaxSize()
-                    .revealWhenPlaced(listState, activeIndex, contentKey = lyrics)
+                    .revealWhenPlaced(listState, activeIndex, contentKey = lyrics.size to lyrics.firstOrNull()?.startTime)
                     .fadingEdge(fadeBrush),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
