@@ -3242,13 +3242,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         navigateToPlaylistId = "upload"
     }
 
+    fun canNavigateToContext(): Boolean {
+        val id = currentContext?.navigationId ?: return false
+        if (id.isBlank()) return false
+        if (id == "your_mix" || id == "expanded_queue") return false
+        return true
+    }
+
     fun navigateToContext() {
+        if (!canNavigateToContext()) return
         currentContext?.let { context ->
             var destination = context.navigationId
+            // Defensive: if a navigationId ever arrives already route-prefixed,
+            // normalize it. Every other prefix ("playlist_fans/", "local_playlist:",
+            // "system_playlist:", ...) is a valid destination as-is and stays untouched.
             if (destination.startsWith("playlist_detail:")) {
                 destination = destination.removePrefix("playlist_detail:")
-            } else if (destination.startsWith("playlist_")) {
-                destination = destination.removePrefix("playlist_")
             }
             navigateToPlaylistId = destination
         }

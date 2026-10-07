@@ -8,17 +8,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.isSpecified
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.domain.Track
+import com.alananasss.kittytune.ui.player.lyrics.lyricUnderline
 
 /**
  * Whether the artist line of a track row should behave as a link. Catalog tracks
@@ -75,17 +78,30 @@ fun ArtistLinkText(
 
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    // Same fix as the lyrics (issue #33): TextDecoration.Underline is drawn per
+    // font run, so an artist name in Cyrillic / Arabic / CJK falling back to a
+    // system face comes out as a mismatched dashed rule. One hand-drawn rect
+    // per laid-out line via lyricUnderline instead.
+    var linkLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    val linkColor = if (hovered) hoverColor else color
+    val fontSizeSp = if (style.fontSize.isSpecified) style.fontSize.value else 14f
     Text(
         text = text,
         style = style,
-        color = if (hovered) hoverColor else color,
+        color = linkColor,
         fontWeight = fontWeight,
-        textDecoration = if (hovered) TextDecoration.Underline else null,
         maxLines = maxLines,
         overflow = overflow,
+        onTextLayout = { linkLayout = it },
         modifier = modifier
             .hoverable(interaction)
             .pointerHoverIcon(PointerIcon.Hand)
             .clickable(interactionSource = interaction, indication = null) { onArtistClick(track) }
+            .lyricUnderline(
+                layout = { linkLayout },
+                visible = hovered,
+                fontSizeSp = fontSizeSp,
+                color = linkColor,
+            )
     )
 }
