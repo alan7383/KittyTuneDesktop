@@ -579,6 +579,13 @@ internal fun Modifier.lyricsWheel(
 /** How long one wheel notch takes to slide the lyrics. */
 private const val WHEEL_SLIDE_MS = 240
 
+/** What has been revealed already, so a second showing of the same lyrics does not fade. Kept short. */
+private val revealedContent: MutableSet<Any> = java.util.Collections.newSetFromMap(
+    object : java.util.LinkedHashMap<Any, Boolean>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Any, Boolean>?) = size > 24
+    },
+)
+
 /** How long the whole list takes to fade in once it is in place. */
 private const val REVEAL_MS = 420
 
@@ -616,7 +623,13 @@ internal fun Modifier.revealWhenPlaced(listState: LazyListState, activeIndex: In
             // One frame more, for the lines that move with the list to land where it put them.
             withFrameNanos { }
         }
-        alpha.animateTo(1f, tween(REVEAL_MS, easing = FastOutSlowInEasing))
+        // Lyrics that were already shown (the panel opened again, a tab came back) appear at once, placed: fading
+        // them in again read as the text loading a second time (issue #66).
+        if (contentKey != null && !revealedContent.add(contentKey)) {
+            alpha.snapTo(1f)
+        } else {
+            alpha.animateTo(1f, tween(REVEAL_MS, easing = FastOutSlowInEasing))
+        }
     }
     return graphicsLayer {
         this.alpha = alpha.value

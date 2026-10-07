@@ -399,6 +399,16 @@ private fun PanelLyricLine(
             textAlign = textAlign,
         )
         if (backingLine != null) {
+          // Slides out under the line while it is sung and folds away after, as in the karaoke view, rather than
+          // standing under every line all the time.
+          androidx.compose.animation.AnimatedVisibility(
+            visible = isActive,
+            enter = androidx.compose.animation.fadeIn(tween(BACKING_ANIM_MS)) +
+                androidx.compose.animation.expandVertically(tween(BACKING_ANIM_MS), expandFrom = Alignment.Top) +
+                androidx.compose.animation.slideInVertically(tween(BACKING_ANIM_MS)) { -it / 3 },
+            exit = androidx.compose.animation.fadeOut(tween(BACKING_ANIM_MS)) +
+                androidx.compose.animation.shrinkVertically(tween(BACKING_ANIM_MS), shrinkTowards = Alignment.Top),
+          ) {
             val backingStyle = { style: androidx.compose.ui.text.TextStyle ->
                 style.copy(fontSize = style.fontSize * BACKING_SCALE, lineHeight = style.lineHeight * BACKING_SCALE)
             }
@@ -415,6 +425,7 @@ private fun PanelLyricLine(
                 unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.4f),
                 textAlign = textAlign,
             )
+          }
         }
         // Gated on the switches, which it was not: a fetched translation stayed in the line, so turning the
         // setting *off* left it on screen until the track changed. "Quand on active la traduction,
@@ -622,3 +633,6 @@ data class PanelLyricsStyle(
 
 /** How large a backing-vocal line is drawn against the line it is sung under. */
 private const val BACKING_SCALE = 0.72f
+
+/** How long a backing line takes to slide out and fold away. */
+private const val BACKING_ANIM_MS = 420
