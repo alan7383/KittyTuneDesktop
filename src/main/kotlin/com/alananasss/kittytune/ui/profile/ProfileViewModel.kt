@@ -36,6 +36,15 @@
     
     class ProfileViewModel(application: Application) : AndroidViewModel(application) {
         companion object {
+            /** Profiles opened lately, kept for the next time they are opened. */
+            private val snapshots = com.alananasss.kittytune.core.BoundedCache<Long, ProfileSnapshot>(16)
+
+            /** A copy younger than this is shown and not asked for again. */
+            private const val SNAPSHOT_FRESH_MS = 90_000L
+
+            /** A copy older than this is not shown while the page loads. */
+            private const val SNAPSHOT_TTL_MS = 15 * 60_000L
+
             private val _refreshTrigger = MutableSharedFlow<Long>(extraBufferCapacity = 1)
             val refreshTrigger: SharedFlow<Long> = _refreshTrigger.asSharedFlow()
 
@@ -449,10 +458,64 @@
             }
         }
 
+        private class ProfileSnapshot(
+            val savedAtMs: Long,
+            val user: User,
+            val isCurrentUser: Boolean,
+            val popular: List<Track>,
+            val tracks: List<Track>,
+            val reposts: List<Track>,
+            val albums: List<Playlist>,
+            val playlists: List<Playlist>,
+            val liked: List<Track>,
+            val similar: List<User>,
+            val comments: List<Comment>,
+            val commentsNext: String?,
+            val stationId: Long?,
+        )
+
+        private fun saveSnapshot(userId: Long) {
+            val u = user ?: return
+            if (u.id != userId || isSpotifyProfile) return
+            snapshots[userId] = ProfileSnapshot(
+                System.currentTimeMillis(), u, isCurrentUser, popularTracks.toList(), allTracks.toList(), repostedTracks.toList(),
+                albums.toList(), playlists.toList(), likedTracks.toList(), similarArtists.toList(), userComments.toList(),
+                commentsNextUrl, artistStationId,
+            )
+        }
+
+        private fun restoreSnapshot(k: ProfileSnapshot) {
+            isSpotifyProfile = false
+            spotifyArtist = null
+            user = k.user
+            isCurrentUser = k.isCurrentUser
+            popularTracks.clear(); popularTracks.addAll(k.popular)
+            allTracks.clear(); allTracks.addAll(k.tracks)
+            repostedTracks.clear(); repostedTracks.addAll(k.reposts)
+            albums.clear(); albums.addAll(k.albums)
+            playlists.clear(); playlists.addAll(k.playlists)
+            likedTracks.clear(); likedTracks.addAll(k.liked)
+            similarArtists.clear(); similarArtists.addAll(k.similar)
+            userComments.clear(); userComments.addAll(k.comments)
+            popularReleases.clear(); singles.clear(); compilations.clear(); appearsOn.clear(); discoveredOn.clear()
+            commentsNextUrl = k.commentsNext
+            artistStationId = k.stationId
+            isLoading = false
+        }
+
         fun loadProfile(userId: Long, forceReload: Boolean = false) {
             if (!forceReload && !isSpotifyProfile && user?.id == userId && (allTracks.isNotEmpty() || likedTracks.isNotEmpty() || popularTracks.isNotEmpty() || userComments.isNotEmpty())) {
                 isLoading = false
                 return
+            }
+            // An artist opened before is shown from memory at once, and only asked for again when the copy is a
+            // minute and a half old (issue #66). It used to load from nothing every time.
+            if (!forceReload) {
+                val kept = snapshots[userId]
+                if (kept != null && System.currentTimeMillis() - kept.savedAtMs < SNAPSHOT_TTL_MS) {
+                    restoreSnapshot(kept)
+                    if (System.currentTimeMillis() - kept.savedAtMs < SNAPSHOT_FRESH_MS) return
+                }
             }
             viewModelScope.launch {
                 isSpotifyProfile = false
@@ -538,6 +601,7 @@
                         launch { appendUserLikes(moreLikesUrl) }
                         launch { similarArtists.addAll(fetchSimilarArtists(userId, station)) }
                     }
+                    saveSnapshot(userId)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 } finally {

@@ -67,6 +67,10 @@ enum class CommentSort(
 
 enum class LyricsMode { SYNCED, PLAIN }
 
+/** The volume glide of the mute button: 15 steps over about a quarter of a second. */
+private const val VOLUME_GLIDE_STEPS = 15
+private const val VOLUME_GLIDE_MS = 260L
+
 /** A held mix starts this long before the last line is done, so the line's end is the start of the fade. */
 private const val LYRICS_MIX_LEAD_MS = 2_500L
 
@@ -235,7 +239,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var volumeBeforeMute: Float = 1.0f
     private var volumePersistJob: Job? = null
 
+    /** Sets the volume, ending any glide under way: a drag or the wheel takes over from where it got to. */
     fun updateVolume(v: Float) {
+        volumeGlideJob?.cancel()
+        applyVolume(v)
+    }
+
+    private fun applyVolume(v: Float) {
         val newVol = if (v <= 0.001f) 0f else v.coerceIn(0f, 1f)
         volume = newVol
         MusicManager.setVolume(newVol)
@@ -261,12 +271,37 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private var volumeGlideJob: Job? = null
+
     fun toggleMute() {
-        if (volume > 0.001f) {
+        val target = if (volume > 0.001f) {
             volumeBeforeMute = volume
-            updateVolume(0f)
+            0f
         } else {
-            updateVolume(if (volumeBeforeMute > 0.001f) volumeBeforeMute else 1.0f)
+            if (volumeBeforeMute > 0.001f) volumeBeforeMute else 1.0f
+        }
+        glideVolumeTo(target)
+    }
+
+    /**
+     * Moves the volume to [target] over a quarter of a second, so the percentage counts and the sound swells
+     * or fades rather than cutting (issue #66). Any other change of volume takes over from wherever it got to.
+     */
+    private fun glideVolumeTo(target: Float) {
+        volumeGlideJob?.cancel()
+        val from = volume
+        if (kotlin.math.abs(target - from) < 0.005f) {
+            applyVolume(target)
+            return
+        }
+        volumeGlideJob = viewModelScope.launch {
+            val steps = VOLUME_GLIDE_STEPS
+            for (step in 1..steps) {
+                val eased = androidx.compose.animation.core.FastOutSlowInEasing.transform(step.toFloat() / steps)
+                applyVolume(from + (target - from) * eased)
+                delay(VOLUME_GLIDE_MS / steps)
+            }
+            applyVolume(target)
         }
     }
 
