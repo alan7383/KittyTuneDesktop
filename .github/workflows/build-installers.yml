@@ -45,8 +45,8 @@ jobs:
       - name: Prepare Windows Distribution Binaries
         run: |
           mkdir dist-win
-          Get-ChildItem -Path build\compose\binaries\main-release\msi\*.msi | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-${{ steps.get_version.outputs.VERSION }}-x64.msi" }
-          Compress-Archive -Path build\compose\binaries\main-release\app\* -DestinationPath dist-win\KittyTune-${{ steps.get_version.outputs.VERSION }}-Windows-Portable-x64.zip
+          Get-ChildItem -Path build\compose\binaries\*\main-release\msi\*.msi | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-${{ steps.get_version.outputs.VERSION }}-x64.msi" }
+          Compress-Archive -Path build\compose\binaries\*\main-release\app\* -DestinationPath dist-win\KittyTune-${{ steps.get_version.outputs.VERSION }}-Windows-Portable-x64.zip
         shell: powershell
 
       - name: Upload Windows Artifacts
@@ -83,7 +83,7 @@ jobs:
       - name: Prepare macOS Binaries
         run: |
           mkdir dist-mac
-          cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-${{ steps.get_version.outputs.VERSION }}.dmg
+          cp build/compose/binaries/*/main-release/dmg/*.dmg dist-mac/KittyTune-${{ steps.get_version.outputs.VERSION }}.dmg
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v7

@@ -47,7 +47,7 @@ jobs:
 
       - name: Confirm the launcher really carries the flags
         run: |
-          $cfg = Get-ChildItem -Recurse -Path build\compose\binaries\main-release\app -Filter *.cfg | Select-Object -First 1
+          $cfg = Get-ChildItem -Recurse -Path build\compose\binaries\*\main-release\app -Filter *.cfg | Select-Object -First 1
           Write-Host "--- $($cfg.FullName) ---"
           Get-Content $cfg.FullName
           if (-not (Select-String -Path $cfg.FullName -Pattern 'NativeMemoryTracking' -Quiet)) {
@@ -58,7 +58,7 @@ jobs:
       - name: Package portable zip
         run: |
           mkdir dist-diag
-          Compress-Archive -Path build\compose\binaries\main-release\app\* -DestinationPath dist-diag\KittyTune-memdiag-Windows-Portable-x64.zip
+          Compress-Archive -Path build\compose\binaries\*\main-release\app\* -DestinationPath dist-diag\KittyTune-memdiag-Windows-Portable-x64.zip
         shell: powershell
 
       - name: Upload diagnostic build
