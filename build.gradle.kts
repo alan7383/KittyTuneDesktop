@@ -418,7 +418,7 @@ tasks.register<Test>("headlessTest") {
     maxParallelForks = 1
     filter {
         listOf("SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
-            "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
+            "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest", "ConnectNetworkStateTest", "ConnectRefactorTest",
             "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest", "SyncPlaybackTest", "ConnectWireTest", "ConnectSocketListenerTest", "ConnectHandoffTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
             "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest"
@@ -435,4 +435,13 @@ tasks.register<Zip>("zipWindowsPortable") {
     archiveFileName.set("KittyTune-${project.version}-Windows-Portable-x64.zip")
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
+}
+
+tasks.register<JavaExec>("connectBenchmark") {
+    description = "Reports Connect CPU/allocation and packet-size baselines without user profiles or audio."
+    group = "verification"
+    dependsOn("testClasses")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("ConnectBenchmark")
+    systemProperty("java.awt.headless", "true")
 }

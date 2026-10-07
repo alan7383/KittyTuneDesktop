@@ -44,4 +44,22 @@ class ConnectSocketListenerTest {
         assertFalse(opened)
         assertEquals("HTTP 502", error)
     }
+    @Test fun routeCancellationIgnoresLateReadyAndFramesFromOldSocket() = runBlocking {
+        var messages = 0
+        val listener = ConnectSocketListener({}, { _, _ -> messages++ }, {})
+        listener.finish("")
+        listener.onMessage(Socket(), "{\"type\":\"ready\"}")
+        listener.onMessage(Socket(), "old-state")
+        assertEquals(0, messages)
+        assertFalse(withTimeout(100) { listener.ready.await() })
+        withTimeout(100) { listener.ended.await() }
+    }
+    @Test fun connectionDiagnosticKeepsErrnoButOmitsPrivateExceptionMessage() {
+        var error = ""
+        val listener = ConnectSocketListener({}, { _, _ -> }, { error = it })
+        listener.onFailure(Socket(), java.net.ConnectException("private host and token").apply {
+            initCause(java.io.IOException("connect failed: EACCES"))
+        }, null)
+        assertEquals("ConnectException (EACCES)", error)
+    }
 }

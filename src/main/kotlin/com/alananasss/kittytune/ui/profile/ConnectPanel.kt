@@ -71,8 +71,7 @@ private fun label(ru: String, en: String) = if (Locale.getDefault().language == 
             val status = when {
                 independent -> label("Выключите «Играть отдельно» для переключения", "Disable independent playback to switch")
                 live?.connected != true -> label("Не в сети", "Offline")
-                live.snapshot?.isPlaying == true -> label("Играет", "Playing") + " · " + (live.snapshot.queue.getOrNull(live.snapshot.currentIndex)?.title ?: "")
-                live.transport == "LAN" -> label("Домашняя сеть", "Local network")
+                live.transport == "LAN" -> label("Локальная сеть", "Local network")
                 else -> label("Интернет", "Internet")
             }
             DeviceChoice(peer.label, status,

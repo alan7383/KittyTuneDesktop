@@ -23,7 +23,7 @@ data class ConnectCredentials(val room: String, val token: String, val key: Byte
                 .joinToString("\u0000") { "${it.first}\u0000${it.second}" }
             fun hash(label: String) = MessageDigest.getInstance("SHA-256")
                 .digest("kitty-connect/v1/$label\u0000$input".toByteArray(Charsets.UTF_8))
-            fun hex(bytes: ByteArray) = bytes.joinToString("") { "%02x".format(it) }
+            fun hex(bytes: ByteArray) = ConnectHex.encode(bytes)
             return ConnectCredentials(hex(hash("room")), hex(hash("auth")), hash("encryption"))
         }
     }
@@ -116,9 +116,29 @@ object ConnectWire {
         }
     }.getOrNull()
 
-    fun queueVersion(state: PlaybackSnapshot): String = MessageDigest.getInstance("SHA-256")
-        .digest(state.queue.joinToString("|") { "${it.source}:${it.id}" }.toByteArray())
-        .take(12).joinToString("") { "%02x".format(it) }
+    fun queueVersion(state: PlaybackSnapshot): String {
+        val input = StringBuilder(state.queue.size * 24)
+        state.queue.forEachIndexed { index, track ->
+            if (index > 0) input.append('|')
+            input.append(track.source).append(':').append(track.id)
+        }
+        return ConnectHex.encode(MessageDigest.getInstance("SHA-256")
+            .digest(input.toString().toByteArray(Charsets.UTF_8)), 12)
+    }
+
+    internal fun serializeSnapshot(state: PlaybackSnapshot): String = gson.toJson(state)
+    internal fun deserializeSnapshot(json: String): PlaybackSnapshot = gson.fromJson(json, PlaybackSnapshot::class.java)
+}
+
+private object ConnectHex {
+    private const val DIGITS = "0123456789abcdef"
+    fun encode(bytes: ByteArray, length: Int = bytes.size): String = String(CharArray(length * 2).also { result ->
+        for (index in 0 until length) {
+            val value = bytes[index].toInt() and 255
+            result[index * 2] = DIGITS[value ushr 4]
+            result[index * 2 + 1] = DIGITS[value and 15]
+        }
+    })
 }
 
 /** Reject replay and reordering within a connection; old sessions cannot reappear on that connection. */

@@ -3,8 +3,20 @@ package com.alananasss.kittytune.data.sync
 import com.alananasss.kittytune.core.NamedPrefs
 
 internal object ConnectPlatform {
-    fun trace(event: String) {} // Debug transport tracing is enabled only in Android debug builds.
+    private val diagnostics by lazy {
+        System.getenv("KITTY_CONNECT_TRACE_FILE")?.takeIf { it.isNotBlank() }?.let { path ->
+            runCatching {
+                java.util.logging.Logger.getLogger("KittyConnect").apply {
+                    useParentHandlers = false
+                    addHandler(java.util.logging.FileHandler(path, true).apply { formatter = java.util.logging.SimpleFormatter() })
+                }
+            }.getOrNull()
+        }
+    }
+    fun trace(event: String) { diagnostics?.info(event) } // Opt-in counts/events only, never frames or credentials.
     fun canUseLan() = true
+    fun canConnect() = true
+    fun routeClient(client: okhttp3.OkHttpClient): okhttp3.OkHttpClient? = client
     const val mobile = false
     var autoHeadphones: Boolean
         get() = false

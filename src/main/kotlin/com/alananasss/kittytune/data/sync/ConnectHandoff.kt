@@ -10,7 +10,8 @@ internal object ConnectHandoff {
         require(track.source != "local") { "Local files are unavailable on another device" }
         execute(target, "transfer", initial.copy(isPlaying = false), 0)
         val latest = readSource() ?: error("Source is unavailable")
-        check(latest.queue.getOrNull(latest.currentIndex)?.id == track.id) { "Track changed; choose the device again" }
+        val currentTrack = latest.queue.getOrNull(latest.currentIndex)
+        check(currentTrack?.id == track.id && currentTrack.source == track.source) { "Track changed; choose the device again" }
         // Respect a pause made while the destination was preparing.
         execute(source, "pause", null, 0)
         val stopped = readSource() ?: latest

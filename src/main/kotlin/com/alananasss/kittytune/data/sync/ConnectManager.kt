@@ -36,7 +36,8 @@ object ConnectManager {
     private val jobs = ConcurrentHashMap<String, Job>()
     private val sockets = ConcurrentHashMap<String, WebSocket>()
     private val links = ConcurrentHashMap<String, Link>()
-    private val pending = ConcurrentHashMap<String, CompletableDeferred<ConnectMessage>>()
+    @Volatile private var connectionGeneration = 0L
+    private val pending = ConnectPendingCommands<Link>()
     private val _peers = MutableStateFlow<Map<String, ConnectPeerState>>(emptyMap())
     val peers: StateFlow<Map<String, ConnectPeerState>> = _peers
     private val _feedback = MutableStateFlow("")
@@ -56,8 +57,8 @@ object ConnectManager {
     private var headphonesConnected = false
     private var suppressAutomatic = false
     private var automaticJob: Job? = null
-    private var foreground = !ConnectPlatform.mobile
-    private var playing = false
+    @Volatile private var foreground = !ConnectPlatform.mobile
+    @Volatile private var playing = false
     @Volatile private var enabled = true
     @Volatile private var local: PlaybackSnapshot? = null
     private var handler: (suspend (ConnectMessage) -> Unit)? = null
@@ -93,7 +94,7 @@ object ConnectManager {
         foreground = value; _visible.value = value; refresh()
         if (!value) { automaticJob?.cancel() } else if (headphonesConnected) scheduleHeadphoneTransfer()
     }
-    fun networkChanged() { if (active()) restart() }
+    @Synchronized fun networkChanged() { if (active()) restart() }
     @Synchronized fun selectDevice(id: String?) { selection.choose(id); _selectedDevice.value = selection.selectedDevice }
     /** A remote command addresses our renderer; it is not a manual choice to pin this UI locally. */
     @Synchronized fun activateLocalRenderer() { selection.activateLocalRenderer(); _selectedDevice.value = null }
@@ -149,7 +150,7 @@ object ConnectManager {
         _independent.value = !SyncPlayback.enabled
         ConnectPlatform.observeHeadphones(enabled && SyncPlayback.enabled && handler != null && (foreground || playing))
         ConnectPlatform.setActive(!ConnectPlatform.mobile || foreground || playing)
-        if (!active()) { closeConnections(); return }
+        if (!active() || !ConnectPlatform.canConnect()) { closeConnections(); return }
         ConnectPlatform.startListener()
         val devices = SyncPeers.all().filter { it.secret.length >= 20 }
         val ids = devices.map { it.deviceId }.toSet()
@@ -157,15 +158,17 @@ object ConnectManager {
         links.keys.filter { it !in ids }.forEach { links.remove(it)?.close?.invoke() }
         for (peer in devices) {
             // Android dials the desktop on LAN. The desktop only makes outbound relay connections.
-            if (links[peer.deviceId]?.transport == "LAN") continue
+            if (ConnectPlatform.mobile && links[peer.deviceId]?.transport == "LAN") continue
             if (!ConnectPlatform.mobile && relayUrl.isBlank()) continue
             if (jobs[peer.deviceId]?.isActive == true) continue
-            jobs[peer.deviceId] = scope.launch { connectionLoop(peer.deviceId) }
+            val generation = connectionGeneration
+            jobs[peer.deviceId] = scope.launch { connectionLoop(peer.deviceId, generation) }
         }
     }
 
-    private fun restart() { closeConnections(); refresh() }
+    @Synchronized private fun restart() { closeConnections(); refresh() }
     @Synchronized private fun closeConnections() {
+        connectionGeneration++
         jobs.values.forEach { it.cancel() }; jobs.clear()
         sockets.values.forEach { it.cancel() }; sockets.clear()
         links.values.toList().forEach { it.close() }; links.clear()
@@ -175,18 +178,18 @@ object ConnectManager {
     fun credentials(peer: KnownDevice) = ConnectCredentials.derive(SyncLog.deviceId,
         SyncService.pairingSecret, peer.deviceId, peer.secret)
 
-    private suspend fun connectionLoop(peerId: String) {
+    private suspend fun connectionLoop(peerId: String, generation: Long) {
         var backoff = 2_000L
         try {
-            while (currentCoroutineContext().isActive && active()) {
+            while (currentCoroutineContext().isActive && active() && generation == connectionGeneration) {
                 val peer = SyncPeers.find(peerId) ?: break
-                if (links[peerId]?.transport == "LAN") {
+                if (ConnectPlatform.mobile && links[peerId]?.transport == "LAN") {
                     _peers.first { links[peerId]?.transport != "LAN" }
                     continue
                 }
                 var established = false
                 if (ConnectPlatform.mobile && ConnectPlatform.canUseLan() && peer.platform != "android" && peer.host.isNotBlank()) {
-                    established = connect(peer, "ws://${peer.host}:${ConnectLanPort}/v1/connect", "LAN")
+                    established = connect(peer, "ws://${peer.host}:${ConnectLanPort}/v1/connect", "LAN", generation)
                     if (!established && relayUrl.isBlank()) {
                         // One bounded discovery attempt per backoff, never a continuous LAN scan.
                         val found = runCatching { SyncDiscovery.locate(peerId).firstOrNull() }.getOrNull()
@@ -195,7 +198,7 @@ object ConnectManager {
                 }
                 if (!active()) break
                 if (!established && relayUrl.isNotBlank()) {
-                    established = connect(peer, ConnectPlatform.relayEndpoint() + "/v1/connect", "Internet")
+                    established = connect(peer, ConnectPlatform.relayEndpoint() + "/v1/connect", "Internet", generation)
                 }
                 if (established) backoff = 2_000L
                 delay(backoff + kotlin.random.Random.nextLong(0, 500))
@@ -204,43 +207,70 @@ object ConnectManager {
         } finally { /* connect() owns its socket; an obsolete job must not cancel a replacement. */ }
     }
 
-    private suspend fun connect(peer: KnownDevice, url: String, transport: String): Boolean {
+    private suspend fun connect(peer: KnownDevice, url: String, transport: String, generation: Long): Boolean {
         ConnectPlatform.trace("connect $transport")
         val credentials = runCatching { credentials(peer) }.getOrNull() ?: return false
+        val owner = currentCoroutineContext()[Job] ?: return false
+        // Keep LAN's existing direct socket path; bind relay DNS/sockets to the new Internet route.
+        val routeClient = if (transport == "LAN") lanClient else ConnectPlatform.routeClient(client) ?: return false
         var link: Link? = null
+        fun current() = generation == connectionGeneration && owner.isActive && active()
+        fun standby() = transport == "Internet" && ConnectTransportPolicy.relayStandby(
+            ConnectPlatform.mobile, links[peer.deviceId]?.transport)
+        fun attachSocket(webSocket: WebSocket): Link = attach(peer, transport, webSocket::send) {
+            // Replacing an Internet renderer link with LAN leaves the PC relay socket on standby.
+            if (!standby()) webSocket.close(1000, "idle")
+        }
         lateinit var listener: ConnectSocketListener
         listener = ConnectSocketListener(opened = { webSocket ->
+            synchronized(this) {
+                if (!current()) { webSocket.cancel(); return@synchronized }
                 webSocket.send(gson.toJson(mapOf("type" to "join", "room" to credentials.room,
                     "token" to credentials.token, "device" to SyncLog.deviceId)))
+            }
             }, received = received@ { webSocket, text ->
+            synchronized(this) {
+                if (!current()) { webSocket.cancel(); return@synchronized }
+                if (link != null && links[peer.deviceId] !== link) link = null
                 if (text == "{\"type\":\"ready\"}") {
                     ConnectPlatform.trace("ready $transport")
-                    if (transport != "LAN" && links[peer.deviceId]?.transport == "LAN") {
-                        webSocket.close(1000, "LAN preferred")
-                        listener.finish("")
-                        return@received
+                    if (standby()) {
+                        listener.ready.complete(true)
+                        return@synchronized
                     }
-                    if (link == null) link = attach(peer, transport, webSocket::send) { webSocket.close(1000, "idle") }
+                    if (link == null) link = attachSocket(webSocket)
                     else { link?.sendMessage("hello"); link?.sendState(localState(), force = true) }
                     listener.ready.complete(true)
                 } else if (text == "{\"type\":\"peer_left\"}") {
-                    updatePeer(peer.deviceId) { (it ?: ConnectPeerState(peer.deviceId, peer.label)).offline() }
-                } else link?.receive(text)
+                    if (!standby()) updatePeer(peer.deviceId) { (it ?: ConnectPeerState(peer.deviceId, peer.label)).offline() }
+                } else {
+                    // A paired phone announces its arrival on the new route with an encrypted hello.
+                    // Relay presence alone is insufficient to replace a healthy LAN connection.
+                    if (link == null && ConnectTransportPolicy.authenticatedArrival(ConnectWire.open(credentials, text), peer.deviceId))
+                        link = attachSocket(webSocket)
+                    link?.receive(text)
+                }
+            }
             }, departed = { error ->
+            synchronized(this) {
                 ConnectPlatform.trace("departed $transport $error")
                 link?.detach()
-                if (error.isNotBlank() && links[peer.deviceId] == null) updatePeer(peer.deviceId) {
+                if (current() && error.isNotBlank() && links[peer.deviceId] == null) updatePeer(peer.deviceId) {
                     (it ?: ConnectPeerState(peer.deviceId, peer.label)).offline().copy(error = error)
                 }
+            }
             })
-        val socket = (if (transport == "LAN") lanClient else client).newWebSocket(Request.Builder().url(url).build(), listener)
-        sockets[peer.deviceId] = socket
+        val socket = synchronized(this) {
+            if (!current()) return false
+            routeClient.newWebSocket(Request.Builder().url(url).build(), listener).also { sockets[peer.deviceId] = it }
+        }
         return try {
             val connected = withTimeoutOrNull(if (transport == "LAN") 5_000L else 15_000L) { listener.ready.await() } == true
             if (!connected) return false
             listener.ended.await()
             true
         } finally {
+            listener.finish("")
             socket.cancel(); sockets.remove(peer.deviceId, socket); link?.detach()
         }
     }
@@ -270,17 +300,23 @@ object ConnectManager {
     }
 
     class Link internal constructor(val peer: KnownDevice, val transport: String,
-        private val send: (String) -> Boolean, val close: () -> Unit) {
+        private val send: (String) -> Boolean, private val disconnect: () -> Unit) {
+        private val sessionJob = SupervisorJob(scope.coroutineContext[Job])
+        private val detached = java.util.concurrent.atomic.AtomicBoolean()
+        private val sessionScope = CoroutineScope(scope.coroutineContext + sessionJob)
+        val close: () -> Unit = { if (detach()) disconnect() }
         private val credentials = credentials(peer)
         private val session = UUID.randomUUID().toString()
         private val challenge = UUID.randomUUID().toString()
-        private var peerChallenge = ""
-        private var peerCompression = false
+        @Volatile private var peerChallenge = ""
+        @Volatile private var peerCompression = false
         private var sequence = 0L
         private val replay = ConnectReplayGuard()
-        private val commands = kotlinx.coroutines.sync.Mutex()
-        private var lastSent: PlaybackSnapshot? = null
-        private var lastQueue = ""
+        private val commands = ConnectCommandQueue(sessionScope, ::executeCommand, failed = { close() })
+        private val publisher = ConnectStatePublisher()
+        private val sender = ConnectFrameSender(sessionScope,
+            encode = { message, compress -> ConnectWire.seal(credentials, message, compress) },
+            send = send, failed = { close() })
         @Synchronized fun sendMessage(kind: String, id: String = "", action: String = "", value: Long = 0, value2: Long = 0,
             state: PlaybackSnapshot? = null, trackId: Long? = null, queueVersion: String = "",
             ok: Boolean = false, error: String = "") {
@@ -288,22 +324,13 @@ object ConnectManager {
                 sequence = ++sequence, id = id, action = action, value = value, value2 = value2, state = state,
                 challenge = challenge, replyTo = peerChallenge,
                 trackId = trackId, queueVersion = queueVersion, ok = ok, error = error, compression = "gzip")
-            runCatching { send(ConnectWire.seal(credentials, message, compress = peerCompression)) }
-                .onFailure { ConnectPlatform.trace("send failed $transport ${it.javaClass.simpleName}"); close() }
+            if (!sender.enqueue(message, peerCompression)) scope.launch { close() }
         }
         @Synchronized fun sendState(state: PlaybackSnapshot?, force: Boolean = false) {
             if (peerChallenge.isEmpty()) return
             if (state == null) { if (force) sendMessage("idle"); return }
-            val version = ConnectWire.queueVersion(state)
-            val old = lastSent
-            val changed = old == null || old.currentIndex != state.currentIndex ||
-                old.isPlaying != state.isPlaying || old.shuffleEnabled != state.shuffleEnabled ||
-                old.repeatMode != state.repeatMode || old.volume != state.volume || version != lastQueue ||
-                kotlin.math.abs(state.positionMs - old.projectedPosition(state.updatedAtMs)) > 1_000L
-            if (!force && !changed && state.updatedAtMs - old!!.updatedAtMs < 60_000L) return
-            val payload = if (force || lastQueue != version) state else state.copy(queue = emptyList())
-            sendMessage("state", state = payload, queueVersion = version)
-            lastSent = state; lastQueue = version
+            val frame = publisher.plan(state, force) ?: return
+            sendMessage("state", state = frame.state, queueVersion = frame.queueVersion)
         }
         fun receive(text: String) {
             if (links[peer.deviceId] !== this || SyncPeers.find(peer.deviceId)?.secret != peer.secret) { close(); return }
@@ -334,41 +361,56 @@ object ConnectManager {
                         incoming.volume?.let { !it.isFinite() || it !in 0f..1f } == true) return
                     val state = incoming.copy(queue = queue, updatedAtMs = System.currentTimeMillis())
                     if (ConnectWire.queueVersion(state) != message.queueVersion) return
+                    ConnectPlatform.trace("accepted $transport tracks=${queue.size} index=${state.currentIndex} playing=${state.isPlaying}")
                     updatePeer(peer.deviceId) { ConnectPeerState(peer.deviceId, peer.label, true, transport,
                         state, message.queueVersion) }
                 }
-                "ack" -> pending.remove(message.id)?.complete(message)
-                "command" -> scope.launch {
-                    commands.lock()
-                    try {
-                    val key = "${peer.deviceId}:${message.id}"
-                    val duplicate = synchronized(handledCommands) { handledCommands.containsKey(key) }
-                    if (duplicate || message.id.length !in 16..64) { sendMessage("ack", id = message.id, error = "Duplicate command"); return@launch }
-                    synchronized(handledCommands) {
-                        handledCommands[key] = true
-                        while (handledCommands.size > 256) handledCommands.remove(handledCommands.keys.first())
-                    }
-                    val result = runCatching {
-                        withContext(Dispatchers.Main) {
-                            val current = snapshotProvider?.invoke()
-                            if (message.trackId != null) require(current?.queue?.getOrNull(current.currentIndex)?.id == message.trackId) { "Track changed; try again" }
-                            if (message.queueVersion.isNotBlank()) require(current != null && ConnectWire.queueVersion(current) == message.queueVersion) { "Queue changed; try again" }
-                            requireNotNull(handler) { "Player is starting" }.invoke(message)
-                        }
-                    }
-                    // Ordered websocket delivery makes the new queue visible before a transfer ACK.
-                    // Subsequent guarded seeks must address the prepared track, not the old one.
-                    withContext(Dispatchers.Main) { local = snapshotProvider?.invoke(); sendState(localState(), force = message.action == "transfer" && result.isSuccess) }
-                    sendMessage("ack", id = message.id, ok = result.isSuccess,
-                        error = result.exceptionOrNull()?.message?.take(100).orEmpty())
-                    } finally { commands.unlock() }
-                }
+                "ack" -> pending.acknowledge(this, message)
+                "command" -> if (!commands.enqueue(message))
+                    sendMessage("ack", id = message.id, error = "Device is busy; try again")
             }
         }
-        fun detach() {
+
+        private suspend fun executeCommand(message: ConnectMessage) {
+            if (links[peer.deviceId] !== this) return
+            val key = "${peer.deviceId}:${message.id}"
+            val duplicate = synchronized(handledCommands) { handledCommands.containsKey(key) }
+            if (duplicate || message.id.length !in 16..64) { sendMessage("ack", id = message.id, error = "Duplicate command"); return }
+            synchronized(handledCommands) {
+                handledCommands[key] = true
+                while (handledCommands.size > 256) handledCommands.remove(handledCommands.keys.first())
+            }
+            val result = runCatching {
+                withContext(Dispatchers.Main) {
+                    val current = snapshotProvider?.invoke()
+                    if (message.trackId != null) require(current?.queue?.getOrNull(current.currentIndex)?.id == message.trackId) { "Track changed; try again" }
+                    if (message.queueVersion.isNotBlank()) require(current != null && ConnectWire.queueVersion(current) == message.queueVersion) { "Queue changed; try again" }
+                    requireNotNull(handler) { "Player is starting" }.invoke(message)
+                }
+            }
+            // Ordered websocket delivery makes the new queue visible before a transfer ACK.
+            // Subsequent guarded seeks must address the prepared track, not the old one.
+            withContext(Dispatchers.Main) { local = snapshotProvider?.invoke(); sendState(localState(), force = message.action == "transfer" && result.isSuccess) }
+            sendMessage("ack", id = message.id, ok = result.isSuccess,
+                error = result.exceptionOrNull()?.message?.take(100).orEmpty())
+        }
+        fun detach(): Boolean {
+            if (!detached.compareAndSet(false, true)) return false
+            sender.close()
+            commands.close()
+            sessionJob.cancel()
+            pending.disconnect(this)
             if (links.remove(peer.deviceId, this)) updatePeer(peer.deviceId) {
                 (it ?: ConnectPeerState(peer.deviceId, peer.label)).offline()
             }
+            return true
+        }
+        fun registerCommand(id: String): CompletableDeferred<ConnectMessage> {
+            check(!detached.get()) { "Device disconnected" }
+            val completion = pending.register(this, id)
+            // Teardown can race registration; either side must fail the completion immediately.
+            if (detached.get()) pending.disconnect(this)
+            return completion
         }
     }
 
@@ -383,15 +425,14 @@ object ConnectManager {
         val link = links[peerId]?.takeIf { _peers.value[peerId]?.connected == true } ?: error("Device is offline")
         val remote = _peers.value[peerId]
         val id = UUID.randomUUID().toString()
-        val deferred = CompletableDeferred<ConnectMessage>()
-        pending[id] = deferred
+        val deferred = link.registerCommand(id)
         try {
             link.sendMessage("command", id = id, action = action, value = value, value2 = value2, state = state,
                 trackId = remote?.snapshot?.queue?.getOrNull(remote.snapshot.currentIndex)?.id.takeIf { action == "seek" },
                 queueVersion = remote?.queueVersion.orEmpty().takeIf { action in listOf("queue", "remove", "move") }.orEmpty())
             val ack = withTimeout(if (action == "transfer") 30_000L else 8_000L) { deferred.await() }
             check(ack.ok) { ack.error.ifBlank { "Command rejected" } }
-        } finally { pending.remove(id) }
+        } finally { pending.discard(id, deferred) }
     }
     private suspend fun executeLocal(action: String, state: PlaybackSnapshot? = null, value: Long = 0) {
         withContext(Dispatchers.Main) {

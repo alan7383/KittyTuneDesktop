@@ -24,7 +24,10 @@ internal class ConnectSocketListener(
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { finish("") }
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
         // No URLs, credentials, request headers or frame contents in diagnostics.
-        finish(response?.let { "HTTP ${it.code}" } ?: t.javaClass.simpleName)
+        val codes = setOf("EACCES", "EPERM", "ECONNREFUSED", "ENETUNREACH", "EHOSTUNREACH", "ETIMEDOUT", "ECONNRESET", "EADDRNOTAVAIL")
+        val code = generateSequence(t) { it.cause }.take(8)
+            .flatMap { it.message.orEmpty().split(Regex("[^A-Z_]+")).asSequence() }.firstOrNull { it in codes }
+        finish(response?.let { "HTTP ${it.code}" } ?: (t.javaClass.simpleName + (code?.let { " ($it)" } ?: "")))
     }
     fun finish(error: String) {
         if (!terminal.compareAndSet(false, true)) return

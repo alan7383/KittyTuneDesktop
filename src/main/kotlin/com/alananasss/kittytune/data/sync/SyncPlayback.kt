@@ -2,7 +2,6 @@ package com.alananasss.kittytune.data.sync
 
 import com.alananasss.kittytune.core.NamedPrefs
 import com.alananasss.kittytune.domain.Track
-import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -30,7 +29,7 @@ data class PlaybackSnapshot(
 object SyncPlayback {
     private const val KEY = "playback_snapshot"
     private const val MAX_QUEUE = 500
-    private val gson = Gson()
+    private val queueWindow = ConnectQueueWindow()
     private val prefs by lazy { NamedPrefs("sync_state") }
     private val _latest = MutableStateFlow(load())
     val latest: StateFlow<PlaybackSnapshot?> = _latest
@@ -47,15 +46,14 @@ object SyncPlayback {
     fun publish(queue: List<Track>, currentIndex: Int, positionMs: Long, isPlaying: Boolean,
                 shuffleEnabled: Boolean, repeatMode: String): PlaybackSnapshot? {
         if (!enabled || !localOwner || queue.isEmpty() || currentIndex !in queue.indices) return null
-        val start = if (queue.size > MAX_QUEUE)
-            (currentIndex - MAX_QUEUE / 2).coerceIn(0, queue.size - MAX_QUEUE) else 0
-        val selectedQueue = queue.drop(start).take(MAX_QUEUE)
-        val selectedIndex = currentIndex - start
+        val window = queueWindow.capture(queue, currentIndex) ?: return null
+        val selectedQueue = window.queue
+        val selectedIndex = window.index
         val now = System.currentTimeMillis()
         val old = _latest.value
         val changed = old == null || old.deviceId != SyncLog.deviceId || old.currentIndex != selectedIndex ||
             old.isPlaying != isPlaying || old.shuffleEnabled != shuffleEnabled ||
-            old.repeatMode != repeatMode || old.queue.map { it.id } != selectedQueue.map { it.id }
+            old.repeatMode != repeatMode || !ConnectQueueWindow.sameTracks(old.queue, selectedQueue)
         val seeked = old != null && kotlin.math.abs(positionMs - old.projectedPosition(now)) > 2_000L
         if (!changed && !seeked &&
             (SyncPeers.isEmpty() || now - lastTransferAtMs < 60_000L)) return old
@@ -93,12 +91,12 @@ object SyncPlayback {
     fun current(): PlaybackSnapshot? = _latest.value.takeIf { enabled }
 
     private fun save(snapshot: PlaybackSnapshot) {
-        prefs.putString(KEY, gson.toJson(snapshot))
+        prefs.putString(KEY, ConnectWire.serializeSnapshot(snapshot))
         _latest.value = snapshot
     }
 
     private fun load(): PlaybackSnapshot? = runCatching {
-        prefs.getString(KEY, null)?.let { gson.fromJson(it, PlaybackSnapshot::class.java) }
+        prefs.getString(KEY, null)?.let(ConnectWire::deserializeSnapshot)
     }.getOrNull()?.takeIf(::isValid)
 
     private fun isValid(snapshot: PlaybackSnapshot?): Boolean = runCatching {
