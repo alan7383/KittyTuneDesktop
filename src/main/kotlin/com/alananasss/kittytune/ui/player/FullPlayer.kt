@@ -1486,7 +1486,7 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
     val played = position.coerceIn(0L, duration)
     // A mix shows on the bar itself, as in the player bar; see MixTransition.
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
-    val shownFraction = if (scrubbing || viewModel.isScrubbing) played.toFloat() / duration
+    val shownFraction = if (scrubbing || viewModel.isScrubbing) (played.toFloat() / duration).also { mix.noteShown(it) }
     else mix.shownFraction(played.toFloat() / duration, viewModel.currentTrack?.id)
 
     Column(Modifier.fillMaxWidth()) {

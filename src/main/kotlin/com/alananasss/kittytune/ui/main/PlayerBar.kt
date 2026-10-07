@@ -558,7 +558,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     val duration = vm.duration.coerceAtLeast(1L)
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
     val isScrubbingNow = scrubbing || vm.isScrubbing
-    val shownFraction = if (isScrubbingNow) position.toFloat() / duration
+    val shownFraction = if (isScrubbingNow) (position.toFloat() / duration).also { mix.noteShown(it) }
     else mix.shownFraction(position.toFloat() / duration, vm.currentTrack?.id)
     val glowColor = MaterialTheme.colorScheme.primary
 

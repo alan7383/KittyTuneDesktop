@@ -44,6 +44,13 @@ private const val CATCH_UP_NANOS = 450_000_000L
 /** How long the bar takes to slide to where a wheel notch sent the playhead. */
 private const val WHEEL_GLIDE_NANOS = 320_000_000L
 
+/** A bar left at or past this fraction, then landing before [LANDED_NEAR_START], slides back instead of jumping. */
+private const val JUMPED_FROM_END = 0.85f
+private const val LANDED_NEAR_START = 0.15f
+
+/** How long the slide back from the end takes. */
+private const val JUMP_BACK_NANOS = 750_000_000L
+
 /** How often an idle bar checks whether a glide has begun; no frames are asked for in between. */
 private const val IDLE_CHECK_MS = 64L
 
@@ -87,6 +94,16 @@ class MixTransition internal constructor(
     /** Whether the bar is drawn somewhere other than the real position and needs frames to get there. */
     internal val isGliding: Boolean get() = glideFrom != null || catchUpFrom != null
 
+    /**
+     * Tells the bar where it is drawn while the reader drags it, when [shownFraction] is not asked: otherwise the
+     * next track change glides from wherever the bar was before the drag began, which showed as a short step
+     * left, a run back to the end, and then the slide (issue #66).
+     */
+    fun noteShown(fraction: Float) {
+        lastShown = fraction
+        catchUpFrom = null
+    }
+
     /** Whether the bar is gliding home after a track change, as opposed to counting down to one. */
     val isMixing: Boolean get() = glideFrom != null || progress.value > 0f
 
@@ -108,6 +125,11 @@ class MixTransition internal constructor(
                 switchedAtNanos = now
                 sawFade = false
                 catchUpFrom = null
+            } else if (lastTrackKey !== NO_TRACK && lastShown >= JUMPED_FROM_END && actualFraction <= LANDED_NEAR_START) {
+                // Dragged or clicked to the very end, which moves on to the next track: the bar slides back from
+                // where it was left instead of jumping to the start.
+                glideFrom = null
+                startCatchUp(now, JUMP_BACK_NANOS, FastOutSlowInEasing)
             } else {
                 glideFrom = null
             }
