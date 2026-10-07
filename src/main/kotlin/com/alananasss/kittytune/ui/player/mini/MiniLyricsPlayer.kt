@@ -487,7 +487,10 @@ fun MiniLyricsPlayerWindow(
                 onDragEnd = {
                     isDragging = false
                     runCatching {
-                        windowState.position = WindowPosition((window.x / density.density).dp, (window.y / density.density).dp)
+                        // The window's own coordinates are the units a Window position is in. Dividing by this
+                        // composition's density put the window somewhere else on a monitor with another scale,
+                        // which read as a mini player that cannot be moved to the second screen (issue #66).
+                        windowState.position = WindowPosition(window.x.dp, window.y.dp)
                     }
                     saveCurrentBounds()
                     com.alananasss.kittytune.core.Prefs.flush()
