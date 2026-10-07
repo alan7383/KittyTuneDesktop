@@ -135,7 +135,8 @@ private fun TitleAndArtist(
             ArtistLinkText(
                 track = track,
                 onArtistClick = { vm.navigateToTrackArtist(it) },
-                text = track.user?.username ?: "",
+                // The track's own credit, not the account that posted it, which can be shared by two artists.
+                text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                 style = if (isLarge) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 hoverColor = MaterialTheme.colorScheme.primary,
