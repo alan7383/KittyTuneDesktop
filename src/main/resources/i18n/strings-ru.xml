@@ -2829,4 +2829,6 @@
     <string name="chart_country_fr">Франция</string>
     <string name="chart_country_hu">Венгрия</string>
     <string name="chart_country_vn">Вьетнам</string>
+    <string name="pref_lyrics_one_line_title">Одна строчка</string>
+    <string name="pref_lyrics_one_line_sub">Поющаяся строка над кнопкой воспроизведения в панели плеера</string>
 </resources>

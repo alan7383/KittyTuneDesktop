@@ -3443,4 +3443,6 @@
     <string name="chart_country_fr">Frankreich</string>
     <string name="chart_country_hu">Ungarn</string>
     <string name="chart_country_vn">Vietnam</string>
+    <string name="pref_lyrics_one_line_title">Eine Zeile</string>
+    <string name="pref_lyrics_one_line_sub">Die gesungene Zeile über der Wiedergabetaste in der Player-Leiste</string>
 </resources>

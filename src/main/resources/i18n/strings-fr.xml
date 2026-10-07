@@ -2831,4 +2831,6 @@
     <string name="chart_country_fr">France</string>
     <string name="chart_country_hu">Hongrie</string>
     <string name="chart_country_vn">Viêt Nam</string>
+    <string name="pref_lyrics_one_line_title">Une ligne</string>
+    <string name="pref_lyrics_one_line_sub">La ligne chantée, au-dessus du bouton lecture de la barre du lecteur</string>
 </resources>
