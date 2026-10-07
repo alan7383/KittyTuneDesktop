@@ -167,6 +167,10 @@ import com.alananasss.kittytune.utils.Logger
         var yandexNotice by mutableStateOf<YandexNotice?>(null)
             private set
 
+        /** The spelling a SoundCloud search was retried with when what was typed found nothing; see [SearchQueryRepair]. */
+        var searchCorrectedQuery by mutableStateOf<String?>(null)
+            private set
+
         /** The Apple result currently being looked for on a source that streams, if any. */
         var resolvingAppleSongId by mutableStateOf<String?>(null)
             private set
@@ -572,6 +576,7 @@ import com.alananasss.kittytune.utils.Logger
             searchResultsQobuzTracks.clear(); searchResultsQobuzAlbums.clear(); searchResultsQobuzPlaylists.clear(); searchResultsQobuzArtists.clear()
             searchResultsApple.clear()
             yandexNotice = null
+            searchCorrectedQuery = null
             tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
         }
     
@@ -597,6 +602,24 @@ import com.alananasss.kittytune.utils.Logger
             } finally {
                 isSearchLoading = false
             }
+        }
+
+        /**
+         * When none of the tracks found looks like what was typed, asks Deezer, whose search forgives a missing
+         * space or dash, how the song is spelt, and searches SoundCloud again with that; see [SearchQueryRepair].
+         */
+        private suspend fun retryWithRepairedQuery(query: String) {
+            val found = searchResultsTracks.map { (it.title.orEmpty()) to it.displayArtist.ifBlank { it.user?.username.orEmpty() } }
+            if (!SearchQueryRepair.needsRepair(query, found)) return
+            val candidates = runCatching {
+                com.alananasss.kittytune.data.deezer.DeezerSearchRepository.searchTracks(query, limit = 10)
+            }.getOrDefault(emptyList()).map { it.title.orEmpty() to it.displayArtist.ifBlank { it.user?.username.orEmpty() } }
+            val repaired = SearchQueryRepair.repairedQuery(query, candidates) ?: return
+            if (searchQuery.trim() != query.trim()) return
+            searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear()
+            tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
+            searchCorrectedQuery = repaired
+            performSoundCloudSearch(repaired, isRetry = true)
         }
 
         private suspend fun performDeezerSearch(query: String) {
@@ -873,7 +896,7 @@ import com.alananasss.kittytune.utils.Logger
                 }
             }
         }
-        private suspend fun performSoundCloudSearch(query: String) {
+        private suspend fun performSoundCloudSearch(query: String, isRetry: Boolean = false) {
             coroutineScope {
                 when (activeFilter) {
                     SearchFilter.ALL -> {
@@ -895,6 +918,9 @@ import com.alananasss.kittytune.utils.Logger
                         val response = api.searchPlaylists(query, limit = 30); searchResultsPlaylists.addAll(response.collection); playlistsNextUrl = response.next_href
                     }
                 }
+            }
+            if (!isRetry && activeFilter != SearchFilter.ARTISTS && activeFilter != SearchFilter.PLAYLISTS) {
+                retryWithRepairedQuery(query)
             }
         }
     

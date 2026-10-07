@@ -865,6 +865,17 @@ private fun SearchResults(
             )
         }
 
+        // What was searched for instead, when what was typed found nothing like itself (issue #66).
+        val corrected = vm.searchCorrectedQuery
+        if (hasQuery && corrected != null && vm.activeSearchSource == SearchSource.SOUNDCLOUD) {
+            Text(
+                text = str("search_showing_results_for", corrected),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+            )
+        }
+
         // ── Content ──
         if (!hasQuery) {
             // With an empty field: recent searches, a chart, and what the liked artists have

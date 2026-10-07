@@ -3269,4 +3269,5 @@
     <string name="lyrics_search_clear">Xóa</string>
     <string name="lyrics_sync_tap_title">Nhấn khi nghe dòng tiếp theo</string>
     <string name="lyrics_sync_tap_button">Ngay bây giờ</string>
+    <string name="search_showing_results_for">Hiển thị kết quả cho “%1$s”</string>
 </resources>

@@ -2819,4 +2819,5 @@
     <string name="lyrics_search_clear">Очистить</string>
     <string name="lyrics_sync_tap_title">Нажмите, когда зазвучит следующая строка</string>
     <string name="lyrics_sync_tap_button">Сейчас</string>
+    <string name="search_showing_results_for">Показаны результаты для «%1$s»</string>
 </resources>

@@ -2822,4 +2822,5 @@
     <string name="lyrics_search_clear">Törlés</string>
     <string name="lyrics_sync_tap_title">Nyomd meg, amikor a következő sor elhangzik</string>
     <string name="lyrics_sync_tap_button">Most</string>
+    <string name="search_showing_results_for">Találatok erre: „%1$s”</string>
 </resources>
