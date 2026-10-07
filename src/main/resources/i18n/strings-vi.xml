@@ -3272,4 +3272,11 @@
     <string name="home_releases_this_friday">Phát hành thứ Sáu này · từ %1$s</string>
     <string name="home_releases_last_friday">Thứ Sáu tuần trước · %1$s</string>
     <string name="home_releases_earlier">Trước đó</string>
+    <string name="chart_country_ru">Nga</string>
+    <string name="chart_country_us">Hoa Kỳ</string>
+    <string name="chart_country_uk">Vương quốc Anh</string>
+    <string name="chart_country_de">Đức</string>
+    <string name="chart_country_fr">Pháp</string>
+    <string name="chart_country_hu">Hungary</string>
+    <string name="chart_country_vn">Việt Nam</string>
 </resources>

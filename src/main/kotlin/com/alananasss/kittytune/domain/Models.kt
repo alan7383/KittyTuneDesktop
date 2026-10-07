@@ -445,6 +445,7 @@
                 ?.distinctBy { it.id.ifBlank { it.name } }
                 ?.joinToString(", ") { it.name }?.takeIf { it.isNotBlank() }
                 ?: publisherMetadata?.artist?.takeIf { it.isNotBlank() }
+                ?: soloArtistFromTitle(title, user?.username)
                 ?: user?.username?.takeIf { it.isNotBlank() }
                 ?: ""
 
@@ -838,3 +839,19 @@ internal fun usablePlaylistCover(url: String?): Boolean =
         !url.contains("picsum") &&
         !url.contains("avatars") &&
         !url.contains("default_avatar")
+
+private val ACCOUNT_NAME_SEPARATOR = Regex("""\s*(?:&|,|\+|\s+x\s+|\s+and\s+)\s*""", RegexOption.IGNORE_CASE)
+private val ARTIST_TITLE_SPLIT = Regex("""\s+[-–—]\s+""")
+
+/**
+ * The one artist of "9mice - So Good" posted from an account named "Kai Angel & 9mice": artists who share an
+ * account post everything under both names, and the title says who sings. Null unless the account names several
+ * artists and the title's artist part is one of them (issue #66).
+ */
+internal fun soloArtistFromTitle(title: String?, account: String?): String? {
+    if (title.isNullOrBlank() || account.isNullOrBlank()) return null
+    val names = account.split(ACCOUNT_NAME_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
+    if (names.size < 2) return null
+    val left = title.split(ARTIST_TITLE_SPLIT, limit = 2).takeIf { it.size == 2 }?.first()?.trim() ?: return null
+    return names.firstOrNull { it.equals(left, ignoreCase = true) }
+}

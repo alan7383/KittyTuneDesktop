@@ -251,6 +251,8 @@ import com.alananasss.kittytune.utils.Logger
                     limit = CHART_PREVIEW_LENGTH,
                     // The landing previews one market; picking another belongs to the chart screen.
                     countryCode = "US",
+                    deezerCountryName = ChartCountry
+                        .forLanguage(com.alananasss.kittytune.core.Strings.resolvedLanguage).deezerName,
                 )
                 if (kind == chartPreviewKind) {
                     chartPreview.clear()

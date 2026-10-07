@@ -269,6 +269,8 @@ fun ChartsScreen(
                     genres = ChartsViewModel.chartGenres,
                     onKindChange = { viewModel.loadChart(it, viewModel.chartGenre) },
                     onGenreChange = { viewModel.loadChart(viewModel.chartKind, it) },
+                    country = viewModel.chartCountry,
+                    onCountryChange = { viewModel.selectChartCountry(it) },
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }

@@ -2825,4 +2825,11 @@
     <string name="home_releases_this_friday">E heti péntek újdonságai · %1$s óta</string>
     <string name="home_releases_last_friday">Múlt péntek · %1$s</string>
     <string name="home_releases_earlier">Korábban</string>
+    <string name="chart_country_ru">Oroszország</string>
+    <string name="chart_country_us">USA</string>
+    <string name="chart_country_uk">Egyesült Királyság</string>
+    <string name="chart_country_de">Németország</string>
+    <string name="chart_country_fr">Franciaország</string>
+    <string name="chart_country_hu">Magyarország</string>
+    <string name="chart_country_vn">Vietnam</string>
 </resources>

@@ -28,9 +28,18 @@ internal suspend fun fetchChart(
     genre: ChartGenre,
     limit: Int,
     countryCode: String,
+    deezerCountryName: String? = null,
 ): List<ChartEntry> = try {
     val tracks: List<Track> = when (kind) {
-        ChartKind.COUNTRY -> com.alananasss.kittytune.data.deezer.DeezerSearchRepository.countryChart(limit)
+        ChartKind.COUNTRY -> com.alananasss.kittytune.data.deezer.DeezerSearchRepository
+            .countryChart(limit, deezerCountryName)
+            // Deezer unreachable: the trending feed, rather than an empty list.
+            .ifEmpty {
+                runCatching {
+                    api.getCharts(kind = "trending", genre = "soundcloud:genres:all-music", limit = limit)
+                        .collection.mapNotNull { it.track }
+                }.getOrDefault(emptyList())
+            }
 
         ChartKind.TRENDING -> api.getCharts(
             kind = "trending",

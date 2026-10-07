@@ -62,6 +62,25 @@
      */
     data class ChartGenre(val id: String, val slug: String)
 
+    /**
+     * A country whose chart can be chosen. One for each language the app is translated into, plus the UK; the
+     * name is what Deezer calls the country in its "Top <country>" playlists.
+     */
+    enum class ChartCountry(val code: String, val deezerName: String, val flag: String, val language: String) {
+        RU("RU", "Russia", "\uD83C\uDDF7\uD83C\uDDFA", "ru"),
+        US("US", "United States", "\uD83C\uDDFA\uD83C\uDDF8", "en"),
+        UK("UK", "United Kingdom", "\uD83C\uDDEC\uD83C\uDDE7", "en"),
+        DE("DE", "Germany", "\uD83C\uDDE9\uD83C\uDDEA", "de"),
+        FR("FR", "France", "\uD83C\uDDEB\uD83C\uDDF7", "fr"),
+        HU("HU", "Hungary", "\uD83C\uDDED\uD83C\uDDFA", "hu"),
+        VN("VN", "Vietnam", "\uD83C\uDDFB\uD83C\uDDF3", "vi");
+
+        companion object {
+            /** The country whose language the app is in. */
+            fun forLanguage(language: String): ChartCountry = entries.firstOrNull { it.language == language } ?: US
+        }
+    }
+
     /** One song at its place in the chart. [rank] is the position, never the score. */
     data class ChartEntry(val rank: Int, val track: Track, val score: Double)
 
@@ -78,6 +97,7 @@
         // ── The song chart ──
         var chartKind by mutableStateOf(ChartKind.COUNTRY)
         var chartGenre by mutableStateOf(chartGenres.first())
+        var chartCountry by mutableStateOf(ChartCountry.forLanguage(com.alananasss.kittytune.core.Strings.resolvedLanguage))
         val chartEntries = mutableStateListOf<ChartEntry>()
         var isChartLoading by mutableStateOf(false)
 
@@ -99,7 +119,7 @@
 
             viewModelScope.launch {
                 isChartLoading = true
-                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode())
+                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode(), chartCountry.deezerName)
                 // A switch made mid-flight must not leave the newer request's answer overwritten by
                 // the older one's.
                 if (kind == chartKind && genre == chartGenre) {
@@ -108,6 +128,11 @@
                     isChartLoading = false
                 }
             }
+        }
+
+        fun selectChartCountry(country: ChartCountry) {
+            chartCountry = country
+            loadChart(chartKind, chartGenre)
         }
 
         fun currentCountryCode(): String =

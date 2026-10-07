@@ -433,7 +433,7 @@ private fun HomeFeed(
                         when (item) {
                             is Track -> MediaCard(
                                 title = item.title ?: "",
-                                subtitle = item.user?.username ?: "",
+                                subtitle = item.displayArtist.ifBlank { item.user?.username.orEmpty() },
                                 artworkUrl = item.fullResArtwork,
                                 round = false,
                                 onRightClick = { playerViewModel.showTrackOptions(item) }

@@ -2823,4 +2823,11 @@
     <string name="home_releases_this_friday">This Friday's releases · since %1$s</string>
     <string name="home_releases_last_friday">Last Friday · %1$s</string>
     <string name="home_releases_earlier">Earlier</string>
+    <string name="chart_country_ru">Russia</string>
+    <string name="chart_country_us">United States</string>
+    <string name="chart_country_uk">United Kingdom</string>
+    <string name="chart_country_de">Germany</string>
+    <string name="chart_country_fr">France</string>
+    <string name="chart_country_hu">Hungary</string>
+    <string name="chart_country_vn">Vietnam</string>
 </resources>
