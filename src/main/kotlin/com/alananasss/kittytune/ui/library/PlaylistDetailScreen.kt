@@ -1252,8 +1252,11 @@ fun PlaylistDetailScreen(
         val creatorName = playlistUser?.username
         val isVerified = playlistUser?.verified == true
         when {
-            playlistId == "likes" -> PlaybackContext(str("context_playlist", str("lib_liked_tracks")), "likes", null, artistName = null)
-            playlistId == "downloads" -> PlaybackContext(str("context_playlist", str("lib_downloads")), "downloads", null, artistName = null)
+            // Named for what they are: "Playlist · Liked tracks" called a list of likes a playlist (issue #66).
+            // Only playlists somebody made keep the word.
+            playlistId == "likes" -> PlaybackContext(str("lib_liked_tracks"), "likes", null, artistName = null)
+            playlistId == "downloads" -> PlaybackContext(str("lib_downloads"), "downloads", null, artistName = null)
+            playlistId == "local_files" -> PlaybackContext(str("local_media_title"), "local_files", null, artistName = null)
             playlistId.startsWith("station") || playlistId.startsWith("yt_radio:") ->
                 PlaybackContext(str("context_station", playlistTitle), playlistId, playlistCover, artistName = null, isVerified = isVerified)
             isAlbum -> PlaybackContext(str("context_album", playlistTitle), playlistId, playlistCover, artistName = creatorName, isVerified = isVerified)

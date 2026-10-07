@@ -64,6 +64,9 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 private const val LRC_LEAD_MS = 300L
+
+/** Where the side panel puts the sung line, as a fraction of its height from the top. */
+private const val SIDEBAR_VERTICAL_OFFSET = 0.36f
 private const val WORD_SYNC_LEAD_MS = 0L
 private const val SMOOTH_PLAYBACK_MAX_FORWARD_DRIFT_MS = 80L
 private const val SMOOTH_PLAYBACK_MAX_BACKWARD_DRIFT_MS = 180L
@@ -101,7 +104,13 @@ fun LyricsEnhanced(
     }
     val lyricsHorizontalMargin = if (isFullScreen) viewModel.lyricsFullScreenHorizontalMargin else viewModel.lyricsHorizontalMargin
     val lyricsHorizontalMarginDp = if (lyricsHorizontalMargin > 0f) lyricsHorizontalMargin.dp else (if (isFullScreen) 0.dp else 16.dp)
-    val lyricsVerticalOffsetFraction = if (isFullScreen) viewModel.lyricsFullScreenVerticalOffset else viewModel.lyricsVerticalOffset
+    // The side panel keeps the sung line near the middle so the one before and the one after are both in view;
+    // the central view's setting is made for a window, and put the line far too low in a panel (issue #66).
+    val lyricsVerticalOffsetFraction = when {
+        isFullScreen -> viewModel.lyricsFullScreenVerticalOffset
+        isSidebar -> SIDEBAR_VERTICAL_OFFSET
+        else -> viewModel.lyricsVerticalOffset
+    }
     val configuredScale = if (isFullScreen) viewModel.lyricsFullScreenActiveScale else viewModel.lyricsActiveScale
     val lyricsActiveScale = if (isFullScreen && configuredScale <= 1.01f) 1.08f else configuredScale
 
@@ -298,6 +307,12 @@ fun LyricsEnhanced(
                                 lrcBounceEnabled = viewModel.lyricsLrcBounceEnabled,
                                 bounceFactor = viewModel.lyricsBounceFactor,
                                 lineSpacing = lyricsLineSpacingDp,
+                                // The dots between verses at the size of the panel, not of a window.
+                                breathingDotsDefaults = if (isSidebar) {
+                                    com.alananasss.kittytune.ui.player.lyrics.accompanist.KaraokeBreathingDotsDefaults(size = 8.dp, margin = 6.dp)
+                                } else {
+                                    com.alananasss.kittytune.ui.player.lyrics.accompanist.KaraokeBreathingDotsDefaults()
+                                },
                                 horizontalMargin = lyricsHorizontalMarginDp,
                                 activeScale = lyricsActiveScale,
                                 modifier = Modifier.fillMaxSize()
@@ -388,11 +403,15 @@ fun buildSyncedLyrics(
             }
 
             val lineStart = entry.startTime.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
-            val lineEnd = if (entry.endTime > entry.startTime) {
+            // Never before the last word ends: a line whose end time falls short of its words (the source's own
+            // rounding, or the next line's start) stopped being the sung line while "за ужин" was still being
+            // sung, and the view moved on before the fill got there (issue #66).
+            val declaredEnd = if (entry.endTime > entry.startTime) {
                 entry.endTime.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
             } else {
-                mainSyllables.maxOfOrNull { it.end } ?: (lineStart + 4000)
+                lineStart + 4000
             }
+            val lineEnd = maxOf(declaredEnd, mainSyllables.maxOfOrNull { it.end } ?: 0)
             if (lineEnd <= lineStart) return@forEachIndexed
 
             val accompanimentLines = if (mainWords.isNotEmpty() && bgWords.isNotEmpty()) {
