@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.media
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import com.alananasss.kittytune.audio.AudioEngine
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.data.StreamResolver
@@ -34,6 +35,10 @@ import kotlin.math.sin
  * first third, the two genuinely blend across the middle, and the incoming is alone for the last
  * third. The point of a crossfade is that the sum does not move, and only a shared span achieves it.
  */
+/** The ramp back from a mix's tempo and key: 60 steps of 40 ms, 2.4 s in all. */
+private const val STRETCH_RAMP_STEPS = 60
+private const val STRETCH_RAMP_STEP_MS = 40L
+
 internal const val CROSSFADE_SPAN_START = 0.3f
 internal const val CROSSFADE_SPAN_END = 0.7f
 
@@ -599,14 +604,16 @@ class Player {
                     AutomixManager.clearPlan()
 
                     if (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f) {
+                        // Back to the track's own tempo and key, in steps too small to hear. Ten jumps of a
+                        // fifth of a second each made the start of a mixed-in track warble, as if it were
+                        // playing at a lower quality for its first seconds (issue #66).
                         scope.launch {
-                            val rampSteps = 10
                             val startTempo = effectivePlan.tempoRatio
                             val startPitch = effectivePlan.pitchRatio
-                            for (step in 1..rampSteps) {
-                                delay(200)
+                            for (step in 1..STRETCH_RAMP_STEPS) {
+                                delay(STRETCH_RAMP_STEP_MS)
                                 if (!isActive) break
-                                val frac = step.toFloat() / rampSteps
+                                val frac = FastOutSlowInEasing.transform(step.toFloat() / STRETCH_RAMP_STEPS)
                                 val curTempo = startTempo + frac * (1f - startTempo)
                                 val curPitch = startPitch + frac * (1f - startPitch)
                                 newEngine.setStretcherRatio(curTempo, curPitch)
