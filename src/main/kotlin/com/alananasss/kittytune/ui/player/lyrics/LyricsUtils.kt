@@ -170,6 +170,56 @@ object LyricsUtils {
 
     private val NUMERIC_ENTITY_REGEX = Regex("&#(x)?([0-9a-fA-F]+);")
 
+    private val LRC_TIMESTAMP = Regex("""\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?]""")
+    private val ENHANCED_TIMESTAMP = Regex("""<\d{1,3}:\d{2}(?:[.:]\d{1,3})?>""")
+    private val LRC_HEADER_TAG = Regex("""\[(?i:ar|ti|al|au|by|re|ve|length|offset|id|lr|la|#):.*]""")
+    private val WEB_ADDRESS =
+        Regex("""(?i)(https?://\S+|www\.\S+|\b[\w-]+\.(?:com|net|org|ru|io|info|me|cc|co|xyz)\b\S*)""")
+    private val WATERMARK_WORDS =
+        Regex("""(?i)\b(lyrics?|lrc|generator|made|created|synced|synchronized|by|with|from|at|on|provided|powered|visit)\b""")
+    private val NOT_A_WORD = Regex("""[^\p{L}\p{Nd}]+""")
+
+    /**
+     * A line some lyrics files carry that is not part of the song: the site or tool that made the file,
+     * "—-www.LRCgenerator.com—-", "Lyrics by RentAnAdviser.com", "https://…". A line counts when it holds a
+     * web address and little else: at most three words once the address is taken out.
+     */
+    fun isWatermarkLine(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || !WEB_ADDRESS.containsMatchIn(trimmed)) return false
+        val rest = trimmed.replace(WEB_ADDRESS, " ").replace(WATERMARK_WORDS, " ")
+            .split(NOT_A_WORD).filter { it.isNotBlank() }
+        return rest.size <= 3
+    }
+
+    /**
+     * Words to show as plain text: LRC timestamps and `[ar:…]`-style header tags taken out, watermark lines
+     * dropped. A file whose timings do not advance ends up here, and used to show its `[00:00.00]` stamps.
+     */
+    fun cleanPlainLyrics(raw: String): String {
+        if (raw.isBlank()) return raw
+        return raw.lines()
+            .filterNot { LRC_HEADER_TAG.matches(it.trim()) }
+            .map { it.replace(LRC_TIMESTAMP, "").replace(ENHANCED_TIMESTAMP, "") }
+            .filterNot { isWatermarkLine(it) }
+            .joinToString("\n")
+            .trim('\n')
+    }
+
+    /**
+     * Whether parsed lines carry real timings. A provider can stamp every line with the same time (often
+     * `[00:00.00]`), or nearly every line: shown as synced, such a sheet sits on its first line for the whole
+     * song while saying it is synchronised (issue #66). At least half the lines have to start at a moment of
+     * their own, and the stamps have to get past the first second.
+     */
+    fun hasRealTimings(lines: List<LyricLine>): Boolean {
+        val sung = lines.filter { !it.isInstrumental && it.text.isNotBlank() }
+        if (sung.size < 2) return sung.size == 1 && sung[0].startTime > 0L
+        val distinctStarts = sung.map { it.startTime }.distinct()
+        if (distinctStarts.size * 2 < sung.size) return false
+        return sung.maxOf { it.startTime } >= 1_000L
+    }
+
     fun decodeHtmlEntities(text: String): String {
         if (!text.contains('&')) return text
         var out = text
@@ -309,7 +359,9 @@ object LyricsUtils {
                 parseLrc(content, totalDurationMs)
             }
         }
-        return insertInstrumentalBreaks(parsed)
+        val withoutWatermarks = parsed.filterNot { isWatermarkLine(it.text) }
+        if (!hasRealTimings(withoutWatermarks)) return emptyList()
+        return insertInstrumentalBreaks(withoutWatermarks)
     }
 
     fun parseTtml(ttml: String, totalDurationMs: Long): List<LyricLine> {

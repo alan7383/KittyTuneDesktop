@@ -376,6 +376,59 @@ object LyricsMatcher {
     }
 
     /**
+     * A dash between an artist and a title in an uploaded title: "9mice - ELA-ELA". Only a dash with a space
+     * on at least one side counts; one inside a word is part of the title. Splitting on any dash turned
+     * "ELA-ELA (feat. kai angel)" into the artist "ELA" and the title "ELA", and the lyrics search into "ELA ELA".
+     */
+    private val ARTIST_TITLE_DASH = Regex("""\s+-\s*|\s*-\s+""")
+
+    /** Two songs released as one track, "your love / narcotic": a slash with spaces around it. */
+    private val DOUBLE_TITLE_SLASH = Regex("""\s+//?\s+""")
+
+    /** Characters an artist credit keeps; the rest of an uploaded name is decoration. */
+    private val ARTIST_DECORATION = Regex("""[^\p{L}\p{Nd}\s\-&'$]""")
+
+    private val BRACKETED_ASIDE = Regex("""(?i)\[.*?]|\(.*?\)""")
+
+    private val TRAILING_CREDIT = Regex("""(?i)\s+(w/|feat\.?|ft\.?|prod\.?|x(?=\s)).*""")
+
+    /**
+     * The artist and the title of an uploaded track, from its title and the name of the account it is credited
+     * to: "Artist - Title" when the title says so, the account's name and the title otherwise. Bracketed asides
+     * and trailing "feat."/"prod." credits are dropped from the title.
+     *
+     * @return the artist first, then the title.
+     */
+    fun splitArtistAndTitle(title: String, uploader: String): Pair<String, String> {
+        val uploaderArtist = uploader.replace(ARTIST_DECORATION, "").trim()
+        val normalizedTitle = title.replace('–', '-').replace('—', '-')
+        val withoutAsides = normalizedTitle.replace(BRACKETED_ASIDE, "").trim()
+
+        var artist = uploaderArtist
+        var songTitle = withoutAsides
+        val parts = when {
+            ARTIST_TITLE_DASH.containsMatchIn(withoutAsides) -> withoutAsides.split(ARTIST_TITLE_DASH, limit = 2)
+            ARTIST_TITLE_DASH.containsMatchIn(normalizedTitle) -> normalizedTitle.split(ARTIST_TITLE_DASH, limit = 2)
+            else -> null
+        }
+        if (parts != null && parts.size == 2 && parts.all { it.isNotBlank() }) {
+            artist = parts[0].replace(ARTIST_DECORATION, "").trim()
+            songTitle = parts[1].replace(BRACKETED_ASIDE, "").trim()
+        }
+        val withoutCredits = songTitle.replace(TRAILING_CREDIT, "").trim()
+        return artist to withoutCredits.ifBlank { songTitle }
+    }
+
+    /**
+     * The songs a title names: "your love / narcotic" is "your love" and "narcotic". A single song gives
+     * an empty list. Lyrics sites list each song on its own, so the whole title finds nothing.
+     */
+    fun titleParts(title: String): List<String> {
+        if (!DOUBLE_TITLE_SLASH.containsMatchIn(title)) return emptyList()
+        return title.split(DOUBLE_TITLE_SLASH).map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    /**
      * Generates intelligent (title, artist) candidate pairs for exact-match providers
      * (BetterLyrics, BetterLyrics Portato, KuGou, Paxsenix, YouLyPlus, Unison).
      *

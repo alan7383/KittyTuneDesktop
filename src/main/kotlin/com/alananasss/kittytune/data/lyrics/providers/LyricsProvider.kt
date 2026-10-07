@@ -1,5 +1,10 @@
 package com.alananasss.kittytune.data.lyrics.providers
 
+/**
+ * The lyrics sources. YouTube Music used to be one: it answered for whatever video its search picked, so it
+ * served another song's words, marked as synced when they were not, and won over LrcLib (issue #66). A saved
+ * order that still names it skips the name.
+ */
 enum class PreferredLyricsProvider(val displayName: String) {
     BETTER_LYRICS("BetterLyrics"),
     BETTER_LYRICS_PORTATO("BetterLyrics (QQ)"),
@@ -13,7 +18,6 @@ enum class PreferredLyricsProvider(val displayName: String) {
     PAXSENIX_SPOTIFY("Paxsenix (Spotify)"),
     PAXSENIX_MUSIXMATCH("Paxsenix (Musixmatch)"),
     YOUTUBE_SUBTITLE("YouTube Subtitle"),
-    YOUTUBE("YouTube Music"),
     MUSIXMATCH("Musixmatch"),
     GENIUS("Genius");
 
@@ -37,7 +41,6 @@ val DefaultLyricsProviderOrder = listOf(
     PreferredLyricsProvider.PAXSENIX_SPOTIFY,
     PreferredLyricsProvider.PAXSENIX_MUSIXMATCH,
     PreferredLyricsProvider.YOUTUBE_SUBTITLE,
-    PreferredLyricsProvider.YOUTUBE,
     PreferredLyricsProvider.GENIUS,
 )
 

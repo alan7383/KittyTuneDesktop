@@ -66,6 +66,9 @@ enum class CommentSort(
 
 enum class LyricsMode { SYNCED, PLAIN }
 
+/** How long after a track's lyrics settle the search-by-hand starts on its own, so it never competes with them. */
+private const val BACKGROUND_LYRICS_SEARCH_DELAY_MS = 1_500L
+
 data class UnifiedLyricResult(
     val id: String,
     val name: String,
@@ -818,6 +821,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var manualSearchProvider by mutableStateOf("ALL") // Par défaut sur Toutes les sources !
     val unifiedLyricSearchResults = mutableStateListOf<UnifiedLyricResult>()
 
+    /** The sources the running lyrics search is still waiting on, in the order they were asked. */
+    val pendingLyricSources = mutableStateListOf<PreferredLyricsProvider>()
+
+    /** The track [unifiedLyricSearchResults] were found for, so another track's results are never offered. */
+    private var lyricSearchTrackId: Long? = null
+
+    /** Which source the lyrics on screen came from, or null when there are none or they were loaded from a file. */
+    var currentLyricsSource by mutableStateOf<String?>(null)
+        private set
+
     var lyricsFontSize by mutableFloatStateOf(playerPrefs.getLyricsFontSize())
     var lyricsFullScreenFontSize by mutableFloatStateOf(playerPrefs.getLyricsFullScreenFontSize())
     var lyricsSidebarFontSize by mutableFloatStateOf(playerPrefs.getLyricsSidebarFontSize())
@@ -831,7 +844,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     var lyricsSidebarDisplayStyle by mutableStateOf(playerPrefs.getLyricsSidebarDisplayStyle())
 
     var lyricsMode by mutableStateOf(LyricsMode.SYNCED)
-    var rawPlainLyrics by mutableStateOf<String?>(null)
+    private var plainLyricsState by mutableStateOf<String?>(null)
+
+    /** The words as plain text, cleaned of timestamps and watermark lines whichever provider they came from. */
+    var rawPlainLyrics: String?
+        get() = plainLyricsState
+        set(value) {
+            plainLyricsState = value?.let(LyricsUtils::cleanPlainLyrics)
+        }
+
     /** How the lyrics are shifted against the audio, one offset or two points (see [LyricsSync]). */
     var lyricsSync by mutableStateOf(com.alananasss.kittytune.data.LyricsSync.NONE)
         private set
@@ -1898,58 +1919,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         showLyricsSheet = if (isDifferentTrack) true else !showLyricsSheet
     }
 
-    private fun parseArtistAndTitle(title: String, uploader: String): Pair<String, String> {
-        val cleanArtist = uploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-        val normalizedTitle = title.replace('–', '-').replace('—', '-')
-        val cleanTitle = normalizedTitle.replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
+    private fun parseArtistAndTitle(title: String, uploader: String): Pair<String, String> =
+        LyricsMatcher.splitArtistAndTitle(title, uploader)
 
-        var parsedArtist = cleanArtist
-        var parsedTitle = cleanTitle
-        if (cleanTitle.contains("-")) {
-            val parts = cleanTitle.split("-", limit = 2)
-            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-            parsedTitle = parts[1].trim()
-        } else if (normalizedTitle.contains("-")) {
-            val parts = normalizedTitle.split("-", limit = 2)
-            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-            parsedTitle = parts[1].replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
-        }
-        val ultraCleanTitle = parsedTitle.replace(Regex("(?i)\\s+(w/|feat\\.?|ft\\.?|prod\\.?|x(?=\\s)).*"), "").trim()
-        return Pair(parsedArtist, ultraCleanTitle.ifBlank { parsedTitle })
-    }
-
+    /**
+     * What to type into a lyrics search for this track, best first. A title naming two songs
+     * ("your love / narcotic") is searched by its first song right after the whole title: lyrics
+     * sites list the songs one by one, so the whole title alone found nothing.
+     */
     private fun generateSearchQueries(title: String, uploader: String, rawUploader: String? = null): List<String> {
         val queries = mutableSetOf<String>()
+        val decoration = Regex("""[^\p{L}\p{Nd}\s\-&'$]""")
+        val uploaderArtist = uploader.replace(decoration, "").trim()
+        val withoutAsides = title.replace('–', '-').replace('—', '-')
+            .replace(Regex("""(?i)\[.*?]|\(.*?\)"""), "").trim()
+        val (parsedArtist, parsedTitle) = parseArtistAndTitle(title, uploader)
+        val titleParts = LyricsMatcher.titleParts(parsedTitle)
 
-        val cleanArtist = uploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-        val normalizedTitle = title.replace('–', '-').replace('—', '-')
-        val cleanTitle = normalizedTitle.replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
-
-        var parsedArtist = cleanArtist
-        var parsedTitle = cleanTitle
-        if (cleanTitle.contains("-")) {
-            val parts = cleanTitle.split("-", limit = 2)
-            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-            parsedTitle = parts[1].trim()
-        } else if (normalizedTitle.contains("-")) {
-            val parts = normalizedTitle.split("-", limit = 2)
-            parsedArtist = parts[0].replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-            parsedTitle = parts[1].replace(Regex("(?i)\\[.*?\\]|\\(.*?\\)"), "").trim()
+        fun withArtist(songTitle: String, artist: String) {
+            if (songTitle.isNotBlank() && artist.isNotBlank()) queries.add("$songTitle $artist")
         }
-        val ultraCleanTitle = parsedTitle.replace(Regex("(?i)\\s+(w/|feat\\.?|ft\\.?|prod\\.?|x(?=\\s)).*"), "").trim()
-        if (ultraCleanTitle.isNotBlank() && parsedArtist.isNotBlank()) queries.add("$ultraCleanTitle $parsedArtist")
-        if (ultraCleanTitle.isNotBlank() && cleanArtist.isNotBlank() && cleanArtist != parsedArtist) queries.add("$ultraCleanTitle $cleanArtist")
-        if (parsedTitle.isNotBlank() && parsedArtist.isNotBlank()) queries.add("$parsedTitle $parsedArtist")
-        if (ultraCleanTitle.isNotBlank()) queries.add(ultraCleanTitle)
+        withArtist(parsedTitle, parsedArtist)
+        titleParts.forEach { withArtist(it, parsedArtist) }
+        if (uploaderArtist != parsedArtist) withArtist(parsedTitle, uploaderArtist)
         if (parsedTitle.isNotBlank()) queries.add(parsedTitle)
-        queries.add(cleanTitle)
+        titleParts.firstOrNull()?.let { queries.add(it) }
+        if (withoutAsides.isNotBlank()) queries.add(withoutAsides)
 
         if (!rawUploader.isNullOrBlank()) {
-            val cleanRaw = rawUploader.replace(Regex("[^\\p{L}\\p{Nd}\\s\\-&'$]"), "").trim()
-            if (cleanRaw.isNotBlank() && cleanRaw != cleanArtist && cleanRaw != parsedArtist) {
-                if (ultraCleanTitle.isNotBlank()) queries.add("$ultraCleanTitle $cleanRaw")
-                if (parsedTitle.isNotBlank()) queries.add("$parsedTitle $cleanRaw")
-            }
+            val rawArtist = rawUploader.replace(decoration, "").trim()
+            if (rawArtist != uploaderArtist && rawArtist != parsedArtist) withArtist(parsedTitle, rawArtist)
         }
 
         return queries.filter { it.length > 2 }.toList()
@@ -2040,7 +2039,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val effectiveArtist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
         val queries = generateSearchQueries(track.title ?: "", effectiveArtist, track.user?.username)
         val (parsedArtist, parsedTitle) = parseArtistAndTitle(track.title ?: "", effectiveArtist)
-        manualSearchQuery = if (parsedTitle.isNotBlank() && parsedArtist.isNotBlank()) "$parsedTitle $parsedArtist" else (queries.firstOrNull() ?: "")
+        // The first song of a two-song title: the whole title is not what any lyrics site calls it.
+        val searchTitle = LyricsMatcher.titleParts(parsedTitle).firstOrNull() ?: parsedTitle
+        manualSearchQuery = if (searchTitle.isNotBlank() && parsedArtist.isNotBlank()) "$searchTitle $parsedArtist" else (queries.firstOrNull() ?: "")
+        if (lyricSearchTrackId != track.id) {
+            manualLyricSearchJob?.cancel()
+            unifiedLyricSearchResults.clear()
+            pendingLyricSources.clear()
+            isManualSearchLoading = false
+            lyricSearchTrackId = null
+        }
+        currentLyricsSource = null
 
         lyricsJob = viewModelScope.launch(Dispatchers.IO) {
             // A previously chosen manual search result wins over automatic matching.
@@ -2097,6 +2106,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             }
             prefetchQueueLyrics()
         }
+        searchLyricsInBackground(track, manualSearchQuery)
     }
 
     /** Publishes a resolved lookup to the screen. Main thread only. */
@@ -2104,6 +2114,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lyricsLines.clear()
         lyricsLines.addAll(payload.lines)
         rawPlainLyrics = payload.plain
+        currentLyricsSource = payload.provider.takeUnless { payload.isEmpty }
         lyricsMode = if (payload.lines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
         isLyricsLoading = false
     }
@@ -2215,7 +2226,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             title = parsedTitle.ifBlank { track.title ?: "" },
             artist = parsedArtist.ifBlank { effectiveArtist },
             durationMs = track.durationMs ?: 0L,
-            alternativeTitles = listOfNotNull(track.title, parsedTitle, track.title?.let { cleanTitleNoise(it) }).filter { it.isNotBlank() }.distinct(),
+            alternativeTitles = (
+                listOfNotNull(track.title, parsedTitle, track.title?.let { cleanTitleNoise(it) }) +
+                    LyricsMatcher.titleParts(parsedTitle)
+                ).filter { it.isNotBlank() }.distinct(),
             alternativeArtists = listOfNotNull(
                 track.displayArtist,
                 parsedArtist,
@@ -2239,8 +2253,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     searchMusixmatchCandidates(query, target, trackDurationMs, variant).firstOrNull()
                 }
                 PreferredLyricsProvider.LRCLIB -> {
-                    val query = queries.firstOrNull() ?: "${target.title} ${target.artist}".trim()
-                    searchLrcLibCandidates(query, target, trackDurationMs).maxByOrNull { it.rank }
+                    // The whole title first, then each song of a two-song title on its own.
+                    val lrcLibQueries = (listOfNotNull(queries.firstOrNull()) +
+                        LyricsMatcher.titleParts(target.title).map { "$it ${target.artist}".trim() })
+                        .ifEmpty { listOf("${target.title} ${target.artist}".trim()) }
+                    var found: LyricsCandidate? = null
+                    for (query in lrcLibQueries) {
+                        found = searchLrcLibCandidates(query, target, trackDurationMs)
+                            .filter { it.isUsable }
+                            .maxByOrNull { it.rank }
+                        if (found != null) break
+                    }
+                    found
                 }
                 PreferredLyricsProvider.GENIUS -> {
                     null
@@ -2558,225 +2582,79 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      */
     private var manualLyricSearchJob: Job? = null
 
-    private fun cleanLyricsPreview(raw: String?): String? {
-        if (raw.isNullOrBlank()) return null
-        val lines = raw.lines()
-            .map { line ->
-                line.replace(Regex("\\[\\d+:\\d+(\\.\\d+)?\\]"), "")
-                    .replace(Regex("<[^>]+>"), "")
-                    .replace(Regex("\\(\\d+:\\d+\\)"), "")
-                    .trim()
-            }
-            .filter { it.isNotBlank() && !it.startsWith("[") && !it.startsWith("{") }
-            .take(2)
-        return if (lines.isNotEmpty()) lines.joinToString(" • ") else null
-    }
+    /**
+     * Searches for lyrics to pick by hand, [provider] being one source's name or "ALL".
+     *
+     * Every source is asked on its own and its results join the list as soon as it answers, so the fast
+     * sources are on screen while LrcLib is still thinking; the list used to stay empty until the slowest
+     * source was done. Results belong to the track they were searched for and are dropped with it.
+     */
+    fun searchLyricsManual(query: String, provider: String = manualSearchProvider) {
+        manualSearchProvider = provider
+        if (query.isBlank()) return
+        val track = currentTrack ?: return
+        manualLyricSearchJob?.cancel()
+        unifiedLyricSearchResults.clear()
+        lyricSearchTrackId = track.id
+        val sources = ManualLyricsSearch.providersFor(provider, playerPrefs)
+        pendingLyricSources.clear()
+        pendingLyricSources.addAll(sources)
+        isManualSearchLoading = sources.isNotEmpty()
 
-    private suspend fun searchProviderLyrics(provider: String, query: String): List<UnifiedLyricResult> {
-        val pref = PreferredLyricsProvider.fromName(provider)
-        return when (provider.uppercase()) {
-            "LRCLIB" -> {
-                try {
-                    LrcLibClient.api.searchLyrics(query).map {
-                        val hasLine = !it.syncedLyrics.isNullOrEmpty() || !it.lyricsfile.isNullOrEmpty()
-                        val raw = it.syncedLyrics ?: it.plainLyrics ?: it.lyricsfile
-                        UnifiedLyricResult(
-                            id = it.id.toString(),
-                            name = it.name,
-                            artistName = it.artistName,
-                            albumName = it.albumName,
-                            durationSec = it.duration,
-                            hasLineSync = hasLine,
-                            hasWordSync = false,
-                            provider = "LRCLIB",
-                            rawContent = raw,
-                            previewText = cleanLyricsPreview(raw)
-                        )
-                    }
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            }
+        val effectiveArtist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+        val searchTrack = LyricsSearchTrack(
+            id = track.id.toString(),
+            artist = effectiveArtist.trim(),
+            album = track.publisherMetadata?.albumTitle,
+            durationMs = track.durationMs ?: 0L,
+        )
+        val (parsedArtist, parsedTitle) = parseArtistAndTitle(track.title ?: "", effectiveArtist)
+        val target = LyricsMatcher.Target(
+            title = parsedTitle.ifBlank { track.title.orEmpty() },
+            artist = parsedArtist.ifBlank { effectiveArtist },
+            durationMs = searchTrack.durationMs,
+            alternativeTitles = (listOfNotNull(track.title) + LyricsMatcher.titleParts(parsedTitle)).filter { it.isNotBlank() },
+            alternativeArtists = listOfNotNull(track.displayArtist, track.user?.username).filter { it.isNotBlank() },
+        )
 
-            "GENIUS" -> {
-                try {
-                    com.alananasss.kittytune.data.network.GeniusClient.search(query).map {
-                        UnifiedLyricResult(
-                            id = it.id.toString(),
-                            name = it.title ?: "",
-                            artistName = it.artist,
-                            albumName = it.releaseDate,
-                            durationSec = 0.0,
-                            hasLineSync = false,
-                            hasWordSync = false,
-                            provider = "GENIUS",
-                            rawContent = null,
-                            previewText = null
-                        )
-                    }
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            }
-
-            "MUSIXMATCH" -> {
-                try {
-                    MusixmatchClient.search(query).map {
-                        UnifiedLyricResult(
-                            id = it.trackId.toString(),
-                            name = it.trackName,
-                            artistName = it.artistName,
-                            albumName = it.albumName,
-                            durationSec = it.trackLength.toDouble(),
-                            hasLineSync = it.hasSubtitles == 1,
-                            hasWordSync = it.hasRichSync == 1,
-                            provider = "MUSIXMATCH",
-                            rawContent = null,
-                            previewText = null
-                        )
-                    }
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            }
-
-            "SIMPMUSIC" -> {
-                try {
-                    SimpMusicClient.search(query).mapNotNull {
-                        val vId = it.videoId?.takeIf { id -> id.isNotBlank() } ?: return@mapNotNull null
-                        UnifiedLyricResult(
-                            id = vId,
-                            name = it.title ?: query,
-                            artistName = it.artist ?: "",
-                            albumName = it.album,
-                            durationSec = (it.duration ?: 0).toDouble(),
-                            hasLineSync = true,
-                            hasWordSync = !it.richSyncLyrics.isNullOrBlank(),
-                            provider = "SIMPMUSIC",
-                            rawContent = null,
-                            previewText = null
-                        )
-                    }
-                } catch (_: Exception) {
-                    emptyList()
-                }
-            }
-
-            else -> {
-                val p = LyricsProviders.all[pref]
-                if (p != null) {
-                    try {
-                        val trackArtist = currentTrack?.displayArtist?.ifBlank { currentTrack?.user?.username.orEmpty() }?.trim().orEmpty()
-                        val trackDuration = ((currentTrack?.durationMs ?: 0L) / 1000L).toInt()
-                        val trackAlbum = currentTrack?.publisherMetadata?.albumTitle
-
-                        val candidates = LyricsMatcher.generateCandidatePairs(query, trackArtist)
-
-                        var raw: String? = null
-                        var matchedTitle = query
-                        var matchedArtist = trackArtist
-
-                        for ((candTitle, candArtist) in candidates.distinct()) {
-                            if (candTitle.isBlank()) continue
-                            val res = p.getLyrics(
-                                id = currentTrack?.id?.toString() ?: "",
-                                title = candTitle,
-                                artist = candArtist,
-                                album = trackAlbum,
-                                duration = trackDuration
-                            )
-                            val content = res.getOrNull()
-                            if (!content.isNullOrBlank()) {
-                                raw = content
-                                matchedTitle = candTitle
-                                matchedArtist = candArtist
-                                break
+        manualLyricSearchJob = viewModelScope.launch {
+            PaxsenixClient.setApiKey(playerPrefs.getPaxsenixApiKey())
+            try {
+                supervisorScope {
+                    sources.forEach { source ->
+                        launch(Dispatchers.IO) {
+                            val found = withTimeoutOrNull(ManualLyricsSearch.PROVIDER_TIMEOUT_MS) {
+                                ManualLyricsSearch.search(source, query, searchTrack)
+                            }.orEmpty()
+                            withContext(Dispatchers.Main) {
+                                val merged = ManualLyricsSearch.merge(unifiedLyricSearchResults.toList(), found, target)
+                                unifiedLyricSearchResults.clear()
+                                unifiedLyricSearchResults.addAll(merged)
+                                pendingLyricSources.remove(source)
                             }
                         }
-
-                        if (!raw.isNullOrBlank()) {
-                            listOf(
-                                UnifiedLyricResult(
-                                    id = query,
-                                    name = matchedTitle,
-                                    artistName = matchedArtist.ifBlank { trackArtist },
-                                    albumName = trackAlbum,
-                                    durationSec = ((currentTrack?.durationMs ?: 0L) / 1000.0),
-                                    hasLineSync = raw.contains("[0") || raw.contains("[1") || raw.contains("begin="),
-                                    hasWordSync = raw.contains("<span") || raw.contains("begin=") || raw.contains("("),
-                                    provider = p.id.displayName,
-                                    rawContent = raw,
-                                    previewText = cleanLyricsPreview(raw)
-                                )
-                            )
-                        } else {
-                            emptyList()
-                        }
-                    } catch (_: Exception) {
-                        emptyList()
                     }
-                } else {
-                    emptyList()
+                }
+            } finally {
+                withContext(NonCancellable + Dispatchers.Main) {
+                    pendingLyricSources.clear()
+                    isManualSearchLoading = false
                 }
             }
         }
     }
 
-    fun searchLyricsManual(query: String, provider: String = manualSearchProvider) {
-        manualSearchProvider = provider
-        if (query.isBlank()) return
-        manualLyricSearchJob?.cancel()
-        isLyricsLoading = true
-        isManualSearchLoading = true
-        unifiedLyricSearchResults.clear()
-
-        manualLyricSearchJob = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                PaxsenixClient.setApiKey(playerPrefs.getPaxsenixApiKey())
-                val isAll = provider.equals("ALL", ignoreCase = true)
-
-                val mapped: List<UnifiedLyricResult> = if (isAll) {
-                    val userOrder = playerPrefs.getLyricsProviderOrder()
-                    val all = (userOrder + PreferredLyricsProvider.entries).distinct()
-                    val (enabled, disabled) = all.partition { playerPrefs.getLyricsProviderEnabled(it) }
-                    val activeProviders = if (enabled.isNotEmpty()) enabled else all
-
-                    coroutineScope {
-                        val deferreds = activeProviders.map { prov ->
-                            async(Dispatchers.IO) {
-                                withTimeoutOrNull(4500L) {
-                                    searchProviderLyrics(prov.name, query)
-                                } ?: emptyList()
-                            }
-                        }
-                        deferreds.awaitAll().flatten()
-                    }
-                } else {
-                    searchProviderLyrics(provider, query)
-                }
-
-                // Distinct by id + provider
-                val distinct = mapped.distinctBy { it.id + it.provider }
-
-                // The synchronized text is written first, and then the rest
-                val sorted = distinct.sortedWith(
-                    compareByDescending<UnifiedLyricResult> { it.hasLineSync || it.hasWordSync }
-                        .thenByDescending { it.hasWordSync }
-                        .thenBy { it.name.lowercase() }
-                )
-
-                withContext(Dispatchers.Main) {
-                    unifiedLyricSearchResults.clear()
-                    unifiedLyricSearchResults.addAll(sorted)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                withContext(Dispatchers.Main) {
-                    isLyricsLoading = false
-                    isManualSearchLoading = false
-                }
-            }
+    /**
+     * Runs the search-by-hand for [track] in the background once its lyrics are settled, so the manual search
+     * opens on results already there instead of starting from nothing (issue #66).
+     */
+    private fun searchLyricsInBackground(track: Track, query: String) {
+        viewModelScope.launch {
+            lyricsJob?.join()
+            delay(BACKGROUND_LYRICS_SEARCH_DELAY_MS)
+            if (currentTrack?.id != track.id) return@launch
+            if (lyricSearchTrackId == track.id && unifiedLyricSearchResults.isNotEmpty()) return@launch
+            searchLyricsManual(query, ManualLyricsSearch.ALL)
         }
     }
 
@@ -2853,12 +2731,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     rawPlainLyrics = finalPlain
                     lyricsMode = LyricsMode.SYNCED
                 } else if (!finalPlain.isNullOrBlank()) {
-                    // A result with no timings must not cost the user the synced lyrics they
-                    // already had: synced outranks plain, so the plain text is added beside them
-                    // and the view stays where it is (issue #33). Only with nothing synced on
-                    // screen does picking plain text switch the view to it.
+                    // Picked by hand, so shown, even over synced lyrics: keeping the synced ones on screen
+                    // made a click on a plain LrcLib result look like it did nothing (issue #66).
+                    lyricsLines.clear()
                     rawPlainLyrics = finalPlain
-                    if (lyricsLines.isEmpty()) lyricsMode = LyricsMode.PLAIN
+                    lyricsMode = LyricsMode.PLAIN
                 } else {
                     lyricsLines.clear()
                     rawPlainLyrics = null
@@ -2866,6 +2743,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 isLyricsLoading = false
                 isSearchingLyrics = false
+                currentLyricsSource = result.provider.takeIf { finalLines.isNotEmpty() || !finalPlain.isNullOrBlank() }
             }
 
             // Remember the manual pick for the current track (issue #27), and drop the cached
