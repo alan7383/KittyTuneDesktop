@@ -2819,8 +2819,6 @@
     <string name="lyrics_search_now_showing">Affiché : %1$s</string>
     <string name="lyrics_search_progress">%1$d trouvés, %2$d sources cherchent encore</string>
     <string name="lyrics_search_clear">Effacer</string>
-    <string name="lyrics_sync_tap_title">Appuyez quand la ligne suivante commence</string>
-    <string name="lyrics_sync_tap_button">Maintenant</string>
     <string name="search_showing_results_for">Résultats pour « %1$s »</string>
     <string name="chart_kind_country">Ton pays</string>
     <string name="home_releases_this_friday">Sorties de ce vendredi · depuis le %1$s</string>

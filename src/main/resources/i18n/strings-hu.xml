@@ -2820,8 +2820,6 @@
     <string name="lyrics_search_now_showing">Most: %1$s</string>
     <string name="lyrics_search_progress">%1$d találat, még %2$d forrás keres</string>
     <string name="lyrics_search_clear">Törlés</string>
-    <string name="lyrics_sync_tap_title">Nyomd meg, amikor a következő sor elhangzik</string>
-    <string name="lyrics_sync_tap_button">Most</string>
     <string name="search_showing_results_for">Találatok erre: „%1$s”</string>
     <string name="chart_kind_country">A te országod</string>
     <string name="home_releases_this_friday">E heti péntek újdonságai · %1$s óta</string>
