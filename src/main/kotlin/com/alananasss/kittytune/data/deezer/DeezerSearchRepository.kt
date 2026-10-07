@@ -60,6 +60,17 @@ object DeezerSearchRepository {
         }
     }
 
+    /**
+     * The most played tracks in the listener's country. Deezer's chart endpoint answers for the country the
+     * request comes from, so there is nothing to pass.
+     */
+    suspend fun countryChart(limit: Int = 50): List<Track> = withContext(Dispatchers.IO) {
+        fetchJson("$API_BASE/chart/0/tracks?limit=$limit")
+            ?.optJSONArray("data")
+            ?.mapObjects { it.toDeezerTrack() }
+            ?: emptyList()
+    }
+
     /** Tracks alone for [query], for a quick look-up rather than a full search page. */
     suspend fun searchTracks(query: String, limit: Int = 10): List<Track> = withContext(Dispatchers.IO) {
         if (query.isBlank()) return@withContext emptyList()

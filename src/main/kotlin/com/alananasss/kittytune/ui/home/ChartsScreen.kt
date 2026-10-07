@@ -292,8 +292,7 @@ fun ChartsScreen(
                                 startIndex = index,
                                 context = PlaybackContext(
                                     displayText = str(
-                                        if (viewModel.chartKind == ChartKind.TOP) "chart_kind_top"
-                                        else "chart_kind_trending"
+                                        viewModel.chartKind.labelKey()
                                     ),
                                     navigationId = "charts",
                                 ),

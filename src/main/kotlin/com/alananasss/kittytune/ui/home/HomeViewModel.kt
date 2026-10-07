@@ -199,7 +199,7 @@ import com.alananasss.kittytune.utils.Logger
 
         /** Enough of the chart to preview on the landing; the whole thing lives on the Charts screen. */
         val chartPreview = mutableStateListOf<ChartEntry>()
-        var chartPreviewKind by mutableStateOf(ChartKind.TOP)
+        var chartPreviewKind by mutableStateOf(ChartKind.COUNTRY)
             private set
         var isChartPreviewLoading by mutableStateOf(false)
             private set
@@ -315,12 +315,12 @@ import com.alananasss.kittytune.utils.Logger
             /** How long a query has to stand still before its results' streams are looked up. */
             private const val WARM_AFTER_IDLE_MS = 700L
 
-            /** How many liked artists are asked for new songs. One request each. */
-            const val ARTIST_UPDATE_SOURCES = 6
+            /** How many liked artists are asked for new songs. One request each, all at once. */
+            const val ARTIST_UPDATE_SOURCES = 10
 
-            private const val TRACKS_PER_ARTIST = 5
-            private const val MAX_PER_ARTIST = 2
-            private const val ARTIST_UPDATE_TOTAL = 18
+            private const val TRACKS_PER_ARTIST = 6
+            private const val MAX_PER_ARTIST = 3
+            private const val ARTIST_UPDATE_TOTAL = 30
         }
 
         init {

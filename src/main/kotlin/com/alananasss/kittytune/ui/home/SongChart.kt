@@ -81,9 +81,7 @@ fun SongChart(
                 fillMaxWidth = true,
                 labelProvider = { option ->
                     Text(
-                        text = str(
-                            if (option == ChartKind.TOP) "chart_kind_top" else "chart_kind_trending"
-                        ),
+                        text = str(option.labelKey()),
                         maxLines = 1,
                     )
                 },

@@ -2821,4 +2821,8 @@
     <string name="lyrics_sync_tap_title">Press when you hear the next line</string>
     <string name="lyrics_sync_tap_button">Now</string>
     <string name="search_showing_results_for">Showing results for “%1$s”</string>
+    <string name="chart_kind_country">Your country</string>
+    <string name="home_releases_this_friday">This Friday's releases · since %1$s</string>
+    <string name="home_releases_last_friday">Last Friday · %1$s</string>
+    <string name="home_releases_earlier">Earlier</string>
 </resources>

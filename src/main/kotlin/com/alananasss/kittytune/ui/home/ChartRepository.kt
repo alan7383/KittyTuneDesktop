@@ -8,9 +8,11 @@ import com.google.gson.Gson
 /**
  * Fetches a ranked song list.
  *
- * The two kinds are two different requests, and both answers are ordered by the server, so the rank
+ * Each kind is a different request, and every answer is ordered by the server, so the rank
  * is always the position and never the score:
  *
+ * - [ChartKind.COUNTRY] is Deezer's chart for the listener's country, which Deezer picks from where the
+ *   request comes from; its tracks play through the configured audio sources like any Deezer track.
  * - [ChartKind.TRENDING] is `GET /charts?kind=trending`, the one live chart the endpoint serves. It
  *   ignores `genre` — every other genre than `all-music` comes back as an empty object — so the
  *   caller is not offered one here.
@@ -28,6 +30,8 @@ internal suspend fun fetchChart(
     countryCode: String,
 ): List<ChartEntry> = try {
     val tracks: List<Track> = when (kind) {
+        ChartKind.COUNTRY -> com.alananasss.kittytune.data.deezer.DeezerSearchRepository.countryChart(limit)
+
         ChartKind.TRENDING -> api.getCharts(
             kind = "trending",
             genre = "soundcloud:genres:all-music",
