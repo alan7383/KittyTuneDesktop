@@ -2,6 +2,9 @@ import com.alananasss.kittytune.ui.player.lyrics.buildSyncedLyrics
 import com.alananasss.kittytune.ui.player.lyrics.instantSyllables
 import com.alananasss.kittytune.ui.player.lyrics.revealSyllables
 import com.alananasss.kittytune.ui.player.lyrics.splitBackingVocals
+import com.alananasss.kittytune.ui.player.lyrics.splitBackingWords
+import com.alananasss.kittytune.ui.player.lyrics.separateBackingVocals
+import com.alananasss.kittytune.ui.player.lyrics.LyricWord
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
@@ -17,7 +20,7 @@ class LineTimingPartsTest {
     @Test
     fun bracketsAreTheBackingVocal() {
         assertEquals("I'm falling" to "falling down", splitBackingVocals("I'm falling (falling down)"))
-        assertEquals("say it again" to "again oh", splitBackingVocals("(again) say it (oh) again"))
+        assertEquals("say it again" to "again, oh", splitBackingVocals("(again) say it (oh) again"))
     }
 
     @Test
@@ -84,5 +87,37 @@ class LineTimingPartsTest {
         val line = assertIs<KaraokeLine.MainKaraokeLine>(lyrics.lines.single())
         assertEquals(3, line.syllables.size)
         assertNull(line.accompanimentLines)
+    }
+
+    private fun words(vararg parts: Pair<String, Long>) = parts.map { (text, at) -> LyricWord(text, at, at + 300) }
+
+    @Test
+    fun wordTimedBracketsBecomeBackingGroupsInOrder() {
+        val line = words("I'm " to 0, "falling " to 300, "(falling " to 600, "down) " to 900, "again " to 1200, "(yeah)" to 1500)
+        val (main, groups) = splitBackingWords(line)
+        assertEquals(listOf("I'm ", "falling ", "again "), main.map { it.text })
+        assertEquals(listOf(listOf("falling", "down"), listOf("yeah")), groups.map { g -> g.map { it.text } })
+        assertEquals(600L, groups.first().first().startTime)
+    }
+
+    @Test
+    fun aWordTimedLineInBracketsOnlyStaysWhole() {
+        val line = words("(ooh " to 0, "ooh)" to 300)
+        val (main, groups) = splitBackingWords(line)
+        assertEquals(line, main)
+        assertTrue(groups.isEmpty())
+    }
+
+    @Test
+    fun backingLineReadsWithCommas() {
+        val line = LyricLine(
+            text = "I'm falling (falling down) again (yeah)",
+            startTime = 0,
+            endTime = 2_000,
+            words = words("I'm " to 0, "falling " to 300, "(falling " to 600, "down) " to 900, "again " to 1200, "(yeah)" to 1500),
+        )
+        val (main, backing) = separateBackingVocals(line)
+        assertEquals("I'm falling again", main.text)
+        assertEquals("falling down, yeah", backing!!.text)
     }
 }

@@ -380,8 +380,13 @@ private fun PanelLyricLine(
             // which is not worth paying for at 0.dp.
             .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)
     ) {
+        // Backing vocals on a smaller line under the words, as in the karaoke view, instead of in brackets inside
+        // them (issue #66).
+        val (mainLine, backingLine) = remember(line, vm.lyricsSplitBackingVocals) {
+            if (vm.lyricsSplitBackingVocals) com.alananasss.kittytune.ui.player.lyrics.separateBackingVocals(line) else line to null
+        }
         LyricLineText(
-            line = line,
+            line = mainLine,
             isActive = isActive,
             positionMs = positionMs,
             wordSync = vm.isWordSyncEnabled,
@@ -393,6 +398,24 @@ private fun PanelLyricLine(
             unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.5f),
             textAlign = textAlign,
         )
+        if (backingLine != null) {
+            val backingStyle = { style: androidx.compose.ui.text.TextStyle ->
+                style.copy(fontSize = style.fontSize * BACKING_SCALE, lineHeight = style.lineHeight * BACKING_SCALE)
+            }
+            LyricLineText(
+                line = backingLine,
+                isActive = isActive,
+                positionMs = positionMs,
+                wordSync = vm.isWordSyncEnabled,
+                fillEffect = vm.isAppleMusicEffectEnabled,
+                activeStyle = backingStyle(inactiveStyle),
+                inactiveStyle = backingStyle(inactiveStyle),
+                activeColor = scheme.onSurface.copy(alpha = 0.8f),
+                inactiveColor = scheme.onSurfaceVariant.copy(alpha = 0.8f),
+                unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.4f),
+                textAlign = textAlign,
+            )
+        }
         // Gated on the switches, which it was not: a fetched translation stayed in the line, so turning the
         // setting *off* left it on screen until the track changed. "Quand on active la traduction,
         // romanization il faut que ça se fasse direct en updatant l'écran avec anim" — direct in both
@@ -596,3 +619,6 @@ data class PanelLyricsStyle(
         )
     }
 }
+
+/** How large a backing-vocal line is drawn against the line it is sung under. */
+private const val BACKING_SCALE = 0.72f
