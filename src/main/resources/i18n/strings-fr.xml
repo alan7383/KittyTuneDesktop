@@ -2821,4 +2821,5 @@
     <string name="lyrics_search_clear">Effacer</string>
     <string name="lyrics_sync_tap_title">Appuyez quand la ligne suivante commence</string>
     <string name="lyrics_sync_tap_button">Maintenant</string>
+    <string name="search_showing_results_for">Résultats pour « %1$s »</string>
 </resources>

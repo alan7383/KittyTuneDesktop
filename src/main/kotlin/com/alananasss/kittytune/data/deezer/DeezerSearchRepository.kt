@@ -60,6 +60,16 @@ object DeezerSearchRepository {
         }
     }
 
+    /** Tracks alone for [query], for a quick look-up rather than a full search page. */
+    suspend fun searchTracks(query: String, limit: Int = 10): List<Track> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) return@withContext emptyList()
+        val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
+        fetchJson("$API_BASE/search/track?q=$encodedQuery&limit=$limit")
+            ?.optJSONArray("data")
+            ?.mapObjects { it.toDeezerTrack() }
+            ?: emptyList()
+    }
+
     suspend fun getAlbum(albumId: String): Playlist? = withContext(Dispatchers.IO) {
         val cleanId = albumId.removePrefix("deezer:album:").trim()
         val json = fetchJson("$API_BASE/album/$cleanId") ?: return@withContext null

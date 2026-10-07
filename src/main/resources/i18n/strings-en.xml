@@ -2820,4 +2820,5 @@
     <string name="lyrics_search_clear">Clear</string>
     <string name="lyrics_sync_tap_title">Press when you hear the next line</string>
     <string name="lyrics_sync_tap_button">Now</string>
+    <string name="search_showing_results_for">Showing results for “%1$s”</string>
 </resources>
