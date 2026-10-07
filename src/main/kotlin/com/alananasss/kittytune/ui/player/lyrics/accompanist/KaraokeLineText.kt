@@ -67,6 +67,11 @@ private val SimpleFloatEasing = CubicBezierEasing(0.0f, 0.0f, 0.2f, 1.0f)
  * Creates a horizontal gradient brush that represents the karaoke progress.
  * The gradient moves from inactive color to active color based on the current time.
  *
+ * The soft edge sits on the playhead and stays inside the word being sung: it narrows to nothing at the
+ * word's start and end, and between words the fill stops dead at the end of the last one. The edge used to be
+ * a fixed 100 px band led past the playhead, so it always lit the start of the next word, and through a
+ * pause in the singing the next word glowed for seconds before it was sung (issue #66).
+ *
  * @param lineLayout The layout information for syllables in the line.
  * @param currentTimeMs The current playback time in milliseconds.
  * @param isRtl Whether the layout direction is Right-to-Left.
@@ -78,7 +83,6 @@ private fun createLineGradientBrush(
 ): Brush {
     val activeColor = Color.White
     val inactiveColor = Color.White.copy(alpha = 0.2f)
-    val minFadeWidth = 100f
 
     val lineLayout = rowData.rowLayouts
     val totalMinX = rowData.totalMinX
@@ -100,59 +104,49 @@ private fun createLineGradientBrush(
         return SolidColor(color)
     }
 
-    val lineProgress = run {
-        if (currentTimeMs <= firstSyllableStart) return Brush.horizontalGradient(
-            listOf(inactiveColor, inactiveColor)
-        )
-        if (currentTimeMs >= lastSyllableEnd) return Brush.horizontalGradient(
-            listOf(activeColor, activeColor)
-        )
+    if (currentTimeMs <= firstSyllableStart) return SolidColor(inactiveColor)
+    if (currentTimeMs >= lastSyllableEnd) return SolidColor(activeColor)
 
-        val activeSyllableLayout = lineLayout.find {
-            currentTimeMs in it.syllable.start until it.syllable.end
+    val activeSyllableLayout = lineLayout.find { currentTimeMs in it.syllable.start until it.syllable.end }
+    val playheadX: Float
+    val edgeWidth: Float
+    if (activeSyllableLayout != null) {
+        val progress = activeSyllableLayout.syllable.progress(currentTimeMs)
+        val sung = activeSyllableLayout.width * progress
+        val left = activeSyllableLayout.width - sung
+        playheadX = if (isRtl) {
+            activeSyllableLayout.position.x + left
+        } else {
+            activeSyllableLayout.position.x + sung
         }
-
-        val currentPixelPosition = when {
-            activeSyllableLayout != null -> {
-                val syllableProgress = activeSyllableLayout.syllable.progress(currentTimeMs)
-                if (isRtl) {
-                    activeSyllableLayout.position.x + activeSyllableLayout.width * (1f - syllableProgress)
-                } else {
-                    activeSyllableLayout.position.x + activeSyllableLayout.width * syllableProgress
-                }
-            }
-
-            else -> {
-                val lastFinished = lineLayout.lastOrNull { currentTimeMs >= it.syllable.end }
-                if (isRtl) {
-                    lastFinished?.position?.x ?: totalMaxX
-                } else {
-                    lastFinished?.let { it.position.x + it.width } ?: totalMinX
-                }
-            }
+        edgeWidth = minOf(SOFT_EDGE_PX, sung * 2f, left * 2f)
+    } else {
+        val lastFinished = lineLayout.lastOrNull { currentTimeMs >= it.syllable.end }
+        playheadX = if (isRtl) {
+            lastFinished?.position?.x ?: totalMaxX
+        } else {
+            lastFinished?.let { it.position.x + it.width } ?: totalMinX
         }
-        ((currentPixelPosition - totalMinX) / totalWidth).coerceIn(0f, 1f)
+        edgeWidth = 0f
     }
 
-    val fadeRange = (minFadeWidth / totalWidth).coerceAtMost(1f)
-    val fadeCenterStart = -fadeRange / 2f
-    val fadeCenterEnd = 1f + fadeRange / 2f
-    val fadeCenter = fadeCenterStart + (fadeCenterEnd - fadeCenterStart) * lineProgress
-    val fadeStart = fadeCenter - fadeRange / 2f
-    val fadeEnd = fadeCenter + fadeRange / 2f
+    val at = ((playheadX - totalMinX) / totalWidth).coerceIn(0f, 1f)
+    val half = edgeWidth / 2f / totalWidth
+    val edgeStart = (at - half).coerceIn(0f, 1f)
+    val edgeEnd = (at + half).coerceIn(0f, 1f)
 
     val colorStops = if (isRtl) {
         arrayOf(
             0.0f to inactiveColor,
-            fadeStart.coerceIn(0f, 1f) to inactiveColor,
-            fadeEnd.coerceIn(0f, 1f) to activeColor,
+            edgeStart to inactiveColor,
+            edgeEnd to activeColor,
             1.0f to activeColor
         )
     } else {
         arrayOf(
             0.0f to activeColor,
-            fadeStart.coerceIn(0f, 1f) to activeColor,
-            fadeEnd.coerceIn(0f, 1f) to inactiveColor,
+            edgeStart to activeColor,
+            edgeEnd to inactiveColor,
             1.0f to inactiveColor
         )
     }
@@ -163,6 +157,9 @@ private fun createLineGradientBrush(
         endX = totalMaxX
     )
 }
+
+/** The widest the fill's soft edge gets, in the middle of a long enough word. */
+private const val SOFT_EDGE_PX = 100f
 
 /**
  * Draws a multi-row lyrics line into the canvas.

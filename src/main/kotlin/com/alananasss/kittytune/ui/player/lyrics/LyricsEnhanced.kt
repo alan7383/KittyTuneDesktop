@@ -363,11 +363,19 @@ fun buildSyncedLyrics(
 
         val hasWords = isWordSynced && entry.words.isNotEmpty()
         if (hasWords) {
-            val mainWords = entry.words.filter { !it.isBackground }
-            val bgWords = entry.words.filter { it.isBackground }
+            val markedBackground = entry.words.filter { it.isBackground }
+            // Backing vocals the source wrote in brackets rather than marked, when the reader wants them apart.
+            val (ownWords, bracketGroups) = if (splitBacking && markedBackground.isEmpty()) {
+                splitBackingWords(entry.words)
+            } else {
+                entry.words to emptyList()
+            }
+            val mainWords = ownWords.filter { !it.isBackground }
+            val bgWords = markedBackground.ifEmpty { bracketGroups.flatten() }
+            val mainText = if (bracketGroups.isNotEmpty()) splitBackingVocals(cleanText).first else cleanText
 
             val wordsForMain = if (mainWords.isNotEmpty()) mainWords else entry.words
-            val formattedMainContents = formatLyricWordContents(cleanText, wordsForMain)
+            val formattedMainContents = formatLyricWordContents(mainText, wordsForMain)
             val mainSyllables = wordsForMain.mapIndexed { wIdx, w ->
                 val start = w.startTime.toInt()
                 val end = w.endTime.toInt().coerceAtLeast(start + MIN_KARAOKE_SYLLABLE_DURATION_MS)
@@ -388,7 +396,11 @@ fun buildSyncedLyrics(
             if (lineEnd <= lineStart) return@forEachIndexed
 
             val accompanimentLines = if (mainWords.isNotEmpty() && bgWords.isNotEmpty()) {
-                val formattedBgContents = formatLyricWordContents("", bgWords)
+                val formattedBgContents = if (bracketGroups.isNotEmpty()) {
+                    backingGroupContents(bracketGroups)
+                } else {
+                    formatLyricWordContents("", bgWords)
+                }
                 val bgSyllables = bgWords.mapIndexed { bgIdx, w ->
                     val start = w.startTime.toInt()
                     val end = w.endTime.toInt().coerceAtLeast(start + MIN_KARAOKE_SYLLABLE_DURATION_MS)
@@ -521,6 +533,22 @@ fun buildSyncedLyrics(
 
     return SyncedLyrics(lines = lines)
 }
+
+/**
+ * What each backing word shows: the word and a space, and a comma after the last word of a group when another
+ * group follows, so "(oh no)" and "(yeah)" read as "oh no, yeah".
+ */
+private fun backingGroupContents(groups: List<List<LyricWord>>): List<String> =
+    groups.flatMapIndexed { groupIndex, group ->
+        group.mapIndexed { wordIndex, word ->
+            val text = LyricsUtils.decodeHtmlEntities(word.text)
+            when {
+                wordIndex < group.lastIndex -> "$text "
+                groupIndex < groups.lastIndex -> text + BACKING_SEPARATOR
+                else -> text
+            }
+        }
+    }
 
 private fun buildWrappingKaraokeSyllables(
     content: String,

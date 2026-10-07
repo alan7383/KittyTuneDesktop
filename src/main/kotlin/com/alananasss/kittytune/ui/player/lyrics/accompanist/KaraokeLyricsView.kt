@@ -274,7 +274,10 @@ fun KaraokeLyricsView(
     val lyricsFocusState by remember(lyrics, effectiveEndTimes, accompanimentToMainMap, haveDotsIntro) {
         derivedStateOf {
             val time = currentTimeMs()
-            val activeIndex = lyrics.lines.indices.find { idx ->
+            // The newest line that has started, not the oldest still sounding: a line whose last word (or
+            // backing vocal) rings on under the next one held the view on it, so the next line could not
+            // start until the previous one was over (issue #66). Both stay lit while they overlap.
+            val activeIndex = lyrics.lines.indices.findLast { idx ->
                 time >= lyrics.lines[idx].start && time < effectiveEndTimes[idx]
             }
 
@@ -510,9 +513,12 @@ fun KaraokeLyricsView(
                             }
                         }
 
+                        // Each line follows a little later than the one nearer the sung line, so the move reads
+                        // as a wave. It used to take most of a second to settle, which made the whole view feel
+                        // a beat behind the song (issue #66).
                         val dynamicStiffness by remember(distanceWeightState.value) {
                             derivedStateOf {
-                                (140f - (distanceWeightState.value * 4f)).coerceAtLeast(115f)
+                                (LINE_STIFFNESS - distanceWeightState.value * LINE_STIFFNESS_STEP).coerceAtLeast(LINE_STIFFNESS_MIN)
                             }
                         }
 
@@ -637,3 +643,8 @@ fun KaraokeLyricsView(
             }
         }
     }
+
+/** How stiffly the sung line springs into place; the lines around it are a little softer. */
+private const val LINE_STIFFNESS = 300f
+private const val LINE_STIFFNESS_STEP = 18f
+private const val LINE_STIFFNESS_MIN = 190f
