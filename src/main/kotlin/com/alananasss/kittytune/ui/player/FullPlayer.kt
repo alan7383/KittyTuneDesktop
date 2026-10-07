@@ -49,7 +49,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.outlined.HeartBroken
 import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.DarkMode
@@ -1383,10 +1382,10 @@ private fun FullPlayerControls(
  * The full player's volume: the same styled track as the player bar's — plain, slim, wavy or squiggly, with
  * the dot that jumps when grabbed and the wave that moves only while music plays — in the artwork's colours.
  *
- * Laid out like the seek bar above it: a quiet speaker at one end and a loud one at the other, their glyphs flush
- * with the bar's ends, so the two bars line up. The percentage that used to sit at the right end made the track
- * shorter than the seek bar and off centre (issue #66). The quiet speaker mutes, the loud one steps the volume
- * up. The wheel works anywhere on the row.
+ * Laid out like the seek bar above it: the speaker at one end, glyph flush with the bar's end, and the level in
+ * per cent at the other, its last digit flush with the other end. A second, louder speaker used to sit where the
+ * level is: two near-identical icons that said nothing the track did not. The speaker mutes; the wheel works
+ * anywhere on the row.
  */
 @Composable
 private fun FullPlayerVolumeBar(
@@ -1430,16 +1429,14 @@ private fun FullPlayerVolumeBar(
             onVolumeChangeFinished = { viewModel.persistVolume() },
             modifier = Modifier.weight(1f),
         )
-        QuietButton(
-            icon = Icons.AutoMirrored.Rounded.VolumeUp,
-            label = str("volume_title"),
-            tint = palette.dim,
-            size = 18.dp,
-            onClick = {
-                viewModel.updateVolume((volume + 0.1f).coerceAtMost(1f))
-                viewModel.persistVolume()
-            },
-            modifier = Modifier.offset(x = VOLUME_BUTTON_INSET),
+        androidx.compose.material3.Text(
+            text = com.alananasss.kittytune.ui.main.volumePercentLabel(volume),
+            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+            color = if (isMuted) palette.dim.copy(alpha = 0.45f) else palette.dim,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.width(VOLUME_LABEL_WIDTH),
         )
     }
 }
@@ -1447,8 +1444,14 @@ private fun FullPlayerVolumeBar(
 /** Space between a [QuietButton]'s touch target and its glyph, on each side. */
 private val QUIET_BUTTON_INSET = 9.dp
 
-/** The same for the volume row's 18 dp speakers. */
+/** The same for the volume row's 18 dp speaker. */
 private val VOLUME_BUTTON_INSET = 9.dp
+
+/**
+ * The level at the volume row's right end, as wide as the speaker at its left (18 dp glyph plus its insets),
+ * so the track keeps the length it had and the text ends flush with the seek bar above.
+ */
+private val VOLUME_LABEL_WIDTH = 18.dp + VOLUME_BUTTON_INSET * 2
 
 /** One glyph, no container, no ripple worth noticing. */
 @Composable
@@ -1528,6 +1531,7 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
                     durationMs = { viewModel.duration },
                     stepSeconds = { seekWheelSeconds },
                     onSeek = { target: Long ->
+                        mix.glideFromShown()
                         viewModel.seekTo(target)
                     }
                 )

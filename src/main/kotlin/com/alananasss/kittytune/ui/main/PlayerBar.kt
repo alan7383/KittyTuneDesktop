@@ -594,6 +594,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                         // Straight to the player rather than through the scrub state: a
                         // wheel notch is a decision, not a drag in progress.
                         scrubbing = false
+                        mix.glideFromShown()
                         vm.seekTo(target)
                     },
                 ),
@@ -689,6 +690,10 @@ private fun ExpressiveToggleButton(
  * goes forward, matching the volume control right next to it, where up is louder. The step is a
  * setting because five seconds is right for checking a lyric and useless for finding your way around
  * a two-hour set.
+ *
+ * Notches that come in a quick run count from where the previous one aimed, not from the reported
+ * position: that lags a seek by up to a quarter of a second, so a fast spin kept landing on stale
+ * spots and the bar jerked back and forth.
  */
 @Composable
 internal fun Modifier.seekWheel(
@@ -702,6 +707,8 @@ internal fun Modifier.seekWheel(
     val step by androidx.compose.runtime.rememberUpdatedState(stepSeconds)
     val seek by androidx.compose.runtime.rememberUpdatedState(onSeek)
     return this.pointerInput(Unit) {
+        var lastTarget = 0L
+        var lastNotchAt = 0L
         awaitPointerEventScope {
             while (true) {
                 val event = awaitPointerEvent()
@@ -710,13 +717,20 @@ internal fun Modifier.seekWheel(
                 if (notches == 0f) continue
                 val total = duration()
                 if (total <= 0L) continue
-                val moved = position() - (notches * step() * 1000f).toLong()
-                seek(moved.coerceIn(0L, total))
+                val now = System.currentTimeMillis()
+                val base = if (now - lastNotchAt < WHEEL_RUN_MS) lastTarget else position()
+                val target = (base - (notches * step() * 1000f).toLong()).coerceIn(0L, total)
+                lastTarget = target
+                lastNotchAt = now
+                seek(target)
                 event.changes.forEach { it.consume() }
             }
         }
     }
 }
+
+/** Wheel notches closer together than this are one spin. */
+private const val WHEEL_RUN_MS = 600L
 
 /**
  * Reactive read of which optional player-bar buttons the user keeps; recomposes on pref changes.
