@@ -2448,6 +2448,8 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
  *    answer and it is better than an empty mix that looks like a bug.
  *  - **Found nothing.** Seeds existed and every expansion came back empty, which in practice means the network.
  */
+private var lastMixBasis: com.alananasss.kittytune.data.mix.MixEngine.Basis? = null
+
 private data class VibeStation(
     val id: String,
     val title: String,
@@ -2463,8 +2465,11 @@ private fun StartMixingCard(playerViewModel: PlayerViewModel) {
     var state by remember { mutableStateOf<MixState>(MixState.Idle) }
     var showOptions by remember { mutableStateOf(false) }
 
-    val basis by produceState<com.alananasss.kittytune.data.mix.MixEngine.Basis?>(initialValue = null) {
-        value = com.alananasss.kittytune.data.mix.MixEngine.basis()
+    // Seeded with the last answer: the card is composed again every time it scrolls back into the list, and
+    // starting from nothing each time made it grow by the artist chip and the basis row after a moment, which
+    // showed as the card's lower edge jumping (issue #66).
+    val basis by produceState<com.alananasss.kittytune.data.mix.MixEngine.Basis?>(initialValue = lastMixBasis) {
+        value = com.alananasss.kittytune.data.mix.MixEngine.basis()?.also { lastMixBasis = it }
     }
 
     val topArtist = basis?.topArtists?.firstOrNull()
