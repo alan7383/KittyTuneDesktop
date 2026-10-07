@@ -377,13 +377,13 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             QuietButton(
                 icon = Icons.Rounded.Search,
                 label = str("lyrics_manual_search"),
-                tint = if (viewModel.isSearchingLyrics) palette.bright else palette.dim,
+                tint = palette.dim,
                 onClick = { viewModel.isSearchingLyrics = true },
             )
             QuietButton(
                 icon = Icons.Rounded.Tune,
                 label = str("pref_lyrics_title"),
-                tint = if (!viewModel.lyricsSync.isNone) palette.bright else palette.dim,
+                tint = palette.dim,
                 onClick = { showQuickSettings = true },
             )
             QuietButton(
@@ -1319,7 +1319,8 @@ private fun FullPlayerControls(
             QuietButton(
                 icon = Icons.Rounded.MoreHoriz,
                 label = str("btn_more"),
-                tint = palette.dim,
+                // Lit while its menu is open, like the lyrics button while the words show.
+                tint = if (viewModel.showMenuSheet) palette.bright else palette.dim,
                 onClick = { viewModel.currentTrack?.let { viewModel.showTrackOptions(it, fromPlayer = true) } },
                 modifier = Modifier.align(Alignment.CenterStart).offset(x = -QUIET_BUTTON_INSET),
             )

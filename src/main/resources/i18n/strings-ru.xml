@@ -2817,8 +2817,6 @@
     <string name="lyrics_search_now_showing">Сейчас: %1$s</string>
     <string name="lyrics_search_progress">Найдено %1$d, ещё ищут источников: %2$d</string>
     <string name="lyrics_search_clear">Очистить</string>
-    <string name="lyrics_sync_tap_title">Нажмите, когда зазвучит следующая строка</string>
-    <string name="lyrics_sync_tap_button">Сейчас</string>
     <string name="search_showing_results_for">Показаны результаты для «%1$s»</string>
     <string name="chart_kind_country">Твоя страна</string>
     <string name="home_releases_this_friday">Новинки этой пятницы · с %1$s</string>

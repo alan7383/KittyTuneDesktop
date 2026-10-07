@@ -256,62 +256,11 @@ private fun SyncCard(viewModel: PlayerViewModel) {
                 }
             }
         }
-        TapSync(viewModel)
         Spacer(Modifier.height(14.dp))
         DriftSync(viewModel)
     }
 }
 
-/**
- * Sync by ear: the next line is shown, and pressing the button the moment it is heard lines the lyrics up with
- * the song, whatever they were off by. The steps above are for the last tenths of a second; finding a
- * three-second offset with them took a dozen presses and a guess at which way to go (issue #66).
- */
-@Composable
-private fun TapSync(viewModel: PlayerViewModel) {
-    val lines = viewModel.lyricsLines
-    if (lines.isEmpty()) return
-    val lyricsTime = viewModel.currentPosition + viewModel.lyricsOffset
-    val target = remember(lines.toList(), lyricsTime / TAP_TARGET_STEP_MS) {
-        val current = LyricsUtils.activeLineIndex(lines, lyricsTime)
-        lines.drop(current + 1).firstOrNull { !it.isInstrumental && it.text.isNotBlank() }
-    } ?: return
-    Spacer(Modifier.height(14.dp))
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                str("lyrics_sync_tap_title"),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            AnimatedContent(
-                targetState = target.text,
-                transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(120)) },
-                label = "tapSyncLine",
-            ) { text ->
-                Text(
-                    text = "«$text»",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        FilledTonalButton(
-            onClick = { viewModel.syncLyricsLineToNow(target) },
-            shapes = ButtonDefaults.shapes(),
-        ) {
-            Icon(Icons.Rounded.TouchApp, null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(str("lyrics_sync_tap_button"), fontWeight = FontWeight.SemiBold, maxLines = 1)
-        }
-    }
-}
-
-/** How often the line offered for tap sync is re-picked: often enough to follow the song, not every tick. */
-private const val TAP_TARGET_STEP_MS = 500L
 
 /**
  * Two points for lyrics that drift apart over the song (issue #66): synced at the start, seconds off by the end.

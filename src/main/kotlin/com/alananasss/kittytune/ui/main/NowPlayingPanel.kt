@@ -80,6 +80,7 @@ import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.ui.graphics.Color
+import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -254,8 +255,14 @@ private fun PanelTabRow(
         tabs.forEach { tab ->
             val isSelected = tab == selected
             val label = panelTabLabel(tab)
+            // The row's share moves on a spring, so the open tab grows and the others give way instead of snapping.
+            val share by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (isSelected) TAB_SELECTED_WEIGHT else 1f,
+                animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 380f),
+                label = "panelTabShare",
+            )
             Box(
-                modifier = Modifier.weight(if (isSelected) TAB_SELECTED_WEIGHT else 1f),
+                modifier = Modifier.weight(share),
                 contentAlignment = Alignment.Center,
             ) {
                 Tip(label, enabled = !isSelected) {
@@ -288,6 +295,7 @@ private fun PanelTabButton(tab: NowPlayingTab, label: String, isSelected: Boolea
         modifier = Modifier
             .fillMaxWidth()
             .height(TAB_HEIGHT)
+            .pressScale(interaction, pressedScale = 0.94f)
             .clip(CircleShape)
             .background(container)
             .hoverable(interaction)
