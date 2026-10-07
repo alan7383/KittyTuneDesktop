@@ -57,7 +57,12 @@ class LyricsWheelStepUiTest {
         return try {
             scene.render()
             scene.sendPointerEvent(PointerEventType.Scroll, Offset(150f, 100f), Offset(0f, 1f))
-            repeat(4) { scene.render() }
+            // The notch slides over a quarter of a second; frames well past that let it land.
+            var frameTime = 0L
+            repeat(40) {
+                frameTime += 16_000_000L
+                scene.render(frameTime)
+            }
             val s = state!!
             s.firstVisibleItemIndex * 20 + s.firstVisibleItemScrollOffset
         } finally {
