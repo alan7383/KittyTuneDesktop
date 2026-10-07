@@ -2830,4 +2830,6 @@
     <string name="chart_country_fr">France</string>
     <string name="chart_country_hu">Hungary</string>
     <string name="chart_country_vn">Vietnam</string>
+    <string name="pref_lyrics_one_line_title">One line</string>
+    <string name="pref_lyrics_one_line_sub">The line being sung, above the play button in the player bar</string>
 </resources>

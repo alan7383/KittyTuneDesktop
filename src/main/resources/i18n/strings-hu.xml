@@ -2832,4 +2832,6 @@
     <string name="chart_country_fr">Franciaország</string>
     <string name="chart_country_hu">Magyarország</string>
     <string name="chart_country_vn">Vietnam</string>
+    <string name="pref_lyrics_one_line_title">Egy sor</string>
+    <string name="pref_lyrics_one_line_sub">Az éppen énekelt sor a lejátszógomb felett a lejátszósávban</string>
 </resources>

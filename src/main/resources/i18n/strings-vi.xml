@@ -3279,4 +3279,6 @@
     <string name="chart_country_fr">Pháp</string>
     <string name="chart_country_hu">Hungary</string>
     <string name="chart_country_vn">Việt Nam</string>
+    <string name="pref_lyrics_one_line_title">Một dòng</string>
+    <string name="pref_lyrics_one_line_sub">Dòng đang hát, phía trên nút phát trong thanh trình phát</string>
 </resources>

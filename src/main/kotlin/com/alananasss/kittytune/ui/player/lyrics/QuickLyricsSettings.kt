@@ -584,6 +584,17 @@ private fun ColumnScope.FeaturesTab(
         checked = viewModel.isDuetViewEnabled,
         onChange = { viewModel.toggleDuetView(it) },
     )
+    var oneLine by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
+    SwitchRow(
+        icon = Icons.Rounded.Subtitles,
+        title = str("pref_lyrics_one_line_title"),
+        subtitle = str("pref_lyrics_one_line_sub"),
+        checked = oneLine,
+        onChange = {
+            oneLine = it
+            prefs.setOneLineLyricsEnabled(it)
+        },
+    )
     SwitchRow(
         icon = Icons.Rounded.RecordVoiceOver,
         title = str("pref_lyrics_backing_title"),
