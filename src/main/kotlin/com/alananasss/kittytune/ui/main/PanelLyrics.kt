@@ -204,7 +204,7 @@ private fun PanelSyncedLyrics(
         val anchorPx =
             (viewportPx * (effectiveStyle.anchorFraction - effectiveStyle.topInsetFraction).coerceAtLeast(0f)).toInt()
 
-        val readingByHand = FollowActiveLine(listState, activeIndex, anchorPx, contentKey = lines)
+        val readingByHand = FollowActiveLine(listState, activeIndex, anchorPx, contentKey = lines.size to lines.firstOrNull()?.startTime)
         val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
 
         // Interpolated between the player's four-per-second reports, so the word fill in the panel is as
@@ -216,7 +216,7 @@ private fun PanelSyncedLyrics(
         ) + vm.lyricsOffset
 
         LazyColumn(
-            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex, contentKey = lines),
+            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex, contentKey = lines.size to lines.firstOrNull()?.startTime),
             state = listState,
             contentPadding = PaddingValues(
                 start = effectiveStyle.startPadding,
@@ -490,7 +490,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
         LazyColumn(
             Modifier
                 .fillMaxSize()
-                .revealWhenPlaced(listState, activeIndex = -1, contentKey = lines)
+                .revealWhenPlaced(listState, activeIndex = -1, contentKey = text)
                 .lyricsWheel(
                     listState = listState,
                     scope = scope,

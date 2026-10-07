@@ -2167,8 +2167,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             ?: return emptyList()
         val page = com.alananasss.kittytune.data.network.GeniusClient.lyrics(hit.id) ?: return emptyList()
         val sections = com.alananasss.kittytune.data.lyrics.GeniusVoices.parseSections(page)
-        val credited = com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(effectiveArtist) +
-            com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(hit.artistNames.orEmpty())
+        // Who is credited, in order: the artist part of the title ("OD1NOKO + Kai Angel - song"), the account, the
+        // Genius credit, and anyone the title adds with "feat." — some uploads name the second artist only there.
+        val featured = Regex("""(?i)(?:\(|\[|\s)(?:feat\.?|ft\.?|featuring|with)\s+([^)\]]+)""")
+            .findAll(track.title.orEmpty()).flatMap { com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(it.groupValues[1]).asSequence() }.toList()
+        val credited = com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(artist) +
+            com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(effectiveArtist) +
+            com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(hit.artistNames.orEmpty()) + featured
         return com.alananasss.kittytune.data.lyrics.GeniusVoices.voicesFor(lines, sections, credited).orEmpty()
     }
 
@@ -3829,7 +3834,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun smartPrevious(isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), autoPlay: Boolean = true) {
-        if (player.currentPosition > 3000) {
+        // Both positions have to say "past the start". The engine's can still be the previous track's for a
+        // moment after a change or a mix, which sent "previous" back to 0:00 of a song that had just begun
+        // instead of to the one before it (issue #66).
+        if (player.currentPosition > 3000 && currentPosition > 3000) {
             flushListenSession("MANUAL_REPLAY")
             // The same track from the top is a new listen, not a continuation of the old one.
             beginListenSession(currentTrack)

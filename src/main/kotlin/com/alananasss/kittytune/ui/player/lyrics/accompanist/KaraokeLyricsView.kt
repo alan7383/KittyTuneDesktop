@@ -431,7 +431,7 @@ fun KaraokeLyricsView(
                 state = listState,
                     modifier = Modifier
                         .fillMaxSize()
-                        .revealWhenPlaced(listState, lyricsFocusState.firstIndex, contentKey = lyrics)
+                        .revealWhenPlaced(listState, lyricsFocusState.firstIndex, contentKey = lyrics.lines.size to lyrics.lines.firstOrNull()?.start)
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
                         }
