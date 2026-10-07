@@ -2822,4 +2822,11 @@
     <string name="home_releases_this_friday">Новинки этой пятницы · с %1$s</string>
     <string name="home_releases_last_friday">Прошлая пятница · %1$s</string>
     <string name="home_releases_earlier">Раньше</string>
+    <string name="chart_country_ru">Россия</string>
+    <string name="chart_country_us">США</string>
+    <string name="chart_country_uk">Великобритания</string>
+    <string name="chart_country_de">Германия</string>
+    <string name="chart_country_fr">Франция</string>
+    <string name="chart_country_hu">Венгрия</string>
+    <string name="chart_country_vn">Вьетнам</string>
 </resources>

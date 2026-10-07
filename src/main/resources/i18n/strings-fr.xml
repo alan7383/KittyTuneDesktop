@@ -2824,4 +2824,11 @@
     <string name="home_releases_this_friday">Sorties de ce vendredi · depuis le %1$s</string>
     <string name="home_releases_last_friday">Vendredi dernier · %1$s</string>
     <string name="home_releases_earlier">Plus tôt</string>
+    <string name="chart_country_ru">Russie</string>
+    <string name="chart_country_us">États-Unis</string>
+    <string name="chart_country_uk">Royaume-Uni</string>
+    <string name="chart_country_de">Allemagne</string>
+    <string name="chart_country_fr">France</string>
+    <string name="chart_country_hu">Hongrie</string>
+    <string name="chart_country_vn">Viêt Nam</string>
 </resources>

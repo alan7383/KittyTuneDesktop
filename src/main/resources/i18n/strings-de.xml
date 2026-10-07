@@ -3436,4 +3436,11 @@
     <string name="home_releases_this_friday">Neu diesen Freitag · seit %1$s</string>
     <string name="home_releases_last_friday">Letzter Freitag · %1$s</string>
     <string name="home_releases_earlier">Früher</string>
+    <string name="chart_country_ru">Russland</string>
+    <string name="chart_country_us">USA</string>
+    <string name="chart_country_uk">Vereinigtes Königreich</string>
+    <string name="chart_country_de">Deutschland</string>
+    <string name="chart_country_fr">Frankreich</string>
+    <string name="chart_country_hu">Ungarn</string>
+    <string name="chart_country_vn">Vietnam</string>
 </resources>

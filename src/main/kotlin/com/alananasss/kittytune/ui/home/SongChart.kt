@@ -64,6 +64,8 @@ fun SongChart(
     onGenreChange: (ChartGenre) -> Unit,
     modifier: Modifier = Modifier,
     showGenreRow: Boolean = true,
+    country: ChartCountry? = null,
+    onCountryChange: (ChartCountry) -> Unit = {},
     /**
      * A switch is in flight, so the list below is about to be replaced.
      *
@@ -95,6 +97,24 @@ fun SongChart(
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Transparent,
                 )
+            }
+        }
+
+        if (country != null && kind == ChartKind.COUNTRY) {
+            Spacer(Modifier.padding(top = 4.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(ChartCountry.entries.toList()) { option ->
+                    FilterChip(
+                        selected = option == country,
+                        onClick = { onCountryChange(option) },
+                        label = { Text("${option.flag} ${str("chart_country_${option.code.lowercase()}")}", maxLines = 1) },
+                        shape = FilterChipDefaults.shape,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ),
+                    )
+                }
             }
         }
 
