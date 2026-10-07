@@ -309,6 +309,12 @@ import com.alananasss.kittytune.utils.Logger
             /** How many songs the landing's chart preview shows. */
             const val CHART_PREVIEW_LENGTH = 5
 
+            /** How many of the first search results have their stream looked up ahead of a press. */
+            private const val WARMED_RESULTS = 2
+
+            /** How long a query has to stand still before its results' streams are looked up. */
+            private const val WARM_AFTER_IDLE_MS = 700L
+
             /** How many liked artists are asked for new songs. One request each. */
             const val ARTIST_UPDATE_SOURCES = 6
 
@@ -601,6 +607,38 @@ import com.alananasss.kittytune.utils.Logger
                 e.printStackTrace()
             } finally {
                 isSearchLoading = false
+            }
+            warmTopResults(query)
+        }
+
+        private var warmStreamsJob: kotlinx.coroutines.Job? = null
+
+        /**
+         * Looks up where the first results stream from while the reader is still reading the list, so pressing
+         * one starts at once instead of after the sources have been asked (issue #66). Only once the query has
+         * stood still for a moment, so typing does not set it off at every letter.
+         */
+        private fun warmTopResults(query: String) {
+            warmStreamsJob?.cancel()
+            val top = when (activeSearchSource) {
+                SearchSource.SOUNDCLOUD -> searchResultsTracks
+                SearchSource.SPOTIFY -> searchResultsSpotify
+                SearchSource.DEEZER -> searchResultsDeezerTracks
+                SearchSource.TIDAL -> searchResultsTidalTracks
+                SearchSource.QOBUZ -> searchResultsQobuzTracks
+                SearchSource.YOUTUBE -> searchResultsYoutube
+                SearchSource.YOUTUBE_MUSIC -> searchResultsYoutubeMusic
+                SearchSource.APPLE_MUSIC, SearchSource.YANDEX_MUSIC -> emptyList()
+            }.take(WARMED_RESULTS).toList()
+            if (top.isEmpty()) return
+            warmStreamsJob = viewModelScope.launch {
+                delay(WARM_AFTER_IDLE_MS)
+                if (searchQuery.trim() != query.trim()) return@launch
+                withContext(Dispatchers.IO) {
+                    top.forEach { track ->
+                        runCatching { com.alananasss.kittytune.data.StreamResolver.resolveStreamWithDrm(track) }
+                    }
+                }
             }
         }
 
