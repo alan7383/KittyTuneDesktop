@@ -59,6 +59,7 @@ import androidx.compose.material3.ContainedLoadingIndicator
     import androidx.compose.ui.draw.blur
     import androidx.compose.ui.draw.clip
     import androidx.compose.ui.draw.drawWithContent
+    import androidx.compose.ui.draw.drawBehind
     import androidx.compose.ui.draw.scale
     import androidx.compose.ui.graphics.BlendMode
     import androidx.compose.ui.graphics.Brush
@@ -477,11 +478,6 @@ import kotlin.math.roundToInt
                     val lineInteractionSource = remember { MutableInteractionSource() }
                     val isHovered by lineInteractionSource.collectIsHoveredAsState()
     
-                    // The hover rule is drawn by [lyricUnderline] rather than set as a
-                    // TextDecoration: Skia underlines each font run separately, so a line that
-                    // falls back out of the variable font (Cyrillic, Arabic, CJK…) came out as a
-                    // broken dashed rule at mismatched thicknesses (issue #33).
-                    var hoverLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
     
                     val hzAlignment = when(alignment) {
                         TextAlign.Left -> Alignment.Start
@@ -528,6 +524,7 @@ import kotlin.math.roundToInt
                                 start = if (effectiveSinger == LyricSinger.SINGER_2) 100.dp else 24.dp,
                                 end = if (effectiveSinger == LyricSinger.SINGER_1) 100.dp else 24.dp
                             )
+                            .lyricHoverHighlight(isHovered, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f))
                             // Grown from the side the line is aligned to. Scaled from its centre, a full-width
                             // line grew past both edges by more than its padding, and the second singer's
                             // right-aligned words ran off the screen (issue #66).
@@ -571,10 +568,6 @@ import kotlin.math.roundToInt
                             lineHeight = (fontSize * 1.4).sp,
                             fontFamily = lyricsFontFamily
                         )
-                        val ruleColor =
-                            if (isActive) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurfaceVariant
-
                         LyricLineText(
                             line = line,
                             isActive = isActive,
@@ -588,16 +581,6 @@ import kotlin.math.roundToInt
                             inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             unsungColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                             textAlign = lineTextAlign,
-                            // The hover rule is drawn rather than set as a TextDecoration: Skia underlines
-                            // each font run separately, so a line that falls back out of the variable font
-                            // (Cyrillic, Arabic, CJK…) came out as a broken dashed rule.
-                            textModifier = Modifier.lyricUnderline(
-                                { hoverLayout },
-                                isHovered,
-                                fontSize,
-                                ruleColor,
-                            ),
-                            onTextLayout = { hoverLayout = it },
                         )
 
                         AnimatedVisibility(
@@ -1040,48 +1023,30 @@ fun UploadYamlDialog(
 }
 
 /**
- * Draws the hover rule under a lyric line by hand.
+ * The hover highlight behind a lyric line: a soft rounded box, a little wider than the line, that fades in
+ * and out. The same look as the karaoke view's hover. It replaces a rule drawn under the text, the last of
+ * the old hover styles left in the lyrics views (issue #66).
  *
- * `TextDecoration.Underline` is drawn per font run, and a lyric line routinely spans several
- * runs: the variable UI font has no Cyrillic, Arabic or CJK coverage, so those stretches fall
- * back to a system face with its own underline thickness and position. The result was a rule
- * that looked dashed and stepped — reported for Russian lyrics in issue #33. One rect per
- * laid-out line, at one thickness, is the same rule whatever the script.
- *
- * @param layout the last layout of the text this sits on, read lazily so a relayout is picked
- *   up without recreating the modifier.
- * @param fontSizeSp the line's font size, which the thickness and the drop below the baseline
- *   are both derived from, so the rule scales with the lyrics font-size setting.
+ * Drawn behind the line's own layer, so the line's blur and scale do not smear it.
  */
-/**
- * The hover rule under a lyric line.
- *
- * Internal rather than private because the panel renderer draws the same lines and needs the same affordance:
- * it was relying on `clickable`'s default indication instead, which on a 34 sp line at full-screen width is a
- * ripple the width of the screen — "un gros truc en surbrillance moche" (issue #33).
- */
-internal fun Modifier.lyricUnderline(
-    layout: () -> androidx.compose.ui.text.TextLayoutResult?,
-    visible: Boolean,
-    fontSizeSp: Float,
-    color: Color,
-): Modifier = drawWithContent {
-    drawContent()
-    if (!visible) return@drawWithContent
-    val result = layout() ?: return@drawWithContent
-    val thickness = (fontSizeSp * 0.06f).sp.toPx().coerceAtLeast(1f)
-    val drop = (fontSizeSp * 0.14f).sp.toPx()
-    for (i in 0 until result.lineCount) {
-        val left = result.getLineLeft(i)
-        val right = result.getLineRight(i)
-        if (right - left <= 0f) continue
-        drawRect(
-            color = color,
-            topLeft = androidx.compose.ui.geometry.Offset(left, result.getLineBaseline(i) + drop),
-            size = androidx.compose.ui.geometry.Size(right - left, thickness),
+@Composable
+internal fun Modifier.lyricHoverHighlight(hovered: Boolean, color: Color): Modifier {
+    val shown by animateFloatAsState(if (hovered) 1f else 0f, tween(HOVER_FADE_MS), label = "lyricHover")
+    return drawBehind {
+        if (shown <= 0f) return@drawBehind
+        val bleed = HOVER_BLEED.toPx()
+        drawRoundRect(
+            color = color.copy(alpha = color.alpha * shown),
+            topLeft = androidx.compose.ui.geometry.Offset(-bleed, 0f),
+            size = androidx.compose.ui.geometry.Size(size.width + bleed * 2, size.height),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(HOVER_CORNER.toPx()),
         )
     }
 }
+
+private const val HOVER_FADE_MS = 150
+private val HOVER_BLEED = 8.dp
+private val HOVER_CORNER = 14.dp
 
 
 

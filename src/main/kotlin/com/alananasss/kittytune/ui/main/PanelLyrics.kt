@@ -8,7 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import com.alananasss.kittytune.ui.player.lyrics.lyricUnderline
+import com.alananasss.kittytune.ui.player.lyrics.lyricHoverHighlight
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -348,17 +348,16 @@ private fun PanelLyricLine(
 
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
-    var hoverLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
 
     Column(
         horizontalAlignment = columnAlign,
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interaction)
-            // No indication. The default is a ripple, and a ripple across a full-screen line of 34 sp type is
-            // the "gros truc en surbrillance moche" — the lyrics screen has always drawn a rule under the
-            // hovered line instead, and that is the affordance these lines should have too (issue #33).
+            // No ripple: across a full-screen line of 34 sp type it is the "gros truc en surbrillance moche"
+            // (issue #33). The hover shows as a soft box instead, as in the karaoke view.
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .lyricHoverHighlight(isHovered, scheme.onSurface.copy(alpha = 0.07f))
             .padding(vertical = style.lineSpacing)
             .padding(start = linePaddingStart, end = linePaddingEnd)
             .graphicsLayer {
@@ -393,13 +392,6 @@ private fun PanelLyricLine(
             inactiveColor = scheme.onSurfaceVariant,
             unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.5f),
             textAlign = textAlign,
-            textModifier = Modifier.lyricUnderline(
-                { hoverLayout },
-                isHovered,
-                base.fontSize.value,
-                if (isActive) scheme.onSurface else scheme.onSurfaceVariant,
-            ),
-            onTextLayout = { hoverLayout = it },
         )
         // Gated on the switches, which it was not: a fetched translation stayed in the line, so turning the
         // setting *off* left it on screen until the track changed. "Quand on active la traduction,

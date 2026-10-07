@@ -61,6 +61,30 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.outlined.Album
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.Lyrics
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 
 /**
  * Right panel — the "Now Playing" column from the reference: big artwork,
@@ -94,8 +118,8 @@ fun NowPlayingPanel(
             // The tab we were on can be hidden from the menu below while we are looking at it.
             LaunchedEffect(tabs) { if (tab !in tabs) onTabChange(tabs.first()) }
 
-            // Header: context name + tab visibility + close
-            var tabMenuOpen by remember { mutableStateOf(false) }
+            // Header: context name + close. Which tabs show is chosen in Appearance > Customize buttons; the gear
+            // that also opened that menu here sat right next to the close button (issue #66).
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -108,25 +132,6 @@ fun NowPlayingPanel(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Box {
-                    Tip(str("panel_tabs_title"), instant = true) {
-                        IconButton(
-                            shapes = IconButtonDefaults.shapes(),
-                            onClick = { tabMenuOpen = true },
-                        ) {
-                            Icon(
-                                Icons.Rounded.Settings,
-                                contentDescription = str("panel_tabs_title"),
-                                modifier = Modifier.size(17.dp),
-                            )
-                        }
-                    }
-                    PanelTabsMenu(
-                        expanded = tabMenuOpen,
-                        hiddenTabs = hiddenTabs,
-                        onDismiss = { tabMenuOpen = false },
-                    )
-                }
                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = onClose) {
                     Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
@@ -230,77 +235,98 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
 
 
 /**
- * The tab row, which gives up its labels before it gives up its legibility (issue #33).
- *
- * Four text-only tabs in a side panel came out as four truncated words, so the row named nothing and
- * a new user could not tell the queue from the effects. Each tab has an icon now, and the labels are
- * dropped whole — with a tooltip taking over — the moment they no longer fit.
- *
- * "No longer fit" is measured rather than guessed at a breakpoint: the labels are laid out with the
- * row's own text style and summed. A guessed width would be wrong in every language but the one it
- * was tuned in, and "Commentaires" against "Comments" is exactly the case that breaks it.
+ * The tab row: one button per tab, drawn like the sidebar's destinations. The open tab has a filled icon on a
+ * tonal pill with its name beside it; the others are outlined icons, named by a tooltip when the pointer rests
+ * on them (issue #66). Material's tab row had them all in one style with an underline, and its tooltips
+ * did not show.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PanelTabRow(
     tabs: List<NowPlayingTab>,
     selected: NowPlayingTab,
     onTabChange: (NowPlayingTab) -> Unit,
 ) {
-    val labels = tabs.map { panelTabLabel(it) }
-    val measurer = rememberTextMeasurer()
-    val labelStyle = MaterialTheme.typography.titleSmall
-    val density = LocalDensity.current
-
-    BoxWithConstraints {
-        val available = with(density) { maxWidth.roundToPx() }
-        val needed = remember(labels, labelStyle, available) {
-            val text = labels.sumOf { measurer.measure(it, labelStyle).size.width }
-            val chrome = with(density) { (TAB_ICON_SIZE + TAB_ICON_GAP + TAB_SIDE_PADDING * 2).roundToPx() }
-            text + chrome * tabs.size
-        }
-        val compact = needed > available
-
-        SecondaryTabRow(selectedTabIndex = tabs.indexOf(selected).coerceAtLeast(0)) {
-            tabs.forEachIndexed { i, t ->
-                val tab = @Composable {
-                    Tab(
-                        selected = selected == t,
-                        onClick = { onTabChange(t) },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                PanelTabIcon(t)
-                                if (!compact) {
-                                    Spacer(Modifier.width(TAB_ICON_GAP))
-                                    Text(labels[i], maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                            }
-                        },
-                    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tabs.forEach { tab ->
+            val isSelected = tab == selected
+            val label = panelTabLabel(tab)
+            Box(
+                modifier = Modifier.weight(if (isSelected) TAB_SELECTED_WEIGHT else 1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Tip(label, enabled = !isSelected) {
+                    PanelTabButton(tab, label, isSelected, onClick = { onTabChange(tab) })
                 }
-                // Only where the icon is on its own. A tooltip repeating a label you can already
-                // read is noise.
-                if (compact) Tip(labels[i], instant = true) { tab() } else tab()
             }
         }
     }
 }
 
 @Composable
-private fun PanelTabIcon(tab: NowPlayingTab) {
-    val modifier = Modifier.size(TAB_ICON_SIZE)
-    when (tab) {
-        NowPlayingTab.TRACK -> Icon(Icons.Rounded.Info, null, modifier)
-        NowPlayingTab.QUEUE -> Icon(Icons.AutoMirrored.Rounded.QueueMusic, null, modifier)
-        // The same drawing the player bar's lyrics button uses, so the two are recognisably one
-        // feature rather than two icons for it.
-        NowPlayingTab.LYRICS -> Icon(
-            painter = androidx.compose.ui.res.painterResource("icons/lyrics.svg"),
-            contentDescription = null,
-            modifier = modifier,
-        )
-        NowPlayingTab.EFFECTS -> Icon(Icons.Rounded.GraphicEq, null, modifier)
+private fun PanelTabButton(tab: NowPlayingTab, label: String, isSelected: Boolean, onClick: () -> Unit) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val isHovered by interaction.collectIsHoveredAsState()
+    val container by animateColorAsState(
+        when {
+            isSelected -> MaterialTheme.colorScheme.secondaryContainer
+            isHovered -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+            else -> Color.Transparent
+        },
+        tween(TAB_ANIM_MS),
+        label = "panelTabContainer",
+    )
+    val content by animateColorAsState(
+        if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        tween(TAB_ANIM_MS),
+        label = "panelTabContent",
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(TAB_HEIGHT)
+            .clip(CircleShape)
+            .background(container)
+            .hoverable(interaction)
+            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .semantics { contentDescription = label }
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Crossfade(isSelected, animationSpec = tween(TAB_ANIM_MS), label = "panelTabIcon") { filled ->
+            Icon(panelTabIcon(tab, filled), contentDescription = null, tint = content, modifier = Modifier.size(TAB_ICON_SIZE))
+        }
+        AnimatedVisibility(
+            visible = isSelected,
+            enter = fadeIn(tween(TAB_ANIM_MS)) + expandHorizontally(tween(TAB_ANIM_MS)),
+            exit = fadeOut(tween(TAB_ANIM_MS / 2)) + shrinkHorizontally(tween(TAB_ANIM_MS)),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.width(TAB_ICON_GAP))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = content,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
+}
+
+/** The filled drawing for the open tab, the outlined one for the rest. */
+private fun panelTabIcon(tab: NowPlayingTab, filled: Boolean): ImageVector = when (tab) {
+    NowPlayingTab.TRACK -> if (filled) Icons.Filled.Album else Icons.Outlined.Album
+    NowPlayingTab.QUEUE -> if (filled) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic
+    NowPlayingTab.LYRICS -> if (filled) Icons.Filled.Lyrics else Icons.Outlined.Lyrics
+    NowPlayingTab.EFFECTS -> if (filled) Icons.Filled.AutoAwesome else Icons.Outlined.AutoAwesome
 }
 
 @Composable
@@ -309,48 +335,6 @@ private fun panelTabLabel(tab: NowPlayingTab): String = when (tab) {
     NowPlayingTab.QUEUE -> str("player_queue")
     NowPlayingTab.LYRICS -> str("player_lyrics")
     NowPlayingTab.EFFECTS -> str("player_effects")
-}
-
-/**
- * The tab-visibility menu, on the panel itself.
- *
- * Also mirrored in Appearance > Customize buttons, next to the player bar's own row, because that is
- * where someone looking for a setting looks. Here because that is where the tabs are, and the effect
- * is visible the moment it is toggled.
- */
-@Composable
-private fun PanelTabsMenu(
-    expanded: Boolean,
-    hiddenTabs: Set<String>,
-    onDismiss: () -> Unit,
-) {
-    val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        Text(
-            text = str("panel_tabs_desc"),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp).width(220.dp),
-        )
-        NowPlayingTab.entries.forEach { t ->
-            val shown = t.prefKey !in hiddenTabs
-            // The last one standing cannot be hidden: a panel with no tabs has no way back.
-            val isLastShown = shown && hiddenTabs.size == NowPlayingTab.entries.size - 1
-            DropdownMenuItem(
-                enabled = !isLastShown,
-                onClick = {
-                    prefs.setHiddenPanelTabs(
-                        if (shown) hiddenTabs + t.prefKey else hiddenTabs - t.prefKey
-                    )
-                },
-                leadingIcon = { PanelTabIcon(t) },
-                trailingIcon = {
-                    Checkbox(checked = shown, onCheckedChange = null, enabled = !isLastShown)
-                },
-                text = { Text(panelTabLabel(t)) },
-            )
-        }
-    }
 }
 
 /** Reactive read of which panel tabs are hidden; recomposes on pref changes. */
@@ -362,8 +346,10 @@ private fun rememberHiddenPanelTabs(): Set<String> {
     }
 }
 
-private val TAB_ICON_SIZE = 16.dp
-private val TAB_ICON_GAP = 6.dp
+private val TAB_ICON_SIZE = 20.dp
+private val TAB_ICON_GAP = 8.dp
+private val TAB_HEIGHT = 40.dp
+private const val TAB_ANIM_MS = 220
 
-/** What a tab spends on padding either side of its content, per Material's own tab metrics. */
-private val TAB_SIDE_PADDING = 16.dp
+/** How much more of the row the open tab takes, for its name. */
+private const val TAB_SELECTED_WEIGHT = 2.6f
