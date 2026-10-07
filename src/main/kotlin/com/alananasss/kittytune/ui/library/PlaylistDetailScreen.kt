@@ -1377,8 +1377,13 @@ fun PlaylistDetailScreen(
                                         }
                                     }
                             ) {
+                                // The tracks' own credit when they agree on one: the account's name can be a
+                                // shared one, "Kai Angel & 9mice" on a record only one of them sings.
+                                val credit = remember(tracks.size, playlistUser) {
+                                    albumCreditFor(tracks)?.takeIf { playlistUser?.urn?.startsWith("spotify") != true }
+                                }
                                 Text(
-                                    str("playlist_by_user", playlistUser!!.username ?: ""),
+                                    str("playlist_by_user", credit ?: playlistUser!!.username ?: ""),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     textDecoration = if (ownerHovered) TextDecoration.Underline else null
