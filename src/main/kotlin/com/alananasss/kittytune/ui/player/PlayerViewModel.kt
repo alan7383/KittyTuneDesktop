@@ -29,6 +29,7 @@ import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.*
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
+import com.alananasss.kittytune.ui.player.lyrics.LyricSinger
 import com.google.gson.Gson
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -386,6 +387,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     fun toggleDuetView(enabled: Boolean) {
         isDuetViewEnabled = enabled
         playerPrefs.setLyricsDuetViewEnabled(enabled)
+        if (enabled) currentTrack?.let { refineLyricVoices(it) }
     }
 
     var duetBlacklist by mutableStateOf(playerPrefs.getLyricsDuetBlacklist())
@@ -2115,8 +2117,56 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         lyricsLines.addAll(payload.lines)
         rawPlainLyrics = payload.plain
         currentLyricsSource = payload.provider.takeUnless { payload.isEmpty }
+        currentTrack?.let { refineLyricVoices(it) }
         lyricsMode = if (payload.lines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
         isLyricsLoading = false
+    }
+
+    /** Who sings each line, per track, as worked out from Genius: an empty list when Genius could not tell. */
+    private val lyricVoicesCache = com.alananasss.kittytune.core.BoundedCache<Long, List<LyricSinger>>(64)
+    private var lyricVoicesJob: Job? = null
+
+    /**
+     * Gives the synced lines on screen the voice Genius says sings each of them, for the duet view: two artists
+     * on two sides, and no duet for a song one artist sings throughout. Runs after the lyrics are shown and only
+     * touches them if they are still the ones it looked at. See [com.alananasss.kittytune.data.lyrics.GeniusVoices].
+     */
+    private fun refineLyricVoices(track: Track) {
+        lyricVoicesJob?.cancel()
+        if (!isDuetViewEnabled || lyricsLines.isEmpty()) return
+        val lines = lyricsLines.toList()
+        lyricVoicesJob = viewModelScope.launch(Dispatchers.IO) {
+            val voices = lyricVoicesCache[track.id] ?: findLyricVoices(track, lines).also { lyricVoicesCache[track.id] = it }
+            if (voices.size != lines.size) return@launch
+            withContext(Dispatchers.Main) {
+                if (currentTrack?.id != track.id || lyricsLines.toList() != lines) return@withContext
+                val voiced = lines.mapIndexed { i, line -> line.copy(singer = voices[i], agent = null) }
+                lyricsLines.clear()
+                lyricsLines.addAll(voiced)
+            }
+        }
+    }
+
+    /** The voices for [lines] from the track's Genius page, or an empty list when there is no page or no answer. */
+    private suspend fun findLyricVoices(track: Track, lines: List<LyricLine>): List<LyricSinger> {
+        val effectiveArtist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+        val (artist, title) = parseArtistAndTitle(track.title ?: "", effectiveArtist)
+        val songTitle = LyricsMatcher.titleParts(title).firstOrNull() ?: title
+        val target = LyricsMatcher.Target(
+            title = songTitle,
+            artist = artist,
+            durationMs = track.durationMs ?: 0L,
+            alternativeArtists = listOfNotNull(track.displayArtist, track.user?.username).filter { it.isNotBlank() },
+        )
+        val hit = com.alananasss.kittytune.data.network.GeniusClient.search("$songTitle $artist".trim())
+            .filter { LyricsMatcher.isAcceptable(it.title, it.artist, target) }
+            .maxByOrNull { LyricsMatcher.score(it.title, it.artist, 0.0, target) }
+            ?: return emptyList()
+        val page = com.alananasss.kittytune.data.network.GeniusClient.lyrics(hit.id) ?: return emptyList()
+        val sections = com.alananasss.kittytune.data.lyrics.GeniusVoices.parseSections(page)
+        val credited = com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(effectiveArtist) +
+            com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(hit.artistNames.orEmpty())
+        return com.alananasss.kittytune.data.lyrics.GeniusVoices.voicesFor(lines, sections, credited).orEmpty()
     }
 
     /** Lyrics tagged into the downloaded file, when the user asked for those to come first. */
@@ -2738,6 +2788,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     lyricsLines.addAll(finalLines)
                     rawPlainLyrics = finalPlain
                     lyricsMode = LyricsMode.SYNCED
+                    currentTrack?.let { refineLyricVoices(it) }
                 } else if (!finalPlain.isNullOrBlank()) {
                     // Picked by hand, so shown, even over synced lyrics: keeping the synced ones on screen
                     // made a click on a plain LrcLib result look like it did nothing (issue #66).
