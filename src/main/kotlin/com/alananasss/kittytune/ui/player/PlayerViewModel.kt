@@ -67,6 +67,9 @@ enum class CommentSort(
 
 enum class LyricsMode { SYNCED, PLAIN }
 
+/** How long after a seek the automix waits before it may start a mix. */
+private const val MIX_AFTER_SEEK_MS = 2_000L
+
 /** How long after a track's lyrics settle the search-by-hand starts on its own, so it never competes with them. */
 private const val BACKGROUND_LYRICS_SEARCH_DELAY_MS = 1_500L
 
@@ -4709,7 +4712,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                         triggerPrebuffer(nextTrack, plan)
                                     }
 
-                                    if (currentPosition >= triggerTime && !MusicManager.player.isCrossfadingOut) {
+                                    // Not in the moment after a seek: the position is the seek's target until the
+                                    // engine has caught up, and a mix set off then is one nobody asked for.
+                                    val settledAfterSeek = System.currentTimeMillis() - lastSeekTimestamp > MIX_AFTER_SEEK_MS
+                                    if (currentPosition >= triggerTime && settledAfterSeek && !MusicManager.player.isCrossfadingOut) {
                                         MusicManager.player.isCrossfadingOut = true
                                         com.alananasss.kittytune.audio.automix.AutomixManager.setMixBeatsLeft(null)
                                         playNext(manual = false, isCrossfade = true)

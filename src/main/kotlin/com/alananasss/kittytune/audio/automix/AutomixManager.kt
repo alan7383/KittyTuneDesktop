@@ -25,6 +25,9 @@ import kotlin.math.max
 import kotlin.math.pow
 
 object AutomixManager {
+    /** The furthest from the end a detected mix-out point may be and still be used; the analysis cuts 45 s at most. */
+    private const val MAX_BELIEVABLE_OUTRO_MS = 60_000L
+
 
     private const val TAG = "AutomixManager"
 
@@ -363,8 +366,11 @@ object AutomixManager {
         val overlapMs = baseOverlapMs.coerceIn(4_000L, 20_000L)
 
         val latestTrigger = trackDuration - overlapMs
+        // A mix-out point is only believed near the end of what is playing. One from an analysis of another
+        // length of the song (a preview, another upload) sat minutes before the end of a long track and set
+        // the mix off as soon as the playhead passed it (issue #66).
         val mixOut = if (prefs.getAutomixDynamicMixPointsEnabled()) {
-            outBeat.mixOutPointMs?.takeIf { it > 0 }
+            outBeat.mixOutPointMs?.takeIf { it > 0 && it >= trackDuration - MAX_BELIEVABLE_OUTRO_MS }
         } else null
         val effectiveTrigger = mixOut?.coerceAtMost(latestTrigger) ?: latestTrigger
 
