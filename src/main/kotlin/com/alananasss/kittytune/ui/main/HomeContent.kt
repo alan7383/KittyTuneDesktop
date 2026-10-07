@@ -809,51 +809,56 @@ private fun SearchResults(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // What you are looking for comes before where to look for it (issue #33).
-            //
-            // "Make the first filter 'All', then 'Tracks', 'Artists', 'Playlists' and only after them make
-            // the platform selection button, again 1 button, and when you click on it you can switch to
-            // another one."
-            //
-            // He is right about the order for a reason worth stating: the platform is set once and then
-            // left alone, while All/Tracks/Artists is touched on every search. The thing you reach for
-            // constantly was sitting to the right of the thing you almost never change, and three
-            // side-by-side platform buttons took as much of the row as the four filters did — which is
-            // also why the row started scrolling sideways on a narrow window.
-            if (vm.activeSearchSource in listOf(SearchSource.SOUNDCLOUD, SearchSource.SPOTIFY, SearchSource.DEEZER, SearchSource.TIDAL, SearchSource.QOBUZ)) {
-                val filters = listOf(
-                    SearchFilter.ALL,
-                    SearchFilter.TRACKS,
-                    SearchFilter.ARTISTS,
-                    SearchFilter.PLAYLISTS,
-                )
-                com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
-                    options = filters,
-                    selectedOption = vm.activeFilter,
-                    onOptionSelected = { vm.onFilterChanged(it) },
-                    fillMaxWidth = false,
-                    labelProvider = { filter ->
-                        val label = when (filter) {
-                            SearchFilter.ALL -> str("search_filter_all")
-                            SearchFilter.TRACKS -> str("search_filter_tracks")
-                            SearchFilter.ARTISTS -> str("lib_artists")
-                            SearchFilter.PLAYLISTS -> str("lib_playlists")
-                        }
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                        )
-                    }
-                )
-
-                VerticalDivider(
-                    modifier = Modifier.height(20.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                )
-            }
-
+            // The platform first, so it stays put. It used to come after the filters, which some platforms do
+            // not have, and jumped across the row whenever they appeared or went (issue #66). The filters now
+            // slide in and out beside it.
             SearchSourceButton(vm)
+
+            val hasFilters = vm.activeSearchSource in listOf(
+                SearchSource.SOUNDCLOUD, SearchSource.SPOTIFY, SearchSource.DEEZER, SearchSource.TIDAL, SearchSource.QOBUZ,
+            )
+            androidx.compose.animation.AnimatedVisibility(
+                visible = hasFilters,
+                enter = androidx.compose.animation.fadeIn(tween(220, delayMillis = 60)) +
+                    androidx.compose.animation.expandHorizontally(tween(260, easing = FastOutSlowInEasing), expandFrom = Alignment.Start),
+                exit = androidx.compose.animation.fadeOut(tween(140)) +
+                    androidx.compose.animation.shrinkHorizontally(tween(240, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Start),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VerticalDivider(
+                        modifier = Modifier.height(20.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    val filters = listOf(
+                        SearchFilter.ALL,
+                        SearchFilter.TRACKS,
+                        SearchFilter.ARTISTS,
+                        SearchFilter.PLAYLISTS,
+                    )
+                    com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                        options = filters,
+                        selectedOption = vm.activeFilter,
+                        onOptionSelected = { vm.onFilterChanged(it) },
+                        fillMaxWidth = false,
+                        labelProvider = { filter ->
+                            val label = when (filter) {
+                                SearchFilter.ALL -> str("search_filter_all")
+                                SearchFilter.TRACKS -> str("search_filter_tracks")
+                                SearchFilter.ARTISTS -> str("lib_artists")
+                                SearchFilter.PLAYLISTS -> str("lib_playlists")
+                            }
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                            )
+                        }
+                    )
+                }
+            }
         }
 
         // ── Loading bar ──
