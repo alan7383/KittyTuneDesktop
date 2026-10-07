@@ -91,8 +91,6 @@ import com.alananasss.kittytune.ui.common.Slider
         var showPaxsenixKeyDialog by remember { mutableStateOf(false) }
         var paxsenixKeyInput by remember { mutableStateOf(prefs.getPaxsenixApiKey()) }
         var showProviderOrderDialog by remember { mutableStateOf(false) }
-        var providerOrder by remember { mutableStateOf(prefs.getLyricsProviderOrder()) }
-        var providerEnabledMap by remember { mutableStateOf(PreferredLyricsProvider.entries.associateWith { prefs.getLyricsProviderEnabled(it) }) }
 
         var showUiStyleDialog by remember { mutableStateOf(false) }
         var showSidebarUiStyleDialog by remember { mutableStateOf(false) }
@@ -222,105 +220,7 @@ import com.alananasss.kittytune.ui.common.Slider
         }
 
         if (showProviderOrderDialog) {
-            var currentOrder by remember { mutableStateOf(prefs.getLyricsProviderOrder().toMutableList()) }
-            var currentEnabled by remember {
-                mutableStateOf(
-                    PreferredLyricsProvider.entries.associateWith { prefs.getLyricsProviderEnabled(it) }
-                )
-            }
-            EscapableAlertDialog(
-                onDismissRequest = { showProviderOrderDialog = false },
-                title = { Text(str("pref_lyrics_order", "Provider Priority Order")) },
-                text = {
-                    com.alananasss.kittytune.ui.common.ScrollableColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
-                        contentPadding = PaddingValues(end = 12.dp)
-                    ) {
-                        sh.calvin.reorderable.ReorderableColumn(
-                            list = currentOrder,
-                            onSettle = { from, to ->
-                                currentOrder = currentOrder.toMutableList().apply { add(to, removeAt(from)) }
-                            },
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) { index, provider, isDragging ->
-                            key(provider) {
-                                ReorderableItem {
-                                    val elevation by androidx.compose.animation.core.animateDpAsState(
-                                        if (isDragging) 6.dp else 0.dp,
-                                        label = "providerDrag"
-                                    )
-                                    val isEnabled = currentEnabled[provider] ?: true
-                                    Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = if (isDragging) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        shadowElevation = elevation,
-                                    ) {
-                                        Row(
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(min = 52.dp)
-                                                .padding(horizontal = 4.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            IconButton(onClick = {}, modifier = Modifier.draggableHandle()) {
-                                                Icon(
-                                                    androidx.compose.material.icons.Icons.Rounded.DragIndicator,
-                                                    contentDescription = str("action_reorder"),
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            Row(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .alpha(if (isEnabled) 1f else 0.45f),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    "${index + 1}",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.width(28.dp)
-                                                )
-                                                Text(
-                                                    provider.displayName,
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                            }
-                                            Spacer(Modifier.width(8.dp))
-                                            SettingsSwitch(
-                                                checked = isEnabled,
-                                                onCheckedChange = { checked ->
-                                                    currentEnabled = currentEnabled + (provider to checked)
-                                                }
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        providerOrder = currentOrder
-                        providerEnabledMap = currentEnabled
-                        prefs.setLyricsProviderOrder(currentOrder)
-                        currentEnabled.forEach { (p, enabled) ->
-                            prefs.setLyricsProviderEnabled(p, enabled)
-                        }
-                        showProviderOrderDialog = false
-                    }) {
-                        Text(str("btn_save", "Save"))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showProviderOrderDialog = false }) {
-                        Text(str("btn_cancel", "Cancel"))
-                    }
-                }
-            )
+            LyricsProviderOrderDialog(prefs = prefs, onDismiss = { showProviderOrderDialog = false })
         }
     
         // --- DIALOGS ---

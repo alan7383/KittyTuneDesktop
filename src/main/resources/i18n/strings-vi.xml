@@ -3267,4 +3267,6 @@
     <string name="lyrics_search_now_showing">Đang hiển thị: %1$s</string>
     <string name="lyrics_search_progress">Đã tìm thấy %1$d, còn %2$d nguồn đang tìm</string>
     <string name="lyrics_search_clear">Xóa</string>
+    <string name="lyrics_sync_tap_title">Nhấn khi nghe dòng tiếp theo</string>
+    <string name="lyrics_sync_tap_button">Ngay bây giờ</string>
 </resources>

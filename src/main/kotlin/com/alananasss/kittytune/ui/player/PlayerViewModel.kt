@@ -2487,6 +2487,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         updateLyricsSync(lyricsSync.adjustedAt(currentPosition, amount))
     }
 
+    /**
+     * Lines the lyrics up so that [line] starts at the playhead: for the tap sync, pressed the moment the line
+     * is heard. With two sync points, the one nearer the playhead moves, as with the step buttons.
+     */
+    fun syncLyricsLineToNow(line: LyricLine) {
+        adjustLyricsOffset(line.startTime - currentPosition - lyricsOffset)
+    }
+
     fun resetLyricsOffset() {
         updateLyricsSync(com.alananasss.kittytune.data.LyricsSync.NONE)
     }
