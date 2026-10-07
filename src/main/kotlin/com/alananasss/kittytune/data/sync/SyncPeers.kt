@@ -42,6 +42,9 @@ object SyncPeers {
     private val deviceListType = object : TypeToken<List<KnownDevice>>() {}.type
     private val payloadListType = object : TypeToken<List<PairingPayload>>() {}.type
     private val inboundListType = object : TypeToken<List<LegacyInbound>>() {}.type
+    private var cachedRaw: String? = null
+    private var cacheLoaded = false
+    private var cachedDevices: List<KnownDevice> = emptyList()
 
     private data class LegacyInbound(
         val deviceId: String = "",
@@ -52,11 +55,15 @@ object SyncPeers {
     @Synchronized
     fun all(): List<KnownDevice> {
         migrateIfNeeded()
-        val raw = prefs.getString(KEY_DEVICES, null) ?: return emptyList()
-        return runCatching { gson.fromJson<List<KnownDevice>>(raw, deviceListType) }
+        val raw = prefs.getString(KEY_DEVICES, null)
+        if (cacheLoaded && raw == cachedRaw) return cachedDevices
+        cachedRaw = raw
+        cacheLoaded = true
+        cachedDevices = runCatching { raw?.let { gson.fromJson<List<KnownDevice>>(it, deviceListType) } }
             .getOrNull()
             ?.filter { it.deviceId.isNotBlank() }
             ?: emptyList()
+        return cachedDevices
     }
 
     fun isEmpty(): Boolean = all().isEmpty()

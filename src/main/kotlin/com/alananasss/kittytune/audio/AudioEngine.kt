@@ -407,6 +407,7 @@ class AudioEngine {
 
     fun release() {
         stop()
+        normalization.release()
         scope.coroutineContext[Job]?.cancel()
     }
 

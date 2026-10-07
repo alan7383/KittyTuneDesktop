@@ -353,7 +353,7 @@ fun LibraryScreen(
             floatingActionButton = {
                 if (!showLogin || isGuest) {
                     val bottomNavHeight = 90.dp
-                    val miniPlayerHeight = if (playerViewModel.currentTrack != null) 72.dp else 0.dp
+                    val miniPlayerHeight = if (playerViewModel.uiCurrentTrack != null) 72.dp else 0.dp
                     val totalBottomPadding = bottomNavHeight + miniPlayerHeight
     
                     Box(modifier = Modifier.padding(bottom = totalBottomPadding)) {

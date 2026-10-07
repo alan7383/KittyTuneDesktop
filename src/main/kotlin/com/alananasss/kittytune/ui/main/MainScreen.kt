@@ -243,7 +243,7 @@ fun MainScreen(
                         else -> null
                     }
                     if (numberSeekFraction != null) {
-                        val duration = playerViewModel.duration
+                        val duration = playerViewModel.uiDuration
                         if (duration > 0) {
                             playerViewModel.seekTo((duration * numberSeekFraction).toLong())
                         }
@@ -266,11 +266,11 @@ fun MainScreen(
                 } else if (noModifiers) {
                     when (event.key) {
                         Key.Spacebar -> playerViewModel.togglePlayPause()
-                        Key.DirectionRight -> playerViewModel.seekTo((playerViewModel.currentPosition + 5000).coerceAtMost(playerViewModel.duration))
-                        Key.DirectionLeft -> playerViewModel.seekTo((playerViewModel.currentPosition - 5000).coerceAtLeast(0))
+                        Key.DirectionRight -> playerViewModel.seekTo((playerViewModel.uiCurrentPosition + 5000).coerceAtMost(playerViewModel.uiDuration))
+                        Key.DirectionLeft -> playerViewModel.seekTo((playerViewModel.uiCurrentPosition - 5000).coerceAtLeast(0))
                         Key.L -> playerViewModel.toggleLike()
                         Key.R -> {
-                            playerViewModel.currentTrack?.let { playerViewModel.repostTrack(it, null) }
+                            playerViewModel.uiCurrentTrack?.let { playerViewModel.repostTrack(it, null) }
                         }
                         Key.S -> {
                             navController.navigate("home")
@@ -278,7 +278,7 @@ fun MainScreen(
                         }
                         Key.M -> playerViewModel.toggleMute()
                         Key.P -> {
-                            val track = playerViewModel.currentTrack
+                            val track = playerViewModel.uiCurrentTrack
                             if (track != null) {
                                 navController.navigate("track_detail/${track.id}")
                             }
@@ -340,6 +340,12 @@ fun MainScreen(
         },
         onOpenLyrics = {
             playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
+        },
+        onOpenDevices = {
+            showNowPlayingPanel = true
+            playerPrefs.setRightPanelOpen(true)
+            playerPrefs.setHiddenPanelTabs(playerPrefs.getHiddenPanelTabs() - "devices")
+            nowPlayingTab = NowPlayingTab.DEVICES
         },
         // Straight to the big one, which is what he asked for: "I think you can do this when you click
         // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
@@ -1139,7 +1145,7 @@ fun MainScreen(
             // rather than reveal it, and the same stiffness on both sides means the two panels feel like
             // one interface.
             androidx.compose.animation.AnimatedVisibility(
-                visible = showNowPlayingPanel && playerViewModel.currentTrack != null,
+                visible = showNowPlayingPanel && (playerViewModel.uiCurrentTrack != null || nowPlayingTab == NowPlayingTab.DEVICES),
                 enter = androidx.compose.animation.fadeIn(
                     androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)
                 ) + androidx.compose.animation.expandHorizontally(
@@ -1248,7 +1254,7 @@ fun MainScreen(
         com.alananasss.kittytune.ui.player.automix.AutomixDebugOverlay(
             // A lambda, not the value: reading the position here recomposed this whole screen
             // several times a second for the sake of a debug overlay that is usually hidden.
-            currentPositionMs = { playerViewModel.currentPosition },
+            currentPositionMs = { playerViewModel.uiCurrentPosition },
             modifier = Modifier.padding(bottom = 100.dp, end = 20.dp)
         )
     }
@@ -1324,6 +1330,7 @@ enum class NowPlayingTab(val prefKey: String) {
     QUEUE(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_QUEUE),
     LYRICS(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_LYRICS),
     EFFECTS(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_EFFECTS),
+    DEVICES("devices"),
 }
 
 @Composable

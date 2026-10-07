@@ -1,0 +1,35 @@
+name: Windows portable and headless checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: ['codex/windows-connect']
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test and package portable Windows app
+        shell: pwsh
+        run: ./scripts/build-windows.ps1 -JavaHome $env:JAVA_HOME
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KittyTune-Windows
+          path: release/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-test-reports
+          path: build/reports/tests/headlessTest

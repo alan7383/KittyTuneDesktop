@@ -57,6 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -84,7 +87,8 @@ fun NowPlayingPanel(
     modifier: Modifier = Modifier,
 ) {
     val vm = playerViewModel
-    val track = vm.currentTrack ?: return
+    val track = vm.uiCurrentTrack
+    if (track == null && tab != NowPlayingTab.DEVICES) return
 
     Surface(
         modifier = modifier,
@@ -110,7 +114,7 @@ fun NowPlayingPanel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val context = vm.currentContext
-                if (context != null && vm.canNavigateToContext()) {
+                if (tab != NowPlayingTab.DEVICES && context != null && vm.canNavigateToContext()) {
                     val contextInteraction = remember(context.navigationId) { MutableInteractionSource() }
                     val contextHovered by contextInteraction.collectIsHoveredAsState()
                     // Same fix as the lyrics (issue #33): TextDecoration.Underline is drawn
@@ -139,7 +143,8 @@ fun NowPlayingPanel(
                     )
                 } else {
                     Text(
-                        text = context?.displayText ?: track.title ?: "",
+                        text = if (tab == NowPlayingTab.DEVICES) panelTabLabel(tab)
+                            else context?.displayText ?: track?.title ?: "",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -177,6 +182,9 @@ fun NowPlayingPanel(
                 NowPlayingTab.QUEUE -> QueueList(vm)
                 NowPlayingTab.LYRICS -> LyricsPreview(vm, onOpenFullLyrics)
                 NowPlayingTab.EFFECTS -> com.alananasss.kittytune.ui.player.EffectsPanel(vm)
+                NowPlayingTab.DEVICES -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
+                    com.alananasss.kittytune.ui.profile.ConnectPanel()
+                }
                 else -> TrackInfoTab(vm)
             }
         }
@@ -339,6 +347,7 @@ private fun PanelTabIcon(tab: NowPlayingTab) {
             modifier = modifier,
         )
         NowPlayingTab.EFFECTS -> Icon(Icons.Rounded.GraphicEq, null, modifier)
+        NowPlayingTab.DEVICES -> Icon(Icons.Rounded.Devices, null, modifier)
     }
 }
 
@@ -348,6 +357,7 @@ private fun panelTabLabel(tab: NowPlayingTab): String = when (tab) {
     NowPlayingTab.QUEUE -> str("player_queue")
     NowPlayingTab.LYRICS -> str("player_lyrics")
     NowPlayingTab.EFFECTS -> str("player_effects")
+    NowPlayingTab.DEVICES -> if (java.util.Locale.getDefault().language == "ru") "Устройства" else "Devices"
 }
 
 /**

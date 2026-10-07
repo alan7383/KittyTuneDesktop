@@ -170,15 +170,15 @@ private fun PanelSyncedLyrics(
     style: PanelLyricsStyle,
 ) {
     // Starts on the line being sung, so the first frame is not the top of the song (issue #33, round 5).
-    val listState = key(vm.currentTrack?.id) {
+    val listState = key(vm.uiCurrentTrack?.id) {
         rememberLazyListState(
-            initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lines, vm.currentPosition + vm.lyricsOffset).coerceAtLeast(0)
+            initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lines, vm.uiCurrentPosition + vm.lyricsOffset).coerceAtLeast(0)
         )
     }
     // Derived rather than read straight from the position, so the lines recompose when the line
     // changes and not on every progress tick.
     val activeIndex by remember {
-        derivedStateOf { LyricsUtils.activeLineIndex(vm.lyricsLines, vm.currentPosition + vm.lyricsOffset) }
+        derivedStateOf { LyricsUtils.activeLineIndex(vm.lyricsLines, vm.uiCurrentPosition + vm.lyricsOffset) }
     }
     BoxWithConstraints(modifier) {
         val density = LocalDensity.current
@@ -217,8 +217,8 @@ private fun PanelSyncedLyrics(
         // Interpolated between the player's four-per-second reports, so the word fill in the panel is as
         // smooth as it is on the full screen instead of stepping (issue #33).
         val smoothPosition = rememberSmoothPosition(
-            positionMs = vm.currentPosition,
-            isPlaying = vm.isPlaying,
+            positionMs = vm.uiCurrentPosition,
+            isPlaying = vm.uiIsPlaying,
             speed = vm.effectsState.speed,
         ) + vm.lyricsOffset
 
@@ -251,7 +251,7 @@ private fun PanelSyncedLyrics(
                         LyricsUtils.seekTargetFor(
                             line = line,
                             lyricsOffsetMs = vm.lyricsOffset,
-                            durationMs = vm.duration,
+                            durationMs = vm.uiDuration,
                         )?.let(vm::seekTo)
                     },
                 )
@@ -321,7 +321,7 @@ private fun PanelLyricLine(
         else -> Alignment.Start
     }
 
-    val isDuetActive = vm.isDuetActiveForTrack(vm.currentTrack)
+    val isDuetActive = vm.isDuetActiveForTrack(vm.uiCurrentTrack)
     val lineSinger = if (isDuetActive) {
         line.singer?.takeIf { it != LyricSinger.DEFAULT }
             ?: when (line.agent?.trim()?.lowercase()) {
@@ -446,7 +446,7 @@ private fun PanelLyricLine(
 private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: PanelLyricsStyle) {
     val text = vm.rawPlainLyrics.orEmpty()
     val lines = remember(text) { text.split("\n") }
-    val listState = key(vm.currentTrack?.id) { rememberLazyListState() }
+    val listState = key(vm.uiCurrentTrack?.id) { rememberLazyListState() }
     val scope = rememberCoroutineScope()
 
     // Wheel and drag always win: the reader is following the words, and having the view creep out
@@ -458,8 +458,8 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
         enabled = vm.isPlainAutoScrollEnabled,
         speed = vm.effectivePlainAutoScrollSpeed,
         lineCount = lines.size,
-        positionMs = { vm.currentPosition },
-        isPlaying = { vm.isPlaying },
+        positionMs = { vm.uiCurrentPosition },
+        isPlaying = { vm.uiIsPlaying },
         playbackSpeed = { vm.effectsState.speed },
         lastManualScrollMs = { lastUserScrollMs },
     )

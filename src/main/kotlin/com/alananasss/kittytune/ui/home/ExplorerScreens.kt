@@ -474,7 +474,7 @@ fun GenreDetailScreen(
                                         val absoluteIndex = pageIndex * 5 + itemIndexInColumn
                                         PopularTrackListItem(
                                             track = track,
-                                            currentlyPlayingTrack = playerViewModel.currentTrack,
+                                            currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
                                             onClick = { playerViewModel.playPlaylist(viewModel.popularTracks, absoluteIndex) },
                                             onOptionClick = { playerViewModel.showTrackOptions(track) },
                                             onArtistClick = { playerViewModel.navigateToTrackArtist(it) }

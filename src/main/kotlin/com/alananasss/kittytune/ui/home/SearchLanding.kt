@@ -101,7 +101,7 @@ fun SearchLanding(
                 kind = vm.chartPreviewKind,
                 entries = vm.chartPreview,
                 isLoading = vm.isChartPreviewLoading,
-                currentTrack = playerViewModel.currentTrack,
+                currentTrack = playerViewModel.uiCurrentTrack,
                 onKindChange = { vm.loadChartPreview(it) },
                 onPlayFrom = { index ->
                     playerViewModel.playPlaylist(
@@ -141,7 +141,7 @@ fun SearchLanding(
                             val track = vm.likedArtistUpdates[index]
                             LandingTrackCard(
                                 track = track,
-                                isCurrent = playerViewModel.currentTrack?.id == track.id,
+                                isCurrent = playerViewModel.uiCurrentTrack?.id == track.id,
                                 onClick = {
                                     playerViewModel.playPlaylist(
                                         tracks = vm.likedArtistUpdates.toList(),

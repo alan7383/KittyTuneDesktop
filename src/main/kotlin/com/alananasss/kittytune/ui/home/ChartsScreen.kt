@@ -283,7 +283,7 @@ fun ChartsScreen(
                     ChartTrackRow(
                         track = entry.track,
                         rank = entry.rank,
-                        currentlyPlayingTrack = playerViewModel.currentTrack,
+                        currentlyPlayingTrack = playerViewModel.uiCurrentTrack,
                         onClick = {
                             // A chart is a queue: pressing a song plays the chart from there, so the
                             // songs either side of it are what comes next.

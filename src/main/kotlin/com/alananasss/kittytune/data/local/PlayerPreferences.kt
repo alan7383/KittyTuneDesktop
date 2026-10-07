@@ -522,7 +522,7 @@ class PlayerPreferences {
 
     fun getDownloadDrmStreamsEnabled(): Boolean = Prefs.getBoolean(KEY_DOWNLOAD_DRM_STREAMS, true)
     fun setDownloadDrmStreamsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DOWNLOAD_DRM_STREAMS, enabled)
-    fun getAutoUpdateEnabled(): Boolean = Prefs.getBoolean(KEY_AUTO_UPDATE, true)
+    fun getAutoUpdateEnabled(): Boolean = Prefs.getBoolean(KEY_AUTO_UPDATE, false)
     fun setAutoUpdateEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTO_UPDATE, enabled)
 
     fun getPreciseSpeedEnabled(): Boolean = Prefs.getBoolean(KEY_PRECISE_SPEED, false)
