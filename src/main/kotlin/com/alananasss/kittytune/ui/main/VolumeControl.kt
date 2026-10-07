@@ -1,6 +1,8 @@
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -86,8 +88,11 @@ import java.awt.Cursor
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
+/** Room for the level beside the track: "100%" included, which used to wrap its sign onto a hidden second line. */
+private val PERCENT_LABEL_WIDTH = 44.dp
+
 /** Mute button, the two gaps and the percentage: everything in the inline row that is not the track. */
-private val INLINE_OVERHEAD = 40.dp + 6.dp + 8.dp + 40.dp
+private val INLINE_OVERHEAD = 40.dp + 6.dp + 8.dp + PERCENT_LABEL_WIDTH
 
 /** Shortest track worth aiming at; with less room the bar uses the hover popup instead. */
 private val MIN_TRACK_WIDTH = 96.dp
@@ -232,7 +237,8 @@ private fun InlineVolumeControl(
             color = if (isMuted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.End,
             maxLines = 1,
-            modifier = Modifier.width(40.dp),
+            softWrap = false,
+            modifier = Modifier.width(PERCENT_LABEL_WIDTH),
         )
     }
 }
@@ -283,8 +289,15 @@ private fun VolumeTrack(
         animationSpec = tween(250, easing = FastOutSlowInEasing),
         label = "volumeThumbInteraction",
     )
+    // What is drawn follows the level on a spring, so wheel steps slide instead of jumping, and a fast spin
+    // just retargets the slide already under way. A drag is drawn exactly where the pointer is.
+    val shownLevel = remember { Animatable(volume) }
+    LaunchedEffect(volume, isDragging) {
+        if (isDragging) shownLevel.snapTo(volume)
+        else shownLevel.animateTo(volume, spring(stiffness = Spring.StiffnessMediumLow))
+    }
     val isMuted = volume <= 0.001f
-    val effectiveThumbColor = if (isMuted) inactiveColor else thumbColor
+    val effectiveThumbColor = mutedThumbColor(isMuted, thumbColor, inactiveColor)
     // The wave moves while music plays and compresses to a flat line when pressed, in step with the seek bar.
     val isMoving = LocalWaveMoving.current && com.alananasss.kittytune.core.LocalWindowSeen.current && spec.amplitude > 0.dp && !isMuted
     val animatedAmplitude by animateFloatAsState(
@@ -356,11 +369,12 @@ private fun VolumeTrack(
                 }
             },
     ) {
+        val level = shownLevel.value
         val inset = TRACK_INSET.toPx()
         val length = ((if (vertical) size.height else size.width) - 2 * inset).coerceAtLeast(0f)
         val cross = (if (vertical) size.width else size.height) / 2f
         val stroke = thickness.toPx()
-        val filled = length * volume.coerceIn(0f, 1f)
+        val filled = length * level.coerceIn(0f, 1f)
 
         val barWidth = 4.dp.toPx()
         val gapMargin = 3.dp.toPx()
@@ -386,7 +400,7 @@ private fun VolumeTrack(
                 val thumbY = bottomY - filled
 
                 // Active track (from bottom up towards thumb)
-                if (volume > 0.001f) {
+                if (level > 0.001f) {
                     val activeTop = (thumbY + actualThumbHalf + actualGap).coerceAtMost(bottomY)
                     val activeHeight = (bottomY - activeTop).coerceAtLeast(0f)
                     if (activeHeight > 0f) {
@@ -401,7 +415,7 @@ private fun VolumeTrack(
                 }
 
                 // Inactive track (from thumb up towards top)
-                if (volume < 0.999f) {
+                if (level < 0.999f) {
                     val inactiveBottom = (thumbY - actualInactiveThumbHalf - actualInactiveGap).coerceAtLeast(topY)
                     val inactiveHeight = (inactiveBottom - topY).coerceAtLeast(0f)
                     if (inactiveHeight > 0f) {
@@ -420,7 +434,7 @@ private fun VolumeTrack(
                 val thumbX = startX + filled
 
                 // Active track (from left up towards thumb)
-                if (volume > 0.001f) {
+                if (level > 0.001f) {
                     val activeRight = (thumbX - actualThumbHalf - actualGap).coerceAtLeast(startX)
                     val activeWidth = (activeRight - startX).coerceAtLeast(0f)
                     if (activeWidth > 0f) {
@@ -435,7 +449,7 @@ private fun VolumeTrack(
                 }
 
                 // Inactive track (from thumb up towards right)
-                if (volume < 0.999f) {
+                if (level < 0.999f) {
                     val inactiveLeft = (thumbX + actualInactiveThumbHalf + actualInactiveGap).coerceAtMost(endX)
                     val inactiveWidth = (endX - inactiveLeft).coerceAtLeast(0f)
                     if (inactiveWidth > 0f) {
@@ -517,8 +531,8 @@ private fun VolumeTrack(
                 if (vertical) Offset(cross + across, size.height - inset - along)
                 else Offset(inset + along, cross + across)
 
-            val activeEnd = if (volume <= 0.001f) 0f else filled
-            val inactiveStart = if (volume >= 0.999f) length else filled
+            val activeEnd = if (level <= 0.001f) 0f else filled
+            val inactiveStart = if (level >= 0.999f) length else filled
 
             if (inactiveStart < length) {
                 drawLine(inactiveColor, at(inactiveStart), at(length), stroke, StrokeCap.Round)
@@ -569,6 +583,16 @@ private fun VolumeTrack(
 }
 
 private fun lerp(start: Float, stop: Float, fraction: Float): Float = start + (stop - start) * fraction
+
+/**
+ * The thumb greys out at zero, but stays solid: a see-through inactive colour (the full player's) let the
+ * track show through the dot, which read as a hole in it.
+ */
+private fun mutedThumbColor(isMuted: Boolean, thumbColor: Color, inactiveColor: Color): Color = when {
+    !isMuted -> thumbColor
+    inactiveColor.alpha >= 0.99f -> inactiveColor
+    else -> androidx.compose.ui.graphics.lerp(thumbColor, Color.Black, 0.45f)
+}
 
 /** How each seek-bar style translates to the volume track. */
 internal data class VolumeTrackSpec(

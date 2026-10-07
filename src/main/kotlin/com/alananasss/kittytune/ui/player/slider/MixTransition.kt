@@ -1,7 +1,9 @@
 package com.alananasss.kittytune.ui.player.slider
 
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -9,10 +11,13 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -24,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.alananasss.kittytune.audio.automix.AutomixManager
 import kotlin.math.pow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /** The countdown starts this many beats before a mix; see the automix loop in PlayerViewModel. */
 private const val COUNTDOWN_BEATS = 16
@@ -33,6 +40,12 @@ private const val WAIT_FOR_MIX_NANOS = 8_000_000_000L
 
 /** How long the bar takes to reach the real position when a mix ends before its fade does. */
 private const val CATCH_UP_NANOS = 450_000_000L
+
+/** How long the bar takes to slide to where a wheel notch sent the playhead. */
+private const val WHEEL_GLIDE_NANOS = 320_000_000L
+
+/** How often an idle bar checks whether a glide has begun; no frames are asked for in between. */
+private const val IDLE_CHECK_MS = 64L
 
 /**
  * A mix, told by the seek bar instead of a label under the track name (issue #66).
@@ -65,6 +78,14 @@ class MixTransition internal constructor(
     private var sawFade = false
     private var catchUpFrom: Float? = null
     private var catchUpAtNanos = 0L
+    private var catchUpNanos = CATCH_UP_NANOS
+    private var catchUpEasing: Easing = FastOutSlowInEasing
+
+    /** Bumped every frame while the bar glides, so the bar is redrawn between the player's position reports. */
+    internal val frameTick = mutableLongStateOf(0L)
+
+    /** Whether the bar is drawn somewhere other than the real position and needs frames to get there. */
+    internal val isGliding: Boolean get() = glideFrom != null || catchUpFrom != null
 
     /** Whether the bar is gliding home after a track change, as opposed to counting down to one. */
     val isMixing: Boolean get() = glideFrom != null || progress.value > 0f
@@ -77,6 +98,7 @@ class MixTransition internal constructor(
      * except around a mix, when it glides from where the old track was to the new track's position.
      */
     fun shownFraction(actualFraction: Float, trackKey: Any?): Float {
+        frameTick.longValue
         val now = System.nanoTime()
         val fade = progress.value
         if (trackKey != lastTrackKey) {
@@ -104,8 +126,7 @@ class MixTransition internal constructor(
             else -> {
                 // The fade is over, or never came. Finish the trip smoothly from wherever the bar is.
                 glideFrom = null
-                catchUpFrom = lastShown
-                catchUpAtNanos = now
+                startCatchUp(now, CATCH_UP_NANOS, FastOutSlowInEasing)
                 catchUp(actualFraction, now)
             }
         }
@@ -113,14 +134,32 @@ class MixTransition internal constructor(
         return shown
     }
 
+    /**
+     * Call just before a wheel seek: the bar slides from where it is drawn to the new position instead of
+     * jumping. A fast spin calls this on every notch and each slide picks up from wherever the last one had
+     * got to, at full speed, so the notches run together into one movement. Outside a mix only; a mix's own
+     * glide carries on.
+     */
+    fun glideFromShown() {
+        if (glideFrom != null) return
+        startCatchUp(System.nanoTime(), WHEEL_GLIDE_NANOS, LinearOutSlowInEasing)
+    }
+
+    private fun startCatchUp(now: Long, nanos: Long, easing: Easing) {
+        catchUpFrom = lastShown
+        catchUpAtNanos = now
+        catchUpNanos = nanos
+        catchUpEasing = easing
+    }
+
     private fun catchUp(actualFraction: Float, now: Long): Float {
         val from = catchUpFrom ?: return actualFraction
-        val t = (now - catchUpAtNanos).toFloat() / CATCH_UP_NANOS
+        val t = (now - catchUpAtNanos).toFloat() / catchUpNanos
         if (t >= 1f) {
             catchUpFrom = null
             return actualFraction
         }
-        return lerp(from, actualFraction, FastOutSlowInEasing.transform(t))
+        return lerp(from, actualFraction, catchUpEasing.transform(t))
     }
 
     /** How strongly the glow shows, 0..1. */
@@ -160,9 +199,19 @@ fun rememberMixTransition(): MixTransition {
         animationSpec = infiniteRepeatable(tween(beatMs, easing = LinearEasing), RepeatMode.Restart),
         label = "mixBeatPulse",
     )
-    return remember(progress, countdown, beatPulse, automixing) {
+    val mix = remember(progress, countdown, beatPulse, automixing) {
         MixTransition(progress, countdown, beatPulse, automixing)
     }
+    // The player reports its position four times a second and the fade publishes its progress as it goes,
+    // but neither keeps time while the bar catches up after a mix or slides after a wheel notch: those steps
+    // were drawn as jumps. Frames are asked for only while such a glide runs.
+    LaunchedEffect(mix) {
+        while (isActive) {
+            if (mix.isGliding) withFrameNanos { mix.frameTick.longValue = it }
+            else delay(IDLE_CHECK_MS)
+        }
+    }
+    return mix
 }
 
 /**
