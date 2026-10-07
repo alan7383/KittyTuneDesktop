@@ -67,6 +67,9 @@ enum class CommentSort(
 
 enum class LyricsMode { SYNCED, PLAIN }
 
+/** A held mix starts this long before the last line is done, so the line's end is the start of the fade. */
+private const val LYRICS_MIX_LEAD_MS = 2_500L
+
 /** How long a lyrics source gets before the others are judged without it. */
 private const val LYRICS_SOURCE_TIMEOUT_MS = 7_000L
 
@@ -4717,7 +4720,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
                             val plan = if (isGaplessAlbum) null else com.alananasss.kittytune.audio.automix.AutomixManager.currentAutomixPlan
                             if (plan != null && dur > 0L) {
-                                val triggerTime = plan.triggerTimeMs
+                                val triggerTime = holdMixForLyrics(plan.triggerTimeMs, dur, plan.overlapMs)
                                 val remainingToTrigger = triggerTime - currentPosition
                                 val outBpm = com.alananasss.kittytune.audio.automix.AutomixManager.automixDebugInfo.value?.outBpm ?: 0f
                                 if (outBpm > 0f) {
@@ -4788,6 +4791,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 delay(sleepTime)
             }
         }
+    }
+
+    /**
+     * Moves a mix's start later while the song still has words to sing, so the mix does not fade out the last
+     * verse (issue #66). The analysis finds where the loud part of the track ends, which can be a verse short of
+     * the last line. Never later than the latest start that still leaves room for the overlap, and only with
+     * lyrics that are timed.
+     */
+    private fun holdMixForLyrics(planTrigger: Long, durationMs: Long, overlapMs: Long): Long {
+        if (lyricsLines.isEmpty() || lyricsMode != LyricsMode.SYNCED) return planTrigger
+        val last = lyricsLines.lastOrNull { !it.isInstrumental && it.text.isNotBlank() } ?: return planTrigger
+        val lastEnd = if (last.words.isNotEmpty()) last.words.maxOf { it.endTime }
+        else last.startTime + minOf((last.endTime - last.startTime).coerceAtLeast(0L), 5_000L)
+        // Lyrics time to audio time.
+        val lastEndInAudio = lastEnd - lyricsOffsetAtLyricTime(lastEnd)
+        val wanted = lastEndInAudio - LYRICS_MIX_LEAD_MS
+        val latest = durationMs - overlapMs.coerceAtLeast(3_000L)
+        return if (wanted > planTrigger && latest > planTrigger) minOf(wanted, latest) else planTrigger
     }
 
     fun updateScrubPosition(position: Long) {
