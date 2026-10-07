@@ -12,7 +12,6 @@ import com.alananasss.kittytune.data.network.MusixmatchClient
 import com.alananasss.kittytune.data.LyricsMatcher
 import com.zionhuang.innertube.YouTube
 import com.zionhuang.innertube.models.SongItem
-import com.zionhuang.innertube.models.WatchEndpoint
 import com.zionhuang.kugou.KuGou
 import java.util.Locale
 import kotlin.math.abs
@@ -217,23 +216,6 @@ object YouTubeSubtitleLyricsProvider : LyricsProvider {
     }
 }
 
-object YouTubeLyricsProvider : LyricsProvider {
-    override val id = PreferredLyricsProvider.YOUTUBE
-    override suspend fun getLyrics(
-        id: String,
-        title: String,
-        artist: String,
-        album: String?,
-        duration: Int,
-    ): Result<String> = runCatching {
-        val ytId = resolveYouTubeVideoId(id, title, artist, duration)
-            ?: throw IllegalStateException("Could not resolve YouTube video ID")
-        val nextResult = YouTube.next(WatchEndpoint(videoId = ytId)).getOrThrow()
-        val lyricsEndpoint = nextResult.lyricsEndpoint ?: throw IllegalStateException("Lyrics endpoint not found")
-        YouTube.lyrics(lyricsEndpoint).getOrThrow() ?: throw IllegalStateException("Lyrics unavailable")
-    }
-}
-
 object MusixmatchLyricsProvider : LyricsProvider {
     override val id = PreferredLyricsProvider.MUSIXMATCH
     override suspend fun getLyrics(
@@ -293,7 +275,6 @@ object LyricsProviders {
         PaxsenixSpotifyLyricsProvider,
         PaxsenixMusixmatchLyricsProvider,
         YouTubeSubtitleLyricsProvider,
-        YouTubeLyricsProvider,
         MusixmatchLyricsProvider,
         GeniusLyricsProvider,
     ).associateBy { it.id }

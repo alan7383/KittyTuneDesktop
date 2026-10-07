@@ -2774,9 +2774,6 @@
     <string name="chart_section_title">Classement</string>
     <string name="chart_genre_folk">Folk</string>
     <string name="lyrics_searching">Recherche des paroles en cours…</string>
-    <string name="lyrics_auto_found_title">Paroles trouvées automatiquement</string>
-    <string name="lyrics_auto_found_desc">Des paroles ont été trouvées automatiquement pour ce morceau.</string>
-    <string name="lyrics_auto_found_use">Afficher</string>
     <string name="pref_track_source_badge_title">Indicateur de source audio</string>
     <string name="pref_track_source_badge_desc">Afficher le badge de la plateforme (YouTube, SoundCloud, etc.) pour le morceau en lecture</string>
     <string name="pref_track_source_badge_both">Icône et texte</string>
@@ -2819,4 +2816,7 @@
 
     <string name="misc_general_sub">Langue, écran de démarrage et mises à jour</string>
     <string name="misc_discord_sub">Afficher la musique en cours sur Discord</string>
+    <string name="lyrics_search_now_showing">Affiché : %1$s</string>
+    <string name="lyrics_search_progress">%1$d trouvés, %2$d sources cherchent encore</string>
+    <string name="lyrics_search_clear">Effacer</string>
 </resources>

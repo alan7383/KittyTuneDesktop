@@ -2775,9 +2775,6 @@
     <string name="chart_section_title">Lista</string>
     <string name="chart_genre_folk">Népzmű</string>
     <string name="lyrics_searching">Dalszöveg keresése…</string>
-    <string name="lyrics_auto_found_title">Dalszöveg automatikusan megtalálva</string>
-    <string name="lyrics_auto_found_desc">A számhoz automatikusan találtunk dalszöveget.</string>
-    <string name="lyrics_auto_found_use">Megtekintés</string>
     <string name="pref_track_source_badge_title">Hangforrás jelző</string>
     <string name="pref_track_source_badge_desc">Platform jelvény (YouTube, SoundCloud stb.) megjelenítése az éppen játszott számnál</string>
     <string name="pref_track_source_badge_both">Ikon és szöveg</string>
@@ -2820,4 +2817,7 @@
 
     <string name="misc_general_sub">Nyelv, kezdőképernyő és frissítések</string>
     <string name="misc_discord_sub">A hallgatott zene megjelenítése a Discordon</string>
+    <string name="lyrics_search_now_showing">Most: %1$s</string>
+    <string name="lyrics_search_progress">%1$d találat, még %2$d forrás keres</string>
+    <string name="lyrics_search_clear">Törlés</string>
 </resources>

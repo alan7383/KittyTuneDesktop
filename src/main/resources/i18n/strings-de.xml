@@ -3386,9 +3386,6 @@
     <string name="chart_section_title">Chartliste</string>
     <string name="chart_genre_folk">Folk</string>
     <string name="lyrics_searching">Songtext wird gesucht…</string>
-    <string name="lyrics_auto_found_title">Songtext automatisch gefunden</string>
-    <string name="lyrics_auto_found_desc">Für diesen Titel wurde automatisch ein Songtext gefunden.</string>
-    <string name="lyrics_auto_found_use">Anzeigen</string>
     <string name="pref_track_source_badge_title">Audioquellen-Anzeige</string>
     <string name="pref_track_source_badge_desc">Plattform-Badge (YouTube, SoundCloud usw.) für den aktuellen Titel anzeigen</string>
     <string name="pref_track_source_badge_both">Symbol &amp; Text</string>
@@ -3431,4 +3428,7 @@
 
     <string name="misc_general_sub">Sprache, Startbildschirm und Aktualisierungen</string>
     <string name="misc_discord_sub">Zeigen, was du gerade auf Discord hörst</string>
+    <string name="lyrics_search_now_showing">Gerade: %1$s</string>
+    <string name="lyrics_search_progress">%1$d gefunden, %2$d Quellen suchen noch</string>
+    <string name="lyrics_search_clear">Leeren</string>
 </resources>

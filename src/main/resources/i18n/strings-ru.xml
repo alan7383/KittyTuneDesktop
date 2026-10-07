@@ -2772,9 +2772,6 @@
     <string name="chart_section_title">Чарт</string>
     <string name="chart_genre_folk">Фолк</string>
     <string name="lyrics_searching">Поиск текста песни…</string>
-    <string name="lyrics_auto_found_title">Текст найден автоматически</string>
-    <string name="lyrics_auto_found_desc">Для этого трека был автоматически найден текст песни.</string>
-    <string name="lyrics_auto_found_use">Показать</string>
     <string name="pref_track_source_badge_title">Индикатор источника аудио</string>
     <string name="pref_track_source_badge_desc">Отображать значок площадки (YouTube, SoundCloud и т.д.) для играющего трека</string>
     <string name="pref_track_source_badge_both">Значок и текст</string>
@@ -2817,4 +2814,7 @@
 
     <string name="misc_general_sub">Язык, начальный экран и обновления</string>
     <string name="misc_discord_sub">Отображение играющего трека в Discord</string>
+    <string name="lyrics_search_now_showing">Сейчас: %1$s</string>
+    <string name="lyrics_search_progress">Найдено %1$d, ещё ищут источников: %2$d</string>
+    <string name="lyrics_search_clear">Очистить</string>
 </resources>

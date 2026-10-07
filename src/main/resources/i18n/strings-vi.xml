@@ -3222,9 +3222,6 @@
     <string name="chart_section_title">Bảng xếp hạng</string>
     <string name="chart_genre_folk">Dân ca</string>
     <string name="lyrics_searching">Đang tìm lời bài hát…</string>
-    <string name="lyrics_auto_found_title">Đã tự động tìm thấy lời bài hát</string>
-    <string name="lyrics_auto_found_desc">Đã tìm thấy lời bài hát tự động cho bài này.</string>
-    <string name="lyrics_auto_found_use">Xem</string>
     <string name="pref_track_source_badge_title">Chỉ báo nguồn âm thanh</string>
     <string name="pref_track_source_badge_desc">Hiển thị biểu tượng nền tảng (YouTube, SoundCloud, v.v.) cho bài hát đang phát</string>
     <string name="pref_track_source_badge_both">Biểu tượng &amp; chữ</string>
@@ -3267,4 +3264,7 @@
 
     <string name="misc_general_sub">Ngôn ngữ, màn hình khởi động và cập nhật</string>
     <string name="misc_discord_sub">Hiển thị nhạc đang nghe trên Discord</string>
+    <string name="lyrics_search_now_showing">Đang hiển thị: %1$s</string>
+    <string name="lyrics_search_progress">Đã tìm thấy %1$d, còn %2$d nguồn đang tìm</string>
+    <string name="lyrics_search_clear">Xóa</string>
 </resources>
