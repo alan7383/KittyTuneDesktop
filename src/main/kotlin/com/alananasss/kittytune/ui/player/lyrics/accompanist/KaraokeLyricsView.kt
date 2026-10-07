@@ -65,6 +65,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
 import com.alananasss.kittytune.ui.player.lyrics.revealWhenPlaced
+import com.alananasss.kittytune.ui.player.lyrics.returnToLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricsScrolling
 import com.alananasss.kittytune.ui.player.lyrics.glideToLine
 import kotlinx.coroutines.delay
@@ -316,9 +317,15 @@ fun KaraokeLyricsView(
         lastScrollTime = 0L
     }
 
+    /** The list is sliding back to the sung line after the reader scrolled away; see [returnToLine]. */
+    val isReturning = remember { mutableStateOf(false) }
+
+    // Lines spring into place only while the song moves them. While the reader scrolls, on a jump, and on the
+    // way back from a manual scroll, the list moves as one block: springing each line there made the words
+    // fly in on the way back (issue #66).
     val isManualScrolling by remember {
         derivedStateOf {
-            (listState.isScrollInProgress && !scrollInCode.value) || isSnapScroll.value || isScrubbing
+            (listState.isScrollInProgress && !scrollInCode.value) || isSnapScroll.value || isScrubbing || isReturning.value
         }
     }
 
@@ -332,18 +339,22 @@ fun KaraokeLyricsView(
             isReadingByHand = true
         } else if (isReadingByHand) {
             delay(LyricsScrolling.MANUAL_GRACE_MS)
-            isReadingByHand = false
-            // And back to the line being sung, gliding, rather than waiting for the next line to start: on a
-            // pause that never happened, and the view stayed where the reader had left it (issue #66).
+            // And back to the line being sung, sliding, rather than waiting for the next line to start: on a
+            // pause that never happened, and the view stayed where the reader had left it (issue #66). Done
+            // before following resumes, so the follow below finds the list already there and does not jump.
             val focus = lyricsFocusState.firstIndex
             if (focus in lyrics.lines.indices) {
                 scrollInCode.value = true
+                isReturning.value = true
                 try {
-                    listState.glideToLine(focus) { (-stableOffsetPx - keepAliveZonePx).toInt() }
+                    listState.returnToLine(focus) { (-stableOffsetPx - keepAliveZonePx).toInt() }
+                    lastFocusedIndex = focus
                 } finally {
+                    isReturning.value = false
                     scrollInCode.value = false
                 }
             }
+            isReadingByHand = false
         }
     }
 
@@ -352,8 +363,11 @@ fun KaraokeLyricsView(
         stableOffsetPx,
     ) {
         androidx.compose.runtime.snapshotFlow {
-            lyricsFocusState.firstIndex to isScrubbing
-        }.collectLatest { (firstIndex, scrubbing) ->
+            Triple(lyricsFocusState.firstIndex, isScrubbing, isReadingByHand)
+        }.collectLatest { (firstIndex, scrubbing, readingByHand) ->
+            // Left alone while the reader is reading by hand: following on every new line pulled the list out
+            // from under a scroll in progress (issue #66). The way back is the reader's grace running out above.
+            if (readingByHand && !scrubbing) return@collectLatest
             if (firstIndex in lyrics.lines.indices) {
                 val now = System.currentTimeMillis()
                 val timeDelta = now - lastScrollTime
