@@ -1075,7 +1075,7 @@ private fun MiniLyricsContent(
 
         // Progress bar along the bottom edge
         if (showProgress && viewModel.duration > 0) {
-            val progress = (adjustedPosition / viewModel.duration).coerceIn(0f, 1f)
+            val progress = viewModel.progressOf(adjustedPosition)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -1314,7 +1314,7 @@ private fun MiniLyricsElongatedContent(
 
         // Hairline progress bar along the bottom edge
         if (showProgress && viewModel.duration > 0) {
-            val progress = (adjustedPosition / viewModel.duration).coerceIn(0f, 1f)
+            val progress = viewModel.progressOf(adjustedPosition)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier

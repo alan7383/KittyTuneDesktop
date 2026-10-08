@@ -289,8 +289,7 @@ private fun NowPlaying(
                 .width(220.dp)
                 .height(2.dp)
                 .drawBehind {
-                    val duration = viewModel.duration.coerceAtLeast(1L)
-                    val fraction = (viewModel.currentPosition.toFloat() / duration).coerceIn(0f, 1f)
+                    val fraction = viewModel.progressOf(viewModel.currentPosition.toFloat())
                     val y = size.height / 2f
                     drawLine(SOFT_WHITE.copy(alpha = 0.12f), Offset(0f, y), Offset(size.width, y), size.height, StrokeCap.Round)
                     drawLine(accent.copy(alpha = 0.7f), Offset(0f, y), Offset(size.width * fraction, y), size.height, StrokeCap.Round)

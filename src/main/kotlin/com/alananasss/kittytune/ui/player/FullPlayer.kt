@@ -1479,7 +1479,11 @@ private fun QuietButton(
  */
 @Composable
 private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPalette) {
-    val duration = viewModel.duration.coerceAtLeast(1L)
+    // A trailer's song is shown as its window; see PlaybackProgressRow in the player bar.
+    val clip = viewModel.clipWindow
+    val shownOf = { songMs: Long -> clip?.toShown(songMs) ?: songMs }
+    val songOf = { shownMs: Long -> clip?.toSong(shownMs) ?: shownMs }
+    val duration = (clip?.lengthMs ?: viewModel.duration).coerceAtLeast(1L)
     val sliderStyle = com.alananasss.kittytune.ui.main.rememberPlayerSliderStyle()
     val seekWheelSeconds = com.alananasss.kittytune.ui.main.rememberSeekWheelSeconds()
     var scrubbing by remember { mutableStateOf(false) }
@@ -1487,16 +1491,16 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
     var drawnMs by remember { mutableLongStateOf(0L) }
     val wheel = com.alananasss.kittytune.ui.main.rememberWheelSeek(
         drawnMs = { drawnMs },
-        reportedMs = { viewModel.currentPosition },
-        durationMs = { viewModel.duration },
+        reportedMs = { shownOf(viewModel.currentPosition) },
+        durationMs = { clip?.lengthMs ?: viewModel.duration },
         stepSeconds = { seekWheelSeconds },
-        commit = { target -> viewModel.seekTo(target) },
+        commit = { target -> viewModel.seekTo(songOf(target)) },
     )
     val wheelMs = wheel.shownMs
     val isScrubbingNow = scrubbing || viewModel.isScrubbing || wheel.isActive
 
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
-        reportedMs = viewModel.currentPosition,
+        reportedMs = shownOf(viewModel.currentPosition),
         isRunning = viewModel.isPlaying && !viewModel.isLoading,
         followsInput = isScrubbingNow,
         trackKey = viewModel.currentTrack?.id,
@@ -1520,10 +1524,10 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
                 wheel.cancel()
                 scrubbing = true
                 scrubPosition = it
-                viewModel.updateScrubPosition(it.toLong())
+                viewModel.updateScrubPosition(songOf(it.toLong()))
             },
             onValueChangeFinished = {
-                viewModel.seekTo(scrubPosition.toLong())
+                viewModel.seekTo(songOf(scrubPosition.toLong()))
                 scrubbing = false
             },
             sliderStyle = sliderStyle,

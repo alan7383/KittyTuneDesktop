@@ -1241,6 +1241,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         private const val TRAILER_SONGS = 10
         private const val TRAILER_SNIPPET_MS = 20_000L
 
+        /** How often a trailer looks at where its song is. */
+        private const val TRAILER_TICK_MS = 100L
+
+        /** After moving on or seeking, the trailer leaves the player alone this long: it has not answered yet. */
+        private const val TRAILER_SETTLE_MS = 900L
+
+        /** A song counts as being before its window only when it is this far before it. */
+        private const val TRAILER_SLACK_MS = 1_500L
+
         /** Where in a song its trailer snippet starts, as a share of its length. */
         private const val TRAILER_START = 0.3
 
@@ -4505,20 +4514,59 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         playPlaylist(tracks.take(TRAILER_SONGS), 0, trailerContext, maintainPlayerState = true, respectShuffle = false)
         trailerJob?.cancel()
         trailerJob = viewModelScope.launch {
+            // Held to the song's place, not to a timer: every song of the queue is its window, so the next and
+            // previous buttons, a click in the queue and the end of a snippet all land the same way. A timer
+            // kept running through a skip, and the song skipped to played in full until the old one ran out.
+            var settledAt = 0L
             while (isActive && currentContext?.navigationId == trailerContext.navigationId) {
-                androidx.compose.runtime.snapshotFlow { isPlaying && !isLoading && duration > 0 }.first { ready -> ready }
-                val songId = currentTrack?.id
-                if ((currentPosition) < duration * TRAILER_START) seekTo((duration * TRAILER_START).toLong())
-                delay(TRAILER_SNIPPET_MS)
-                if (currentContext?.navigationId != trailerContext.navigationId) break
-                if (currentTrack?.id != songId) continue
-                if (currentQueueIndex >= _queue.lastIndex) {
-                    pause()
-                    break
+                delay(TRAILER_TICK_MS)
+                val window = clipWindow ?: continue
+                if (isLoading || System.currentTimeMillis() < settledAt) continue
+                val position = player.currentPosition
+                when {
+                    position < window.startMs - TRAILER_SLACK_MS -> {
+                        settledAt = System.currentTimeMillis() + TRAILER_SETTLE_MS
+                        seekTo(window.startMs)
+                    }
+                    position >= window.endMs -> {
+                        settledAt = System.currentTimeMillis() + TRAILER_SETTLE_MS
+                        if (currentQueueIndex >= _queue.lastIndex) {
+                            seekTo(window.startMs)
+                            pause()
+                        } else {
+                            playNext(manual = true, isCrossfade = false)
+                        }
+                    }
                 }
-                playNext(manual = true, isCrossfade = false)
             }
         }
+    }
+
+    /** Whether the queue is a trailer, every song of it only its window. */
+    val isTrailerActive: Boolean get() = currentContext?.navigationId?.startsWith(TRAILER_NAV_PREFIX) == true
+
+    /**
+     * The part of the song playing now that is shown as the song, or null when all of it is. Known once the song's
+     * length is; until then it is shown whole.
+     */
+    val clipWindow: ClipWindow?
+        get() {
+            if (!isTrailerActive || duration <= 0L) return null
+            return ClipWindow.forTrailer(duration, TRAILER_SNIPPET_MS, TRAILER_START)
+        }
+
+    /** How long [track] is shown to be: its window in a trailer, null when it is shown at its own length. */
+    fun clipLengthOf(track: Track): Long? {
+        if (!isTrailerActive) return null
+        val total = track.durationMs?.takeIf { it > 0L } ?: return null
+        return ClipWindow.forTrailer(total, TRAILER_SNIPPET_MS, TRAILER_START).lengthMs
+    }
+
+    /** How far through what is shown as the song a moment is, 0 to 1. */
+    fun progressOf(songMs: Float): Float {
+        val window = clipWindow
+        if (window != null) return ((songMs - window.startMs) / window.lengthMs).coerceIn(0f, 1f)
+        return if (duration > 0L) (songMs / duration).coerceIn(0f, 1f) else 0f
     }
 
     /** A song of the wave left by hand: how early decides how much it counts against its artist. */
