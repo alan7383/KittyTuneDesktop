@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.media
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,7 +19,10 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.bytedeco.ffmpeg.global.avutil
 import org.bytedeco.javacv.FFmpegFrameGrabber
-import org.bytedeco.javacv.Java2DFrameConverter
+import org.jetbrains.skia.ColorAlphaType
+import org.jetbrains.skia.ColorType
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.ImageInfo
 import java.nio.ShortBuffer
 import java.util.concurrent.atomic.AtomicLong
 import javax.sound.sampled.AudioFormat
@@ -34,9 +38,10 @@ import kotlin.math.min
  */
 class ClipPlayback(
     private val scope: CoroutineScope,
-    /** Loudness as an amplitude factor; the music's volume by default, so a clip is as loud as a song. */
-    private val gain: () -> Float = { VolumeCurve.sliderToAmplitude(MusicManager.getVolume()) },
 ) {
+
+    /** The clip's own volume, 0 to 1 on the same curve as the music's; it starts at the music's so a clip is as loud as a song. */
+    var volume by mutableFloatStateOf(MusicManager.getVolume())
 
     var frame by mutableStateOf<ImageBitmap?>(null)
         private set
@@ -86,14 +91,15 @@ class ClipPlayback(
         runCatching { avutil.av_log_set_level(avutil.AV_LOG_ERROR) }
         var grabber: FFmpegFrameGrabber? = null
         var line: SourceDataLine? = null
-        val converter = Java2DFrameConverter()
-        try {
+            try {
             grabber = FFmpegFrameGrabber(streamUrl).apply {
                 setOption("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 setOption("rw_timeout", "10000000")
                 setOption("reconnect", "1")
                 setOption("reconnect_streamed", "1")
                 sampleFormat = avutil.AV_SAMPLE_FMT_S16
+                // Handed to Skia as it is: the Java2D route through a BufferedImage cost more than the picture's time.
+                pixelFormat = avutil.AV_PIX_FMT_BGRA
                 start()
             }
             durationMs = grabber.lengthInTime / 1000
@@ -135,7 +141,7 @@ class ClipPlayback(
                 if (samples != null && line != null) {
                     val count = samples.remaining()
                     if (bytes.size < count * 2) bytes = ByteArray(count * 2)
-                    val gain = gain()
+                    val gain = VolumeCurve.sliderToAmplitude(volume)
                     for (i in 0 until count) {
                         val value = (samples.get(samples.position() + i) * gain).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
                         bytes[i * 2] = value.toByte()
@@ -147,7 +153,7 @@ class ClipPlayback(
                     val aheadUs = next.timestamp - clock.nowUs()
                     if (aheadUs < -LATE_FRAME_US) continue
                     if (aheadUs > 0) delay(min(aheadUs / 1000, MAX_FRAME_WAIT_MS))
-                    converter.convert(next)?.let { frame = it.toComposeImageBitmap() }
+                    toBitmap(next)?.let { frame = it }
                     positionMs = next.timestamp / 1000
                 }
             }
@@ -157,9 +163,20 @@ class ClipPlayback(
             isLoading = false
         } finally {
             runCatching { line?.flush(); line?.stop(); line?.close() }
-            runCatching { converter.close() }
             runCatching { grabber?.stop(); grabber?.release() }
         }
+    }
+
+    /** One decoded picture (BGRA, as the grabber was asked for) as an image Compose can draw. */
+    private fun toBitmap(decoded: org.bytedeco.javacv.Frame): ImageBitmap? {
+        val buffer = decoded.image?.firstOrNull() as? java.nio.ByteBuffer ?: return null
+        val width = decoded.imageWidth
+        val height = decoded.imageHeight
+        if (width <= 0 || height <= 0) return null
+        val pixels = ByteArray(decoded.imageStride * height)
+        buffer.duplicate().get(pixels, 0, minOf(pixels.size, buffer.remaining()))
+        val info = ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.OPAQUE)
+        return Image.makeRaster(info, pixels, decoded.imageStride).toComposeImageBitmap()
     }
 
     /** Where playback is, in microseconds: the sound actually played, or the wall clock when there is none. */

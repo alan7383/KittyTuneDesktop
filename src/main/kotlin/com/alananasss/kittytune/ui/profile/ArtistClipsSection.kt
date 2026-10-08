@@ -22,6 +22,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
@@ -74,7 +76,8 @@ internal fun ArtistClipsSection(artistName: String, playerViewModel: PlayerViewM
 
     Column {
         ArtistSectionTitle(str("artist_clips_title"), onOpen = null)
-        LazyRow(
+        // Arrows at the ends, and a held left button drags it: the row is longer than the page.
+        com.alananasss.kittytune.ui.common.ScrollableLazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -223,6 +226,16 @@ private fun ClipControls(playback: ClipPlayback) {
             modifier = Modifier.weight(1f),
         )
         Text(formatClock(playback.durationMs), style = MaterialTheme.typography.labelMedium)
+        Icon(
+            if (playback.volume <= 0.001f) Icons.AutoMirrored.Rounded.VolumeOff else Icons.AutoMirrored.Rounded.VolumeUp,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+        )
+        Slider(
+            value = playback.volume,
+            onValueChange = { playback.volume = it },
+            modifier = Modifier.width(110.dp),
+        )
     }
 }
 
