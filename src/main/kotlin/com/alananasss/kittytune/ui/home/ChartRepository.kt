@@ -4,6 +4,11 @@ import com.alananasss.kittytune.data.network.SoundCloudApi
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.google.gson.Gson
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Fetches a ranked song list.
@@ -11,8 +16,9 @@ import com.google.gson.Gson
  * Each kind is a different request, and every answer is ordered by the server, so the rank
  * is always the position and never the score:
  *
- * - [ChartKind.COUNTRY] is Deezer's chart for the listener's country, which Deezer picks from where the
- *   request comes from; its tracks play through the configured audio sources like any Deezer track.
+ * - [ChartKind.COUNTRY] is Deezer's chart for the chosen country, its tracks played through the configured audio
+ *   sources like any Deezer track; where Deezer keeps none, Apple Music's chart for it, each song matched to the
+ *   same song on SoundCloud. See [countryChartTracks].
  * - [ChartKind.TRENDING] is `GET /charts?kind=trending`, the one live chart the endpoint serves. It
  *   ignores `genre` — every other genre than `all-music` comes back as an empty object — so the
  *   caller is not offered one here.
@@ -28,18 +34,16 @@ internal suspend fun fetchChart(
     genre: ChartGenre,
     limit: Int,
     countryCode: String,
-    deezerCountryName: String? = null,
+    country: ChartCountry? = null,
 ): List<ChartEntry> = try {
     val tracks: List<Track> = when (kind) {
-        ChartKind.COUNTRY -> com.alananasss.kittytune.data.deezer.DeezerSearchRepository
-            .countryChart(limit, deezerCountryName)
-            // Deezer unreachable: the trending feed, rather than an empty list.
-            .ifEmpty {
-                runCatching {
-                    api.getCharts(kind = "trending", genre = "soundcloud:genres:all-music", limit = limit)
-                        .collection.mapNotNull { it.track }
-                }.getOrDefault(emptyList())
-            }
+        ChartKind.COUNTRY -> countryChartTracks(country, limit).ifEmpty {
+            // Neither chart reachable: the trending feed, rather than an empty list.
+            runCatching {
+                api.getCharts(kind = "trending", genre = "soundcloud:genres:all-music", limit = limit)
+                    .collection.mapNotNull { it.track }
+            }.getOrDefault(emptyList())
+        }
 
         ChartKind.TRENDING -> api.getCharts(
             kind = "trending",
@@ -69,6 +73,36 @@ internal suspend fun fetchChart(
     e.printStackTrace()
     emptyList()
 }
+
+/**
+ * The chart of [country]: Deezer's where it keeps a real one, else Apple Music's.
+ *
+ * Apple's songs carry no stream, so each is matched to the same song on SoundCloud, several at a time and kept in
+ * chart order; a song with no confident match is left out rather than replaced by a guess.
+ */
+private suspend fun countryChartTracks(country: ChartCountry?, limit: Int): List<Track> {
+    if (country == null || country.hasDeezerChart) {
+        val deezer = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.countryChart(limit, country?.deezerName)
+        if (deezer.size >= minOf(limit, MIN_REAL_CHART) || country == null) return deezer
+    }
+    val songs = com.alananasss.kittytune.data.applemusic.AppleMusicClient.topSongs(country.appleStorefront, CHART_FETCH)
+    val matching = Semaphore(MATCH_PARALLELISM)
+    val matched = coroutineScope {
+        songs.map { song ->
+            async { matching.withPermit { com.alananasss.kittytune.data.catalog.CatalogFallback.resolve(song) } }
+        }.awaitAll()
+    }
+    return matched.filterNotNull().take(limit)
+}
+
+/** Fewer songs than this from Deezer is a chart it no longer keeps up. */
+private const val MIN_REAL_CHART = 10
+
+/** Apple's chart is read whole, so a few unmatched songs do not leave a short preview. */
+private const val CHART_FETCH = 50
+
+/** Songs matched to SoundCloud at once. */
+private const val MATCH_PARALLELISM = 8
 
 /**
  * Fills in the tracks a resolved playlist only names.

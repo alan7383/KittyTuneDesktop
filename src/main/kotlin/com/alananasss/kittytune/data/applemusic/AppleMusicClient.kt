@@ -120,6 +120,26 @@ object AppleMusicClient {
     }
 
     /**
+     * The most played songs in [storefront] right now, Apple's own chart, in its order.
+     *
+     * For the countries whose chart Deezer no longer keeps: its "Top Russia" has held a single track since it
+     * left the country, and the chart there showed one song or none (issue #66).
+     */
+    suspend fun topSongs(storefront: String, limit: Int = 50): List<com.alananasss.kittytune.data.catalog.CatalogSong> =
+        withContext(Dispatchers.IO) {
+            val body = withToken { token ->
+                callCatalog(token, "charts", mapOf("types" to "songs", "limit" to limit.coerceIn(1, 50).toString()), storefront)
+            } ?: return@withContext emptyList()
+            runCatching {
+                json.parseToJsonElement(body).jsonObject["results"]?.jsonObject
+                    ?.get("songs")?.jsonArray?.firstOrNull()?.jsonObject
+                    ?.get("data")?.jsonArray
+                    ?.mapNotNull { AppleSong.from(it.jsonObject) }
+                    .orEmpty()
+            }.getOrDefault(emptyList())
+        }
+
+    /**
      * Runs [block] with a token, once more with a fresh one if the first answer was unauthorised.
      *
      * The retry is the whole reason the token is cached optimistically: a stale token costs one wasted
@@ -133,8 +153,12 @@ object AppleMusicClient {
         return block(fresh)
     }
 
-    private fun callCatalog(token: String, path: String, query: Map<String, String>): String? {
-        val storefront = AppleMusicTokens.storefrontFor(Strings.resolvedLanguage)
+    private fun callCatalog(
+        token: String,
+        path: String,
+        query: Map<String, String>,
+        storefront: String = AppleMusicTokens.storefrontFor(Strings.resolvedLanguage),
+    ): String? {
         val url = buildString {
             append(AppleMusicTokens.API).append("/v1/catalog/").append(storefront).append('/').append(path)
             append('?')
