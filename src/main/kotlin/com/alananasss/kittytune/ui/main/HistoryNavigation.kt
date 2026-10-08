@@ -219,12 +219,18 @@ fun Modifier.mouseHistoryButtons(navigator: HistoryNavigator): Modifier =
 
                 val index = if (isBack) 0 else 1
                 val now = System.currentTimeMillis()
+                // Over the right-hand panel the buttons walk its own tabs while it has any to walk.
+                val panelHandles = PanelHistory.pointerInside && (if (isBack) PanelHistory.canGoBack else PanelHistory.canGoForward)
                 event.changes.forEach { it.consume() }
                 if (index == lastIndex && now - lastAtMs < PAIRED_EVENT_MS) continue
                 lastIndex = index
                 lastAtMs = now
 
-                if (isBack) navigator.back() else navigator.forward()
+                when {
+                    panelHandles -> if (isBack) PanelHistory.goBack() else PanelHistory.goForward()
+                    isBack -> navigator.back()
+                    else -> navigator.forward()
+                }
             }
         }
     }

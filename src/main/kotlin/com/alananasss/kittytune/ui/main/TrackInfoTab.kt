@@ -156,8 +156,13 @@ fun TrackInfoTab(vm: PlayerViewModel) {
      * lyrics are the only half they have.
      */
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
-    var showLyricsHalf by remember { mutableStateOf(playerPrefs.infoPanelOpensOnLyrics()) }
+    var showLyricsHalf by remember { mutableStateOf(PanelHistory.present.lyricsHalf ?: playerPrefs.infoPanelOpensOnLyrics()) }
     val lyricsHalf = isSpotifyTrack || showLyricsHalf
+    // Comments or lyrics is part of where the panel is, for the mouse's back and forward buttons.
+    LaunchedEffect(showLyricsHalf) { PanelHistory.noteHalf(showLyricsHalf) }
+    LaunchedEffect(PanelHistory.movedTick) {
+        if (PanelHistory.movedTick > 0) PanelHistory.present.lyricsHalf?.let { showLyricsHalf = it }
+    }
 
     val selectHalf: (Boolean) -> Unit = {
         showLyricsHalf = it
