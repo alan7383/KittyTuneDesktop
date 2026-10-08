@@ -3456,4 +3456,15 @@
     <string name="search_kind_artist">Künstler</string>
     <string name="search_kind_playlist">Playlist</string>
     <string name="search_kind_track">Titel · %1$s</string>
+    <string name="wave_title">Meine Welle</string>
+    <string name="wave_subtitle">Endlose Musik für dich. Lernt aus Likes und Übersprungenem.</string>
+    <string name="wave_nothing_yet">Noch nichts, woraus die Welle entstehen kann</string>
+    <string name="wave_mode_balanced">Gemischt</string>
+    <string name="wave_mode_favorites">Lieblinge</string>
+    <string name="wave_mode_discover">Entdecken</string>
+    <string name="wave_mode_popular">Beliebt</string>
+    <string name="wave_now_playing">Jetzt in deiner Welle</string>
+    <string name="home_continue">Weiterhören</string>
+    <string name="home_new_from_artists">Neu von deinen Künstlern</string>
+    <string name="home_chart_title">Ganz oben in den Charts</string>
 </resources>

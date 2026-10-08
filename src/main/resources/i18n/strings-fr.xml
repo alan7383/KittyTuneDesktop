@@ -2845,4 +2845,15 @@
     <string name="search_kind_artist">Artiste</string>
     <string name="search_kind_playlist">Playlist</string>
     <string name="search_kind_track">Titre · %1$s</string>
+    <string name="wave_title">Ma vague</string>
+    <string name="wave_subtitle">De la musique sans fin, pour vous. Elle apprend de vos j’aime et de vos sauts.</string>
+    <string name="wave_nothing_yet">Rien pour construire la vague pour l’instant</string>
+    <string name="wave_mode_balanced">Mélange</string>
+    <string name="wave_mode_favorites">Favoris</string>
+    <string name="wave_mode_discover">Découverte</string>
+    <string name="wave_mode_popular">Populaire</string>
+    <string name="wave_now_playing">En ce moment dans votre vague</string>
+    <string name="home_continue">Reprendre</string>
+    <string name="home_new_from_artists">Nouveautés de vos artistes</string>
+    <string name="home_chart_title">En tête des classements</string>
 </resources>

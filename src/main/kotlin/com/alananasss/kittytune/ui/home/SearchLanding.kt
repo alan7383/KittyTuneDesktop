@@ -110,81 +110,6 @@ fun SearchLanding(
         }
 
         item {
-            ChartPreviewSection(
-                kind = vm.chartPreviewKind,
-                entries = vm.chartPreview,
-                isLoading = vm.isChartPreviewLoading,
-                currentTrack = playerViewModel.currentTrack,
-                onKindChange = { vm.loadChartPreview(it) },
-                onPlayFrom = { index ->
-                    playerViewModel.playPlaylist(
-                        tracks = vm.chartPreview.map { it.track },
-                        startIndex = index,
-                        context = PlaybackContext(
-                            displayText = str(
-                                vm.chartPreviewKind.labelKey()
-                            ),
-                            navigationId = "charts",
-                        ),
-                    )
-                },
-                onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
-                onSeeAll = onOpenCharts,
-            )
-        }
-
-        if (vm.likedArtistUpdates.isNotEmpty()) {
-            item {
-                Column {
-                    LandingHeader(str("home_from_your_artists"), action = null)
-                    Text(
-                        text = str("home_from_your_artists_sub"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = CONTENT_PADDING),
-                    )
-                    // Split by release Friday, the way new music comes out: this Friday's, last Friday's, and
-                    // the rest, each song with its date (issue #66).
-                    val groups = remember(vm.likedArtistUpdates.toList()) { ReleaseWeeks.group(vm.likedArtistUpdates.toList()) }
-                    groups.forEach { group ->
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = releaseWeekTitle(group),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = CONTENT_PADDING),
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        ScrollableLazyRow(
-                            contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            fadeColor = MaterialTheme.colorScheme.surface,
-                        ) {
-                            items(group.tracks.size) { index ->
-                                val track = group.tracks[index]
-                                LandingTrackCard(
-                                    track = track,
-                                    isCurrent = playerViewModel.currentTrack?.id == track.id,
-                                    releaseDate = ReleaseWeeks.releaseDateOf(track),
-                                    onClick = {
-                                        playerViewModel.playPlaylist(
-                                            tracks = group.tracks,
-                                            startIndex = index,
-                                            context = PlaybackContext(
-                                                displayText = str("home_from_your_artists"),
-                                                navigationId = "home",
-                                            ),
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        item {
             Column {
                 LandingHeader(str("explore"), action = null)
                 Row(
@@ -240,6 +165,87 @@ fun SearchLanding(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The country's chart, a few songs and the way into all of it, for the home page: it moved there from the search
+ * page, where it was a thing to scroll past on the way to typing (issue #66).
+ */
+@Composable
+internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewModel, onOpenCharts: () -> Unit) {
+    ChartPreviewSection(
+        kind = vm.chartPreviewKind,
+        entries = vm.chartPreview,
+        isLoading = vm.isChartPreviewLoading,
+        currentTrack = playerViewModel.currentTrack,
+        onKindChange = { vm.loadChartPreview(it) },
+        onPlayFrom = { index ->
+            playerViewModel.playPlaylist(
+                tracks = vm.chartPreview.map { it.track },
+                startIndex = index,
+                context = PlaybackContext(
+                    displayText = str(
+                        vm.chartPreviewKind.labelKey()
+                    ),
+                    navigationId = "charts",
+                ),
+            )
+        },
+        onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+        onSeeAll = onOpenCharts,
+        )
+}
+
+/** New songs from the artists already in the liked list, by release Friday; nothing when there are none. */
+@Composable
+internal fun FromYourArtistsSection(vm: HomeViewModel, playerViewModel: PlayerViewModel) {
+    if (vm.likedArtistUpdates.isEmpty()) return
+    Column {
+        LandingHeader(str("home_from_your_artists"), action = null)
+        Text(
+            text = str("home_from_your_artists_sub"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = CONTENT_PADDING),
+        )
+        // Split by release Friday, the way new music comes out: this Friday's, last Friday's, and
+        // the rest, each song with its date (issue #66).
+        val groups = remember(vm.likedArtistUpdates.toList()) { ReleaseWeeks.group(vm.likedArtistUpdates.toList()) }
+        groups.forEach { group ->
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = releaseWeekTitle(group),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = CONTENT_PADDING),
+            )
+            Spacer(Modifier.height(8.dp))
+            ScrollableLazyRow(
+                contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                fadeColor = MaterialTheme.colorScheme.surface,
+            ) {
+                items(group.tracks.size) { index ->
+                    val track = group.tracks[index]
+                    LandingTrackCard(
+                        track = track,
+                        isCurrent = playerViewModel.currentTrack?.id == track.id,
+                        releaseDate = ReleaseWeeks.releaseDateOf(track),
+                        onClick = {
+                            playerViewModel.playPlaylist(
+                                tracks = group.tracks,
+                                startIndex = index,
+                                context = PlaybackContext(
+                                    displayText = str("home_from_your_artists"),
+                                    navigationId = "home",
+                                ),
+                            )
+                        },
+                    )
                 }
             }
         }

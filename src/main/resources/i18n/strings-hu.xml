@@ -2846,4 +2846,15 @@
     <string name="search_kind_artist">Előadó</string>
     <string name="search_kind_playlist">Lejátszási lista</string>
     <string name="search_kind_track">Szám · %1$s</string>
+    <string name="wave_title">Hullámom</string>
+    <string name="wave_subtitle">Végtelen zene neked. Tanul a kedvelésekből és az átugrásokból.</string>
+    <string name="wave_nothing_yet">Még nincs miből összeállítani a hullámot</string>
+    <string name="wave_mode_balanced">Vegyes</string>
+    <string name="wave_mode_favorites">Kedvencek</string>
+    <string name="wave_mode_discover">Felfedezés</string>
+    <string name="wave_mode_popular">Népszerű</string>
+    <string name="wave_now_playing">Most a hullámodban</string>
+    <string name="home_continue">Folytatás</string>
+    <string name="home_new_from_artists">Új az előadóidtól</string>
+    <string name="home_chart_title">A slágerlisták élén</string>
 </resources>

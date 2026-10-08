@@ -3293,4 +3293,15 @@
     <string name="search_kind_artist">Nghệ sĩ</string>
     <string name="search_kind_playlist">Danh sách phát</string>
     <string name="search_kind_track">Bài hát · %1$s</string>
+    <string name="wave_title">Làn sóng của tôi</string>
+    <string name="wave_subtitle">Nhạc bất tận dành cho bạn. Học từ lượt thích và bỏ qua.</string>
+    <string name="wave_nothing_yet">Chưa có gì để tạo làn sóng</string>
+    <string name="wave_mode_balanced">Kết hợp</string>
+    <string name="wave_mode_favorites">Yêu thích</string>
+    <string name="wave_mode_discover">Khám phá</string>
+    <string name="wave_mode_popular">Phổ biến</string>
+    <string name="wave_now_playing">Đang phát trong làn sóng</string>
+    <string name="home_continue">Nghe tiếp</string>
+    <string name="home_new_from_artists">Mới từ nghệ sĩ của bạn</string>
+    <string name="home_chart_title">Đứng đầu bảng xếp hạng</string>
 </resources>

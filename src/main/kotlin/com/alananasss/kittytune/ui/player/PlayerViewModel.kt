@@ -1230,6 +1230,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     private var windowsSmtcService: com.alananasss.kittytune.data.WindowsSmtcService? = null
 
     companion object {
+        const val MY_WAVE_NAV_ID = "my_wave"
+
+        /** Fewer songs than this left after the current one, and the wave fetches more. */
+        private const val WAVE_LOW_WATER = 4
+
         const val TRACK_PREFIX = "track:"
         const val CONTEXT_SEPARATOR = ":context:"
 
@@ -3547,7 +3552,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         tracks: List<Track>,
         startIndex: Int = 0,
         context: PlaybackContext? = null,
-        maintainPlayerState: Boolean = false
+        maintainPlayerState: Boolean = false,
+        /** False for a stream whose order is the point, like My Wave: shuffle mode leaves it as it is. */
+        respectShuffle: Boolean = true,
     ) {
         if (tracks.isEmpty()) return
         if (!maintainPlayerState) {
@@ -3563,7 +3570,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val effectiveStartIndex = if (startIndex in tracks.indices) startIndex else 0
         val isHistoryContext = context?.navigationId == "history" || context?.navigationId?.startsWith("history") == true
 
-        if (shuffleEnabled) {
+        if (shuffleEnabled && respectShuffle) {
             val clickedTrack = tracks[effectiveStartIndex]
             val rest =
                 tracks.filterIndexed { index, _ -> index != effectiveStartIndex }.shuffled()
@@ -3672,6 +3679,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         currentTrack = trackToPlay; MusicManager.currentTrack = trackToPlay
 
         playRobustly(index, autoPlay = autoPlay, isCrossfade = isCrossfade)
+        refillWaveIfLow()
 
         // A paused prepare emits no engine state change, so nothing else would announce
         // the new track: push it here. Delta-suppressed when nothing actually changed.
@@ -3740,6 +3748,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             currentTrack?.let { track ->
                 flushListenSession("SKIP_NEXT")
             }
+            noteWaveSkip()
+        } else if (isMyWaveActive) {
+            currentTrack?.let { com.alananasss.kittytune.data.wave.WaveFeedback.onCompleted(it) }
         }
 
         if (!manual && !ignoreRepeatOne && repeatMode == RepeatMode.ONE) {
@@ -4250,16 +4261,100 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
         if (isLiked) {
             LikeRepository.addLike(t)
+            if (isMyWaveActive) com.alananasss.kittytune.data.wave.WaveFeedback.onLiked(t)
         } else {
             LikeRepository.removeLike(t.id)
         }
     }
 
     val isYourMixActive: Boolean
-        get() = currentContext?.navigationId == "your_mix"
+        get() = currentContext?.navigationId == "your_mix" || isMyWaveActive
+
+    // ─── My Wave ───────────────────────────────────────────────────────────────────────────────────────
+    // See [com.alananasss.kittytune.data.wave.MyWave]: started from the home page, refilled whenever the queue
+    // runs low, and told about every skip, like and thumb down.
+
+    val isMyWaveActive: Boolean
+        get() = currentContext?.navigationId == MY_WAVE_NAV_ID
+
+    var waveMode by mutableStateOf(
+        runCatching { com.alananasss.kittytune.data.wave.WaveMode.valueOf(playerPrefs.getWaveMode()) }
+            .getOrDefault(com.alananasss.kittytune.data.wave.WaveMode.BALANCED)
+    )
+        private set
+
+    var isWaveLoading by mutableStateOf(false)
+        private set
+
+    private var waveRefillJob: Job? = null
+
+    /** Starts the wave, or changes its mode while it plays: what is up next is replaced, the song playing stays. */
+    fun startMyWave(mode: com.alananasss.kittytune.data.wave.WaveMode = waveMode) {
+        val changingMode = isMyWaveActive && mode != waveMode
+        waveMode = mode
+        playerPrefs.setWaveMode(mode.name)
+        if (isMyWaveActive && !changingMode) {
+            if (!isPlaying) togglePlayPause()
+            return
+        }
+        waveRefillJob?.cancel()
+        waveRefillJob = viewModelScope.launch {
+            isWaveLoading = true
+            try {
+                val exclude = playedTrackIds + _queue.map { it.id }
+                val batch = com.alananasss.kittytune.data.wave.MyWave.nextBatch(mode, exclude)
+                if (batch.isEmpty()) {
+                    emitUiEvent(str("wave_nothing_yet"))
+                } else if (changingMode) {
+                    clearUpcoming()
+                    appendToQueue(batch)
+                } else {
+                    playPlaylist(
+                        tracks = batch,
+                        startIndex = 0,
+                        context = PlaybackContext(displayText = str("wave_title"), navigationId = MY_WAVE_NAV_ID),
+                        maintainPlayerState = true,
+                        respectShuffle = false,
+                    )
+                }
+            } finally {
+                isWaveLoading = false
+            }
+        }
+    }
+
+    /** More of the wave once fewer than [WAVE_LOW_WATER] songs are left after the current one. */
+    private fun refillWaveIfLow() {
+        if (!isMyWaveActive || waveRefillJob?.isActive == true) return
+        if (_queue.size - currentQueueIndex - 1 >= WAVE_LOW_WATER) return
+        waveRefillJob = viewModelScope.launch {
+            val exclude = playedTrackIds + _queue.map { it.id }
+            val batch = runCatching { com.alananasss.kittytune.data.wave.MyWave.nextBatch(waveMode, exclude) }.getOrDefault(emptyList())
+            if (isMyWaveActive && batch.isNotEmpty()) appendToQueue(batch)
+        }
+    }
+
+    private fun appendToQueue(tracks: List<Track>) {
+        val known = _queue.map { it.id }.toHashSet()
+        val fresh = tracks.filter { it.id !in known }
+        _queue.addAll(fresh)
+        _originalQueue.addAll(fresh)
+        updateQueueState()
+        saveStateAsync(saveQueue = true)
+        if (MusicManager.player.mediaItemCount <= 1) preloadNextTrack(currentQueueIndex + 1)
+    }
+
+    /** A song of the wave left by hand: how early decides how much it counts against its artist. */
+    private fun noteWaveSkip() {
+        val track = currentTrack ?: return
+        if (isMyWaveActive) {
+            com.alananasss.kittytune.data.wave.WaveFeedback.onSkipped(track, currentPosition, duration)
+        }
+    }
 
     fun dislikeCurrentTrackInMix() {
         val track = currentTrack ?: return
+        if (isMyWaveActive) com.alananasss.kittytune.data.wave.WaveFeedback.onDisliked(track)
         playerPrefs.addMixDislikedTrack(track.id)
         if (isLiked) {
             isLiked = false
