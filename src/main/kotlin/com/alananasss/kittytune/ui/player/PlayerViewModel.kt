@@ -1232,6 +1232,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     companion object {
         const val MY_WAVE_NAV_ID = "my_wave"
+        const val TRAILER_NAV_PREFIX = "trailer:"
         const val TOGETHER_NAV_PREFIX = "together:"
 
         /** A listener further than this from the host's position is moved to it. */
@@ -3271,14 +3272,26 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         navigateToPlaylistId = "upload"
     }
 
+    fun canNavigateToContext(): Boolean {
+        val id = currentContext?.navigationId ?: return false
+        if (id.isBlank()) return false
+        if (id == "your_mix" || id == "expanded_queue") return false
+        return true
+    }
+
     fun navigateToContext() {
+        if (!canNavigateToContext()) return
         currentContext?.let { context ->
             var destination = context.navigationId
+            // Defensive: if a navigationId ever arrives already route-prefixed,
+            // normalize it. Every other prefix ("playlist_fans/", "local_playlist:",
+            // "system_playlist:", ...) is a valid destination as-is and stays untouched.
             if (destination.startsWith("playlist_detail:")) {
                 destination = destination.removePrefix("playlist_detail:")
-            } else if (destination.startsWith("playlist_")) {
-                destination = destination.removePrefix("playlist_")
             }
+            // A trailer leads back to what it was cut from; My Wave lives on the home page.
+            destination = destination.removePrefix(TRAILER_NAV_PREFIX)
+            if (destination == MY_WAVE_NAV_ID) destination = "home"
             navigateToPlaylistId = destination
         }
     }
@@ -4488,7 +4501,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
      */
     fun playTrailer(tracks: List<Track>, context: PlaybackContext) {
         if (tracks.isEmpty()) return
-        val trailerContext = context.copy(navigationId = "trailer:" + context.navigationId)
+        val trailerContext = context.copy(navigationId = TRAILER_NAV_PREFIX + context.navigationId)
         playPlaylist(tracks.take(TRAILER_SONGS), 0, trailerContext, maintainPlayerState = true, respectShuffle = false)
         trailerJob?.cancel()
         trailerJob = viewModelScope.launch {
