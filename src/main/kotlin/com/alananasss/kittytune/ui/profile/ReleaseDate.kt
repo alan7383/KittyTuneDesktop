@@ -22,6 +22,13 @@ internal object ReleaseDate {
         return format(date, today, locale)
     }
 
+    /** The date with its month shortened and its year always: "9 сент. 2025". For a pill, where the long one is too wide. */
+    fun shortText(raw: String?, locale: Locale = Strings.locale()): String {
+        val date = parse(raw) ?: return ""
+        val pattern = SHORT_PATTERNS[locale.language] ?: DEFAULT_SHORT_PATTERN
+        return DateTimeFormatter.ofPattern(pattern, locale).format(date)
+    }
+
     internal fun format(date: LocalDate, today: LocalDate, locale: Locale): String {
         val patterns = PATTERNS[locale.language] ?: DEFAULT_PATTERNS
         val pattern = if (date.year == today.year) patterns.first else patterns.second
@@ -49,6 +56,16 @@ internal object ReleaseDate {
         "vi" to ("d MMMM" to "d MMMM, yyyy"),
     )
     private val DEFAULT_PATTERNS = "d MMMM" to "d MMMM yyyy"
+
+    private val SHORT_PATTERNS = mapOf(
+        "ru" to "d MMM yyyy",
+        "en" to "MMM d, yyyy",
+        "de" to "d. MMM yyyy",
+        "fr" to "d MMM yyyy",
+        "hu" to "yyyy. MMM d.",
+        "vi" to "d MMM, yyyy",
+    )
+    private const val DEFAULT_SHORT_PATTERN = "d MMM yyyy"
 
     private val TIMESTAMP_FORMATS = listOf(
         "yyyy-MM-dd'T'HH:mm:ss'Z'",

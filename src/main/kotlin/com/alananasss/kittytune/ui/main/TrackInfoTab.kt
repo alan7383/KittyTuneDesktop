@@ -273,26 +273,29 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Description (SoundCloud only)
+        // Description (SoundCloud only): the artist's own words, set off by a line beside them rather than boxed in a
+        // card, which next to the numbers' pills looked like a different app.
         if (!isSpotifyTrack && !displayTrack.description.isNullOrBlank()) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            ExpandableDescription(
-                                text = displayTrack.description!!,
-                                onUrlClick = { url ->
-                                    com.alananasss.kittytune.core.openUrl(url)
-                                },
-                                onMentionClick = { username ->
-                                    vm.resolveAndNavigateToArtist(username.removePrefix("@"))
-                                }
-                            )
-                        }
+                Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                    Box(
+                        Modifier
+                            .width(3.dp)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.weight(1f)) {
+                        ExpandableDescription(
+                            text = displayTrack.description!!,
+                            onUrlClick = { url ->
+                                com.alananasss.kittytune.core.openUrl(url)
+                            },
+                            onMentionClick = { username ->
+                                vm.resolveAndNavigateToArtist(username.removePrefix("@"))
+                            }
+                        )
                     }
                 }
             }
@@ -863,45 +866,16 @@ private fun LazyListScope.trackTagsAndDetails(
 ) {
     item {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
-            val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
+            // The date is with the numbers at the top now; the genre stays here, with the tags.
             val genre = displayTrack.genre
-            val isDateValid = !dateRaw.isNullOrBlank() && releaseDateStr != str("detail_unknown")
             val hasGenre = !genre.isNullOrBlank()
 
-            if (isDateValid || hasGenre) {
+            if (hasGenre) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (isDateValid) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    Icons.Rounded.CalendarToday,
-                                    contentDescription = str("detail_release_date"),
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = releaseDateStr,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-
                     if (hasGenre) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
