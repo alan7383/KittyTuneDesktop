@@ -2932,4 +2932,5 @@
     <string name="release_kind_compilation">Válogatás</string>
     <string name="artist_more_title">Továbbiak az előadótól</string>
     <string name="artist_more_playlists">Lejátszási listák</string>
+    <string name="track_sorted_by_followers">Legtöbb követő elöl</string>
 </resources>

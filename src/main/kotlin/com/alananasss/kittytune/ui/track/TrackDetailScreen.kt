@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -127,13 +128,17 @@ fun TrackDetailScreen(
                                 users = detailViewModel.likers,
                                 onNavigate = onNavigate,
                                 onLoadMore = { detailViewModel.loadMoreLikers() },
-                                isLoadingMore = detailViewModel.isLikersLoadingMore
+                                isLoadingMore = detailViewModel.isLikersLoadingMore,
+                                isSortedByFollowers = detailViewModel.isUsersSortedByFollowers,
+                                onToggleSort = { detailViewModel.toggleUsersSort() },
                             )
                             1 -> UserList(
                                 users = detailViewModel.reposters,
                                 onNavigate = onNavigate,
                                 onLoadMore = { detailViewModel.loadMoreReposters() },
-                                isLoadingMore = detailViewModel.isRepostersLoadingMore
+                                isLoadingMore = detailViewModel.isRepostersLoadingMore,
+                                isSortedByFollowers = detailViewModel.isUsersSortedByFollowers,
+                                onToggleSort = { detailViewModel.toggleUsersSort() },
                             )
                             2 -> PlaylistList(
                                 playlists = detailViewModel.inPlaylists,
@@ -163,14 +168,32 @@ fun UserList(
     users: List<User>,
     onNavigate: (String) -> Unit,
     onLoadMore: () -> Unit,
-    isLoadingMore: Boolean
+    isLoadingMore: Boolean,
+    /** Whether the list is by followers; null where it is not offered a choice of order. */
+    isSortedByFollowers: Boolean? = null,
+    onToggleSort: () -> Unit = {},
 ) {
     if (users.isEmpty() && !isLoadingMore) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str("detail_no_one_yet"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    } else {
-        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
+    } else Column(Modifier.fillMaxSize()) {
+        if (isSortedByFollowers != null) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            FilterChip(
+                selected = isSortedByFollowers,
+                onClick = onToggleSort,
+                label = { Text(str("track_sorted_by_followers")) },
+                leadingIcon = {
+                    Icon(
+                        if (isSortedByFollowers) Icons.Rounded.Check else Icons.Rounded.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(FilterChipDefaults.IconSize),
+                    )
+                },
+                shape = CircleShape,
+            )
+        }
+        LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.weight(1f)) {
             itemsIndexed(users) { index, user ->
                 if (index >= users.size - 5) {
                     LaunchedEffect(Unit) { onLoadMore() }
