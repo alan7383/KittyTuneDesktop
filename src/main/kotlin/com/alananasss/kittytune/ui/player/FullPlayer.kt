@@ -84,6 +84,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
@@ -374,16 +375,18 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
             modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Lit only while what they open is open, and never left lit by keyboard focus after a click: the
+            // one pressed last used to stay highlighted until the player was closed (issue #66).
             QuietButton(
                 icon = Icons.Rounded.Search,
                 label = str("lyrics_manual_search"),
-                tint = palette.dim,
+                tint = if (viewModel.isSearchingLyrics) palette.bright else palette.dim,
                 onClick = { viewModel.isSearchingLyrics = true },
             )
             QuietButton(
                 icon = Icons.Rounded.Tune,
                 label = str("pref_lyrics_title"),
-                tint = palette.dim,
+                tint = if (showQuickSettings) palette.bright else palette.dim,
                 onClick = { showQuickSettings = true },
             )
             QuietButton(
@@ -1452,7 +1455,9 @@ private fun QuietButton(
     androidx.compose.material3.IconButton(
         onClick = onClick,
         shapes = IconButtonDefaults.shapes(),
-        modifier = modifier.size(size + QUIET_BUTTON_INSET * 2),
+        modifier = modifier
+            .size(size + QUIET_BUTTON_INSET * 2)
+            .focusProperties { canFocus = false },
     ) {
         androidx.compose.material3.Icon(
             icon,
