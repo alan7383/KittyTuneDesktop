@@ -122,6 +122,8 @@ internal fun VolumeControl(
     onVolumeScrolled: (Float) -> Unit,
     onToggleMute: () -> Unit,
     shapes: IconButtonShapes = IconButtonDefaults.shapes(),
+    /** A right click on the speaker lists the output devices; see [OutputDevicePicker]. */
+    onSelectDevice: (String) -> Unit = {},
 ) {
     val style = rememberVolumeStyle()
     androidx.compose.runtime.CompositionLocalProvider(LocalWaveMoving provides isPlaying) {
@@ -141,7 +143,7 @@ internal fun VolumeControl(
             label = "volumeLayout",
         ) { usesPopup ->
             if (usesPopup) {
-                VolumeHoverControl(volume, style, onVolumeChange, onVolumeChangeFinished, onVolumeScrolled, onToggleMute, shapes = shapes)
+                VolumeHoverControl(volume, style, onVolumeChange, onVolumeChangeFinished, onVolumeScrolled, onToggleMute, shapes = shapes, onSelectDevice = onSelectDevice)
             } else {
                 InlineVolumeControl(
                     volume = volume,
@@ -152,6 +154,7 @@ internal fun VolumeControl(
                     onVolumeScrolled = onVolumeScrolled,
                     onToggleMute = onToggleMute,
                     shapes = shapes,
+                    onSelectDevice = onSelectDevice,
                 )
             }
         }
@@ -202,23 +205,26 @@ private fun InlineVolumeControl(
     onVolumeScrolled: (Float) -> Unit,
     onToggleMute: () -> Unit,
     shapes: IconButtonShapes = IconButtonDefaults.shapes(),
+    onSelectDevice: (String) -> Unit = {},
 ) {
     val isMuted = volume <= 0.001f
     val iconColor = speakerTint(isMuted)
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(
-            onClick = onToggleMute,
-            shapes = shapes,
-            modifier = Modifier
-                .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
-                .volumeWheel({ volume }, onVolumeScrolled),
-        ) {
-            Icon(
-                imageVector = volumeIcon(volume),
-                contentDescription = if (isMuted) "Unmute" else "Mute",
-                tint = iconColor,
-                modifier = Modifier.size(20.dp),
-            )
+        OutputDevicePicker(onSelect = onSelectDevice) { pickerModifier ->
+            IconButton(
+                onClick = onToggleMute,
+                shapes = shapes,
+                modifier = pickerModifier
+                    .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                    .volumeWheel({ volume }, onVolumeScrolled),
+            ) {
+                Icon(
+                    imageVector = volumeIcon(volume),
+                    contentDescription = if (isMuted) "Unmute" else "Mute",
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
         Spacer(Modifier.width(6.dp))
         VolumeTrack(
@@ -696,6 +702,7 @@ private fun VolumeHoverControl(
     onVolumeScrolled: (Float) -> Unit,
     onToggleMute: () -> Unit,
     shapes: IconButtonShapes = IconButtonDefaults.shapes(),
+    onSelectDevice: (String) -> Unit = {},
 ) {
     var overButton by remember { mutableStateOf(false) }
     var overPanel by remember { mutableStateOf(false) }
@@ -715,25 +722,27 @@ private fun VolumeHoverControl(
     val iconColor = speakerTint(isMuted)
 
     Box {
-        IconButton(
-            onClick = onToggleMute,
-            shapes = shapes,
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = if (expanded) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f) else Color.Transparent,
-                contentColor = iconColor,
-            ),
-            modifier = Modifier
-                .onPointerEvent(PointerEventType.Enter) { overButton = true }
-                .onPointerEvent(PointerEventType.Exit) { overButton = false }
-                .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
-                .volumeWheel({ volume }, onVolumeScrolled),
-        ) {
-            Icon(
-                levelIcon,
-                contentDescription = if (isMuted) "Unmute" else "Volume",
-                tint = iconColor,
-                modifier = Modifier.size(20.dp),
-            )
+        OutputDevicePicker(onSelect = onSelectDevice) { pickerModifier ->
+            IconButton(
+                onClick = onToggleMute,
+                shapes = shapes,
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = if (expanded) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f) else Color.Transparent,
+                    contentColor = iconColor,
+                ),
+                modifier = pickerModifier
+                    .onPointerEvent(PointerEventType.Enter) { overButton = true }
+                    .onPointerEvent(PointerEventType.Exit) { overButton = false }
+                    .pointerHoverIcon(PointerIcon(Cursor(Cursor.HAND_CURSOR)))
+                    .volumeWheel({ volume }, onVolumeScrolled),
+            ) {
+                Icon(
+                    levelIcon,
+                    contentDescription = if (isMuted) "Unmute" else "Volume",
+                    tint = iconColor,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
 
         if (expanded) {

@@ -1400,14 +1400,16 @@ private fun FullPlayerVolumeBar(
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        QuietButton(
-            icon = com.alananasss.kittytune.ui.main.volumeIcon(volume),
-            label = if (isMuted) "Unmute" else str("volume_title"),
-            tint = if (isMuted) palette.dim.copy(alpha = 0.45f) else palette.dim,
-            size = 18.dp,
-            onClick = { viewModel.toggleMute() },
-            modifier = Modifier.offset(x = -VOLUME_BUTTON_INSET),
-        )
+        com.alananasss.kittytune.ui.main.OutputDevicePicker(onSelect = { viewModel.changeOutputDevice(it) }) { pickerModifier ->
+            QuietButton(
+                icon = com.alananasss.kittytune.ui.main.volumeIcon(volume),
+                label = if (isMuted) "Unmute" else str("volume_title"),
+                tint = if (isMuted) palette.dim.copy(alpha = 0.45f) else palette.dim,
+                size = 18.dp,
+                onClick = { viewModel.toggleMute() },
+                modifier = pickerModifier.offset(x = -VOLUME_BUTTON_INSET),
+            )
+        }
         com.alananasss.kittytune.ui.main.StyledVolumeTrack(
             volume = volume,
             isPlaying = viewModel.isPlaying,
