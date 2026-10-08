@@ -68,6 +68,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -140,11 +141,27 @@ fun NowPlayingPanel(
 
             PanelTabRow(tabs = tabs, selected = tab, onTabChange = onTabChange)
 
-            when (tab) {
-                NowPlayingTab.QUEUE -> QueueList(vm)
-                NowPlayingTab.LYRICS -> LyricsPreview(vm, onOpenFullLyrics)
-                NowPlayingTab.EFFECTS -> com.alananasss.kittytune.ui.player.EffectsPanel(vm)
-                else -> TrackInfoTab(vm)
+            // The pages slide in from the side of the tab they come from, like pages of one strip, instead of
+            // swapping in a single frame while only the tab buttons moved (issue #66).
+            androidx.compose.animation.AnimatedContent(
+                targetState = tab,
+                transitionSpec = {
+                    val forward = tabs.indexOf(targetState) > tabs.indexOf(initialState)
+                    val direction = if (forward) 1 else -1
+                    (androidx.compose.animation.slideInHorizontally(PAGE_SLIDE) { width -> direction * width / 5 } +
+                        fadeIn(tween(PAGE_FADE_MS, delayMillis = PAGE_FADE_MS / 3))) togetherWith
+                        (androidx.compose.animation.slideOutHorizontally(PAGE_SLIDE) { width -> -direction * width / 5 } +
+                            fadeOut(tween(PAGE_FADE_MS * 2 / 3)))
+                },
+                modifier = Modifier.fillMaxSize(),
+                label = "panelPage",
+            ) { page ->
+                when (page) {
+                    NowPlayingTab.QUEUE -> QueueList(vm)
+                    NowPlayingTab.LYRICS -> LyricsPreview(vm, onOpenFullLyrics)
+                    NowPlayingTab.EFFECTS -> com.alananasss.kittytune.ui.player.EffectsPanel(vm)
+                    else -> TrackInfoTab(vm)
+                }
             }
         }
     }
@@ -182,58 +199,64 @@ private fun LyricsPreview(vm: PlayerViewModel, onOpenFullLyrics: () -> Unit) {
         )
     }
 
+    // The tab already says "Lyrics", so the bar above the words names where they came from instead, and keeps the
+    // two actions as round buttons like the rest of the panel: a title, a gear and a labelled pill in three styles
+    // looked stuck together (issue #66).
     Column(Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(start = 16.dp, end = 12.dp, top = 2.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = str("player_lyrics"),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Bold
-            )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Same glyph and same label as the gear on the full screen, because it opens the same dialog.
-                Tip(str("pref_lyrics_title"), instant = true) {
-                    IconButton(
-                        onClick = { showQuickSettings = true },
-                        shapes = IconButtonDefaults.shapes(),
-                        modifier = Modifier.size(30.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Settings,
-                            contentDescription = str("pref_lyrics_title"),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp),
-                        )
-                    }
-                }
-                Spacer(Modifier.width(6.dp))
-                androidx.compose.material3.FilledTonalButton(
-                    onClick = onOpenFullLyrics,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
-                    shapes = ButtonDefaults.shapes(),
-                    modifier = Modifier.height(30.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.OpenInFull,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(str("btn_fullscreen"), style = MaterialTheme.typography.labelSmall)
-                }
+            val source = vm.currentLyricsSource?.let {
+                com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider.fromName(it)?.displayName ?: it
             }
+            Text(
+                text = source?.let { str("lyrics_search_now_showing", it) }.orEmpty(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            // Same glyph and same label as the gear on the full screen, because it opens the same dialog.
+            PanelToolButton(Icons.Rounded.Settings, str("pref_lyrics_title"), onClick = { showQuickSettings = true })
+            Spacer(Modifier.width(6.dp))
+            PanelToolButton(Icons.Rounded.OpenInFull, str("btn_fullscreen"), onClick = onOpenFullLyrics)
         }
 
         PanelLyrics(vm, Modifier.fillMaxSize())
     }
 }
 
+
+/** A small round action of the panel's own: tonal, with its name in a tooltip. One shape for all of them. */
+@Composable
+internal fun PanelToolButton(icon: ImageVector, label: String, onClick: () -> Unit, isActive: Boolean = false) {
+    val scheme = MaterialTheme.colorScheme
+    Tip(label, instant = true) {
+        androidx.compose.material3.FilledTonalIconButton(
+            onClick = onClick,
+            shapes = IconButtonDefaults.shapes(),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = if (isActive) scheme.secondaryContainer else scheme.surfaceContainerHigh,
+                contentColor = if (isActive) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+            ),
+            modifier = Modifier.size(PANEL_TOOL_SIZE),
+        ) {
+            Icon(icon, contentDescription = label, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+internal val PANEL_TOOL_SIZE = 34.dp
+
+private val PAGE_SLIDE = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(
+    dampingRatio = 0.9f,
+    stiffness = 420f,
+)
+private const val PAGE_FADE_MS = 240
 
 /**
  * The tab row: one button per tab, drawn like the sidebar's destinations. The open tab has a filled icon on a

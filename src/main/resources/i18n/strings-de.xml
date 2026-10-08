@@ -772,8 +772,7 @@
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
     <!-- SOCIAL                                                                           -->
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
-
-    <string name="add_comment_hint">Kommentar hinzufügen&#8230;</string>
+    <string name="add_comment_hint">Kommentar…</string>
     <string name="comment_no_comments">Noch keine Kommentare</string>
     <string name="comment_anonymous">Anonym</string>
     <string name="comment_send_action">Posten</string>
@@ -3445,4 +3444,6 @@
     <string name="chart_country_vn">Vietnam</string>
     <string name="pref_lyrics_one_line_title">Eine Zeile</string>
     <string name="pref_lyrics_one_line_sub">Die gesungene Zeile über der Wiedergabetaste in der Player-Leiste</string>
+    <string name="queue_time_left">Noch %1$s</string>
+    <string name="queue_clear_upcoming">Als Nächstes leeren</string>
 </resources>

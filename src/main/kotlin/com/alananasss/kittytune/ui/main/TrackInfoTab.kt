@@ -26,6 +26,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Lyrics
+import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.animateColorAsState
@@ -183,6 +186,17 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         commentsScrollRequest = 0
     }
 
+    // Where the lyrics half starts when the list is at its top, so it can reach down to the panel's bottom edge
+    // instead of stopping at a fixed height with room to spare under it (issue #66).
+    var lyricsTopPx by remember { mutableStateOf(-1) }
+    LaunchedEffect(listState, lyricsHalf) {
+        androidx.compose.runtime.snapshotFlow { listState.layoutInfo }.collect { info ->
+            if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                info.visibleItemsInfo.firstOrNull { it.key == LYRICS_HALF_KEY }?.let { lyricsTopPx = it.offset }
+            }
+        }
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val panelHeight = maxHeight
         // The header's size follows the panel's height alone. Tied to the lyrics half as well, it went small
@@ -190,11 +204,12 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         val isCompact = panelHeight < 780.dp
         val isUltraCompact = panelHeight < 580.dp
 
-        val dynamicLyricsHeight = when {
-            !lyricsHalf -> LYRICS_HALF_HEIGHT
-            isUltraCompact -> (panelHeight - 120.dp).coerceAtLeast(180.dp)
-            isCompact -> (panelHeight - 160.dp).coerceAtLeast(220.dp)
-            else -> LYRICS_HALF_HEIGHT
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val dynamicLyricsHeight = if (lyricsTopPx > 0) {
+            (panelHeight - with(density) { lyricsTopPx.toDp() } - LIST_TOP_PADDING - LYRICS_BOTTOM_GAP)
+                .coerceAtLeast(LYRICS_MIN_HEIGHT)
+        } else {
+            LYRICS_HALF_HEIGHT
         }
 
         LazyColumn(
@@ -204,7 +219,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             Modifier.fillMaxSize(),
             state = listState,
             verticalArrangement = Arrangement.spacedBy(if (isCompact) 12.dp else 18.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = LIST_TOP_PADDING, bottom = LYRICS_BOTTOM_GAP)
         ) {
             item {
                 TrackInfoHeader(vm, displayTrack, isSpotifyTrack, isCompact, isUltraCompact, onCommentsClick)
@@ -317,8 +332,8 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     icon = { it.icon },
                     label = { str(it.labelResId) },
                     tooltip = { str("sorted_by", str(it.labelResId)) },
-                    size = 48.dp,
-                    iconSize = 22.dp,
+                    size = 44.dp,
+                    iconSize = 20.dp,
                 )
                 OutlinedTextField(
                     value = newCommentText,
@@ -364,7 +379,8 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     vm.loadComments(refresh = false)
                 }
             }
-            CommentItemUI(comment, vm)
+            // Faded in and out with the switch to the lyrics and back, not only when they first appear.
+            Box(Modifier.animateItem()) { CommentItemUI(comment, vm) }
         }
 
         if (!isSpotifyTrack && !lyricsHalf && vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {
@@ -421,12 +437,15 @@ private fun InfoHalfToggle(
         Row(Modifier.padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
             InfoHalfChip(
                 text = str("menu_comments"),
+                icon = if (!lyricsSelected) Icons.Rounded.Forum else Icons.Outlined.Forum,
+                badge = count.takeIf { commentCount > 0 },
                 isSelected = !lyricsSelected,
                 onClick = { onSelect(false) },
                 modifier = Modifier.weight(1f)
             )
             InfoHalfChip(
                 text = str("player_lyrics"),
+                icon = if (lyricsSelected) Icons.Rounded.Lyrics else Icons.Outlined.Lyrics,
                 isSelected = lyricsSelected,
                 onClick = { onSelect(true) },
                 modifier = Modifier.weight(1f)
@@ -435,41 +454,62 @@ private fun InfoHalfToggle(
     }
 }
 
+/**
+ * One half of the switch, drawn like the panel's tab buttons: an icon, filled when chosen, on the tonal pill the
+ * open tab sits on, so the panel speaks one language from the tabs down (issue #66).
+ */
 @Composable
 private fun InfoHalfChip(
     text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    badge: String? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val background by animateColorAsState(
-        targetValue = if (isSelected) scheme.primary else Color.Transparent,
-        animationSpec = tween(300),
+        targetValue = if (isSelected) scheme.secondaryContainer else Color.Transparent,
+        animationSpec = tween(250),
         label = "infoHalfBackground"
     )
     val textColor by animateColorAsState(
-        targetValue = if (isSelected) scheme.onPrimary else scheme.onSurfaceVariant,
-        animationSpec = tween(300),
+        targetValue = if (isSelected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+        animationSpec = tween(250),
         label = "infoHalfText"
     )
-    Box(
+    Row(
         modifier = modifier
             .fillMaxHeight()
+            .pressScale(interaction, pressedScale = 0.95f)
             .clip(CircleShape)
             .background(background)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick)
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
             color = textColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp)
+            modifier = Modifier.weight(1f, fill = false),
         )
+        if (badge != null) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = badge,
+                style = MaterialTheme.typography.labelSmall,
+                color = textColor.copy(alpha = 0.75f),
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -489,9 +529,9 @@ private fun LazyListScope.trackLyricsHalf(
     showHeader: Boolean,
     lyricsHeight: androidx.compose.ui.unit.Dp = LYRICS_HALF_HEIGHT,
 ) {
-    item {
+    item(key = LYRICS_HALF_KEY) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().animateItem(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (showHeader) {
@@ -512,29 +552,18 @@ private fun LazyListScope.trackLyricsHalf(
                     ContainedLoadingIndicator()
                 }
             } else {
+                // Down to the panel's bottom edge. The lyrics tab and the full screen are a click away anyway, so
+                // the button that opened them here only took room from the words (issue #66).
                 PanelLyrics(vm, Modifier.fillMaxWidth().height(lyricsHeight))
-            }
-
-            if (vm.hasLyrics) {
-                OutlinedButton(
-                    onClick = { vm.openLyrics() },
-                    shapes = ButtonDefaults.shapes(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Rounded.Lyrics, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = str("info_open_lyrics_view"),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
         }
     }
 }
+
+private const val LYRICS_HALF_KEY = "info_lyrics_half"
+private val LIST_TOP_PADDING = 16.dp
+private val LYRICS_BOTTOM_GAP = 16.dp
+private val LYRICS_MIN_HEIGHT = 240.dp
 
 /**
  * Height of the lyrics pane inside the info tab. Tall enough for the current line to sit a third of

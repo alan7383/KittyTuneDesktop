@@ -139,6 +139,11 @@ fun KaraokeLyricsView(
     showTranslation: Boolean = true,
     showPhonetic: Boolean = true,
     offset: Dp = 32.dp,
+    /**
+     * The first line starts at the top instead of at [offset], and the list only starts moving once the sung line
+     * gets that far down. For the side panel: a song began there on a third of the panel left empty (issue #66).
+     */
+    startsAtTop: Boolean = false,
     keepAliveZone: Dp = 100.dp,
     blurDelta: Float = 3f,
     isScrubbing: Boolean = false,
@@ -466,7 +471,12 @@ fun KaraokeLyricsView(
                                 placeable.place(0, -(keepAliveZone.roundToPx()))
                             }
                         },
-                    contentPadding = PaddingValues(horizontal = horizontalMargin, vertical = stableOffset + keepAliveZone),
+                    contentPadding = PaddingValues(
+                        start = horizontalMargin,
+                        end = horizontalMargin,
+                        top = if (startsAtTop) keepAliveZone + TOP_START_GAP else stableOffset + keepAliveZone,
+                        bottom = stableOffset + keepAliveZone,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(lineSpacing)
                 ) {
                     itemsIndexed(
@@ -645,6 +655,9 @@ fun KaraokeLyricsView(
             }
         }
     }
+
+/** Room above the first line when the lyrics start at the top; the fade at the top edge needs a little. */
+private val TOP_START_GAP = 12.dp
 
 /** How stiffly the sung line springs into place; the lines around it are a little softer. */
 private const val LINE_STIFFNESS = 300f

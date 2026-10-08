@@ -33,7 +33,9 @@ import androidx.compose.foundation.onClick
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ClearAll
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Verified
@@ -153,6 +155,8 @@ internal fun QueueList(vm: PlayerViewModel) {
         targetIndex = targetListIndex,
     )
 
+    Column(Modifier.fillMaxSize()) {
+    QueueToolbar(vm, upNextCount)
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -196,6 +200,48 @@ internal fun QueueList(vm: PlayerViewModel) {
                     }
                 }
             }
+        }
+    }
+    }
+}
+
+/**
+ * What is left of the queue and the two things done to all of it at once: shuffle, and clearing what comes next.
+ * The same round buttons as the rest of the panel (issue #66).
+ */
+@Composable
+private fun QueueToolbar(vm: PlayerViewModel, upNextCount: Int) {
+    val queue = vm.queueState
+    val current = vm.currentQueueIndex
+    val leftMs = remember(queue, current, vm.duration, vm.currentPosition / 10_000L) {
+        val upcoming = queue.drop(current + 1).sumOf { it.durationMs ?: 0L }
+        upcoming + (vm.duration - vm.currentPosition).coerceAtLeast(0L)
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 2.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = str("queue_time_left", makeTimeString(leftMs)),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        PanelToolButton(
+            icon = Icons.Rounded.Shuffle,
+            label = str("btn_shuffle"),
+            isActive = vm.shuffleEnabled,
+            onClick = { vm.toggleShuffle() },
+        )
+        if (upNextCount > 0) {
+            Spacer(Modifier.width(6.dp))
+            PanelToolButton(
+                icon = Icons.Rounded.ClearAll,
+                label = str("queue_clear_upcoming"),
+                onClick = { vm.clearUpcoming() },
+            )
         }
     }
 }

@@ -165,7 +165,7 @@
     <string name="action_pause">Szünet</string>
     <string name="action_play">Lejátszás</string>
     <string name="action_unlike">Kedvelés visszavonása</string>
-    <string name="add_comment_hint">Szólj hozzá&#8230;</string>
+    <string name="add_comment_hint">Hozzászólás…</string>
     <string name="add_to_playlist_new">Új playlist</string>
     <string name="add_to_playlist_title_multi">%1$d szám hozzáadása&#8230;</string>
     <string name="add_to_playlist_title_single">Hozzáadás&#8230;</string>
@@ -2834,4 +2834,6 @@
     <string name="chart_country_vn">Vietnam</string>
     <string name="pref_lyrics_one_line_title">Egy sor</string>
     <string name="pref_lyrics_one_line_sub">Az éppen énekelt sor a lejátszógomb felett a lejátszósávban</string>
+    <string name="queue_time_left">Még %1$s</string>
+    <string name="queue_clear_upcoming">Következők törlése</string>
 </resources>

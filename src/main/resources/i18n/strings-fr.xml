@@ -165,7 +165,7 @@
     <string name="action_pause">Pause</string>
     <string name="action_play">Lecture</string>
     <string name="action_unlike">Unlike</string>
-    <string name="add_comment_hint">Ajouter un commentaire&#8230;</string>
+    <string name="add_comment_hint">Commenter…</string>
     <string name="add_to_playlist_new">Nouvelle playlist</string>
     <string name="add_to_playlist_title_multi">Ajouter %1$d titres à&#8230;</string>
     <string name="add_to_playlist_title_single">Ajouter à&#8230;</string>
@@ -2833,4 +2833,6 @@
     <string name="chart_country_vn">Viêt Nam</string>
     <string name="pref_lyrics_one_line_title">Une ligne</string>
     <string name="pref_lyrics_one_line_sub">La ligne chantée, au-dessus du bouton lecture de la barre du lecteur</string>
+    <string name="queue_time_left">Encore %1$s</string>
+    <string name="queue_clear_upcoming">Vider la suite</string>
 </resources>
