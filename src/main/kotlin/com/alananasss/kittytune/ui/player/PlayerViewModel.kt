@@ -2368,7 +2368,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     found = searchMusixmatchCandidates(spelling, target, trackDurationMs, variant).firstOrNull()
                     if (found != null) break
                 }
-                found
+                found ?: com.alananasss.kittytune.data.lyrics.TitleSpellings.respelled(query)?.let { respelled ->
+                    searchMusixmatchCandidates(respelled, target, trackDurationMs, variant).firstOrNull()
+                }
             }
             PreferredLyricsProvider.LRCLIB -> {
                 // The whole title first, then each song of a two-song title on its own.
@@ -2382,7 +2384,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         .maxByOrNull { it.rank }
                     if (found != null) break
                 }
-                found
+                // "NEWYORK" as SoundCloud titles it is only found as "NEW YORK": the spelling Genius gives it.
+                found ?: queries.firstOrNull()
+                    ?.let { com.alananasss.kittytune.data.lyrics.TitleSpellings.respelled(it) }
+                    ?.let { respelled ->
+                        searchLrcLibCandidates(respelled, target, trackDurationMs).filter { it.isUsable }.maxByOrNull { it.rank }
+                    }
             }
             PreferredLyricsProvider.GENIUS -> {
                 null

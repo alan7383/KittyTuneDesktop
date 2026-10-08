@@ -44,19 +44,23 @@ internal object ManualLyricsSearch {
     ): List<UnifiedLyricResult> {
         // The query as typed, then with its punctuation spaced and run-together words spelled out: "NEWYORK" found
         // nothing on LrcLib or Musixmatch and "NEW YORK" found it at once (issue #66).
+        suspend fun searchAs(variant: String): List<UnifiedLyricResult> = runCatching {
+            when (provider) {
+                PreferredLyricsProvider.LRCLIB -> searchLrcLib(variant, track)
+                PreferredLyricsProvider.GENIUS -> searchGenius(variant)
+                PreferredLyricsProvider.MUSIXMATCH -> searchMusixmatch(variant)
+                PreferredLyricsProvider.SIMPMUSIC -> searchSimpMusic(variant)
+                else -> searchByTitle(provider, variant, track)
+            }
+        }.getOrDefault(emptyList())
+
         for (variant in LyricsMatcher.queryVariants(query, track.title)) {
-            val found = runCatching {
-                when (provider) {
-                    PreferredLyricsProvider.LRCLIB -> searchLrcLib(variant, track)
-                    PreferredLyricsProvider.GENIUS -> searchGenius(variant)
-                    PreferredLyricsProvider.MUSIXMATCH -> searchMusixmatch(variant)
-                    PreferredLyricsProvider.SIMPMUSIC -> searchSimpMusic(variant)
-                    else -> searchByTitle(provider, variant, track)
-                }
-            }.getOrDefault(emptyList())
+            val found = searchAs(variant)
             if (found.isNotEmpty()) return found
         }
-        return emptyList()
+        // Nothing under any spelling of ours: the one Genius gives the title, which spells out run-together words.
+        val respelled = com.alananasss.kittytune.data.lyrics.TitleSpellings.respelled(query) ?: return emptyList()
+        return searchAs(respelled)
     }
 
     /**
