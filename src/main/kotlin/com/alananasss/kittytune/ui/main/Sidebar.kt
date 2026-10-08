@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
@@ -979,7 +980,10 @@ private fun LibraryHeader(
                 end = 8.dp,
                 top = headerVerticalPadding,
                 bottom = 4.dp,
-            ),
+            )
+            // One height whether the buttons are there or not. They are taller than the title alone, so the
+            // header grew by a dozen dp in the frame they arrived and every entry below jumped down with it.
+            .height(LIBRARY_HEADER_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val currentFolder = libraryViewModel.currentFolder
@@ -1073,13 +1077,16 @@ private fun LibraryHeader(
                     }
                 }
             }
-            if (collapse < 0.9f) {
+            if (collapse < SidebarMorph.FADE_DONE_AT) {
                 Spacer(Modifier.weight(1f))
             }
         }
 
-        if (collapse < 0.9f) {
-            Row(Modifier.receded(collapse), verticalAlignment = Alignment.CenterVertically) {
+        // Only while they can be seen: past FADE_DONE_AT they have faded out, so leaving or arriving there is
+        // invisible. They keep their full size throughout and give up room instead of being squeezed into it,
+        // which is what made them shrink and pop while the panel was still narrow.
+        if (collapse < SidebarMorph.FADE_DONE_AT) {
+            Row(Modifier.overflowingStart().receded(collapse), verticalAlignment = Alignment.CenterVertically) {
         // Extended "+ Créer" with dropdown menu. Outlined rather than filled tonal: next to a row
         // of plain icon buttons the tonal fill made it the loudest thing in the header, which is
         // not what a secondary action should be (issue #33).
@@ -1824,6 +1831,20 @@ private fun EntryArtwork(
  * do not exist at all before then — an invisible button that can still be clicked is worse than no
  * animation.
  */
+/** The library header's height in every state: the height of its tallest button, the outlined "Create". */
+private val LIBRARY_HEADER_HEIGHT = 40.dp
+
+/**
+ * Measures the content at its own width and, when there is less room than that, takes only the room there is,
+ * letting the content run out past its start instead of being squeezed. Used for the header buttons while the
+ * panel is narrower than they are, which only happens as they fade out.
+ */
+private fun Modifier.overflowingStart(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
+    val width = placeable.width.coerceAtMost(constraints.maxWidth)
+    layout(width, placeable.height) { placeable.placeRelative(width - placeable.width, 0) }
+}
+
 @Composable
 private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> Unit) {
     val appearance = SidebarMorph.arrivalOf(collapse)
