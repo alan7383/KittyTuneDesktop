@@ -717,7 +717,7 @@
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
     <!-- SOCIAL                                                                           -->
     <!-- ═══════════════════════════════════════════════════════════════════════════════ -->
-    <string name="add_comment_hint">Thêm bình luận&#8230;</string>
+    <string name="add_comment_hint">Bình luận…</string>
     <string name="comment_no_comments">Chưa có bình luận nào</string>
     <string name="comment_anonymous">Ẩn danh</string>
     <string name="comment_send_action">Đăng</string>
@@ -3281,4 +3281,6 @@
     <string name="chart_country_vn">Việt Nam</string>
     <string name="pref_lyrics_one_line_title">Một dòng</string>
     <string name="pref_lyrics_one_line_sub">Dòng đang hát, phía trên nút phát trong thanh trình phát</string>
+    <string name="queue_time_left">Còn %1$s</string>
+    <string name="queue_clear_upcoming">Xóa danh sách tiếp theo</string>
 </resources>

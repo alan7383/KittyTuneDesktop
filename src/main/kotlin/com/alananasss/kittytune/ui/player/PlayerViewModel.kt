@@ -4147,6 +4147,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         saveStateAsync(saveQueue = true)
     }
 
+    /** Drops every track after the one playing, from the shuffled order and the original one alike. */
+    fun clearUpcoming() {
+        if (currentQueueIndex !in _queue.indices || currentQueueIndex == _queue.lastIndex) return
+        val upcoming = _queue.subList(currentQueueIndex + 1, _queue.size)
+        val dropped = upcoming.toList()
+        upcoming.clear()
+        _originalQueue.removeAll { original -> dropped.any { it === original } }
+        updateQueueState()
+        if (MusicManager.player.mediaItemCount > 1) {
+            runCatching { MusicManager.player.removeMediaItem(1) }
+        }
+        saveStateAsync(saveQueue = true)
+    }
+
     fun insertNext(tracks: List<Track>) {
         if (tracks.isEmpty()) return
         val insertIndex = currentQueueIndex + 1

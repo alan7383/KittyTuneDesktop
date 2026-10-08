@@ -302,6 +302,7 @@ fun LyricsEnhanced(
                                 showTranslation = showTranslations,
                                 showPhonetic = showPhonetics,
                                 offset = lyricsViewportOffset,
+                                startsAtTop = isSidebar,
                                 keepAliveZone = 72.dp,
                                 isScrubbing = viewModel.isScrubbing,
                                 lrcBounceEnabled = viewModel.lyricsLrcBounceEnabled,

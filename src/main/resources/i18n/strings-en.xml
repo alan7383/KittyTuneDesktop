@@ -165,7 +165,7 @@
     <string name="action_pause">Pause</string>
     <string name="action_play">Play</string>
     <string name="action_unlike">Unlike</string>
-    <string name="add_comment_hint">Add a comment&#8230;</string>
+    <string name="add_comment_hint">Comment…</string>
     <string name="add_to_playlist_new">New playlist</string>
     <string name="add_to_playlist_title_multi">Add %1$d tracks to&#8230;</string>
     <string name="add_to_playlist_title_single">Add to&#8230;</string>
@@ -2832,4 +2832,6 @@
     <string name="chart_country_vn">Vietnam</string>
     <string name="pref_lyrics_one_line_title">One line</string>
     <string name="pref_lyrics_one_line_sub">The line being sung, above the play button in the player bar</string>
+    <string name="queue_time_left">%1$s left</string>
+    <string name="queue_clear_upcoming">Clear what is up next</string>
 </resources>
