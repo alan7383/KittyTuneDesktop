@@ -2917,4 +2917,7 @@
     <string name="artist_clips_title">Videoklipek</string>
     <string name="artist_clip_views">%s megtekintés</string>
     <string name="artist_clip_failed">Ez a videó nem játszható le</string>
+    <string name="artist_listening">Hallgatod</string>
+    <string name="artist_resume">Folytatás</string>
+    <string name="artist_trailer_playing">Trailer megy</string>
 </resources>

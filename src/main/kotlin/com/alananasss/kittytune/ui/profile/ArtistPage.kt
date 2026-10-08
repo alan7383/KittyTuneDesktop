@@ -52,6 +52,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import com.alananasss.kittytune.ui.common.PlayingBars
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -235,34 +237,71 @@ private fun ArtistActions(
     }
     val isSaved by DownloadManager.isArtistSavedFlow(user.id).collectAsState(initial = null)
     val pinKey = "artist_${user.id}"
-    var isPinned by remember(user.id) { mutableStateOf(libraryViewModel.isItemPinned(pinKey)) }
+    // Read from the library's own state, so the pin shows what is true once the library has loaded and follows
+    // a change made anywhere, instead of being a copy taken at the first frame.
+    val itemMetas by libraryViewModel.allItemMetas.collectAsState()
+    val isPinned = itemMetas[pinKey]?.isPinned == true
     var menuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val topTracks = profileViewModel.popularTracks.ifEmpty { profileViewModel.allTracks }
     val context = artistContext ?: PlaybackContext(user.username.orEmpty(), "profile:${user.id}")
 
+    // What is playing says what these buttons are: listening to this artist, or their trailer. They show it, and a
+    // press pauses and resumes it instead of starting it over.
+    val playingContext = playerViewModel.currentContext?.navigationId
+    val isListening = playingContext == context.navigationId
+    val isTrailer = playingContext == PlayerViewModel.TRAILER_NAV_PREFIX + context.navigationId
+    val isPlaying = playerViewModel.isPlaying
+
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Button(
-            onClick = { if (topTracks.isNotEmpty()) playerViewModel.playPlaylist(topTracks.toList(), 0, context, respectShuffle = false) },
-            enabled = topTracks.isNotEmpty(),
+            onClick = {
+                if (isListening) playerViewModel.togglePlayPause()
+                else if (topTracks.isNotEmpty()) playerViewModel.playPlaylist(topTracks.toList(), 0, context, respectShuffle = false)
+            },
+            enabled = topTracks.isNotEmpty() || isListening,
             shapes = ButtonDefaults.shapes(),
             contentPadding = ButtonDefaults.ContentPadding,
             modifier = Modifier.height(52.dp),
         ) {
-            Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(24.dp))
+            if (isListening) {
+                PlayingBars(isPlaying = isPlaying, color = LocalContentColor.current, modifier = Modifier.size(22.dp))
+            } else {
+                Icon(Icons.Rounded.PlayArrow, null, modifier = Modifier.size(24.dp))
+            }
             Spacer(Modifier.width(8.dp))
-            Text(str("artist_listen"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                str(if (!isListening) "artist_listen" else if (isPlaying) "artist_listening" else "artist_resume"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
         }
         Tip(str("artist_trailer_tip")) {
+            val trailerColors = if (isTrailer) ButtonDefaults.filledTonalButtonColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            ) else ButtonDefaults.filledTonalButtonColors()
             FilledTonalButton(
-                onClick = { playerViewModel.playTrailer(topTracks.toList(), context) },
-                enabled = topTracks.isNotEmpty(),
+                onClick = {
+                    if (isTrailer) playerViewModel.togglePlayPause()
+                    else playerViewModel.playTrailer(topTracks.toList(), context)
+                },
+                enabled = topTracks.isNotEmpty() || isTrailer,
+                colors = trailerColors,
                 shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.height(52.dp),
             ) {
-                Icon(Icons.Rounded.SlowMotionVideo, null, modifier = Modifier.size(20.dp))
+                if (isTrailer) {
+                    PlayingBars(isPlaying = isPlaying, color = LocalContentColor.current, modifier = Modifier.size(20.dp))
+                } else {
+                    Icon(Icons.Rounded.SlowMotionVideo, null, modifier = Modifier.size(20.dp))
+                }
                 Spacer(Modifier.width(8.dp))
-                Text(str("artist_trailer"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    str(if (!isTrailer) "artist_trailer" else if (isPlaying) "artist_trailer_playing" else "artist_resume"),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
         if (!profileViewModel.isSpotifyProfile) {
@@ -286,7 +325,6 @@ private fun ArtistActions(
                     onClick = {
                         if (isSaved == null) DownloadManager.toggleSaveArtist(user)
                         libraryViewModel.togglePinItem(pinKey)
-                        isPinned = !isPinned
                     },
                     shapes = IconButtonDefaults.shapes(),
                     modifier = Modifier.size(52.dp),

@@ -2916,4 +2916,7 @@
     <string name="artist_clips_title">Clips</string>
     <string name="artist_clip_views">%s vues</string>
     <string name="artist_clip_failed">Impossible de lire cette vidéo</string>
+    <string name="artist_listening">En écoute</string>
+    <string name="artist_resume">Reprendre</string>
+    <string name="artist_trailer_playing">Bande-annonce en cours</string>
 </resources>

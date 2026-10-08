@@ -70,6 +70,7 @@ import com.alananasss.kittytune.ui.player.AnchorCurrentQueueItem
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.queueItemKeys
 import com.alananasss.kittytune.utils.makeTimeString
+import com.alananasss.kittytune.ui.common.PlayingBars
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -460,32 +461,6 @@ private fun QueueCover(track: Track, size: Dp, isCurrent: Boolean, isPlaying: Bo
         }
     }
 }
-
-/** Three bars bouncing out of step, the usual "this one is playing" mark. */
-@Composable
-private fun PlayingBars(isPlaying: Boolean, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "playing_bars")
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
-        BAR_PERIODS_MS.forEachIndexed { i, period ->
-            val bounce by transition.animateFloat(
-                initialValue = 0.25f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(period), RepeatMode.Reverse),
-                label = "playing_bar_$i"
-            )
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight(if (isPlaying) bounce else PAUSED_BAR_HEIGHTS[i])
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(Color.White)
-            )
-        }
-    }
-}
-
-private val BAR_PERIODS_MS = listOf(420, 560, 360)
-private val PAUSED_BAR_HEIGHTS = listOf(0.4f, 0.7f, 0.5f)
 
 /** How far the already-played rows recede. Legible on purpose — they are still part of the queue. */
 private const val PAST_ROW_ALPHA = 0.55f
