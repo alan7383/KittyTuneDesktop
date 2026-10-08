@@ -1338,7 +1338,7 @@ fun PlaylistDetailScreen(
 
         // The colour of the liked songs, from the top, while one of them plays (issue #66).
         if (playlistId == "likes" && likedTracksRepo.size >= 4) {
-            LikesAura(likedTracksRepo, playerViewModel, fadeInto = backgroundColor, modifier = Modifier.align(Alignment.TopCenter))
+            LikesAura(likedTracksRepo, playerViewModel, modifier = Modifier.align(Alignment.TopCenter))
         }
 
         LazyColumn(

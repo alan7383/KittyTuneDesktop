@@ -47,7 +47,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
@@ -78,7 +81,7 @@ private data class Swatch(val color: Color, val tracks: List<Track>)
  * out, and comes back when one starts. (It was a card of coloured dots to press, which was not what was meant.)
  */
 @Composable
-internal fun LikesAura(likes: List<Track>, playerViewModel: PlayerViewModel, fadeInto: Color, modifier: Modifier = Modifier) {
+internal fun LikesAura(likes: List<Track>, playerViewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val sample = remember(likes.size) { likes.take(SAMPLE_SIZE) }
     val swatches by produceState<List<Swatch>>(initialValue = emptyList(), sample) {
         value = withContext(Dispatchers.IO) { swatchesOf(sample) }
@@ -87,8 +90,8 @@ internal fun LikesAura(likes: List<Track>, playerViewModel: PlayerViewModel, fad
     val palette = remember(swatches, scheme.primary, scheme.tertiary, scheme.secondary) {
         AuraPalette.of(swatches.map { it.color to it.tracks.size }, listOf(scheme.primary, scheme.tertiary, scheme.secondary))
     }
-    val likedIds = remember(likes.size) { likes.mapTo(HashSet()) { it.id } }
-    val isLikedPlaying = playerViewModel.isPlaying && playerViewModel.currentTrack?.id in likedIds
+    // Lit by listening to the liked songs, that is, playing from this very list, not by any song that happens to be liked.
+    val isLikedPlaying = playerViewModel.isPlaying && playerViewModel.currentContext?.navigationId == "likes"
     val intensity by animateFloatAsState(
         targetValue = if (isLikedPlaying) 1f else 0f,
         animationSpec = tween(if (isLikedPlaying) 900 else 1500),
@@ -105,35 +108,54 @@ internal fun LikesAura(likes: List<Track>, playerViewModel: PlayerViewModel, fad
         animationSpec = infiniteRepeatable(tween(AURA_PERIOD_MS, easing = LinearEasing), RepeatMode.Restart),
         label = "likesAuraPhase",
     )
-    AuraCanvas(palette, intensity, drift, fadeInto, modifier)
+    AuraCanvas(palette, intensity, drift, modifier)
 }
 
 /** The aura itself: [drift] is a phase from 0 to a full turn, [intensity] how much of it is shown. */
 @Composable
-internal fun AuraCanvas(palette: AuraPalette, intensity: Float, drift: Float, fadeInto: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier.fillMaxWidth().height(AURA_HEIGHT)) {
+internal fun AuraCanvas(palette: AuraPalette, intensity: Float, drift: Float, modifier: Modifier = Modifier) {
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(AURA_HEIGHT)
+            // Drawn in its own layer so the bottom can be faded out to nothing whatever the page behind is
+            // made of, instead of painting a colour that has to match it.
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    ) {
         val w = size.width
         val h = size.height
-        // The mix, as a wash from the very top.
-        drawRect(Brush.verticalGradient(listOf(palette.mix.copy(alpha = 0.42f * intensity), Color.Transparent)))
+        // The mix, as a quiet wash from the very top.
+        drawRect(Brush.verticalGradient(listOf(palette.mix.copy(alpha = 0.20f * intensity), Color.Transparent)))
         palette.colors.forEachIndexed { i, color ->
             val turns = AURA_TURNS[i % AURA_TURNS.size]
             val angle = drift * turns + i * 2.1f
             val centre = Offset(
-                x = w * (0.18f + 0.32f * i) + cos(angle) * w * 0.10f,
-                y = h * 0.34f + sin(angle) * h * 0.16f,
+                x = w * (0.16f + 0.34f * i) + cos(angle) * w * 0.10f,
+                y = h * 0.22f + sin(angle) * h * 0.10f,
             )
             // A slow swell on each, so the colour breathes as well as moves.
-            val swell = 0.82f + 0.18f * sin(drift * 2f + i)
-            val radius = w * 0.34f
+            val swell = 0.85f + 0.15f * sin(drift * 2f + i)
+            val radius = w * 0.55f
+            val a = 0.34f * swell * intensity
+            // Eased falloff, so no edge of the blob can be told apart.
             drawCircle(
-                brush = Brush.radialGradient(listOf(color.copy(alpha = 0.72f * swell * intensity), Color.Transparent), center = centre, radius = radius),
+                brush = Brush.radialGradient(
+                    0f to color.copy(alpha = a),
+                    0.35f to color.copy(alpha = a * 0.55f),
+                    0.7f to color.copy(alpha = a * 0.15f),
+                    1f to Color.Transparent,
+                    center = centre,
+                    radius = radius,
+                ),
                 radius = radius,
                 center = centre,
             )
         }
-        // Into the page's own colour at the bottom, like the cover's backdrop.
-        drawRect(Brush.verticalGradient(0.5f to Color.Transparent, 1f to fadeInto))
+        // Gone by the bottom.
+        drawRect(
+            brush = Brush.verticalGradient(0f to Color.White, 0.45f to Color.White, 1f to Color.Transparent),
+            blendMode = BlendMode.DstIn,
+        )
     }
 }
 
