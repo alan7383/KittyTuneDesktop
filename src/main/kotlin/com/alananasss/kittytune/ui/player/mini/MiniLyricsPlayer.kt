@@ -199,6 +199,23 @@ internal class WindowDragHandler(
         }
         if (!nativeStarted) {
             window.addMouseMotionListener(dragMotionListener)
+        } else if (isWindows) {
+            watchNativeMoveEnd()
+        }
+    }
+
+    /**
+     * Windows moves the window in a loop of its own and the button's release goes to that loop, not to us, so the
+     * drag never ended: the mini player stayed "being dragged" and its position was not saved, which read as one
+     * that would not move (issue #66). The button is watched instead.
+     */
+    private fun watchNativeMoveEnd() {
+        kotlin.concurrent.thread(isDaemon = true, name = "mini-player-move-end") {
+            val user32 = com.sun.jna.platform.win32.User32.INSTANCE
+            fun isLeftDown() = user32.GetAsyncKeyState(VK_LBUTTON).toInt() and 0x8000 != 0
+            Thread.sleep(NATIVE_MOVE_SETTLE_MS)
+            while (isDraggingInternal && isLeftDown()) Thread.sleep(NATIVE_MOVE_POLL_MS)
+            javax.swing.SwingUtilities.invokeLater { if (isDraggingInternal) stopDrag() }
         }
     }
 
@@ -242,6 +259,11 @@ internal class WindowDragHandler(
 }
 
 private var loggedDragPath = false
+
+private val isWindows = System.getProperty("os.name").lowercase().contains("win")
+private const val VK_LBUTTON = 0x01
+private const val NATIVE_MOVE_SETTLE_MS = 80L
+private const val NATIVE_MOVE_POLL_MS = 25L
 
 /** At most one manual placement per frame: faster only churns the compositor. */
 private const val MANUAL_MOVE_MIN_INTERVAL_NS = 16_000_000L
@@ -587,7 +609,9 @@ fun MiniLyricsPlayerWindow(
                             .hoverable(windowInteractionSource)
                             .pointerInput(Unit) {
                                 awaitEachGesture {
-                                    val down = awaitFirstDown(requireUnconsumed = true)
+                                    // Also from a press a button or the words took: the mini player is mostly
+                                    // words and buttons, and a drag had to find the few empty pixels to start.
+                                    val down = awaitFirstDown(requireUnconsumed = false)
                                     if (down.type == PointerType.Mouse && currentEvent.buttons.isPrimaryPressed) {
                                         // A plain click must never touch the window manager: posting a
                                         // native move (or grabbing listeners) on every press made clicks
@@ -715,7 +739,7 @@ fun MiniLyricsPlayerWindow(
                                 }
                             }
                             if (settingsVisible) {
-                                MiniPlayerSettingsWindow(onClose = { settingsVisible = false })
+                                MiniPlayerSettingsWindow(onClose = { settingsVisible = false }, nearWindow = window)
                             }
 
                             // Right edge resize handle
