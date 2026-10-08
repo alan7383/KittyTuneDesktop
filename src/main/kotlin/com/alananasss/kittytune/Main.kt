@@ -634,7 +634,11 @@ fun main(args: Array<String>) {
                     val menuDark = androidx.compose.material3.MaterialTheme.colorScheme.surface.luminance() < 0.5f
                     LaunchedEffect(menuDark) { com.alananasss.kittytune.core.Win32TrayMenu.setDark(menuDark) }
                     ThemedWindowBackgroundEffect(window)
-                    Surface { AppRouter(playerViewModel = playerViewModel) }
+                    androidx.compose.foundation.layout.Box(propagateMinConstraints = true) {
+                        Surface { AppRouter(playerViewModel = playerViewModel) }
+                        // Closing dialogs fade out over the app, drawn above it.
+                        com.alananasss.kittytune.core.DialogExitHost()
+                    }
                 }
             }
         } // End Window
