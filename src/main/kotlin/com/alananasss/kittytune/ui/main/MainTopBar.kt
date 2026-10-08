@@ -217,8 +217,11 @@ fun MainTopBar(
                         // In the accent for as long as what it opens is open, and plain again once it is left.
                         colors = cornerButtonColors(isActive = currentRoute == "recognition"),
                         onClick = {
+                            // A second press of the lit button leaves again.
                             if (currentRoute != "recognition") {
                                 navController.navigate("recognition")
+                            } else {
+                                navController.popBackStack()
                             }
                         }
                     ) {

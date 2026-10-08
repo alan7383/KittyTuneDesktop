@@ -489,6 +489,8 @@ fun LibraryPanel(
             folderToRename != null || folderToDelete != null || playlistForMenu != null ||
             movingItemKey != null || playlistForDetails != null
     TrackSidebarPopup(isAnyDialogOpen, libraryViewModel)
+    // Esc folds the expanded library back, after any dialog or search on top of it has taken its own Esc.
+    com.alananasss.kittytune.core.BackHandler(enabled = fullScreen) { libraryViewModel.isLibraryFullScreen = false }
 
     val openEntry: (LibEntry) -> Unit = { entry ->
         playerViewModel.showLyricsSheet = false
