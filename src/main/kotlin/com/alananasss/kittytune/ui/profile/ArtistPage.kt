@@ -450,10 +450,11 @@ internal fun NewReleaseCard(
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(release.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                val ago = getRelativeTime(release.date)
-                if (ago.isNotBlank()) {
+                // A date, not "3 years ago": for an artist who has been quiet that says nothing about when.
+                val released = ReleaseDate.text(release.date)
+                if (released.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
-                    Text(str("artist_released_when", ago), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(str("artist_released_when", released), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
