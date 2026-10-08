@@ -3290,4 +3290,7 @@
     <string name="stat_likes">Lượt thích</string>
     <string name="stat_reposts">Đăng lại</string>
     <string name="stat_comments">Bình luận</string>
+    <string name="search_kind_artist">Nghệ sĩ</string>
+    <string name="search_kind_playlist">Danh sách phát</string>
+    <string name="search_kind_track">Bài hát · %1$s</string>
 </resources>

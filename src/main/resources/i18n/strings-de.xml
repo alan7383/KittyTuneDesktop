@@ -3453,4 +3453,7 @@
     <string name="stat_likes">Likes</string>
     <string name="stat_reposts">Reposts</string>
     <string name="stat_comments">Kommentare</string>
+    <string name="search_kind_artist">Künstler</string>
+    <string name="search_kind_playlist">Playlist</string>
+    <string name="search_kind_track">Titel · %1$s</string>
 </resources>

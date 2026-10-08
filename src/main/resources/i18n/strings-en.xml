@@ -2841,4 +2841,7 @@
     <string name="stat_likes">Likes</string>
     <string name="stat_reposts">Reposts</string>
     <string name="stat_comments">Comments</string>
+    <string name="search_kind_artist">Artist</string>
+    <string name="search_kind_playlist">Playlist</string>
+    <string name="search_kind_track">Track · %1$s</string>
 </resources>

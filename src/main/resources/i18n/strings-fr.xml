@@ -2842,4 +2842,7 @@
     <string name="stat_likes">J’aime</string>
     <string name="stat_reposts">Reposts</string>
     <string name="stat_comments">Commentaires</string>
+    <string name="search_kind_artist">Artiste</string>
+    <string name="search_kind_playlist">Playlist</string>
+    <string name="search_kind_track">Titre · %1$s</string>
 </resources>

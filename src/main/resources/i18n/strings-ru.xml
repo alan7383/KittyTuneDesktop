@@ -2840,4 +2840,7 @@
     <string name="stat_likes">Лайки</string>
     <string name="stat_reposts">Репосты</string>
     <string name="stat_comments">Комментарии</string>
+    <string name="search_kind_artist">Исполнитель</string>
+    <string name="search_kind_playlist">Плейлист</string>
+    <string name="search_kind_track">Трек · %1$s</string>
 </resources>
