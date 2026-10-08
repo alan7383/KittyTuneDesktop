@@ -542,7 +542,6 @@
     <string name="preset_stadium_50k">Stadion 50.000</string>
     <string name="preset_stadium_arena">Live-Arena</string>
     <string name="preset_stadium_festival">Open Air</string>
-
     <string name="effect_cassette_walkman">Walkman</string>
     <string name="fx_walkman_desc">Tragbarer Kassettenspieler der 80er mit Magnetbandsättigung, Ferro-EQ-Biss und Bandrauschen</string>
     <string name="label_walkman_drive">Bandsättigung: %1$d%%</string>
@@ -3490,4 +3489,14 @@
     <string name="artist_mix_label_rare">SELTEN</string>
     <string name="artist_mix_label_radio">RADIO</string>
     <string name="artist_videos_title">Musikvideos</string>
+    <string name="fx_speed_title">Tempo</string>
+    <string name="fx_pitch_follow">Tonhöhe folgt dem Tempo</string>
+    <string name="fx_pitch_follow_sub">Schneller klingt höher, wie bei einer Platte</string>
+    <string name="fx_reset_speed">Normales Tempo</string>
+    <string name="fx_presets_title">Klänge mit einem Klick</string>
+    <string name="fx_preset_normal">Normal</string>
+    <string name="fx_preset_slowed">Slowed + Reverb</string>
+    <string name="fx_preset_nightcore">Nightcore</string>
+    <string name="fx_preset_chill">Gemächlich</string>
+    <string name="fx_active_count">%1$d an</string>
 </resources>

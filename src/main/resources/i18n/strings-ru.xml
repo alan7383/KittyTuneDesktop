@@ -531,9 +531,9 @@
     <string name="effect_ambient_sound">Эмбиент</string>
     <string name="effect_asmr_vocal">Вокальный ASMR</string>
     <string name="effect_bass_boost">Усиление НЧ</string>
-    <string name="effect_cassette_walkman">Walkman</string>
+    <string name="effect_cassette_walkman">Кассетный плеер</string>
     <string name="effect_chiptune">8-Бит Ретро</string>
-    <string name="effect_chorus">Chorus</string>
+    <string name="effect_chorus">Хорус</string>
     <string name="effect_empty_mall">Пустой молл</string>
     <string name="effect_flanger">Джет-фланжер</string>
     <string name="effect_gramophone">Граммофон</string>
@@ -553,7 +553,7 @@
     <string name="effect_sub_octaver">Саб-бас 808</string>
     <string name="effect_super_wide">3D Super-Wide</string>
     <string name="effect_tape_saturation">Ленточная сатурация</string>
-    <string name="effect_trance_gate">Trance Gate</string>
+    <string name="effect_trance_gate">Транс-гейт</string>
     <string name="effect_underwater">Под водой</string>
     <string name="effect_vintage_mp3">Винтажный MP3</string>
     <string name="effect_vinyl_lofi">Винил и кассета Lo-Fi</string>
@@ -2877,4 +2877,14 @@
     <string name="artist_mix_label_rare">РЕДКОЕ</string>
     <string name="artist_mix_label_radio">РАДИО</string>
     <string name="artist_videos_title">Клипы</string>
+    <string name="fx_speed_title">Скорость</string>
+    <string name="fx_pitch_follow">Тон вместе со скоростью</string>
+    <string name="fx_pitch_follow_sub">Быстрее — выше, как на пластинке</string>
+    <string name="fx_reset_speed">Обычная скорость</string>
+    <string name="fx_presets_title">Готовые звуки</string>
+    <string name="fx_preset_normal">Обычно</string>
+    <string name="fx_preset_slowed">Slowed + reverb</string>
+    <string name="fx_preset_nightcore">Nightcore</string>
+    <string name="fx_preset_chill">Неспешно</string>
+    <string name="fx_active_count">Включено: %1$d</string>
 </resources>

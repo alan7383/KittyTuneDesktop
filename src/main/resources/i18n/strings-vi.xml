@@ -3327,4 +3327,14 @@
     <string name="artist_mix_label_rare">HIẾM</string>
     <string name="artist_mix_label_radio">RADIO</string>
     <string name="artist_videos_title">Video âm nhạc</string>
+    <string name="fx_speed_title">Tốc độ</string>
+    <string name="fx_pitch_follow">Cao độ theo tốc độ</string>
+    <string name="fx_pitch_follow_sub">Nhanh hơn thì cao hơn, như đĩa than</string>
+    <string name="fx_reset_speed">Tốc độ bình thường</string>
+    <string name="fx_presets_title">Âm thanh một chạm</string>
+    <string name="fx_preset_normal">Bình thường</string>
+    <string name="fx_preset_slowed">Slowed + reverb</string>
+    <string name="fx_preset_nightcore">Nightcore</string>
+    <string name="fx_preset_chill">Thong thả</string>
+    <string name="fx_active_count">%1$d đang bật</string>
 </resources>
