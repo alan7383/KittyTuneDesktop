@@ -56,6 +56,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.unit.sp
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 
 data class AudioFxDefinition(
     val id: String,
@@ -519,94 +524,11 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp)
         ) {
-            Text(
-                text = str("player_audio_settings"),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-
-            // Speed + Pitch Card
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Rounded.Speed,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = "${viewModel.effectsState.speed}x",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    val isPitchActive = viewModel.effectsState.isPitchEnabled
-                    val pitchContainerColor by animateColorAsState(
-                        targetValue = if (isPitchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                        label = "pitchContainer"
-                    )
-                    val pitchContentColor by animateColorAsState(
-                        targetValue = if (isPitchActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                        label = "pitchContent"
-                    )
-
-                    Surface(
-                        onClick = { viewModel.togglePitchEnabled(!isPitchActive) },
-                        shape = CircleShape,
-                        color = pitchContainerColor,
-                        border = if (isPitchActive) null else BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                        ),
-                        contentColor = pitchContentColor
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AnimatedVisibility(visible = isPitchActive) {
-                                Row {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                            }
-                            Text(
-                                text = str("player_pitch"),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Slider(
-                    value = viewModel.effectsState.speed,
-                    onValueChange = { viewModel.setCustomSpeed(it) },
-                    valueRange = 0.5f..2.0f,
-                    steps = if (isPrecise) 29 else 14,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(Modifier.height(28.dp))
+            // The tab already says what this is: the speed card leads, then sounds made in one tap (issue #66).
+            SpeedCard(viewModel)
+            Spacer(Modifier.height(16.dp))
+            SoundPresetsRow(viewModel)
+            Spacer(Modifier.height(24.dp))
 
             // Special Effects Header
             Row(
@@ -617,12 +539,27 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = str("player_special_effects"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    val activeCount = allEffects.count { it.isActive(viewModel.effectsState) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = str("player_special_effects"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (activeCount > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                                Text(
+                                    str("fx_active_count", activeCount),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = str("audio_fx_long_press_hint"),
@@ -683,7 +620,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                shape = RoundedCornerShape(18.dp),
+                shapes = ButtonShapes(RoundedCornerShape(20.dp), RoundedCornerShape(14.dp)),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
                 ),
@@ -921,6 +858,8 @@ fun FxTile(
     }
 
     // The weight or width lands on this box: the tooltip's own wrapper sits between it and the button.
+    // A rounded rectangle, not a pill: the round ends of a pill this wide cut into the name, which read as words
+    // spilling out of the circle (issue #66). The name may take two lines rather than being cut.
     Box(modifier) {
         Tip(tooltip) {
             FilledTonalButton(
@@ -930,45 +869,218 @@ fun FxTile(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(84.dp)
+                    .height(72.dp)
                     .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
                         onLongClick?.invoke()
                     },
-                shapes = ButtonDefaults.shapes(),
+                shapes = ButtonShapes(RoundedCornerShape(22.dp), RoundedCornerShape(14.dp)),
                 interactionSource = interactionSource,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = containerColor,
                     contentColor = contentColor
                 ),
-                contentPadding = PaddingValues(0.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp)
             ) {
-                Column(
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .graphicsLayer {
-                                scaleX = iconScale
-                                scaleY = iconScale
-                            }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isActive) Color.White.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = if (isActive) contentColor else activeColor,
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .graphicsLayer {
+                                        scaleX = iconScale
+                                        scaleY = iconScale
+                                    }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        maxLines = 2,
+                        lineHeight = 16.sp,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
         }
     }
+}
+
+/**
+ * Playback speed: the value, a few common speeds to pick at once, a fine slider, whether the pitch moves with it,
+ * and the way back to normal.
+ */
+@Composable
+private fun SpeedCard(viewModel: PlayerViewModel) {
+    val speed = viewModel.effectsState.speed
+    val isPitchActive = viewModel.effectsState.isPitchEnabled
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(22.dp))
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Text(str("fx_speed_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                AnimatedContent(
+                    targetState = speed,
+                    transitionSpec = { (fadeIn(tween(150)) togetherWith fadeOut(tween(100))) },
+                    label = "speedValue",
+                ) { value ->
+                    Text(
+                        text = formatSpeed(value),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color = if (value == 1f) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+                    )
+                }
+                if (speed != 1f) {
+                    Tip(str("fx_reset_speed")) {
+                        IconButton(onClick = { viewModel.setCustomSpeed(1f) }, shapes = IconButtonDefaults.shapes()) {
+                            Icon(Icons.Rounded.RestartAlt, contentDescription = str("fx_reset_speed"))
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                SPEED_STEPS.forEach { step ->
+                    val selected = kotlin.math.abs(speed - step) < 0.001f
+                    val container by animateColorAsState(
+                        if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        label = "speedStep",
+                    )
+                    Surface(
+                        onClick = { viewModel.setCustomSpeed(step) },
+                        shape = CircleShape,
+                        color = container,
+                        modifier = Modifier.weight(1f).height(34.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                formatSpeed(step),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+            Slider(
+                value = speed,
+                onValueChange = { viewModel.setCustomSpeed(it) },
+                valueRange = 0.5f..2.0f,
+                steps = if (viewModel.isPreciseSpeedEnabled) 29 else 14,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { viewModel.togglePitchEnabled(!isPitchActive) }
+                    .padding(vertical = 6.dp, horizontal = 4.dp),
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(str("fx_pitch_follow"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                    Text(str("fx_pitch_follow_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                androidx.compose.material3.Switch(checked = isPitchActive, onCheckedChange = { viewModel.togglePitchEnabled(it) })
+            }
+        }
+    }
+}
+
+/** Speeds offered as one-click steps above the slider. */
+private val SPEED_STEPS = listOf(0.75f, 0.85f, 1f, 1.1f, 1.25f, 1.5f)
+
+private fun formatSpeed(value: Float): String {
+    val rounded = (value * 100).roundToInt() / 100f
+    val text = if (rounded == rounded.toInt().toFloat()) "${rounded.toInt()}.0" else rounded.toString().trimEnd('0')
+    return "$text×"
+}
+
+/**
+ * Sounds made in one tap, from the speed, the pitch and the reverb: slowed with reverb, nightcore, unhurried, and
+ * back to normal. Only what a sound needs is touched; the other effects stay as they are.
+ */
+@Composable
+private fun SoundPresetsRow(viewModel: PlayerViewModel) {
+    Column {
+        Text(
+            str("fx_presets_title"),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            SoundPreset.entries.forEach { preset ->
+                val state = viewModel.effectsState
+                val selected = kotlin.math.abs(state.speed - preset.speed) < 0.001f &&
+                    state.isPitchEnabled == preset.pitch && state.isReverbEnabled == preset.reverb
+                val container by animateColorAsState(
+                    if (selected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    label = "soundPreset",
+                )
+                val content = if (selected) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface
+                Surface(
+                    onClick = {
+                        viewModel.setCustomSpeed(preset.speed)
+                        if (viewModel.effectsState.isPitchEnabled != preset.pitch) viewModel.togglePitchEnabled(preset.pitch)
+                        if (viewModel.effectsState.isReverbEnabled != preset.reverb) viewModel.toggleReverb()
+                    },
+                    shape = RoundedCornerShape(18.dp),
+                    color = container,
+                    contentColor = content,
+                    modifier = Modifier.weight(1f).height(64.dp),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 6.dp),
+                    ) {
+                        Icon(preset.icon, null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            str(preset.titleKey),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum class SoundPreset(val titleKey: String, val icon: ImageVector, val speed: Float, val pitch: Boolean, val reverb: Boolean) {
+    NORMAL("fx_preset_normal", Icons.Rounded.RestartAlt, 1f, false, false),
+    SLOWED("fx_preset_slowed", Icons.Rounded.Nightlight, 0.85f, true, true),
+    NIGHTCORE("fx_preset_nightcore", Icons.Rounded.Bolt, 1.25f, true, false),
+    UNHURRIED("fx_preset_chill", Icons.Rounded.Spa, 0.92f, false, false),
 }
 
 // ── AudioFxStudioSheet (Matching Android Studio Sheet) ──
