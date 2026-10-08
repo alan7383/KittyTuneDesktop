@@ -1,4 +1,8 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package com.alananasss.kittytune.ui.main
+
+import androidx.compose.ui.input.pointer.onPointerEvent
 
 import com.alananasss.kittytune.ui.common.notePointerPresses
 import androidx.compose.animation.*
@@ -121,6 +125,11 @@ fun MainScreen(
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
     var showNowPlayingPanel by remember { mutableStateOf(playerPrefs.getRightPanelOpen()) }
     var nowPlayingTab by remember { mutableStateOf(NowPlayingTab.TRACK) }
+    // The panel's tabs keep a history of their own for the mouse's side buttons.
+    LaunchedEffect(nowPlayingTab) { PanelHistory.noteTab(nowPlayingTab) }
+    LaunchedEffect(PanelHistory.movedTick) {
+        if (PanelHistory.movedTick > 0) nowPlayingTab = PanelHistory.present.tab
+    }
 
 
     // Close full-screen lyrics when navigation happens (e.g. sidebar click)
@@ -1239,7 +1248,10 @@ fun MainScreen(
                         playerPrefs.setRightPanelOpen(false)
                     },
                     onOpenFullLyrics = { playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet },
-                    modifier = Modifier.width(rightPanelWidth)
+                    modifier = Modifier
+                        .width(rightPanelWidth)
+                        .onPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Enter) { PanelHistory.pointerInside = true }
+                        .onPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Exit) { PanelHistory.pointerInside = false }
                 )
             }
             }
