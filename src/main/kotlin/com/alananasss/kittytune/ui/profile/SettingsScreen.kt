@@ -720,7 +720,11 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         ),
         SettingsSearchItem(
             title = str(com.alananasss.kittytune.R.string.automix),
-            subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
+            subtitle = if (com.alananasss.kittytune.data.together.Together.mayChangeAutomix()) {
+                str(com.alananasss.kittytune.R.string.automix_desc)
+            } else {
+                str("together_automix_host_only")
+            },
             category = SettingsCategory.AUDIO,
             place = SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_TRANSITIONS)),
             icon = Icons.Rounded.AutoAwesome,
@@ -728,8 +732,10 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             hasSwitch = true,
             switchState = automix,
             onSwitchChange = {
-                automix = it
-                prefs.setAutomixEnabled(it)
+                if (com.alananasss.kittytune.data.together.Together.mayChangeAutomix()) {
+                    automix = it
+                    prefs.setAutomixEnabled(it)
+                }
             },
             highlightKey = "pref_automix",
         ),

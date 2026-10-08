@@ -95,6 +95,8 @@ dependencies {
     // QR rendering for the Discord remote-auth (scan-to-log-in) flow. Same artifact and
     // version the Android app already uses for its VK QR login.
     implementation("com.google.zxing:core:3.5.4")
+    // Shared playlists: the relay between listeners is MQTT (see data/together).
+    implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
 
     implementation("org.json:json:20260814")
     implementation("org.yaml:snakeyaml:2.7")

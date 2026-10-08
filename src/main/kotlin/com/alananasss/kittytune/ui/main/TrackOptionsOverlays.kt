@@ -61,6 +61,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.Radio
@@ -512,6 +513,19 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             if (!viewModel.isMenuContextFromPlayer) {
                 add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.insertNext(listOf(track)); viewModel.showMenuSheet = false })
                 add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
+            }
+            // In a shared playlist a song can go next for everyone, or be offered to the playlist itself.
+            val togetherCode = com.alananasss.kittytune.data.together.Together.active.collectAsState().value
+            if (togetherCode != null) {
+                val shared = com.alananasss.kittytune.data.together.SharedTrack.of(track)
+                add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_play_next")) {
+                    com.alananasss.kittytune.data.together.Together.playNext(shared)
+                    viewModel.showMenuSheet = false
+                })
+                add(MenuOptionItem("together_suggest", Icons.Rounded.Groups, str("together_suggest")) {
+                    com.alananasss.kittytune.data.together.Together.suggest(togetherCode, shared)
+                    viewModel.showMenuSheet = false
+                })
             }
             if (track.source != "youtube" && !isSpotify && !isLocalFile) {
                 add(MenuOptionItem("comments", Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) { viewModel.openComments(track) })
