@@ -2921,4 +2921,7 @@
     <string name="together_offline">Connexion…</string>
     <string name="together_your_name">Votre nom pour les autres</string>
     <string name="together_automix_host_only">Seul l’hôte change l’automix</string>
+    <string name="artist_clips_title">Clips</string>
+    <string name="artist_clip_views">%s vues</string>
+    <string name="artist_clip_failed">Impossible de lire cette vidéo</string>
 </resources>

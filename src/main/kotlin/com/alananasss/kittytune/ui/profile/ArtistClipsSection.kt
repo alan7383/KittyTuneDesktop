@@ -1,0 +1,237 @@
+package com.alananasss.kittytune.ui.profile
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Replay
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.data.artist.ArtistClips
+import com.alananasss.kittytune.data.artist.Clip
+import com.alananasss.kittytune.media.ClipPlayback
+import com.alananasss.kittytune.ui.home.formatCompactNumber
+import com.alananasss.kittytune.ui.player.PlayerViewModel
+import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.pressScale
+
+/** The artist's music videos, watched right here (tester's list, 5.5). Nothing is shown when there are none. */
+@Composable
+internal fun ArtistClipsSection(artistName: String, playerViewModel: PlayerViewModel) {
+    val clips by produceState(emptyList<Clip>(), artistName) { value = ArtistClips.clipsFor(artistName) }
+    var watching by remember { mutableStateOf<Clip?>(null) }
+    if (clips.isEmpty()) return
+
+    Column {
+        ArtistSectionTitle(str("artist_clips_title"), onOpen = null)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            items(clips, key = { it.url }) { clip -> ClipCard(clip) { watching = clip } }
+        }
+    }
+    watching?.let { clip -> ClipPlayerDialog(clip, playerViewModel, onDismiss = { watching = null }) }
+}
+
+@Composable
+private fun ClipCard(clip: Clip, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Column(Modifier.width(CLIP_CARD_WIDTH)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .pressScale(interaction)
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick),
+        ) {
+            AsyncImage(model = clip.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Box(
+                Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(30.dp))
+            }
+            Text(
+                formatClock(clip.durationSec * 1000),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color.Black.copy(alpha = 0.7f))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(clip.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (clip.viewCount > 0) {
+            Text(
+                str("artist_clip_views", formatCompactNumber(clip.viewCount)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** A clip playing over the page. The music pauses while it plays and carries on afterwards if it was playing. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    val playback = remember(clip) { ClipPlayback(scope) }
+    var hasNoStream by remember(clip) { mutableStateOf(false) }
+
+    DisposableEffect(clip) {
+        // Watching something else leaves a shared playlist, the way playing your own music does; otherwise the
+        // pause below would pause it for everyone.
+        com.alananasss.kittytune.data.together.Together.stopListening()
+        val wasPlaying = playerViewModel.isPlaying
+        playerViewModel.pause()
+        onDispose {
+            playback.stop()
+            if (wasPlaying) playerViewModel.play()
+        }
+    }
+    LaunchedEffect(clip) {
+        val url = ArtistClips.streamUrl(clip)
+        if (url == null) hasNoStream = true else playback.play(url)
+    }
+
+    BackHandler(onBack = onDismiss)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.widthIn(max = 960.dp).fillMaxWidth(0.86f),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(clip.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(clip.uploader, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    }
+                    IconButton(onClick = onDismiss, shapes = IconButtonDefaults.shapes()) {
+                        Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
+                    }
+                }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.Black)
+                        .clickable(enabled = !playback.isLoading) { playback.togglePause() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    val frame = playback.frame
+                    if (frame != null) {
+                        androidx.compose.foundation.Image(frame, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                    } else if (!hasNoStream && !playback.hasFailed) {
+                        AsyncImage(model = clip.thumbnailUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    }
+                    when {
+                        hasNoStream || playback.hasFailed -> Text(str("artist_clip_failed"), color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                        playback.isLoading -> ContainedLoadingIndicator(Modifier.size(56.dp))
+                    }
+                }
+                ClipControls(playback)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ClipControls(playback: ClipPlayback) {
+    var dragged by remember { mutableStateOf<Float?>(null) }
+    val duration = playback.durationMs.coerceAtLeast(1L)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FilledIconButton(onClick = { playback.togglePause() }, enabled = !playback.isLoading, shapes = IconButtonDefaults.shapes()) {
+            Icon(
+                when {
+                    playback.hasEnded -> Icons.Rounded.Replay
+                    playback.isPaused -> Icons.Rounded.PlayArrow
+                    else -> Icons.Rounded.Pause
+                },
+                contentDescription = null,
+            )
+        }
+        Text(formatClock(playback.positionMs), style = MaterialTheme.typography.labelMedium)
+        Slider(
+            value = dragged ?: (playback.positionMs.toFloat() / duration).coerceIn(0f, 1f),
+            onValueChange = { dragged = it },
+            onValueChangeFinished = {
+                dragged?.let { playback.seekTo((it * duration).toLong()) }
+                dragged = null
+            },
+            enabled = playback.durationMs > 0,
+            modifier = Modifier.weight(1f),
+        )
+        Text(formatClock(playback.durationMs), style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+private fun formatClock(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    val hours = totalSec / 3600
+    val minutes = totalSec / 60 % 60
+    val seconds = totalSec % 60
+    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
+}
+
+private val CLIP_CARD_WIDTH = 260.dp

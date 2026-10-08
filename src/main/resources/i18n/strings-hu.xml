@@ -2922,4 +2922,7 @@
     <string name="together_offline">Kapcsolódás…</string>
     <string name="together_your_name">A neved a többieknek</string>
     <string name="together_automix_host_only">Csak a házigazda kapcsolja az automixet</string>
+    <string name="artist_clips_title">Videoklipek</string>
+    <string name="artist_clip_views">%s megtekintés</string>
+    <string name="artist_clip_failed">Ez a videó nem játszható le</string>
 </resources>

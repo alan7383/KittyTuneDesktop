@@ -3369,4 +3369,7 @@
     <string name="together_offline">Đang kết nối…</string>
     <string name="together_your_name">Tên của bạn</string>
     <string name="together_automix_host_only">Chỉ chủ phòng bật tắt automix</string>
+    <string name="artist_clips_title">Video âm nhạc</string>
+    <string name="artist_clip_views">%s lượt xem</string>
+    <string name="artist_clip_failed">Không thể phát video này</string>
 </resources>
