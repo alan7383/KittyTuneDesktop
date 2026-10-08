@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -73,10 +75,25 @@ fun SongChart(
      * request takes, which is indistinguishable from the switch doing nothing.
      */
     isSwitching: Boolean = false,
+    /** The lists as small chips that scroll, for a preview on a page; the chart's own page stretches them across. */
+    compactKinds: Boolean = false,
 ) {
     Column(modifier = modifier) {
         Box {
-            ExpressiveConnectedButtonGroup(
+            if (compactKinds) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ChartKind.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == kind,
+                            onClick = { onKindChange(option) },
+                            label = { Text(str(option.labelKey()), maxLines = 1) },
+                        )
+                    }
+                }
+            } else ExpressiveConnectedButtonGroup(
                 options = ChartKind.entries,
                 selectedOption = kind,
                 onOptionSelected = onKindChange,

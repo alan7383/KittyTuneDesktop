@@ -755,9 +755,9 @@ class PlayerPreferences {
 
     // On by default: the card was always on the home screen before it could be switched off, and hiding it in the
     // same update that added the switch read to people as the mix having disappeared (issue #66).
-    fun getShowHomeYourMix(): Boolean = Prefs.getBoolean(KEY_SHOW_HOME_YOUR_MIX, true)
+    fun getShowHomeYourMix(): Boolean = Prefs.getBoolean(KEY_SHOW_HOME_YOUR_MIX, false)
     fun setShowHomeYourMix(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_HOME_YOUR_MIX, enabled)
-    fun showHomeYourMixFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_YOUR_MIX, true)
+    fun showHomeYourMixFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_YOUR_MIX, false)
     fun getShowHomeYourMixFlow(): Flow<Boolean> = showHomeYourMixFlow()
     fun getAudioQuality(): String = Prefs.getString(KEY_AUDIO_QUALITY, "HIGH") ?: "HIGH"
     fun setAudioQuality(quality: String) = Prefs.putString(KEY_AUDIO_QUALITY, quality)

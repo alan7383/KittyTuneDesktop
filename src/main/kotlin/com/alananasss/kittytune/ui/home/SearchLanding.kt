@@ -200,57 +200,48 @@ internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewMode
         )
 }
 
-/** New songs from the artists already in the liked list, by release Friday; nothing when there are none. */
+/**
+ * New songs from the artists already in the liked list, newest first, in one row; nothing when there are none.
+ *
+ * It used to split them by release Friday under three sub-titles, each with a row and a line of explanation, which on
+ * a page of rows was a lot of small print. One row, each song with its date, is what it is for.
+ */
 @Composable
 internal fun FromYourArtistsSection(vm: HomeViewModel, playerViewModel: PlayerViewModel) {
     if (vm.likedArtistUpdates.isEmpty()) return
+    val tracks = remember(vm.likedArtistUpdates.toList()) {
+        ReleaseWeeks.group(vm.likedArtistUpdates.toList()).flatMap { it.tracks }.take(FROM_YOUR_ARTISTS_COUNT)
+    }
     Column {
         LandingHeader(str("home_from_your_artists"), action = null)
-        Text(
-            text = str("home_from_your_artists_sub"),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = CONTENT_PADDING),
-        )
-        // Split by release Friday, the way new music comes out: this Friday's, last Friday's, and
-        // the rest, each song with its date (issue #66).
-        val groups = remember(vm.likedArtistUpdates.toList()) { ReleaseWeeks.group(vm.likedArtistUpdates.toList()) }
-        groups.forEach { group ->
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = releaseWeekTitle(group),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = CONTENT_PADDING),
-            )
-            Spacer(Modifier.height(8.dp))
-            ScrollableLazyRow(
-                contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                fadeColor = MaterialTheme.colorScheme.surface,
-            ) {
-                items(group.tracks.size) { index ->
-                    val track = group.tracks[index]
-                    LandingTrackCard(
-                        track = track,
-                        isCurrent = playerViewModel.currentTrack?.id == track.id,
-                        releaseDate = ReleaseWeeks.releaseDateOf(track),
-                        onClick = {
-                            playerViewModel.playPlaylist(
-                                tracks = group.tracks,
-                                startIndex = index,
-                                context = PlaybackContext(
-                                    displayText = str("home_from_your_artists"),
-                                    navigationId = "home",
-                                ),
-                            )
-                        },
-                    )
-                }
+        ScrollableLazyRow(
+            contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            items(tracks.size) { index ->
+                val track = tracks[index]
+                LandingTrackCard(
+                    track = track,
+                    isCurrent = playerViewModel.currentTrack?.id == track.id,
+                    releaseDate = ReleaseWeeks.releaseDateOf(track),
+                    onClick = {
+                        playerViewModel.playPlaylist(
+                            tracks = tracks,
+                            startIndex = index,
+                            context = PlaybackContext(
+                                displayText = str("home_from_your_artists"),
+                                navigationId = "home",
+                            ),
+                        )
+                    },
+                )
             }
         }
     }
 }
+
+private const val FROM_YOUR_ARTISTS_COUNT = 16
 
 /**
  * The one way this screen introduces a section: a title, and optionally a link into more.
@@ -523,7 +514,7 @@ private fun RecentSearchRow(
 
 /** The first few songs of a chart, and the way into all of it. */
 @Composable
-private fun ChartPreviewSection(
+internal fun ChartPreviewSection(
     kind: ChartKind,
     entries: List<ChartEntry>,
     isLoading: Boolean,
@@ -533,11 +524,15 @@ private fun ChartPreviewSection(
     onArtistClick: (Track) -> Unit,
     onSeeAll: () -> Unit,
 ) {
-    Column {
-        LandingHeader(
-            title = str("chart_section_title"),
-            action = str("search_see_all") to onSeeAll,
-        )
+    // One card on the page's own inset, like My Wave and the statistics around it, with the title as the way in,
+    // an arrow after its words where the eye is, instead of a "see all" at the far right of the row.
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = CONTENT_PADDING),
+    ) {
+    Column(Modifier.padding(top = 8.dp, bottom = 10.dp)) {
+        com.alananasss.kittytune.ui.profile.ArtistSectionTitle(str("chart_section_title"), onOpen = onSeeAll)
 
         SongChart(
             kind = kind,
@@ -547,6 +542,7 @@ private fun ChartPreviewSection(
             onGenreChange = {},
             // The landing previews one genre; choosing between them belongs to the chart itself.
             showGenreRow = false,
+            compactKinds = true,
             isSwitching = isLoading && entries.isNotEmpty(),
             modifier = Modifier.padding(horizontal = CONTENT_PADDING - 6.dp),
         )
@@ -577,6 +573,7 @@ private fun ChartPreviewSection(
                 )
             }
         }
+    }
     }
 }
 
