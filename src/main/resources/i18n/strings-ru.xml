@@ -2843,4 +2843,15 @@
     <string name="search_kind_artist">Исполнитель</string>
     <string name="search_kind_playlist">Плейлист</string>
     <string name="search_kind_track">Трек · %1$s</string>
+    <string name="wave_title">Моя волна</string>
+    <string name="wave_subtitle">Бесконечная музыка под вас. Учится на лайках и пропусках.</string>
+    <string name="wave_nothing_yet">Пока не из чего собрать волну</string>
+    <string name="wave_mode_balanced">Всё вместе</string>
+    <string name="wave_mode_favorites">Любимое</string>
+    <string name="wave_mode_discover">Незнакомое</string>
+    <string name="wave_mode_popular">Популярное</string>
+    <string name="wave_now_playing">Сейчас в волне</string>
+    <string name="home_continue">Продолжить</string>
+    <string name="home_new_from_artists">Новое у ваших артистов</string>
+    <string name="home_chart_title">В топе чартов</string>
 </resources>

@@ -200,281 +200,12 @@ fun HomeContent(
 
 private enum class HomeMode { SEARCH, LOADING, FEED }
 
-@Composable
-private fun HomeFeed(
-    vm: HomeViewModel,
-    playerViewModel: PlayerViewModel,
-    navController: NavController,
-) {
-    val history by vm.historyFlow.collectAsState(initial = emptyList())
-    val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
-    val showHomeYourMix by prefs.showHomeYourMixFlow().collectAsState(initial = prefs.getShowHomeYourMix())
-    val showHomeListeningStats by prefs.showHomeListeningStatsFlow().collectAsState(initial = prefs.getShowHomeListeningStats())
-
-    val contextHistory = remember(history) {
-        history.filter { it.id != "playlist:0" && !it.title.equals("history", ignoreCase = true) }
-            .distinctBy { it.id }
-    }
-
-    var quickPage by remember { mutableStateOf(0) }
-
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isWideScreen = maxWidth >= 880.dp
-        val pageSize = if (isWideScreen) 9 else 6
-        val maxPages = ((contextHistory.size + pageSize - 1) / pageSize).coerceAtLeast(1)
-        val currentPage = quickPage.coerceIn(0, maxPages - 1)
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            // Greeting
-            item {
-                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                // Desktop-only greeting (no Android key for this) — localized by app language.
-                val lang = Strings.resolvedLanguage
-                val greeting = when (hour) {
-                    in 5..11 -> when (lang) { "fr" -> "Bonjour"; "hu" -> "Jó reggelt"; "ru" -> "Доброе утро"; else -> "Good morning" }
-                    in 12..17 -> when (lang) { "fr" -> "Bon après-midi"; "hu" -> "Jó napot"; "ru" -> "Добрый день"; else -> "Good afternoon" }
-                    else -> when (lang) { "fr" -> "Bonsoir"; "hu" -> "Jó estét"; "ru" -> "Добрый вечер"; else -> "Good evening" }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = greeting,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    if (maxPages > 1) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { if (currentPage > 0) quickPage = currentPage - 1 },
-                                enabled = currentPage > 0,
-                                modifier = Modifier.size(32.dp),
-                                shapes = IconButtonDefaults.shapes()
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(20.dp))
-                            }
-                            IconButton(
-                                onClick = { if (currentPage < maxPages - 1) quickPage = currentPage + 1 },
-                                enabled = currentPage < maxPages - 1,
-                                modifier = Modifier.size(32.dp),
-                                shapes = IconButtonDefaults.shapes()
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Quick tiles: recently played contexts (3 rows x 3 cols or 2 rows x 3 cols with pagination)
-            if (contextHistory.isNotEmpty()) {
-                item {
-                    // Always the three rows a wide window shows. The third folds away when the window narrows
-                    // to two and unfolds when it widens, rather than six tiles jumping into place (issue #66).
-                    val pageItems = contextHistory.drop(currentPage * pageSize).take(9)
-                    Column {
-                        pageItems.chunked(3).forEachIndexed { rowIndex, rowItems ->
-                            AnimatedVisibility(
-                                visible = rowIndex * 3 < pageSize,
-                                enter = fadeIn(tween(260, delayMillis = 60)) + expandVertically(tween(300, easing = FastOutSlowInEasing)),
-                                exit = fadeOut(tween(140)) + shrinkVertically(tween(300, easing = FastOutSlowInEasing)),
-                            ) {
-                            Row(
-                                modifier = Modifier.padding(top = if (rowIndex > 0) 8.dp else 0.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                rowItems.forEach { entry ->
-                                    val isLikes = entry.id == "likes" || entry.numericId == -1L || entry.id == "pin_likes" ||
-                                            entry.title.equals("Titres Likés", ignoreCase = true) ||
-                                            entry.title.equals(str("lib_liked_tracks"), ignoreCase = true) ||
-                                            entry.title.equals(str("history_title_likes"), ignoreCase = true) ||
-                                            entry.title.equals("Liked Tracks", ignoreCase = true)
-                                    val isDownloads = entry.id == "downloads" || entry.numericId == -2L || entry.id == "pin_downloads" ||
-                                            entry.title.equals(str("lib_downloads"), ignoreCase = true) ||
-                                            entry.title.equals(str("history_title_downloads"), ignoreCase = true) ||
-                                            entry.title.equals("Downloads", ignoreCase = true)
-                                    val isLocalFiles = entry.id == "local_files" || entry.id == "pin_local" ||
-                                            entry.title.equals(str("lib_local_media"), ignoreCase = true)
-
-                                    QuickTile(
-                                        title = entry.title,
-                                        imageUrl = if (isLikes || isDownloads || isLocalFiles) null else entry.imageUrl,
-                                        isLikes = isLikes,
-                                        isDownloads = isDownloads,
-                                        isLocalFiles = isLocalFiles,
-                                        modifier = Modifier.weight(1f),
-                                        // Right-click on tile = playlist/track options sheet.
-                                        onRightClick = when {
-                                            entry.id.startsWith("playlist:") -> {
-                                                {
-                                                    playerViewModel.showPlaylistOptions(
-                                                        Playlist(
-                                                            id = entry.numericId,
-                                                            title = entry.title,
-                                                            artworkUrl = entry.imageUrl,
-                                                            calculatedArtworkUrl = null,
-                                                            trackCount = null,
-                                                            user = null,
-                                                            tracks = null,
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                            entry.type == "TRACK" || entry.id.startsWith("track:") -> {
-                                                {
-                                                    playerViewModel.showTrackOptions(
-                                                        Track(
-                                                            id = entry.numericId,
-                                                            title = entry.title,
-                                                            artworkUrl = entry.imageUrl,
-                                                            durationMs = null,
-                                                            user = User(0, entry.subtitle ?: "", null),
-                                                            source = entry.source,
-                                                            permalinkUrl = entry.originalUrl
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                            else -> null
-                                        },
-                                    ) {
-                                        if (entry.type == "TRACK" || entry.id.startsWith("track:")) {
-                                            val trackToPlay = Track(
-                                                id = entry.numericId,
-                                                title = entry.title,
-                                                artworkUrl = entry.imageUrl,
-                                                durationMs = null,
-                                                user = User(0, entry.subtitle ?: "", null),
-                                                source = entry.source,
-                                                permalinkUrl = entry.originalUrl
-                                            )
-                                            playerViewModel.playPlaylist(listOf(trackToPlay), 0)
-                                        } else {
-                                            playerViewModel.navigateToPlaylistId = when {
-                                                entry.id.startsWith("playlist:") -> entry.numericId.toString()
-                                                entry.id.startsWith("spotify_artist:") -> entry.id
-                                                entry.id.startsWith("spotify_radio:") -> entry.id
-                                                entry.id.startsWith("spotify:") -> entry.id
-                                                entry.type == "STATION" && entry.id.contains("spotify") -> {
-                                                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                                                    "spotify_radio:$clean"
-                                                }
-                                                entry.type == "PROFILE" -> {
-                                                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                                                    if (clean.isNotBlank() && clean != "0" && (entry.id.contains("spotify") || clean.length == 22)) {
-                                                        "spotify_artist:$clean"
-                                                    } else if (entry.id == "profile:0" || entry.numericId == 0L) {
-                                                        if (entry.title.isNotBlank()) {
-                                                            "profile:${entry.title}"
-                                                        } else {
-                                                            entry.id
-                                                        }
-                                                    } else {
-                                                        entry.id
-                                                    }
-                                                }
-                                                else -> entry.id
-                                            }
-                                        }
-                                    }
-                                }
-                                repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
-                            }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // "Your Mix" card
-            if (showHomeYourMix) {
-                item {
-                    StartMixingCard(playerViewModel)
-                }
-            }
-
-            // "Listening Stats" card just below Your mix
-            if (showHomeListeningStats) {
-                item {
-                    ListeningStatsCard(navController)
-                }
-            }
-
-            // Section carousels
-            items(vm.homeSections, key = { it.title }) { section ->
-                Column {
-                    Text(
-                        text = SoundCloudLocalizationUtils.localizeSectionTitle(section.title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    SoundCloudLocalizationUtils.localizeSectionSubtitle(section.subtitle)?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                
-                // Faded into the panel's own colour: the old copy faded into `surface`, which is not what
-                // this panel is drawn on, so every carousel had a band of the wrong colour at each end.
-                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    items(section.content) { item ->
-                        when (item) {
-                            is Track -> MediaCard(
-                                title = item.title ?: "",
-                                subtitle = item.displayArtist.ifBlank { item.user?.username.orEmpty() },
-                                artworkUrl = item.fullResArtwork,
-                                round = false,
-                                onRightClick = { playerViewModel.showTrackOptions(item) }
-                            ) {
-                                playerViewModel.playPlaylist(listOf(item), 0)
-                            }
-                            is Playlist -> MediaCard(
-                                title = item.title ?: "",
-                                subtitle = item.user?.username ?: "",
-                                artworkUrl = item.fullResArtwork,
-                                round = false,
-                                onRightClick = { playerViewModel.showPlaylistOptions(item) }
-                            ) {
-                                playerViewModel.navigateToPlaylistId = getStationNavId(item)
-                            }
-                            is User -> MediaCard(
-                                title = item.username ?: "",
-                                subtitle = str("lib_artists"),
-                                artworkUrl = item.avatarUrl,
-                                round = true,
-                            ) {
-                                playerViewModel.navigateToPlaylistId = item.profileNavId
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-
 /** Hover highlights ease in and out instead of snapping. */
 private const val HOVER_FADE_MS = 120
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun QuickTile(
+internal fun QuickTile(
     title: String,
     imageUrl: String?,
     isLikes: Boolean = false,
@@ -1976,7 +1707,7 @@ private fun SpotifyResults(
 }
 
 /** Same station-marker resolution as the Android home screen. */
-private fun getStationNavId(playlist: Playlist): String {
+internal fun getStationNavId(playlist: Playlist): String {
     val isLikedBy = playlist.permalinkUrl == "liked_by_marker"
     val isArtistStation = playlist.permalinkUrl == "artist_station_marker"
     val isTrackStation = playlist.permalinkUrl == "track_station_marker"
@@ -2487,7 +2218,7 @@ private data class VibeStation(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StartMixingCard(playerViewModel: PlayerViewModel) {
+internal fun StartMixingCard(playerViewModel: PlayerViewModel) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<MixState>(MixState.Idle) }
     var showOptions by remember { mutableStateOf(false) }
@@ -3115,7 +2846,7 @@ private fun MixSectionLabel(icon: androidx.compose.ui.graphics.vector.ImageVecto
  */
 
 @Composable
-private fun ListeningStatsCard(navController: NavController) {
+internal fun ListeningStatsCard(navController: NavController) {
     val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
     val summary by produceState<HomeStatsSummary?>(initialValue = null, key1 = weekAgo) {
         value = withContext(Dispatchers.IO) {

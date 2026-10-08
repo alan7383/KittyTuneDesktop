@@ -345,6 +345,7 @@ class PlayerPreferences {
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
+        private const val KEY_WAVE_MODE = "wave_mode"
         private const val KEY_DISCORD_TOKEN = "discord_token"
         private const val KEY_DISCORD_ENABLED = "discord_rpc_enabled"
         private const val KEY_PRECISE_LYRICS_SEARCH = "precise_lyrics_search_enabled"
@@ -526,6 +527,9 @@ class PlayerPreferences {
     fun setDiscordAssetLogo(assetId: String?) = Prefs.putString(KEY_DISCORD_ASSET_LOGO, assetId)
 
     /** The line being sung, on one row above the player bar's transport (issue #66). */
+    fun getWaveMode(): String = Prefs.getString(KEY_WAVE_MODE, "BALANCED") ?: "BALANCED"
+    fun setWaveMode(mode: String) = Prefs.putString(KEY_WAVE_MODE, mode)
+
     fun getOneLineLyricsEnabled(): Boolean = Prefs.getBoolean(KEY_ONE_LINE_LYRICS, true)
     fun setOneLineLyricsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ONE_LINE_LYRICS, enabled)
 
