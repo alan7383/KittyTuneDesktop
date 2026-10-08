@@ -2081,7 +2081,10 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                if (user.verified) {
+                // Verified on SoundCloud, or the artist's own streaming profile by that exact name is: the real
+                // artist among the copies that share their name (issue #66).
+                val profile = com.alananasss.kittytune.ui.common.rememberArtistProfile(user.username)
+                if (user.verified || profile?.isVerified == true) {
                     Spacer(Modifier.width(4.dp))
                     Icon(
                         Icons.Rounded.Verified,
@@ -2092,12 +2095,14 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
                 }
             }
             val followersCount = user.followersCount
-            val followersText = when {
-                followersCount >= 1_000_000 -> "${followersCount / 1_000_000}M followers"
-                followersCount >= 1_000 -> "${followersCount / 1_000}K followers"
-                followersCount > 0 -> "$followersCount followers"
-                else -> str("lib_artists")
-            }
+            val followersText = listOfNotNull(
+                com.alananasss.kittytune.ui.common.rememberArtistProfile(user.username)?.monthlyListeners
+                    ?.let { com.alananasss.kittytune.ui.common.monthlyListenersLabel(it) },
+                followersCount.takeIf { it > 0 }?.let {
+                    java.text.NumberFormat.getCompactNumberInstance(Strings.locale(), java.text.NumberFormat.Style.SHORT)
+                        .format(it) + " " + str("profile_followers")
+                },
+            ).joinToString(" · ").ifBlank { str("lib_artists") }
             Text(
                 text = followersText,
                 style = MaterialTheme.typography.bodySmall,
