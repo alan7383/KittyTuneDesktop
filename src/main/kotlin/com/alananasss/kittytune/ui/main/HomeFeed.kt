@@ -42,8 +42,9 @@ import java.util.Calendar
  * It was a grid of nine recently played things, a mix card and SoundCloud's own shelves, and two days of steady
  * listening used none of it but the statistics. It leads with My Wave now, one press for music picked for this
  * listener that keeps going and learns; then what was playing lately as one scrolling row instead of a grid that
- * lost a row whenever the side panel opened; new songs from the artists already liked; the statistics; the
- * country's chart; the mix; and SoundCloud's shelves last.
+ * lost a row whenever the side panel opened; the statistics; the country's chart; new songs from the artists
+ * already liked; and SoundCloud's shelves last. The mix card is off unless it is switched on: My Wave does that
+ * job, and a second card for it at the foot of the page only repeated it (round 2, item 10.1).
  */
 @Composable
 internal fun HomeFeed(
@@ -93,8 +94,6 @@ internal fun HomeFeed(
             }
         }
 
-        item { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
-
         if (showHomeListeningStats) {
             item { Box(Modifier.padding(horizontal = HOME_PADDING)) { ListeningStatsCard(navController) } }
         }
@@ -102,6 +101,8 @@ internal fun HomeFeed(
         item {
             com.alananasss.kittytune.ui.home.HomeChartSection(vm, playerViewModel, onOpenCharts = { navController.navigate("charts") })
         }
+
+        item { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
 
         if (showHomeYourMix) {
             item { Box(Modifier.padding(horizontal = HOME_PADDING)) { StartMixingCard(playerViewModel) } }
