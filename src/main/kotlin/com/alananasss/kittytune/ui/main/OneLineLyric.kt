@@ -14,7 +14,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,6 +39,7 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
 import com.alananasss.kittytune.ui.player.lyrics.separateBackingVocals
+import com.alananasss.kittytune.ui.player.lyrics.withEvenWords
 
 /**
  * The line being sung, in a small card floating above the play button (issue #66): for when the app is open for
@@ -71,12 +71,13 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
         val active = lines.getOrNull(activeIndex)
         val showsWords = active != null && !active.isInstrumental && active.text.isNotBlank()
         val scheme = MaterialTheme.colorScheme
+        // Quiet: one step above the panel, hardly raised and with no outline, so it reads as part of the bar and the
+        // words are what stands out. It was the lightest thing on the screen, with a rim and a deep shadow.
         Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = scheme.surfaceContainerHighest,
+            shape = RoundedCornerShape(16.dp),
+            color = scheme.surfaceContainer.copy(alpha = 0.94f),
             contentColor = scheme.onSurface,
-            shadowElevation = 8.dp,
-            border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.35f)),
+            shadowElevation = 3.dp,
         ) {
             AnimatedContent(
                 targetState = if (showsWords) activeIndex else -1,
@@ -101,7 +102,9 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
                             modifier = Modifier.size(16.dp),
                         )
                     } else {
-                        SungLine(vm, line, position)
+                        // A line timed only as a whole gets the words spread across it, so it fills in as smoothly as one
+                        // timed word by word; the next line's start is where it ends when it has no end of its own.
+                        SungLine(vm, line.withEvenWords(lines.getOrNull(index + 1)?.startTime), position, isEven = line.words.isEmpty())
                     }
                 }
             }
@@ -110,7 +113,7 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
 }
 
 @Composable
-private fun SungLine(vm: PlayerViewModel, line: LyricLine, position: Float) {
+private fun SungLine(vm: PlayerViewModel, line: LyricLine, position: Float, isEven: Boolean) {
     val scheme = MaterialTheme.colorScheme
     val main = remember(line) { separateBackingVocals(line).first }
     val style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
@@ -118,14 +121,18 @@ private fun SungLine(vm: PlayerViewModel, line: LyricLine, position: Float) {
         line = main,
         isActive = true,
         positionMs = position,
-        wordSync = vm.isWordSyncEnabled,
-        fillEffect = vm.isAppleMusicEffectEnabled,
+        // Words spread evenly over a line are only worth showing as a smooth fill: coloured a word at a time on a
+        // guess, they would jump.
+        wordSync = vm.isWordSyncEnabled || isEven,
+        fillEffect = vm.isAppleMusicEffectEnabled || isEven,
         activeStyle = style,
         inactiveStyle = style,
         activeColor = scheme.onSurface,
         inactiveColor = scheme.onSurfaceVariant,
         unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.55f),
         textAlign = TextAlign.Center,
+        // As wide as the words, so a short line is a small card instead of one the width of the longest.
+        fillWidth = false,
         modifier = Modifier.widthIn(max = MAX_LINE_WIDTH),
     )
 }
