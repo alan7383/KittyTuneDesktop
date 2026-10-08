@@ -2890,4 +2890,7 @@
     <string name="fx_preset_nightcore">Nightcore</string>
     <string name="fx_preset_chill">Ráérősen</string>
     <string name="fx_active_count">%1$d bekapcsolva</string>
+    <string name="likes_vibe_title">A zenéd színe</string>
+    <string name="likes_vibe_sub">Válassz színt, és a kedvenceid abban a színben szólnak</string>
+    <string name="likes_vibe_top">Legtöbbet kedvelt: %1$s</string>
 </resources>

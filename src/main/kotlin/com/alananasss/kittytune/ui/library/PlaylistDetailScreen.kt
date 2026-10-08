@@ -1681,6 +1681,13 @@ fun PlaylistDetailScreen(
                 }
             }
 
+            // -------- the liked songs' own colours (issue #66)
+            if (playlistId == "likes" && likedTracksRepo.size >= 8) {
+                item(key = "likes_vibe") {
+                    LikesVibeCard(likedTracksRepo, playerViewModel, Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+                }
+            }
+
             // -------- playlist download progress
             item {
                 AnimatedVisibility(

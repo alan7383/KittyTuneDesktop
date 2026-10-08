@@ -2887,4 +2887,7 @@
     <string name="fx_preset_nightcore">Nightcore</string>
     <string name="fx_preset_chill">Неспешно</string>
     <string name="fx_active_count">Включено: %1$d</string>
+    <string name="likes_vibe_title">Цвет вашей музыки</string>
+    <string name="likes_vibe_sub">Нажмите на цвет — включим любимое этого оттенка</string>
+    <string name="likes_vibe_top">Чаще всего в любимом: %1$s</string>
 </resources>
