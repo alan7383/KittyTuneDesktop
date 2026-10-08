@@ -371,11 +371,11 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             title = { Text(if (isLocalFile) str("menu_remove_local_q") else str("menu_remove_download_q")) },
             text = { Text(if (isLocalFile) str("menu_remove_local_body") else str("menu_remove_download_body")) },
             confirmButton = {
-                TextButton(onClick = { DownloadManager.deleteTrack(track.id); showDeleteDialog = false; viewModel.showMenuSheet = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { DownloadManager.deleteTrack(track.id); showDeleteDialog = false; viewModel.showMenuSheet = false }) {
                     Text(str("btn_delete"), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -392,11 +392,11 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             title = { Text(str("dialog_repost_delete_title")) },
             text = { Text(str("dialog_repost_delete_msg")) },
             confirmButton = {
-                TextButton(onClick = { viewModel.deleteRepost(track.id); showDeleteRepostConfirm = false; viewModel.showMenuSheet = false },
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.deleteRepost(track.id); showDeleteRepostConfirm = false; viewModel.showMenuSheet = false },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text(str("btn_delete")) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteRepostConfirm = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeleteRepostConfirm = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -626,7 +626,7 @@ private fun AddToPlaylistContent(viewModel: PlayerViewModel) {
                     singleLine = true
                 )
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = {
+                Button(shapes = ButtonDefaults.shapes(), onClick = {
                     if (newName.isNotBlank()) {
                         if (bulkTracks != null) viewModel.createAndAddTracksToPlaylist(newName, bulkTracks)
                         else if (singleTrack != null) viewModel.createAndAddToPlaylist(newName, singleTrack)
@@ -714,8 +714,8 @@ private fun RepostDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
                 )
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(caption) }) { Text(str("dialog_repost_confirm")) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } }
+        confirmButton = { Button(shapes = ButtonDefaults.shapes(), onClick = { onConfirm(caption) }) { Text(str("dialog_repost_confirm")) } },
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_cancel")) } }
     )
 }
 
@@ -766,7 +766,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Spacer(Modifier.height(8.dp))
-                            TextButton(
+                            TextButton(shapes = ButtonDefaults.shapes(),
                                 onClick = {
                                     viewModel.cancelSleepTimer()
                                     viewModel.showSleepTimerDialog = false
@@ -825,7 +825,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
                 Spacer(Modifier.height(8.dp))
 
                 // End of track option
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         viewModel.startSleepTimerEndOfTrack()
                         viewModel.showSleepTimerDialog = false
@@ -834,7 +834,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
             }
         },
         confirmButton = {
-            Button(
+            Button(shapes = ButtonDefaults.shapes(),
                 onClick = {
                     viewModel.startSleepTimer(selectedMinutes * 60_000L)
                     viewModel.showSleepTimerDialog = false
@@ -842,7 +842,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
             ) { Text(str("btn_ok")) }
         },
         dismissButton = {
-            TextButton(onClick = { viewModel.showSleepTimerDialog = false }) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.showSleepTimerDialog = false }) {
                 Text(str("btn_cancel"))
             }
         }
@@ -945,13 +945,13 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
             title = { Text(str("dialog_remove_download_title")) },
             text = { Text(str("dialog_remove_download_msg")) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     DownloadManager.removePlaylistDownloads(playlist.id)
                     showRemoveDownloadDialog = false
                     viewModel.showPlaylistMenuSheet = false
                 }) { Text(str("btn_delete"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1214,7 +1214,7 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                 }
             }
 
-            IconButton(onClick = { viewModel.showCommentsSheet = false }, modifier = Modifier.size(32.dp)) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.showCommentsSheet = false }, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
             }
         }
@@ -1332,7 +1332,7 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                 shape = RoundedCornerShape(24.dp),
                 enabled = !isPosting
             )
-            IconButton(
+            IconButton(shapes = IconButtonDefaults.shapes(),
                 onClick = {
                     if (newCommentText.isNotBlank()) {
                         viewModel.postComment(newCommentText, null)

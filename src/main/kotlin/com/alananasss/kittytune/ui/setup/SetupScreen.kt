@@ -45,6 +45,7 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.theme.End4ThemeManager
 import com.alananasss.kittytune.ui.profile.DiscordLoginScreen
 import kotlinx.coroutines.launch
+import androidx.compose.material3.IconButtonDefaults
 
 private data class SetupColor(val color: Color, val nameRes: String)
 
@@ -223,7 +224,7 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                                 val listState = rememberLazyListState()
                                 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
+                                    IconButton(shapes = IconButtonDefaults.shapes(),
                                         onClick = {
                                             coroutineScope.launch {
                                                 listState.animateScrollBy(-200f)
@@ -306,7 +307,7 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                                         }
                                     }
 
-                                    IconButton(
+                                    IconButton(shapes = IconButtonDefaults.shapes(),
                                         onClick = {
                                             coroutineScope.launch {
                                                 listState.animateScrollBy(200f)

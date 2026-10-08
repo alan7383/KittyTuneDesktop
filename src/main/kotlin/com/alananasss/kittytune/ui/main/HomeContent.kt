@@ -2090,7 +2090,7 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel) {
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
-        IconButton(onClick = { playerViewModel.showTrackOptions(track) },
+        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.showTrackOptions(track) },
             modifier = Modifier.size(32.dp),
         ) {
             Icon(
@@ -2240,7 +2240,7 @@ private fun SearchTopMatchHeroCard(
 
                     if (onPlayClick != null) {
                         if (isCompactCard) {
-                            androidx.compose.material3.FilledIconButton(
+                            androidx.compose.material3.FilledIconButton(shapes = IconButtonDefaults.shapes(),
                                 onClick = onPlayClick,
                                 modifier = Modifier.size(42.dp),
                                 colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(

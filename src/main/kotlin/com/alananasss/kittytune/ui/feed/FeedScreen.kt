@@ -45,6 +45,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -83,7 +85,7 @@ fun FeedScreen(
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )
-            IconButton(onClick = { feedViewModel.refresh() }) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { feedViewModel.refresh() }) {
                 Icon(Icons.Rounded.Refresh, contentDescription = str("feed_refresh"))
             }
         }
@@ -99,7 +101,7 @@ fun FeedScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Rounded.CloudOff, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(str("error_generic"), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = { feedViewModel.refresh() }) {
+                        Button(shapes = ButtonDefaults.shapes(), onClick = { feedViewModel.refresh() }) {
                             Text(str("btn_retry"))
                         }
                     }
@@ -321,7 +323,7 @@ private fun TrackFeedItem(
                 }
 
                 // Options button
-                IconButton(
+                IconButton(shapes = IconButtonDefaults.shapes(),
                     onClick = onRightClick,
                     modifier = Modifier.size(36.dp),
                 ) {
@@ -457,7 +459,7 @@ private fun PlaylistFeedItem(
                     }
                 }
 
-                IconButton(
+                IconButton(shapes = IconButtonDefaults.shapes(),
                     onClick = onRightClick,
                     modifier = Modifier.size(36.dp),
                 ) {

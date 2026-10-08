@@ -57,6 +57,7 @@ import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * What the search screen shows while the field is empty.
@@ -254,7 +255,7 @@ private fun LandingHeader(title: String, action: Pair<String, () -> Unit>?) {
             modifier = Modifier.weight(1f),
         )
         if (action != null) {
-            TextButton(onClick = action.second) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = action.second) {
                 Text(
                     text = action.first,
                     style = MaterialTheme.typography.labelLarge,
@@ -295,7 +296,7 @@ private fun RecentSearchesSection(
 
         if (searches.size > COLLAPSED_RECENT_SEARCHES) {
             val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "seeMoreChevron")
-            TextButton(
+            TextButton(shapes = ButtonDefaults.shapes(),
                 onClick = { expanded = !expanded },
                 modifier = Modifier.padding(start = CONTENT_PADDING - 12.dp, top = 2.dp),
             ) {

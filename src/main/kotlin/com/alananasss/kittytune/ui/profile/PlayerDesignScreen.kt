@@ -53,6 +53,7 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.slider.PlayerSlider
 import kotlin.math.roundToInt
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * Dedicated Player Design Screen (issue #56).
@@ -1096,7 +1097,7 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
                     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(str("menu_tiles_desc"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     prefs.resetMenuTiles(menu)
                     hidden = emptySet()
                 }) { Text(str("menu_tiles_reset")) }
@@ -1139,7 +1140,7 @@ private fun FloatingBarSection() {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(str("floating_bar_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = { update(com.alananasss.kittytune.data.local.FloatingBarLook.DEFAULT) }) { Text(str("btn_reset")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { update(com.alananasss.kittytune.data.local.FloatingBarLook.DEFAULT) }) { Text(str("btn_reset")) }
             }
             // A live miniature of the bar with the chosen corner and width.
             Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest), contentAlignment = Alignment.Center) {

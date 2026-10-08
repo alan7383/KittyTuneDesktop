@@ -582,7 +582,7 @@ fun SectionTitle(title: String, showMore: Boolean = false, onMoreClick: (() -> U
             fontWeight = FontWeight.Bold
         )
         if (showMore && onMoreClick != null) {
-            TextButton(onClick = onMoreClick) { Text(str("btn_see_all")) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onMoreClick) { Text(str("btn_see_all")) }
         }
     }
 }
@@ -690,7 +690,7 @@ private fun PopularTrackListItem(
                     com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track)
                 }
             }
-            IconButton(onClick = onOptionClick) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick) {
                 Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

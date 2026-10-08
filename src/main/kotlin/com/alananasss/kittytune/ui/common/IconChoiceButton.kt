@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.IconButtonDefaults
 
 /**
  * A round button that opens a menu, drawn the same way wherever a list is filtered or sorted.
@@ -50,7 +51,7 @@ fun IconMenuButton(
     androidx.compose.runtime.LaunchedEffect(expanded) { onExpandedChange(expanded) }
     Box(modifier) {
         Tip(tooltip) {
-            FilledTonalIconButton(onClick = { expanded = true }, modifier = Modifier.size(size)) {
+            FilledTonalIconButton(shapes = IconButtonDefaults.shapes(), onClick = { expanded = true }, modifier = Modifier.size(size)) {
                 AnimatedContent(
                     targetState = icon,
                     transitionSpec = {

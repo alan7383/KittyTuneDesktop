@@ -539,7 +539,7 @@ private fun ColumnScope.LayoutTab(viewModel: PlayerViewModel, knobs: ModeKnobs) 
             )
         }
     }
-    TextButton(
+    TextButton(shapes = ButtonDefaults.shapes(),
         onClick = { knobs.resetTypography() },
         modifier = Modifier.align(Alignment.End),
     ) {
@@ -847,7 +847,7 @@ private fun SliderRow(
     QuickCard {
         RowTitle(icon, title, subtitle) {
             ValuePill(valueText)
-            IconButton(onClick = onReset, modifier = Modifier.size(32.dp)) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onReset, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Rounded.RestartAlt, str("pref_lyrics_reset"), modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -899,7 +899,7 @@ private fun TranslationLanguageDialog(viewModel: PlayerViewModel, onDismiss: () 
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_cancel")) } },
     )
 }
 

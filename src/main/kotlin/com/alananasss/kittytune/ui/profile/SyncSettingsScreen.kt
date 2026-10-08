@@ -61,6 +61,7 @@ import com.alananasss.kittytune.ui.common.SettingsScaffold
 import com.alananasss.kittytune.ui.common.getSettingsShape
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * Pairing devices, and seeing that it is working (issue #33).
@@ -174,7 +175,7 @@ fun SyncDevicesPage() {
                 }
             },
             confirmButton = {
-                Button(
+                Button(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         if (dontShowAgain) playerPrefs.setSyncDisclaimerDismissed(true)
                         showDisclaimerDialog = false
@@ -476,7 +477,7 @@ private fun DeviceRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TextButton(onClick = onForget) { Text(str("sync_forget_device")) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onForget) { Text(str("sync_forget_device")) }
         }
     }
 }
@@ -570,14 +571,14 @@ private fun PairDeviceDialog(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                         clipboard.setText(AnnotatedString(code))
                     }) {
                         Icon(Icons.Rounded.ContentCopy, null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(str("sync_copy_code"))
                     }
-                    TextButton(onClick = { revealed = !revealed }) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { revealed = !revealed }) {
                         Text(str(if (revealed) "sync_hide_code" else "sync_show_code"))
                     }
                 }
@@ -592,7 +593,7 @@ private fun PairDeviceDialog(
 
                 // For pairing with another computer, where there is no camera in the loop. Folded away
                 // because it is the rarer half.
-                TextButton(onClick = { pasteMode = !pasteMode }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { pasteMode = !pasteMode }) {
                     Text(str("sync_have_a_code"))
                 }
                 if (pasteMode) {
@@ -640,7 +641,7 @@ private fun PairDeviceDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(str("btn_close")) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_close")) }
         },
     )
 }
@@ -711,13 +712,13 @@ private fun AdvancedSection(
         )
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 clipboard.setText(AnnotatedString(code))
                 onStatus(str("sync_code_copied"))
             }) {
                 Text(str("sync_copy_code"))
             }
-            TextButton(onClick = {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 SyncService.regeneratePairingSecret()
                 // Every device paired with the old secret is locked out now, so their entries go too
                 // rather than sitting in the list failing silently.

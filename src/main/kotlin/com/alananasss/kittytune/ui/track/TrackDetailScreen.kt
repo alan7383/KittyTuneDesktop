@@ -75,7 +75,7 @@ fun TrackDetailScreen(
             TopAppBar(
                 title = { Text(str("detail_track_title"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
                     }
                 }

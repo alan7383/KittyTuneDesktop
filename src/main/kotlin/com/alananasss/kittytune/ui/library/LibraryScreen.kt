@@ -63,6 +63,8 @@ import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.ui.common.SquareCardShimmer
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.profile.ArtistAvatar
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1324,7 +1326,7 @@ fun LibraryScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                IconButton(
+                IconButton(shapes = IconButtonDefaults.shapes(),
                     onClick = onOptionClick,
                     modifier = Modifier.size(28.dp)
                 ) {
@@ -1402,7 +1404,7 @@ fun LibraryScreen(
                     onArtistClick = onArtistClick
                 )
             }
-            IconButton(onClick = onOptionClick) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = str("btn_options"),
@@ -1515,7 +1517,7 @@ fun LibraryScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         viewModel.uploadsSortOption = selectedSort
                         viewModel.uploadsPrivacyFilter = selectedPrivacy
@@ -1526,7 +1528,7 @@ fun LibraryScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) {
                     Text(str("btn_cancel"))
                 }
             }

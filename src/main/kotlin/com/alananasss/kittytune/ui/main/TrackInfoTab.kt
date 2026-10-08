@@ -74,6 +74,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.material3.IconButtonDefaults
 
 @Composable
 fun TrackInfoTab(vm: PlayerViewModel) {
@@ -346,7 +347,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { send() }),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
                     trailingIcon = {
-                        IconButton(
+                        IconButton(shapes = IconButtonDefaults.shapes(),
                             onClick = send,
                             enabled = newCommentText.isNotBlank(),
                             colors = IconButtonDefaults.iconButtonColors(
@@ -759,7 +760,7 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                         singleLine = true,
                         shape = RoundedCornerShape(24.dp)
                     )
-                    IconButton(
+                    IconButton(shapes = IconButtonDefaults.shapes(),
                         onClick = {
                             if (replyText.isNotBlank()) {
                                 vm.postComment(replyText, null)

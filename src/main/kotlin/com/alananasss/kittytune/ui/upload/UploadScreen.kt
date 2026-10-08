@@ -62,6 +62,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import androidx.compose.material3.IconButtonDefaults
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -1038,7 +1039,7 @@ private fun BasicInfoTabContent(
                     },
                 trailingIcon = {
                     if (viewModel.tagInput.isNotBlank()) {
-                        IconButton(onClick = { viewModel.addTag(viewModel.tagInput) }) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.addTag(viewModel.tagInput) }) {
                             Icon(Icons.Rounded.Add, contentDescription = "Add tag")
                         }
                     }
@@ -1058,7 +1059,7 @@ private fun BasicInfoTabContent(
                             onClick = { },
                             label = { Text("#$tag") },
                             trailingIcon = {
-                                IconButton(
+                                IconButton(shapes = IconButtonDefaults.shapes(),
                                     onClick = { viewModel.removeTag(tag) },
                                     modifier = Modifier.size(16.dp)
                                 ) {
@@ -1371,7 +1372,7 @@ private fun ScheduleSection(
                     ) {
                         // Hours
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            IconButton(onClick = { selectedHour = (selectedHour + 1) % 24 }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { selectedHour = (selectedHour + 1) % 24 }) {
                                 Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null)
                             }
                             Surface(
@@ -1388,7 +1389,7 @@ private fun ScheduleSection(
                                     )
                                 }
                             }
-                            IconButton(onClick = { selectedHour = if (selectedHour - 1 < 0) 23 else selectedHour - 1 }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { selectedHour = if (selectedHour - 1 < 0) 23 else selectedHour - 1 }) {
                                 Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
                             }
                         }
@@ -1402,7 +1403,7 @@ private fun ScheduleSection(
 
                         // Minutes
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            IconButton(onClick = { selectedMinute = (selectedMinute + 5) % 60 }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { selectedMinute = (selectedMinute + 5) % 60 }) {
                                 Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null)
                             }
                             Surface(
@@ -1419,7 +1420,7 @@ private fun ScheduleSection(
                                     )
                                 }
                             }
-                            IconButton(onClick = { selectedMinute = if (selectedMinute - 5 < 0) 55 else (selectedMinute - 5) }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { selectedMinute = if (selectedMinute - 5 < 0) 55 else (selectedMinute - 5) }) {
                                 Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = null)
                             }
                         }
@@ -1593,7 +1594,7 @@ private fun MetadataTabContent(
                         },
                         trailingIcon = {
                             if (viewModel.releaseDate.isNotBlank()) {
-                                IconButton(onClick = { viewModel.releaseDate = "" }) {
+                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.releaseDate = "" }) {
                                     Icon(
                                         Icons.Rounded.Close,
                                         contentDescription = "Clear",
@@ -1602,7 +1603,7 @@ private fun MetadataTabContent(
                                     )
                                 }
                             } else {
-                                IconButton(onClick = { showReleaseDatePicker = true }) {
+                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showReleaseDatePicker = true }) {
                                     Icon(
                                         Icons.Rounded.Event,
                                         contentDescription = null,
@@ -2378,7 +2379,7 @@ private fun ArtistStorefrontDialog(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    IconButton(onClick = onDismiss) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.Rounded.Close,
                             contentDescription = str("btn_close"),
@@ -2473,7 +2474,7 @@ private fun ArtistStorefrontDialog(
                             }
                         }
 
-                        IconButton(
+                        IconButton(shapes = IconButtonDefaults.shapes(),
                             onClick = {},
                             enabled = viewModel.storefrontLink.isNotBlank()
                         ) {

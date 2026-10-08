@@ -29,6 +29,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.compose.material3.IconButtonDefaults
 
 /** How a full list is ordered. */
 private enum class ListSort(val labelKey: String) { TIME("stats_sort_time"), PLAYS("stats_sort_plays"), NAME("stats_sort_name") }
@@ -75,7 +76,7 @@ private fun StatsListDialog(
                             Text(count.toString(), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
                         }
                     }
-                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = str("btn_close")) }
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = str("btn_close")) }
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {

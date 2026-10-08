@@ -43,6 +43,7 @@ import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.ui.common.viewableCover
 import com.alananasss.kittytune.ui.profile.getRelativeTime
 import java.util.regex.Pattern
+import androidx.compose.material3.IconButtonDefaults
 
 /**
  * Desktop playlist-info dialog content (Android's PlaylistDetailsSheet redesigned
@@ -193,7 +194,7 @@ fun PlaylistDetailsSheet(
                 }
             }
             Spacer(Modifier.width(16.dp))
-            IconButton(
+            IconButton(shapes = IconButtonDefaults.shapes(),
                 onClick = onDismiss,
                 modifier = Modifier.size(32.dp),
 

@@ -34,6 +34,8 @@ import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider
 import com.alananasss.kittytune.ui.common.ScrollableColumn
 import com.alananasss.kittytune.ui.common.SettingsSwitch
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * The lyrics sources in the order they are tried, each one switchable, reordered by dragging. Saved on
@@ -77,7 +79,7 @@ fun LyricsProviderOrderDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
                                         .padding(horizontal = 4.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    IconButton(onClick = {}, modifier = Modifier.draggableHandle()) {
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {}, modifier = Modifier.draggableHandle()) {
                                         Icon(
                                             Icons.Rounded.DragIndicator,
                                             contentDescription = str("action_reorder"),
@@ -114,7 +116,7 @@ fun LyricsProviderOrderDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 prefs.setLyricsProviderOrder(currentOrder)
                 currentEnabled.forEach { (provider, enabled) -> prefs.setLyricsProviderEnabled(provider, enabled) }
                 onDismiss()
@@ -123,7 +125,7 @@ fun LyricsProviderOrderDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) {
                 Text(str("btn_cancel", "Cancel"))
             }
         },

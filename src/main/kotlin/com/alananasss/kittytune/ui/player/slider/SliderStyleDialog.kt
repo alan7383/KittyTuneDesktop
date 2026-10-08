@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerSliderStyle
+import androidx.compose.material3.ButtonDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +47,7 @@ fun SliderStyleDialog(
             Text(str("pref_slider_style", "Style du curseur"))
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) {
                 Text(str("btn_cancel", "Annuler"))
             }
         },

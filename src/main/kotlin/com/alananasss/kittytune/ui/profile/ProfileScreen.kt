@@ -576,19 +576,19 @@ fun ProfileScreen(
                 actions = {
                     if (profileViewModel.isCurrentUser) {
                         AnimatedVisibility(visible = showBarBackground, enter = fadeIn(), exit = fadeOut()) {
-                            IconButton(onClick = { showEditSheet = true }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showEditSheet = true }) {
                                 Icon(Icons.Outlined.Edit, str("profile_edit"), tint = contentColor)
                             }
                         }
                     } else {
-                        IconButton(onClick = { DownloadManager.toggleSaveArtist(user) },
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { DownloadManager.toggleSaveArtist(user) },
                             colors = IconButtonDefaults.iconButtonColors(containerColor = if (showBarBackground) Color.Transparent else Color.Black.copy(alpha = 0.3f), contentColor = if (isArtistSaved != null) Color(0xFFFF4081) else contentColor)
                         ) {
                             Icon(if (isArtistSaved != null) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, str("btn_follow"))
                         }
                     }
 
-                    IconButton(onClick = {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                             val cleanUsername = user.username?.replace(" ", "")?.lowercase() ?: "user"
                             val shareUrl = user.permalinkUrl ?: if (profileViewModel.isSpotifyProfile) {
                                 "https://open.spotify.com/artist/${user.permalink}"
@@ -1248,7 +1248,7 @@ fun FullListScreen(
                             leadingIcon = { Icon(Icons.Default.Search, null) },
                             trailingIcon = {
                                 if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, null) }
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, null) }
                                 }
                             },
                             singleLine = true,
@@ -1441,7 +1441,7 @@ fun <T> ProfileHorizontalCarouselRow(
                             ),
                         contentAlignment = Alignment.CenterStart
                     ) {
-                        IconButton(
+                        IconButton(shapes = IconButtonDefaults.shapes(),
                             onClick = {
                                 coroutineScope.launch {
                                     val first = listState.firstVisibleItemIndex
@@ -1478,7 +1478,7 @@ fun <T> ProfileHorizontalCarouselRow(
                             ),
                         contentAlignment = Alignment.CenterEnd
                     ) {
-                        IconButton(
+                        IconButton(shapes = IconButtonDefaults.shapes(),
                             onClick = {
                                 coroutineScope.launch {
                                     val first = listState.firstVisibleItemIndex

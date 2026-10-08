@@ -478,7 +478,7 @@ fun ArtistRankRow(
             )
         }
 
-        IconButton(onClick = onMenuClick) {
+        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onMenuClick) {
             Icon(
                 imageVector = Icons.Default.MoreVert,
                 contentDescription = str("btn_options"),

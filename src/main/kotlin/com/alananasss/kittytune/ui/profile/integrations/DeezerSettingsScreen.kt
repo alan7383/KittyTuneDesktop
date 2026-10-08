@@ -24,6 +24,7 @@ import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsScaffold
 import java.net.URI
+import androidx.compose.material3.ButtonDefaults
 
 @Composable
 fun DeezerSettingsScreen(
@@ -69,7 +70,7 @@ fun DeezerSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         val cleaned = tempUrl.trim().ifBlank { DeezerAudioProvider.DEFAULT_RESOLVER_URL }
                         resolverUrl = cleaned
@@ -81,7 +82,7 @@ fun DeezerSettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showResolverDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showResolverDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -150,7 +151,7 @@ fun DeezerSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showProxyModeDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showProxyModeDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -180,7 +181,7 @@ fun DeezerSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         val cleaned = DeezerAudioProvider.normalizeProxyUrl(tempProxy)
                         proxyUrl = cleaned
@@ -194,7 +195,7 @@ fun DeezerSettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCustomProxyDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showCustomProxyDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -239,7 +240,7 @@ fun DeezerSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showQualityDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showQualityDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -271,7 +272,7 @@ fun DeezerSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         val cleaned = normalizeDeezerCookieInput(tempCookie).orEmpty()
                         deezerCookie = cleaned
@@ -283,7 +284,7 @@ fun DeezerSettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCookieDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showCookieDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }

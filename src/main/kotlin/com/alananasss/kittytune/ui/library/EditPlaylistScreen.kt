@@ -109,12 +109,12 @@ fun EditPlaylistScreen(
                 TopAppBar(
                     title = { Text(str("edit_playlist_title")) },
                     navigationIcon = {
-                        IconButton(onClick = onDismissRequest) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismissRequest) {
                             Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
                         }
                     },
                     actions = {
-                        TextButton(onClick = {
+                        TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                                 onSave(
                                     title,
                                     description,
@@ -255,7 +255,7 @@ fun EditPlaylistScreen(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             trailingIcon = {
-                                TextButton(onClick = { showDatePicker = true }) {
+                                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDatePicker = true }) {
                                     Text(str("btn_pick"))
                                 }
                             }
@@ -330,7 +330,7 @@ fun EditPlaylistScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         trailingIcon = {
                             if (tagInput.isNotBlank()) {
-                                IconButton(onClick = { 
+                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { 
                                     if (!tags.contains(tagInput.trim())) {
                                         tags = tags + tagInput.trim()
                                     }
@@ -407,7 +407,7 @@ fun EditPlaylistScreen(
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
                         val calendar = java.util.Calendar.getInstance()
                         calendar.timeInMillis = millis
@@ -420,7 +420,7 @@ fun EditPlaylistScreen(
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text(str("btn_cancel")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDatePicker = false }) { Text(str("btn_cancel")) }
             }
         ) {
             DatePicker(state = datePickerState)

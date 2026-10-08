@@ -29,6 +29,8 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.SplitSettingsItem
 import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * Audio Settings: separated into clean sub-page folders (Playback, Sound & Output, Transitions, Sleep Timer).
@@ -93,7 +95,7 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showSeekWheelDialog = false }) { Text(str("btn_ok")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSeekWheelDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }
@@ -210,7 +212,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showQualityDialog = false }) { Text(str("btn_cancel")) } }
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showQualityDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -269,7 +271,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showDeviceDialog = false }) { Text(str("btn_cancel")) } }
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeviceDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -286,7 +288,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                             .align(Alignment.Center)
                             .padding(horizontal = 32.dp)
                     )
-                    IconButton(
+                    IconButton(shapes = IconButtonDefaults.shapes(),
                         onClick = { showNormalizationInfoDialog = true },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
@@ -340,7 +342,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = { showNormDialog = false }) { Text(str("btn_ok")) } }
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showNormDialog = false }) { Text(str("btn_ok")) } }
         )
     }
 
@@ -376,7 +378,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showNormalizationInfoDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showNormalizationInfoDialog = false }) {
                     Text(str("btn_ok"))
                 }
             }
@@ -472,7 +474,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showCrossfadeDurationDialog = false }) { Text(str("btn_ok")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showCrossfadeDurationDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }
@@ -513,7 +515,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAutomixOverlapDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAutomixOverlapDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -575,7 +577,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     automixStartOffsetMode = tempMode
                     automixStartOffsetCustomSec = tempCustomSec
                     prefs.setAutomixStartOffsetMode(tempMode)
@@ -587,7 +589,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAutomixStartOffsetDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAutomixStartOffsetDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -798,7 +800,7 @@ fun AudioSleepTimerPage() {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFadeDurationDialog = false }) { Text(str("btn_ok")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFadeDurationDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }
