@@ -25,6 +25,10 @@ import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -375,6 +379,9 @@ private fun RecognitionHomeView(
 
 private enum class AudioSourceCategory { MIC, DESKTOP }
 
+/** Height kept for the device picker under the source switch. */
+private val DEVICE_CHIP_SLOT = 40.dp
+
 @Composable
 private fun AudioDeviceSelector(
     viewModel: RecognitionViewModel,
@@ -434,15 +441,23 @@ private fun AudioDeviceSelector(
                 }
             )
 
+            // The picker's room is kept whether or not the chosen kind has several devices: appearing and going
+            // away, it moved the listen button up and down on every switch (issue #66).
             val categoryDevices = if (selectedCategory == AudioSourceCategory.DESKTOP) desktopDevices else micDevices
-            if (categoryDevices.size > 1) {
-                Spacer(Modifier.height(8.dp))
-                DeviceDropdownChip(
-                    viewModel = viewModel,
-                    devices = categoryDevices,
-                    selectedDeviceId = selectedDevice?.id,
-                    enabled = enabled
-                )
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.height(DEVICE_CHIP_SLOT), contentAlignment = Alignment.Center) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = categoryDevices.size > 1,
+                    enter = fadeIn(tween(200)),
+                    exit = fadeOut(tween(150)),
+                ) {
+                    DeviceDropdownChip(
+                        viewModel = viewModel,
+                        devices = categoryDevices,
+                        selectedDeviceId = selectedDevice?.id,
+                        enabled = enabled
+                    )
+                }
             }
         } else {
             // Single category on this machine: straight to the device picker.
@@ -572,6 +587,12 @@ private fun DeviceDropdownChip(
 }
 
 
+/**
+ * What was heard, as a card to act on (issue #66): the cover first, then the song, the one artist Shazam credits
+ * with how many people listen to them, where it comes from and when it came out, the track's numbers on
+ * SoundCloud, and the way to play it here. The account that uploaded it is not the artist: it used to stand in
+ * for one, so a song by one singer read as by two.
+ */
 @Composable
 private fun SuccessView(
     state: RecognitionState.Success,
@@ -580,175 +601,196 @@ private fun SuccessView(
 ) {
     val shazamResult = state.result
     val soundcloudTrack = state.soundcloudTrack
-    val imageUrl = soundcloudTrack?.fullResArtwork ?: shazamResult.coverArtHqUrl ?: shazamResult.coverArtUrl
-    val title = soundcloudTrack?.title ?: shazamResult.title
-    val artist = soundcloudTrack?.user?.username ?: shazamResult.artist
+    val imageUrl = shazamResult.coverArtHqUrl ?: soundcloudTrack?.fullResArtwork ?: shazamResult.coverArtUrl
+    val title = shazamResult.title.ifBlank { soundcloudTrack?.title.orEmpty() }
+    val artist = shazamResult.artist.ifBlank { soundcloudTrack?.displayArtist.orEmpty() }
+    val leadArtist = remember(artist) { com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(artist).firstOrNull() ?: artist }
+    val recognizedAt = remember(state) {
+        java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+    }
+    val released = remember(shazamResult, soundcloudTrack) {
+        (shazamResult.releaseDate ?: soundcloudTrack?.releaseDate)?.takeIf { it.isNotBlank() }
+    }
 
     val likedTracks by LikeRepository.likedTracks.collectAsStateWithLifecycle()
     val isLiked = soundcloudTrack?.let { track -> likedTracks.any { it.id == track.id } } == true
 
-    Box(modifier = Modifier.fillMaxSize()) {
-
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .widthIn(max = 520.dp)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
         ) {
             Spacer(modifier = Modifier.statusBarsPadding())
-            Spacer(modifier = Modifier.height(72.dp))
-            
+            Spacer(modifier = Modifier.height(64.dp))
+
+            ElevatedCard(
+                shape = RoundedCornerShape(28.dp),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 18.dp),
+                modifier = Modifier.size(240.dp)
+            ) {
+                if (imageUrl != null) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Rounded.MusicNote, null, Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = title,
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 24.dp)
             )
-            
             Spacer(modifier = Modifier.height(4.dp))
-            
             Text(
                 text = artist,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 24.dp)
             )
-            
+            com.alananasss.kittytune.ui.common.MonthlyListenersText(
+                artistName = leadArtist,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+
+            val facts = listOfNotNull(
+                shazamResult.album?.takeIf { it.isNotBlank() && !it.equals(title, ignoreCase = true) },
+                released?.let { str("recognition_released", com.alananasss.kittytune.ui.main.formatReleaseDate(it)) },
+                shazamResult.genre?.takeIf { it.isNotBlank() },
+            )
+            if (facts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = facts.joinToString("  ·  "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            if (soundcloudTrack != null) {
+                Spacer(modifier = Modifier.height(20.dp))
+                TrackStatsRow(soundcloudTrack)
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
-            
             Row(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (soundcloudTrack != null) {
-                    Button(
-                        shapes = ButtonDefaults.shapes(),
-                        onClick = onPlayClick,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp),
-
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    ) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            str("recognition_listen_on_kittytune"),
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                } else {
-                    Button(
-                        shapes = ButtonDefaults.shapes(),
-                        onClick = onRetry,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(52.dp),
-
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            str("btn_retry"),
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                
                 Button(
                     shapes = ButtonDefaults.shapes(),
-                    onClick = {
-                        soundcloudTrack?.let { track ->
-                            if (isLiked) {
-                                LikeRepository.removeLike(track.id)
-                            } else {
-                                LikeRepository.addLike(track)
-                            }
-                        }
-                    },
-                    modifier = Modifier.height(52.dp),
-
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                    ),
-                    contentPadding = PaddingValues(0.dp)
+                    onClick = if (soundcloudTrack != null) onPlayClick else onRetry,
+                    modifier = Modifier.weight(1f).height(56.dp),
                 ) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = str("player_like_action"), 
-                        modifier = Modifier.padding(horizontal = 24.dp),
-                        tint = if (isLiked) MaterialTheme.colorScheme.primary else LocalContentColor.current
+                    Icon(if (soundcloudTrack != null) Icons.Rounded.PlayArrow else Icons.Rounded.Refresh, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (soundcloudTrack != null) str("recognition_listen_on_kittytune") else str("btn_retry"),
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                
                 if (soundcloudTrack != null) {
-                    Button(
-                        shapes = ButtonDefaults.shapes(),
-                        onClick = onRetry,
-                        modifier = Modifier.height(52.dp),
-
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        ),
-                        contentPadding = PaddingValues(0.dp)
+                    FilledTonalIconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = {
+                            if (isLiked) LikeRepository.removeLike(soundcloudTrack.id) else LikeRepository.addLike(soundcloudTrack)
+                        },
+                        modifier = Modifier.size(56.dp),
                     ) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = str("btn_retry"), modifier = Modifier.padding(horizontal = 24.dp))
-                    }
-                }
-            }
-            
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                ElevatedCard(
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 18.dp),
-                    modifier = Modifier.size(260.dp)
-                ) {
-                    if (imageUrl != null) {
-                        AsyncImage(
-                            model = imageUrl,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                        Icon(
+                            imageVector = if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                            contentDescription = str("player_like_action"),
+                            tint = if (isLiked) MaterialTheme.colorScheme.primary else LocalContentColor.current
                         )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Rounded.MusicNote, null,
-                                Modifier.size(64.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    }
+                    FilledTonalIconButton(
+                        shapes = IconButtonDefaults.shapes(),
+                        onClick = onRetry,
+                        modifier = Modifier.size(56.dp),
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = str("btn_retry"))
                     }
                 }
             }
-            
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = str("recognition_recognized_at", recognizedAt),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
             Spacer(modifier = Modifier.height(120.dp))
+        }
+    }
+}
+
+/** The track's plays, likes, reposts and comments on SoundCloud, each a small tile with its icon. */
+@Composable
+private fun TrackStatsRow(track: com.alananasss.kittytune.domain.Track) {
+    val format = remember { java.text.NumberFormat.getCompactNumberInstance(com.alananasss.kittytune.core.Strings.locale(), java.text.NumberFormat.Style.SHORT) }
+    val stats = listOf(
+        Triple(Icons.Rounded.PlayArrow, track.playbackCount, str("stat_plays")),
+        Triple(Icons.Rounded.Favorite, track.likesCount, str("stat_likes")),
+        Triple(Icons.Rounded.Repeat, track.repostsCount, str("stat_reposts")),
+        Triple(Icons.Rounded.ChatBubble, track.commentCount, str("stat_comments")),
+    ).filter { it.second > 0 }
+    if (stats.isEmpty()) return
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        stats.forEach { (icon, count, label) ->
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.weight(1f),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(vertical = 12.dp, horizontal = 6.dp),
+                ) {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        format.format(count),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }

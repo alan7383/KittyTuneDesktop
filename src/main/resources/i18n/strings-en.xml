@@ -2834,4 +2834,11 @@
     <string name="pref_lyrics_one_line_sub">The line being sung, above the play button in the player bar</string>
     <string name="queue_time_left">%1$s left</string>
     <string name="queue_clear_upcoming">Clear what is up next</string>
+    <string name="artist_monthly_listeners">%1$s monthly listeners</string>
+    <string name="recognition_recognized_at">Recognized at %1$s</string>
+    <string name="recognition_released">Released %1$s</string>
+    <string name="stat_plays">Plays</string>
+    <string name="stat_likes">Likes</string>
+    <string name="stat_reposts">Reposts</string>
+    <string name="stat_comments">Comments</string>
 </resources>

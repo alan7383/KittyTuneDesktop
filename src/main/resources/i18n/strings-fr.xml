@@ -2835,4 +2835,11 @@
     <string name="pref_lyrics_one_line_sub">La ligne chantée, au-dessus du bouton lecture de la barre du lecteur</string>
     <string name="queue_time_left">Encore %1$s</string>
     <string name="queue_clear_upcoming">Vider la suite</string>
+    <string name="artist_monthly_listeners">%1$s auditeurs mensuels</string>
+    <string name="recognition_recognized_at">Reconnu à %1$s</string>
+    <string name="recognition_released">Sorti le %1$s</string>
+    <string name="stat_plays">Écoutes</string>
+    <string name="stat_likes">J’aime</string>
+    <string name="stat_reposts">Reposts</string>
+    <string name="stat_comments">Commentaires</string>
 </resources>

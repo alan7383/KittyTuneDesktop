@@ -2836,4 +2836,11 @@
     <string name="pref_lyrics_one_line_sub">Az éppen énekelt sor a lejátszógomb felett a lejátszósávban</string>
     <string name="queue_time_left">Még %1$s</string>
     <string name="queue_clear_upcoming">Következők törlése</string>
+    <string name="artist_monthly_listeners">%1$s havi hallgató</string>
+    <string name="recognition_recognized_at">Felismerve: %1$s</string>
+    <string name="recognition_released">Megjelent: %1$s</string>
+    <string name="stat_plays">Lejátszás</string>
+    <string name="stat_likes">Kedvelés</string>
+    <string name="stat_reposts">Megosztás</string>
+    <string name="stat_comments">Hozzászólás</string>
 </resources>

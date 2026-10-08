@@ -3446,4 +3446,11 @@
     <string name="pref_lyrics_one_line_sub">Die gesungene Zeile über der Wiedergabetaste in der Player-Leiste</string>
     <string name="queue_time_left">Noch %1$s</string>
     <string name="queue_clear_upcoming">Als Nächstes leeren</string>
+    <string name="artist_monthly_listeners">%1$s monatliche Hörer</string>
+    <string name="recognition_recognized_at">Erkannt um %1$s</string>
+    <string name="recognition_released">Erschienen %1$s</string>
+    <string name="stat_plays">Wiedergaben</string>
+    <string name="stat_likes">Likes</string>
+    <string name="stat_reposts">Reposts</string>
+    <string name="stat_comments">Kommentare</string>
 </resources>
