@@ -2212,8 +2212,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             .filter { LyricsMatcher.isAcceptable(it.title, it.artist, target) }
             .maxByOrNull { LyricsMatcher.score(it.title, it.artist, 0.0, target) }
             ?: return emptyList()
-        val page = com.alananasss.kittytune.data.network.GeniusClient.lyrics(hit.id) ?: return emptyList()
-        val sections = com.alananasss.kittytune.data.lyrics.GeniusVoices.parseSections(page)
+        // The HTML, for the formatting that says who sings each line of a shared part; plain text as a fallback.
+        val page = com.alananasss.kittytune.data.network.GeniusClient.lyricsHtml(hit.id)
+            ?.let(com.alananasss.kittytune.data.lyrics.GeniusVoices::parseHtml)
+            ?: com.alananasss.kittytune.data.network.GeniusClient.lyrics(hit.id)
+                ?.let(com.alananasss.kittytune.data.lyrics.GeniusVoices::parsePlain)
+            ?: return emptyList()
         // Who is credited, in order: the artist part of the title ("OD1NOKO + Kai Angel - song"), the account, the
         // Genius credit, and anyone the title adds with "feat." — some uploads name the second artist only there.
         val featured = Regex("""(?i)(?:\(|\[|\s)(?:feat\.?|ft\.?|featuring|with)\s+([^)\]]+)""")
@@ -2221,7 +2225,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         val credited = com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(artist) +
             com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(effectiveArtist) +
             com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(hit.artistNames.orEmpty()) + featured
-        return com.alananasss.kittytune.data.lyrics.GeniusVoices.voicesFor(lines, sections, credited).orEmpty()
+        return com.alananasss.kittytune.data.lyrics.GeniusVoices.voicesFor(lines, page, credited).orEmpty()
     }
 
     /** Lyrics tagged into the downloaded file, when the user asked for those to come first. */
