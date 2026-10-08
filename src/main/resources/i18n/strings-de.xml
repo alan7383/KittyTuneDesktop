@@ -3539,4 +3539,8 @@
     <string name="artist_more_title">Mehr vom Künstler</string>
     <string name="artist_more_playlists">Playlists</string>
     <string name="track_sorted_by_followers">Meiste Follower zuerst</string>
+    <string name="artist_share_title">Künstler teilen</string>
+    <string name="artist_share_copy_image">Bild kopieren</string>
+    <string name="artist_share_image_copied">Bild kopiert</string>
+    <string name="release_kind_track">Track</string>
 </resources>

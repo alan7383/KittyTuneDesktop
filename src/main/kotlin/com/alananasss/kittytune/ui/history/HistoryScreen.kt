@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.alananasss.kittytune.ui.history
 
 import androidx.compose.animation.*
@@ -5,6 +6,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
@@ -510,7 +512,7 @@ fun HistoryTrackRow(
         onClick = onClick,
         color = if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else Color.Transparent,
         shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().onClick(matcher = androidx.compose.foundation.PointerMatcher.mouse(androidx.compose.ui.input.pointer.PointerButton.Secondary), onClick = onMoreClick)
     ) {
         Row(
             modifier = Modifier
@@ -602,13 +604,6 @@ fun HistoryTrackRow(
                 }
             }
 
-            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onMoreClick) {
-                Icon(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }

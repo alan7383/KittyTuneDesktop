@@ -1848,16 +1848,6 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel, onOpe
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
-        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.showTrackOptions(track) },
-            modifier = Modifier.size(32.dp),
-        ) {
-            Icon(
-                Icons.Filled.MoreVert,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
-        }
     }
     }
 }

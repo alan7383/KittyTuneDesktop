@@ -690,9 +690,6 @@ private fun PopularTrackListItem(
                     com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track)
                 }
             }
-            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick) {
-                Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }

@@ -2928,4 +2928,8 @@
     <string name="artist_more_title">More from the artist</string>
     <string name="artist_more_playlists">Playlists</string>
     <string name="track_sorted_by_followers">Most followers first</string>
+    <string name="artist_share_title">Share artist</string>
+    <string name="artist_share_copy_image">Copy picture</string>
+    <string name="artist_share_image_copied">Picture copied</string>
+    <string name="release_kind_track">Track</string>
 </resources>

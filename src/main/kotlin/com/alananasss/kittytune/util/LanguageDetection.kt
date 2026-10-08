@@ -32,6 +32,8 @@ object LanguageDetection {
     private const val MIN_WORDS_TO_DETECT = 3
     private const val RUSSIAN_LETTERS = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
     private val WHITESPACE = Regex("\\s+")
+    /** @mentions and links are names, not prose: "@dj_kitty nice track" is Russian text in Latin letters. */
+    private val MENTION_OR_LINK = Regex("(@[\\w.\\-]+)|(https?://\\S+)|(\\bwww\\.\\S+)")
     private val NOT_A_WORD = Regex("[^\\p{L}\\p{Nd}\\s]")
 
     /**
@@ -64,7 +66,7 @@ object LanguageDetection {
      * detector, where the reader's language has to be clearly behind the best guess.
      */
     fun needsTranslation(text: String, readerLanguage: String): Boolean {
-        val words = text.replace(NOT_A_WORD, " ").trim()
+        val words = text.replace(MENTION_OR_LINK, " ").replace(NOT_A_WORD, " ").trim()
         val textScript = dominantScript(words) ?: return false
         val readerCode = readerLanguage.substringBefore('-').substringBefore('_').lowercase()
         val readerLocale = Locale.forLanguageTag(readerCode)

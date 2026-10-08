@@ -402,19 +402,31 @@ fun ProfileScreen(
                                 }
                             }
                             val releaseColumn: @Composable (Modifier) -> Unit = { m ->
-                                if (latest != null) Column(m) {
+                                if (latest.isNotEmpty()) Column(m) {
                                     ArtistSectionTitle(
-                                        str("artist_new_release"),
-                                        // Every release, newest first: the records and singles when there are some, else the songs.
+                                        str("artist_new_releases"),
+                                        // Records only, never a list of songs: the albums when there are some, else
+                                        // the singles and the rest of the records.
                                         onOpen = {
-                                            val hasReleases = profileViewModel.albums.isNotEmpty() || profileViewModel.singles.isNotEmpty()
-                                            onNavigate("profile_collection:${user.id}:${if (hasReleases) "releases" else "latest"}")
+                                            val section = when {
+                                                profileViewModel.albums.isNotEmpty() -> "albums"
+                                                profileViewModel.singles.isNotEmpty() -> "singles"
+                                                profileViewModel.compilations.isNotEmpty() -> "compilations"
+                                                else -> "latest"
+                                            }
+                                            onNavigate("profile_collection:${user.id}:$section")
                                         },
                                     )
-                                    NewReleaseCard(latest, playerViewModel, artistPlaybackContext, onNavigate, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
+                                    latest.forEachIndexed { index, release ->
+                                        NewReleaseCard(
+                                            release, playerViewModel, artistPlaybackContext, onNavigate,
+                                            Modifier.padding(horizontal = 16.dp, vertical = if (index == 0) 0.dp else 4.dp).fillMaxWidth(),
+                                            previous = index > 0,
+                                        )
+                                    }
                                 }
                             }
-                            if (maxWidth >= 860.dp && latest != null) {
+                            if (maxWidth >= 860.dp && latest.isNotEmpty()) {
                                 Row(Modifier.fillMaxWidth()) {
                                     popularColumn(Modifier.weight(1.5f))
                                     releaseColumn(Modifier.weight(1f).padding(top = 0.dp))
@@ -686,22 +698,15 @@ fun ProfileScreen(
                         }
                     } else if (showBarBackground) {
                         IconButton(shapes = IconButtonDefaults.shapes(), onClick = { DownloadManager.toggleSaveArtist(user) },
-                            colors = IconButtonDefaults.iconButtonColors(containerColor = if (showBarBackground) Color.Transparent else Color.Black.copy(alpha = 0.3f), contentColor = if (isArtistSaved != null) Color(0xFFFF4081) else contentColor)
+                            colors = IconButtonDefaults.iconButtonColors(containerColor = if (showBarBackground) Color.Transparent else Color.Black.copy(alpha = 0.3f), contentColor = if (isArtistSaved != null) MaterialTheme.colorScheme.primary else contentColor)
                         ) {
                             Icon(if (isArtistSaved != null) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder, str("btn_follow"))
                         }
                     }
 
-                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
-                            val cleanUsername = user.username?.replace(" ", "")?.lowercase() ?: "user"
-                            val shareUrl = user.permalinkUrl ?: if (profileViewModel.isSpotifyProfile) {
-                                "https://open.spotify.com/artist/${user.permalink}"
-                            } else {
-                                "https://soundcloud.com/$cleanUsername"
-                            }
-                            val selection = java.awt.datatransfer.StringSelection(shareUrl)
-                            java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
-                        },
+                    var showShare by remember { mutableStateOf(false) }
+                    if (showShare) ArtistShareDialog(rememberArtistShareCard(user, profileViewModel), onDismiss = { showShare = false })
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showShare = true },
                         colors = IconButtonDefaults.iconButtonColors(containerColor = if (showBarBackground) Color.Transparent else Color.Black.copy(alpha = 0.3f), contentColor = contentColor)
                     ) {
                         Icon(Icons.Outlined.Share, str("btn_share"))
