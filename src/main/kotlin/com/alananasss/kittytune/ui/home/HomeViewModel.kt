@@ -228,6 +228,72 @@ import com.alananasss.kittytune.utils.Logger
 
         fun clearRecentSearches() {
             viewModelScope.launch { RecentSearchRepository.clear() }
+            com.alananasss.kittytune.data.search.RecentVisits.clear()
+        }
+
+        /** Artists, tracks and playlists opened from search, newest first; see [RecentVisits]. */
+        val recentVisits = com.alananasss.kittytune.data.search.RecentVisits.visits
+
+        fun forgetVisit(visit: com.alananasss.kittytune.data.search.RecentVisits.Visit) =
+            com.alananasss.kittytune.data.search.RecentVisits.forget(visit)
+
+        /**
+         * Something was opened from the results: it takes the place of the words typed to find it in the recent
+         * list, and an artist picked for this query counts towards making them its best result next time.
+         */
+        private fun noteOpened(visit: com.alananasss.kittytune.data.search.RecentVisits.Visit) {
+            com.alananasss.kittytune.data.search.RecentVisits.record(visit)
+            searchQuery.trim().takeIf { it.isNotEmpty() }?.let(::forgetSearch)
+        }
+
+        fun noteOpenedArtist(user: User) {
+            com.alananasss.kittytune.data.search.SearchPicks.record(searchQuery, user.id)
+            noteOpened(
+                com.alananasss.kittytune.data.search.RecentVisits.Visit(
+                    kind = com.alananasss.kittytune.data.search.RecentVisits.Kind.ARTIST,
+                    key = user.profileNavId,
+                    title = user.username.orEmpty(),
+                    subtitle = null,
+                    imageUrl = user.avatarUrl,
+                    destination = user.profileNavId,
+                    track = null,
+                    isVerified = user.verified,
+                    at = System.currentTimeMillis(),
+                )
+            )
+        }
+
+        fun noteOpenedTrack(track: Track) {
+            noteOpened(
+                com.alananasss.kittytune.data.search.RecentVisits.Visit(
+                    kind = com.alananasss.kittytune.data.search.RecentVisits.Kind.TRACK,
+                    key = track.id.toString(),
+                    title = track.title.orEmpty(),
+                    subtitle = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
+                    imageUrl = track.fullResArtwork,
+                    destination = null,
+                    // Without what goes stale or weighs a lot; the player fetches the rest again.
+                    track = track.copy(description = null, tagList = null, caption = null, waveformUrl = null, media = null),
+                    isVerified = track.user?.verified == true,
+                    at = System.currentTimeMillis(),
+                )
+            )
+        }
+
+        fun noteOpenedPlaylist(playlist: Playlist, destination: String) {
+            noteOpened(
+                com.alananasss.kittytune.data.search.RecentVisits.Visit(
+                    kind = com.alananasss.kittytune.data.search.RecentVisits.Kind.PLAYLIST,
+                    key = destination,
+                    title = playlist.title.orEmpty(),
+                    subtitle = playlist.user?.username,
+                    imageUrl = playlist.artworkUrl ?: playlist.calculatedArtworkUrl,
+                    destination = destination,
+                    track = null,
+                    isVerified = false,
+                    at = System.currentTimeMillis(),
+                )
+            )
         }
 
         /**

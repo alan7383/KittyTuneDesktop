@@ -27,12 +27,14 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,17 +83,27 @@ fun SearchLanding(
     onOpenTag: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val visits by vm.recentVisits.collectAsState()
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
     ) {
-        if (vm.recentSearches.isNotEmpty()) {
+        if (vm.recentSearches.isNotEmpty() || visits.isNotEmpty()) {
             item {
                 RecentSearchesSection(
+                    visits = visits,
                     searches = vm.recentSearches,
                     onRun = { vm.runRecentSearch(it) },
                     onForget = { vm.forgetSearch(it) },
+                    onOpenVisit = { visit ->
+                        when (visit.kind) {
+                            com.alananasss.kittytune.data.search.RecentVisits.Kind.TRACK ->
+                                visit.track?.let { playerViewModel.playPlaylist(listOf(it), 0) }
+                            else -> visit.destination?.let { playerViewModel.navigateToPlaylistId = it }
+                        }
+                    },
+                    onForgetVisit = { vm.forgetVisit(it) },
                     onClearAll = { vm.clearRecentSearches() },
                 )
             }
@@ -276,9 +288,12 @@ private fun LandingHeader(title: String, action: Pair<String, () -> Unit>?) {
  */
 @Composable
 private fun RecentSearchesSection(
+    visits: List<com.alananasss.kittytune.data.search.RecentVisits.Visit>,
     searches: List<String>,
     onRun: (String) -> Unit,
     onForget: (String) -> Unit,
+    onOpenVisit: (com.alananasss.kittytune.data.search.RecentVisits.Visit) -> Unit,
+    onForgetVisit: (com.alananasss.kittytune.data.search.RecentVisits.Visit) -> Unit,
     onClearAll: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -289,12 +304,19 @@ private fun RecentSearchesSection(
             action = str("search_clear_all") to onClearAll,
         )
 
-        val visible = if (expanded) searches else searches.take(COLLAPSED_RECENT_SEARCHES)
-        visible.forEach { term ->
+        // What was opened comes first, as itself: the artist with their picture is one click from their page,
+        // where the words typed to find them were two (issue #66).
+        val total = visits.size + searches.size
+        val shownVisits = if (expanded) visits else visits.take(COLLAPSED_RECENT_SEARCHES)
+        shownVisits.forEach { visit ->
+            RecentVisitRow(visit = visit, onOpen = { onOpenVisit(visit) }, onForget = { onForgetVisit(visit) })
+        }
+        val roomForTerms = if (expanded) searches.size else (COLLAPSED_RECENT_SEARCHES - shownVisits.size).coerceAtLeast(0)
+        searches.take(roomForTerms).forEach { term ->
             RecentSearchRow(term = term, onRun = { onRun(term) }, onForget = { onForget(term) })
         }
 
-        if (searches.size > COLLAPSED_RECENT_SEARCHES) {
+        if (total > COLLAPSED_RECENT_SEARCHES) {
             val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "seeMoreChevron")
             TextButton(shapes = ButtonDefaults.shapes(),
                 onClick = { expanded = !expanded },
@@ -316,6 +338,102 @@ private fun RecentSearchesSection(
         }
     }
 }
+
+/** Something opened from search before: an artist, a track or a playlist, with its picture. */
+@Composable
+private fun RecentVisitRow(
+    visit: com.alananasss.kittytune.data.search.RecentVisits.Visit,
+    onOpen: () -> Unit,
+    onForget: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val crossSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val background by animateColorAsState(
+        if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+        label = "recentVisitBackground",
+    )
+    val crossAlpha by animateFloatAsState(if (hovered) 1f else 0f, label = "recentVisitCross")
+    val isArtist = visit.kind == com.alananasss.kittytune.data.search.RecentVisits.Kind.ARTIST
+    val subtitle = when (visit.kind) {
+        com.alananasss.kittytune.data.search.RecentVisits.Kind.ARTIST -> str("search_kind_artist")
+        com.alananasss.kittytune.data.search.RecentVisits.Kind.TRACK -> str("search_kind_track", visit.subtitle.orEmpty())
+        com.alananasss.kittytune.data.search.RecentVisits.Kind.PLAYLIST ->
+            listOfNotNull(str("search_kind_playlist"), visit.subtitle?.takeIf { it.isNotBlank() }).joinToString(" · ")
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = CONTENT_PADDING - 6.dp)
+            .height(VISIT_ROW_HEIGHT)
+            .hoverable(interactionSource)
+            .pressScale(interactionSource, pressedScale = 0.98f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(background)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onOpen)
+            .padding(start = 6.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = visit.imageUrl,
+            contentDescription = null,
+            placeholder = if (isArtist) rememberDefaultAvatarPainter() else null,
+            error = if (isArtist) rememberDefaultAvatarPainter() else null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(if (isArtist) CircleShape else RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = visit.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (visit.isVerified) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Rounded.Verified,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .clickable(interactionSource = crossSource, indication = null, onClick = onForget)
+                .alpha(crossAlpha),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.Close,
+                contentDescription = str("search_remove_recent"),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+private val VISIT_ROW_HEIGHT = 56.dp
 
 /**
  * One stored query.

@@ -2843,4 +2843,7 @@
     <string name="stat_likes">Kedvelés</string>
     <string name="stat_reposts">Megosztás</string>
     <string name="stat_comments">Hozzászólás</string>
+    <string name="search_kind_artist">Előadó</string>
+    <string name="search_kind_playlist">Lejátszási lista</string>
+    <string name="search_kind_track">Szám · %1$s</string>
 </resources>
