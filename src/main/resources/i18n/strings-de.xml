@@ -3529,4 +3529,16 @@
     <string name="artist_listening">Du hörst zu</string>
     <string name="artist_resume">Weiter</string>
     <string name="artist_trailer_playing">Trailer läuft</string>
+    <string name="sort_now">Aktuell gehört</string>
+    <string name="sort_all_time">Aller Zeiten</string>
+    <string name="sort_likes">Meiste Likes</string>
+    <string name="sort_followers">Meiste Follower</string>
+    <string name="artist_new_releases">Neuerscheinungen</string>
+    <string name="btn_load_more">Mehr laden</string>
+    <string name="release_kind_album">Album</string>
+    <string name="release_kind_ep">EP</string>
+    <string name="release_kind_single">Single</string>
+    <string name="release_kind_compilation">Compilation</string>
+    <string name="artist_more_title">Mehr vom Künstler</string>
+    <string name="artist_more_playlists">Playlists</string>
 </resources>

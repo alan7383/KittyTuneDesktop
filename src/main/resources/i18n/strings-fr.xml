@@ -2919,4 +2919,16 @@
     <string name="artist_listening">En écoute</string>
     <string name="artist_resume">Reprendre</string>
     <string name="artist_trailer_playing">Bande-annonce en cours</string>
+    <string name="sort_now">Écoutés en ce moment</string>
+    <string name="sort_all_time">De tous les temps</string>
+    <string name="sort_likes">Les plus aimés</string>
+    <string name="sort_followers">Plus d'abonnés</string>
+    <string name="artist_new_releases">Nouveautés</string>
+    <string name="btn_load_more">Charger plus</string>
+    <string name="release_kind_album">Album</string>
+    <string name="release_kind_ep">EP</string>
+    <string name="release_kind_single">Single</string>
+    <string name="release_kind_compilation">Compilation</string>
+    <string name="artist_more_title">Plus de l'artiste</string>
+    <string name="artist_more_playlists">Playlists</string>
 </resources>

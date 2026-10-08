@@ -3367,4 +3367,16 @@
     <string name="artist_listening">Đang nghe</string>
     <string name="artist_resume">Tiếp tục</string>
     <string name="artist_trailer_playing">Đang phát trailer</string>
+    <string name="sort_now">Đang được nghe</string>
+    <string name="sort_all_time">Mọi thời đại</string>
+    <string name="sort_likes">Nhiều lượt thích</string>
+    <string name="sort_followers">Nhiều người theo dõi</string>
+    <string name="artist_new_releases">Phát hành mới</string>
+    <string name="btn_load_more">Tải thêm</string>
+    <string name="release_kind_album">Album</string>
+    <string name="release_kind_ep">EP</string>
+    <string name="release_kind_single">Đĩa đơn</string>
+    <string name="release_kind_compilation">Tuyển tập</string>
+    <string name="artist_more_title">Thêm từ nghệ sĩ</string>
+    <string name="artist_more_playlists">Danh sách phát</string>
 </resources>
