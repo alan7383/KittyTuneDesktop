@@ -350,7 +350,9 @@ fun KaraokeLyricsView(
                 scrollInCode.value = true
                 isReturning.value = true
                 try {
-                    listState.returnToLine(focus) { (-stableOffsetPx - keepAliveZonePx).toInt() }
+                    // The same spot the follow below settles a line on. The way back used to aim one top inset
+                    // lower, so the follow then pulled the list up again with a jump a moment later (issue #66).
+                    listState.returnToLine(focus) { -followTopPx(listState, stableOffsetPx, keepAliveZonePx) }
                     lastFocusedIndex = focus
                 } finally {
                     isReturning.value = false
@@ -394,7 +396,7 @@ fun KaraokeLyricsView(
                         isSnapScroll.value = true
                     }
 
-                    val desiredOffset = (listState.layoutInfo.viewportStartOffset + stableOffsetPx + keepAliveZonePx).toInt()
+                    val desiredOffset = followTopPx(listState, stableOffsetPx, keepAliveZonePx)
 
                     if (targetItem != null && !isLargeJump) {
                         val scrollOffset = targetItem.offset - desiredOffset
@@ -402,7 +404,7 @@ fun KaraokeLyricsView(
                             listState.scrollBy(scrollOffset.toFloat())
                         }
                     } else if (!isLargeJump && !scrubbing && !isRapidClick) {
-                        listState.animateScrollToItem(firstIndex, (-stableOffsetPx - keepAliveZonePx).toInt())
+                        listState.animateScrollToItem(firstIndex, -desiredOffset)
                     } else {
                         listState.scrollToItem(firstIndex)
                         val refreshed = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == firstIndex }
@@ -648,3 +650,10 @@ fun KaraokeLyricsView(
 private const val LINE_STIFFNESS = 300f
 private const val LINE_STIFFNESS_STEP = 18f
 private const val LINE_STIFFNESS_MIN = 190f
+
+/**
+ * Where the sung line's top settles, as a [androidx.compose.foundation.lazy.LazyListItemInfo.offset]: the same
+ * for the follow and for the way back after a manual scroll, so one never undoes the other.
+ */
+private fun followTopPx(listState: LazyListState, stableOffsetPx: Int, keepAliveZonePx: Float): Int =
+    (listState.layoutInfo.viewportStartOffset + stableOffsetPx + keepAliveZonePx).toInt()

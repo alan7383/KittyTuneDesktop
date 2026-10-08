@@ -5,7 +5,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.PressInteraction
@@ -288,47 +287,60 @@ private const val RETURN_MAX_VIEWPORTS = 2f
  *
  * [glideToLine] jumped to a few lines short of a far line first and then sprang the rest, and in the karaoke
  * view every line followed with its own spring, so the way back was a jump and lines flying into place
- * (issue #66). The distance to a line that is not laid out is estimated from the lines that are, and the
- * last few pixels are corrected once it is on screen.
+ * (issue #66). The distance to a line that is not laid out yet can only be estimated from the lines that are,
+ * and a fixed movement over the estimate landed short or long and then corrected itself in a second, sharper
+ * movement: "it takes me back to the wrong place and then jumps to the line" (issue #66). The way left is
+ * measured again on every frame instead, so the one movement ends exactly on the line.
  *
  * @param offset the scroll offset to settle the line at, as for [LazyListState.scrollToItem].
  */
 internal suspend fun LazyListState.returnToLine(index: Int, offset: () -> Int) {
     val info = layoutInfo
     val viewport = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1)
-    val visible = info.visibleItemsInfo
-    if (visible.isEmpty()) {
+    var distance = distanceToLine(index, offset) ?: run {
         scrollToItem(index, offset())
         return
-    }
-    val target = visible.firstOrNull { it.index == index }
-    var distance = if (target != null) {
-        (target.offset + offset()).toFloat()
-    } else {
-        val first = visible.first()
-        val averageStep = (visible.last().offset + visible.last().size - first.offset).toFloat() / visible.size
-        first.offset + (index - first.index) * averageStep + offset()
     }
     val maxRun = viewport * RETURN_MAX_VIEWPORTS
     if (kotlin.math.abs(distance) > maxRun) {
         // Too far to scroll through in one movement: start the movement from closer.
         scrollBy(distance - kotlin.math.sign(distance) * maxRun)
-        distance = kotlin.math.sign(distance) * maxRun
+        withFrameNanos { }
+        distance = distanceToLine(index, offset) ?: return
     }
-    val durationMs = (RETURN_BASE_MS + RETURN_PER_VIEWPORT_MS * kotlin.math.abs(distance) / viewport).toInt()
-    animateScrollBy(distance, tween(durationMs, easing = FastOutSlowInEasing))
-    val landed = layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
-    if (landed != null) {
-        val miss = landed.offset + offset()
-        if (kotlin.math.abs(miss) > 1) animateScrollBy(miss.toFloat(), tween(RETURN_CORRECTION_MS, easing = FastOutSlowInEasing))
-    } else {
-        animateScrollToItem(index, offset())
+    val durationMs = RETURN_BASE_MS + RETURN_PER_VIEWPORT_MS * kotlin.math.abs(distance) / viewport
+    scroll {
+        var travelled = 0f
+        val startNanos = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val t = ((now - startNanos) / 1_000_000f / durationMs).coerceIn(0f, 1f)
+            val left = distanceToLine(index, offset) ?: break
+            val wanted = (travelled + left) * FastOutSlowInEasing.transform(t)
+            val step = wanted - travelled
+            val consumed = scrollBy(step)
+            travelled += consumed
+            // Done, or held at the end of the list.
+            if (t >= 1f || kotlin.math.abs(consumed) + 0.5f < kotlin.math.abs(step)) break
+        }
     }
+}
+
+/**
+ * How far the list has to scroll for line [index] to sit at [offset]: measured when the line is laid out,
+ * estimated from the average height of the lines that are when it is not, and null for an empty layout.
+ */
+private fun LazyListState.distanceToLine(index: Int, offset: () -> Int): Float? {
+    val visible = layoutInfo.visibleItemsInfo
+    if (visible.isEmpty()) return null
+    visible.firstOrNull { it.index == index }?.let { return (it.offset + offset()).toFloat() }
+    val first = visible.first()
+    val averageStep = (visible.last().offset + visible.last().size - first.offset).toFloat() / visible.size
+    return first.offset + (index - first.index) * averageStep + offset()
 }
 
 private const val RETURN_BASE_MS = 520f
 private const val RETURN_PER_VIEWPORT_MS = 180f
-private const val RETURN_CORRECTION_MS = 160
 
 /** How many lines short of a far-away line a glide starts, so it reads as movement rather than a jump. */
 private const val GLIDE_RUN_UP_LINES = 3
