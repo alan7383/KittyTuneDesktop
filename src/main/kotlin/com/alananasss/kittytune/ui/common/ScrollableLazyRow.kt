@@ -66,6 +66,8 @@ fun ScrollableLazyRow(
     fadeColor: Color = MaterialTheme.colorScheme.background,
     /** How far one press of an arrow travels. Three cards is a screenful on most window widths. */
     itemsPerJump: Int = 3,
+    /** Off for a short row of chips, which is plainly dragged and where arrows only crowd it (issue #66). */
+    showsArrows: Boolean = true,
     content: LazyListScope.() -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -73,8 +75,8 @@ fun ScrollableLazyRow(
     val canScrollBackward by remember { derivedStateOf { state.canScrollBackward } }
     val canScrollForward by remember { derivedStateOf { state.canScrollForward } }
 
-    val alphaLeft by animateFloatAsState(if (canScrollBackward) 1f else 0f, label = "rowArrowLeft")
-    val alphaRight by animateFloatAsState(if (canScrollForward) 1f else 0f, label = "rowArrowRight")
+    val alphaLeft by animateFloatAsState(if (showsArrows && canScrollBackward) 1f else 0f, label = "rowArrowLeft")
+    val alphaRight by animateFloatAsState(if (showsArrows && canScrollForward) 1f else 0f, label = "rowArrowRight")
 
     Box(modifier) {
         LazyRow(

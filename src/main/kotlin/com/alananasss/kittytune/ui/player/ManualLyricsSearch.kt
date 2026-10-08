@@ -118,6 +118,16 @@ internal object ManualLyricsSearch {
     private fun isAboutThisSong(result: UnifiedLyricResult, target: LyricsMatcher.Target): Boolean =
         LyricsMatcher.titleSimilarity(result.name, target) >= LyricsMatcher.CONFIDENT_MATCH
 
+    /** Sure enough to be used without asking: this song's title, and its length when both lengths are known. */
+    fun isConfidentMatch(result: UnifiedLyricResult, target: LyricsMatcher.Target): Boolean {
+        if (!isAboutThisSong(result, target)) return false
+        val targetSec = target.durationMs / 1000.0
+        return result.durationSec <= 0.0 || targetSec <= 0.0 || lengthMiss(result, targetSec) <= MAX_LENGTH_MISS_SEC
+    }
+
+    /** Further off the track's length than this, a timed copy is probably another cut of the song. */
+    private const val MAX_LENGTH_MISS_SEC = 6.0
+
     private fun rank(result: UnifiedLyricResult, target: LyricsMatcher.Target): Float {
         val score = LyricsMatcher.score(result.name, result.artistName, result.durationSec, target)
         val titleSimilarity = LyricsMatcher.titleSimilarity(result.name, target)
