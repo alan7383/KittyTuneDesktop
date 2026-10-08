@@ -22,13 +22,55 @@ class ArtistClipsTest {
         )
         assertEquals(
             listOf("Rihanna - Umbrella (Official Music Video) ft. JAY-Z", "Rihanna - Diamonds"),
-            ArtistClips.pickClips("Rihanna", found).map { it.title },
+            ArtistClips.pickClips(ArtistClips.namesOf("Rihanna"), found).map { it.title },
         )
     }
 
     @Test
     fun `a title starting with the artist counts even from another channel`() {
         val found = listOf(clip("9mice - NEW-YORK (клип)", "Some Label"), clip("NEW-YORK", "Some Label"))
-        assertEquals(listOf("9mice - NEW-YORK (клип)"), ArtistClips.pickClips("9mice", found).map { it.title })
+        assertEquals(listOf("9mice - NEW-YORK (клип)"), ArtistClips.pickClips(ArtistClips.namesOf("9mice"), found).map { it.title })
+    }
+
+    @Test
+    fun `a duo is looked for as each member, whatever joins their names`() {
+        assertEquals(listOf("Kai Angel & 9mice", "Kai Angel", "9mice"), ArtistClips.namesOf("Kai Angel & 9mice"))
+        assertEquals(listOf("A / B", "A", "B"), ArtistClips.namesOf("A / B"))
+        assertEquals(listOf("A + B", "A", "B"), ArtistClips.namesOf("A + B"))
+        assertEquals(listOf("A, B", "A", "B"), ArtistClips.namesOf("A, B"))
+        assertEquals(listOf("Rihanna"), ArtistClips.namesOf("Rihanna"))
+    }
+
+    @Test
+    fun `a duo keeps each member's own videos, not only the ones they made together`() {
+        val found = listOf(
+            clip("Kai Angel & 9mice - TV (Official Video)", "kai angel"),
+            clip("Kai Angel - gladiator (Official Music Video)", "kai angel"),
+            clip("9mice - u+me (official music video)", "9mice"),
+            clip("Kai Angel - jennifer's body (текст)", "Blademp3"),
+            clip("Kai Angel - PRADA PARTY (Official Music Video)", "viperrviperrviperr"),
+            clip("Kai Angel - gladiator (slowed + reverb)", "Some Channel"),
+            clip("Kai Angel & 9mice - Pitch Black (Visualizer)", "kai angel"),
+            clip("Someone Else - Kai Angel type beat", "Beats"),
+        )
+        val titles = ArtistClips.pickClips(ArtistClips.namesOf("Kai Angel & 9mice"), found).map { it.title }
+        assertEquals(
+            listOf(
+                "Kai Angel & 9mice - TV (Official Video)",
+                "Kai Angel - gladiator (Official Music Video)",
+                "9mice - u+me (official music video)",
+                "Kai Angel - PRADA PARTY (Official Music Video)",
+            ),
+            titles,
+        )
+    }
+
+    @Test
+    fun `a video marked as one comes before a bare title`() {
+        val found = listOf(clip("Rihanna - Diamonds", "Rihanna"), clip("Rihanna - Umbrella (Official Music Video)", "Rihanna"))
+        assertEquals(
+            listOf("Rihanna - Umbrella (Official Music Video)", "Rihanna - Diamonds"),
+            ArtistClips.pickClips(listOf("Rihanna"), found).map { it.title },
+        )
     }
 }
