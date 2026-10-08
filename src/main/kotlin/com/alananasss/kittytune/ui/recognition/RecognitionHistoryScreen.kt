@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.alananasss.kittytune.ui.recognition
 
 import androidx.compose.material3.IconButtonDefaults
@@ -6,6 +7,7 @@ import androidx.compose.material3.ButtonDefaults
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -236,6 +238,7 @@ fun HistoryItemRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .onClick(matcher = androidx.compose.foundation.PointerMatcher.mouse(androidx.compose.ui.input.pointer.PointerButton.Secondary), onClick = onOptionsClick)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -296,12 +299,5 @@ fun HistoryItemRow(
             )
         }
 
-        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionsClick) {
-            Icon(
-                Icons.Rounded.MoreVert,
-                contentDescription = "Options",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
     }
 }

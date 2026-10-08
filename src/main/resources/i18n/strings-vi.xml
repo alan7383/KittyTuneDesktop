@@ -3377,4 +3377,8 @@
     <string name="artist_more_title">Thêm từ nghệ sĩ</string>
     <string name="artist_more_playlists">Danh sách phát</string>
     <string name="track_sorted_by_followers">Nhiều người theo dõi trước</string>
+    <string name="artist_share_title">Chia sẻ nghệ sĩ</string>
+    <string name="artist_share_copy_image">Sao chép ảnh</string>
+    <string name="artist_share_image_copied">Đã sao chép ảnh</string>
+    <string name="release_kind_track">Bài hát</string>
 </resources>

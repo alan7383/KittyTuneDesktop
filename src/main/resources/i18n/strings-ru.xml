@@ -2927,4 +2927,8 @@
     <string name="artist_more_title">Ещё у исполнителя</string>
     <string name="artist_more_playlists">Плейлисты</string>
     <string name="track_sorted_by_followers">Сначала с большим числом подписчиков</string>
+    <string name="artist_share_title">Поделиться исполнителем</string>
+    <string name="artist_share_copy_image">Скопировать картинку</string>
+    <string name="artist_share_image_copied">Картинка скопирована</string>
+    <string name="release_kind_track">Трек</string>
 </resources>

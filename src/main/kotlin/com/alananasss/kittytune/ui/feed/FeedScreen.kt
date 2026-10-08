@@ -322,17 +322,6 @@ private fun TrackFeedItem(
                     }
                 }
 
-                // Options button
-                IconButton(shapes = IconButtonDefaults.shapes(),
-                    onClick = onRightClick,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.MoreVert,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
 
             // Posted time (if not a repost, show post date at the bottom)
@@ -459,16 +448,6 @@ private fun PlaylistFeedItem(
                     }
                 }
 
-                IconButton(shapes = IconButtonDefaults.shapes(),
-                    onClick = onRightClick,
-                    modifier = Modifier.size(36.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.MoreVert,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
 
             if (!isRepost) {

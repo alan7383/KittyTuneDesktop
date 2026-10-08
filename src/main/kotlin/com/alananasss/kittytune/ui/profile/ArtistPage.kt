@@ -244,6 +244,7 @@ private fun ArtistActions(
     val itemMetas by libraryViewModel.allItemMetas.collectAsState()
     val isPinned = itemMetas[pinKey]?.isPinned == true
     var menuOpen by remember { mutableStateOf(false) }
+    var showShare by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val topTracks = profileViewModel.popularTracks.ifEmpty { profileViewModel.allTracks }
     val context = artistContext ?: PlaybackContext(user.username.orEmpty(), "profile:${user.id}")
@@ -255,6 +256,7 @@ private fun ArtistActions(
     val isTrailer = playingContext == PlayerViewModel.TRAILER_NAV_PREFIX + context.navigationId
     val isPlaying = playerViewModel.isPlaying
 
+    if (showShare) ArtistShareDialog(rememberArtistShareCard(user, profileViewModel), onDismiss = { showShare = false })
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Button(
             onClick = {
@@ -359,10 +361,7 @@ private fun ArtistActions(
                 }
                 ArtistMenuItem(Icons.Rounded.Share, str("btn_share")) {
                     menuOpen = false
-                    val shareUrl = user.permalinkUrl ?: "https://soundcloud.com/${user.permalink ?: user.username?.replace(" ", "")?.lowercase()}"
-                    val selection = java.awt.datatransfer.StringSelection(shareUrl)
-                    java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(selection, selection)
-                    Toaster.show(str("artist_link_copied"))
+                    showShare = true
                 }
                 ArtistMenuItem(Icons.Rounded.Info, str("artist_about")) {
                     menuOpen = false
@@ -472,8 +471,9 @@ internal fun ArtistSectionTitle(title: String, onOpen: (() -> Unit)?, modifier: 
 }
 
 /**
- * The artist's latest release, for the right of their popular songs: the song or record, its cover, and how long
- * it has been out.
+ * A release for the right of the artist's popular songs: its cover, whether it is a song or a record, who made it,
+ * and when. The newest one is shown in full; the one before it is [previous], held back in quieter colours so the
+ * two never read as equals.
  */
 @Composable
 internal fun NewReleaseCard(
@@ -482,20 +482,28 @@ internal fun NewReleaseCard(
     context: PlaybackContext?,
     onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
+    previous: Boolean = false,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val scheme = MaterialTheme.colorScheme
     val container by animateColorAsState(
-        if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer,
+        when {
+            previous -> if (hovered) scheme.surfaceContainer else scheme.surfaceContainerLow
+            hovered -> scheme.surfaceContainerHigh
+            else -> scheme.surfaceContainer
+        },
         label = "newReleaseContainer",
     )
+    val cover = if (previous) 88.dp else 132.dp
+    val shape = RoundedCornerShape(if (previous) 18.dp else 24.dp)
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = shape,
         color = container,
         modifier = modifier
             .pressScale(interaction, pressedScale = 0.98f)
             .hoverable(interaction)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(shape)
             .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
                 when (release) {
                     is ArtistRelease.Song -> playerViewModel.playPlaylist(listOf(release.track), 0, context)
@@ -505,61 +513,107 @@ internal fun NewReleaseCard(
                 }
             },
     ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(if (previous) 12.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = release.artworkUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(132.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.size(cover).clip(RoundedCornerShape(if (previous) 12.dp else 16.dp)).background(scheme.surfaceVariant),
             )
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(if (previous) 12.dp else 16.dp))
             Column(Modifier.weight(1f)) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                Surface(shape = CircleShape, color = if (previous) scheme.surfaceVariant else scheme.primaryContainer) {
                     Text(
-                        str("artist_new_release").uppercase(),
+                        release.kindLabel().uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        color = if (previous) scheme.onSurfaceVariant else scheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
-                Spacer(Modifier.height(10.dp))
-                Text(release.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(if (previous) 6.dp else 10.dp))
+                Text(
+                    release.title,
+                    style = if (previous) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (previous) scheme.onSurface.copy(alpha = 0.85f) else scheme.onSurface,
+                    maxLines = if (previous) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                release.byline().takeIf { it.isNotBlank() }?.let {
+                    Spacer(Modifier.height(2.dp))
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 // A date, not "3 years ago": for an artist who has been quiet that says nothing about when.
                 val released = ReleaseDate.text(release.date)
-                if (released.isNotBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(str("artist_released_when", released), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val facts = listOfNotNull(released.takeIf { it.isNotBlank() }?.let { str("artist_released_when", it) }, release.sizeLabel())
+                if (facts.isNotEmpty()) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        facts.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant.copy(alpha = if (previous) 0.7f else 1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
     }
 }
 
-/** What an artist put out last: a single song, or a record of several. */
+/** What an artist put out: a single song, or a record of several. */
 internal sealed interface ArtistRelease {
     val title: String
     val artworkUrl: String?
     val date: String?
 
+    /** "Track", "Album", "Single", "EP" or "Compilation". */
+    @Composable fun kindLabel(): String
+
+    /** Who it is by. */
+    fun byline(): String
+
+    /** How long a song is, or how many songs a record holds. */
+    @Composable fun sizeLabel(): String?
+
     data class Song(val track: Track) : ArtistRelease {
         override val title get() = track.title.orEmpty()
         override val artworkUrl get() = track.fullResArtwork
         override val date get() = track.releaseDate ?: track.createdAt
+        @Composable override fun kindLabel() = str("release_kind_track")
+        override fun byline() = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
+        @Composable override fun sizeLabel() = track.durationMs?.takeIf { it > 0 }?.let {
+            val seconds = it / 1000
+            String.format("%d:%02d", seconds / 60, seconds % 60)
+        }
     }
 
     data class Record(val playlist: Playlist) : ArtistRelease {
         override val title get() = playlist.title.orEmpty()
         override val artworkUrl get() = playlist.fullResArtwork
         override val date get() = playlist.releaseDate ?: playlist.createdAt
+        @Composable override fun kindLabel() = when ((playlist.setType ?: playlist.playlistType)?.lowercase()) {
+            "single" -> str("release_kind_single")
+            "ep" -> str("release_kind_ep")
+            "compilation" -> str("release_kind_compilation")
+            else -> str("release_kind_album")
+        }
+        override fun byline() = playlist.user?.username.orEmpty()
+        @Composable override fun sizeLabel() = playlist.trackCount?.takeIf { it > 0 }?.let { str("playlist_num_tracks", it) }
     }
 
     companion object {
-        /** The newest of the artist's songs and records, by release date where one is given, upload date if not. */
-        fun latestOf(tracks: List<Track>, records: List<Playlist>): ArtistRelease? {
-            val candidates = tracks.map { Song(it) } + records.map { Record(it) }
-            return candidates.filter { !it.date.isNullOrBlank() }.maxByOrNull { it.date!!.take(10) }
-                ?: candidates.firstOrNull()
+        /**
+         * The newest of the artist's songs and records, newest first, by release date where one is given and upload
+         * date if not. A song that shares its name with a record is the record's own, so it is listed once.
+         */
+        fun latestOf(tracks: List<Track>, records: List<Playlist>, count: Int = 2): List<ArtistRelease> {
+            val recordTitles = records.mapNotNull { it.title?.trim()?.lowercase() }.toSet()
+            val candidates = records.map { Record(it) } +
+                tracks.filter { it.title?.trim()?.lowercase() !in recordTitles }.map { Song(it) }
+            val dated = candidates.filter { !it.date.isNullOrBlank() }.sortedByDescending { it.date!!.take(10) }
+            return (dated + candidates.filter { it.date.isNullOrBlank() }).take(count)
         }
     }
 }

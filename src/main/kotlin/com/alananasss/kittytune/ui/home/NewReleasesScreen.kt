@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.alananasss.kittytune.ui.home
 
 import androidx.compose.material3.IconButtonDefaults
@@ -6,6 +7,7 @@ import androidx.compose.material3.ButtonDefaults
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
@@ -210,6 +212,7 @@ fun PopularTrackRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .onClick(matcher = androidx.compose.foundation.PointerMatcher.mouse(androidx.compose.ui.input.pointer.PointerButton.Secondary), onClick = onOptionClick)
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -282,10 +285,6 @@ fun PopularTrackRow(
             }
         }
 
-        // kebab menu
-        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick) {
-            Icon(Icons.Default.MoreVert, str("btn_options"))
-        }
     }
 }
 

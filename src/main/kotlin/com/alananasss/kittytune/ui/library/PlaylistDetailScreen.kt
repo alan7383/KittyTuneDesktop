@@ -2114,9 +2114,6 @@ fun TrackListItem(
                     com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track, showLikeIndicator)
                 }
             }
-            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }
@@ -2458,9 +2455,6 @@ fun TrackTableItem(
                 modifier = Modifier.width(60.dp),
                 textAlign = TextAlign.End
             )
-            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }
@@ -2752,9 +2746,6 @@ fun TrackCompactItem(
                 modifier = Modifier.width(60.dp),
                 textAlign = TextAlign.End
             )
-            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-            }
         }
     }
 }
