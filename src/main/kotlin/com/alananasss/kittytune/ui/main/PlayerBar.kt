@@ -170,7 +170,10 @@ fun PlayerBar(
             // Proportional to the bar's width rather than stepped at a few widths. The steps were where the
             // transport visibly jumped narrower while a window was being resized (issue #66).
             val centerMax = lerpByWidth(barWidth, from = 700.dp to 280.dp, to = 1100.dp to 560.dp)
-            val centerMin = lerpByWidth(barWidth, from = 700.dp to 180.dp, to = 850.dp to 300.dp)
+            // Never narrower than the buttons need: below that the play button was squeezed to a sliver while the
+            // title and the volume took the room, and the shuffle went with it.
+            val centerMin = maxOf(lerpByWidth(barWidth, from = 700.dp to 180.dp, to = 850.dp to 300.dp), if (isVeryCompact) 264.dp else 0.dp)
+            val showVolume = barWidth >= 560.dp
 
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = if (isFloating) 18.dp else 12.dp),
@@ -294,7 +297,7 @@ fun PlayerBar(
 
                 // --- center: transport + progress ------------------------------------------
                 Column(
-                    modifier = Modifier.widthIn(min = centerMin, max = centerMax),
+                    modifier = Modifier.widthIn(min = centerMin, max = maxOf(centerMin, if (isVeryCompact) centerMin else centerMax)),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Row(
@@ -437,8 +440,10 @@ fun PlayerBar(
             val verticalVolumeSlider = rememberVerticalVolumeSlider()
 
             // --- right: lyrics / effects / queue / volume ------------------------------
+            // Narrow, the right side takes only what its buttons need and the title gets the rest, instead of both
+            // sides getting an equal share that left the title nothing.
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = if (isVeryCompact) Modifier else Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.End,
             ) {
@@ -514,7 +519,7 @@ fun PlayerBar(
                     }
                 }
 
-                VolumeControl(
+                if (showVolume) VolumeControl(
                     volume = vm.volume,
                     preferVertical = verticalVolumeSlider,
                     isPlaying = vm.isPlaying,

@@ -4366,7 +4366,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             isWaveLoading = true
             try {
                 val exclude = playedTrackIds + _queue.map { it.id }
-                val batch = com.alananasss.kittytune.data.wave.MyWave.nextBatch(mode, exclude)
+                // The first press starts from a quick handful and lets the full batch follow into the queue; waiting
+                // for the full one took the better part of half a minute.
+                val batch = if (changingMode) {
+                    com.alananasss.kittytune.data.wave.MyWave.nextBatch(mode, exclude)
+                } else {
+                    com.alananasss.kittytune.data.wave.MyWave.quickBatch(mode, exclude)
+                        .ifEmpty { com.alananasss.kittytune.data.wave.MyWave.nextBatch(mode, exclude) }
+                }
                 if (batch.isEmpty()) {
                     emitUiEvent(str("wave_nothing_yet"))
                 } else if (changingMode) {
@@ -4380,6 +4387,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         maintainPlayerState = true,
                         respectShuffle = false,
                     )
+                    isWaveLoading = false
+                    val more = runCatching {
+                        com.alananasss.kittytune.data.wave.MyWave.nextBatch(mode, playedTrackIds + _queue.map { it.id })
+                    }.getOrDefault(emptyList())
+                    if (isMyWaveActive && more.isNotEmpty()) appendToQueue(more)
                 }
             } finally {
                 isWaveLoading = false

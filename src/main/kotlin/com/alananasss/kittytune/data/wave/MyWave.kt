@@ -8,7 +8,11 @@ import com.alananasss.kittytune.domain.Track
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * What "My Wave" is tuned for, chosen on its card. The names are the ones Yandex Music made familiar.
@@ -55,6 +59,37 @@ object MyWave {
 
         val chosenFresh = fresh.take(freshCount)
         // Short of new songs: the gap is filled with favourites rather than left.
+        val chosenFamiliar = familiar.take(familiarCount + (freshCount - chosenFresh.size).coerceAtLeast(0))
+        interleave(chosenFresh, chosenFamiliar)
+    }
+
+    /**
+     * Songs for the first press, ready in a second or two. The full batch reads the listener's whole history and
+     * expands nine seeds through SoundCloud, which took the better part of half a minute before anything played; this
+     * takes what is near at hand (favourites, songs related to two recent likes, else what is trending) and the full
+     * batch follows into the queue.
+     */
+    suspend fun quickBatch(mode: WaveMode, exclude: Set<Long>, size: Int = QUICK_SIZE): List<Track> = withContext(Dispatchers.IO) {
+        val familiar = familiarSongs(exclude)
+        val familiarCount = (size * familiarShare(mode)).toInt().coerceAtMost(familiar.size)
+        val freshCount = size - familiarCount
+        val liked = runCatching { LikeRepository.likedTracks.value }.getOrDefault(emptyList())
+        val related = withTimeoutOrNull(QUICK_TIMEOUT_MS) {
+            coroutineScope {
+                liked.take(RECENT_LIKES).shuffled().take(2).map { seed ->
+                    async { runCatching { api.getRelatedTracks(seed.id, limit = 30).collection }.getOrDefault(emptyList()) }
+                }.awaitAll().flatten()
+            }
+        }.orEmpty()
+        val pool = related.ifEmpty {
+            withTimeoutOrNull(QUICK_TIMEOUT_MS) {
+                runCatching {
+                    api.getCharts(kind = "trending", genre = "soundcloud:genres:all-music", limit = size * 2).collection.mapNotNull { it.track }
+                }.getOrDefault(emptyList())
+            }.orEmpty()
+        }
+        val fresh = pool.distinctBy { it.id }.filter { it.id !in exclude && WaveFeedback.isWelcome(it) }.shuffled()
+        val chosenFresh = fresh.take(freshCount)
         val chosenFamiliar = familiar.take(familiarCount + (freshCount - chosenFresh.size).coerceAtLeast(0))
         interleave(chosenFresh, chosenFamiliar)
     }
@@ -128,6 +163,8 @@ object MyWave {
         (track.displayArtist.ifBlank { track.user?.username.orEmpty() }).trim().lowercase()
 
     private const val RECENT_LIKES = 100
+    private const val QUICK_SIZE = 8
+    private const val QUICK_TIMEOUT_MS = 6_000L
 }
 
 /**
