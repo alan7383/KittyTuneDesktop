@@ -2856,4 +2856,27 @@
     <string name="home_continue">Reprendre</string>
     <string name="home_new_from_artists">Nouveautés de vos artistes</string>
     <string name="home_chart_title">En tête des classements</string>
+    <string name="artist_listen">Écouter</string>
+    <string name="artist_trailer">Bande-annonce</string>
+    <string name="artist_trailer_tip">Vingt secondes de chaque titre phare</string>
+    <string name="artist_pin">Épingler dans la bibliothèque</string>
+    <string name="artist_unpin">Désépingler</string>
+    <string name="artist_more">Plus</string>
+    <string name="artist_about">À propos de l’artiste</string>
+    <string name="artist_read_more">Plus</string>
+    <string name="artist_dislike">Ne pas jouer cet artiste</string>
+    <string name="artist_disliked">Ma vague laissera cet artiste de côté</string>
+    <string name="artist_link_copied">Lien copié</string>
+    <string name="artist_new_release">Nouvelle sortie</string>
+    <string name="artist_released_when">Sorti %1$s</string>
+    <string name="artist_mixes_title">Mix</string>
+    <string name="artist_mix_best">Le meilleur de %1$s</string>
+    <string name="artist_mix_style">Dans le style de %1$s</string>
+    <string name="artist_mix_rare">Titres rares</string>
+    <string name="artist_mix_radio">Radio %1$s</string>
+    <string name="artist_mix_label_best">LE MEILLEUR</string>
+    <string name="artist_mix_label_style">DANS LE STYLE</string>
+    <string name="artist_mix_label_rare">RARE</string>
+    <string name="artist_mix_label_radio">RADIO</string>
+    <string name="artist_videos_title">Clips</string>
 </resources>

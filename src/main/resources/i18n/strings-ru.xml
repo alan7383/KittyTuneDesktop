@@ -2854,4 +2854,27 @@
     <string name="home_continue">Продолжить</string>
     <string name="home_new_from_artists">Новое у ваших артистов</string>
     <string name="home_chart_title">В топе чартов</string>
+    <string name="artist_listen">Слушать</string>
+    <string name="artist_trailer">Трейлер</string>
+    <string name="artist_trailer_tip">По 20 секунд из каждого популярного трека</string>
+    <string name="artist_pin">Закрепить в библиотеке</string>
+    <string name="artist_unpin">Открепить</string>
+    <string name="artist_more">Ещё</string>
+    <string name="artist_about">Об исполнителе</string>
+    <string name="artist_read_more">Подробнее</string>
+    <string name="artist_dislike">Не нравится</string>
+    <string name="artist_disliked">Моя волна больше не будет ставить этого артиста</string>
+    <string name="artist_link_copied">Ссылка скопирована</string>
+    <string name="artist_new_release">Новый релиз</string>
+    <string name="artist_released_when">Вышел %1$s</string>
+    <string name="artist_mixes_title">Миксы</string>
+    <string name="artist_mix_best">Лучшее: %1$s</string>
+    <string name="artist_mix_style">В стиле %1$s</string>
+    <string name="artist_mix_rare">Редкие треки</string>
+    <string name="artist_mix_radio">Радио %1$s</string>
+    <string name="artist_mix_label_best">ЛУЧШЕЕ</string>
+    <string name="artist_mix_label_style">В СТИЛЕ</string>
+    <string name="artist_mix_label_rare">РЕДКОЕ</string>
+    <string name="artist_mix_label_radio">РАДИО</string>
+    <string name="artist_videos_title">Клипы</string>
 </resources>

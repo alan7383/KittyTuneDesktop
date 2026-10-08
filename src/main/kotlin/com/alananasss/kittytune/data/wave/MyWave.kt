@@ -169,6 +169,9 @@ object WaveFeedback {
 
     fun onCompleted(track: Track) = adjust(track, 0.3f)
 
+    /** "Don't play this artist", from their page: out of the wave until one of their songs is liked. */
+    fun dislikeArtist(artistName: String) = adjustKey(artistName.trim().lowercase(), -5f)
+
     fun onLiked(track: Track) = adjust(track, 1.5f)
 
     @Synchronized
@@ -180,9 +183,10 @@ object WaveFeedback {
         adjust(track, -1.5f)
     }
 
+    private fun adjust(track: Track, delta: Float) = adjustKey(MyWave.artistKey(track), delta)
+
     @Synchronized
-    private fun adjust(track: Track, delta: Float) {
-        val key = MyWave.artistKey(track)
+    private fun adjustKey(key: String, delta: Float) {
         if (key.isEmpty()) return
         val score = ((artists.remove(key) ?: 0f) + delta).coerceIn(-5f, 5f)
         artists[key] = score

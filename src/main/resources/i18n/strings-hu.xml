@@ -2857,4 +2857,27 @@
     <string name="home_continue">Folytatás</string>
     <string name="home_new_from_artists">Új az előadóidtól</string>
     <string name="home_chart_title">A slágerlisták élén</string>
+    <string name="artist_listen">Lejátszás</string>
+    <string name="artist_trailer">Előzetes</string>
+    <string name="artist_trailer_tip">Húsz másodperc minden népszerű dalból</string>
+    <string name="artist_pin">Kitűzés a könyvtárba</string>
+    <string name="artist_unpin">Kitűzés megszüntetése</string>
+    <string name="artist_more">Továbbiak</string>
+    <string name="artist_about">Az előadóról</string>
+    <string name="artist_read_more">Bővebben</string>
+    <string name="artist_dislike">Ne játssza ezt az előadót</string>
+    <string name="artist_disliked">A Hullámom kihagyja ezt az előadót</string>
+    <string name="artist_link_copied">Hivatkozás másolva</string>
+    <string name="artist_new_release">Új megjelenés</string>
+    <string name="artist_released_when">Megjelent: %1$s</string>
+    <string name="artist_mixes_title">Mixek</string>
+    <string name="artist_mix_best">%1$s legjobbjai</string>
+    <string name="artist_mix_style">%1$s stílusában</string>
+    <string name="artist_mix_rare">Ritka számok</string>
+    <string name="artist_mix_radio">%1$s rádió</string>
+    <string name="artist_mix_label_best">LEGJOBBAK</string>
+    <string name="artist_mix_label_style">STÍLUSÁBAN</string>
+    <string name="artist_mix_label_rare">RITKA</string>
+    <string name="artist_mix_label_radio">RÁDIÓ</string>
+    <string name="artist_videos_title">Videoklipek</string>
 </resources>

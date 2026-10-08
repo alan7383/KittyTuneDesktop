@@ -3304,4 +3304,27 @@
     <string name="home_continue">Nghe tiếp</string>
     <string name="home_new_from_artists">Mới từ nghệ sĩ của bạn</string>
     <string name="home_chart_title">Đứng đầu bảng xếp hạng</string>
+    <string name="artist_listen">Nghe</string>
+    <string name="artist_trailer">Trailer</string>
+    <string name="artist_trailer_tip">Mỗi bài nổi bật 20 giây</string>
+    <string name="artist_pin">Ghim vào thư viện</string>
+    <string name="artist_unpin">Bỏ ghim</string>
+    <string name="artist_more">Thêm</string>
+    <string name="artist_about">Về nghệ sĩ</string>
+    <string name="artist_read_more">Xem thêm</string>
+    <string name="artist_dislike">Không phát nghệ sĩ này</string>
+    <string name="artist_disliked">Làn sóng sẽ bỏ qua nghệ sĩ này</string>
+    <string name="artist_link_copied">Đã sao chép liên kết</string>
+    <string name="artist_new_release">Phát hành mới</string>
+    <string name="artist_released_when">Phát hành %1$s</string>
+    <string name="artist_mixes_title">Bản phối</string>
+    <string name="artist_mix_best">Hay nhất của %1$s</string>
+    <string name="artist_mix_style">Theo phong cách %1$s</string>
+    <string name="artist_mix_rare">Bài hiếm</string>
+    <string name="artist_mix_radio">Radio %1$s</string>
+    <string name="artist_mix_label_best">HAY NHẤT</string>
+    <string name="artist_mix_label_style">PHONG CÁCH</string>
+    <string name="artist_mix_label_rare">HIẾM</string>
+    <string name="artist_mix_label_radio">RADIO</string>
+    <string name="artist_videos_title">Video âm nhạc</string>
 </resources>
