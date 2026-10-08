@@ -64,16 +64,27 @@
 
     /**
      * A country whose chart can be chosen. One for each language the app is translated into, plus the UK; the
-     * name is what Deezer calls the country in its "Top <country>" playlists.
+     * name is what Deezer calls the country in its "Top <country>" playlists, the storefront where Apple Music
+     * keeps its chart for it.
+     *
+     * @param hasDeezerChart false where Deezer stopped keeping one: it left Russia, and its "Top Russia" has held a
+     *   single track since, so that chart comes from Apple Music straight away (issue #66).
      */
-    enum class ChartCountry(val code: String, val deezerName: String, val flag: String, val language: String) {
-        RU("RU", "Russia", "\uD83C\uDDF7\uD83C\uDDFA", "ru"),
-        US("US", "United States", "\uD83C\uDDFA\uD83C\uDDF8", "en"),
-        UK("UK", "United Kingdom", "\uD83C\uDDEC\uD83C\uDDE7", "en"),
-        DE("DE", "Germany", "\uD83C\uDDE9\uD83C\uDDEA", "de"),
-        FR("FR", "France", "\uD83C\uDDEB\uD83C\uDDF7", "fr"),
-        HU("HU", "Hungary", "\uD83C\uDDED\uD83C\uDDFA", "hu"),
-        VN("VN", "Vietnam", "\uD83C\uDDFB\uD83C\uDDF3", "vi");
+    enum class ChartCountry(
+        val code: String,
+        val deezerName: String,
+        val flag: String,
+        val language: String,
+        val appleStorefront: String,
+        val hasDeezerChart: Boolean = true,
+    ) {
+        RU("RU", "Russia", "\uD83C\uDDF7\uD83C\uDDFA", "ru", "ru", hasDeezerChart = false),
+        US("US", "United States", "\uD83C\uDDFA\uD83C\uDDF8", "en", "us"),
+        UK("UK", "United Kingdom", "\uD83C\uDDEC\uD83C\uDDE7", "en", "gb"),
+        DE("DE", "Germany", "\uD83C\uDDE9\uD83C\uDDEA", "de", "de"),
+        FR("FR", "France", "\uD83C\uDDEB\uD83C\uDDF7", "fr", "fr"),
+        HU("HU", "Hungary", "\uD83C\uDDED\uD83C\uDDFA", "hu", "hu"),
+        VN("VN", "Vietnam", "\uD83C\uDDFB\uD83C\uDDF3", "vi", "vn");
 
         companion object {
             /** The country whose language the app is in. */
@@ -119,7 +130,7 @@
 
             viewModelScope.launch {
                 isChartLoading = true
-                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode(), chartCountry.deezerName)
+                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode(), chartCountry)
                 // A switch made mid-flight must not leave the newer request's answer overwritten by
                 // the older one's.
                 if (kind == chartKind && genre == chartGenre) {
