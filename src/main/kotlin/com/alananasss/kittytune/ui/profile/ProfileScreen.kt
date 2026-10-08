@@ -515,7 +515,7 @@ fun ProfileScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                             ) {
                                 items(artistMixes.size) { index ->
-                                    ArtistMixCard(artistMixes[index]) { tracks ->
+                                    ArtistMixCard(artistMixes[index], accentIndex = index) { tracks ->
                                         playerViewModel.playPlaylist(tracks, 0, artistPlaybackContext, respectShuffle = false)
                                     }
                                 }

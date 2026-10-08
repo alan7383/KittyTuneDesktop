@@ -3,6 +3,7 @@ package com.alananasss.kittytune.ui.profile
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -67,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -530,28 +532,37 @@ internal fun rememberArtistMixes(user: User, profileViewModel: ProfileViewModel)
 }
 
 /**
- * A mix's own cover, drawn rather than borrowed: an album's cover made the mixes look like more albums (issue
- * #66). Colours follow the mix's title, so each mix keeps its own; the artist's portrait sits in a ring when
- * there is one, the mix's kind is written across the top.
+ * A mix's own cover, drawn rather than borrowed: an album's cover made the mixes look like more albums (issue #66).
+ *
+ * The artist's portrait fills the card under a dark wash in one of the app's own accent colours, so a row of mixes
+ * belongs to the page and to the chosen theme instead of being a row of unrelated gradients. What kind of mix it
+ * is stands large at the bottom; a play button comes up under the pointer. Without a portrait (a member of a duo
+ * has none of their own) the wash is the whole cover, with the mix's icon large and faint in a corner.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun ArtistMixCard(mix: ArtistMix, onPlay: (List<Track>) -> Unit) {
-    val (from, to) = remember(mix.title) { mixColours(mix.title) }
+internal fun ArtistMixCard(mix: ArtistMix, accentIndex: Int = 0, onPlay: (List<Track>) -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    val start = lerp(from, scheme.primary, 0.25f)
-    val end = lerp(to, scheme.tertiary, 0.25f)
+    // One of three accents, by place in the row, so neighbours differ; held down to a muted tone below.
+    val accent = remember(accentIndex, scheme.primary, scheme.tertiary, scheme.secondary) {
+        listOf(scheme.primary, scheme.tertiary, scheme.secondary)[Math.floorMod(accentIndex, 3)]
+    }
+    val deep = remember(accent) { lerp(Color(0xFF101014), accent, 0.38f) }
+    val mid = remember(accent) { lerp(Color(0xFF101014), accent, 0.62f) }
     var isLoading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
 
     Column(Modifier.width(MIX_CARD_SIZE)) {
         Box(
             modifier = Modifier
                 .size(MIX_CARD_SIZE)
                 .pressScale(interaction)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(listOf(start, end)))
+                .clip(RoundedCornerShape(24.dp))
+                .background(Brush.linearGradient(listOf(mid, deep)))
+                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                .hoverable(interaction)
                 .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
                     if (isLoading) return@clickable
                     scope.launch {
@@ -565,24 +576,75 @@ internal fun ArtistMixCard(mix: ArtistMix, onPlay: (List<Track>) -> Unit) {
                     }
                 },
         ) {
-            // Soft rings behind the portrait.
-            Box(Modifier.align(Alignment.BottomEnd).offset(x = 30.dp, y = 30.dp).size(150.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.10f)))
-            Box(Modifier.align(Alignment.BottomEnd).offset(x = 14.dp, y = 14.dp).size(110.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.12f)))
             if (mix.imageUrl != null) {
                 AsyncImage(
                     model = mix.imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(14.dp).size(76.dp).clip(CircleShape),
+                    modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                Icon(mix.icon, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.align(Alignment.BottomEnd).padding(22.dp).size(56.dp))
+                // A soft light from the corner the icon sits in, so the plain wash is not flat.
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.radialGradient(
+                            listOf(Color.White.copy(alpha = 0.18f), Color.Transparent),
+                            center = Offset(MIX_CARD_GLOW_X, 0f),
+                            radius = MIX_CARD_GLOW_RADIUS,
+                        )
+                    )
+                )
+                Icon(
+                    mix.icon, null,
+                    tint = Color.White.copy(alpha = 0.16f),
+                    modifier = Modifier.align(Alignment.TopEnd).offset(x = 18.dp, y = (-14).dp).size(112.dp),
+                )
             }
-            Column(Modifier.padding(14.dp)) {
-                Text(mix.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.85f), letterSpacing = 1.2.sp)
+            // The wash: the accent over the portrait, then dark toward the text.
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(
+                        0f to accent.copy(alpha = if (mix.imageUrl != null) 0.34f else 0f),
+                        0.45f to deep.copy(alpha = if (mix.imageUrl != null) 0.38f else 0f),
+                        1f to Color(0xFF08080B).copy(alpha = 0.88f),
+                    )
+                )
+            )
+            Box(
+                Modifier
+                    .padding(12.dp)
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(mix.icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
             }
-            if (isLoading) {
-                ContainedLoadingIndicator(modifier = Modifier.align(Alignment.Center).size(48.dp))
+            Text(
+                mix.label,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 14.dp, end = 58.dp),
+            )
+            androidx.compose.animation.AnimatedVisibility(
+                visible = hovered || isLoading,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.7f),
+                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.7f),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+            ) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(Color.White),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (isLoading) {
+                        ContainedLoadingIndicator(modifier = Modifier.size(34.dp))
+                    } else {
+                        Icon(Icons.Rounded.PlayArrow, null, tint = Color(0xFF101014), modifier = Modifier.size(26.dp))
+                    }
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -590,19 +652,8 @@ internal fun ArtistMixCard(mix: ArtistMix, onPlay: (List<Track>) -> Unit) {
     }
 }
 
-/** Two colours for a mix, chosen from a few pairs that sit well together, by its title. */
-private fun mixColours(title: String): Pair<Color, Color> {
-    val pairs = listOf(
-        Color(0xFF7C3AED) to Color(0xFFDB2777),
-        Color(0xFF0EA5E9) to Color(0xFF6366F1),
-        Color(0xFFF97316) to Color(0xFFE11D48),
-        Color(0xFF10B981) to Color(0xFF0E7490),
-        Color(0xFFEAB308) to Color(0xFFEA580C),
-        Color(0xFF8B5CF6) to Color(0xFF0EA5E9),
-    )
-    return pairs[Math.floorMod(title.hashCode(), pairs.size)]
-}
-
 private val HERO_HEIGHT = 380.dp
 private val AVATAR_SIZE = 132.dp
 private val MIX_CARD_SIZE = 168.dp
+private const val MIX_CARD_GLOW_X = 460f
+private const val MIX_CARD_GLOW_RADIUS = 520f
