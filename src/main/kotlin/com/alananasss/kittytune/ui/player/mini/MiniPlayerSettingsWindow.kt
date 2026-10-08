@@ -45,6 +45,19 @@ import com.alananasss.kittytune.ui.profile.MiniPlayerSettingsList
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
 import androidx.compose.material3.IconButtonDefaults
 
+private const val SETTINGS_WIDTH = 480
+private const val SETTINGS_HEIGHT = 620
+
+/** The middle of the usable area of the monitor [window] is on, for a window of this size. */
+private fun centredOnScreenOf(window: java.awt.Window?, width: Int, height: Int): WindowPosition {
+    val config = window?.graphicsConfiguration ?: return WindowPosition(Alignment.Center)
+    val bounds = config.bounds
+    val insets = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(config)
+    val x = bounds.x + insets.left + (bounds.width - insets.left - insets.right - width) / 2
+    val y = bounds.y + insets.top + (bounds.height - insets.top - insets.bottom - height) / 2
+    return WindowPosition(x.dp, y.dp)
+}
+
 /** Material's emphasized-decelerate curve: arrives quickly and settles. */
 private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
 private const val ENTER_MS = 260
@@ -58,12 +71,14 @@ private const val EXIT_MS = 150
  * fading in while it grows from 92 %, and reversing on close. The title row drags the window.
  */
 @Composable
-fun MiniPlayerSettingsWindow(onClose: () -> Unit) {
+fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? = null) {
     val prefs = remember { PlayerPreferences() }
     val shown = remember { MutableTransitionState(false).apply { targetState = true } }
+    // On the monitor the mini player is on, not on the main one: opened from a mini player on a second screen,
+    // the settings came up on the first (issue #66).
     val state = rememberWindowState(
-        position = WindowPosition(Alignment.Center),
-        size = DpSize(480.dp, 620.dp),
+        position = remember(nearWindow) { centredOnScreenOf(nearWindow, SETTINGS_WIDTH, SETTINGS_HEIGHT) },
+        size = DpSize(SETTINGS_WIDTH.dp, SETTINGS_HEIGHT.dp),
     )
 
     // Closing plays the exit first; the window goes once the card has gone.
@@ -92,7 +107,12 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit) {
         },
     ) {
         runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
-        LaunchedEffect(window) { com.alananasss.kittytune.core.ToolWindowStyle.apply(window) }
+        // An ordinary window that takes focus. Turning it into a tool window hid and re-showed it behind the
+        // toolkit's back, and the settings then sat on screen frozen, taking no clicks (issue #66).
+        LaunchedEffect(window) {
+            window.toFront()
+            window.requestFocus()
+        }
 
         KittyTuneTheme {
             Box(Modifier.fillMaxSize().padding(12.dp)) {
