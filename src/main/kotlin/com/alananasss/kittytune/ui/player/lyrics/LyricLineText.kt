@@ -12,10 +12,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -225,29 +230,53 @@ internal fun LyricLineText(
                 val position =
                     if (line.endTime > line.startTime) positionMs.coerceAtMost(line.endTime.toFloat())
                     else positionMs
-                clipPath(sungPath(result, words, ranges, text.length, position)) {
+                val region = sungRegion(result, words, ranges, text.length, position)
+                // The bright copy is drawn in a layer and the part not sung yet rubbed out of it, with the playhead's
+                // edge fading instead of cut straight: the same soft fill the full screen's karaoke has.
+                drawIntoCanvas { canvas ->
+                    canvas.saveLayer(Rect(Offset.Zero, size), Paint())
                     this@drawWithContent.drawContent()
+                    val keep = Path().apply {
+                        addPath(region.sung)
+                        region.band?.let { addRect(it) }
+                    }
+                    val everything = Path().apply { addRect(Rect(Offset.Zero, size)) }
+                    drawPath(Path.combine(PathOperation.Difference, everything, keep), Color.White, blendMode = BlendMode.DstOut)
+                    region.band?.let { band ->
+                        drawRect(
+                            brush = Brush.horizontalGradient(0f to Color.Transparent, 1f to Color.White, startX = band.left, endX = band.right),
+                            topLeft = band.topLeft,
+                            size = band.size,
+                            blendMode = BlendMode.DstOut,
+                        )
+                    }
+                    canvas.restore()
                 }
             },
         )
     }
 }
 
+/** What has been sung of a line: [sung] in full, and [band], the soft edge at the playhead, which fades out to the right. */
+private class SungRegion(val sung: Path, val band: Rect?)
+
 /**
  * The region of the line that has been sung by [positionMs].
  *
- * Whole characters for words already finished, and a fraction of one character for the word in progress —
- * which is what separates a smooth fill from a word-by-word jump.
+ * Whole characters for words already finished, and a fraction of one character for the word in progress, which is
+ * what separates a smooth fill from a word-by-word jump. The edge at the playhead is a band that narrows to nothing
+ * at a word's start and end, as the full screen's fill does, so a finished word is never left half faded.
  */
-private fun sungPath(
+private fun sungRegion(
     layout: TextLayoutResult,
     words: List<LyricWord>,
     ranges: List<Pair<Int, Int>>,
     textLength: Int,
     positionMs: Float,
-): Path {
+): SungRegion {
     val path = Path()
     val lastIndex = (textLength - 1).coerceAtLeast(0)
+    var band: Rect? = null
 
     for (i in words.indices) {
         val word = words[i]
@@ -270,11 +299,20 @@ private fun sungPath(
         if (partial < to) {
             val box = layout.getBoundingBox(partial.coerceIn(0, lastIndex))
             val edge = box.left + (box.right - box.left) * (exact - whole)
-            path.addRect(Rect(box.left, box.top, edge, box.bottom))
+            val wordLeft = layout.getBoundingBox(from.coerceIn(0, lastIndex)).left
+            val wordRight = layout.getBoundingBox((to - 1).coerceIn(0, lastIndex)).right
+            // A word broken across two rows has no single width to fade over.
+            val soft = if (wordRight > wordLeft) minOf(box.height * SOFT_EDGE_EMS, (edge - wordLeft) * 2f, (wordRight - edge) * 2f) else 0f
+            val half = soft.coerceAtLeast(0f) / 2f
+            path.addRect(Rect(box.left, box.top, (edge - half).coerceAtLeast(box.left), box.bottom))
+            if (half > 0.5f) band = Rect(edge - half, box.top, edge + half, box.bottom)
         }
     }
-    return path
+    return SungRegion(path, band)
 }
+
+/** The widest the fill's soft edge gets, as a multiple of the line's height. */
+private const val SOFT_EDGE_EMS = 1.6f
 
 /**
  * The playback position, interpolated between the player's reports (issue #33).
