@@ -3364,4 +3364,7 @@
     <string name="artist_clips_title">Video âm nhạc</string>
     <string name="artist_clip_views">%s lượt xem</string>
     <string name="artist_clip_failed">Không thể phát video này</string>
+    <string name="artist_listening">Đang nghe</string>
+    <string name="artist_resume">Tiếp tục</string>
+    <string name="artist_trailer_playing">Đang phát trailer</string>
 </resources>

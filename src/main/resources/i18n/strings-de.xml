@@ -3526,4 +3526,7 @@
     <string name="artist_clips_title">Musikvideos</string>
     <string name="artist_clip_views">%s Aufrufe</string>
     <string name="artist_clip_failed">Dieses Video kann nicht abgespielt werden</string>
+    <string name="artist_listening">Du hörst zu</string>
+    <string name="artist_resume">Weiter</string>
+    <string name="artist_trailer_playing">Trailer läuft</string>
 </resources>

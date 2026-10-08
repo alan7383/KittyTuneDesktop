@@ -79,6 +79,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.alananasss.kittytune.ui.common.PlayingBars
 import com.alananasss.kittytune.core.Toaster
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
@@ -226,7 +227,7 @@ private fun SavedRoomCard(name: String, code: String, listeners: List<String>, c
                 )
                 Text(str("together_code", TogetherWire.displayCode(code)), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
             }
-            if (listeners.isNotEmpty()) PlayingBars(Modifier.size(22.dp))
+            if (listeners.isNotEmpty()) PlayingBars(isPlaying = true, modifier = Modifier.size(22.dp), color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -244,19 +245,7 @@ private fun TogetherCover(url: String?, isLive: Boolean, size: Int) {
         if (url != null) AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         else Icon(Icons.Rounded.Groups, null, tint = Color.White, modifier = Modifier.size((size / 2).dp))
         if (isLive && url != null) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)), contentAlignment = Alignment.Center) {
-            PlayingBars(Modifier.size((size / 3).dp), color = Color.White)
-        }
-    }
-}
-
-/** Three bars moving out of step: someone is listening. */
-@Composable
-private fun PlayingBars(modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
-    val transition = rememberInfiniteTransition(label = "togetherBars")
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
-        listOf(420, 560, 360).forEachIndexed { i, period ->
-            val h by transition.animateFloat(0.25f, 1f, infiniteRepeatable(tween(period), RepeatMode.Reverse), label = "bar$i")
-            Box(Modifier.weight(1f).fillMaxHeight(h).clip(RoundedCornerShape(1.dp)).background(color))
+            PlayingBars(isPlaying = true, modifier = Modifier.size((size / 3).dp))
         }
     }
 }
@@ -410,7 +399,7 @@ private fun RoomHeader(
             AnimatedVisibility(visible = room.nowPlaying != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 room.nowPlaying?.let { now ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (room.isPlaying) PlayingBars(Modifier.size(18.dp)) else Icon(Icons.Rounded.Headphones, null, modifier = Modifier.size(18.dp))
+                        if (room.isPlaying) PlayingBars(isPlaying = true, modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.primary) else Icon(Icons.Rounded.Headphones, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(10.dp))
                         Text(
                             listOfNotNull(now.title, now.artist).joinToString(" · "),

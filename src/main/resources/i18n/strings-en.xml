@@ -2915,4 +2915,7 @@
     <string name="artist_clips_title">Music videos</string>
     <string name="artist_clip_views">%s views</string>
     <string name="artist_clip_failed">This video can't be played</string>
+    <string name="artist_listening">Listening</string>
+    <string name="artist_resume">Resume</string>
+    <string name="artist_trailer_playing">Trailer on</string>
 </resources>

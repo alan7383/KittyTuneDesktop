@@ -2914,4 +2914,7 @@
     <string name="artist_clips_title">Клипы</string>
     <string name="artist_clip_views">%s просмотров</string>
     <string name="artist_clip_failed">Этот клип не воспроизводится</string>
+    <string name="artist_listening">Слушаете</string>
+    <string name="artist_resume">Продолжить</string>
+    <string name="artist_trailer_playing">Трейлер играет</string>
 </resources>

@@ -222,7 +222,10 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         val matchesSearch = if (searchQuery.isBlank()) true else {
                             item.artist.username.contains(searchQuery, ignoreCase = true)
                         }
-                        val matchesType = selectedFilter == artistsLabel || (selectedFilter == null && searchQuery.isNotBlank())
+                        // Artists are a list of their own, behind the "Artists" filter or a search; one that was pinned
+                        // asked to be on the front, so it is shown in the plain list too.
+                        val matchesType = selectedFilter == artistsLabel ||
+                            (selectedFilter == null && (searchQuery.isNotBlank() || item.isPinned))
                         matchesFolder && matchesSearch && matchesType
                     }
                 }
@@ -788,11 +791,20 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             )
         }
 
+        // An artist is pinned by the same row of item metadata as a playlist; it was never read for them, so pinning
+        // an artist changed nothing in the list.
+        val artistItems = savedArtistsCache.map { item ->
+            if (item is LibraryItem.ArtistItem) {
+                val meta = allItemMetasCache[item.key]
+                item.copy(isPinned = meta?.folderId == null && meta?.isPinned == true)
+            } else item
+        }
+
         _allItems.clear()
         _allItems.addAll(folderItems)
         _allItems.addAll(filteredOnlineItems)
         _allItems.addAll(filteredLocalItems)
-        _allItems.addAll(savedArtistsCache)
+        _allItems.addAll(artistItems)
     }
 
     private var loadJob: Job? = null
