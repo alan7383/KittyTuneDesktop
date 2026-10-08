@@ -213,9 +213,12 @@ internal fun QueueList(vm: PlayerViewModel) {
 private fun QueueToolbar(vm: PlayerViewModel, upNextCount: Int) {
     val queue = vm.queueState
     val current = vm.currentQueueIndex
-    val leftMs = remember(queue, current, vm.duration, vm.currentPosition / 10_000L) {
-        val upcoming = queue.drop(current + 1).sumOf { it.durationMs ?: 0L }
-        upcoming + (vm.duration - vm.currentPosition).coerceAtLeast(0L)
+    val clip = vm.clipWindow
+    val leftMs = remember(queue, current, vm.duration, vm.currentPosition / 10_000L, clip) {
+        val upcoming = queue.drop(current + 1).sumOf { vm.clipLengthOf(it) ?: it.durationMs ?: 0L }
+        // In a trailer, what is left of the song is what is left of its window.
+        val songEnd = clip?.endMs ?: vm.duration
+        upcoming + (songEnd - vm.currentPosition).coerceAtLeast(0L)
     }
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 2.dp, bottom = 4.dp),
@@ -394,7 +397,7 @@ private fun ReorderableCollectionItemScope.QueueRow(
         // The length and the controls share one slot; the handle stays composed while hidden, since the
         // drag has to be able to start from it the moment the row is hovered.
         Box(contentAlignment = Alignment.CenterEnd) {
-            val duration = track.durationMs?.takeIf { it > 0 }
+            val duration = (vm.clipLengthOf(track) ?: track.durationMs)?.takeIf { it > 0 }
             if (duration != null && !isPast) {
                 Text(
                     text = makeTimeString(duration),

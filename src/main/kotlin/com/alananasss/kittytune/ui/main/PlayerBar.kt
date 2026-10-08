@@ -561,17 +561,22 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
     var drawnMs by remember { mutableLongStateOf(0L) }
+    // A trailer's song is shown as its window: 0:00 to its length. Everything below is in that time, and what is
+    // asked of the player is turned back into the song's.
+    val clip = vm.clipWindow
+    val shownOf = { songMs: Long -> clip?.toShown(songMs) ?: songMs }
+    val songOf = { shownMs: Long -> clip?.toSong(shownMs) ?: shownMs }
     val wheel = rememberWheelSeek(
         drawnMs = { drawnMs },
-        reportedMs = { vm.currentPosition },
-        durationMs = { vm.duration },
+        reportedMs = { shownOf(vm.currentPosition) },
+        durationMs = { clip?.lengthMs ?: vm.duration },
         stepSeconds = { seekWheelSeconds },
-        commit = { target -> vm.seekTo(target) },
+        commit = { target -> vm.seekTo(songOf(target)) },
     )
     val wheelMs = wheel.shownMs
     val isScrubbingNow = scrubbing || vm.isScrubbing || wheel.isActive
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
-        reportedMs = vm.currentPosition,
+        reportedMs = shownOf(vm.currentPosition),
         isRunning = vm.isPlaying && !vm.isLoading,
         followsInput = isScrubbingNow,
         trackKey = vm.currentTrack?.id,
@@ -582,7 +587,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
         else -> playhead
     }
     drawnMs = position
-    val duration = vm.duration.coerceAtLeast(1L)
+    val duration = (clip?.lengthMs ?: vm.duration).coerceAtLeast(1L)
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
     val shownFraction = if (isScrubbingNow) (position.toFloat() / duration).also { mix.noteShown(it) }
     else mix.shownFraction(position.toFloat() / duration, vm.currentTrack?.id)
@@ -600,10 +605,10 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                 wheel.cancel()
                 scrubbing = true
                 scrubPosition = it
-                vm.updateScrubPosition(it.toLong())
+                vm.updateScrubPosition(songOf(it.toLong()))
             },
             onValueChangeFinished = {
-                vm.seekTo(scrubPosition.toLong())
+                vm.seekTo(songOf(scrubPosition.toLong()))
                 scrubbing = false
             },
             sliderStyle = sliderStyle,
