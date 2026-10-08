@@ -2878,15 +2878,7 @@
     <string name="artist_mix_label_rare">RARE</string>
     <string name="artist_mix_label_radio">RADIO</string>
     <string name="artist_videos_title">Music videos</string>
-    <string name="fx_speed_title">Speed</string>
-    <string name="fx_pitch_follow">Pitch follows the speed</string>
-    <string name="fx_pitch_follow_sub">Faster sounds higher, like a record</string>
     <string name="fx_reset_speed">Back to normal speed</string>
-    <string name="fx_presets_title">One-tap sounds</string>
-    <string name="fx_preset_normal">Normal</string>
-    <string name="fx_preset_slowed">Slowed + reverb</string>
-    <string name="fx_preset_nightcore">Nightcore</string>
-    <string name="fx_preset_chill">Unhurried</string>
     <string name="fx_active_count">%1$d on</string>
     <string name="likes_vibe_title">The colour of your music</string>
     <string name="likes_vibe_sub">Pick a colour and your favourites in it will play</string>

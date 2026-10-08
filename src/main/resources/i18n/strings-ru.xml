@@ -2877,15 +2877,7 @@
     <string name="artist_mix_label_rare">РЕДКОЕ</string>
     <string name="artist_mix_label_radio">РАДИО</string>
     <string name="artist_videos_title">Клипы</string>
-    <string name="fx_speed_title">Скорость</string>
-    <string name="fx_pitch_follow">Тон вместе со скоростью</string>
-    <string name="fx_pitch_follow_sub">Быстрее — выше, как на пластинке</string>
     <string name="fx_reset_speed">Обычная скорость</string>
-    <string name="fx_presets_title">Готовые звуки</string>
-    <string name="fx_preset_normal">Обычно</string>
-    <string name="fx_preset_slowed">Slowed + reverb</string>
-    <string name="fx_preset_nightcore">Nightcore</string>
-    <string name="fx_preset_chill">Неспешно</string>
     <string name="fx_active_count">Включено: %1$d</string>
     <string name="likes_vibe_title">Цвет вашей музыки</string>
     <string name="likes_vibe_sub">Нажмите на цвет — включим любимое этого оттенка</string>

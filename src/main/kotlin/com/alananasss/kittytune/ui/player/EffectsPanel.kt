@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -70,8 +71,8 @@ data class AudioFxDefinition(
     val isActive: (AudioEffectsState) -> Boolean,
     val onToggle: (PlayerViewModel, onEarrapeWarning: () -> Unit) -> Unit,
     val onOpenDialog: (() -> Unit)? = null,
-    val activeColor: @Composable () -> Color = { MaterialTheme.colorScheme.primary },
-    val activeContentColor: @Composable () -> Color = { MaterialTheme.colorScheme.onPrimary }
+    /** Drawn in the error colours while on: an effect that can hurt, not one of the ordinary kind. */
+    val isDanger: Boolean = false,
 )
 
 /** What the effect does on hover, and how to reach its settings when it has any. */
@@ -132,8 +133,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isBassBoostEnabled },
                 onToggle = { vm, _ -> vm.toggleBassBoost() },
                 onOpenDialog = { showBassBoostDialog = true },
-                activeColor = { MaterialTheme.colorScheme.primary },
-                activeContentColor = { MaterialTheme.colorScheme.onPrimary }
             ),
             AudioFxDefinition(
                 id = "sub_octaver",
@@ -143,8 +142,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isSubOctaverEnabled },
                 onToggle = { vm, _ -> vm.toggleSubOctaver() },
                 onOpenDialog = { showSubOctaverDialog = true },
-                activeColor = { Color(0xFFD500F9) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "tape_saturation",
@@ -154,8 +151,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isTapeSaturationEnabled },
                 onToggle = { vm, _ -> vm.toggleTapeSaturation() },
                 onOpenDialog = { showTapeSaturationDialog = true },
-                activeColor = { Color(0xFFFF6E40) },
-                activeContentColor = { Color(0xFF3E1200) }
             ),
             AudioFxDefinition(
                 id = "vocal_boost",
@@ -165,8 +160,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVocalBoostEnabled },
                 onToggle = { vm, _ -> vm.toggleVocalBoost() },
                 onOpenDialog = { showVocalBoostDialog = true },
-                activeColor = { Color(0xFF00B0FF) },
-                activeContentColor = { Color(0xFF002244) }
             ),
             AudioFxDefinition(
                 id = "vocal_remover",
@@ -176,8 +169,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVocalRemoverEnabled },
                 onToggle = { vm, _ -> vm.toggleVocalRemover() },
                 onOpenDialog = { showVocalRemoverDialog = true },
-                activeColor = { Color(0xFFE91E63) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "normalization",
@@ -187,8 +178,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isNormalizationEnabled },
                 onToggle = { vm, _ -> vm.toggleNormalization() },
                 onOpenDialog = { showNormalizationDialog = true },
-                activeColor = { MaterialTheme.colorScheme.primary },
-                activeContentColor = { MaterialTheme.colorScheme.onPrimary }
             ),
             AudioFxDefinition(
                 id = "earrape",
@@ -200,8 +189,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     if (!vm.hasSeenEarrapeWarning()) showWarn() else vm.toggleEarrape()
                 },
                 onOpenDialog = { showEarrapeDialog = true },
-                activeColor = { MaterialTheme.colorScheme.error },
-                activeContentColor = { MaterialTheme.colorScheme.onError }
+                isDanger = true,
             ),
 
             AudioFxDefinition(
@@ -212,8 +200,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.is8DEnabled },
                 onToggle = { vm, _ -> vm.toggle8D() },
                 onOpenDialog = { showEightDDialog = true },
-                activeColor = { MaterialTheme.colorScheme.tertiary },
-                activeContentColor = { MaterialTheme.colorScheme.onTertiary }
             ),
             AudioFxDefinition(
                 id = "super_wide",
@@ -223,8 +209,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isSuperWideEnabled },
                 onToggle = { vm, _ -> vm.toggleSuperWide() },
                 onOpenDialog = { showSuperWideDialog = true },
-                activeColor = { Color(0xFF26C6DA) },
-                activeContentColor = { Color(0xFF00363A) }
             ),
             AudioFxDefinition(
                 id = "chorus",
@@ -234,8 +218,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isChorusEnabled },
                 onToggle = { vm, _ -> vm.toggleChorus() },
                 onOpenDialog = { showChorusDialog = true },
-                activeColor = { Color(0xFF5C6BC0) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "flanger",
@@ -245,8 +227,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isFlangerEnabled },
                 onToggle = { vm, _ -> vm.toggleFlanger() },
                 onOpenDialog = { showFlangerDialog = true },
-                activeColor = { Color(0xFF00E5FF) },
-                activeContentColor = { Color(0xFF003840) }
             ),
             AudioFxDefinition(
                 id = "phaser",
@@ -256,8 +236,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isPhaserEnabled },
                 onToggle = { vm, _ -> vm.togglePhaser() },
                 onOpenDialog = { showPhaserDialog = true },
-                activeColor = { Color(0xFF7C4DFF) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "ping_pong",
@@ -267,8 +245,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isPingPongDelayEnabled },
                 onToggle = { vm, _ -> vm.togglePingPongDelay() },
                 onOpenDialog = { showPingPongDelayDialog = true },
-                activeColor = { Color(0xFF64DD17) },
-                activeContentColor = { Color(0xFF1B3B00) }
             ),
             AudioFxDefinition(
                 id = "reverse_echo",
@@ -278,8 +254,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isReverseEchoEnabled },
                 onToggle = { vm, _ -> vm.toggleReverseEcho() },
                 onOpenDialog = { showReverseEchoDialog = true },
-                activeColor = { Color(0xFF00E5FF) },
-                activeContentColor = { Color(0xFF003B46) }
             ),
             AudioFxDefinition(
                 id = "reverb",
@@ -289,8 +263,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isReverbEnabled },
                 onToggle = { vm, _ -> vm.toggleReverb() },
                 onOpenDialog = { showReverbDialog = true },
-                activeColor = { MaterialTheme.colorScheme.primary },
-                activeContentColor = { MaterialTheme.colorScheme.onPrimary }
             ),
             AudioFxDefinition(
                 id = "shimmer_reverb",
@@ -300,8 +272,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isShimmerReverbEnabled },
                 onToggle = { vm, _ -> vm.toggleShimmerReverb() },
                 onOpenDialog = { showShimmerReverbDialog = true },
-                activeColor = { Color(0xFFFF4081) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "stadium",
@@ -311,8 +281,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isStadiumEnabled },
                 onToggle = { vm, _ -> vm.toggleStadium() },
                 onOpenDialog = { showStadiumDialog = true },
-                activeColor = { Color(0xFF00E676) },
-                activeContentColor = { Color(0xFF003815) }
             ),
             AudioFxDefinition(
                 id = "rotary_speaker",
@@ -322,8 +290,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isRotarySpeakerEnabled },
                 onToggle = { vm, _ -> vm.toggleRotarySpeaker() },
                 onOpenDialog = { showRotarySpeakerDialog = true },
-                activeColor = { Color(0xFFFF6D00) },
-                activeContentColor = { Color(0xFF3E1200) }
             ),
             AudioFxDefinition(
                 id = "asmr_vocal",
@@ -333,8 +299,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isAsmrVocalEnabled },
                 onToggle = { vm, _ -> vm.toggleAsmrVocal() },
                 onOpenDialog = { showAsmrVocalDialog = true },
-                activeColor = { Color(0xFFFF4081) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "mono",
@@ -344,8 +308,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isMonoEnabled },
                 onToggle = { vm, _ -> vm.toggleMono() },
                 onOpenDialog = null,
-                activeColor = { MaterialTheme.colorScheme.secondary },
-                activeContentColor = { MaterialTheme.colorScheme.onSecondary }
             ),
 
             AudioFxDefinition(
@@ -356,8 +318,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isRainEnabled },
                 onToggle = { vm, _ -> vm.toggleRain() },
                 onOpenDialog = { showRainVolumeDialog = true },
-                activeColor = { Color(0xFF81D4FA) },
-                activeContentColor = { Color(0xFF004BA0) }
             ),
             AudioFxDefinition(
                 id = "underwater",
@@ -367,8 +327,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isUnderwaterEnabled },
                 onToggle = { vm, _ -> vm.toggleUnderwater() },
                 onOpenDialog = { showUnderwaterDialog = true },
-                activeColor = { Color(0xFF00838F) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "empty_mall",
@@ -378,8 +336,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isEmptyMallEnabled },
                 onToggle = { vm, _ -> vm.toggleEmptyMall() },
                 onOpenDialog = { showEmptyMallDialog = true },
-                activeColor = { Color(0xFF00BFA5) },
-                activeContentColor = { Color(0xFF003730) }
             ),
             AudioFxDefinition(
                 id = "party_next_door",
@@ -389,8 +345,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isPartyNextDoorEnabled },
                 onToggle = { vm, _ -> vm.togglePartyNextDoor() },
                 onOpenDialog = { showPartyNextDoorDialog = true },
-                activeColor = { Color(0xFFAB47BC) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "night_drive",
@@ -400,8 +354,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isNightDriveEnabled },
                 onToggle = { vm, _ -> vm.toggleNightDrive() },
                 onOpenDialog = { showNightDriveDialog = true },
-                activeColor = { Color(0xFF2979FF) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "muffled",
@@ -411,8 +363,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isMuffledEnabled },
                 onToggle = { vm, _ -> vm.toggleMuffled() },
                 onOpenDialog = { showMuffledDialog = true },
-                activeColor = { MaterialTheme.colorScheme.secondary },
-                activeContentColor = { MaterialTheme.colorScheme.onSecondary }
             ),
 
             AudioFxDefinition(
@@ -423,8 +373,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isWalkmanEnabled },
                 onToggle = { vm, _ -> vm.toggleWalkman() },
                 onOpenDialog = { showWalkmanDialog = true },
-                activeColor = { Color(0xFFFFAB00) },
-                activeContentColor = { Color(0xFF3E2700) }
             ),
             AudioFxDefinition(
                 id = "vinyl_lofi",
@@ -434,8 +382,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVinylLoFiEnabled },
                 onToggle = { vm, _ -> vm.toggleVinylLoFi() },
                 onOpenDialog = { showVinylLoFiDialog = true },
-                activeColor = { Color(0xFFFFB300) },
-                activeContentColor = { Color(0xFF3E2723) }
             ),
             AudioFxDefinition(
                 id = "gramophone",
@@ -445,8 +391,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isGramophoneEnabled },
                 onToggle = { vm, _ -> vm.toggleGramophone() },
                 onOpenDialog = { showGramophoneDialog = true },
-                activeColor = { Color(0xFF8D6E63) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "vintage_mp3",
@@ -456,8 +400,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVintageMp3Enabled },
                 onToggle = { vm, _ -> vm.toggleVintageMp3() },
                 onOpenDialog = { showVintageMp3Dialog = true },
-                activeColor = { Color(0xFFFFB74D) },
-                activeContentColor = { Color(0xFF5D2B00) }
             ),
             AudioFxDefinition(
                 id = "chiptune",
@@ -467,8 +409,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isChiptuneEnabled },
                 onToggle = { vm, _ -> vm.toggleChiptune() },
                 onOpenDialog = { showChiptuneDialog = true },
-                activeColor = { Color(0xFFE040FB) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "megaphone",
@@ -478,8 +418,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isMegaphoneEnabled },
                 onToggle = { vm, _ -> vm.toggleMegaphone() },
                 onOpenDialog = { showMegaphoneDialog = true },
-                activeColor = { Color(0xFFFF7043) },
-                activeContentColor = { Color(0xFF3E1200) }
             ),
             AudioFxDefinition(
                 id = "robot_vocoder",
@@ -489,8 +427,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isRobotVocoderEnabled },
                 onToggle = { vm, _ -> vm.toggleRobotVocoder() },
                 onOpenDialog = { showRobotVocoderDialog = true },
-                activeColor = { Color(0xFF00E676) },
-                activeContentColor = { Color(0xFF003314) }
             ),
             AudioFxDefinition(
                 id = "trance_gate",
@@ -500,8 +436,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isTranceGateEnabled },
                 onToggle = { vm, _ -> vm.toggleTranceGate() },
                 onOpenDialog = { showTranceGateDialog = true },
-                activeColor = { Color(0xFFFF9100) },
-                activeContentColor = { Color(0xFF3E1A00) }
             )
         )
     }
@@ -524,10 +458,8 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp)
         ) {
-            // The tab already says what this is: the speed card leads, then sounds made in one tap (issue #66).
+            // The tab already says what this is, so the speed card leads (issue #66).
             SpeedCard(viewModel)
-            Spacer(Modifier.height(16.dp))
-            SoundPresetsRow(viewModel)
             Spacer(Modifier.height(24.dp))
 
             // Special Effects Header
@@ -603,8 +535,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                                     onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
                                     onLongClick = fx.onOpenDialog,
                                     modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
-                                    activeColor = fx.activeColor(),
-                                    activeContentColor = fx.activeContentColor(),
+                                    isDanger = fx.isDanger,
                                     tooltip = fx.tooltip(),
                                 )
                             }
@@ -803,7 +734,15 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-// ── FxTile (Matching Android FxTile) ──
+// ── FxTile ──
+/**
+ * One effect: its icon over its name, in the app's colours.
+ *
+ * Every effect used to carry a colour of its own, a purple, an orange, a lime, and was drawn in it when on, with
+ * its icon in it when off. A panel of those was a row of unrelated neons, and the text on some of them hardly
+ * read. They are all the theme's now, so what is on is the one thing that stands out; only an effect that can
+ * hurt, [isDanger], is drawn apart.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FxTile(
@@ -813,24 +752,28 @@ fun FxTile(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    activeColor: Color = MaterialTheme.colorScheme.primary,
-    activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    isDanger: Boolean = false,
     tooltip: String = "",
 ) {
+    val scheme = MaterialTheme.colorScheme
+    val activeContainer = if (isDanger) scheme.errorContainer else scheme.primaryContainer
+    val activeContent = if (isDanger) scheme.onErrorContainer else scheme.onPrimaryContainer
     val containerColor by animateColorAsState(
-        targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = tween(300), label = "containerColor"
+        targetValue = if (isActive) activeContainer else scheme.surfaceContainerHigh,
+        animationSpec = tween(250), label = "containerColor"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isActive) activeContentColor else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(300), label = "contentColor"
+        targetValue = if (isActive) activeContent else scheme.onSurface,
+        animationSpec = tween(250), label = "contentColor"
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (isActive) activeContent else scheme.onSurfaceVariant,
+        animationSpec = tween(250), label = "iconColor"
     )
     val iconScale by animateFloatAsState(
-        targetValue = if (isActive) 1.2f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioHighBouncy,
-            stiffness = Spring.StiffnessMedium
-        ), label = "iconScale"
+        targetValue = if (isActive) 1.12f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "iconScale"
     )
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -858,8 +801,6 @@ fun FxTile(
     }
 
     // The weight or width lands on this box: the tooltip's own wrapper sits between it and the button.
-    // A rounded rectangle, not a pill: the round ends of a pill this wide cut into the name, which read as words
-    // spilling out of the circle (issue #66). The name may take two lines rather than being cut.
     Box(modifier) {
         Tip(tooltip) {
             FilledTonalButton(
@@ -869,50 +810,40 @@ fun FxTile(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp)
+                    .height(88.dp)
                     .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
                         onLongClick?.invoke()
                     },
                 shapes = ButtonShapes(RoundedCornerShape(22.dp), RoundedCornerShape(14.dp)),
                 interactionSource = interactionSource,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = containerColor,
-                    contentColor = contentColor
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp)
+                colors = ButtonDefaults.filledTonalButtonColors(containerColor = containerColor, contentColor = contentColor),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = if (isActive) Color.White.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceContainerHighest,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = if (isActive) contentColor else activeColor,
-                                modifier = Modifier
-                                    .size(22.dp)
-                                    .graphicsLayer {
-                                        scaleX = iconScale
-                                        scaleY = iconScale
-                                    }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.width(10.dp))
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                        modifier = Modifier
+                            .size(26.dp)
+                            .graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
+                            }
+                    )
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                        textAlign = TextAlign.Center,
                         maxLines = 2,
-                        lineHeight = 16.sp,
+                        lineHeight = 14.sp,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -920,167 +851,86 @@ fun FxTile(
     }
 }
 
-/**
- * Playback speed: the value, a few common speeds to pick at once, a fine slider, whether the pitch moves with it,
- * and the way back to normal.
- */
+/** Playback speed: the value, whether the pitch moves with it, and the slider. */
 @Composable
 private fun SpeedCard(viewModel: PlayerViewModel) {
     val speed = viewModel.effectsState.speed
     val isPitchActive = viewModel.effectsState.isPitchEnabled
-    Surface(
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth(),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(20.dp)
     ) {
-        Column(Modifier.padding(20.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(40.dp)) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(22.dp))
-                    }
-                }
+                Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
-                Text(str("fx_speed_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                AnimatedContent(
-                    targetState = speed,
-                    transitionSpec = { (fadeIn(tween(150)) togetherWith fadeOut(tween(100))) },
-                    label = "speedValue",
-                ) { value ->
-                    Text(
-                        text = formatSpeed(value),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Black,
-                        color = if (value == 1f) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
-                    )
-                }
+                Text(
+                    text = formatSpeed(speed),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
                 if (speed != 1f) {
                     Tip(str("fx_reset_speed")) {
                         IconButton(onClick = { viewModel.setCustomSpeed(1f) }, shapes = IconButtonDefaults.shapes()) {
-                            Icon(Icons.Rounded.RestartAlt, contentDescription = str("fx_reset_speed"))
+                            Icon(Icons.Rounded.RestartAlt, contentDescription = str("fx_reset_speed"), modifier = Modifier.size(20.dp))
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                SPEED_STEPS.forEach { step ->
-                    val selected = kotlin.math.abs(speed - step) < 0.001f
-                    val container by animateColorAsState(
-                        if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
-                        label = "speedStep",
-                    )
-                    Surface(
-                        onClick = { viewModel.setCustomSpeed(step) },
-                        shape = CircleShape,
-                        color = container,
-                        modifier = Modifier.weight(1f).height(34.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                formatSpeed(step),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                }
-            }
-            Slider(
-                value = speed,
-                onValueChange = { viewModel.setCustomSpeed(it) },
-                valueRange = 0.5f..2.0f,
-                steps = if (viewModel.isPreciseSpeedEnabled) 29 else 14,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+
+            val pitchContainerColor by animateColorAsState(
+                targetValue = if (isPitchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                label = "pitchContainer"
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { viewModel.togglePitchEnabled(!isPitchActive) }
-                    .padding(vertical = 6.dp, horizontal = 4.dp),
+            val pitchContentColor by animateColorAsState(
+                targetValue = if (isPitchActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                label = "pitchContent"
+            )
+            Surface(
+                onClick = { viewModel.togglePitchEnabled(!isPitchActive) },
+                shape = CircleShape,
+                color = pitchContainerColor,
+                border = if (isPitchActive) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                contentColor = pitchContentColor
             ) {
-                Column(Modifier.weight(1f)) {
-                    Text(str("fx_pitch_follow"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                    Text(str("fx_pitch_follow_sub"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AnimatedVisibility(visible = isPitchActive) {
+                        Row {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                        }
+                    }
+                    Text(text = str("player_pitch"), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
-                androidx.compose.material3.Switch(checked = isPitchActive, onCheckedChange = { viewModel.togglePitchEnabled(it) })
             }
         }
+
+        Spacer(Modifier.height(20.dp))
+
+        Slider(
+            value = speed,
+            onValueChange = { viewModel.setCustomSpeed(it) },
+            valueRange = 0.5f..2.0f,
+            steps = if (viewModel.isPreciseSpeedEnabled) 29 else 14,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
-
-/** Speeds offered as one-click steps above the slider. */
-private val SPEED_STEPS = listOf(0.75f, 0.85f, 1f, 1.1f, 1.25f, 1.5f)
 
 private fun formatSpeed(value: Float): String {
     val rounded = (value * 100).roundToInt() / 100f
     val text = if (rounded == rounded.toInt().toFloat()) "${rounded.toInt()}.0" else rounded.toString().trimEnd('0')
     return "$text×"
-}
-
-/**
- * Sounds made in one tap, from the speed, the pitch and the reverb: slowed with reverb, nightcore, unhurried, and
- * back to normal. Only what a sound needs is touched; the other effects stay as they are.
- */
-@Composable
-private fun SoundPresetsRow(viewModel: PlayerViewModel) {
-    Column {
-        Text(
-            str("fx_presets_title"),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            SoundPreset.entries.forEach { preset ->
-                val state = viewModel.effectsState
-                val selected = kotlin.math.abs(state.speed - preset.speed) < 0.001f &&
-                    state.isPitchEnabled == preset.pitch && state.isReverbEnabled == preset.reverb
-                val container by animateColorAsState(
-                    if (selected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    label = "soundPreset",
-                )
-                val content = if (selected) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface
-                Surface(
-                    onClick = {
-                        viewModel.setCustomSpeed(preset.speed)
-                        if (viewModel.effectsState.isPitchEnabled != preset.pitch) viewModel.togglePitchEnabled(preset.pitch)
-                        if (viewModel.effectsState.isReverbEnabled != preset.reverb) viewModel.toggleReverb()
-                    },
-                    shape = RoundedCornerShape(18.dp),
-                    color = container,
-                    contentColor = content,
-                    modifier = Modifier.weight(1f).height(64.dp),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(horizontal = 6.dp),
-                    ) {
-                        Icon(preset.icon, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            str(preset.titleKey),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private enum class SoundPreset(val titleKey: String, val icon: ImageVector, val speed: Float, val pitch: Boolean, val reverb: Boolean) {
-    NORMAL("fx_preset_normal", Icons.Rounded.RestartAlt, 1f, false, false),
-    SLOWED("fx_preset_slowed", Icons.Rounded.Nightlight, 0.85f, true, true),
-    NIGHTCORE("fx_preset_nightcore", Icons.Rounded.Bolt, 1.25f, true, false),
-    UNHURRIED("fx_preset_chill", Icons.Rounded.Spa, 0.92f, false, false),
 }
 
 // ── AudioFxStudioSheet (Matching Android Studio Sheet) ──
@@ -1384,8 +1234,9 @@ fun ActiveQSTile(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val activeColor = fx.activeColor()
-    val activeContentColor = fx.activeContentColor()
+    val scheme = MaterialTheme.colorScheme
+    val activeColor = if (fx.isDanger) scheme.errorContainer else scheme.primaryContainer
+    val activeContentColor = if (fx.isDanger) scheme.onErrorContainer else scheme.onPrimaryContainer
 
     val containerColor by animateColorAsState(
         targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1418,7 +1269,7 @@ fun ActiveQSTile(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = if (isActive) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = if (isActive) activeContentColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
