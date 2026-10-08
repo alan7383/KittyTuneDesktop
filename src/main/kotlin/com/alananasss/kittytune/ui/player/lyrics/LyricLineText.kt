@@ -150,8 +150,11 @@ internal fun LyricLineText(
     modifier: Modifier = Modifier,
     textModifier: Modifier = Modifier,
     onTextLayout: (TextLayoutResult) -> Unit = {},
+    /** Fill the width given. Off, the line is as wide as its words are, up to what it was given. */
+    fillWidth: Boolean = true,
 ) {
     val words = if (wordSync && isActive) line.words else emptyList()
+    val fullWidth = if (fillWidth) Modifier.fillMaxWidth() else Modifier
 
     if (words.isEmpty()) {
         Text(
@@ -159,7 +162,7 @@ internal fun LyricLineText(
             style = if (isActive) activeStyle else inactiveStyle,
             color = if (isActive) activeColor else inactiveColor,
             textAlign = textAlign,
-            modifier = modifier.fillMaxWidth().then(textModifier),
+            modifier = modifier.then(fullWidth).then(textModifier),
             onTextLayout = onTextLayout,
         )
         return
@@ -182,7 +185,7 @@ internal fun LyricLineText(
             text = coloured,
             style = activeStyle,
             textAlign = textAlign,
-            modifier = modifier.fillMaxWidth().then(textModifier),
+            modifier = modifier.then(fullWidth).then(textModifier),
             onTextLayout = onTextLayout,
         )
         return
@@ -198,13 +201,13 @@ internal fun LyricLineText(
         }
     }
 
-    Box(modifier.fillMaxWidth()) {
+    Box(modifier.then(fullWidth)) {
         Text(
             text = text,
             style = activeStyle,
             color = unsungColor,
             textAlign = textAlign,
-            modifier = Modifier.fillMaxWidth().then(textModifier),
+            modifier = fullWidth.then(textModifier),
             onTextLayout = {
                 layout = it
                 onTextLayout(it)
@@ -215,7 +218,7 @@ internal fun LyricLineText(
             style = activeStyle,
             color = activeColor,
             textAlign = textAlign,
-            modifier = Modifier.fillMaxWidth().drawWithContent {
+            modifier = fullWidth.drawWithContent {
                 val result = layout ?: return@drawWithContent
                 // Clamped to this line's own end so the fill can only ever complete, never overrun and
                 // then snap back when the next line takes over.
@@ -312,3 +315,34 @@ internal fun rememberSmoothPosition(
 
 /** One report interval plus slack. Past this the estimate is guessing, not interpolating. */
 private const val MAX_EXTRAPOLATION_MS = 400L
+
+/**
+ * This line with its words timed evenly across it, when it has none of its own timings (a line timed only as a whole).
+ *
+ * Each word gets a share of the time in proportion to its letters, so the line can fill in smoothly like one timed
+ * word by word, if only by a guess. The line's own end is used when it has one, else [fallbackEndMs] (usually where
+ * the next line starts), else a few seconds.
+ */
+internal fun LyricLine.withEvenWords(fallbackEndMs: Long?): LyricLine {
+    if (words.isNotEmpty() || text.isBlank()) return this
+    val end = when {
+        endTime > startTime -> endTime
+        fallbackEndMs != null && fallbackEndMs > startTime -> fallbackEndMs
+        else -> startTime + DEFAULT_LINE_MS
+    }
+    val pieces = Regex("""\S+\s*""").findAll(text).map { it.value }.toList()
+    if (pieces.isEmpty()) return this
+    val weights = pieces.map { it.trimEnd().length.coerceAtLeast(1) }
+    val total = weights.sum().toDouble()
+    val span = (end - startTime).toDouble()
+    var elapsed = 0
+    val timed = pieces.mapIndexed { i, piece ->
+        val from = startTime + (span * elapsed / total).toLong()
+        elapsed += weights[i]
+        val to = startTime + (span * elapsed / total).toLong()
+        LyricWord(piece, from, to)
+    }
+    return copy(words = timed, endTime = end)
+}
+
+private const val DEFAULT_LINE_MS = 4_000L
