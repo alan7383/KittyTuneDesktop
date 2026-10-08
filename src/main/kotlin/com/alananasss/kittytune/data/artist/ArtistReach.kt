@@ -78,6 +78,19 @@ object ArtistReach {
         )
     }
 
+    /**
+     * A banner for [artistName]: their own header on the streaming service, or for a duo named for both ("A & B")
+     * that of the first member who has one, since a duo has no profile under the joint name.
+     */
+    suspend fun bannerOf(artistName: String?): String? {
+        val name = artistName?.trim().orEmpty()
+        if (name.isEmpty()) return null
+        profileOf(name)?.headerImageUrl?.let { return it }
+        val members = com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(name.replace('/', '&')).filter { it.isNotBlank() }
+        if (members.size < 2) return null
+        return members.firstNotNullOfOrNull { profileOf(it)?.headerImageUrl }
+    }
+
     private fun keyOf(name: String): String = LyricsMatcher.normalize(name).replace(" ", "")
 
     private const val MAX_PARALLEL = 4

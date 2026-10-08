@@ -124,7 +124,8 @@ internal fun ArtistHero(
     onAbout: () -> Unit,
 ) {
     val profile = rememberArtistProfile(user.username)
-    val banner = user.bannerUrl ?: profile?.headerImageUrl ?: profileViewModel.spotifyArtist?.headerImageUrl
+    val streamingBanner = com.alananasss.kittytune.ui.common.rememberArtistBanner(user.username)
+    val banner = user.bannerUrl ?: streamingBanner ?: profileViewModel.spotifyArtist?.headerImageUrl
     val portrait = user.avatarUrl.takeIf { !it.isDefaultAvatar() }?.getHighResAvatarUrl() ?: profile?.avatarUrl
     val scheme = MaterialTheme.colorScheme
     val about = user.description?.takeIf { it.isNotBlank() } ?: profile?.biography
