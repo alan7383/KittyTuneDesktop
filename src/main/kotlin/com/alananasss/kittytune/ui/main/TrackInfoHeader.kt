@@ -152,6 +152,12 @@ private fun TitleAndArtist(
                 )
             }
         }
+        // The lead artist's monthly listeners, for a sense of who this is.
+        com.alananasss.kittytune.ui.common.MonthlyListenersText(
+            artistName = remember(track.id) { com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(track.displayArtist).firstOrNull() },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

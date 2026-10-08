@@ -3283,4 +3283,11 @@
     <string name="pref_lyrics_one_line_sub">Dòng đang hát, phía trên nút phát trong thanh trình phát</string>
     <string name="queue_time_left">Còn %1$s</string>
     <string name="queue_clear_upcoming">Xóa danh sách tiếp theo</string>
+    <string name="artist_monthly_listeners">%1$s người nghe hằng tháng</string>
+    <string name="recognition_recognized_at">Nhận diện lúc %1$s</string>
+    <string name="recognition_released">Phát hành %1$s</string>
+    <string name="stat_plays">Lượt nghe</string>
+    <string name="stat_likes">Lượt thích</string>
+    <string name="stat_reposts">Đăng lại</string>
+    <string name="stat_comments">Bình luận</string>
 </resources>

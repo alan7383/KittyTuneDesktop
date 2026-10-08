@@ -2833,4 +2833,11 @@
     <string name="pref_lyrics_one_line_sub">Поющаяся строка над кнопкой воспроизведения в панели плеера</string>
     <string name="queue_time_left">Осталось %1$s</string>
     <string name="queue_clear_upcoming">Очистить следующие</string>
+    <string name="artist_monthly_listeners">%1$s слушателей в месяц</string>
+    <string name="recognition_recognized_at">Распознано в %1$s</string>
+    <string name="recognition_released">Вышел %1$s</string>
+    <string name="stat_plays">Прослушивания</string>
+    <string name="stat_likes">Лайки</string>
+    <string name="stat_reposts">Репосты</string>
+    <string name="stat_comments">Комментарии</string>
 </resources>
