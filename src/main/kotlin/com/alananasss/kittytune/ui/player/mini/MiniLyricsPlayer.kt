@@ -111,6 +111,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import coil3.compose.AsyncImage
@@ -187,7 +188,8 @@ internal class WindowDragHandler(
         window.addMouseListener(dragMouseListener)
         window.addWindowFocusListener(focusListener)
 
-        val nativeStarted = com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
+        // Windows moves it by hand: the system's own move loop swallowed the release and the pointer events with it.
+        val nativeStarted = !isWindows && com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
         isNativeMoveActive = nativeStarted
         if (!loggedDragPath) {
             loggedDragPath = true
@@ -199,23 +201,6 @@ internal class WindowDragHandler(
         }
         if (!nativeStarted) {
             window.addMouseMotionListener(dragMotionListener)
-        } else if (isWindows) {
-            watchNativeMoveEnd()
-        }
-    }
-
-    /**
-     * Windows moves the window in a loop of its own and the button's release goes to that loop, not to us, so the
-     * drag never ended: the mini player stayed "being dragged" and its position was not saved, which read as one
-     * that would not move (issue #66). The button is watched instead.
-     */
-    private fun watchNativeMoveEnd() {
-        kotlin.concurrent.thread(isDaemon = true, name = "mini-player-move-end") {
-            val user32 = com.sun.jna.platform.win32.User32.INSTANCE
-            fun isLeftDown() = user32.GetAsyncKeyState(VK_LBUTTON).toInt() and 0x8000 != 0
-            Thread.sleep(NATIVE_MOVE_SETTLE_MS)
-            while (isDraggingInternal && isLeftDown()) Thread.sleep(NATIVE_MOVE_POLL_MS)
-            javax.swing.SwingUtilities.invokeLater { if (isDraggingInternal) stopDrag() }
         }
     }
 
@@ -261,9 +246,6 @@ internal class WindowDragHandler(
 private var loggedDragPath = false
 
 private val isWindows = System.getProperty("os.name").lowercase().contains("win")
-private const val VK_LBUTTON = 0x01
-private const val NATIVE_MOVE_SETTLE_MS = 80L
-private const val NATIVE_MOVE_POLL_MS = 25L
 
 /** At most one manual placement per frame: faster only churns the compositor. */
 private const val MANUAL_MOVE_MIN_INTERVAL_NS = 16_000_000L
@@ -565,7 +547,9 @@ fun MiniLyricsPlayerWindow(
 
                 val surfaceAlpha by animateFloatAsState(
                     targetValue = when {
-                        transparentBg && (!hoverIllumination || !isEffectivelyHovered) -> 0.0f
+                        // Never fully clear: a pixel with no opacity at all is click-through on Windows, so the transparent look
+                    // could not be grabbed anywhere but on its words.
+                    transparentBg && (!hoverIllumination || !isEffectivelyHovered) -> 0.02f
                         transparentBg -> 0.35f
                         !hoverIllumination -> if (hoverEffect) 0.82f else 0.96f
                         !hoverEffect || isEffectivelyHovered -> 0.96f
@@ -574,11 +558,7 @@ fun MiniLyricsPlayerWindow(
                     animationSpec = tween(200)
                 )
 
-                val surfaceColor = if (transparentBg && surfaceAlpha == 0.0f) {
-                    Color.Transparent
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = surfaceAlpha)
-                }
+                val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = surfaceAlpha)
 
                 val surfaceBorder = when {
                     transparentBg && (!isEffectivelyHovered || !hoverIllumination) -> null
@@ -607,40 +587,7 @@ fun MiniLyricsPlayerWindow(
                         modifier = Modifier
                             .fillMaxSize()
                             .hoverable(windowInteractionSource)
-                            .pointerInput(Unit) {
-                                awaitEachGesture {
-                                    // Also from a press a button or the words took: the mini player is mostly
-                                    // words and buttons, and a drag had to find the few empty pixels to start.
-                                    val down = awaitFirstDown(requireUnconsumed = false)
-                                    if (down.type == PointerType.Mouse && currentEvent.buttons.isPrimaryPressed) {
-                                        // A plain click must never touch the window manager: posting a
-                                        // native move (or grabbing listeners) on every press made clicks
-                                        // jitter the window and risked wedging the EDT in a move loop.
-                                        // Only once the pointer travelled past the slop is this a drag.
-                                        val slop = awaitTouchSlopOrCancellation(down.id) { change, _ ->
-                                            change.consume()
-                                            val cur = java.awt.MouseInfo.getPointerInfo()?.location
-                                            val awt = currentEvent.nativeEvent as? java.awt.event.MouseEvent
-                                            val xRoot = cur?.x ?: awt?.xOnScreen ?: (window.x + change.position.x.toInt())
-                                            val yRoot = cur?.y ?: awt?.yOnScreen ?: (window.y + change.position.y.toInt())
-                                            dragHandler.startDrag(xRoot, yRoot)
-                                        }
-                                        if (slop == null) return@awaitEachGesture
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            if (event.changes.all { !it.pressed }) {
-                                                dragHandler.stopDrag()
-                                                break
-                                            }
-                                            val curMouse = java.awt.MouseInfo.getPointerInfo()?.location
-                                            val curAwt = event.nativeEvent as? java.awt.event.MouseEvent
-                                            val curX = curMouse?.x ?: curAwt?.xOnScreen ?: (window.x + (event.changes.firstOrNull()?.position?.x?.toInt() ?: 0))
-                                            val curY = curMouse?.y ?: curAwt?.yOnScreen ?: (window.y + (event.changes.firstOrNull()?.position?.y?.toInt() ?: 0))
-                                            dragHandler.onPointerMove(curX, curY)
-                                        }
-                                    }
-                                }
-                            }
+                            .dragsWindow(window, dragHandler)
                     ) {
                         // Context menu state: opened by right-click anywhere on the mini player
                         var contextMenuVisible by remember { mutableStateOf(false) }
@@ -1558,4 +1505,41 @@ private fun sungPath(
         }
     }
     return path
+}
+
+/**
+ * Moves [window] when the pointer is pressed on this and dragged, wherever the press lands: on the words, a button or
+ * an empty pixel alike.
+ *
+ * The press is watched on the way down, before the buttons and the text see it, and only once the pointer has gone
+ * past a few pixels is it taken as a drag and claimed, so a plain click still reaches what was clicked. The pointer is
+ * read in screen coordinates: the window moves under it, so a position relative to the window would chase itself.
+ * The strips along the right and bottom edge and the corner belong to the resize handles and are left to them.
+ */
+internal fun Modifier.dragsWindow(window: java.awt.Window, handler: WindowDragHandler): Modifier = pointerInput(window, handler) {
+    val slopPx = viewConfiguration.touchSlop
+    val edgePx = 10.dp.toPx()
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val onResizeEdge = down.position.x > size.width - edgePx || down.position.y > size.height - edgePx
+        if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed || onResizeEdge) return@awaitEachGesture
+        val start = java.awt.MouseInfo.getPointerInfo()?.location ?: return@awaitEachGesture
+        var dragging = false
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) {
+                if (dragging) handler.stopDrag()
+                break
+            }
+            val now = java.awt.MouseInfo.getPointerInfo()?.location ?: continue
+            if (!dragging) {
+                if (kotlin.math.hypot((now.x - start.x).toFloat(), (now.y - start.y).toFloat()) < slopPx) continue
+                dragging = true
+                handler.startDrag(start.x, start.y)
+            }
+            change.consume()
+            handler.onPointerMove(now.x, now.y)
+        }
+    }
 }
