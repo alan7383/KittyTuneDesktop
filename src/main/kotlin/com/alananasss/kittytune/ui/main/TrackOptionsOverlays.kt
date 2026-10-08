@@ -1028,7 +1028,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                     withTracks { viewModel.playPlaylist(it, 0); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("shuffle", Icons.Rounded.Shuffle, str("btn_shuffle")) {
-                    withTracks { viewModel.playPlaylist(it.shuffled(), 0); viewModel.showPlaylistMenuSheet = false }
+                    withTracks { viewModel.playPlaylistShuffled(it); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
                     withTracks { viewModel.insertNext(it); viewModel.showPlaylistMenuSheet = false }

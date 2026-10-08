@@ -536,8 +536,8 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
             }
             if (allTracks.isNotEmpty()) {
                 kotlinx.coroutines.withContext(Dispatchers.Main) {
-                    val finalTracks = if (shuffle) allTracks.shuffled() else allTracks
-                    playerViewModel.playPlaylist(finalTracks, 0)
+                    if (shuffle) playerViewModel.playPlaylistShuffled(allTracks)
+                    else playerViewModel.playPlaylist(allTracks, 0)
                 }
             }
         }

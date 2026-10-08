@@ -695,7 +695,7 @@ fun LibraryPlaylistOptionsDialog(
                     withTracks { playerViewModel.playPlaylist(it, 0); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.Rounded.Shuffle, str("btn_shuffle")) {
-                    withTracks { playerViewModel.playPlaylist(it.shuffled(), 0); onDismiss() }
+                    withTracks { playerViewModel.playPlaylistShuffled(it); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
                     withTracks { playerViewModel.insertNext(it); onDismiss() }
