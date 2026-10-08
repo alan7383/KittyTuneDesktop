@@ -2855,4 +2855,27 @@
     <string name="home_continue">Jump back in</string>
     <string name="home_new_from_artists">New from your artists</string>
     <string name="home_chart_title">Top of the charts</string>
+    <string name="artist_listen">Listen</string>
+    <string name="artist_trailer">Trailer</string>
+    <string name="artist_trailer_tip">A taste of each top song, twenty seconds apiece</string>
+    <string name="artist_pin">Pin to the library</string>
+    <string name="artist_unpin">Unpin from the library</string>
+    <string name="artist_more">More</string>
+    <string name="artist_about">About the artist</string>
+    <string name="artist_read_more">More</string>
+    <string name="artist_dislike">Don’t play this artist</string>
+    <string name="artist_disliked">My Wave will leave this artist out</string>
+    <string name="artist_link_copied">Link copied</string>
+    <string name="artist_new_release">New release</string>
+    <string name="artist_released_when">Out %1$s</string>
+    <string name="artist_mixes_title">Mixes</string>
+    <string name="artist_mix_best">Best of %1$s</string>
+    <string name="artist_mix_style">In the style of %1$s</string>
+    <string name="artist_mix_rare">Rare tracks</string>
+    <string name="artist_mix_radio">%1$s radio</string>
+    <string name="artist_mix_label_best">BEST OF</string>
+    <string name="artist_mix_label_style">IN THE STYLE</string>
+    <string name="artist_mix_label_rare">RARE</string>
+    <string name="artist_mix_label_radio">RADIO</string>
+    <string name="artist_videos_title">Music videos</string>
 </resources>

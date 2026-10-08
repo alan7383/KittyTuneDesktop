@@ -3467,4 +3467,27 @@
     <string name="home_continue">Weiterhören</string>
     <string name="home_new_from_artists">Neu von deinen Künstlern</string>
     <string name="home_chart_title">Ganz oben in den Charts</string>
+    <string name="artist_listen">Anhören</string>
+    <string name="artist_trailer">Trailer</string>
+    <string name="artist_trailer_tip">Zwanzig Sekunden aus jedem Top-Song</string>
+    <string name="artist_pin">In der Bibliothek anheften</string>
+    <string name="artist_unpin">Lösen</string>
+    <string name="artist_more">Mehr</string>
+    <string name="artist_about">Über den Künstler</string>
+    <string name="artist_read_more">Mehr</string>
+    <string name="artist_dislike">Diesen Künstler nicht spielen</string>
+    <string name="artist_disliked">Meine Welle lässt diesen Künstler aus</string>
+    <string name="artist_link_copied">Link kopiert</string>
+    <string name="artist_new_release">Neue Veröffentlichung</string>
+    <string name="artist_released_when">Erschienen %1$s</string>
+    <string name="artist_mixes_title">Mixe</string>
+    <string name="artist_mix_best">Das Beste von %1$s</string>
+    <string name="artist_mix_style">Im Stil von %1$s</string>
+    <string name="artist_mix_rare">Seltene Titel</string>
+    <string name="artist_mix_radio">%1$s Radio</string>
+    <string name="artist_mix_label_best">BEST OF</string>
+    <string name="artist_mix_label_style">IM STIL</string>
+    <string name="artist_mix_label_rare">SELTEN</string>
+    <string name="artist_mix_label_radio">RADIO</string>
+    <string name="artist_videos_title">Musikvideos</string>
 </resources>

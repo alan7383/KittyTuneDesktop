@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -1231,6 +1232,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
     companion object {
         const val MY_WAVE_NAV_ID = "my_wave"
+
+        private const val TRAILER_SONGS = 10
+        private const val TRAILER_SNIPPET_MS = 20_000L
+
+        /** Where in a song its trailer snippet starts, as a share of its length. */
+        private const val TRAILER_START = 0.3
 
         /** Fewer songs than this left after the current one, and the wave fetches more. */
         private const val WAVE_LOW_WATER = 4
@@ -4349,6 +4356,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         updateQueueState()
         saveStateAsync(saveQueue = true)
         if (MusicManager.player.mediaItemCount <= 1) preloadNextTrack(currentQueueIndex + 1)
+    }
+
+    // ─── Artist trailer ──────────────────────────────────────────────────────────────────────────────
+    private var trailerJob: Job? = null
+
+    /**
+     * An artist's trailer: twenty seconds of each of their top songs, from the part a third of the way in where the
+     * hook usually is, one after another, for a first impression of someone new (issue #66). Ends on the last song;
+     * pressing anything else leaves it.
+     */
+    fun playTrailer(tracks: List<Track>, context: PlaybackContext) {
+        if (tracks.isEmpty()) return
+        val trailerContext = context.copy(navigationId = "trailer:" + context.navigationId)
+        playPlaylist(tracks.take(TRAILER_SONGS), 0, trailerContext, maintainPlayerState = true, respectShuffle = false)
+        trailerJob?.cancel()
+        trailerJob = viewModelScope.launch {
+            while (isActive && currentContext?.navigationId == trailerContext.navigationId) {
+                androidx.compose.runtime.snapshotFlow { isPlaying && !isLoading && duration > 0 }.first { ready -> ready }
+                val songId = currentTrack?.id
+                if ((currentPosition) < duration * TRAILER_START) seekTo((duration * TRAILER_START).toLong())
+                delay(TRAILER_SNIPPET_MS)
+                if (currentContext?.navigationId != trailerContext.navigationId) break
+                if (currentTrack?.id != songId) continue
+                if (currentQueueIndex >= _queue.lastIndex) {
+                    pause()
+                    break
+                }
+                playNext(manual = true, isCrossfade = false)
+            }
+        }
     }
 
     /** A song of the wave left by hand: how early decides how much it counts against its artist. */

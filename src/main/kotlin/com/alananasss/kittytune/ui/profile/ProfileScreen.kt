@@ -150,6 +150,10 @@ fun ProfileScreen(
     }
 
     val user = profileViewModel.user
+    // Another artist's page, as opposed to the listener's own profile, which keeps its own header and sections.
+    val isArtistPage = user != null && !profileViewModel.isCurrentUser
+    var showAbout by remember { mutableStateOf(false) }
+    val artistMixes = if (user != null && isArtistPage) rememberArtistMixes(user, profileViewModel) else emptyList()
 
     val artistText = str("generic_artist")
     val artistPlaybackContext = remember(user, artistText) {
@@ -353,23 +357,72 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 item {
-                    ModernProfileHeader(
-                        user = user,
-                        isCurrentUser = profileViewModel.isCurrentUser,
-                        onEditClick = { showEditSheet = true },
-                        playerViewModel = playerViewModel,
-                        onNavigate = onNavigate,
-                        profileViewModel = profileViewModel,
-                        artistContext = artistPlaybackContext,
-                        onFollowersClick = { userListDialogType = "followers" },
-                        onFollowingClick = { userListDialogType = "followings" },
-                        hasMotionVideo = !artistVideoUrl.isNullOrBlank(),
-                        artistVideoUrl = artistVideoUrl
-                    )
+                    if (isArtistPage) {
+                        ArtistHero(
+                            user = user,
+                            profileViewModel = profileViewModel,
+                            playerViewModel = playerViewModel,
+                            artistContext = artistPlaybackContext,
+                            onNavigate = onNavigate,
+                            onAbout = { showAbout = true },
+                        )
+                    } else {
+                        ModernProfileHeader(
+                            user = user,
+                            isCurrentUser = profileViewModel.isCurrentUser,
+                            onEditClick = { showEditSheet = true },
+                            playerViewModel = playerViewModel,
+                            onNavigate = onNavigate,
+                            profileViewModel = profileViewModel,
+                            artistContext = artistPlaybackContext,
+                            onFollowersClick = { userListDialogType = "followers" },
+                            onFollowingClick = { userListDialogType = "followings" },
+                            hasMotionVideo = !artistVideoUrl.isNullOrBlank(),
+                            artistVideoUrl = artistVideoUrl
+                        )
+                    }
+                }
+
+                // On an artist's page the popular songs come first and the newest release beside them; who they
+                // are moved to the header's "about", which a page opened to listen does not need first (issue #66).
+                if (isArtistPage && (profileViewModel.popularTracks.isNotEmpty() || profileViewModel.allTracks.isNotEmpty())) {
+                    item {
+                        val popular = profileViewModel.popularTracks.ifEmpty { profileViewModel.allTracks }
+                        val latest = remember(profileViewModel.allTracks.size, profileViewModel.albums.size, profileViewModel.singles.size) {
+                            ArtistRelease.latestOf(profileViewModel.allTracks.take(10), profileViewModel.albums + profileViewModel.singles)
+                        }
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            val popularColumn: @Composable (Modifier) -> Unit = { m ->
+                                Column(m) {
+                                    ArtistSectionTitle(str("profile_tab_popular"), onOpen = { onNavigate("profile_collection:${user.id}:popular") })
+                                    popular.take(5).forEachIndexed { index, track ->
+                                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, popular, artistPlaybackContext, showPlays = true, showDate = false)
+                                    }
+                                }
+                            }
+                            val releaseColumn: @Composable (Modifier) -> Unit = { m ->
+                                if (latest != null) Column(m) {
+                                    ArtistSectionTitle(str("artist_new_release"), onOpen = null)
+                                    NewReleaseCard(latest, playerViewModel, artistPlaybackContext, onNavigate, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
+                                }
+                            }
+                            if (maxWidth >= 860.dp && latest != null) {
+                                Row(Modifier.fillMaxWidth()) {
+                                    popularColumn(Modifier.weight(1.5f))
+                                    releaseColumn(Modifier.weight(1f).padding(top = 0.dp))
+                                }
+                            } else {
+                                Column {
+                                    popularColumn(Modifier.fillMaxWidth())
+                                    releaseColumn(Modifier.fillMaxWidth().padding(top = 8.dp))
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // bio section
-                if (!user.description.isNullOrBlank()) {
+                if (!isArtistPage && !user.description.isNullOrBlank()) {
                     item {
                         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
                             Text(
@@ -389,14 +442,14 @@ fun ProfileScreen(
                     }
                 }
 
-                if (profileViewModel.popularTracks.isNotEmpty()) {
+                if (!isArtistPage && profileViewModel.popularTracks.isNotEmpty()) {
                     item { ProfileSectionTitle(title = str("profile_tab_popular"), showMore = profileViewModel.popularTracks.size > 5, onMoreClick = { onNavigate("profile_collection:${user.id}:popular") }) }
                     itemsIndexed(profileViewModel.popularTracks.take(5)) { index, track ->
                         ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.popularTracks, artistPlaybackContext, showPlays = true, showDate = false)
                     }
                 }
 
-                if (profileViewModel.allTracks.isNotEmpty()) {
+                if (!isArtistPage && profileViewModel.allTracks.isNotEmpty()) {
                     item { ProfileSectionTitle(title = str("profile_latest_tracks"), showMore = true, onMoreClick = { onNavigate("profile_collection:${user.id}:tracks") }) }
                     itemsIndexed(profileViewModel.allTracks.take(5)) { index, track ->
                         ProfileTrackItem(track, index, playerViewModel, downloadProgress, profileViewModel.allTracks, artistPlaybackContext, showPlays = true, showDate = false)
@@ -453,7 +506,23 @@ fun ProfileScreen(
                     }
                 }
 
-                if (artistPresets.isNotEmpty()) {
+                if (isArtistPage && artistMixes.isNotEmpty()) {
+                    item {
+                        Column {
+                            ArtistSectionTitle(str("artist_mixes_title"), onOpen = null)
+                            androidx.compose.foundation.lazy.LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            ) {
+                                items(artistMixes.size) { index ->
+                                    ArtistMixCard(artistMixes[index]) { tracks ->
+                                        playerViewModel.playPlaylist(tracks, 0, artistPlaybackContext, respectShuffle = false)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (artistPresets.isNotEmpty()) {
                     item {
                         ProfileHorizontalCarouselRow(
                             title = str("artist_presets_title"),
@@ -546,7 +615,8 @@ fun ProfileScreen(
                     item {
                         ProfileHorizontalCarouselRow(
                             title = str("profile_similar_artists"),
-                            items = profileViewModel.similarArtists
+                            // The biggest neighbours first: the order SoundCloud gave read as random (issue #66).
+                            items = profileViewModel.similarArtists.sortedByDescending { it.followersCount }
                         ) { artist ->
                             ArtistCircle(artist) { onNavigate(artist.profileNavId) }
                         }
@@ -580,7 +650,7 @@ fun ProfileScreen(
                                 Icon(Icons.Outlined.Edit, str("profile_edit"), tint = contentColor)
                             }
                         }
-                    } else {
+                    } else if (showBarBackground) {
                         IconButton(shapes = IconButtonDefaults.shapes(), onClick = { DownloadManager.toggleSaveArtist(user) },
                             colors = IconButtonDefaults.iconButtonColors(containerColor = if (showBarBackground) Color.Transparent else Color.Black.copy(alpha = 0.3f), contentColor = if (isArtistSaved != null) Color(0xFFFF4081) else contentColor)
                         ) {
@@ -606,6 +676,10 @@ fun ProfileScreen(
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = barColor, titleContentColor = MaterialTheme.colorScheme.onSurface, actionIconContentColor = MaterialTheme.colorScheme.onSurface),
                 modifier = Modifier.align(Alignment.TopCenter).zIndex(1f)
             )
+
+            if (showAbout) {
+                ArtistAboutDialog(user = user, onDismiss = { showAbout = false }, playerViewModel = playerViewModel)
+            }
 
             if (showEditSheet) {
                 EditProfileDialog(
@@ -1956,7 +2030,9 @@ fun ProfileCollectionScreen(
             )
             else -> {
                 val (title, list) = when (section) {
-                    "popular" -> str("profile_tab_popular") to profileViewModel.popularTracks.toList()
+                    // Every song of theirs, most played first, as Yandex Music lists an artist's tracks (issue #66).
+                    "popular" -> str("profile_tab_popular") to (profileViewModel.popularTracks + profileViewModel.allTracks)
+                        .distinctBy { it.id }.sortedByDescending { it.playbackCount }
                     "tracks" -> str("profile_tab_tracks") to profileViewModel.allTracks.toList()
                     "reposts" -> str("profile_tab_reposts") to profileViewModel.repostedTracks.toList()
                     "likes" -> str("profile_tab_likes", user?.username ?: "") to profileViewModel.likedTracks.toList()
@@ -2134,4 +2210,35 @@ fun ArtistPresetCard(preset: ArtistPresetItem) {
             modifier = Modifier.padding(horizontal = 8.dp)
         )
     }
+}
+
+
+/** Everything about the artist, from their page's menu or the header's "more". */
+@Composable
+private fun ArtistAboutDialog(user: User, onDismiss: () -> Unit, playerViewModel: PlayerViewModel) {
+    val profile = com.alananasss.kittytune.ui.common.rememberArtistProfile(user.username)
+    val text = user.description?.takeIf { it.isNotBlank() } ?: profile?.biography.orEmpty()
+    val uriHandler = LocalUriHandler.current
+    com.alananasss.kittytune.core.EscapableAlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(user.username ?: str("artist_about"), fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                profile?.monthlyListeners?.let {
+                    Text(
+                        com.alananasss.kittytune.ui.common.monthlyListenersLabel(it),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+                ExpandableDescription(
+                    text = text,
+                    onUrlClick = { url -> uriHandler.openUri(url) },
+                    onMentionClick = { username -> playerViewModel.resolveAndNavigateToArtist(username.removePrefix("@")) },
+                )
+            }
+        },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_close")) } },
+    )
 }
