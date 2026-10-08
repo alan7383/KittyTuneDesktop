@@ -1295,6 +1295,9 @@ fun MainScreen(
             androidx.compose.animation.core.tween(FULLSCREEN_EXIT_MS)
         ),
     ) {
+        // Out here it is not under the root that notes where the pointer pressed, so the track menu opened at the
+        // last press made somewhere else: to the left of its three dots, as if the player were not full screen.
+        Box(Modifier.fillMaxSize().notePointerPresses()) {
         com.alananasss.kittytune.ui.player.FullPlayerScreen(
             viewModel = playerViewModel,
             onExitFullScreen = {
@@ -1307,6 +1310,7 @@ fun MainScreen(
                 com.alananasss.kittytune.core.AppWindowState.fullScreen = false
             },
         )
+        }
     }
 
     if (showShortcutsDialog) {
