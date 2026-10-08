@@ -2707,11 +2707,22 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
      * sources are on screen while LrcLib is still thinking; the list used to stay empty until the slowest
      * source was done. Results belong to the track they were searched for and are dropped with it.
      */
-    fun searchLyricsManual(query: String, provider: String = manualSearchProvider) {
+    fun searchLyricsManual(query: String, provider: String = manualSearchProvider) =
+        startManualLyricsSearch(query, provider, onSettled = null)
+
+    /**
+     * Which search the list belongs to. A search cancelled by the next one (a chip clicked while the first was
+     * still running) used to clear the spinners and the "searching" flag on its way out, after the new search had
+     * set them: the panel then showed nothing, and stayed empty until the slow source answered (issue #66).
+     */
+    private var manualSearchGeneration = 0
+
+    private fun startManualLyricsSearch(query: String, provider: String, onSettled: ((LyricsMatcher.Target) -> Unit)?) {
         manualSearchProvider = provider
         if (query.isBlank()) return
         val track = currentTrack ?: return
         manualLyricSearchJob?.cancel()
+        val generation = ++manualSearchGeneration
         unifiedLyricSearchResults.clear()
         lyricSearchTrackId = track.id
         val sources = ManualLyricsSearch.providersFor(provider, playerPrefs)
@@ -2746,6 +2757,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                                 ManualLyricsSearch.search(source, query, searchTrack)
                             }.orEmpty()
                             withContext(Dispatchers.Main) {
+                                if (generation != manualSearchGeneration) return@withContext
                                 val merged = ManualLyricsSearch.merge(unifiedLyricSearchResults.toList(), found, target)
                                 unifiedLyricSearchResults.clear()
                                 unifiedLyricSearchResults.addAll(merged)
@@ -2754,10 +2766,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     }
                 }
+                onSettled?.invoke(target)
             } finally {
                 withContext(NonCancellable + Dispatchers.Main) {
-                    pendingLyricSources.clear()
-                    isManualSearchLoading = false
+                    if (generation == manualSearchGeneration) {
+                        pendingLyricSources.clear()
+                        isManualSearchLoading = false
+                    }
                 }
             }
         }
@@ -2773,17 +2788,32 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             delay(BACKGROUND_LYRICS_SEARCH_DELAY_MS)
             if (currentTrack?.id != track.id) return@launch
             if (lyricSearchTrackId == track.id && unifiedLyricSearchResults.isNotEmpty()) return@launch
-            searchLyricsManual(query, ManualLyricsSearch.ALL)
+            startManualLyricsSearch(query, ManualLyricsSearch.ALL) { target -> upgradeToSyncedLyrics(track, target) }
         }
     }
 
-    fun selectUnifiedLyricResult(result: UnifiedLyricResult) {
+    /**
+     * The automatic lookup settled on plain text or nothing, while the search for the manual list found this song
+     * with timings: those are used. The lookup and the list rank differently, and a song that played unsynced
+     * while LrcLib's line-timed copy sat at the top of the list made no sense (issue #66).
+     */
+    private fun upgradeToSyncedLyrics(track: Track, target: LyricsMatcher.Target) {
+        if (currentTrack?.id != track.id || lyricsMode == LyricsMode.SYNCED || isLyricsLoading) return
+        if (getLyricsOverride(track.id) != null) return
+        val best = unifiedLyricSearchResults.firstOrNull {
+            (it.hasLineSync || it.hasWordSync) && ManualLyricsSearch.isConfidentMatch(it, target)
+        } ?: return
+        selectUnifiedLyricResult(best, isManualPick = false)
+    }
+
+    fun selectUnifiedLyricResult(result: UnifiedLyricResult, isManualPick: Boolean = true) {
         // The automatic search has to be cut dead here. It was left running, so a slow resolution —
         // and it is slow once Genius is in the chain — finished after the manual pick and overwrote
         // it with whatever it had found, which is the "after some time it adds synchronised text
         // that does not match this song" report in issue #33.
         lyricsJob?.cancel()
         lyricsPrefetchJob?.cancel()
+        val pickedForTrackId = currentTrack?.id
         viewModelScope.launch(Dispatchers.IO) {
             isLyricsLoading = true
             var finalLines = emptyList<LyricLine>()
@@ -2843,6 +2873,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
+            if (!isManualPick && currentTrack?.id != pickedForTrackId) {
+                withContext(Dispatchers.Main) { isLyricsLoading = false }
+                return@launch
+            }
             withContext(Dispatchers.Main) {
                 if (finalLines.isNotEmpty()) {
                     lyricsLines.clear()
@@ -2868,11 +2902,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
 
             // Remember the manual pick for the current track (issue #27), and drop the cached
             // automatic match so it cannot come back on the next play.
-            if (finalLines.isNotEmpty() || !finalPlain.isNullOrBlank()) {
+            if (isManualPick && (finalLines.isNotEmpty() || !finalPlain.isNullOrBlank())) {
                 currentTrack?.id?.let {
                     saveLyricsOverride(it, result)
                     LyricsCache.invalidate(it)
                 }
+            } else if (!isManualPick && finalLines.isNotEmpty() && pickedForTrackId != null) {
+                // Found for the track rather than chosen by the listener: cached like an automatic match, so the
+                // timed copy is there from the start next time.
+                val variant = currentLyricsVariant()
+                LyricsCache.put(
+                    pickedForTrackId,
+                    LyricsCache.Entry(
+                        found = true,
+                        lines = finalLines,
+                        plain = finalPlain,
+                        provider = result.provider,
+                        providerPreference = variant.providerPreference,
+                        translationLang = variant.translationLang,
+                        romanized = variant.romanized,
+                    ),
+                )
             }
         }
     }

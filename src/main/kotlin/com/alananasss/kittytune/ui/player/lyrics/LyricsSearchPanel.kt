@@ -80,7 +80,6 @@ import com.alananasss.kittytune.data.lyrics.providers.PreferredLyricsProvider
 import com.alananasss.kittytune.ui.common.ShimmerBox
 import com.alananasss.kittytune.ui.common.ShimmerLine
 import com.alananasss.kittytune.ui.common.escapeDismisses
-import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
 import com.alananasss.kittytune.ui.player.ManualLyricsSearch
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.UnifiedLyricResult
@@ -180,15 +179,14 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
     }
     val selected = viewModel.manualSearchProvider
     val isAll = selected.equals(ManualLyricsSearch.ALL, ignoreCase = true)
-    // Dragged with the mouse, turned with the wheel and arrowed at the ends like every other row, and inset the
-    // same as the search field above it (issue #66).
-    val chipsState = androidx.compose.foundation.lazy.rememberLazyListState()
+    // Dragged with the mouse or turned with Shift and the wheel, without arrows, and inset the same as the search
+    // field above it (issue #66).
     com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-        state = chipsState,
         contentPadding = PaddingValues(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         fadeColor = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxWidth().horizontalMouseSwipe(chipsState),
+        showsArrows = false,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         item(key = ManualLyricsSearch.ALL) {
             SourceChip(
