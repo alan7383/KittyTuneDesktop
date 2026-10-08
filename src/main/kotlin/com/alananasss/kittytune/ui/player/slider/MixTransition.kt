@@ -3,7 +3,6 @@ package com.alananasss.kittytune.ui.player.slider
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -21,6 +20,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -40,9 +40,6 @@ private const val WAIT_FOR_MIX_NANOS = 8_000_000_000L
 
 /** How long the bar takes to reach the real position when a mix ends before its fade does. */
 private const val CATCH_UP_NANOS = 450_000_000L
-
-/** How long the bar takes to slide to where a wheel notch sent the playhead. */
-private const val WHEEL_GLIDE_NANOS = 320_000_000L
 
 /** A bar left at or past this fraction, then landing before [LANDED_NEAR_START], slides back instead of jumping. */
 private const val JUMPED_FROM_END = 0.85f
@@ -156,17 +153,6 @@ class MixTransition internal constructor(
         return shown
     }
 
-    /**
-     * Call just before a wheel seek: the bar slides from where it is drawn to the new position instead of
-     * jumping. A fast spin calls this on every notch and each slide picks up from wherever the last one had
-     * got to, at full speed, so the notches run together into one movement. Outside a mix only; a mix's own
-     * glide carries on.
-     */
-    fun glideFromShown() {
-        if (glideFrom != null) return
-        startCatchUp(System.nanoTime(), WHEEL_GLIDE_NANOS, LinearOutSlowInEasing)
-    }
-
     private fun startCatchUp(now: Long, nanos: Long, easing: Easing) {
         catchUpFrom = lastShown
         catchUpAtNanos = now
@@ -225,7 +211,7 @@ fun rememberMixTransition(): MixTransition {
         MixTransition(progress, countdown, beatPulse, automixing)
     }
     // The player reports its position four times a second and the fade publishes its progress as it goes,
-    // but neither keeps time while the bar catches up after a mix or slides after a wheel notch: those steps
+    // but neither keeps time while the bar catches up after a mix: those steps
     // were drawn as jumps. Frames are asked for only while such a glide runs.
     LaunchedEffect(mix) {
         while (isActive) {
@@ -251,26 +237,34 @@ fun Modifier.mixGlow(mix: MixTransition, color: Color, shownFraction: () -> Floa
     val y = size.height / 2f
     val headX = shownFraction().coerceIn(0f, 1f) * size.width
     val reach = if (mix.isMixing) 1f else FastOutSlowInEasing.transform(mix.countdownFraction)
-    val endX = headX + (size.width - headX) * reach
-    if (endX - headX < 1f) return@drawBehind
+    // Starts clear of the thumb: from the playhead itself, the widest stroke's round end showed around and
+    // behind the dot (issue #66).
+    val startX = headX + GLOW_THUMB_CLEARANCE.dp.toPx()
+    val endX = startX + (size.width - startX) * reach
+    if (endX - startX < 1f) return@drawBehind
 
     // Three strokes of falling strength and growing width read as one soft band, without a blur pass.
-    for ((width, alpha) in GLOW_LAYERS) {
-        drawLine(
-            brush = Brush.horizontalGradient(
-                0f to color.copy(alpha = alpha * intensity),
-                0.6f to color.copy(alpha = alpha * intensity * 0.45f),
-                1f to Color.Transparent,
-                startX = headX,
-                endX = endX,
-            ),
-            start = Offset(headX, y),
-            end = Offset(endX, y),
-            strokeWidth = width.dp.toPx(),
-            cap = StrokeCap.Round,
-        )
+    clipRect(left = startX) {
+        for ((width, alpha) in GLOW_LAYERS) {
+            drawLine(
+                brush = Brush.horizontalGradient(
+                    0f to color.copy(alpha = alpha * intensity),
+                    0.6f to color.copy(alpha = alpha * intensity * 0.45f),
+                    1f to Color.Transparent,
+                    startX = startX,
+                    endX = endX,
+                ),
+                start = Offset(startX, y),
+                end = Offset(endX, y),
+                strokeWidth = width.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+        }
     }
 }
+
+/** Room left for the thumb between the playhead and where the glow begins. */
+private const val GLOW_THUMB_CLEARANCE = 10f
 
 /** Width in dp and peak alpha of each stroke of the glow, widest and faintest first. */
 private val GLOW_LAYERS = listOf(18f to 0.10f, 10f to 0.18f, 4f to 0.42f)
