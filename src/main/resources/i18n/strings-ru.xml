@@ -2919,4 +2919,7 @@
     <string name="together_offline">Подключение…</string>
     <string name="together_your_name">Ваше имя для других</string>
     <string name="together_automix_host_only">Автомикс переключает только хост</string>
+    <string name="artist_clips_title">Клипы</string>
+    <string name="artist_clip_views">%s просмотров</string>
+    <string name="artist_clip_failed">Этот клип не воспроизводится</string>
 </resources>

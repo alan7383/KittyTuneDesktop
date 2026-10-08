@@ -3,6 +3,7 @@ package com.alananasss.kittytune.audio
 import com.alananasss.kittytune.util.LinuxAudioManager
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.DataLine
+import javax.sound.sampled.Mixer
 import javax.sound.sampled.SourceDataLine
 
 /** A place the sound can go: [id] is what the playback device setting stores, [label] what the listener reads. */
@@ -41,4 +42,25 @@ fun listOutputDevices(): List<OutputDevice> {
         devices += OutputDevice(name, LinuxAudioManager.cleanName(name))
     }
     return devices
+}
+
+/**
+ * Java's mixer called [deviceName] when it takes [info], else null for the system default. On Linux the
+ * device is a PulseAudio sink chosen as the default one, so there is no mixer to look up.
+ */
+fun mixerNamed(deviceName: String, info: DataLine.Info): Mixer? {
+    if (deviceName.isEmpty()) return null
+    val target = runCatching { AudioSystem.getMixerInfo() }.getOrDefault(emptyArray()).firstOrNull { it.name.trim() == deviceName }
+        ?: return null
+    return runCatching { AudioSystem.getMixer(target).takeIf { it.isLineSupported(info) } }.getOrNull()
+}
+
+/** A playback line on the device the listener chose for the music, opened and started. */
+fun openPlaybackLine(format: javax.sound.sampled.AudioFormat, bufferBytes: Int): SourceDataLine {
+    val info = DataLine.Info(SourceDataLine::class.java, format)
+    val mixer = mixerNamed(com.alananasss.kittytune.data.local.PlayerPreferences().getAudioDevice(), info)
+    val line = (mixer?.getLine(info) ?: AudioSystem.getLine(info)) as SourceDataLine
+    line.open(format, bufferBytes)
+    line.start()
+    return line
 }

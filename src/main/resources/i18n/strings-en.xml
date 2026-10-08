@@ -2920,4 +2920,7 @@
     <string name="together_offline">Connecting…</string>
     <string name="together_your_name">Your name for the others</string>
     <string name="together_automix_host_only">Only the host switches automix</string>
+    <string name="artist_clips_title">Music videos</string>
+    <string name="artist_clip_views">%s views</string>
+    <string name="artist_clip_failed">This video can't be played</string>
 </resources>

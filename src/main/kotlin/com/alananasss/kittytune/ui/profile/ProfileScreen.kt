@@ -533,6 +533,12 @@ fun ProfileScreen(
                     }
                 }
 
+                if (isArtistPage) {
+                    item(key = "artist_clips") {
+                        ArtistClipsSection(user.username.orEmpty(), playerViewModel)
+                    }
+                }
+
                 if (profileViewModel.appearsOn.isNotEmpty()) {
                     item {
                         ProfileHorizontalCarouselRow(

@@ -1079,15 +1079,7 @@ class AudioEngine {
                 } catch (_: Exception) {
                 }
             } else {
-                val mixerInfos = AudioSystem.getMixerInfo()
-                val targetInfo = mixerInfos.firstOrNull { it.name.trim() == deviceName }
-                if (targetInfo != null) {
-                    try {
-                        val m = AudioSystem.getMixer(targetInfo)
-                        if (m.isLineSupported(info)) mixer = m
-                    } catch (_: Exception) {
-                    }
-                }
+                mixer = mixerNamed(deviceName, info)
             }
         }
 
