@@ -1488,24 +1488,40 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
     val seekWheelSeconds = com.alananasss.kittytune.ui.main.rememberSeekWheelSeconds()
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
+    var drawnMs by remember { mutableLongStateOf(0L) }
+    val wheel = com.alananasss.kittytune.ui.main.rememberWheelSeek(
+        drawnMs = { drawnMs },
+        reportedMs = { viewModel.currentPosition },
+        durationMs = { viewModel.duration },
+        stepSeconds = { seekWheelSeconds },
+        commit = { target -> viewModel.seekTo(target) },
+    )
+    val wheelMs = wheel.shownMs
+    val isScrubbingNow = scrubbing || viewModel.isScrubbing || wheel.isActive
 
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
         reportedMs = viewModel.currentPosition,
         isRunning = viewModel.isPlaying && !viewModel.isLoading,
-        followsInput = scrubbing || viewModel.isScrubbing,
+        followsInput = isScrubbingNow,
         trackKey = viewModel.currentTrack?.id,
     )
-    val position = if (scrubbing || viewModel.isScrubbing) scrubPosition.toLong() else playhead
+    val position = when {
+        wheelMs != null -> wheelMs
+        isScrubbingNow -> scrubPosition.toLong()
+        else -> playhead
+    }
+    drawnMs = position
     val played = position.coerceIn(0L, duration)
     // A mix shows on the bar itself, as in the player bar; see MixTransition.
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
-    val shownFraction = if (scrubbing || viewModel.isScrubbing) (played.toFloat() / duration).also { mix.noteShown(it) }
+    val shownFraction = if (isScrubbingNow) (played.toFloat() / duration).also { mix.noteShown(it) }
     else mix.shownFraction(played.toFloat() / duration, viewModel.currentTrack?.id)
 
     Column(Modifier.fillMaxWidth()) {
         com.alananasss.kittytune.ui.player.slider.PlayerSlider(
             value = shownFraction * duration,
             onValueChange = {
+                wheel.cancel()
                 scrubbing = true
                 scrubPosition = it
                 viewModel.updateScrubPosition(it.toLong())
@@ -1525,12 +1541,7 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
             modifier = Modifier
                 .fillMaxWidth()
                 .mixGlow(mix, palette.bright) { shownFraction }
-                .seekWheel(
-                    positionMs = { if (scrubbing || viewModel.isScrubbing) scrubPosition.toLong() else viewModel.currentPosition },
-                    durationMs = { viewModel.duration },
-                    stepSeconds = { seekWheelSeconds },
-                    onSeek = { target: Long -> viewModel.seekTo(target) }
-                )
+                .seekWheel(wheel)
         )
 
         val showRemaining = rememberFullPlayerShowRemaining()

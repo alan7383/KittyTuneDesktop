@@ -39,6 +39,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -559,14 +560,28 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     val sliderStyle = rememberPlayerSliderStyle()
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
-    val isScrubbingNow = scrubbing || vm.isScrubbing
+    var drawnMs by remember { mutableLongStateOf(0L) }
+    val wheel = rememberWheelSeek(
+        drawnMs = { drawnMs },
+        reportedMs = { vm.currentPosition },
+        durationMs = { vm.duration },
+        stepSeconds = { seekWheelSeconds },
+        commit = { target -> vm.seekTo(target) },
+    )
+    val wheelMs = wheel.shownMs
+    val isScrubbingNow = scrubbing || vm.isScrubbing || wheel.isActive
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
         reportedMs = vm.currentPosition,
         isRunning = vm.isPlaying && !vm.isLoading,
         followsInput = isScrubbingNow,
         trackKey = vm.currentTrack?.id,
     )
-    val position = if (isScrubbingNow) scrubPosition.toLong() else playhead
+    val position = when {
+        wheelMs != null -> wheelMs
+        isScrubbingNow -> scrubPosition.toLong()
+        else -> playhead
+    }
+    drawnMs = position
     val duration = vm.duration.coerceAtLeast(1L)
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
     val shownFraction = if (isScrubbingNow) (position.toFloat() / duration).also { mix.noteShown(it) }
@@ -582,6 +597,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
         PlayerSlider(
             value = (shownFraction * duration).coerceIn(0f, duration.toFloat()),
             onValueChange = {
+                wheel.cancel()
                 scrubbing = true
                 scrubPosition = it
                 vm.updateScrubPosition(it.toLong())
@@ -597,17 +613,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                 .weight(1f)
                 .padding(horizontal = 8.dp)
                 .mixGlow(mix, glowColor) { shownFraction }
-                .seekWheel(
-                    positionMs = { if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition },
-                    durationMs = { vm.duration },
-                    stepSeconds = { seekWheelSeconds },
-                    onSeek = { target ->
-                        // Straight to the player rather than through the scrub state: a
-                        // wheel notch is a decision, not a drag in progress. The playhead slides there.
-                        scrubbing = false
-                        vm.seekTo(target)
-                    },
-                ),
+                .seekWheel(wheel),
         )
         // Click to switch between the track's length and the time left, which counts down with a minus, as in
         // the full player. Remembered and synced with settings.
@@ -689,58 +695,6 @@ private fun ExpressiveToggleButton(
         )
     }
 }
-
-/**
- * The wheel over the progress bar, moving the playhead (issue #33).
- *
- * "If you hover over the slider showing how long the track is, you can use the mouse wheel to rewind
- * and fast-forward the track."
- *
- * Consumed, so the wheel does not also scroll whatever the player bar happens to be sitting on. Up
- * goes forward, matching the volume control right next to it, where up is louder. The step is a
- * setting because five seconds is right for checking a lyric and useless for finding your way around
- * a two-hour set.
- *
- * Notches that come in a quick run count from where the previous one aimed, not from the reported
- * position: that lags a seek by up to a quarter of a second, so a fast spin kept landing on stale
- * spots and the bar jerked back and forth.
- */
-@Composable
-internal fun Modifier.seekWheel(
-    positionMs: () -> Long,
-    durationMs: () -> Long,
-    stepSeconds: () -> Float,
-    onSeek: (Long) -> Unit,
-): Modifier {
-    val position by androidx.compose.runtime.rememberUpdatedState(positionMs)
-    val duration by androidx.compose.runtime.rememberUpdatedState(durationMs)
-    val step by androidx.compose.runtime.rememberUpdatedState(stepSeconds)
-    val seek by androidx.compose.runtime.rememberUpdatedState(onSeek)
-    return this.pointerInput(Unit) {
-        var lastTarget = 0L
-        var lastNotchAt = 0L
-        awaitPointerEventScope {
-            while (true) {
-                val event = awaitPointerEvent()
-                if (event.type != PointerEventType.Scroll) continue
-                val notches = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                if (notches == 0f) continue
-                val total = duration()
-                if (total <= 0L) continue
-                val now = System.currentTimeMillis()
-                val base = if (now - lastNotchAt < WHEEL_RUN_MS) lastTarget else position()
-                val target = (base - (notches * step() * 1000f).toLong()).coerceIn(0L, total)
-                lastTarget = target
-                lastNotchAt = now
-                seek(target)
-                event.changes.forEach { it.consume() }
-            }
-        }
-    }
-}
-
-/** Wheel notches closer together than this are one spin. */
-private const val WHEEL_RUN_MS = 600L
 
 /**
  * Reactive read of which optional player-bar buttons the user keeps; recomposes on pref changes.
