@@ -2880,9 +2880,6 @@
     <string name="artist_videos_title">Music videos</string>
     <string name="fx_reset_speed">Back to normal speed</string>
     <string name="fx_active_count">%1$d on</string>
-    <string name="likes_vibe_title">The colour of your music</string>
-    <string name="likes_vibe_sub">Pick a colour and your favourites in it will play</string>
-    <string name="likes_vibe_top">You like most: %1$s</string>
     <string name="together_title">Shared playlist</string>
     <string name="together_create">New shared playlist</string>
     <string name="together_join">Join with a code</string>

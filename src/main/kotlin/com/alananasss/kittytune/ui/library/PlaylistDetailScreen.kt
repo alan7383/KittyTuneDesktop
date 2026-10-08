@@ -1336,6 +1336,11 @@ fun PlaylistDetailScreen(
             }
         }
 
+        // The colour of the liked songs, from the top, while one of them plays (issue #66).
+        if (playlistId == "likes" && likedTracksRepo.size >= 4) {
+            LikesAura(likedTracksRepo, playerViewModel, fadeInto = backgroundColor, modifier = Modifier.align(Alignment.TopCenter))
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -1727,13 +1732,6 @@ fun PlaylistDetailScreen(
                             }
                         }
                     }
-                }
-            }
-
-            // -------- the liked songs' own colours (issue #66)
-            if (playlistId == "likes" && likedTracksRepo.size >= 8) {
-                item(key = "likes_vibe") {
-                    LikesVibeCard(likedTracksRepo, playerViewModel, Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
                 }
             }
 

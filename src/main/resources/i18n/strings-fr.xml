@@ -2881,9 +2881,6 @@
     <string name="artist_videos_title">Clips</string>
     <string name="fx_reset_speed">Vitesse normale</string>
     <string name="fx_active_count">%1$d actifs</string>
-    <string name="likes_vibe_title">La couleur de votre musique</string>
-    <string name="likes_vibe_sub">Choisissez une couleur, vos favoris de cette teinte se lancent</string>
-    <string name="likes_vibe_top">Vos plus aimés : %1$s</string>
     <string name="together_title">Playlist partagée</string>
     <string name="together_create">Nouvelle playlist partagée</string>
     <string name="together_join">Rejoindre avec un code</string>

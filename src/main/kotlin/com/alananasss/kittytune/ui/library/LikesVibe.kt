@@ -1,5 +1,17 @@
 package com.alananasss.kittytune.ui.library
 
+import kotlin.math.sin
+import kotlin.math.cos
+import kotlin.math.PI
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
@@ -58,85 +70,104 @@ import kotlinx.coroutines.withContext
 private data class Swatch(val color: Color, val tracks: List<Track>)
 
 /**
- * The liked songs' own look (issue #66): "you can only tell it is your favourites by the title and the cover". The
- * covers of the latest likes are read for their main colours; the card is painted with the five most common, and a
- * colour, pressed, plays the favourites whose covers are of it. Under it, the artists liked most.
+ * The colour of the liked songs, from the top of their page (issue #66; redone in round 2 of the tester's list, 13).
+ *
+ * The covers of the latest likes are read for their main colours and mixed, the mix drawn toward the colours of the
+ * theme the app is in so it belongs to it, and it comes down from the top of the page behind the header. It drifts
+ * and shimmers while a liked song is playing; with nothing playing, or a song that is not among the likes, it fades
+ * out, and comes back when one starts. (It was a card of coloured dots to press, which was not what was meant.)
  */
 @Composable
-internal fun LikesVibeCard(likes: List<Track>, playerViewModel: PlayerViewModel, modifier: Modifier = Modifier) {
+internal fun LikesAura(likes: List<Track>, playerViewModel: PlayerViewModel, fadeInto: Color, modifier: Modifier = Modifier) {
     val sample = remember(likes.size) { likes.take(SAMPLE_SIZE) }
     val swatches by produceState<List<Swatch>>(initialValue = emptyList(), sample) {
         value = withContext(Dispatchers.IO) { swatchesOf(sample) }
     }
-    val topArtists = remember(likes.size) {
-        likes.mapNotNull { t -> t.displayArtist.ifBlank { t.user?.username.orEmpty() }.takeIf { it.isNotBlank() } }
-            .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.take(3).map { it.key }
+    val scheme = MaterialTheme.colorScheme
+    val palette = remember(swatches, scheme.primary, scheme.tertiary, scheme.secondary) {
+        AuraPalette.of(swatches.map { it.color to it.tracks.size }, listOf(scheme.primary, scheme.tertiary, scheme.secondary))
     }
+    val likedIds = remember(likes.size) { likes.mapTo(HashSet()) { it.id } }
+    val isLikedPlaying = playerViewModel.isPlaying && playerViewModel.currentTrack?.id in likedIds
+    val intensity by animateFloatAsState(
+        targetValue = if (isLikedPlaying) 1f else 0f,
+        animationSpec = tween(if (isLikedPlaying) 900 else 1500),
+        label = "likesAura",
+    )
+    // Nothing drawn, and nothing running, once it has faded out.
+    if (intensity <= 0.01f) return
 
-    AnimatedVisibility(visible = swatches.size >= 2, enter = fadeIn() + expandVertically(), modifier = modifier) {
-        val colors = swatches.map { it.color }
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = Color.Transparent,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Box(
-                Modifier
-                    .background(Brush.horizontalGradient(colors.map { it.copy(alpha = 0.85f) }))
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.35f))))
-                    .padding(20.dp)
-            ) {
-                Column {
-                    Text(str("likes_vibe_title"), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(str("likes_vibe_sub"), style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.85f))
-                    Spacer(Modifier.height(14.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        swatches.forEach { swatch ->
-                            SwatchButton(swatch) {
-                                playerViewModel.playPlaylist(
-                                    tracks = swatch.tracks.shuffled(),
-                                    startIndex = 0,
-                                    context = PlaybackContext(str("lib_liked_tracks"), "likes"),
-                                    respectShuffle = false,
-                                )
-                            }
-                        }
-                    }
-                    if (topArtists.isNotEmpty()) {
-                        Spacer(Modifier.height(14.dp))
-                        Text(
-                            str("likes_vibe_top", topArtists.joinToString(", ")),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
+    val transition = rememberInfiniteTransition(label = "likesAuraDrift")
+    // A whole turn, started over: the blobs go round by whole turns of it (see below), so the loop has no seam.
+    val drift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(AURA_PERIOD_MS, easing = LinearEasing), RepeatMode.Restart),
+        label = "likesAuraPhase",
+    )
+    AuraCanvas(palette, intensity, drift, fadeInto, modifier)
 }
 
+/** The aura itself: [drift] is a phase from 0 to a full turn, [intensity] how much of it is shown. */
 @Composable
-private fun SwatchButton(swatch: Swatch, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val scale by animateFloatAsState(if (hovered) 1.12f else 1f, label = "swatchScale")
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(46.dp)
-            .scale(scale)
-            .clip(CircleShape)
-            .background(swatch.color)
-            .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick),
-    ) {
-        Surface(shape = CircleShape, color = Color.Transparent, border = BorderStroke(2.dp, Color.White.copy(alpha = 0.8f)), modifier = Modifier.size(46.dp)) {}
-        if (hovered) Icon(Icons.Rounded.PlayArrow, null, tint = Color.White, modifier = Modifier.size(22.dp))
+internal fun AuraCanvas(palette: AuraPalette, intensity: Float, drift: Float, fadeInto: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier.fillMaxWidth().height(AURA_HEIGHT)) {
+        val w = size.width
+        val h = size.height
+        // The mix, as a wash from the very top.
+        drawRect(Brush.verticalGradient(listOf(palette.mix.copy(alpha = 0.42f * intensity), Color.Transparent)))
+        palette.colors.forEachIndexed { i, color ->
+            val turns = AURA_TURNS[i % AURA_TURNS.size]
+            val angle = drift * turns + i * 2.1f
+            val centre = Offset(
+                x = w * (0.18f + 0.32f * i) + cos(angle) * w * 0.10f,
+                y = h * 0.34f + sin(angle) * h * 0.16f,
+            )
+            // A slow swell on each, so the colour breathes as well as moves.
+            val swell = 0.82f + 0.18f * sin(drift * 2f + i)
+            val radius = w * 0.34f
+            drawCircle(
+                brush = Brush.radialGradient(listOf(color.copy(alpha = 0.72f * swell * intensity), Color.Transparent), center = centre, radius = radius),
+                radius = radius,
+                center = centre,
+            )
+        }
+        // Into the page's own colour at the bottom, like the cover's backdrop.
+        drawRect(Brush.verticalGradient(0.5f to Color.Transparent, 1f to fadeInto))
     }
 }
+
+/** The colours the aura is drawn in. Pure, so that what it makes of the covers and the theme can be tested. */
+internal class AuraPalette(val colors: List<Color>, val mix: Color) {
+
+    companion object {
+        /**
+         * @param covers the covers' colours with how many songs each stands for.
+         * @param theme the theme's accents, which each cover colour is drawn a third of the way toward.
+         */
+        fun of(covers: List<Pair<Color, Int>>, theme: List<Color>): AuraPalette {
+            val fallback = theme.take(3)
+            if (covers.isEmpty()) return AuraPalette(fallback, fallback.firstOrNull() ?: Color.Gray)
+            val chosen = covers.sortedByDescending { it.second }.take(3)
+            val harmonised = chosen.mapIndexed { i, (color, _) -> lerp(color, theme[i % theme.size], THEME_PULL) }
+            val total = chosen.sumOf { it.second }.coerceAtLeast(1).toFloat()
+            val mix = harmonised.foldIndexed(Color(0f, 0f, 0f, 1f)) { i, acc, color ->
+                val share = chosen[i].second / total
+                Color(acc.red + color.red * share, acc.green + color.green * share, acc.blue + color.blue * share, 1f)
+            }
+            return AuraPalette(harmonised, mix)
+        }
+
+        /** How far a cover's colour is drawn toward the theme's. */
+        const val THEME_PULL = 0.33f
+    }
+}
+
+private val AURA_HEIGHT = 420.dp
+private const val AURA_PERIOD_MS = 18_000
+
+/** Whole turns of the drift for each blob, one backwards: the loop is seamless and they go their own ways. */
+private val AURA_TURNS = intArrayOf(1, -1, 2)
 
 /**
  * The main colours of [tracks]' covers, by hue: covers too grey to have one are left out, the hues are put in
