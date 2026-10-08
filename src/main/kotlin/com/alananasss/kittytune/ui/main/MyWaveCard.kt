@@ -256,19 +256,26 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
             val amplitude = h * (0.06f + 0.05f * i) * (0.4f + energy)
             val frequency = 1.2f + i * 0.45f
             val shift = phase * (1f + i * 0.35f) + i * 1.7f
-            val path = Path().apply {
-                moveTo(0f, h)
-                var x = 0f
-                while (x <= w) {
-                    val y = baseline + amplitude * sin((x / w) * frequency * 2 * PI.toFloat() + shift)
-                    lineTo(x, y)
+            fun crestY(x: Float) = baseline + amplitude * sin((x / w) * frequency * 2 * PI.toFloat() + shift)
+            // The crest alone gets the bright line; outlining the filled shape also drew its sides, two white
+            // bars down the card's edges.
+            val crest = Path().apply {
+                moveTo(0f, crestY(0f))
+                var x = 6f
+                while (x < w) {
+                    lineTo(x, crestY(x))
                     x += 6f
                 }
+                lineTo(w, crestY(w))
+            }
+            val body = Path().apply {
+                addPath(crest)
                 lineTo(w, h)
+                lineTo(0f, h)
                 close()
             }
             drawPath(
-                path = path,
+                path = body,
                 brush = Brush.verticalGradient(
                     0f to color.copy(alpha = 0.22f + 0.1f * energy),
                     1f to color.copy(alpha = 0.04f),
@@ -276,7 +283,7 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
                     endY = h,
                 ),
             )
-            drawPath(path = path, color = color.copy(alpha = 0.25f + 0.25f * energy), style = Stroke(width = 2f))
+            drawPath(path = crest, color = color.copy(alpha = 0.25f + 0.25f * energy), style = Stroke(width = 2f))
         }
         // A glow at the top right, behind the play button.
         drawCircle(
