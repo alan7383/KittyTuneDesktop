@@ -735,7 +735,8 @@ class Player {
         }
     }
 
-    private fun buildHeaders(track: Track?): Map<String, String> {
+    /** The request headers a stream for [track] is opened with. */
+    fun buildHeaders(track: Track?): Map<String, String> {
         val headers = mutableMapOf("User-Agent" to "SoundCloud/2025.12.10-release (Android 10; Android)")
         if (track?.source != "youtube") {
             headers["Origin"] = "https://soundcloud.com"
