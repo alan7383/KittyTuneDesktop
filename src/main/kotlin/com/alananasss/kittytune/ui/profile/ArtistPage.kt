@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.profile
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -386,6 +387,41 @@ private fun ArtistMenuItem(icon: ImageVector, text: String, danger: Boolean = fa
         leadingIcon = { Icon(icon, null, tint = if (danger) color else MaterialTheme.colorScheme.onSurfaceVariant) },
         onClick = onClick,
     )
+}
+
+/** One of the buttons at the foot of an artist's page: what it is called, how many there are, and where it goes. */
+internal data class ArtistMoreEntry(val icon: ImageVector, val label: String, val count: Int, val section: String)
+
+/** The small things beside an artist's music, as buttons that open them (round 2 of the tester's list, item 8.2). */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+internal fun ArtistMoreRow(entries: List<ArtistMoreEntry>, onOpen: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        ArtistSectionTitle(str("artist_more_title"), onOpen = null)
+        androidx.compose.foundation.layout.FlowRow(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            entries.forEach { entry ->
+                androidx.compose.material3.OutlinedButton(
+                    onClick = { onOpen(entry.section) },
+                    shapes = ButtonDefaults.shapes(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Icon(entry.icon, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(entry.label, style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        NumberFormat.getIntegerInstance(com.alananasss.kittytune.core.Strings.locale()).format(entry.count),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
 }
 
 /** Where an artist's radio opens: the catalogue's for a streaming profile, SoundCloud's station otherwise. */

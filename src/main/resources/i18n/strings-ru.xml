@@ -2917,4 +2917,16 @@
     <string name="artist_listening">Слушаете</string>
     <string name="artist_resume">Продолжить</string>
     <string name="artist_trailer_playing">Трейлер играет</string>
+    <string name="sort_now">Слушают сейчас</string>
+    <string name="sort_all_time">За всё время</string>
+    <string name="sort_likes">По лайкам</string>
+    <string name="sort_followers">По подписчикам</string>
+    <string name="artist_new_releases">Новые релизы</string>
+    <string name="btn_load_more">Загрузить ещё</string>
+    <string name="release_kind_album">Альбом</string>
+    <string name="release_kind_ep">EP</string>
+    <string name="release_kind_single">Сингл</string>
+    <string name="release_kind_compilation">Сборник</string>
+    <string name="artist_more_title">Ещё у исполнителя</string>
+    <string name="artist_more_playlists">Плейлисты</string>
 </resources>
