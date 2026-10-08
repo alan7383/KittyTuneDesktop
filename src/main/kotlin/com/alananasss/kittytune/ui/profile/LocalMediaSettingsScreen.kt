@@ -185,7 +185,7 @@ fun LocalMediaSettingsScreen(
                                                                 maxLines = 1,
                                                                 color = MaterialTheme.colorScheme.onSurface
                                                             )
-                                                            IconButton(onClick = { deleteFolderWithAnimation(uriString) }
+                                                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { deleteFolderWithAnimation(uriString) }
                                                             ) {
                                                                 Icon(
                                                                     Icons.Rounded.Delete,

@@ -1114,7 +1114,7 @@ fun PlaylistDetailScreen(
             title = { Text(str(if (isUserCreated) "dialog_delete_playlist_title" else "dialog_delete_playlist_from_lib_title")) },
             text = { Text(str("dialog_delete_playlist_msg")) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     if (stableId != 0L) {
                         DownloadManager.deletePlaylist(
                             playlistId = stableId,
@@ -1126,7 +1126,7 @@ fun PlaylistDetailScreen(
                     onBackClick()
                 }) { Text(str("btn_confirm"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1136,7 +1136,7 @@ fun PlaylistDetailScreen(
             title = { Text(str("dialog_remove_download_title")) },
             text = { Text(str("dialog_remove_download_msg")) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     if (playlistId == "likes") {
                         // Full list, not tracksToDisplay — an active search must not
                         // limit the removal to the visible subset.
@@ -1148,7 +1148,7 @@ fun PlaylistDetailScreen(
                     if (isDownloadedView) onBackClick()
                 }) { Text(str("btn_delete"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1166,7 +1166,7 @@ fun PlaylistDetailScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     if (currentIdLong != 0L && newTitle.isNotBlank()) {
                         DownloadManager.editPlaylistMetadata(currentIdLong, newTitle)
                         playlistTitle = newTitle
@@ -1174,7 +1174,7 @@ fun PlaylistDetailScreen(
                     showRenameDialog = false
                 }) { Text(str("btn_confirm")) }
             },
-            dismissButton = { TextButton(onClick = { showRenameDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showRenameDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1784,7 +1784,7 @@ fun PlaylistDetailScreen(
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     trailingIcon = {
                                         if (playlistSearchQuery.isNotEmpty()) {
-                                            IconButton(onClick = {
+                                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                                                 playlistSearchQuery = ""
                                                 focusManager.clearFocus()
                                             }) { Icon(Icons.Rounded.Close, null) }
@@ -2060,7 +2060,7 @@ fun TrackListItem(
                     com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track, showLikeIndicator)
                 }
             }
-            IconButton(onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
                 Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -2428,7 +2428,7 @@ fun TrackTableItem(
                 modifier = Modifier.width(60.dp),
                 textAlign = TextAlign.End
             )
-            IconButton(onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
                 Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -2746,7 +2746,7 @@ fun TrackCompactItem(
                 modifier = Modifier.width(60.dp),
                 textAlign = TextAlign.End
             )
-            IconButton(onClick = onOptionClick, modifier = Modifier.size(32.dp)) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
         }

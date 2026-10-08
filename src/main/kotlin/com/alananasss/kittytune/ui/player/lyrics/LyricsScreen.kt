@@ -849,7 +849,7 @@ import kotlin.math.roundToInt
                         color = scheme.onSurface,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = onClose) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onClose) {
                         Icon(Icons.Rounded.Close, contentDescription = str("btn_close"), tint = scheme.onSurfaceVariant)
                     }
                 }
@@ -873,7 +873,7 @@ import kotlin.math.roundToInt
                     RepeatingIconButton(onClick = { onAdjust(OFFSET_STEP_MS) }, icon = Icons.Rounded.Add, tint = scheme.onSurface)
                 }
 
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = onReset,
                     enabled = offset != 0L,
                     modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp, end = 12.dp),

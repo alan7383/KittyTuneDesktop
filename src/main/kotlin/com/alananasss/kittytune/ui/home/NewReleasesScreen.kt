@@ -283,7 +283,7 @@ fun PopularTrackRow(
         }
 
         // kebab menu
-        IconButton(onClick = onOptionClick) {
+        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick) {
             Icon(Icons.Default.MoreVert, str("btn_options"))
         }
     }

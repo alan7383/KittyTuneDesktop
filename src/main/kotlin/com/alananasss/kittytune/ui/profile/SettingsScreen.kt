@@ -45,6 +45,8 @@ import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 /** Material's emphasized-decelerate curve: arrives quickly and settles. */
 private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
@@ -366,7 +368,7 @@ private fun SettingsPane(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onBack != null && searchQuery.isEmpty()) {
-                IconButton(onClick = onBack) {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBack) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
                 }
             }
@@ -415,7 +417,7 @@ private fun SettingsSearchField(
         },
         trailingIcon = {
             if (query.isNotEmpty()) {
-                IconButton(onClick = {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                     onQueryChange("")
                     focusManager.clearFocus()
                 }) {
@@ -1321,7 +1323,7 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
                         if (reveal) androidx.compose.ui.text.input.VisualTransformation.None
                         else androidx.compose.ui.text.input.PasswordVisualTransformation(),
                     trailingIcon = {
-                        IconButton(onClick = { reveal = !reveal }) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { reveal = !reveal }) {
                             Icon(
                                 if (reveal) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                                 contentDescription = null,
@@ -1332,7 +1334,7 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
                 )
 
                 Spacer(Modifier.height(8.dp))
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         runCatching {
                             java.awt.Desktop.getDesktop()
@@ -1343,14 +1345,14 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
 
                 Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(
+                    TextButton(shapes = ButtonDefaults.shapes(),
                         onClick = {
                             client.token = null
                             value = ""
                             onDismiss()
                         }
                     ) { Text(str("pref_yandex_token_clear")) }
-                    TextButton(
+                    TextButton(shapes = ButtonDefaults.shapes(),
                         onClick = {
                             client.token = value
                             onDismiss()

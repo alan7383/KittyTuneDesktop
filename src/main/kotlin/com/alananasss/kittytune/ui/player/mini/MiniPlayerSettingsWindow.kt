@@ -43,6 +43,7 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.profile.MiniPlayerSettingsList
 import com.alananasss.kittytune.ui.theme.KittyTuneTheme
+import androidx.compose.material3.IconButtonDefaults
 
 /** Material's emphasized-decelerate curve: arrives quickly and settles. */
 private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
@@ -115,7 +116,7 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit) {
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
                                     Text(str("mini_player_settings_title"), style = MaterialTheme.typography.headlineSmall)
-                                    IconButton(onClick = requestClose) {
+                                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = requestClose) {
                                         Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
                                     }
                                 }

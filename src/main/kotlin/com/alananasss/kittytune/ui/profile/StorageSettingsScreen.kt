@@ -32,6 +32,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 private val cacheLimitsMb = listOf(256, 512, 1024, 2048, 5120, 10240)
 
@@ -167,7 +169,7 @@ fun StorageDownloadsPage() {
             title = { Text(str("pref_storage_downloads_clear")) },
             text = { Text(str("storage_delete_all_confirm", downloaded.size)) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     confirmDeleteAll = false
                     scope.launch {
                         withContext(Dispatchers.IO) {
@@ -178,7 +180,7 @@ fun StorageDownloadsPage() {
                     }
                 }) { Text(str("btn_delete"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDeleteAll = false }) { Text(str("btn_cancel")) } },
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirmDeleteAll = false }) { Text(str("btn_cancel")) } },
         )
     }
 
@@ -281,7 +283,7 @@ private fun CleanableRow(shape: androidx.compose.ui.graphics.Shape, title: Strin
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
                 Text(size, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            OutlinedButton(onClick = onClear) { Text(str("storage_clear")) }
+            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onClear) { Text(str("storage_clear")) }
         }
     }
 }
@@ -298,7 +300,7 @@ private fun DownloadsDialog(tracks: List<LocalTrack>, onDismiss: () -> Unit) {
             Column(Modifier.padding(20.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(str("storage_downloaded_music"), style = MaterialTheme.typography.headlineSmall)
-                    IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = null) }
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = null) }
                 }
                 Spacer(Modifier.height(12.dp))
                 if (tracks.isEmpty()) {
@@ -324,7 +326,7 @@ private fun DownloadsDialog(tracks: List<LocalTrack>, onDismiss: () -> Unit) {
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 Text(size, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                IconButton(onClick = { DownloadManager.deleteTrack(track.id) }) {
+                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { DownloadManager.deleteTrack(track.id) }) {
                                     Icon(Icons.Rounded.Delete, contentDescription = str("btn_delete"), tint = MaterialTheme.colorScheme.error)
                                 }
                             }

@@ -54,6 +54,8 @@ import com.alananasss.kittytune.ui.common.Tip
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 data class AudioFxDefinition(
     val id: String,
@@ -1542,7 +1544,7 @@ private fun BassBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1600,7 +1602,7 @@ private fun EarrapeDialog(viewModel: PlayerViewModel, onShowWarning: () -> Unit,
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1618,7 +1620,7 @@ private fun EarrapeWarningDialog(viewModel: PlayerViewModel, onDismiss: () -> Un
         title = { Text(str("warning_title")) },
         text = { Text(str("earrape_warning")) },
         confirmButton = {
-            TextButton(
+            TextButton(shapes = ButtonDefaults.shapes(),
                 onClick = {
                     viewModel.setHasSeenEarrapeWarning(true)
                     viewModel.toggleEarrape()
@@ -1629,7 +1631,7 @@ private fun EarrapeWarningDialog(viewModel: PlayerViewModel, onDismiss: () -> Un
                 Text(if (countdown > 0) "${str("btn_ok")} (${countdown}s)" else str("btn_ok"))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } }
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_cancel")) } }
     )
 }
 
@@ -1657,7 +1659,7 @@ private fun EightDDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1685,7 +1687,7 @@ private fun MuffledDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1713,7 +1715,7 @@ private fun ReverbDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1783,7 +1785,7 @@ private fun AmbientSoundscapeDialog(viewModel: PlayerViewModel, onDismiss: () ->
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1839,7 +1841,7 @@ private fun NormalizationDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    IconButton(
+                    IconButton(shapes = IconButtonDefaults.shapes(),
                         onClick = { viewModel.adjustTrackGain(-1) },
                         enabled = viewModel.trackGainDb > com.alananasss.kittytune.audio.TrackGain.MIN_DB
                     ) { Icon(Icons.Rounded.Remove, contentDescription = null) }
@@ -1849,17 +1851,17 @@ private fun NormalizationDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    IconButton(
+                    IconButton(shapes = IconButtonDefaults.shapes(),
                         onClick = { viewModel.adjustTrackGain(1) },
                         enabled = viewModel.trackGainDb < com.alananasss.kittytune.audio.TrackGain.MAX_DB
                     ) { Icon(Icons.Rounded.Add, contentDescription = null) }
                 }
                 if (viewModel.trackGainDb != com.alananasss.kittytune.audio.TrackGain.NONE) {
-                    TextButton(onClick = { viewModel.resetTrackGain() }) { Text(str("btn_reset")) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.resetTrackGain() }) { Text(str("btn_reset")) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1929,7 +1931,7 @@ private fun VintageMp3Dialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1991,7 +1993,7 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2053,7 +2055,7 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2138,7 +2140,7 @@ private fun FlangerDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2248,7 +2250,7 @@ private fun PartyNextDoorDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2334,7 +2336,7 @@ private fun SuperWideDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2420,7 +2422,7 @@ private fun VinylLoFiDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2506,7 +2508,7 @@ private fun PhaserDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2592,7 +2594,7 @@ private fun MegaphoneDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2678,7 +2680,7 @@ private fun RobotVocoderDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2764,7 +2766,7 @@ private fun ChorusDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2850,7 +2852,7 @@ private fun UnderwaterDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2955,7 +2957,7 @@ private fun TranceGateDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3041,7 +3043,7 @@ private fun PingPongDelayDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3127,7 +3129,7 @@ private fun ChiptuneDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3213,7 +3215,7 @@ private fun ShimmerReverbDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3299,7 +3301,7 @@ private fun RotarySpeakerDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3385,7 +3387,7 @@ private fun TapeSaturationDialog(viewModel: PlayerViewModel, onDismiss: () -> Un
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3471,7 +3473,7 @@ private fun SubOctaverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3557,7 +3559,7 @@ private fun EmptyMallDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3643,7 +3645,7 @@ private fun GramophoneDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3729,7 +3731,7 @@ private fun ReverseEchoDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit)
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3815,7 +3817,7 @@ private fun StadiumDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3901,7 +3903,7 @@ private fun WalkmanDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3987,7 +3989,7 @@ private fun AsmrVocalDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -4073,6 +4075,6 @@ private fun NightDriveDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }

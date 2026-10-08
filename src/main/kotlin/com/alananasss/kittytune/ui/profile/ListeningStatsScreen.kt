@@ -37,6 +37,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 /** The full lists the summary opens. */
 internal enum class StatsList { NONE, PLAYS, TRACKS, ARTISTS }
@@ -148,11 +150,11 @@ private fun StatsHeader(
             }
             Box {
                 if (isNarrow) {
-                    FilledTonalIconButton(onClick = { styleMenu = true }) {
+                    FilledTonalIconButton(shapes = IconButtonDefaults.shapes(), onClick = { styleMenu = true }) {
                         Icon(style.icon, contentDescription = str(style.labelKey), modifier = Modifier.size(20.dp))
                     }
                 } else {
-                    FilledTonalButton(onClick = { styleMenu = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
+                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { styleMenu = true }, contentPadding = PaddingValues(horizontal = 14.dp)) {
                         Icon(style.icon, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(str(style.labelKey))
@@ -179,7 +181,7 @@ private fun StatsHeader(
                     }
                 }
             }
-            IconButton(onClick = onPrivacy) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onPrivacy) {
                 Icon(Icons.Rounded.Tune, contentDescription = str("pref_privacy_title"))
             }
         }
@@ -251,7 +253,7 @@ private fun PrivacyDialog(onDismiss: () -> Unit) {
                 Text(str("listening_stats_disclaimer"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_close")) } },
     )
 }
 
@@ -287,7 +289,7 @@ internal fun StatsCard(
                     }
                 }
                 if (action != null) {
-                    TextButton(onClick = action) { Text(str("listening_stats_show_all")) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = action) { Text(str("listening_stats_show_all")) }
                 }
             }
             Spacer(Modifier.height(12.dp))

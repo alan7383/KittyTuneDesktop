@@ -94,7 +94,7 @@ fun MusicApiAuthScreen(
                 },
                 navigationIcon = {
                     if (onBackClick != null) {
-                        FilledTonalIconButton(
+                        FilledTonalIconButton(shapes = IconButtonDefaults.shapes(),
                             onClick = onBackClick,
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),

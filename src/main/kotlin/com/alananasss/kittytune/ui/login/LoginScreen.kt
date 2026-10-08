@@ -333,7 +333,7 @@ fun LoginScreen(
             TopAppBar(
                 title = { Text(str("login_title")) },
                 navigationIcon = {
-                    FilledTonalIconButton(onClick = onBackClick,
+                    FilledTonalIconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick,
                                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -375,7 +375,7 @@ fun LoginScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    OutlinedButton(
+                    OutlinedButton(shapes = ButtonDefaults.shapes(),
 onClick = { launchSoundCloudAuth(authUrl) }) {
                         Text(str("login_reopen_browser"))
                     }

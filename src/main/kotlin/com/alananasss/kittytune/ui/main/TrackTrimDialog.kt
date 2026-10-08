@@ -29,6 +29,7 @@ import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * Trimming the track that is playing, by ear (issue #33).
@@ -164,7 +165,7 @@ fun TrackTrimDialog(viewModel: PlayerViewModel) {
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 viewModel.saveCurrentTrim(draft)
                 viewModel.showTrimDialog = false
             }) { Text(str("btn_save")) }
@@ -172,13 +173,13 @@ fun TrackTrimDialog(viewModel: PlayerViewModel) {
         dismissButton = {
             Row {
                 if (!viewModel.currentTrim.isEmpty) {
-                    TextButton(onClick = {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                         viewModel.clearCurrentTrim()
                         segments = emptyList()
                         viewModel.showTrimDialog = false
                     }) { Text(str("trim_clear")) }
                 }
-                TextButton(onClick = { viewModel.showTrimDialog = false }) { Text(str("btn_cancel")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.showTrimDialog = false }) { Text(str("btn_cancel")) }
             }
         },
     )
@@ -244,8 +245,8 @@ private fun TrimSegmentRow(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onStartHere) { Text(str("trim_set_start", formatMs(position))) }
-                TextButton(onClick = onEndHere) { Text(str("trim_set_end", formatMs(position))) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = onStartHere) { Text(str("trim_set_start", formatMs(position))) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = onEndHere) { Text(str("trim_set_end", formatMs(position))) }
             }
         }
     }

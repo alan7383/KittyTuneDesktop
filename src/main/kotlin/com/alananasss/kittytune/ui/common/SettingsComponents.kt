@@ -302,7 +302,7 @@ fun SettingsScaffold(
             title = { Text(title, fontWeight = FontWeight.Bold, maxLines = 1) },
             navigationIcon = {
                 if (onBackClick != null) {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick) {
                         Icon(imageVector = Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
                     }
                 }

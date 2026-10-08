@@ -66,6 +66,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.data.vk.VkPlaylist
+import androidx.compose.material3.IconButtonDefaults
 
 /**
  * Importing a VK Music playlist from its link, start to finish, in one card.
@@ -112,7 +113,7 @@ fun VkImportCard(
                     placeholder = { Text(str("vk_import_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { Icon(Icons.Rounded.Link, null) },
                     trailingIcon = {
-                        IconButton(onClick = { clipboard.getText()?.text?.let { link = it.trim() } }, enabled = !isBusy) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { clipboard.getText()?.text?.let { link = it.trim() } }, enabled = !isBusy) {
                             Icon(Icons.Rounded.ContentPaste, str("vk_import_paste"))
                         }
                     },
@@ -220,7 +221,7 @@ private fun DoneSection(done: VkImportState.Done, onOpenPlaylist: (Long) -> Unit
             FilledTonalButton(onClick = { VkImportSession.reset() }, shapes = ButtonDefaults.shapes()) { Text(str("vk_import_another")) }
         }
         if (result.missing.isNotEmpty()) {
-            TextButton(onClick = { showMissing = !showMissing }) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showMissing = !showMissing }) {
                 Text(str("vk_import_missing", result.missing.size))
                 Icon(if (showMissing) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, null)
             }

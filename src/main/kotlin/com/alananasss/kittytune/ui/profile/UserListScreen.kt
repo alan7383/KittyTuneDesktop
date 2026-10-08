@@ -30,6 +30,7 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.domain.User
 import java.text.NumberFormat
 import java.util.Locale
+import androidx.compose.material3.IconButtonDefaults
 
 enum class UserFilterType {
     ALL,
@@ -149,7 +150,7 @@ fun UserListDialog(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(36.dp)) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss, modifier = Modifier.size(36.dp)) {
                         Icon(
                             Icons.Rounded.Close,
                             contentDescription = str("btn_close"),
