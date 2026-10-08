@@ -56,6 +56,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import com.alananasss.kittytune.ui.player.lyrics.lyricUnderline
 import com.alananasss.kittytune.core.str
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -122,18 +126,50 @@ fun NowPlayingPanel(
 
             // Header: context name + close. Which tabs show is chosen in Appearance > Customize buttons; the gear
             // that also opened that menu here sat right next to the close button (issue #66).
+            // The context reads as a link (same hover underline + hand cursor as ArtistLinkText)
+            // and routes back to its playlist / artist / tag via navigateToContext.
             Row(
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = vm.currentContext?.displayText ?: track.title ?: "",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
+                val context = vm.currentContext
+                if (context != null && vm.canNavigateToContext()) {
+                    val contextInteraction = remember(context.navigationId) { MutableInteractionSource() }
+                    val contextHovered by contextInteraction.collectIsHoveredAsState()
+                    // Same fix as the lyrics (issue #33): TextDecoration.Underline is drawn
+                    // per font run, so Cyrillic / Arabic / CJK falling back to a system
+                    // face comes out as a mismatched dashed rule. One hand-drawn rect
+                    // per laid-out line via lyricUnderline.
+                    var contextLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+                    val contextStyle = MaterialTheme.typography.titleSmall
+                    Text(
+                        text = context.displayText,
+                        style = contextStyle,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { contextLayout = it },
+                        modifier = Modifier.weight(1f)
+                            .hoverable(contextInteraction)
+                            .pointerHoverIcon(PointerIcon.Hand)
+                            .clickable(interactionSource = contextInteraction, indication = null) { vm.navigateToContext() }
+                            .lyricUnderline(
+                                layout = { contextLayout },
+                                visible = contextHovered,
+                                fontSizeSp = contextStyle.fontSize.value,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            ),
+                    )
+                } else {
+                    Text(
+                        text = context?.displayText ?: track.title ?: "",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 IconButton(shapes = IconButtonDefaults.shapes(), onClick = onClose) {
                     Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                 }

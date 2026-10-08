@@ -1,24 +1,21 @@
 <p align="center">
-  <img src="scratch/banner_real_kittytune_font.png" width="100%" alt="KittyTune Desktop Banner">
-</p>
-
-<h1 align="center">KittyTune Desktop (・∀・)ﾉ</h1>
-
-<p align="center">
-  <a href="https://github.com/alan7383/KittyTuneDesktop/releases">
-    <img src="https://img.shields.io/github/v/tag/alan7383/KittyTuneDesktop?style=for-the-badge&logo=github&color=orange" alt="Release">
-  </a>
-  <img src="https://img.shields.io/badge/Kotlin-2.4.20-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin Badge">
-  <img src="https://img.shields.io/badge/Compose_Desktop-1.12.0-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white" alt="Compose Desktop Badge">
-  <img src="https://img.shields.io/badge/Linux_(Primary)_|_Win_|_macOS-000000?style=for-the-badge&logo=linux&logoColor=white" alt="Platform Badge">
-  <a href="https://github.com/alan7383/KittyTuneDesktop/blob/master/LICENSE">
-    <img src="https://img.shields.io/github/license/alan7383/KittyTuneDesktop?style=for-the-badge&logo=github" alt="License">
-  </a>
+  <a href="https://alan7383.github.io/kittytune-website/download" title="Download KittyTune"><img src="images/banner.png" alt="KittyTune Desktop - click to download"></a>
 </p>
 
 <p align="center">
-  <strong>A lightweight, native desktop music player for Linux, Windows, and macOS.</strong><br>
-  SoundCloud-first streaming with full account sync, lossless upgrades (Qobuz, TIDAL, Deezer), Apple-style karaoke lyrics, DJ Automix & a 30+ audio effects studio.
+  <a href="https://github.com/alan7383/KittyTuneDesktop/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-gray?style=for-the-badge&logo=github" alt="License"></a>
+  <a href="https://github.com/alan7383/KittyTuneDesktop/releases"><img src="https://img.shields.io/github/v/tag/alan7383/KittyTuneDesktop?style=for-the-badge&label=Release&color=gray&logo=github" alt="Release"></a>
+  <a href="https://github.com/alan7383/KittyTuneDesktop/stargazers"><img src="https://img.shields.io/github/stars/alan7383/KittyTuneDesktop?style=for-the-badge&label=Stars&color=gray&logo=github" alt="Stars"></a>
+  <a href="https://ko-fi.com/alan7383"><img src="https://img.shields.io/badge/Ko--fi-gray?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://discord.gg/thyHQH9jV9"><img src="https://img.shields.io/badge/Discord-gray?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+<p align="center">
+  <a href="https://alan7383.github.io/kittytune-website/download" title="Download KittyTune"><img src=".github/assets/download-kittytune.svg" alt="Download KittyTune" width="240"/></a>
+</p>
+
+<p align="center">
+  <sub>[!] <b>KittyTune Desktop is in active beta</b> - some features may be incomplete. Found a bug? Feel free to <a href="https://github.com/alan7383/KittyTuneDesktop/issues">open an issue</a>!</sub><br/>
+  <sub>[&gt;] <b>Looking for Android?</b> KittyTune is also available for <b>Android</b> on <a href="https://github.com/alan7383/kittytune"><b>KittyTune</b></a>.</sub>
 </p>
 
 ---
@@ -106,22 +103,8 @@ No heavy web wrappers or Electron bloat here. Just a fast, lightweight JVM clien
 <br>
 
 <p align="center">
-  <img src="images/lyrics_preview.gif" width="850" style="border-radius: 12px;" alt="Apple-Style Synchronized Lyrics">
+  <img src="images/lyrics_preview.gif" width="800" style="border-radius: 12px;" alt="Apple-Style Synchronized Lyrics">
   <br><em>synchronized lyrics — real-time karaoke tracking, accompanist animations, and duet singer split.</em>
-</p>
-
-<br>
-
-<p align="center">
-  <img src="images/effects_studio.png" width="850" style="border-radius: 12px;" alt="Audio FX Studio">
-  <br><em>audio fx studio — 30+ modular dsp effects, bass boost, 8d audio, and rain mixer.</em>
-</p>
-
-<br>
-
-<p align="center">
-  <img src="images/mini_player.png" width="750" style="border-radius: 12px;" alt="Mini Player">
-  <br><em>floating mini-player — transparent elongated bar with hover controls and live lyrics.</em>
 </p>
 
 <br>
@@ -209,7 +192,7 @@ pre-built binaries for linux, windows, and macos are available on the [**release
 #### **arch linux**
 
 ##### **option 1: aur (recommended)**
-the package [**`kitty-tune-bin`**](https://aur.archlinux.org/packages/kitty-tune-bin) is available on the Arch User Repository (AUR), maintained by [@Felitendo](https://github.com/Felitendo).
+the package [**`kitty-tune-bin`**](https://aur.archlinux.org/packages/kitty-tune-bin) is available on the Arch User Repository (AUR), maintained by [@Felitendo](https://git.felo.gg/Felitendo).
 
 install with **yay**:
 ```bash
@@ -222,7 +205,7 @@ paru -S kitty-tune-bin
 ```
 
 > [!NOTE]
-> The AUR package is maintained independently by Felitendo. As with any AUR package, you can inspect the [`PKGBUILD`](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=kitty-tune-bin) before installing.
+> The AUR package is maintained independently by [Felitendo](https://git.felo.gg/Felitendo). As with any AUR package, you can inspect the [`PKGBUILD`](https://aur.archlinux.org/cgit/aur.git/tree/PKGBUILD?h=kitty-tune-bin) before installing.
 
 ##### **option 2: official pacman package (`.pkg.tar.zst`)**
 download the latest `.pkg.tar.zst` archive directly from [**releases**](https://github.com/alan7383/KittyTuneDesktop/releases) and install via `pacman`:

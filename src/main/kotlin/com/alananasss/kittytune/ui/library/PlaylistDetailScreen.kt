@@ -34,6 +34,7 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.style.TextDecoration
+import com.alananasss.kittytune.ui.player.lyrics.lyricUnderline
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -267,6 +268,45 @@ private object TrackCompactColumns {
         prefs.putInt("compact_col_album", (album * 100).toInt())
         prefs.putInt("compact_col_date", (date * 100).toInt())
     }
+}
+
+/**
+ * Clickable album title for the track tables.
+ *
+ * Same hand-drawn rule as the lyrics and artist links: album titles are user
+ * text and can be Cyrillic / Arabic / CJK, where the native
+ * TextDecoration.Underline comes out as a mismatched dashed rule (one
+ * underline per font run). One rect per laid-out line instead.
+ */
+@Composable
+private fun AlbumHoverLink(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    var layout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+    val style = MaterialTheme.typography.bodyMedium
+    val linkColor = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text = text,
+        style = style,
+        color = linkColor,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { layout = it },
+        modifier = modifier
+            .hoverable(interaction)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .lyricUnderline(
+                layout = { layout },
+                visible = hovered,
+                fontSizeSp = style.fontSize.value,
+                color = linkColor,
+            )
+    )
 }
 
 /**
@@ -1361,6 +1401,9 @@ fun PlaylistDetailScreen(
                         } else if (playlistUser != null && playlistUser!!.id > 0) {
                             val ownerInteraction = remember { MutableInteractionSource() }
                             val ownerHovered by ownerInteraction.collectIsHoveredAsState()
+                            // Username: same Cyrillic-safe hand-drawn rule as the lyrics.
+                            var ownerLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+                            val ownerStyle = MaterialTheme.typography.titleMedium
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
@@ -1387,9 +1430,15 @@ fun PlaylistDetailScreen(
                                 }
                                 Text(
                                     str("playlist_by_user", credit ?: playlistUser!!.username ?: ""),
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = ownerStyle,
                                     color = MaterialTheme.colorScheme.primary,
-                                    textDecoration = if (ownerHovered) TextDecoration.Underline else null
+                                    onTextLayout = { ownerLayout = it },
+                                    modifier = Modifier.lyricUnderline(
+                                        layout = { ownerLayout },
+                                        visible = ownerHovered,
+                                        fontSizeSp = ownerStyle.fontSize.value,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
                                 )
                                 if (playlistUser?.verified == true) {
                                     Spacer(Modifier.width(4.dp))
@@ -2325,21 +2374,9 @@ fun TrackTableItem(
                 val spotifyAlbumTitle = track.publisherMetadata?.albumTitle
                 when {
                     spotifyAlbumId != null -> {
-                        val interaction = remember { MutableInteractionSource() }
-                        val hovered by interaction.collectIsHoveredAsState()
-                        Text(
+                        AlbumHoverLink(
                             text = spotifyAlbumTitle ?: str("profile_tab_albums"),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                            textDecoration = if (hovered) TextDecoration.Underline else null,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .hoverable(interaction)
-                                .pointerHoverIcon(PointerIcon.Hand)
-                                .clickable(interactionSource = interaction, indication = null) {
-                                    onAlbumClick("spotify:album:$spotifyAlbumId")
-                                }
+                            onClick = { onAlbumClick("spotify:album:$spotifyAlbumId") }
                         )
                     }
                     else -> {
@@ -2347,21 +2384,9 @@ fun TrackTableItem(
                 if (resolved != null) {
                     val albumId = resolved.info.playlistId
                     if (albumId != null) {
-                        val interaction = remember { MutableInteractionSource() }
-                        val hovered by interaction.collectIsHoveredAsState()
-                        Text(
+                        AlbumHoverLink(
                             text = resolved.info.title,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                            textDecoration = if (hovered) TextDecoration.Underline else null,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .hoverable(interaction)
-                                .pointerHoverIcon(PointerIcon.Hand)
-                                .clickable(interactionSource = interaction, indication = null) {
-                                    onAlbumClick(albumId.toString())
-                                }
+                            onClick = { onAlbumClick(albumId.toString()) }
                         )
                     } else {
                         Text(
@@ -2668,21 +2693,9 @@ fun TrackCompactItem(
                         val spotifyAlbumId = if (track.source == "spotify") track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() } else null
                         when {
                             spotifyAlbumId != null -> {
-                                val interaction = remember { MutableInteractionSource() }
-                                val hovered by interaction.collectIsHoveredAsState()
-                                Text(
+                                AlbumHoverLink(
                                     text = track.publisherMetadata?.albumTitle ?: str("profile_tab_albums"),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textDecoration = if (hovered) TextDecoration.Underline else null,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .hoverable(interaction)
-                                        .pointerHoverIcon(PointerIcon.Hand)
-                                        .clickable(interactionSource = interaction, indication = null) {
-                                            onAlbumClick("spotify:album:$spotifyAlbumId")
-                                        }
+                                    onClick = { onAlbumClick("spotify:album:$spotifyAlbumId") }
                                 )
                             }
                             else -> {
@@ -2690,21 +2703,9 @@ fun TrackCompactItem(
                         if (resolved != null) {
                             val albumId = resolved.info.playlistId
                             if (albumId != null) {
-                                val interaction = remember { MutableInteractionSource() }
-                                val hovered by interaction.collectIsHoveredAsState()
-                                Text(
+                                AlbumHoverLink(
                                     text = resolved.info.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (hovered) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textDecoration = if (hovered) TextDecoration.Underline else null,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier
-                                        .hoverable(interaction)
-                                        .pointerHoverIcon(PointerIcon.Hand)
-                                        .clickable(interactionSource = interaction, indication = null) {
-                                            onAlbumClick(albumId.toString())
-                                        }
+                                    onClick = { onAlbumClick(albumId.toString()) }
                                 )
                             } else {
                                 Text(
