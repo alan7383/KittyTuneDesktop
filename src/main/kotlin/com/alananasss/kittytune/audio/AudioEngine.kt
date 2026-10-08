@@ -167,7 +167,9 @@ class AudioEngine {
         seekRequestMs = if (startPositionMs > 0) startPositionMs else -1L
         Logger.e("AudioEngine", "setMediaItem called with url: $url")
         try {
-            hlsAdapter = if (url.contains(".m3u8")) HlsStreamAdapter(url, headers, ::reResolveUrl) else null
+            hlsAdapter = if (url.contains(".m3u8")) {
+                HlsHeadCache.take(url, ::reResolveUrl) ?: HlsStreamAdapter(url, headers, ::reResolveUrl)
+            } else null
             Logger.e("AudioEngine", "hlsAdapter initialized: ${hlsAdapter != null}")
         } catch (e: Exception) {
             Logger.e("AudioEngine", "Failed to init HlsStreamAdapter: ${e.message}")
@@ -564,7 +566,11 @@ class AudioEngine {
                 adapter = HlsStreamAdapter(targetUrl, headers, ::reResolveUrl)
                 hlsAdapter = adapter
             }
-            return FFmpegFrameGrabber(adapter.getInputStream(startPositionMs)).apply {
+            // A maximum size of 0 reads the fragments in order and nothing else. javacv's default treats the stream as
+            // seekable: it keeps every byte read in memory, and FFmpeg asking for the stream's size made it read to
+            // the end first, so a track only started once all of it had been downloaded, the longer the slower
+            // (issue #66).
+            return FFmpegFrameGrabber(adapter.getInputStream(startPositionMs), 0).apply {
                 format = "mp4" // Fragments are ISOBMFF (mp4)
                 setOption("probesize", "32768") // 32KB is enough for MOOV atom + some audio
                 setOption("analyzeduration", "0")

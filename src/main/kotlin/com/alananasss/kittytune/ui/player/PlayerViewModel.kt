@@ -5503,6 +5503,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     if (resolved?.isDrmProtected == true && resolved.licenseAuthToken != null) {
                         MusicManager.putDrmToken(nextTrack.id, resolved.licenseAuthToken)
                     }
+                    resolved?.url?.let { warmHlsHead(it, nextTrack) }
                 }
 
                 if (resolvedUrl != null) {
@@ -5555,10 +5556,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 !local.localAudioPath.startsWith("exo_cache://")
             ) return // local file — nothing to resolve
 
-            StreamResolver.resolveStreamWithDrm(track)
+            val stream = StreamResolver.resolveStreamWithDrm(track)
+            // The tracks up next also get their first seconds fetched, so a skip plays at once.
+            if (track.id != currentTrack?.id) stream?.url?.let { warmHlsHead(it, track) }
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun warmHlsHead(url: String, track: Track) {
+        com.alananasss.kittytune.audio.HlsHeadCache.warm(url, MusicManager.player.buildHeaders(track))
     }
 
     private fun isColorDark(color: Int): Boolean {
