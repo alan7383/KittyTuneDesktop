@@ -556,10 +556,16 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     val sliderStyle = rememberPlayerSliderStyle()
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
-    val position = if (scrubbing || vm.isScrubbing) scrubPosition.toLong() else vm.currentPosition
+    val isScrubbingNow = scrubbing || vm.isScrubbing
+    val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
+        reportedMs = vm.currentPosition,
+        isRunning = vm.isPlaying && !vm.isLoading,
+        followsInput = isScrubbingNow,
+        trackKey = vm.currentTrack?.id,
+    )
+    val position = if (isScrubbingNow) scrubPosition.toLong() else playhead
     val duration = vm.duration.coerceAtLeast(1L)
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
-    val isScrubbingNow = scrubbing || vm.isScrubbing
     val shownFraction = if (isScrubbingNow) (position.toFloat() / duration).also { mix.noteShown(it) }
     else mix.shownFraction(position.toFloat() / duration, vm.currentTrack?.id)
     val glowColor = MaterialTheme.colorScheme.primary
@@ -594,9 +600,8 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
                     stepSeconds = { seekWheelSeconds },
                     onSeek = { target ->
                         // Straight to the player rather than through the scrub state: a
-                        // wheel notch is a decision, not a drag in progress.
+                        // wheel notch is a decision, not a drag in progress. The playhead slides there.
                         scrubbing = false
-                        mix.glideFromShown()
                         vm.seekTo(target)
                     },
                 ),

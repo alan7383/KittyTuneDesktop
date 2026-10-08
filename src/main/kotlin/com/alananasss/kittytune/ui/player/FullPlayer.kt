@@ -1482,7 +1482,13 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
 
-    val position = if (scrubbing || viewModel.isScrubbing) scrubPosition.toLong() else viewModel.currentPosition
+    val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
+        reportedMs = viewModel.currentPosition,
+        isRunning = viewModel.isPlaying && !viewModel.isLoading,
+        followsInput = scrubbing || viewModel.isScrubbing,
+        trackKey = viewModel.currentTrack?.id,
+    )
+    val position = if (scrubbing || viewModel.isScrubbing) scrubPosition.toLong() else playhead
     val played = position.coerceIn(0L, duration)
     // A mix shows on the bar itself, as in the player bar; see MixTransition.
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
@@ -1516,10 +1522,7 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
                     positionMs = { if (scrubbing || viewModel.isScrubbing) scrubPosition.toLong() else viewModel.currentPosition },
                     durationMs = { viewModel.duration },
                     stepSeconds = { seekWheelSeconds },
-                    onSeek = { target: Long ->
-                        mix.glideFromShown()
-                        viewModel.seekTo(target)
-                    }
+                    onSeek = { target: Long -> viewModel.seekTo(target) }
                 )
         )
 
