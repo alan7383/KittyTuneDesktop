@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.main
 
+import com.alananasss.kittytune.ui.common.notePointerPresses
 import androidx.compose.animation.*
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.togetherWith
@@ -360,6 +361,7 @@ fun MainScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .notePointerPresses()
             .mouseHistoryButtons(historyNavigator)
             .clearFocusOnEmptyClick(focusManager)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)

@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -158,14 +160,8 @@ private val SpotifyAccentGreen = androidx.compose.ui.graphics.Color(0xFF1DB954)
 fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
     if (viewModel.showMenuSheet) {
         BackHandler(onBack = { viewModel.showMenuSheet = false })
-        Dialog(onDismissRequest = { viewModel.showMenuSheet = false }) {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                modifier = Modifier.width(420.dp),
-            ) {
-                MenuSheetContent(viewModel)
-            }
+        TrackMenuAtPointer(onDismiss = { viewModel.showMenuSheet = false }) {
+            MenuSheetContent(viewModel)
         }
     }
     if (viewModel.showCommentsSheet) {
@@ -209,6 +205,51 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
     }
     SleepTimerDialog(viewModel)
     TrackTrimDialog(viewModel)
+}
+
+/**
+ * The track's menu where it was asked for: at the pointer, as a context menu, instead of a dialog in the middle of
+ * the window, a long way from the row that was right-clicked (issue #66). It grows out of the pointer and shrinks
+ * back into it, and closes on a click outside or Escape.
+ */
+@Composable
+private fun TrackMenuAtPointer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val anchor = remember {
+        val press = com.alananasss.kittytune.ui.common.PointerAnchor.lastPress.value
+        androidx.compose.ui.unit.IntOffset(press.x.toInt(), press.y.toInt())
+    }
+    val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+    var closing by remember { mutableStateOf(false) }
+    val close = { if (!closing) { closing = true; shown.targetState = false } }
+    LaunchedEffect(shown.currentState, shown.isIdle) {
+        if (closing && shown.isIdle && !shown.currentState) onDismiss()
+    }
+    androidx.compose.ui.window.Popup(
+        popupPositionProvider = remember(anchor) { com.alananasss.kittytune.ui.common.AtPointPositionProvider(anchor) },
+        onDismissRequest = close,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+        onKeyEvent = { event ->
+            if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.key == androidx.compose.ui.input.key.Key.Escape) { close(); true } else false
+        },
+    ) {
+        androidx.compose.animation.AnimatedVisibility(
+            visibleState = shown,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)) +
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(200), initialScale = 0.9f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)) +
+                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(140), targetScale = 0.94f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shadowElevation = 12.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                modifier = Modifier.padding(6.dp).width(400.dp).heightIn(max = 600.dp),
+            ) {
+                Box(Modifier.verticalScroll(rememberScrollState())) { content() }
+            }
+        }
+    }
 }
 
 /**
