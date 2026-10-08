@@ -72,13 +72,13 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.outlined.QueueMusic
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Lyrics
-import androidx.compose.material.icons.outlined.Album
 import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Lyrics
 import androidx.compose.ui.graphics.Color
 import com.alananasss.kittytune.ui.common.pressScale
@@ -354,8 +354,8 @@ private fun PanelTabButton(tab: NowPlayingTab, label: String, isSelected: Boolea
 
 /** The filled drawing for the open tab, the outlined one for the rest. */
 private fun panelTabIcon(tab: NowPlayingTab, filled: Boolean): ImageVector = when (tab) {
-    NowPlayingTab.TRACK -> if (filled) Icons.Filled.Album else Icons.Outlined.Album
-    NowPlayingTab.QUEUE -> if (filled) Icons.Filled.LibraryMusic else Icons.Outlined.LibraryMusic
+    NowPlayingTab.TRACK -> if (filled) Icons.Filled.Info else Icons.Outlined.Info
+    NowPlayingTab.QUEUE -> if (filled) Icons.AutoMirrored.Filled.QueueMusic else Icons.AutoMirrored.Outlined.QueueMusic
     NowPlayingTab.LYRICS -> if (filled) Icons.Filled.Lyrics else Icons.Outlined.Lyrics
     NowPlayingTab.EFFECTS -> if (filled) Icons.Filled.AutoAwesome else Icons.Outlined.AutoAwesome
 }

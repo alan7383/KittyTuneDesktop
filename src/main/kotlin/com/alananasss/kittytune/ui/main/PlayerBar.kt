@@ -25,15 +25,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.outlined.HeartBroken
@@ -96,6 +87,16 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material.icons.rounded.SkipPrevious
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.ViewSidebar
 
 /**
  * Bottom full-width playback bar: track info left, transport + progress center,
@@ -266,7 +267,7 @@ fun PlayerBar(
                             Spacer(Modifier.width(8.dp))
                             IconButton(shapes = iconShapes, onClick = { vm.toggleLike() }) {
                                 Icon(
-                                    if (vm.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                    if (vm.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                                     contentDescription = str("player_like"),
                                     tint = if (vm.isLiked) MaterialTheme.colorScheme.primary
                                     else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -306,7 +307,7 @@ fun PlayerBar(
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons) {
                         ExpressiveToggleButton(
                             selected = vm.shuffleEnabled,
-                            icon = Icons.Filled.Shuffle,
+                            icon = Icons.Rounded.Shuffle,
                             contentDescription = "Shuffle",
                             onClick = { vm.toggleShuffle() },
                         )
@@ -373,7 +374,7 @@ fun PlayerBar(
                             ) { vm.smartPrevious() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.SkipPrevious, null, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Rounded.SkipPrevious, null, modifier = Modifier.size(22.dp))
                     }
 
                     Spacer(Modifier.width(transportGap))
@@ -393,7 +394,7 @@ fun PlayerBar(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            if (vm.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            if (vm.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimary,
                         )
@@ -415,15 +416,15 @@ fun PlayerBar(
                             ) { vm.playNext() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.SkipNext, null, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Rounded.SkipNext, null, modifier = Modifier.size(22.dp))
                     }
 
                     if (PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons) {
                         Spacer(Modifier.width(transportGap))
                         ExpressiveToggleButton(
                             selected = vm.repeatMode != RepeatMode.NONE,
-                            icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne
-                            else Icons.Filled.Repeat,
+                            icon = if (vm.repeatMode == RepeatMode.ONE) Icons.Rounded.RepeatOne
+                            else Icons.Rounded.Repeat,
                             contentDescription = "Repeat",
                             onClick = { vm.toggleRepeatMode() },
                         )
@@ -484,7 +485,7 @@ fun PlayerBar(
                         onClick = onToggleNowPlaying,
                     ) {
                         Icon(
-                            Icons.Rounded.Tune,
+                            Icons.Rounded.ViewSidebar,
                             contentDescription = null,
                             tint = if (isNowPlayingOpen) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
