@@ -255,7 +255,7 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
             val baseline = h * (0.62f + i * 0.1f)
             val amplitude = h * (0.06f + 0.05f * i) * (0.4f + energy)
             val frequency = 1.2f + i * 0.45f
-            val shift = phase * (1f + i * 0.35f) + i * 1.7f
+            val shift = waveShift(phase, i)
             fun crestY(x: Float) = baseline + amplitude * sin((x / w) * frequency * 2 * PI.toFloat() + shift)
             // The crest alone gets the bright line; outlining the filled shape also drew its sides, two white
             // bars down the card's edges.
@@ -298,6 +298,17 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
     }
 }
 
+/**
+ * How far wave [index] has drifted at [phase], which runs from 0 to a full turn and starts over.
+ *
+ * Whole turns of the phase only: a wave that makes a fraction of a turn in that time (they made 1.0, 1.35 and 1.7)
+ * jumps at the start of each round, which showed as the animation beginning again after a while. Different whole
+ * numbers, one of them backwards, keep the waves drifting at their own speeds and the loop seamless.
+ */
+internal fun waveShift(phase: Float, index: Int): Float = phase * WAVE_TURNS[index % WAVE_TURNS.size] + index * 1.7f
+
+private val WAVE_TURNS = intArrayOf(1, -1, 2)
+
 private val WAVE_CARD_HEIGHT = 230.dp
 private val PLAY_SIZE = 72.dp
-private const val WAVE_PERIOD_MS = 9_000
+private const val WAVE_PERIOD_MS = 12_000
