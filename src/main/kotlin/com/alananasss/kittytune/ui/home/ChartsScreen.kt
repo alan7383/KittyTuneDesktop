@@ -193,7 +193,7 @@ fun ChartsScreen(
                         onClick = {
                             viewModel.fetchArtistTopTracks(user.id) { tracks ->
                                 if (tracks.isNotEmpty()) {
-                                    playerViewModel.playPlaylist(tracks.shuffled(), 0)
+                                    playerViewModel.playPlaylistShuffled(tracks)
                                 }
                             }
                             showArtistMenu = null

@@ -3562,13 +3562,30 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * A collection's Shuffle button. It turns shuffle mode on rather than handing over a pre-shuffled copy:
+     * with the copy, the original order was lost and shuffle stayed off, so the next tap on a track of the
+     * same list played straight down from it instead of jumping in ahead of a shuffled queue (issue #66).
+     */
+    fun playPlaylistShuffled(tracks: List<Track>, context: PlaybackContext? = null) {
+        if (tracks.isEmpty()) return
+        if (!shuffleEnabled) {
+            shuffleEnabled = true
+            mprisService?.updateShuffle(true)
+        }
+        playPlaylist(tracks, startIndex = tracks.indices.random(), context = context)
+    }
+
     fun playTrackAtPosition(track: Track, position: Long) {
         pendingSeekPosition = position; playPlaylist(listOf(track), 0); showCommentsSheet = false; isPlayerExpanded =
             true
     }
 
     fun skipToQueueItem(index: Int) {
-        if (isQueuePreserveUpcomingEnabled && index > currentQueueIndex && currentQueueIndex >= 0 && index < _queue.size) {
+        // In a shuffled queue the order is random anyway, so a picked track jumps in right after the current
+        // one instead of the queue running on from wherever it happened to sit.
+        val keepsUpcoming = isQueuePreserveUpcomingEnabled || shuffleEnabled
+        if (keepsUpcoming && index > currentQueueIndex && currentQueueIndex >= 0 && index < _queue.size) {
             val targetIndex = currentQueueIndex + 1
             moveQueueItem(index, targetIndex)
             playTrackAtIndex(targetIndex, addToHistory = false)
@@ -3887,10 +3904,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun smartPrevious(isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), autoPlay: Boolean = true) {
-        // Both positions have to say "past the start". The engine's can still be the previous track's for a
-        // moment after a change or a mix, which sent "previous" back to 0:00 of a song that had just begun
-        // instead of to the one before it (issue #66).
-        if (player.currentPosition > 3000 && currentPosition > 3000) {
+        // "Previous" always means the track before this one; rewinding first made it take two presses
+        // (issue #66). Only the first track of the queue, with nothing before it, starts over.
+        val prev = currentQueueIndex - 1
+        if (prev < 0) {
             flushListenSession("MANUAL_REPLAY")
             // The same track from the top is a new listen, not a continuation of the old one.
             beginListenSession(currentTrack)
@@ -3901,16 +3918,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                 isPlaying = true
             }
         } else {
-            currentTrack?.let { track ->
-                flushListenSession("SKIP_PREVIOUS")
-            }
-            val prev = currentQueueIndex - 1
-            if (prev >= 0) {
-                playTrackAtIndex(prev, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
-            } else {
-                currentPosition = 0L
-                player.seekTo(0)
-            }
+            if (currentTrack != null) flushListenSession("SKIP_PREVIOUS")
+            playTrackAtIndex(prev, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
         }
         // Restarts and rewinds emit no engine state change when paused: refresh the baseline.
         updateMprisMedia()

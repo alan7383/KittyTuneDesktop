@@ -1457,7 +1457,7 @@ fun PlaylistDetailScreen(
                                     Text(str("btn_play"), fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList().shuffled(), context = playbackContext) },
+                                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylistShuffled(tracksToDisplay.toList(), context = playbackContext) },
                                     modifier = Modifier.height(44.dp)
                                 ) {
                                     Icon(Icons.Default.Shuffle, null)

@@ -850,9 +850,8 @@ fun ModernProfileHeader(
                     Button(
                         onClick = {
                             if (profileViewModel.popularTracks.isNotEmpty()) {
-                                playerViewModel.playPlaylist(
-                                    tracks = profileViewModel.popularTracks.toList().shuffled(),
-                                    startIndex = 0,
+                                playerViewModel.playPlaylistShuffled(
+                                    tracks = profileViewModel.popularTracks.toList(),
                                     context = artistContext
                                 )
                             }
@@ -926,9 +925,8 @@ fun ModernProfileHeader(
                 if (user.trackCount > 0) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                         Button(shapes = ButtonDefaults.shapes(), onClick = {
-                                playerViewModel.playPlaylist(
-                                    tracks = profileViewModel.allTracks.toList().shuffled(),
-                                    startIndex = 0,
+                                playerViewModel.playPlaylistShuffled(
+                                    tracks = profileViewModel.allTracks.toList(),
                                     context = artistContext
                                 )
                             },
@@ -1225,7 +1223,7 @@ fun FullListScreen(
                     ) {
                         Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(str("btn_play"), fontWeight = FontWeight.Bold)
                     }
-                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(filteredTracks.shuffled(), context = context) },
+                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylistShuffled(filteredTracks, context = context) },
                         modifier = Modifier.weight(1f).height(44.dp)
                     ) {
                         Icon(Icons.Default.Shuffle, null); Spacer(Modifier.width(8.dp)); Text(str("btn_shuffle"), fontWeight = FontWeight.Bold)
