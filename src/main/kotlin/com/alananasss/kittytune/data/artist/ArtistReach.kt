@@ -4,8 +4,9 @@ import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.data.LyricsMatcher
 import com.alananasss.kittytune.data.spotify.SpotifyArtist
 import com.alananasss.kittytune.data.spotify.SpotifyRepository
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * An artist's own profile on a streaming service, found by name: how many people listen to them each month, and
@@ -31,7 +32,9 @@ object ArtistReach {
     )
 
     private val cache = BoundedCache<String, Lookup>(256)
-    private val lock = Mutex()
+    private val inFlight = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Deferred<Profile?>>()
+    private val requests = Semaphore(MAX_PARALLEL)
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
 
     private data class Lookup(val profile: Profile?)
 
@@ -41,13 +44,20 @@ object ArtistReach {
         if (name.isEmpty()) return null
         val key = keyOf(name)
         cache[key]?.let { return it.profile }
-        // One lookup per name at a time: a list of tracks by one artist asks for the same name many times at once.
-        return lock.withLock {
-            cache[key]?.let { return@withLock it.profile }
-            val found = runCatching { lookUp(name) }.getOrNull()
-            cache[key] = Lookup(found)
-            found
+        // One lookup per name however many rows ask for it at once, and a few names at a time: a list of search
+        // results asks for twenty at once, and in turn the last waited for all the others.
+        val lookup = inFlight.computeIfAbsent(key) {
+            scope.async {
+                try {
+                    val found = requests.withPermit { runCatching { lookUp(name) }.getOrNull() }
+                    cache[key] = Lookup(found)
+                    found
+                } finally {
+                    inFlight.remove(key)
+                }
+            }
         }
+        return lookup.await()
     }
 
     private suspend fun lookUp(name: String): Profile? {
@@ -69,4 +79,6 @@ object ArtistReach {
     }
 
     private fun keyOf(name: String): String = LyricsMatcher.normalize(name).replace(" ", "")
+
+    private const val MAX_PARALLEL = 4
 }
