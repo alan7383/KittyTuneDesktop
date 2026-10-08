@@ -38,6 +38,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.*
@@ -1202,101 +1203,100 @@ private fun LibraryHeader(
 // Search + sort/view-mode row
 // ---------------------------------------------------------------------------
 
+/**
+ * The library's search: one long field that is always there, in Material's search-bar shape, with the filter and
+ * sort buttons after it (issue #66). It used to be an icon that unfolded into a small box. The field says nothing
+ * until it is used: its hint only shows once it has the focus, so the panel does not carry a line of grey text
+ * all the time.
+ */
 @Composable
 private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
-    var searchActive by remember { mutableStateOf(libraryViewModel.searchQuery.isNotBlank()) }
-    TrackSidebarPopup(searchActive, libraryViewModel)
-    // One way out, whichever gesture asked for it: the cross, Escape, or a click anywhere else.
-    val dismiss = {
+    val query = libraryViewModel.searchQuery
+    TrackSidebarPopup(query.isNotBlank(), libraryViewModel)
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    var isFocused by remember { mutableStateOf(false) }
+    val clear = {
         libraryViewModel.searchQuery = ""
-        searchActive = false
+        focusManager.clearFocus()
     }
+    val scheme = MaterialTheme.colorScheme
+    val container by androidx.compose.animation.animateColorAsState(
+        if (isFocused) scheme.surfaceContainerHighest else scheme.surfaceContainerHigh,
+        label = "librarySearchContainer",
+    )
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(36.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(40.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (searchActive) {
-            val focusRequester = remember { FocusRequester() }
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.weight(1f).height(32.dp),
+        Surface(
+            shape = CircleShape,
+            color = container,
+            border = if (isFocused) androidx.compose.foundation.BorderStroke(1.dp, scheme.primary.copy(alpha = 0.6f)) else null,
+            modifier = Modifier.weight(1f).height(40.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Rounded.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        if (libraryViewModel.searchQuery.isEmpty()) {
-                            Text(
-                                str("lib_search_hint"),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        BasicTextField(
-                            value = libraryViewModel.searchQuery,
-                            onValueChange = { libraryViewModel.searchQuery = it },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .trackTextInput()
-                                .focusRequester(focusRequester)
-                                // This field is an icon until it is pressed, so both gestures close it
-                                // outright — see [escapeDismisses] for why they are separate modifiers.
-                                .escapeDismisses(dismiss)
-                                .focusLossDismisses(dismiss),
+                Icon(
+                    Icons.Rounded.Search,
+                    contentDescription = str("lib_search_tooltip"),
+                    tint = if (isFocused) scheme.primary else scheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isFocused && query.isEmpty(),
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut(),
+                    ) {
+                        Text(
+                            str("lib_search_hint"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { libraryViewModel.searchQuery = it },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = scheme.onSurface),
+                        cursorBrush = SolidColor(scheme.primary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .trackTextInput()
+                            .onFocusChanged { isFocused = it.isFocused }
+                            .escapeDismisses(clear),
+                    )
+                }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = query.isNotEmpty(),
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(),
+                ) {
                     IconButton(
                         shapes = IconButtonDefaults.shapes(),
-                        onClick = dismiss,
-                        modifier = Modifier.size(20.dp),
+                        onClick = clear,
+                        modifier = Modifier.size(32.dp),
                     ) {
                         Icon(
                             Icons.Rounded.Close,
                             contentDescription = str("btn_cancel"),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
+                            tint = scheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
             }
-            LaunchedEffect(Unit) { focusRequester.requestFocus() }
-        } else {
-            Tip(str("lib_search_tooltip")) {
-                IconButton(
-                    shapes = IconButtonDefaults.shapes(),
-                    onClick = { searchActive = true },
-
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.Search,
-                        contentDescription = str("lib_search_tooltip"),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.weight(1f))
         }
 
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         LibraryCategoryButton(libraryViewModel)
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(2.dp))
         SortAndViewMenuButton(libraryViewModel)
     }
 }
