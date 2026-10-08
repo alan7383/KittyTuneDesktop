@@ -141,9 +141,9 @@ fun PlayerBar(
             com.alananasss.kittytune.data.local.PlayerBarStyle.FLOATING -> Modifier
                 .fillMaxWidth(floatLook.widthPercent / 100f)
                 .padding(horizontal = 24.dp)
-                .height(if (oneLineLyrics) 76.dp + ONE_LINE_EXTRA else 76.dp)
+                .height(76.dp)
                 .then(onBarPlaced?.let { report -> Modifier.onGloballyPositioned { report(it) } } ?: Modifier)
-            else -> Modifier.fillMaxWidth().height(if (oneLineLyrics) 88.dp + ONE_LINE_EXTRA else 88.dp)
+            else -> Modifier.fillMaxWidth().height(88.dp)
         },
         shape = when (barStyle) {
             com.alananasss.kittytune.data.local.PlayerBarStyle.DEFAULT -> PanelShape
@@ -296,7 +296,6 @@ fun PlayerBar(
                     modifier = Modifier.widthIn(min = centerMin, max = centerMax),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    if (oneLineLyrics) OneLineLyric(vm)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth()
@@ -528,6 +527,8 @@ fun PlayerBar(
         }
     }
     }
+    // Above the play button: the transport is centred in the bar, its two sides having equal weight.
+    if (oneLineLyrics) FloatingLyricChip(vm, Modifier.align(Alignment.TopCenter))
 }
 }
 
@@ -773,9 +774,6 @@ private fun rememberShowLyricsButton(): Boolean {
     val prefsSnapshot by com.alananasss.kittytune.core.Prefs.flow.collectAsState()
     return remember(prefsSnapshot) { PlayerPreferences().getShowLyricsButtonEnabled() }
 }
-
-/** Room the one-line lyrics take above the transport. */
-private val ONE_LINE_EXTRA = 20.dp
 
 @Composable
 private fun rememberOneLineLyrics(): Boolean {

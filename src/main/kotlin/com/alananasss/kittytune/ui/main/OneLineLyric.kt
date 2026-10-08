@@ -1,33 +1,39 @@
 package com.alananasss.kittytune.ui.main
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.alananasss.kittytune.ui.player.LyricsMode
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
@@ -36,38 +42,68 @@ import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
 import com.alananasss.kittytune.ui.player.lyrics.separateBackingVocals
 
 /**
- * The line being sung, on one row above the transport (issue #66): for when the app is open for something else
- * and the song is still worth following. Words light up one by one where the lyrics are timed that way, backing
- * vocals follow the line in a quieter voice, and a note stands in for a break or for lyrics that are not there yet.
- * Switched in the lyrics settings; not drawn in the full player, which has the whole lyrics.
+ * The line being sung, in a small card floating above the play button (issue #66): for when the app is open for
+ * something else and the song is still worth following. It used to sit inside the player bar and made it taller;
+ * the bar keeps its height now and the card hovers just over it. Words light up one by one where the lyrics are
+ * timed that way, a note stands in for a break, and backing vocals are left out, as there is no room to set them
+ * apart. Only for timed lyrics, switched in the lyrics settings, and not in the full player, which has them all.
+ *
+ * Placed at the top of the bar and drawn above it: it takes no room in the bar's layout.
  */
 @Composable
-internal fun OneLineLyric(vm: PlayerViewModel, modifier: Modifier = Modifier) {
+internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifier) {
     val lines = vm.lyricsLines
-    val position = rememberSmoothPosition(vm.currentPosition, vm.isPlaying, 1f) + vm.lyricsOffset
-    val activeIndex = if (lines.isEmpty()) -1 else LyricsUtils.activeLineIndex(lines, position.toLong())
-    val active = lines.getOrNull(activeIndex)
-    val showsWords = active != null && !active.isInstrumental && active.text.isNotBlank()
+    val isTimed = vm.lyricsMode == LyricsMode.SYNCED && lines.isNotEmpty() && !vm.isLyricsLoading
+    val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { CHIP_GAP.roundToPx() }
 
-    Box(modifier.fillMaxWidth().height(LINE_HEIGHT).clipToBounds(), contentAlignment = Alignment.Center) {
-        AnimatedContent(
-            targetState = if (showsWords) activeIndex else -1,
-            transitionSpec = {
-                (fadeIn(tween(220, delayMillis = 60)) + slideInVertically(tween(260)) { it / 2 }) togetherWith
-                    (fadeOut(tween(140)) + slideOutVertically(tween(200)) { -it / 2 })
-            },
-            label = "oneLineLyric",
-        ) { index ->
-            val line = lines.getOrNull(index)
-            if (line == null) {
-                Icon(
-                    Icons.Rounded.MusicNote,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                    modifier = Modifier.size(14.dp),
-                )
-            } else {
-                SungLine(vm, line, position)
+    AnimatedVisibility(
+        visible = isTimed,
+        enter = fadeIn(tween(220)) + scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = 0.9f),
+        exit = fadeOut(tween(160)) + scaleOut(tween(200), targetScale = 0.9f),
+        modifier = modifier.layout { measurable, constraints ->
+            val chip = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+            // Takes no height in the bar and is drawn above its top edge.
+            layout(chip.width, 0) { chip.place(0, -chip.height - gapPx) }
+        },
+    ) {
+        val position = rememberSmoothPosition(vm.currentPosition, vm.isPlaying, 1f) + vm.lyricsOffset
+        val activeIndex = LyricsUtils.activeLineIndex(lines, position.toLong())
+        val active = lines.getOrNull(activeIndex)
+        val showsWords = active != null && !active.isInstrumental && active.text.isNotBlank()
+        val scheme = MaterialTheme.colorScheme
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = scheme.surfaceContainerHighest,
+            contentColor = scheme.onSurface,
+            shadowElevation = 8.dp,
+            border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.35f)),
+        ) {
+            AnimatedContent(
+                targetState = if (showsWords) activeIndex else -1,
+                transitionSpec = {
+                    (fadeIn(tween(200, delayMillis = 50)) + slideInVertically(tween(240)) { it / 2 }) togetherWith
+                        (fadeOut(tween(120)) + slideOutVertically(tween(180)) { -it / 2 }) using
+                        SizeTransform(clip = false) { _, _ -> spring(stiffness = Spring.StiffnessMediumLow) }
+                },
+                contentAlignment = Alignment.Center,
+                label = "floatingLyric",
+            ) { index ->
+                val line = lines.getOrNull(index)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.padding(horizontal = if (line == null) 12.dp else 16.dp, vertical = 8.dp),
+                ) {
+                    if (line == null) {
+                        Icon(
+                            Icons.Rounded.MusicNote,
+                            contentDescription = null,
+                            tint = scheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    } else {
+                        SungLine(vm, line, position)
+                    }
+                }
             }
         }
     }
@@ -76,50 +112,24 @@ internal fun OneLineLyric(vm: PlayerViewModel, modifier: Modifier = Modifier) {
 @Composable
 private fun SungLine(vm: PlayerViewModel, line: LyricLine, position: Float) {
     val scheme = MaterialTheme.colorScheme
-    val (main, backing) = remember(line, vm.lyricsSplitBackingVocals) {
-        if (vm.lyricsSplitBackingVocals) separateBackingVocals(line) else line to null
-    }
-    val base = MaterialTheme.typography.labelLarge
-    val own = base.copy(fontWeight = FontWeight.SemiBold)
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(horizontal = 12.dp),
-    ) {
-        LyricLineText(
-            line = main,
-            isActive = true,
-            positionMs = position,
-            wordSync = vm.isWordSyncEnabled,
-            fillEffect = vm.isAppleMusicEffectEnabled,
-            activeStyle = own,
-            inactiveStyle = own,
-            activeColor = scheme.onSurface,
-            inactiveColor = scheme.onSurfaceVariant,
-            unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.55f),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(max = MAX_LINE_WIDTH).let { if (backing == null) it else it.widthIn(max = MAX_MAIN_WIDTH) },
-        )
-        if (backing != null) {
-            LyricLineText(
-                line = backing,
-                isActive = true,
-                positionMs = position,
-                wordSync = vm.isWordSyncEnabled,
-                fillEffect = vm.isAppleMusicEffectEnabled,
-                activeStyle = base.copy(fontWeight = FontWeight.Normal),
-                inactiveStyle = base.copy(fontWeight = FontWeight.Normal),
-                activeColor = scheme.onSurfaceVariant,
-                inactiveColor = scheme.onSurfaceVariant,
-                unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.4f),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = MAX_BACKING_WIDTH),
-            )
-        }
-    }
+    val main = remember(line) { separateBackingVocals(line).first }
+    val style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+    LyricLineText(
+        line = main,
+        isActive = true,
+        positionMs = position,
+        wordSync = vm.isWordSyncEnabled,
+        fillEffect = vm.isAppleMusicEffectEnabled,
+        activeStyle = style,
+        inactiveStyle = style,
+        activeColor = scheme.onSurface,
+        inactiveColor = scheme.onSurfaceVariant,
+        unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.55f),
+        textAlign = TextAlign.Center,
+        modifier = Modifier.widthIn(max = MAX_LINE_WIDTH),
+    )
 }
 
-private val LINE_HEIGHT = 18.dp
-private val MAX_LINE_WIDTH = 520.dp
-private val MAX_MAIN_WIDTH = 340.dp
-private val MAX_BACKING_WIDTH = 170.dp
+/** Air between the card and the top of the player bar. */
+private val CHIP_GAP = 10.dp
+private val MAX_LINE_WIDTH = 460.dp
