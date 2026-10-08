@@ -183,29 +183,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
     }
 
     val availableDevices = remember {
-        val isLinux = System.getProperty("os.name").lowercase().contains("linux")
-        if (isLinux) {
-            val sinks = com.alananasss.kittytune.util.LinuxAudioManager.getOutputSinks()
-            if (sinks.isNotEmpty()) return@remember sinks.map { it.id to it.description }
-        }
-        val list = mutableListOf<Pair<String, String>>()
-        try {
-            val mixerInfos = javax.sound.sampled.AudioSystem.getMixerInfo()
-            val seenNames = mutableSetOf<String>()
-            for (info in mixerInfos) {
-                val rawName = info.name.trim()
-                if (rawName.isNotEmpty() && !seenNames.contains(rawName) && !rawName.contains("Port")) {
-                    try {
-                        val mixer = javax.sound.sampled.AudioSystem.getMixer(info)
-                        if (mixer.isLineSupported(javax.sound.sampled.DataLine.Info(javax.sound.sampled.SourceDataLine::class.java, null))) {
-                            seenNames.add(rawName)
-                            list.add(rawName to com.alananasss.kittytune.util.LinuxAudioManager.cleanName(rawName))
-                        }
-                    } catch (e: Exception) {}
-                }
-            }
-        } catch (e: Exception) {}
-        list
+        com.alananasss.kittytune.audio.listOutputDevices().map { it.id to it.label }
     }
 
     if (showQualityDialog) {

@@ -522,6 +522,7 @@ fun PlayerBar(
                     onVolumeScrolled = { vm.updateVolume(it); vm.persistVolumeSoon() },
                     onToggleMute = { vm.toggleMute() },
                     shapes = iconShapes,
+                    onSelectDevice = { vm.changeOutputDevice(it) },
                 )
             }
         }
