@@ -440,7 +440,9 @@ import kotlin.math.roundToInt
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val screenHeight = maxHeight
             val halfHeight = screenHeight / 2
-            val topPadding = halfHeight - 50.dp
+            // Little above the first line: the lyrics start at the top and come down to the middle as the song
+            // goes, instead of an empty half of the screen. The bottom keeps half, so the last line reaches the middle.
+            val topPadding = 24.dp
     
             LazyColumn(
                 state = listState,

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
@@ -201,12 +202,23 @@ fun rememberMixTransition(): MixTransition {
         label = "mixCountdown",
     )
     val beatMs = debug?.outBpm?.takeIf { it > 0f }?.let { 60_000f / it }?.toInt()?.coerceIn(250, 1000) ?: 500
-    val beatPulse = rememberInfiniteTransition(label = "mixBeat").animateFloat(
-        initialValue = 1f,
-        targetValue = 0f,
-        animationSpec = infiniteRepeatable(tween(beatMs, easing = LinearEasing), RepeatMode.Restart),
-        label = "mixBeatPulse",
-    )
+    // Runs only through the countdown. An infinite transition asked for a frame sixty times a second for as long as the
+    // player was open, mixing or not, which is the steady cost the heavy full-screen player did not need.
+    val beatPulse = remember { mutableFloatStateOf(1f) }
+    val counting = beatsLeft != null
+    LaunchedEffect(counting, beatMs) {
+        if (!counting) {
+            beatPulse.floatValue = 1f
+            return@LaunchedEffect
+        }
+        val startedAt = System.nanoTime()
+        while (isActive) {
+            withFrameNanos { now ->
+                val phase = ((now - startedAt) / 1_000_000L % beatMs).toFloat() / beatMs
+                beatPulse.floatValue = 1f - phase
+            }
+        }
+    }
     val mix = remember(progress, countdown, beatPulse, automixing) {
         MixTransition(progress, countdown, beatPulse, automixing)
     }
@@ -257,7 +269,7 @@ fun Modifier.mixGlow(mix: MixTransition, color: Color, shownFraction: () -> Floa
                 start = Offset(startX, y),
                 end = Offset(endX, y),
                 strokeWidth = width.dp.toPx(),
-                cap = StrokeCap.Round,
+                cap = StrokeCap.Butt,
             )
         }
     }

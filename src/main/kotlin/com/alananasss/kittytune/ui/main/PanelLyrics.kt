@@ -595,7 +595,7 @@ data class PanelLyricsStyle(
             startPadding = 16.dp,
             endPadding = 16.dp,
             topInsetFraction = 0.03f,
-            tailFraction = 0.35f,
+            tailFraction = 0.58f,
             anchorFraction = 0.42f,
             lineSpacing = 6.dp,
             isFullScreen = false,
@@ -609,8 +609,10 @@ data class PanelLyricsStyle(
         val Compact = PanelLyricsStyle(
             startPadding = 16.dp,
             endPadding = 16.dp,
-            topInsetFraction = 0.40f,
-            tailFraction = 0.40f,
+            // The first line sits at the top and the list only starts moving once the sung line is as far down as
+            // the middle; the tail lets the last line reach the middle as well.
+            topInsetFraction = 0.03f,
+            tailFraction = 0.50f,
             anchorFraction = 0.50f,
             lineSpacing = 4.dp,
             isFullScreen = false,
@@ -620,10 +622,11 @@ data class PanelLyricsStyle(
         val FullScreen = PanelLyricsStyle(
             startPadding = 24.dp,
             endPadding = 48.dp,
-            topInsetFraction = 0.34f,
+            // Starts at the top like the side panel and settles in the middle once the song has got that far,
+            // instead of an empty third of the screen above the first line.
+            topInsetFraction = 0.03f,
             tailFraction = 0.55f,
-            // The inset already puts the line a third of the way down, so this asks for nothing on top of it.
-            anchorFraction = 0.34f,
+            anchorFraction = 0.42f,
             // Overwritten by the caller, which scales it to whatever size the reader has chosen.
             lineSpacing = 14.dp,
             isFullScreen = true,
