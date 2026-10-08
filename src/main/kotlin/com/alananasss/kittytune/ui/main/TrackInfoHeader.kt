@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Comment
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
@@ -201,6 +202,8 @@ private fun SoundCloudStats(vm: PlayerViewModel, track: Track, onCommentsClick: 
                 onCommentsClick()
             }
         }
+        // The date sits with the numbers, in the same pill, in the room the row has left after them.
+        ReleaseDatePill(track)
         if (showInfo) {
             FilledTonalIconButton(
                 onClick = { vm.navigateToTrackDetails(track.id, 0) },
@@ -232,7 +235,17 @@ private fun SpotifyStats(track: Track) {
             StatPill(Icons.Rounded.PlayArrow, compactCount(streams) + " " + str("spotify_streams_formatted"))
         }
         if (track.publisherMetadata?.explicit == true) StatPill(label = "E")
+        ReleaseDatePill(track)
     }
+}
+
+/** When the track came out, as one more of the numbers; nothing when it has no date. */
+@Composable
+private fun ReleaseDatePill(track: Track) {
+    val date = remember(track.id, track.releaseDate, track.createdAt) {
+        com.alananasss.kittytune.ui.profile.ReleaseDate.shortText(track.releaseDate ?: track.createdAt)
+    }
+    if (date.isNotEmpty()) StatPill(Icons.Rounded.CalendarToday, date)
 }
 
 @Composable

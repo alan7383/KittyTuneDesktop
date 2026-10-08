@@ -45,4 +45,11 @@ class ReleaseDateTest {
         assertNull(ReleaseDate.parse(""))
         assertNull(ReleaseDate.parse("soon"))
     }
+
+    @Test
+    fun `the short form always has the year and a shortened month`() {
+        assertEquals("9 сент. 2025", ReleaseDate.shortText("2025-09-09", ru))
+        assertEquals("Sep 9, 2025", ReleaseDate.shortText("2025-09-09", en))
+        assertEquals("", ReleaseDate.shortText(null, en))
+    }
 }
