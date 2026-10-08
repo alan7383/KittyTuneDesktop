@@ -3329,9 +3329,6 @@
     <string name="artist_videos_title">Video âm nhạc</string>
     <string name="fx_reset_speed">Tốc độ bình thường</string>
     <string name="fx_active_count">%1$d đang bật</string>
-    <string name="likes_vibe_title">Màu âm nhạc của bạn</string>
-    <string name="likes_vibe_sub">Chọn một màu để phát bài yêu thích cùng sắc</string>
-    <string name="likes_vibe_top">Thích nhiều nhất: %1$s</string>
     <string name="together_title">Danh sách phát chung</string>
     <string name="together_create">Danh sách chung mới</string>
     <string name="together_join">Tham gia bằng mã</string>
