@@ -145,6 +145,8 @@ fun MainScreen(
                 destinationId == "recognition" -> "recognition"
                 destinationId == "recognition_history" -> "recognition_history"
                 destinationId == "credits" -> "credits"
+                destinationId == "together" -> "together_home"
+                destinationId.startsWith("together:") -> "together/${destinationId.removePrefix("together:")}"
                 destinationId.startsWith("edit_track:") -> "edit_track/${destinationId.removePrefix("edit_track:")}"
                 destinationId.startsWith("profile:") -> "profile/${destinationId.removePrefix("profile:")}"
                 // Spotify artist profiles route to the profile screen; the string
@@ -1009,6 +1011,22 @@ fun MainScreen(
                                 onBackClick = null,
                                 onNavigate = { dest -> navController.navigate(dest) },
                                 playerViewModel = playerViewModel
+                            )
+                        }
+                        composable("together_home") {
+                            com.alananasss.kittytune.ui.together.TogetherHomeScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpen = { code -> navController.navigate("together/$code") }
+                            )
+                        }
+                        composable("together/{code}") { backStackEntry ->
+                            val code = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("code") } }.getOrNull()
+                            } ?: ""
+                            com.alananasss.kittytune.ui.together.TogetherScreen(
+                                code = code,
+                                playerViewModel = playerViewModel,
+                                onBack = { navController.popBackStack() }
                             )
                         }
                         composable("history") {

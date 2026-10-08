@@ -438,6 +438,8 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
     var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
 
     var automixEnabled by remember { mutableStateOf(prefs.getAutomixEnabled()) }
+    val togetherCode by com.alananasss.kittytune.data.together.Together.active.collectAsState()
+    val mayChangeAutomix = togetherCode?.let(com.alananasss.kittytune.data.together.Together::isHostOf) ?: true
     var automixOverlapMode by remember { mutableStateOf(prefs.getAutomixOverlapMode()) }
     var automixStartOffsetMode by remember { mutableStateOf(prefs.getAutomixStartOffsetMode()) }
     var automixStartOffsetCustomSec by remember { mutableStateOf(prefs.getAutomixStartOffsetCustomSec()) }
@@ -671,12 +673,15 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                     bottomEnd = automixBottomRadius
                 ),
                 title = str(com.alananasss.kittytune.R.string.automix),
-                subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
+                // A listener in a shared playlist plays it the way the host does, automix included.
+                subtitle = if (mayChangeAutomix) str(com.alananasss.kittytune.R.string.automix_desc) else str("together_automix_host_only"),
                 hasSwitch = true,
                 switchState = automixEnabled,
-                onSwitchChange = { 
-                    automixEnabled = it
-                    prefs.setAutomixEnabled(it)
+                onSwitchChange = {
+                    if (mayChangeAutomix) {
+                        automixEnabled = it
+                        prefs.setAutomixEnabled(it)
+                    }
                 },
                 highlightKey = "pref_automix"
             )
