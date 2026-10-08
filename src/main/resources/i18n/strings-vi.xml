@@ -3379,4 +3379,5 @@
     <string name="release_kind_compilation">Tuyển tập</string>
     <string name="artist_more_title">Thêm từ nghệ sĩ</string>
     <string name="artist_more_playlists">Danh sách phát</string>
+    <string name="track_sorted_by_followers">Nhiều người theo dõi trước</string>
 </resources>

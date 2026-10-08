@@ -2931,4 +2931,5 @@
     <string name="release_kind_compilation">Compilation</string>
     <string name="artist_more_title">Plus de l'artiste</string>
     <string name="artist_more_playlists">Playlists</string>
+    <string name="track_sorted_by_followers">Plus d'abonnés d'abord</string>
 </resources>
