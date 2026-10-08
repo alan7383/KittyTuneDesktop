@@ -2888,4 +2888,7 @@
     <string name="fx_preset_nightcore">Nightcore</string>
     <string name="fx_preset_chill">Unhurried</string>
     <string name="fx_active_count">%1$d on</string>
+    <string name="likes_vibe_title">The colour of your music</string>
+    <string name="likes_vibe_sub">Pick a colour and your favourites in it will play</string>
+    <string name="likes_vibe_top">You like most: %1$s</string>
 </resources>

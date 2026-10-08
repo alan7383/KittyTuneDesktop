@@ -3499,4 +3499,7 @@
     <string name="fx_preset_nightcore">Nightcore</string>
     <string name="fx_preset_chill">Gemächlich</string>
     <string name="fx_active_count">%1$d an</string>
+    <string name="likes_vibe_title">Die Farbe deiner Musik</string>
+    <string name="likes_vibe_sub">Wähle eine Farbe, und deine Lieblinge in ihr laufen</string>
+    <string name="likes_vibe_top">Am meisten geliked: %1$s</string>
 </resources>

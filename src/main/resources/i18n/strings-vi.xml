@@ -3337,4 +3337,7 @@
     <string name="fx_preset_nightcore">Nightcore</string>
     <string name="fx_preset_chill">Thong thả</string>
     <string name="fx_active_count">%1$d đang bật</string>
+    <string name="likes_vibe_title">Màu âm nhạc của bạn</string>
+    <string name="likes_vibe_sub">Chọn một màu để phát bài yêu thích cùng sắc</string>
+    <string name="likes_vibe_top">Thích nhiều nhất: %1$s</string>
 </resources>
