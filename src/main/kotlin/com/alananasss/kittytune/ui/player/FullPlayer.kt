@@ -50,13 +50,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.HeartBroken
 import androidx.compose.material.icons.rounded.CloseFullscreen
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Lyrics
@@ -1205,7 +1205,7 @@ private fun TrackCredit(viewModel: PlayerViewModel, palette: FullPlayerPalette) 
             )
             if (viewModel.isYourMixActive) {
                 QuietButton(
-                    icon = Icons.Outlined.HeartBroken,
+                    icon = Icons.Rounded.ThumbDown,
                     label = str("mix_dislike"),
                     tint = palette.dim,
                     size = 22.dp,
