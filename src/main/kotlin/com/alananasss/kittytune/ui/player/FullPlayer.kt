@@ -145,6 +145,8 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     val track = viewModel.currentTrack
     var showText by remember { mutableStateOf(true) }
     var showQuickSettings by remember { mutableStateOf(false) }
+    var lastActivityMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var screensaverActive by remember { mutableStateOf(false) }
 
     val toggleLyricsAction: () -> Unit = { showText = !showText }
 
@@ -162,6 +164,11 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
         com.alananasss.kittytune.ui.player.lyrics.QuickLyricsSettingsDialog(
             viewModel = viewModel,
             isFullScreen = true,
+            // The focus mode lives with the other settings, not as a button of its own in the corner.
+            onFocusMode = {
+                lastActivityMs = System.currentTimeMillis()
+                screensaverActive = true
+            },
             onDismiss = { showQuickSettings = false },
         )
     }
@@ -201,8 +208,6 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
     val layout = viewModel.fullPlayerLayout
     val screensaverEnabled = viewModel.fullPlayerScreensaverEnabled
     val screensaverTimeoutMs = (viewModel.fullPlayerScreensaverTimeoutSeconds * 1000L).coerceAtLeast(10_000L)
-    var lastActivityMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    var screensaverActive by remember { mutableStateOf(false) }
 
     LaunchedEffect(screensaverEnabled, screensaverTimeoutMs) {
         if (!screensaverEnabled) {
@@ -388,15 +393,6 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                 label = str("pref_lyrics_title"),
                 tint = if (showQuickSettings) palette.bright else palette.dim,
                 onClick = { showQuickSettings = true },
-            )
-            QuietButton(
-                icon = Icons.Rounded.DarkMode,
-                label = str("screensaver_focus_mode"),
-                tint = palette.dim,
-                onClick = {
-                    lastActivityMs = System.currentTimeMillis()
-                    screensaverActive = true
-                },
             )
             QuietButton(
                 icon = Icons.Rounded.CloseFullscreen,

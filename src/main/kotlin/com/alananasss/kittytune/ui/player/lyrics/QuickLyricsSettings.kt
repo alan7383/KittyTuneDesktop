@@ -109,6 +109,8 @@ fun QuickLyricsSettingsDialog(
     viewModel: PlayerViewModel,
     isFullScreen: Boolean = false,
     isSidebar: Boolean = false,
+    /** Where a button for the focus (screensaver) mode leads; null where there is no such mode to start. */
+    onFocusMode: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     val knobs = remember(viewModel, isFullScreen, isSidebar) { ModeKnobs(viewModel, isFullScreen, isSidebar) }
@@ -158,6 +160,21 @@ fun QuickLyricsSettingsDialog(
                         Icon(Icons.Rounded.Search, null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(str("lyrics_manual_search"), fontWeight = FontWeight.SemiBold)
+                    }
+                    if (onFocusMode != null) {
+                        Spacer(Modifier.height(8.dp))
+                        FilledTonalButton(
+                            onClick = {
+                                onDismiss()
+                                onFocusMode()
+                            },
+                            shapes = ButtonDefaults.shapes(),
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                        ) {
+                            Icon(Icons.Rounded.DarkMode, null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(str("screensaver_focus_mode"), fontWeight = FontWeight.SemiBold)
+                        }
                     }
                     Spacer(Modifier.height(16.dp))
                     ExpressiveConnectedButtonGroup(
