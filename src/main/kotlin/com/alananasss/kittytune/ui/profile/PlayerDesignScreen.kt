@@ -20,7 +20,6 @@ import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.rounded.TextSnippet
-import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -607,7 +606,7 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE,
             label = str("player_button_like"),
             desc = str("player_button_like_desc"),
-            mark = rememberVectorPainter(Icons.Filled.Favorite),
+            mark = rememberVectorPainter(Icons.Rounded.Favorite),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons
         ),
         ButtonConfigItem(
@@ -629,7 +628,7 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL,
             label = str("player_button_panel"),
             desc = str("player_button_panel_desc"),
-            mark = rememberVectorPainter(Icons.Rounded.Tune),
+            mark = rememberVectorPainter(Icons.Rounded.ViewSidebar),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons
         ),
         ButtonConfigItem(
@@ -643,14 +642,14 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE,
             label = str("player_button_shuffle"),
             desc = str("player_button_shuffle_desc"),
-            mark = rememberVectorPainter(Icons.Filled.Shuffle),
+            mark = rememberVectorPainter(Icons.Rounded.Shuffle),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT,
             label = str("player_button_repeat"),
             desc = str("player_button_repeat_desc"),
-            mark = rememberVectorPainter(Icons.Filled.Repeat),
+            mark = rememberVectorPainter(Icons.Rounded.Repeat),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons
         ),
     )
