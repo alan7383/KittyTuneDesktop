@@ -24,6 +24,13 @@ fun rememberArtistProfile(artistName: String?): ArtistReach.Profile? =
         value = ArtistReach.profileOf(artistName)
     }.value
 
+/** A banner for [artistName] from their streaming profile, or a member's for a duo; null before it is found and when there is none. */
+@Composable
+fun rememberArtistBanner(artistName: String?): String? =
+    produceState<String?>(initialValue = null, artistName) {
+        value = ArtistReach.bannerOf(artistName)
+    }.value
+
 /** "550,512 monthly listeners", the way Spotify writes it: the whole number, grouped. */
 fun monthlyListenersLabel(count: Long): String =
     str("artist_monthly_listeners", NumberFormat.getIntegerInstance(Strings.locale()).format(count))
