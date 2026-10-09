@@ -73,6 +73,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -114,6 +116,29 @@ import java.text.NumberFormat
  * lines about the artist sit over its lower edge, with the actions under them: listen, a trailer of the top
  * songs, follow, pin to the library, and a menu with the rest.
  */
+/** Up to four covers in a 2 by 2 grid, blurred and darkened: the stand-in banner for an artist with none. */
+@Composable
+private fun ArtistCoverCollage(covers: List<String>, modifier: Modifier = Modifier) {
+    Box(modifier.clipToBounds()) {
+        Column(Modifier.fillMaxSize().blur(36.dp).graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }) {
+            for (row in 0..1) {
+                Row(Modifier.weight(1f).fillMaxWidth()) {
+                    for (column in 0..1) {
+                        val url = covers.getOrElse(row * 2 + column) { covers.first() }
+                        AsyncImage(
+                            model = url,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                        )
+                    }
+                }
+            }
+        }
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)))
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ArtistHero(
@@ -128,6 +153,9 @@ internal fun ArtistHero(
     val streamingBanner = com.alananasss.kittytune.ui.common.rememberArtistBanner(user.username)
     val banner = user.bannerUrl ?: streamingBanner ?: profileViewModel.spotifyArtist?.headerImageUrl
     val portrait = user.avatarUrl.takeIf { !it.isDefaultAvatar() }?.getHighResAvatarUrl() ?: profile?.avatarUrl
+    val heroCovers = remember(profileViewModel.popularTracks.size) {
+        profileViewModel.popularTracks.mapNotNull { it.fullResArtwork.takeIf { url -> url.isNotBlank() } }.distinct().take(4)
+    }
     val scheme = MaterialTheme.colorScheme
     val about = user.description?.takeIf { it.isNotBlank() } ?: profile?.biography
 
@@ -139,6 +167,8 @@ internal fun ArtistHero(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            // No banner: their best songs' covers, blurred into one wash, rather than the portrait smeared.
+            banner == null && heroCovers.size >= 3 -> ArtistCoverCollage(heroCovers, Modifier.fillMaxSize())
             portrait != null -> AsyncImage(
                 model = portrait,
                 contentDescription = null,
