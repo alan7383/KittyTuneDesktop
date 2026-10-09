@@ -51,6 +51,7 @@ import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -71,6 +72,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -234,11 +236,12 @@ private fun SavedRoomCard(name: String, code: String, listeners: List<String>, c
 
 /** A shared playlist's cover: the song playing in it, on the two-person mark, with live bars over it. */
 @Composable
-private fun TogetherCover(url: String?, isLive: Boolean, size: Int) {
+private fun TogetherCover(url: String?, isLive: Boolean, size: Int, elevated: Boolean = false) {
     Box(
         modifier = Modifier
             .size(size.dp)
-            .clip(RoundedCornerShape((size / 4).dp))
+            .then(if (elevated) Modifier.shadow(18.dp, RoundedCornerShape(16.dp)) else Modifier)
+            .clip(RoundedCornerShape(if (elevated) 16.dp else (size / 4).dp))
             .background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.tertiary))),
         contentAlignment = Alignment.Center,
     ) {
@@ -307,7 +310,7 @@ fun TogetherScreen(code: String, playerViewModel: PlayerViewModel, onBack: () ->
             }
         }
         itemsIndexed(room.playlist, key = { i, t -> "p$i-${t.id}" }) { index, t ->
-            SharedTrackRow(t, onClick = {
+            SharedTrackRow(t, index = index, onClick = {
                 if (isListening && isHost) playerViewModel.hostPlay(room.playlist, index)
                 else if (isListening) Together.playNext(t)
                 else Together.startListening(code, index)
@@ -355,6 +358,10 @@ fun TogetherScreen(code: String, playerViewModel: PlayerViewModel, onBack: () ->
     }
 }
 
+/**
+ * The top of a shared playlist, laid out as any playlist's page is: a large cover on the left, the kind of thing it is, its
+ * name big, a line of facts, and under them one round play button with the quieter actions beside it.
+ */
 @Composable
 private fun RoomHeader(
     room: Together.Room,
@@ -368,34 +375,41 @@ private fun RoomHeader(
     Box(
         Modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(scheme.primaryContainer.copy(alpha = 0.7f), scheme.surfaceContainerLow)))
+            .background(Brush.verticalGradient(listOf(scheme.primaryContainer.copy(alpha = 0.55f), scheme.background)))
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, str("btn_back")) }
                 Spacer(Modifier.weight(1f))
                 if (!connected) Text(str("together_offline"), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-                IconButton(onClick = { Together.forget(room.code); onBack() }, shapes = IconButtonDefaults.shapes()) {
-                    Icon(Icons.Rounded.Delete, str("together_forget"), tint = scheme.onSurfaceVariant)
+            }
+            Row(verticalAlignment = Alignment.Bottom) {
+                TogetherCover(
+                    room.nowPlaying?.artworkUrl ?: room.playlist.firstOrNull()?.artworkUrl,
+                    isLive = room.listeners.isNotEmpty() || isListening,
+                    size = 200,
+                    elevated = true,
+                )
+                Spacer(Modifier.width(24.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(str("together_title").uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = scheme.onSurfaceVariant)
+                    Text(
+                        room.name.ifBlank { str("together_title") },
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Black,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val totalMs = room.playlist.sumOf { it.durationMs ?: 0L }
+                    val facts = listOfNotNull(
+                        str("playlist_num_tracks", room.playlist.size),
+                        com.alananasss.kittytune.ui.library.formatPlaylistTotalDuration(totalMs).takeIf { totalMs > 0 },
+                    )
+                    Text(facts.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
+                    MembersRow(room, isHost)
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TogetherCover(room.nowPlaying?.artworkUrl ?: room.playlist.firstOrNull()?.artworkUrl, isLive = room.listeners.isNotEmpty() || isListening, size = 120)
-                Spacer(Modifier.width(20.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(str("together_title").uppercase(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = scheme.primary)
-                    Text(room.name.ifBlank { str("together_title") }, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Surface(onClick = { copyCode(room.code) }, shape = CircleShape, color = scheme.surfaceContainerHighest, modifier = Modifier.padding(top = 6.dp)) {
-                        Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(str("together_code", TogetherWire.displayCode(room.code)), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(6.dp))
-                            Icon(Icons.Rounded.ContentCopy, null, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
-            }
-            MembersRow(room, isHost)
             AnimatedVisibility(visible = room.nowPlaying != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
                 room.nowPlaying?.let { now ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -411,30 +425,36 @@ private fun RoomHeader(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (!isListening) {
-                    Button(onClick = { Together.startListening(room.code) }, shapes = ButtonDefaults.shapes(), modifier = Modifier.height(48.dp)) {
-                        Icon(Icons.Rounded.Headphones, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(str("together_listen"), fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    FilledTonalButton(onClick = { Together.stopListening() }, shapes = ButtonDefaults.shapes(), modifier = Modifier.height(48.dp)) {
-                        Icon(Icons.Rounded.Logout, null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(str("together_leave"))
-                    }
-                    if (!isHost) {
-                        FilledTonalButton(onClick = { Together.claimHost(room.code) }, shapes = ButtonDefaults.shapes(), modifier = Modifier.height(48.dp)) {
-                            Icon(Icons.Rounded.Star, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("together_become_host"))
-                        }
-                    }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                // One round button, as a playlist has: listen, or leave while listening.
+                FilledIconButton(
+                    onClick = { if (isListening) Together.stopListening() else Together.startListening(room.code) },
+                    shapes = IconButtonDefaults.shapes(),
+                    modifier = Modifier.size(56.dp),
+                ) {
+                    Icon(if (isListening) Icons.Rounded.Logout else Icons.Rounded.PlayArrow, if (isListening) str("together_leave") else str("together_listen"), modifier = Modifier.size(30.dp))
                 }
                 if (isListening && !isHost) {
-                    Text(str("together_automix_host_only"), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
+                    FilledTonalButton(onClick = { Together.claimHost(room.code) }, shapes = ButtonDefaults.shapes(), modifier = Modifier.height(44.dp)) {
+                        Icon(Icons.Rounded.Star, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("together_become_host"))
+                    }
                 }
+                Surface(onClick = { copyCode(room.code) }, shape = CircleShape, color = scheme.surfaceContainerHighest) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(str("together_code", TogetherWire.displayCode(room.code)), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(8.dp))
+                        Icon(Icons.Rounded.ContentCopy, null, modifier = Modifier.size(16.dp))
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { Together.forget(room.code); onBack() }, shapes = IconButtonDefaults.shapes()) {
+                    Icon(Icons.Rounded.Delete, str("together_forget"), tint = scheme.onSurfaceVariant)
+                }
+            }
+            if (isListening && !isHost) {
+                Text(str("together_automix_host_only"), style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
             }
         }
     }
@@ -486,6 +506,7 @@ private fun SectionTitle(text: String) {
 @Composable
 private fun SharedTrackRow(
     track: SharedTrack,
+    index: Int? = null,
     subtitle: String? = null,
     onClick: (() -> Unit)? = null,
     actions: @Composable () -> Unit,
@@ -499,6 +520,16 @@ private fun SharedTrackRow(
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (index != null) {
+            Text(
+                (index + 1).toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.width(32.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+        }
         AsyncImage(
             model = track.artworkUrl,
             contentDescription = null,
@@ -514,6 +545,14 @@ private fun SharedTrackRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+        track.durationMs?.takeIf { it > 0 }?.let { ms ->
+            Text(
+                String.format("%d:%02d", ms / 60000, (ms / 1000) % 60),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
         Row(verticalAlignment = Alignment.CenterVertically) { actions() }
