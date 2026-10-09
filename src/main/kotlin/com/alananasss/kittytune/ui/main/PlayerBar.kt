@@ -170,7 +170,9 @@ fun PlayerBar(
             val isVeryCompact = barWidth < 740.dp
             // Proportional to the bar's width rather than stepped at a few widths. The steps were where the
             // transport visibly jumped narrower while a window was being resized (issue #66).
-            val centerMax = lerpByWidth(barWidth, from = 700.dp to 280.dp, to = 1100.dp to 560.dp)
+            // Narrow bars give the title and the artist the room: at the smallest window the transport used to take
+            // over 400 dp and left them about 50.
+            val centerMax = lerpByWidth(barWidth, from = 700.dp to 264.dp, to = 1500.dp to 560.dp)
             // Never narrower than the buttons need: below that the play button was squeezed to a sliver while the
             // title and the volume took the room, and the shuffle went with it.
             val centerMin = maxOf(lerpByWidth(barWidth, from = 700.dp to 180.dp, to = 850.dp to 300.dp), if (isVeryCompact) 264.dp else 248.dp)
