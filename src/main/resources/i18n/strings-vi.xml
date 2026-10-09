@@ -3393,4 +3393,19 @@
     <string name="search_all_sources">Tất cả</string>
     <string name="search_all_show_source">Xem tất cả</string>
     <string name="home_clips_title">Clip</string>
+    <string name="chart_country_fi">Phần Lan</string>
+    <string name="chart_country_se">Thụy Điển</string>
+    <string name="chart_country_no">Na Uy</string>
+    <string name="chart_country_pl">Ba Lan</string>
+    <string name="chart_country_it">Ý</string>
+    <string name="chart_country_es">Tây Ban Nha</string>
+    <string name="chart_country_nl">Hà Lan</string>
+    <string name="chart_country_ca">Canada</string>
+    <string name="chart_country_au">Úc</string>
+    <string name="chart_country_jp">Nhật Bản</string>
+    <string name="chart_country_br">Brazil</string>
+    <string name="chart_country_mx">Mexico</string>
+    <string name="chart_country_ie">Ireland</string>
+    <string name="chart_country_at">Áo</string>
+    <string name="chart_country_cz">Séc</string>
 </resources>

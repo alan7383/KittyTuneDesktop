@@ -3555,4 +3555,19 @@
     <string name="search_all_sources">Alle</string>
     <string name="search_all_show_source">Alle anzeigen</string>
     <string name="home_clips_title">Clips</string>
+    <string name="chart_country_fi">Finnland</string>
+    <string name="chart_country_se">Schweden</string>
+    <string name="chart_country_no">Norwegen</string>
+    <string name="chart_country_pl">Polen</string>
+    <string name="chart_country_it">Italien</string>
+    <string name="chart_country_es">Spanien</string>
+    <string name="chart_country_nl">Niederlande</string>
+    <string name="chart_country_ca">Kanada</string>
+    <string name="chart_country_au">Australien</string>
+    <string name="chart_country_jp">Japan</string>
+    <string name="chart_country_br">Brasilien</string>
+    <string name="chart_country_mx">Mexiko</string>
+    <string name="chart_country_ie">Irland</string>
+    <string name="chart_country_at">Österreich</string>
+    <string name="chart_country_cz">Tschechien</string>
 </resources>
