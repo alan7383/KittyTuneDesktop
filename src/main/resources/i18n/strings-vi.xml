@@ -3385,4 +3385,8 @@
     <string name="like_all_prompt_text">Album này có %1$d bài, trong đó %2$d bài rất ngắn hoặc rất dài: intro, ghi âm, im lặng dài.</string>
     <string name="like_all_prompt_skip_odd">Bỏ qua bài lạ</string>
     <string name="like_all_prompt_all">Thích tất cả</string>
+    <string name="search_sources_title">Nguồn tìm kiếm</string>
+    <string name="search_source_move_up">Lên</string>
+    <string name="search_source_move_down">Xuống</string>
+    <string name="search_sources_edit">Sửa nguồn…</string>
 </resources>

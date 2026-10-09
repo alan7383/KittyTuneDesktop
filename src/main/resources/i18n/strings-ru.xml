@@ -2935,4 +2935,8 @@
     <string name="like_all_prompt_text">В альбоме %1$d треков, из них %2$d очень короткие или очень длинные: вступления, голосовые, долгая тишина.</string>
     <string name="like_all_prompt_skip_odd">Без странных</string>
     <string name="like_all_prompt_all">Лайкнуть все</string>
+    <string name="search_sources_title">Источники поиска</string>
+    <string name="search_source_move_up">Выше</string>
+    <string name="search_source_move_down">Ниже</string>
+    <string name="search_sources_edit">Изменить источники…</string>
 </resources>

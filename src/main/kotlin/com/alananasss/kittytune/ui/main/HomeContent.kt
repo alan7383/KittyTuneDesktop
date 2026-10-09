@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
+import com.alananasss.kittytune.ui.home.searchSourceName
+
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.shrinkVertically
@@ -429,17 +431,9 @@ fun MediaCard(
 @Composable
 private fun SearchSourceButton(vm: HomeViewModel) {
     var expanded by remember { mutableStateOf(false) }
-    val sources = listOf(
-        SearchSource.SOUNDCLOUD,
-        SearchSource.YOUTUBE,
-        SearchSource.YOUTUBE_MUSIC,
-        SearchSource.SPOTIFY,
-        SearchSource.APPLE_MUSIC,
-        SearchSource.YANDEX_MUSIC,
-        SearchSource.DEEZER,
-        SearchSource.TIDAL,
-        SearchSource.QOBUZ,
-    )
+    var editing by remember { mutableStateOf(false) }
+    // The order and what is hidden come from the reader's settings; see SearchSourceOrder.
+    val sources = remember(expanded, editing) { com.alananasss.kittytune.data.local.SearchSourceOrder.visible() }
 
     Box {
         com.alananasss.kittytune.ui.common.Tip(str("search_source_tooltip")) {
@@ -449,7 +443,7 @@ private fun SearchSourceButton(vm: HomeViewModel) {
                 contentPadding = PaddingValues(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 Text(
-                    text = searchSourceLabel(vm.activeSearchSource),
+                    text = searchSourceName(vm.activeSearchSource),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                 )
@@ -467,7 +461,7 @@ private fun SearchSourceButton(vm: HomeViewModel) {
         ) {
             sources.forEach { source ->
                 androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(searchSourceLabel(source)) },
+                    text = { Text(searchSourceName(source)) },
                     leadingIcon = {
                         // The current one is marked rather than merely styled: a menu of three names with
                         // no indication of which is live reads as three actions, not as a choice.
@@ -483,21 +477,26 @@ private fun SearchSourceButton(vm: HomeViewModel) {
                     },
                 )
             }
+            androidx.compose.material3.HorizontalDivider()
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text(str("search_sources_edit")) },
+                leadingIcon = { Icon(Icons.Rounded.Tune, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    editing = true
+                },
+            )
+        }
+        if (editing) {
+            com.alananasss.kittytune.ui.home.SearchSourceOrderDialog(
+                onDismiss = { editing = false },
+                onSaved = {
+                    val fixed = com.alananasss.kittytune.data.local.SearchSourceOrder.fallbackFor(vm.activeSearchSource)
+                    if (fixed != vm.activeSearchSource) vm.onSearchSourceChanged(fixed)
+                },
+            )
         }
     }
-}
-
-/** Platform names are brands, so they are not translated. */
-private fun searchSourceLabel(source: SearchSource): String = when (source) {
-    SearchSource.SOUNDCLOUD -> "SoundCloud"
-    SearchSource.YOUTUBE -> "YouTube"
-    SearchSource.YOUTUBE_MUSIC -> "YouTube Music"
-    SearchSource.SPOTIFY -> "Spotify"
-    SearchSource.APPLE_MUSIC -> "Apple Music"
-    SearchSource.YANDEX_MUSIC -> "Yandex Music"
-    SearchSource.DEEZER -> "Deezer"
-    SearchSource.TIDAL -> "TIDAL"
-    SearchSource.QOBUZ -> "Qobuz"
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)

@@ -2936,4 +2936,8 @@
     <string name="like_all_prompt_text">This album has %1$d tracks, %2$d of them very short or very long: intros, voice notes, long silences.</string>
     <string name="like_all_prompt_skip_odd">Skip the odd ones</string>
     <string name="like_all_prompt_all">Like all</string>
+    <string name="search_sources_title">Search sources</string>
+    <string name="search_source_move_up">Move up</string>
+    <string name="search_source_move_down">Move down</string>
+    <string name="search_sources_edit">Edit sources…</string>
 </resources>

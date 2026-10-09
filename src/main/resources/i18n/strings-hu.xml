@@ -2938,4 +2938,8 @@
     <string name="like_all_prompt_text">Ennek az albumnak %1$d száma van, ebből %2$d nagyon rövid vagy nagyon hosszú: intró, hangjegyzet, hosszú csend.</string>
     <string name="like_all_prompt_skip_odd">A furcsák kihagyása</string>
     <string name="like_all_prompt_all">Mindet kedvelem</string>
+    <string name="search_sources_title">Keresési források</string>
+    <string name="search_source_move_up">Feljebb</string>
+    <string name="search_source_move_down">Lejjebb</string>
+    <string name="search_sources_edit">Források szerkesztése…</string>
 </resources>
