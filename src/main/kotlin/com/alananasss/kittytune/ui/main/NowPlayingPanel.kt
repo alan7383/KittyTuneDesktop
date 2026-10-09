@@ -107,6 +107,8 @@ fun NowPlayingPanel(
     modifier: Modifier = Modifier,
 ) {
     val vm = playerViewModel
+    // The panel going away under the pointer sends no Exit; without this the side buttons stay bound to it.
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { PanelHistory.pointerInside = false } }
     val track = vm.currentTrack ?: return
 
     Surface(

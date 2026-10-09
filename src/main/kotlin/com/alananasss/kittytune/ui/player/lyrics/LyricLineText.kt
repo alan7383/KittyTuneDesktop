@@ -17,7 +17,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.ClipOp
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -197,6 +198,8 @@ internal fun LyricLineText(
     }
 
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val layerPaint = remember { Paint() }
+    val keepPath = remember { Path() }
     val ranges = remember(words) {
         var start = 0
         words.map { word ->
@@ -234,14 +237,15 @@ internal fun LyricLineText(
                 // The bright copy is drawn in a layer and the part not sung yet rubbed out of it, with the playhead's
                 // edge fading instead of cut straight: the same soft fill the full screen's karaoke has.
                 drawIntoCanvas { canvas ->
-                    canvas.saveLayer(Rect(Offset.Zero, size), Paint())
+                    canvas.saveLayer(Rect(Offset.Zero, size), layerPaint)
                     this@drawWithContent.drawContent()
-                    val keep = Path().apply {
-                        addPath(region.sung)
-                        region.band?.let { addRect(it) }
+                    keepPath.rewind()
+                    keepPath.addPath(region.sung)
+                    region.band?.let { keepPath.addRect(it) }
+                    // Everything outside the sung part is rubbed out; clipping to the difference needs no extra paths.
+                    clipPath(keepPath, clipOp = ClipOp.Difference) {
+                        drawRect(Color.White, size = size, blendMode = BlendMode.DstOut)
                     }
-                    val everything = Path().apply { addRect(Rect(Offset.Zero, size)) }
-                    drawPath(Path.combine(PathOperation.Difference, everything, keep), Color.White, blendMode = BlendMode.DstOut)
                     region.band?.let { band ->
                         drawRect(
                             brush = Brush.horizontalGradient(0f to Color.Transparent, 1f to Color.White, startX = band.left, endX = band.right),
