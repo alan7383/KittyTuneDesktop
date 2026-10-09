@@ -2856,8 +2856,8 @@
     <string name="home_new_from_artists">New from your artists</string>
     <string name="home_chart_title">Top of the charts</string>
     <string name="artist_listen">Listen</string>
-    <string name="artist_trailer">Trailer</string>
-    <string name="artist_trailer_tip">A taste of each top song, twenty seconds apiece</string>
+    <string name="artist_trailer">Teaser</string>
+    <string name="artist_trailer_tip">A teaser of each top song, twenty seconds apiece</string>
     <string name="artist_pin">Pin to the library</string>
     <string name="artist_unpin">Unpin from the library</string>
     <string name="artist_more">More</string>
@@ -2914,7 +2914,7 @@
     <string name="artist_clip_failed">This video can't be played</string>
     <string name="artist_listening">Listening</string>
     <string name="artist_resume">Resume</string>
-    <string name="artist_trailer_playing">Trailer on</string>
+    <string name="artist_trailer_playing">Teaser on</string>
     <string name="sort_now">Played now</string>
     <string name="sort_all_time">All time</string>
     <string name="sort_likes">Most liked</string>
