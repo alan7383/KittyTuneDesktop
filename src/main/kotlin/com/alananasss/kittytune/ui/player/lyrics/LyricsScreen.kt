@@ -450,6 +450,7 @@ import kotlin.math.roundToInt
                 modifier = Modifier
                     .fillMaxSize()
                     .revealWhenPlaced(listState, activeIndex, contentKey = lyrics.size to lyrics.firstOrNull()?.startTime)
+                    .stopAtLastLine(listState)
                     .fadingEdge(fadeBrush),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {

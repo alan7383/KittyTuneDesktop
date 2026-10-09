@@ -36,6 +36,7 @@ import com.alananasss.kittytune.ui.player.LyricsMode
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.lyrics.LyricLine
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
+import com.alananasss.kittytune.ui.player.lyrics.LyricsScrolling
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
 import com.alananasss.kittytune.ui.player.lyrics.separateBackingVocals
@@ -52,21 +53,33 @@ import com.alananasss.kittytune.ui.player.lyrics.withEvenWords
  */
 @Composable
 internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifier) {
-    val lines = vm.lyricsLines
-    val isTimed = vm.lyricsMode == LyricsMode.SYNCED && lines.isNotEmpty() && !vm.isLyricsLoading
+    val syncedLines = vm.lyricsLines
+    val plainText = vm.rawPlainLyrics.orEmpty()
+    val plainSpeed = vm.effectivePlainAutoScrollSpeed
+    val followsPlain = vm.lyricsMode == LyricsMode.PLAIN && vm.isPlainAutoScrollEnabled && plainText.isNotBlank()
+    // Untimed text is paced the way the full screen scrolls it, line after line at the reader's chosen speed, so the card
+    // moves through it at the same rate as the page does and fills each line the same smooth way.
+    val plainLines = remember(plainText, plainSpeed, followsPlain) {
+        if (followsPlain) pacedPlainLines(plainText, plainSpeed) else emptyList()
+    }
+    val lines = if (followsPlain) plainLines else syncedLines
+    val isTimed = (followsPlain || vm.lyricsMode == LyricsMode.SYNCED) && lines.isNotEmpty() && !vm.isLyricsLoading
     val gapPx = with(androidx.compose.ui.platform.LocalDensity.current) { CHIP_GAP.roundToPx() }
+    val maxChipPx = with(androidx.compose.ui.platform.LocalDensity.current) { (MAX_LINE_WIDTH + 40.dp).roundToPx() }
 
     AnimatedVisibility(
         visible = isTimed,
         enter = fadeIn(tween(220)) + scaleIn(tween(260, easing = FastOutSlowInEasing), initialScale = 0.9f),
         exit = fadeOut(tween(160)) + scaleOut(tween(200), targetScale = 0.9f),
         modifier = modifier.layout { measurable, constraints ->
-            val chip = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+            // Bounded, so a long line breaks onto a second row instead of running on past the card.
+            val chip = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0, maxWidth = constraints.maxWidth.coerceAtMost(maxChipPx)))
             // Takes no height in the bar and is drawn above its top edge.
             layout(chip.width, 0) { chip.place(0, -chip.height - gapPx) }
         },
     ) {
-        val position = rememberSmoothPosition(vm.currentPosition, vm.isPlaying, 1f) + vm.lyricsOffset
+        val position = rememberSmoothPosition(vm.currentPosition, vm.isPlaying, vm.effectsState.speed) +
+            if (followsPlain) 0L else vm.lyricsOffset
         val activeIndex = LyricsUtils.activeLineIndex(lines, position.toLong())
         val active = lines.getOrNull(activeIndex)
         val showsWords = active != null && !active.isInstrumental && active.text.isNotBlank()
@@ -109,6 +122,20 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
                 }
             }
         }
+    }
+}
+
+/** Untimed [text] as lines laid on a timeline at the full screen's scroll pace; blank lines become breaks. */
+private fun pacedPlainLines(text: String, speed: Float): List<LyricLine> {
+    val lineMs = (1000f / (LyricsScrolling.PLAIN_BASE_LINES_PER_SEC * speed.coerceAtLeast(0.1f))).toLong().coerceAtLeast(400L)
+    return text.split("\n").mapIndexed { index, raw ->
+        val line = raw.trim()
+        LyricLine(
+            text = line,
+            startTime = index * lineMs,
+            endTime = (index + 1) * lineMs,
+            isInstrumental = line.isEmpty(),
+        )
     }
 }
 
