@@ -88,7 +88,7 @@ internal fun HomeFeed(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        item {
+        item(key = "greeting") {
             Text(
                 text = homeGreeting(),
                 style = MaterialTheme.typography.headlineSmall,
@@ -100,27 +100,27 @@ internal fun HomeFeed(
         }
 
         if (contextHistory.isNotEmpty()) {
-            item {
+            item(key = "continue") {
                 HomeShelfTitle(str("home_continue"))
                 ContinueGrid(contextHistory.take(CONTINUE_COUNT), playerViewModel)
             }
         }
 
         if (showHomeListeningStats) {
-            item { Box(Modifier.padding(horizontal = HOME_PADDING)) { ListeningStatsCard(navController) } }
+            item(key = "stats") { Box(Modifier.padding(horizontal = HOME_PADDING)) { ListeningStatsCard(navController) } }
         }
 
-        item {
+        item(key = "chart") {
             com.alananasss.kittytune.ui.home.HomeChartSection(vm, playerViewModel, onOpenCharts = { navController.navigate("charts") })
         }
 
         // New videos of the artists being listened to, on the home page as on an artist's own (round 3, 24), under the chart.
-        item { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel) }
+        item(key = "clips") { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel) }
 
-        item { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
+        item(key = "from_artists") { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
 
         if (showHomeYourMix) {
-            item { Box(Modifier.padding(horizontal = HOME_PADDING)) { StartMixingCard(playerViewModel) } }
+            item(key = "mix") { Box(Modifier.padding(horizontal = HOME_PADDING)) { StartMixingCard(playerViewModel) } }
         }
 
         items(vm.homeSections, key = { it.title }) { section ->

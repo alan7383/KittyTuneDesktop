@@ -60,6 +60,8 @@ import java.time.format.TextStyle
  * it was, and the artist at the top, on a wash of the theme's own colours like My Wave above it. Absent until there
  * is something to show: a card reading zero minutes on a fresh install is noise.
  */
+private val STATS_CARD_PLACEHOLDER_HEIGHT = 170.dp
+
 @Composable
 internal fun ListeningStatsCard(navController: NavController) {
     val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
@@ -78,7 +80,12 @@ internal fun ListeningStatsCard(navController: NavController) {
         }
     }
 
-    val stats = summary ?: return
+    // While the numbers are read, a card-sized blank holds the place: the card used to arrive late and push everything under
+    // it down, which showed as the page jumping while it was being scrolled.
+    val stats = summary ?: run {
+        Box(Modifier.fillMaxWidth().height(STATS_CARD_PLACEHOLDER_HEIGHT).clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f)))
+        return
+    }
     if (stats.listenedMs <= 0L) return
     StatsCardContent(stats, onClick = { navController.navigate("listening_stats") })
 }
