@@ -592,9 +592,15 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
     var replyText by remember { mutableStateOf("") }
     var showReplyField by remember { mutableStateOf(false) }
 
+    // Each comment is a quiet card of its own: it had been bare text, and the bare text fought the header above it.
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = if (isReply) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().padding(start = if (isReply) 32.dp else 0.dp),
+    ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(start = if (isReply) 48.dp else 0.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             com.alananasss.kittytune.ui.common.UserAvatar(
@@ -784,6 +790,7 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                 focusRequester.requestFocus()
             }
         }
+    }
     }
 }
 
