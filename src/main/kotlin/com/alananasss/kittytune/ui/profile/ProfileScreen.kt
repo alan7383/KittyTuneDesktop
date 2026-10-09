@@ -405,15 +405,9 @@ fun ProfileScreen(
                                 if (latest.isNotEmpty()) Column(m) {
                                     ArtistSectionTitle(
                                         str("artist_new_releases"),
-                                        // Records only, never a list of songs: the albums when there are some, else
-                                        // the singles and the rest of the records.
+                                        // Albums only, never songs: the page lists the records the artist put out.
                                         onOpen = {
-                                            val section = when {
-                                                profileViewModel.albums.isNotEmpty() -> "albums"
-                                                profileViewModel.singles.isNotEmpty() -> "singles"
-                                                profileViewModel.compilations.isNotEmpty() -> "compilations"
-                                                else -> "latest"
-                                            }
+                                            val section = if (profileViewModel.albums.isNotEmpty()) "albums" else "releases"
                                             onNavigate("profile_collection:${user.id}:$section")
                                         },
                                     )

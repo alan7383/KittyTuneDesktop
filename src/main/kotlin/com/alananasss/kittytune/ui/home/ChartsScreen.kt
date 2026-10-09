@@ -328,8 +328,6 @@ fun ChartsScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = currentCountry.flagEmoji, style = MaterialTheme.typography.titleLarge)
-                                Spacer(Modifier.width(12.dp))
                                 Text(
                                     text = currentCountry.countryName,
                                     style = MaterialTheme.typography.titleMedium,
@@ -540,8 +538,6 @@ private fun ChartsCountryCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = flagEmoji, style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.width(16.dp))
                 Text(
                     text = countryName,
                     style = MaterialTheme.typography.bodyLarge,

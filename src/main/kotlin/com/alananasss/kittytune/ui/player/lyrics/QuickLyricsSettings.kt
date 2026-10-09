@@ -38,6 +38,7 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -149,31 +150,33 @@ fun QuickLyricsSettingsDialog(
                     Column(Modifier.padding(end = 12.dp).verticalScroll(scroll)) {
                     SyncCard(viewModel)
                     Spacer(Modifier.height(10.dp))
-                    FilledTonalButton(
-                        onClick = {
-                            onDismiss()
-                            viewModel.isSearchingLyrics = true
-                        },
-                        shapes = ButtonDefaults.shapes(),
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     ) {
-                        Icon(Icons.Rounded.Search, null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(str("lyrics_manual_search"), fontWeight = FontWeight.SemiBold)
-                    }
-                    if (onFocusMode != null) {
-                        Spacer(Modifier.height(8.dp))
-                        FilledTonalButton(
-                            onClick = {
-                                onDismiss()
-                                onFocusMode()
-                            },
-                            shapes = ButtonDefaults.shapes(),
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                        ) {
-                            Icon(Icons.Rounded.DarkMode, null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(str("screensaver_focus_mode"), fontWeight = FontWeight.SemiBold)
+                        // The two ways out to other views, as small icons: they were full-width rows that took a
+                        // third of the panel between the title and the tabs.
+                        com.alananasss.kittytune.ui.common.Tip(str("lyrics_manual_search")) {
+                            FilledTonalIconButton(
+                                onClick = {
+                                    onDismiss()
+                                    viewModel.isSearchingLyrics = true
+                                },
+                                shapes = IconButtonDefaults.shapes(),
+                                modifier = Modifier.size(40.dp),
+                            ) { Icon(Icons.Rounded.Search, str("lyrics_manual_search"), modifier = Modifier.size(20.dp)) }
+                        }
+                        if (onFocusMode != null) {
+                            com.alananasss.kittytune.ui.common.Tip(str("screensaver_focus_mode")) {
+                                FilledTonalIconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onFocusMode()
+                                    },
+                                    shapes = IconButtonDefaults.shapes(),
+                                    modifier = Modifier.size(40.dp),
+                                ) { Icon(Icons.Rounded.DarkMode, str("screensaver_focus_mode"), modifier = Modifier.size(20.dp)) }
+                            }
                         }
                     }
                     Spacer(Modifier.height(16.dp))
@@ -246,7 +249,7 @@ private fun SyncCard(viewModel: PlayerViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             RowIcon(Icons.Rounded.Timer)
             Spacer(Modifier.width(14.dp))
-            Text(str("lyrics_sync"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text(str("lyrics_sync"), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
             ValuePill(
                 text = (if (offsetMs > 0) "+" else "") + String.format("%.2fs", offsetMs / 1000f),
                 isActive = offsetMs != 0L,
@@ -291,12 +294,23 @@ private fun SyncCard(viewModel: PlayerViewModel) {
 private fun DriftSync(viewModel: PlayerViewModel) {
     val sync = viewModel.lyricsSync
     val format = { ms: Long -> (if (ms > 0) "+" else "") + String.format("%.1f s", ms / 1000f) }
-    Text(
-        str("lyrics_sync_drift_title"),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Spacer(Modifier.height(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            str("lyrics_sync_drift_title"),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        com.alananasss.kittytune.ui.common.Tip(str("lyrics_sync_drift_hint")) {
+            Icon(
+                Icons.Rounded.Info,
+                contentDescription = str("lyrics_sync_drift_hint"),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+    Spacer(Modifier.height(6.dp))
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         val startSet = sync.isTwoPoint || sync.anchorMs > 0L
         OutlinedButton(
@@ -351,22 +365,23 @@ private fun DriftSync(viewModel: PlayerViewModel) {
             }
         }
     }
-    Spacer(Modifier.height(6.dp))
-    Text(
-        text = if (sync.isTwoPoint) {
-            str(
+    Spacer(Modifier.height(4.dp))
+    // What the two points are doing, shown only while they are set; the hint itself is on the info mark.
+    if (sync.isTwoPoint) {
+        Text(
+            text = str(
                 "lyrics_sync_drift_active",
                 format(sync.offsetMs),
                 com.alananasss.kittytune.utils.makeTimeString(sync.anchorMs),
                 format(sync.endOffsetMs ?: 0L),
                 com.alananasss.kittytune.utils.makeTimeString(sync.endAtMs ?: 0L),
-            )
-        } else {
-            str("lyrics_sync_drift_hint")
-        },
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 // ─── Tabs ────────────────────────────────────────────────────────

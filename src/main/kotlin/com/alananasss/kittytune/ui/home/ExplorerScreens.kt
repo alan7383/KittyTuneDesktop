@@ -500,8 +500,6 @@ fun GenreDetailScreen(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(OfficialPlaylistsData.sources[viewModel.selectedSourceIndex].flagEmoji)
-                                    Spacer(Modifier.width(8.dp))
                                     Text(OfficialPlaylistsData.sources[viewModel.selectedSourceIndex].countryName, style = MaterialTheme.typography.labelLarge)
                                     Icon(Icons.Rounded.KeyboardArrowDown, null)
                                 }
@@ -729,8 +727,6 @@ private fun CountrySelectionCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = flagEmoji, style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.width(16.dp))
                 Text(
                     text = countryName,
                     style = MaterialTheme.typography.bodyLarge,
