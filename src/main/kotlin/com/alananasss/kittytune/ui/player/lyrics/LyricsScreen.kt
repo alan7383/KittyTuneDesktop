@@ -611,12 +611,14 @@ import kotlin.math.roundToInt
                         ) {
                             Text(
                                 text = line.translation ?: "",
+                                // Quieter than the words it sits under: lighter, smaller, and set a little looser, so it reads as a
+                                // gloss and not as a second line of the song.
                                 style = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = (fontSize * 0.70f).sp,
-                                    lineHeight = (fontSize * 1.0f).sp
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = (fontSize * 0.60f).sp,
+                                    lineHeight = (fontSize * 0.88f).sp
                                 ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 textAlign = lineTextAlign,
                                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
                             )
