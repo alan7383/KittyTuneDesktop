@@ -339,17 +339,12 @@ private fun ArtistActions(
             )
         }
         Tip(str("artist_trailer_tip")) {
-            val trailerColors = if (isTrailer) ButtonDefaults.filledTonalButtonColors(
-                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            ) else ButtonDefaults.filledTonalButtonColors()
             FilledTonalButton(
                 onClick = {
                     if (isTrailer) playerViewModel.togglePlayPause()
                     else playerViewModel.playTrailer(topTracks.toList(), context)
                 },
                 enabled = topTracks.isNotEmpty() || isTrailer,
-                colors = trailerColors,
                 shapes = ButtonDefaults.shapes(),
                 modifier = Modifier.height(52.dp),
             ) {

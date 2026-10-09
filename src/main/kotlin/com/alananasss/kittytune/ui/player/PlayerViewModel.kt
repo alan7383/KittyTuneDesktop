@@ -4525,6 +4525,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     fun playTrailer(tracks: List<Track>, context: PlaybackContext) {
         if (tracks.isEmpty()) return
         val trailerContext = context.copy(navigationId = TRAILER_NAV_PREFIX + context.navigationId)
+        // The first song opens at its window, not at its start and then jumping there once its length is known.
+        tracks.first().durationMs?.takeIf { it > 0L }?.let { total ->
+            pendingSeekPosition = ClipWindow.forTrailer(total, TRAILER_SNIPPET_MS, TRAILER_START).startMs
+        }
         playPlaylist(tracks.take(TRAILER_SONGS), 0, trailerContext, maintainPlayerState = true, respectShuffle = false)
         trailerJob?.cancel()
         trailerJob = viewModelScope.launch {
