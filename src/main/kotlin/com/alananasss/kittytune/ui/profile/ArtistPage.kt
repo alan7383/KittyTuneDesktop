@@ -71,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
@@ -116,26 +117,53 @@ import java.text.NumberFormat
  * lines about the artist sit over its lower edge, with the actions under them: listen, a trailer of the top
  * songs, follow, pin to the library, and a menu with the rest.
  */
-/** Up to four covers in a 2 by 2 grid, blurred and darkened: the stand-in banner for an artist with none. */
+/**
+ * The stand-in banner for an artist with none: the best songs' covers melted into one wash.
+ *
+ * The first cover fills the banner, blurred and enlarged so no edge of it shows; the others are soft patches of colour
+ * laid over it at different places, each fading to nothing towards its rim. It used to be a 2 by 2 grid of four blurred
+ * squares, and the seams between them showed as hard lines through the colour.
+ */
 @Composable
 private fun ArtistCoverCollage(covers: List<String>, modifier: Modifier = Modifier) {
-    Box(modifier.clipToBounds()) {
-        Column(Modifier.fillMaxSize().blur(36.dp).graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }) {
-            for (row in 0..1) {
-                Row(Modifier.weight(1f).fillMaxWidth()) {
-                    for (column in 0..1) {
-                        val url = covers.getOrElse(row * 2 + column) { covers.first() }
-                        AsyncImage(
-                            model = url,
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
+    BoxWithConstraints(modifier.clipToBounds()) {
+        AsyncImage(
+            model = covers.first(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().blur(70.dp).graphicsLayer { scaleX = 1.5f; scaleY = 1.5f },
+        )
+        // Where each of the other covers sits: a fraction across and down, and how wide its patch is against the banner.
+        val patches = listOf(Triple(0.15f, 0.30f, 0.62f), Triple(0.55f, 0.75f, 0.58f), Triple(0.88f, 0.25f, 0.55f))
+        covers.drop(1).take(patches.size).forEachIndexed { index, url ->
+            val (x, y, share) = patches[index]
+            val patchWidth = maxWidth * share
+            val patchHeight = maxHeight * 1.5f
+            AsyncImage(
+                model = url,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(patchWidth, patchHeight)
+                    .offset(x = maxWidth * x - patchWidth / 2, y = maxHeight * y - patchHeight / 2)
+                    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                    .blur(56.dp)
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(
+                            Brush.radialGradient(
+                                0f to Color.Black.copy(alpha = 0.95f),
+                                0.45f to Color.Black.copy(alpha = 0.6f),
+                                1f to Color.Transparent,
+                                center = center,
+                                radius = size.maxDimension / 2f,
+                            ),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
                         )
-                    }
-                }
-            }
+                    },
+            )
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.25f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)))
     }
 }
 
