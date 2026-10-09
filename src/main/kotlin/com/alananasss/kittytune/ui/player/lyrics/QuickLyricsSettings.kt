@@ -396,23 +396,22 @@ private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, is
                 { FunFactDot(str("full_player_bg_apple_music_fact")) }
             } else null,
         ) {
-            ExpressiveConnectedButtonGroup(
+            // Each style drawn as a small sketch, so the choice is seen before it is made.
+            SketchChoices(
                 options = FullPlayerBgStyle.entries,
-                selectedOption = viewModel.fullPlayerBgStyle,
-                onOptionSelected = { viewModel.updateFullPlayerBgStyle(it) },
-                fillMaxWidth = true,
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-                labelProvider = { ChoiceLabel(bgStyleLabel(it)) },
+                selected = viewModel.fullPlayerBgStyle,
+                label = { bgStyleLabel(it) },
+                onSelect = { viewModel.updateFullPlayerBgStyle(it) },
+                sketch = { BackgroundSketch(it) },
             )
         }
         ChoiceRow(icon = Icons.Rounded.Dashboard, title = str("full_player_layout")) {
-            ExpressiveConnectedButtonGroup(
+            SketchChoices(
                 options = FullPlayerLayout.entries,
-                selectedOption = viewModel.fullPlayerLayout,
-                onOptionSelected = { viewModel.updateFullPlayerLayout(it) },
-                fillMaxWidth = true,
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-                labelProvider = { ChoiceLabel(layoutLabel(it)) },
+                selected = viewModel.fullPlayerLayout,
+                label = { layoutLabel(it) },
+                onSelect = { viewModel.updateFullPlayerLayout(it) },
+                sketch = { LayoutSketch(it) },
             )
         }
         ChoiceRow(icon = Icons.Rounded.FormatAlignCenter, title = str("full_player_info_align")) {
