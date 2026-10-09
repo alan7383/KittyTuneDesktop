@@ -127,6 +127,10 @@ object AppDatabase {
                     st.execute("ALTER TABLE downloaded_tracks ADD COLUMN $column")
                 } catch (_: Exception) {}
             }
+            // How energetic a track is, for choosing how to blend it (see AutomixManager); older rows have none.
+            try {
+                st.execute("ALTER TABLE beat_info ADD COLUMN energy REAL")
+            } catch (_: Exception) {}
             st.execute("UPDATE library_folders SET parentFolderId = NULL WHERE parentFolderId = 0")
             st.execute("UPDATE library_item_meta SET folderId = NULL WHERE folderId = 0")
 

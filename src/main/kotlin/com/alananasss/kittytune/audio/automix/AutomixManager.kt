@@ -25,6 +25,12 @@ import kotlin.math.max
 import kotlin.math.pow
 
 object AutomixManager {
+
+    /** The blend for two keys that clash: long enough to be a change, too short to be heard as two songs at odds. */
+    private const val SHORT_BLEND_MS = 6_000L
+
+    /** A difference in energy this big (on 0 to 1) is a change of mood, and the blend is shortened for it. */
+    private const val BIG_ENERGY_GAP = 0.35f
     /** The furthest from the end a detected mix-out point may be and still be used; the analysis cuts 45 s at most. */
     private const val MAX_BELIEVABLE_OUTRO_MS = 60_000L
 
@@ -267,6 +273,7 @@ object AutomixManager {
             mixOutPointMs = result.mixOutPointMs,
             keyPitchClass = result.keyPitchClass,
             keyIsMinor = result.keyIsMinor,
+            energy = result.energy,
         )
 
         withContext(Dispatchers.IO) {
@@ -363,7 +370,12 @@ object AutomixManager {
             4 -> prefs.getCrossfadeDuration() * 1000L
             else -> (16 * periodMs).toLong().coerceIn(6_000L, 16_000L) // Auto
         }
-        val overlapMs = baseOverlapMs.coerceIn(4_000L, 20_000L)
+        val outCamelot = camelotCode(outBeat.keyPitchClass, outBeat.keyIsMinor)
+        val inCamelot = camelotCode(inBeat.keyPitchClass, inBeat.keyIsMinor)
+        val keyFit = if (prefs.getAutomixHarmonicMixEnabled()) KeyHarmony.between(outCamelot, inCamelot) else KeyHarmony.Fit.UNKNOWN
+
+        // Moved to a shift, when one is made, in the block below; the blend is sized after it is known.
+        var overlapMs = baseOverlapMs.coerceIn(4_000L, 20_000L)
 
         val latestTrigger = trackDuration - overlapMs
         // A mix-out point is only believed near the end of what is playing. One from an analysis of another
@@ -379,10 +391,15 @@ object AutomixManager {
         val k = ((anchor - outBeat.firstBeatOffsetMs) / phraseMs).toLong()
         var triggerTime = (outBeat.firstBeatOffsetMs + k * phraseMs).toLong()
         if (triggerTime < anchor) triggerTime = (outBeat.firstBeatOffsetMs + (k + 1) * phraseMs).toLong()
+        // Where the loud part ends (a mix-out point is known), the phrase boundary nearest to it is taken, not the next one
+        // after it: the blend then covers the last bars of the drop going out, and does not begin in the empty tail.
+        if (mixOut != null) {
+            val nearest = (outBeat.firstBeatOffsetMs + Math.round((anchor - outBeat.firstBeatOffsetMs) / phraseMs) * phraseMs).toLong()
+            if (nearest >= currentPosition + 1000) triggerTime = nearest
+        }
 
         val roomMs = trackDuration - 500 - triggerTime
-        val effectiveOverlapMs = overlapMs.coerceAtMost(roomMs)
-        if (effectiveOverlapMs < 3000L || triggerTime >= trackDuration - 3000) {
+        if (overlapMs.coerceAtMost(roomMs) < 3000L || triggerTime >= trackDuration - 3000) {
             _automixDebugInfo.value = partialDebug.copy(status = "fallback: trigger out of range")
             return AutomixPlanResult(plan = null, pairAnalyzed = true)
         }
@@ -399,7 +416,9 @@ object AutomixManager {
         if (prefs.getAutomixHarmonicMixEnabled()) {
             val outKeyClass = outBeat.keyPitchClass
             val inKeyClass = inBeat.keyPitchClass
-            if (outKeyClass != null && inKeyClass != null) {
+            // Keys that already blend need no shift, and a shift costs sound quality: only a clash is moved.
+            val needsShift = keyFit == KeyHarmony.Fit.CLASH || keyFit == KeyHarmony.Fit.UNKNOWN
+            if (outKeyClass != null && inKeyClass != null && needsShift) {
                 val outEffective = if (outBeat.keyIsMinor == true) (outKeyClass + 3) % 12 else outKeyClass
                 val inEffective = if (inBeat.keyIsMinor == true) (inKeyClass + 3) % 12 else inKeyClass
                 var semitoneShift = (outEffective - inEffective) % 12
@@ -409,6 +428,20 @@ object AutomixManager {
                     pitchRatio = 2.0.pow(semitoneShift / 12.0).toFloat()
                 }
             }
+        }
+
+        // The blend is sized for the pair, in Auto only (a length chosen by hand is the listener's). Keys that agree, with a
+        // similar drive, blend long; keys that fight, and a change from a loud track into a quiet one or back, are cut shorter.
+        if (overlapMode == 0) {
+            val effectiveFit = if (pitchRatio != 1f) KeyHarmony.Fit.SAME else keyFit
+            val energyGap = if (outBeat.energy != null && inBeat.energy != null) abs(outBeat.energy - inBeat.energy) else 0f
+            overlapMs = when (effectiveFit) {
+                KeyHarmony.Fit.SAME, KeyHarmony.Fit.NEIGHBOUR -> (overlapMs * 1.2f).toLong()
+                KeyHarmony.Fit.CLASH -> minOf(overlapMs, SHORT_BLEND_MS)
+                else -> overlapMs
+            }
+            if (energyGap > BIG_ENERGY_GAP) overlapMs = (overlapMs * 0.7f).toLong()
+            overlapMs = overlapMs.coerceIn(4_000L, 20_000L)
         }
 
         val inPeriodMs = (60_000f / inBeat.bpm).toDouble()
@@ -451,7 +484,7 @@ object AutomixManager {
             incomingStartMs = effectiveIncomingStart,
             tempoRatio = tempoRatio,
             pitchRatio = pitchRatio,
-            overlapMs = effectiveOverlapMs,
+            overlapMs = overlapMs.coerceAtMost(roomMs),
         )
 
         currentAutomixPlan = plan
