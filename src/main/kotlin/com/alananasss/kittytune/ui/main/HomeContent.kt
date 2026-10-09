@@ -524,10 +524,14 @@ private fun SearchResults(
     }
 
     val hasQuery = vm.searchQuery.isNotBlank()
-    val listState = rememberLazyListState()
+    // A fresh list for each source, for All, and for each query: it used to keep its scroll from the last one, which
+    // opened the new results half way down.
+    val listState = remember(vm.activeSearchSource, vm.searchAllPlatforms, vm.searchQuery) {
+        androidx.compose.foundation.lazy.LazyListState()
+    }
 
     // Detect end-of-list for load-more
-    val shouldLoadMore by remember {
+    val shouldLoadMore by remember(listState) {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             val totalItems = listState.layoutInfo.totalItemsCount
