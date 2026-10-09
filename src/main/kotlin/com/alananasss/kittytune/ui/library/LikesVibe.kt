@@ -92,9 +92,17 @@ internal fun LikesAura(likes: List<Track>, playerViewModel: PlayerViewModel, mod
     }
     // Lit by listening to the liked songs, that is, playing from this very list, not by any song that happens to be liked.
     val isLikedPlaying = playerViewModel.isPlaying && playerViewModel.currentContext?.navigationId == "likes"
+    // A song ending, a skip or a buffering pause drops "playing" for a moment; waiting a little before letting go keeps the
+    // colour from pulsing out and back in at every change of track.
+    val lit by produceState(isLikedPlaying, isLikedPlaying) {
+        if (isLikedPlaying) value = true else {
+            kotlinx.coroutines.delay(AURA_HOLD_MS)
+            value = false
+        }
+    }
     val intensity by animateFloatAsState(
-        targetValue = if (isLikedPlaying) 1f else 0f,
-        animationSpec = tween(if (isLikedPlaying) 900 else 1500),
+        targetValue = if (lit) 1f else 0f,
+        animationSpec = tween(if (lit) 1600 else 2400, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "likesAura",
     )
     // Nothing drawn, and nothing running, once it has faded out.
@@ -130,20 +138,18 @@ internal fun AuraCanvas(palette: AuraPalette, intensity: Float, drift: Float, mo
             val turns = AURA_TURNS[i % AURA_TURNS.size]
             val angle = drift * turns + i * 2.1f
             val centre = Offset(
-                x = w * (0.16f + 0.34f * i) + cos(angle) * w * 0.10f,
-                y = h * 0.22f + sin(angle) * h * 0.10f,
+                x = w * (0.16f + 0.34f * i) + cos(angle) * w * 0.14f,
+                y = h * 0.20f + sin(angle) * h * 0.12f,
             )
             // A slow swell on each, so the colour breathes as well as moves.
-            val swell = 0.85f + 0.15f * sin(drift * 2f + i)
-            val radius = w * 0.55f
-            val a = 0.34f * swell * intensity
-            // Eased falloff, so no edge of the blob can be told apart.
+            val swell = 0.88f + 0.12f * sin(drift * 2f + i)
+            val radius = w * 0.75f
+            val a = 0.30f * swell * intensity
+            // A bell-shaped falloff (many stops, each the Gaussian's value), so there is no rim anywhere to tell the blob
+            // from the page: with the three stops it had, each colour read as a circle laid on the screen.
             drawCircle(
                 brush = Brush.radialGradient(
-                    0f to color.copy(alpha = a),
-                    0.35f to color.copy(alpha = a * 0.55f),
-                    0.7f to color.copy(alpha = a * 0.15f),
-                    1f to Color.Transparent,
+                    colorStops = AURA_FALLOFF.map { (t, weight) -> t to color.copy(alpha = a * weight) }.toTypedArray(),
                     center = centre,
                     radius = radius,
                 ),
@@ -185,8 +191,17 @@ internal class AuraPalette(val colors: List<Color>, val mix: Color) {
     }
 }
 
-private val AURA_HEIGHT = 420.dp
-private const val AURA_PERIOD_MS = 18_000
+private val AURA_HEIGHT = 460.dp
+private const val AURA_PERIOD_MS = 40_000
+
+/** How long the aura stays lit after the likes stop playing, so a change of song does not make it flicker. */
+private const val AURA_HOLD_MS = 2_500L
+
+/** Distance from the centre (0..1) and the share of the colour left there: a Gaussian, ending at nothing. */
+private val AURA_FALLOFF: List<Pair<Float, Float>> = (0..10).map { step ->
+    val t = step / 10f
+    t to (if (step == 10) 0f else kotlin.math.exp(-4.0 * t * t).toFloat())
+}
 
 /** Whole turns of the drift for each blob, one backwards: the loop is seamless and they go their own ways. */
 private val AURA_TURNS = intArrayOf(1, -1, 2)
