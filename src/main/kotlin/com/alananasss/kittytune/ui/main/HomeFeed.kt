@@ -101,6 +101,9 @@ internal fun HomeFeed(
             }
         }
 
+        // New videos of the artists being listened to, on the home page as on an artist's own (round 3, 24).
+        item { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel) }
+
         if (showHomeListeningStats) {
             item { Box(Modifier.padding(horizontal = HOME_PADDING)) { ListeningStatsCard(navController) } }
         }
