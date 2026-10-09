@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -38,11 +39,14 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lyrics
+import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Notes
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Subject
 import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -60,6 +64,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -113,6 +118,9 @@ fun SearchLyricsView(
         if (nothingYet && query.isNotBlank()) viewModel.searchLyricsManual(query, viewModel.manualSearchProvider)
     }
 
+    var showUpload by remember { mutableStateOf(false) }
+    if (showUpload) UploadYamlDialog(viewModel = viewModel, onDismiss = { showUpload = false })
+
     Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         SearchField(
             query = query,
@@ -122,7 +130,7 @@ fun SearchLyricsView(
         )
         SourceChips(viewModel, onPick = runSearch)
         SearchStatus(viewModel)
-        SearchResults(viewModel)
+        SearchResults(viewModel, onUpload = { showUpload = true })
     }
 }
 
@@ -181,10 +189,13 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
     val isAll = selected.equals(ManualLyricsSearch.ALL, ignoreCase = true)
     // Dragged with the mouse or turned with Shift and the wheel, without arrows, and inset the same as the search
     // field above it (issue #66).
+    // A soft edge on the right, so a source running off the end of the row fades out rather than being cut.
+    val edge = MaterialTheme.colorScheme.surface
+    Box(Modifier.fillMaxWidth()) {
     com.alananasss.kittytune.ui.common.ScrollableLazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        fadeColor = MaterialTheme.colorScheme.surface,
+        fadeColor = edge,
         showsArrows = false,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -204,6 +215,14 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
                 onClick = { onPick(source.name) },
             )
         }
+    }
+    Box(
+        Modifier
+            .align(Alignment.CenterEnd)
+            .width(36.dp)
+            .fillMaxHeight()
+            .background(Brush.horizontalGradient(0f to Color.Transparent, 1f to edge)),
+    )
     }
 }
 
@@ -250,18 +269,24 @@ private fun SearchStatus(viewModel: PlayerViewModel) {
 }
 
 @Composable
-private fun SearchResults(viewModel: PlayerViewModel) {
+private fun SearchResults(viewModel: PlayerViewModel, onUpload: () -> Unit) {
     val results = viewModel.unifiedLyricSearchResults
     val searching = viewModel.isManualSearchLoading
     val listState = rememberLazyListState()
 
     if (results.isEmpty() && !searching) {
-        Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
             Text(
                 text = str("no_results"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(Modifier.height(16.dp))
+            UploadOwnLyricsButton(onUpload)
         }
         return
     }
@@ -285,11 +310,29 @@ private fun SearchResults(viewModel: PlayerViewModel) {
                     ResultPlaceholder(Modifier.animateItem())
                 }
             }
+            // Last in the list, so a reader who has been through every result finds it at the bottom.
+            item(key = "upload-own") {
+                Spacer(Modifier.height(8.dp))
+                UploadOwnLyricsButton(onUpload)
+            }
         }
         VerticalScrollbar(
             adapter = rememberScrollbarAdapter(listState),
             modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp, horizontal = 4.dp),
         )
+    }
+}
+
+@Composable
+private fun UploadOwnLyricsButton(onClick: () -> Unit) {
+    FilledTonalButton(
+        onClick = onClick,
+        shapes = ButtonDefaults.shapes(),
+        modifier = Modifier.fillMaxWidth().height(44.dp),
+    ) {
+        Icon(Icons.Rounded.UploadFile, null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(str("dialog_upload_yaml_title"), fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -299,15 +342,31 @@ private const val PLACEHOLDER_ROWS = 2
 @Composable
 private fun ResultCard(result: UnifiedLyricResult, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
+    // Told apart at a glance: a word-synced result has a bright bar and the raised card, a line-synced one a
+    // tertiary bar, and a plain text one stays flat with a grey bar.
+    val wordSynced = result.hasWordSync
+    val lineSynced = result.hasLineSync && !wordSynced
+    val accent = when {
+        wordSynced -> MaterialTheme.colorScheme.primary
+        lineSynced -> MaterialTheme.colorScheme.tertiary
+        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    }
+    val container = when {
+        wordSynced -> MaterialTheme.colorScheme.surfaceContainerHighest
+        lineSynced -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> MaterialTheme.colorScheme.surfaceContainerLow
+    }
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = container,
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick),
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(Modifier.height(IntrinsicSize.Min)) {
+        Box(Modifier.width(4.dp).fillMaxHeight().background(accent))
+        Column(Modifier.weight(1f).padding(start = 14.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -341,21 +400,23 @@ private fun ResultCard(result: UnifiedLyricResult, onClick: () -> Unit, modifier
                 }
             }
             if (!result.previewText.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
+                // One line, so the preview reads as a hint of the words and not a block of its own.
                 Text(
-                    text = result.previewText,
-                    style = MaterialTheme.typography.bodySmall.copy(fontStyle = FontStyle.Italic),
+                    text = result.previewText.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty(),
+                    style = MaterialTheme.typography.labelMedium.copy(fontStyle = FontStyle.Italic),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.6f))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.5f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
                 )
             }
         }
+    }
     }
 }
 
