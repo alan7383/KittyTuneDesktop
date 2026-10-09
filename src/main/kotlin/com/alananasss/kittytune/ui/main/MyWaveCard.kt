@@ -208,7 +208,7 @@ private fun WaveModeChip(mode: WaveMode, isSelected: Boolean, onClick: () -> Uni
         label = "waveModeContent",
     )
     val (icon, label) = waveModeVisual(mode)
-    Tip(label) {
+    run {
         Surface(
             onClick = onClick,
             shape = CircleShape,

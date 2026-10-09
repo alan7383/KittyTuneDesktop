@@ -2,6 +2,7 @@ package com.alananasss.kittytune.ui.common
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -126,34 +127,22 @@ private fun androidx.compose.foundation.layout.BoxScope.EdgeArrow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
 ) {
-    val toTransparent = alignment == Alignment.CenterStart
-    Box(
+    // Just the button: no strip of fade behind it, which showed as a black bar on coloured covers. It is lifted by a
+    // shadow and an outline instead, so it stands out from whatever row it sits on.
+    IconButton(
+        onClick = onClick,
+        shapes = IconButtonDefaults.shapes(),
         modifier = Modifier
-            .fillMaxHeight()
-            .width(ARROW_LANE)
             .align(alignment)
+            .padding(horizontal = 8.dp)
             .graphicsLayer { this.alpha = alpha }
-            .background(
-                Brush.horizontalGradient(
-                    colors = if (toTransparent) listOf(fadeColor, Color.Transparent)
-                    else listOf(Color.Transparent, fadeColor)
-                )
-            ),
-        contentAlignment = if (toTransparent) Alignment.CenterStart else Alignment.CenterEnd,
+            .size(40.dp)
+            .shadow(6.dp, CircleShape)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f), CircleShape),
     ) {
-        IconButton(
-            onClick = onClick,
-            shapes = IconButtonDefaults.shapes(),
-            modifier = Modifier
-                .padding(horizontal = 4.dp)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        ) {
-            Icon(icon, contentDescription = null)
-        }
+        Icon(icon, contentDescription = null)
     }
 }
 
-/** Width of the faded lane an arrow sits in. Wide enough to soften the cut-off card behind it. */
-private val ARROW_LANE = 72.dp

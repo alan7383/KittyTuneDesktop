@@ -2855,7 +2855,7 @@
     <string name="home_new_from_artists">Новое у ваших артистов</string>
     <string name="home_chart_title">В топе чартов</string>
     <string name="artist_listen">Слушать</string>
-    <string name="artist_trailer">Трейлер</string>
+    <string name="artist_trailer">Тизер</string>
     <string name="artist_trailer_tip">По 20 секунд из каждого популярного трека</string>
     <string name="artist_pin">Закрепить в библиотеке</string>
     <string name="artist_unpin">Открепить</string>
@@ -2913,7 +2913,7 @@
     <string name="artist_clip_failed">Этот клип не воспроизводится</string>
     <string name="artist_listening">Слушаете</string>
     <string name="artist_resume">Продолжить</string>
-    <string name="artist_trailer_playing">Трейлер играет</string>
+    <string name="artist_trailer_playing">Тизер играет</string>
     <string name="sort_now">Слушают сейчас</string>
     <string name="sort_all_time">За всё время</string>
     <string name="sort_likes">По лайкам</string>

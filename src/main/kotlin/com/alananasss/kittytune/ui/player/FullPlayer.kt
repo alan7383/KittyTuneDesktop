@@ -1556,6 +1556,8 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
                 text = if (showRemaining) "-" + com.alananasss.kittytune.utils.makeTimeString((duration - played).coerceAtLeast(0L)) else com.alananasss.kittytune.utils.makeTimeString(duration),
                 palette = palette,
                 modifier = Modifier
+                    // Fixed width for the longest time, so the bar keeps its length when the label flips.
+                    .widthIn(min = 56.dp)
                     .clip(RoundedCornerShape(6.dp))
                     .clickable {
                         com.alananasss.kittytune.data.local.PlayerPreferences().setShowRemainingTime(!showRemaining)

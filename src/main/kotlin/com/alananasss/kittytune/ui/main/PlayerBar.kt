@@ -48,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -631,7 +632,10 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
             text = if (showRemaining) "-" + makeTimeString((duration - position).coerceAtLeast(0L)) else makeTimeString(duration),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            // Wide enough for the longest time, so flipping between the length and the countdown never moves the bar.
             modifier = Modifier
+                .widthIn(min = 52.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .clickable {
                     com.alananasss.kittytune.data.local.PlayerPreferences().setShowRemainingTime(!showRemaining)
