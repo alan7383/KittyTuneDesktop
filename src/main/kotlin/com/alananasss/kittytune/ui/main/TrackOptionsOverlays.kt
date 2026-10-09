@@ -43,6 +43,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
@@ -1504,20 +1505,26 @@ private fun ReorderableCollectionItemScope.MenuTile(
                 // there (issue #33).
                 .fillMaxWidth()
                 .graphicsLayer { scaleX = scale; scaleY = scale }
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    if (item.tint != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                )
                 .longPressDraggableHandle()
                 .onClick(
                     matcher = PointerMatcher.mouse(PointerButton.Secondary),
                     onClick = { contextMenuOpen = true },
                 )
                 .clickable { item.onClick() }
-                .padding(vertical = 6.dp)
+                .padding(horizontal = 6.dp, vertical = 12.dp)
         ) {
+            // One size and one tone for every icon: the old per-item outlines and the default set were the
+            // mismatched part of this menu.
             val icon = item.iconContent
             if (icon != null) {
                 icon(tint)
             } else {
-                Icon(item.icon, null, modifier = Modifier.size(30.dp), tint = tint)
+                Icon(item.icon, null, modifier = Modifier.size(26.dp), tint = tint)
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -1526,13 +1533,14 @@ private fun ReorderableCollectionItemScope.MenuTile(
                 textAlign = TextAlign.Center,
                 color = tint,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
         DropdownMenu(expanded = contextMenuOpen, onDismissRequest = { contextMenuOpen = false }) {
             DropdownMenuItem(
                 text = { Text(str("menu_tile_hide")) },
-                leadingIcon = { Icon(Icons.Outlined.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
+                leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
                 onClick = {
                     onHide()
                     contextMenuOpen = false
