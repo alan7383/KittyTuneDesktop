@@ -1271,6 +1271,7 @@ fun MainScreen(
     }
 
     TrackOptionsOverlays(playerViewModel)
+    com.alananasss.kittytune.ui.library.LikeAllPromptHost()
 
     CoverViewerOverlay()
 

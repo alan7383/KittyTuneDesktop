@@ -2931,4 +2931,8 @@
     <string name="artist_share_copy_image">Скопировать картинку</string>
     <string name="artist_share_image_copied">Картинка скопирована</string>
     <string name="release_kind_track">Трек</string>
+    <string name="like_all_prompt_title">Лайкнуть эти треки?</string>
+    <string name="like_all_prompt_text">В альбоме %1$d треков, из них %2$d очень короткие или очень длинные: вступления, голосовые, долгая тишина.</string>
+    <string name="like_all_prompt_skip_odd">Без странных</string>
+    <string name="like_all_prompt_all">Лайкнуть все</string>
 </resources>

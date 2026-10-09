@@ -1602,13 +1602,7 @@ fun PlaylistDetailScreen(
                                             leadingIcon = { Icon(Icons.Rounded.Favorite, null) },
                                             onClick = {
                                                 showOptionsMenu = false
-                                                val likedCount =
-                                                    com.alananasss.kittytune.data.LikeRepository.addLikesBulk(tracksToDisplay.toList())
-                                                if (likedCount > 0) {
-                                                    com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_done", likedCount))
-                                                } else {
-                                                    com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_nothing"))
-                                                }
+                                                LikeAllPrompt.ask(tracksToDisplay.toList())
                                             }
                                         )
                                     }

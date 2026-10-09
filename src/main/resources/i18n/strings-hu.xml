@@ -2934,4 +2934,8 @@
     <string name="artist_share_copy_image">Kép másolása</string>
     <string name="artist_share_image_copied">Kép másolva</string>
     <string name="release_kind_track">Szám</string>
+    <string name="like_all_prompt_title">Kedveled ezeket a számokat?</string>
+    <string name="like_all_prompt_text">Ennek az albumnak %1$d száma van, ebből %2$d nagyon rövid vagy nagyon hosszú: intró, hangjegyzet, hosszú csend.</string>
+    <string name="like_all_prompt_skip_odd">A furcsák kihagyása</string>
+    <string name="like_all_prompt_all">Mindet kedvelem</string>
 </resources>
