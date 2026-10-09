@@ -1,5 +1,20 @@
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.fillMaxWidth
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+
 import com.alananasss.kittytune.utils.SoundCloudLocalizationUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,15 +97,7 @@ internal fun HomeFeed(
         if (contextHistory.isNotEmpty()) {
             item {
                 HomeShelfTitle(str("home_continue"))
-                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = HOME_PADDING),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    items(contextHistory.take(CONTINUE_COUNT), key = { it.id }) { entry ->
-                        HistoryEntryTile(entry, playerViewModel, Modifier.width(CONTINUE_TILE_WIDTH))
-                    }
-                }
+                ContinueGrid(contextHistory.take(CONTINUE_COUNT), playerViewModel)
             }
         }
 
@@ -283,3 +290,85 @@ private fun HistoryEntryTile(
 private val HOME_PADDING = 20.dp
 private val CONTINUE_TILE_WIDTH = 240.dp
 private const val CONTINUE_COUNT = 16
+
+/**
+ * "Continue listening" as two columns of rows, the way Spotify lays it out: a cover, the name, and what kind of thing it
+ * is under it. A row of square tiles could not say a track from an album from a playlist.
+ */
+@Composable
+private fun ContinueGrid(entries: List<com.alananasss.kittytune.data.local.HistoryItem>, playerViewModel: PlayerViewModel) {
+    Column(
+        Modifier.padding(horizontal = HOME_PADDING),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        entries.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { entry ->
+                    ContinueRow(entry, playerViewModel, Modifier.weight(1f))
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContinueRow(
+    entry: com.alananasss.kittytune.data.local.HistoryItem,
+    playerViewModel: PlayerViewModel,
+    modifier: Modifier,
+) {
+    val isTrack = entry.type == "TRACK" || entry.id.startsWith("track:")
+    val isArtist = entry.id.startsWith("profile:") || entry.id.startsWith("spotify_artist:")
+    val kind = when {
+        isTrack -> str("release_kind_track")
+        isArtist -> str("lib_artists")
+        else -> str("lib_playlists")
+    }
+    val interaction = remember { MutableInteractionSource() }
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
+                if (isTrack) {
+                    playerViewModel.playPlaylist(
+                        listOf(
+                            Track(
+                                id = entry.numericId,
+                                title = entry.title,
+                                artworkUrl = entry.imageUrl,
+                                durationMs = null,
+                                user = User(0, entry.subtitle ?: "", null),
+                                source = entry.source,
+                                permalinkUrl = entry.originalUrl,
+                            )
+                        ),
+                        0,
+                    )
+                } else {
+                    playerViewModel.navigateToPlaylistId = entry.id.removePrefix("playlist:").ifBlank { entry.numericId.toString() }
+                }
+            },
+    ) {
+        Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = entry.imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceVariant),
+            )
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center) {
+                Text(entry.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    kind,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
