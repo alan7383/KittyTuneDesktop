@@ -2932,4 +2932,8 @@
     <string name="artist_share_copy_image">Copy picture</string>
     <string name="artist_share_image_copied">Picture copied</string>
     <string name="release_kind_track">Track</string>
+    <string name="like_all_prompt_title">Like these songs?</string>
+    <string name="like_all_prompt_text">This album has %1$d tracks, %2$d of them very short or very long: intros, voice notes, long silences.</string>
+    <string name="like_all_prompt_skip_odd">Skip the odd ones</string>
+    <string name="like_all_prompt_all">Like all</string>
 </resources>

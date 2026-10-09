@@ -735,13 +735,8 @@ fun LibraryPlaylistOptionsDialog(
                         tint = primaryColor
                     ) {
                         withTracks { list ->
-                            val likedCount = LikeRepository.addLikesBulk(list)
                             onDismiss()
-                            if (likedCount > 0) {
-                                com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_done", likedCount))
-                            } else {
-                                com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_nothing"))
-                            }
+                            LikeAllPrompt.ask(list)
                         }
                     }
                 )

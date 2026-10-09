@@ -3381,4 +3381,8 @@
     <string name="artist_share_copy_image">Sao chép ảnh</string>
     <string name="artist_share_image_copied">Đã sao chép ảnh</string>
     <string name="release_kind_track">Bài hát</string>
+    <string name="like_all_prompt_title">Thích các bài này?</string>
+    <string name="like_all_prompt_text">Album này có %1$d bài, trong đó %2$d bài rất ngắn hoặc rất dài: intro, ghi âm, im lặng dài.</string>
+    <string name="like_all_prompt_skip_odd">Bỏ qua bài lạ</string>
+    <string name="like_all_prompt_all">Thích tất cả</string>
 </resources>

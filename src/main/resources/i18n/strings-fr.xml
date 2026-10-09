@@ -2933,4 +2933,8 @@
     <string name="artist_share_copy_image">Copier l\'image</string>
     <string name="artist_share_image_copied">Image copiée</string>
     <string name="release_kind_track">Titre</string>
+    <string name="like_all_prompt_title">Aimer ces titres ?</string>
+    <string name="like_all_prompt_text">Cet album compte %1$d titres, dont %2$d très courts ou très longs : intros, notes vocales, longs silences.</string>
+    <string name="like_all_prompt_skip_odd">Ignorer les bizarres</string>
+    <string name="like_all_prompt_all">Tout aimer</string>
 </resources>
