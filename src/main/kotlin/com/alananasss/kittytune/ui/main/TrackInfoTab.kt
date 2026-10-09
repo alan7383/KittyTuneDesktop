@@ -587,226 +587,264 @@ private val LYRICS_MIN_HEIGHT = 240.dp
  */
 private val LYRICS_HALF_HEIGHT = 440.dp
 
+/**
+ * One comment thread: the comment and, under it, its replies.
+ *
+ * The thread is one card. Replies used to be cards inside the comment's own text column, so each level of reply was
+ * narrower than the last until the time chip wrapped one digit to a line. Now they sit flat under the comment, in the
+ * card's full width, beside a thin line that says whose they are; only a top-level comment has the card.
+ */
 @Composable
 fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = false) {
-    var replyText by remember { mutableStateOf("") }
-    var showReplyField by remember { mutableStateOf(false) }
+    if (isReply) {
+        CommentThread(comment, vm, isReply = true)
+    } else {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Box(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) { CommentThread(comment, vm, isReply = false) }
+        }
+    }
+}
 
-    // Each comment is a quiet card of its own: it had been bare text, and the bare text fought the header above it.
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = if (isReply) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().padding(start = if (isReply) 32.dp else 0.dp),
-    ) {
-    Column(
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+@Composable
+private fun CommentThread(comment: Comment, vm: PlayerViewModel, isReply: Boolean) {
+    val avatar = if (isReply) 26.dp else 38.dp
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             com.alananasss.kittytune.ui.common.UserAvatar(
                 url = comment.user?.avatarUrl,
-                modifier = Modifier.size(if (isReply) 28.dp else 36.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable { comment.user?.id?.let { vm.navigateToArtist(it) } }
+                modifier = Modifier.size(avatar).clip(androidx.compose.foundation.shape.CircleShape).clickable { comment.user?.id?.let { vm.navigateToArtist(it) } },
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = comment.user?.username ?: str("comment_anonymous"),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { comment.user?.id?.let { vm.navigateToArtist(it) } }
-                    )
-                    if (comment.user?.verified == true) {
-                        Icon(
-                            Icons.Rounded.Verified,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                    if (comment.trackTimestamp != null && comment.trackTimestamp > 0) {
-                        val minutes = comment.trackTimestamp / 60000
-                        val seconds = (comment.trackTimestamp % 60000) / 1000
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.clickable { vm.seekTo(comment.trackTimestamp) }
-                        ) {
-                            Text(
-                                String.format(Locale.getDefault(), "%d:%02d", minutes, seconds),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-            var translatedText by remember { mutableStateOf<String?>(null) }
-            var showTranslation by remember { mutableStateOf(false) }
-            var isTranslating by remember { mutableStateOf(false) }
-            val scope = rememberCoroutineScope()
-
-            if (showTranslation && !translatedText.isNullOrEmpty()) {
-                CommentBodyText(body = translatedText!!, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
-            } else {
-                CommentBodyText(body = comment.body, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
-            }
-
-            val appLang = com.alananasss.kittytune.core.Strings.appLanguage
-            val langCode = if (appLang == "system" || appLang.isBlank()) java.util.Locale.getDefault().language else appLang
-            val langName = remember(langCode) {
-                val loc = java.util.Locale(langCode)
-                loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
-            }
-
-            // A comment that mixes the reader's language with another one: the foreign words, each with its meaning, under it.
-            val glosses by androidx.compose.runtime.produceState(emptyList<Pair<String, String>>(), comment.body, langCode) {
-                value = if (!com.alananasss.kittytune.util.WordGloss.isMixed(comment.body, langCode)) emptyList()
-                else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    com.alananasss.kittytune.util.WordGloss.glossFor(comment.body, langCode)
-                }
-            }
-            if (glosses.isNotEmpty()) {
-                Text(
-                    text = com.alananasss.kittytune.util.WordGloss.line(glosses),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // Hidden until the detector has answered, so it never flashes up on a comment already in the reader's language.
-            val needsTranslation by androidx.compose.runtime.produceState(false, comment.body, langCode) {
-                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    com.alananasss.kittytune.util.LanguageDetection.needsTranslation(comment.body, langCode)
-                }
-            }
-
-            if (translatedText == null && !isTranslating && needsTranslation) {
-                Text(
-                    text = str("comment_translate", langName),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable {
-                            isTranslating = true
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                val res = com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(listOf(comment.body), langCode)
-                                val t = res[comment.body.trim()]
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    if (t != null && t.lowercase() != comment.body.trim().lowercase()) {
-                                        translatedText = t
-                                        showTranslation = true
-                                    } else {
-                                        translatedText = "" 
-                                    }
-                                    isTranslating = false
-                                }
-                            }
-                        }
-                        .padding(vertical = 2.dp)
-                )
-            } else if (isTranslating) {
-                Text(
-                    text = str("comment_translating"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(vertical = 2.dp)
-                )
-            } else if (!translatedText.isNullOrEmpty()) {
-                Text(
-                    text = if (showTranslation) str("comment_see_original") else str("comment_translate", langName),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { showTranslation = !showTranslation }
-                        .padding(vertical = 2.dp)
-                )
-            }
-                
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.clickable { vm.toggleCommentLike(comment) },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            if (comment.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (comment.isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if ((comment.likesCount ?: 0) > 0) {
-                            Text(comment.likesCount.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    
-                    Text(
-                        str("comment_reply"),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.clickable { vm.startReplying(comment) }
-                    )
-
-                    val relTime = getRelativeTime(comment.createdAt)
-                    if (relTime.isNotBlank()) {
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            text = relTime,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                CommentHeader(comment, vm)
+                CommentContent(comment, vm)
+                CommentActions(comment, vm)
             }
         }
 
         if (!comment.replies.isNullOrEmpty()) {
-            Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                comment.replies.forEach { reply ->
-                    CommentItemUI(reply, vm, isReply = true)
+            // The thread line runs under the comment's avatar, so the replies read as hanging off it.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                Box(Modifier.width(avatar).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+                    Box(
+                        Modifier.width(2.dp).fillMaxHeight()
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    comment.replies.forEach { reply -> CommentItemUI(reply, vm, isReply = true) }
                 }
             }
         }
 
-        if (vm.replyingToComment == comment) {
-            var replyText by remember { mutableStateOf("") }
-            val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-            
-            Column(modifier = Modifier.padding(top = 8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val targetUser = comment.user?.username ?: str("comment_anonymous")
-                    Text(str("comment_replying_to", targetUser), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() }, tint = MaterialTheme.colorScheme.primary)
-                }
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = replyText,
-                        onValueChange = { replyText = it },
-                        modifier = Modifier.weight(1f).trackTextInput().focusRequester(focusRequester),
-                        placeholder = { Text(str("comment_write_reply")) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    IconButton(shapes = IconButtonDefaults.shapes(),
-                        onClick = {
-                            if (replyText.isNotBlank()) {
-                                vm.postComment(replyText, null)
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    ) {
-                        Icon(Icons.Rounded.Send, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        if (vm.replyingToComment == comment) ReplyField(comment, vm)
+    }
+}
+
+/** Name, verified mark, the moment of the track it was left at, and how long ago, on one line that never wraps. */
+@Composable
+private fun CommentHeader(comment: Comment, vm: PlayerViewModel) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = comment.user?.username ?: str("comment_anonymous"),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(4.dp)).clickable { comment.user?.id?.let { vm.navigateToArtist(it) } },
+        )
+        if (comment.user?.verified == true) {
+            Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
+        }
+        val at = comment.trackTimestamp
+        if (at != null && at > 0) {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { vm.seekTo(at) },
+            ) {
+                Text(
+                    String.format(Locale.getDefault(), "%d:%02d", at / 60000, (at % 60000) / 1000),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+        val relTime = getRelativeTime(comment.createdAt)
+        if (relTime.isNotBlank()) {
+            Text(
+                text = relTime,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+}
+
+/** The words, the foreign words glossed under them, and the translate link when the comment is in another language. */
+@Composable
+private fun CommentContent(comment: Comment, vm: PlayerViewModel) {
+    var translatedText by remember { mutableStateOf<String?>(null) }
+    var showTranslation by remember { mutableStateOf(false) }
+    var isTranslating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    if (showTranslation && !translatedText.isNullOrEmpty()) {
+        CommentBodyText(body = translatedText!!, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
+    } else {
+        CommentBodyText(body = comment.body, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
+    }
+
+    val appLang = com.alananasss.kittytune.core.Strings.appLanguage
+    val langCode = if (appLang == "system" || appLang.isBlank()) java.util.Locale.getDefault().language else appLang
+    val langName = remember(langCode) {
+        val loc = java.util.Locale(langCode)
+        loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
+    }
+
+    // A comment that mixes the reader's language with another one: the foreign words, each with its meaning, under it.
+    val glosses by androidx.compose.runtime.produceState(emptyList<Pair<String, String>>(), comment.body, langCode) {
+        value = if (!com.alananasss.kittytune.util.WordGloss.isMixed(comment.body, langCode)) emptyList()
+        else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.alananasss.kittytune.util.WordGloss.glossFor(comment.body, langCode)
+        }
+    }
+    if (glosses.isNotEmpty()) {
+        Text(
+            text = com.alananasss.kittytune.util.WordGloss.line(glosses),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    // Hidden until the detector has answered, so it never flashes up on a comment already in the reader's language.
+    val needsTranslation by androidx.compose.runtime.produceState(false, comment.body, langCode) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.alananasss.kittytune.util.LanguageDetection.needsTranslation(comment.body, langCode)
+        }
+    }
+
+    val linkStyle = MaterialTheme.typography.labelMedium
+    if (translatedText == null && !isTranslating && needsTranslation) {
+        Text(
+            text = str("comment_translate", langName),
+            style = linkStyle,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable {
+                isTranslating = true
+                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val res = com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(listOf(comment.body), langCode)
+                    val t = res[comment.body.trim()]
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (t != null && t.lowercase() != comment.body.trim().lowercase()) {
+                            translatedText = t
+                            showTranslation = true
+                        } else {
+                            translatedText = ""
+                        }
+                        isTranslating = false
                     }
                 }
+            },
+        )
+    } else if (isTranslating) {
+        Text(
+            text = str("comment_translating"),
+            style = linkStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        )
+    } else if (!translatedText.isNullOrEmpty()) {
+        Text(
+            text = if (showTranslation) str("comment_see_original") else str("comment_translate", langName),
+            style = linkStyle,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { showTranslation = !showTranslation },
+        )
+    }
+}
+
+/** Like and reply, as quiet pills under the words. */
+@Composable
+private fun CommentActions(comment: Comment, vm: PlayerViewModel) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        val liked = comment.isLiked
+        CommentActionPill(
+            onClick = { vm.toggleCommentLike(comment) },
+            tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            container = if (liked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent,
+        ) {
+            Icon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(15.dp))
+            if ((comment.likesCount ?: 0) > 0) {
+                Spacer(Modifier.width(4.dp))
+                Text(comment.likesCount.toString(), style = MaterialTheme.typography.labelSmall)
             }
-            LaunchedEffect(Unit) {
-                focusRequester.requestFocus()
+        }
+        CommentActionPill(
+            onClick = { vm.startReplying(comment) },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            container = Color.Transparent,
+        ) {
+            Text(str("comment_reply"), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun CommentActionPill(onClick: () -> Unit, tint: Color, container: Color, content: @Composable RowScope.() -> Unit) {
+    CompositionLocalProvider(LocalContentColor provides tint) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(container)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun ReplyField(comment: Comment, vm: PlayerViewModel) {
+    var replyText by remember { mutableStateOf("") }
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            val targetUser = comment.user?.username ?: str("comment_anonymous")
+            Text(str("comment_replying_to", targetUser), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() }, tint = MaterialTheme.colorScheme.primary)
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = replyText,
+                onValueChange = { replyText = it },
+                modifier = Modifier.weight(1f).trackTextInput().focusRequester(focusRequester),
+                placeholder = { Text(str("comment_write_reply")) },
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+            )
+            IconButton(
+                shapes = IconButtonDefaults.shapes(),
+                onClick = { if (replyText.isNotBlank()) vm.postComment(replyText, null) },
+                colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Icon(Icons.Rounded.Send, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
     }
-    }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 }
 
 @Composable
