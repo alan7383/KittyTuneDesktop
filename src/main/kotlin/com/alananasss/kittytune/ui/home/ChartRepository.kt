@@ -81,6 +81,20 @@ internal suspend fun fetchChart(
  * chart order; a song with no confident match is left out rather than replaced by a guess.
  */
 private suspend fun countryChartTracks(country: ChartCountry?, limit: Int): List<Track> {
+    val key = "${country?.deezerName ?: "all"}/$limit"
+    // A chart changes over days, not minutes: the second visit to a country answers at once.
+    countryCache[key]?.takeIf { System.currentTimeMillis() - it.first < COUNTRY_CACHE_MS }?.let { return it.second }
+    val tracks = loadCountryChart(country, limit)
+    if (tracks.isNotEmpty()) countryCache[key] = System.currentTimeMillis() to tracks
+    return tracks
+}
+
+private val countryCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Track>>>()
+
+/** How long a country's chart is kept before it is read again. */
+private const val COUNTRY_CACHE_MS = 6 * 60 * 60 * 1000L
+
+private suspend fun loadCountryChart(country: ChartCountry?, limit: Int): List<Track> {
     if (country == null || country.hasDeezerChart) {
         val deezer = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.countryChart(limit, country?.deezerName)
         if (deezer.size >= minOf(limit, MIN_REAL_CHART) || country == null) return deezer
@@ -102,7 +116,7 @@ private const val MIN_REAL_CHART = 10
 private const val CHART_FETCH = 50
 
 /** Songs matched to SoundCloud at once. */
-private const val MATCH_PARALLELISM = 8
+private const val MATCH_PARALLELISM = 16
 
 /**
  * Fills in the tracks a resolved playlist only names.
