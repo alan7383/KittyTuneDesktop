@@ -2117,7 +2117,7 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
@@ -2126,7 +2126,7 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
             error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
             fallback = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
             modifier = Modifier
-                .size(48.dp)
+                .size(64.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentScale = ContentScale.Crop,
@@ -2163,6 +2163,7 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
                     java.text.NumberFormat.getCompactNumberInstance(Strings.locale(), java.text.NumberFormat.Style.SHORT)
                         .format(it) + " " + str("profile_followers")
                 },
+                user.trackCount.takeIf { it > 0 }?.let { "$it ${str("search_filter_tracks").lowercase()}" },
             ).joinToString(" · ").ifBlank { str("lib_artists") }
             Text(
                 text = followersText,
@@ -2198,15 +2199,15 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = playlist.fullResArtwork,
             contentDescription = null,
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .size(64.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentScale = ContentScale.Crop,
         )
