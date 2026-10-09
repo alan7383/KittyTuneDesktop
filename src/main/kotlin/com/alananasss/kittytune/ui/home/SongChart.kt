@@ -124,7 +124,8 @@ fun SongChart(
                     FilterChip(
                         selected = option == country,
                         onClick = { onCountryChange(option) },
-                        label = { Text("${option.flag} ${str("chart_country_${option.code.lowercase()}")}", maxLines = 1) },
+                        // The name alone: Windows draws a flag emoji as two letters ("RU", "US"), which read as a stray code.
+                        label = { Text(str("chart_country_${option.code.lowercase()}"), maxLines = 1) },
                         shape = FilterChipDefaults.shape,
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,

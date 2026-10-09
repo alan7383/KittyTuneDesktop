@@ -85,9 +85,36 @@ private suspend fun countryChartTracks(country: ChartCountry?, limit: Int): List
     val key = "${country?.deezerName ?: "all"}/$limit"
     // A chart changes over days, not minutes: the second visit to a country answers at once.
     countryCache[key]?.takeIf { System.currentTimeMillis() - it.first < COUNTRY_CACHE_MS }?.let { return it.second }
+    // Kept on disk too, so a country that has to be matched song by song (Russia) opens at once on the next launch.
+    readChartFromDisk(key)?.let { countryCache[key] = it; return it.second }
     val tracks = loadCountryChart(country, limit)
-    if (tracks.isNotEmpty()) countryCache[key] = System.currentTimeMillis() to tracks
+    if (tracks.isNotEmpty()) {
+        val now = System.currentTimeMillis()
+        countryCache[key] = now to tracks
+        writeChartToDisk(key, now, tracks)
+    }
     return tracks
+}
+
+private class CachedChart(val savedAt: Long, val tracks: List<Track>)
+
+private fun chartCacheFile(key: String): java.io.File =
+    java.io.File(com.alananasss.kittytune.core.AppDirs.cacheDir, "country_charts/" + key.replace(Regex("[^A-Za-z0-9._-]"), "_") + ".json")
+
+private fun readChartFromDisk(key: String): Pair<Long, List<Track>>? = runCatching {
+    val file = chartCacheFile(key)
+    if (!file.exists()) return null
+    val cached = Gson().fromJson(file.readText(), CachedChart::class.java) ?: return null
+    if (System.currentTimeMillis() - cached.savedAt >= COUNTRY_CACHE_MS || cached.tracks.isEmpty()) return null
+    cached.savedAt to cached.tracks
+}.getOrNull()
+
+private fun writeChartToDisk(key: String, savedAt: Long, tracks: List<Track>) {
+    runCatching {
+        val file = chartCacheFile(key)
+        file.parentFile?.mkdirs()
+        file.writeText(Gson().toJson(CachedChart(savedAt, tracks)))
+    }
 }
 
 private val countryCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Track>>>()
@@ -162,7 +189,7 @@ private const val MIN_REAL_CHART = 10
 private const val CHART_FETCH = 50
 
 /** Songs matched to SoundCloud at once. */
-private const val MATCH_PARALLELISM = 16
+private const val MATCH_PARALLELISM = 24
 
 /**
  * Fills in the tracks a resolved playlist only names.
