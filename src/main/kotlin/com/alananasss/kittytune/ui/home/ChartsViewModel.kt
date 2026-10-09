@@ -112,7 +112,10 @@
              * app. A Russian interface in Finland is a listener in Finland, and the chart for "your country" is Finland's.
              */
             fun forDevice(language: String): ChartCountry {
-                val region = java.util.Locale.getDefault(java.util.Locale.Category.FORMAT).country.uppercase()
+                // The property the JVM was started with, not Locale.getDefault(): the app sets the default locale to its own
+                // language, and with it the region, which is how a Russian interface in Finland read as Russia.
+                val region = (System.getProperty("user.country.format")?.takeIf { it.isNotBlank() }
+                    ?: java.util.Locale.getDefault(java.util.Locale.Category.FORMAT).country).uppercase()
                 val code = if (region == "GB") "UK" else region
                 return entries.firstOrNull { it.code == code } ?: forLanguage(language)
             }
