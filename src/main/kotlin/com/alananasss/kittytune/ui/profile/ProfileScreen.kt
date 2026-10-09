@@ -815,7 +815,7 @@ fun ModernProfileHeader(
     val bgModel = if (user.bannerUrl != null) user.bannerUrl else if (!user.avatarUrl.isDefaultAvatar()) user.avatarUrl else null
     val showVideo = hasMotionVideo && !artistVideoUrl.isNullOrBlank()
 
-    Box(modifier = Modifier.fillMaxWidth().height(420.dp).clipToBounds()) {
+    Box(modifier = Modifier.fillMaxWidth().height(if (isCurrentUser) 560.dp else 420.dp).clipToBounds()) {
         if (bgModel != null || showVideo) {
             Box(modifier = Modifier.fillMaxSize()) {
                 if (bgModel != null) {
