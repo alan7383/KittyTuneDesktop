@@ -1348,11 +1348,14 @@ fun PlaylistDetailScreen(
         ) {
             // -------- header: cover + meta + actions
             item {
+                // Narrow, with the right panel open: the cover gives way so the title and the artist keep their room.
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val coverSize = if (maxWidth < 520.dp) 120.dp else 180.dp
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(24.dp).padding(top = 32.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(12.dp), modifier = Modifier.size(180.dp)) {
+                    Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(12.dp), modifier = Modifier.size(coverSize)) {
                         if (!playlistCover.isNullOrEmpty()) {
                             AsyncImage(model = playlistCover, contentDescription = null, modifier = Modifier.fillMaxSize().viewableCover(playlistCover), contentScale = ContentScale.Crop)
                         } else if (defaultIcon != null) {
@@ -1726,6 +1729,7 @@ fun PlaylistDetailScreen(
                             }
                         }
                     }
+                }
                 }
             }
 

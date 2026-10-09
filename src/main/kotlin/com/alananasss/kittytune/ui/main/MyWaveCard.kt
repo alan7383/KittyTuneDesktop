@@ -285,15 +285,17 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
             )
             drawPath(path = crest, color = color.copy(alpha = 0.25f + 0.25f * energy), style = Stroke(width = 2f))
         }
-        // A glow at the top right, behind the play button.
+        // A glow behind the play button. It is placed from the card's edge, where the button is, not from a share of the
+        // width: at a wide window the share put it well to the left of the button.
+        val glow = Offset(w - 24.dp.toPx() - PLAY_SIZE.toPx() / 2, 20.dp.toPx() + PLAY_SIZE.toPx() / 2)
         drawCircle(
             brush = Brush.radialGradient(
                 listOf(colors.first().copy(alpha = 0.18f * (0.5f + energy)), Color.Transparent),
-                center = Offset(w * 0.88f, h * 0.22f),
+                center = glow,
                 radius = h * 0.8f,
             ),
             radius = h * 0.8f,
-            center = Offset(w * 0.88f, h * 0.22f),
+            center = glow,
         )
     }
 }
