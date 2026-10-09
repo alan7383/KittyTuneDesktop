@@ -42,6 +42,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -88,7 +94,7 @@ internal fun ArtistClipsSection(artistName: String, playerViewModel: PlayerViewM
 }
 
 @Composable
-private fun ClipCard(clip: Clip, onClick: () -> Unit) {
+internal fun ClipCard(clip: Clip, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Column(Modifier.width(CLIP_CARD_WIDTH)) {
         Box(
@@ -134,7 +140,7 @@ private fun ClipCard(clip: Clip, onClick: () -> Unit) {
 /** A clip playing over the page. The music pauses while it plays and carries on afterwards if it was playing. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDismiss: () -> Unit) {
+internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     val playback = remember(clip) { ClipPlayback(scope) }
     var hasNoStream by remember(clip) { mutableStateOf(false) }
@@ -248,3 +254,41 @@ private fun formatClock(ms: Long): String {
 }
 
 private val CLIP_CARD_WIDTH = 260.dp
+
+/**
+ * Clips on the home page: the videos of the artists the listener plays most (round 3 of the tester's list, 24). The
+ * artists come from the liked songs, the most liked first, and each one's clips are looked up once and kept.
+ */
+@Composable
+internal fun HomeClipsShelf(playerViewModel: PlayerViewModel) {
+    val likes by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
+    val artists = remember(likes.size) {
+        likes.mapNotNull { it.displayArtist.takeIf { name -> name.isNotBlank() } }
+            .groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }
+            .take(HOME_CLIP_ARTISTS).map { it.key }
+    }
+    val clips by produceState(emptyList<Clip>(), artists) {
+        value = withContext(Dispatchers.IO) {
+            coroutineScope { artists.map { async { ArtistClips.clipsFor(it).take(HOME_CLIPS_EACH) } }.awaitAll().flatten() }
+        }.distinctBy { it.url }.take(HOME_CLIPS_MAX)
+    }
+    var watching by remember { mutableStateOf<Clip?>(null) }
+    if (clips.isEmpty()) return
+
+    Column {
+        ArtistSectionTitle(str("home_clips_title"), onOpen = null)
+        com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            fadeColor = MaterialTheme.colorScheme.background,
+        ) {
+            items(clips, key = { it.url }) { clip -> ClipCard(clip) { watching = clip } }
+        }
+    }
+    watching?.let { clip -> ClipPlayerDialog(clip, playerViewModel, onDismiss = { watching = null }) }
+}
+
+private const val HOME_CLIP_ARTISTS = 4
+private const val HOME_CLIPS_EACH = 3
+private const val HOME_CLIPS_MAX = 12
