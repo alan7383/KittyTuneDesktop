@@ -1260,7 +1260,9 @@ private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
         Surface(
             shape = CircleShape,
             color = container,
-            border = if (isFocused) androidx.compose.foundation.BorderStroke(1.dp, scheme.primary.copy(alpha = 0.6f)) else null,
+            // No hard outline when focused: the thin accent line was what read as a stripe. The field lifts a shade
+            // and its icon takes the accent instead.
+            border = null,
             modifier = Modifier.weight(1f).height(40.dp),
         ) {
             Row(
