@@ -43,6 +43,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.automirrored.rounded.Comment
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
@@ -360,7 +364,7 @@ private fun ArtistPickerRow(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.width(12.dp))
@@ -554,7 +558,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     viewModel.toggleTrackDuetBlacklist(track.id)
                 }
             )
-            add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
+            add(MenuOptionItem("add_playlist", Icons.Rounded.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
 
             // Catalog tracks carry their album id: jump straight to it.
             val albumId = track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() }
@@ -566,7 +570,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             }
             if (track.source != "youtube" && !isLocalFile) {
                 add(
-                    MenuOptionItem("go_artist", Icons.Default.Person, str("menu_go_artist")) {
+                    MenuOptionItem("go_artist", Icons.Rounded.Person, str("menu_go_artist")) {
                         if (isSpotify) {
                             viewModel.navigateToTrackArtist(track)
                             viewModel.showMenuSheet = false
@@ -577,7 +581,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 )
                 val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
                 if (isOwnTrack) {
-                    add(MenuOptionItem("edit_track", Icons.Default.Edit, str("menu_edit_track")) {
+                    add(MenuOptionItem("edit_track", Icons.Rounded.Edit, str("menu_edit_track")) {
                         viewModel.showMenuSheet = false
                         viewModel.navigateToEditTrack(track.id)
                     })
@@ -616,7 +620,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 add(
                     MenuOptionItem(
                         id = "download",
-                        icon = if (isDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                        icon = if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
                         text = when {
                             isDownloaded -> str("btn_delete")
                             isDownloading -> "${downloadProgressVal ?: 0}%"
@@ -637,7 +641,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                                     Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(18.dp))
                                 } else {
                                     Icon(
-                                        if (isDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                                        if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
                                         null,
                                         modifier = Modifier.size(30.dp),
                                         tint = tint,
@@ -697,7 +701,7 @@ private fun AddToPlaylistContent(viewModel: PlayerViewModel) {
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         str("add_to_playlist_new"),
@@ -1091,7 +1095,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
                     withTracks { viewModel.addToQueue(it); viewModel.showPlaylistMenuSheet = false }
                 })
-                add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) {
+                add(MenuOptionItem("add_playlist", Icons.Rounded.Add, str("menu_add_playlist")) {
                     withTracks {
                         viewModel.showPlaylistMenuSheet = false
                         viewModel.prepareBulkAdd(it)
@@ -1102,7 +1106,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_playlist_details")) { showDetailsSheet = true })
             }
             playlist.user?.id?.takeIf { it > 0 }?.let { ownerId ->
-                add(MenuOptionItem("go_artist", Icons.Default.Person, str("menu_go_artist")) {
+                add(MenuOptionItem("go_artist", Icons.Rounded.Person, str("menu_go_artist")) {
                     viewModel.showPlaylistMenuSheet = false
                     viewModel.navigateToPlaylistId = "profile:$ownerId"
                 })
@@ -1114,7 +1118,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 add(
                     MenuOptionItem(
                         id = "download",
-                        icon = if (isFullyDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                        icon = if (isFullyDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
                         text = when {
                             isFullyDownloaded -> str("btn_delete")
                             isPlaylistDownloading -> str("btn_cancel")
