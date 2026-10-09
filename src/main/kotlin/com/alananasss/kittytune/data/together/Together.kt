@@ -84,6 +84,13 @@ object Together {
     private const val HOST_TIMEOUT_MS = 20_000L
     private const val HELLO_EVERY_MS = 8_000L
     private const val STATE_EVERY_MS = 4_000L
+    private const val SETTLE_BEFORE_STATE_MS = 150L
+
+    /** What the quickest trip is taken to cost, as the floor itself holds only the clocks' difference. */
+    private const val TYPICAL_TRIP_MS = 120L
+
+    /** The longest a message in flight is allowed to add to the host's position. */
+    private const val MAX_FLIGHT_MS = 3_000L
     private const val MAX_SHARED_UPCOMING = 30
 
     private val gson = Gson()
@@ -263,7 +270,7 @@ object Together {
     /** A pause, play, seek, skip from this listener: the host applies it, a member asks the host. */
     fun control(action: String, positionMs: Long) {
         val code = _active.value ?: return
-        if (isHostOf(code)) publishState(code)
+        if (isHostOf(code)) publishStateSoon(code)
         else send(code, TogetherMessage.Control(memberId, System.currentTimeMillis(), action, positionMs))
     }
 
@@ -278,6 +285,18 @@ object Together {
         if (!isHostOf(code)) return
         scope.launch {
             publishQueue(code, force = false)
+            publishStateSoon(code)
+        }
+    }
+
+    /**
+     * Publishes the state once the player has acted on what just happened. A pause or a seek calls in before the player
+     * has done it, so a state sent at once still said "playing" at the old spot and the others kept playing until the
+     * next tick, four seconds later.
+     */
+    private fun publishStateSoon(code: String) {
+        scope.launch {
+            delay(SETTLE_BEFORE_STATE_MS)
             publishState(code)
         }
     }
@@ -332,9 +351,11 @@ object Together {
                     val room = _rooms.value[code]
                     if (room != null && room.queueVersion != message.queueVersion) send(code, TogetherMessage.SyncRequest(memberId, now))
                     val track = message.track ?: return
-                    val drift = if (message.isPlaying) (now - message.sentAt).coerceIn(0L, 10_000L) else 0L
+                    val drift = if (message.isPlaying) flightTime(message.from, now - message.sentAt) else 0L
+                    // Never past the end of the song, whatever the host's report says.
+                    val target = (message.positionMs + drift).coerceAtLeast(0L).let { p -> track.durationMs?.takeIf { it > 0 }?.let { p.coerceAtMost(it) } ?: p }
                     kotlinx.coroutines.withContext(Dispatchers.Main) {
-                        player?.followHost(track, message.positionMs + drift, message.isPlaying, room?.upcoming, message.automix)
+                        player?.followHost(track, target, message.isPlaying, room?.upcoming, message.automix)
                     }
                 }
             }
@@ -366,6 +387,24 @@ object Together {
                 player?.hostControl(message.action, message.positionMs)
             }
         }
+    }
+
+    /** Per host, the smallest "arrived minus sent" seen: the two clocks' difference plus the quickest trip. */
+    private val quickestTrip = HashMap<String, Long>()
+
+    /**
+     * How long a message was on its way, given the gap between the host's clock at sending and this one on arrival.
+     *
+     * The two computers' clocks are not the same, and that gap used to be taken for travel time: a clock ten seconds ahead
+     * of the host's made every follower play ten seconds ahead of them. Only the excess over the quickest message seen
+     * is real delay, since the quickest is as close to zero travel as the connection ever gets.
+     */
+    private fun flightTime(host: String, arrivedMinusSent: Long): Long {
+        val floor = synchronized(quickestTrip) {
+            val known = quickestTrip[host]
+            if (known == null || arrivedMinusSent < known) { quickestTrip[host] = arrivedMinusSent; arrivedMinusSent } else known
+        }
+        return (arrivedMinusSent - floor + TYPICAL_TRIP_MS).coerceIn(0L, MAX_FLIGHT_MS)
     }
 
     private fun renameSaved(code: String, name: String) {
