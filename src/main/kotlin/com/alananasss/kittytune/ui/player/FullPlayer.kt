@@ -84,6 +84,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
@@ -1043,6 +1046,19 @@ private const val SPACING_PER_SP = 0.34f
  * height, capped, so it stays about a third of the window and keeps its air instead of growing to fill
  * whatever it is put in. That cap is the difference between this and the first attempt.
  */
+/** How much of each side of the sleeve fades out: a sixth of it, which reads as a soft edge rather than a vignette. */
+private const val FEATHER_FRACTION = 0.16f
+
+/** Fades all four edges of what it is drawn over to nothing, so the image melts into whatever is behind it. */
+private fun Modifier.featheredEdges(fraction: Float): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val across = Brush.horizontalGradient(0f to Color.Transparent, fraction to Color.Black, 1f - fraction to Color.Black, 1f to Color.Transparent)
+        val down = Brush.verticalGradient(0f to Color.Transparent, fraction to Color.Black, 1f - fraction to Color.Black, 1f to Color.Transparent)
+        drawRect(brush = across, blendMode = BlendMode.DstIn)
+        drawRect(brush = down, blendMode = BlendMode.DstIn)
+    }
+
 @Composable
 private fun CoverColumn(
     viewModel: PlayerViewModel,
@@ -1095,6 +1111,8 @@ private fun CoverColumn(
                         spotColor = Color.Black.copy(alpha = 0.45f),
                     )
                     .clip(coverShape)
+                    // With the words beside it the sleeve's edges melt into the screen rather than stopping at a line.
+                    .then(if (showText) Modifier.featheredEdges(FEATHER_FRACTION) else Modifier)
                     // A hairline, so the sleeve's edge and corners read even when it is as dark as the wall.
                     .border(1.dp, Color.White.copy(alpha = 0.08f), coverShape)
                     .pointerInput(Unit) {
