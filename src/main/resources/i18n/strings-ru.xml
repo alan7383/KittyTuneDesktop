@@ -2939,4 +2939,5 @@
     <string name="search_source_move_up">Выше</string>
     <string name="search_source_move_down">Ниже</string>
     <string name="search_sources_edit">Изменить источники…</string>
+    <string name="together_library_subtitle">Слушать вместе</string>
 </resources>

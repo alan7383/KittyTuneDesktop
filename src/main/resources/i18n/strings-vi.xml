@@ -3389,4 +3389,5 @@
     <string name="search_source_move_up">Lên</string>
     <string name="search_source_move_down">Xuống</string>
     <string name="search_sources_edit">Sửa nguồn…</string>
+    <string name="together_library_subtitle">Nghe cùng nhau</string>
 </resources>

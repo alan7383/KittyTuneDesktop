@@ -62,7 +62,9 @@ import androidx.compose.material3.TextButton
 
 import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -809,6 +811,23 @@ private fun rememberFixedLibraryTiles(): List<LibEntry> {
                 )
             )
         }
+        // Listening together lives in the library as a playlist would, with a room's cover, not as a button of its own.
+        val rooms by com.alananasss.kittytune.data.together.Together.saved.collectAsState()
+        val roomCover = rooms.firstOrNull()?.tracks?.firstOrNull()?.artworkUrl
+        add(
+            LibEntry(
+                key = "pin_together",
+                title = str("together_title"),
+                subtitle = str("together_library_subtitle"),
+                artworkUrl = roomCover,
+                icon = if (roomCover == null) Icons.Rounded.Groups else null,
+                gradient = if (themed || roomCover != null) null else listOf(Color(0xFFFF7A1A), Color(0xFFFFB27A)),
+                flatColor = if (themed && roomCover == null) scheme.tertiaryContainer else null,
+                iconTint = if (themed) scheme.onTertiaryContainer else Color.White,
+                destination = "together",
+                isPinned = true,
+            )
+        )
         if (PlayerPreferences.LIBRARY_TILE_LOCAL !in hidden) {
             add(
                 LibEntry(
