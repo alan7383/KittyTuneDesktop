@@ -1,5 +1,10 @@
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.FolderOpen
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxWidth
 
@@ -249,43 +254,48 @@ private fun HistoryEntryTile(
             else -> null
         },
     ) {
-        if (entry.type == "TRACK" || entry.id.startsWith("track:")) {
-            val trackToPlay = Track(
-                id = entry.numericId,
-                title = entry.title,
-                artworkUrl = entry.imageUrl,
-                durationMs = null,
-                user = User(0, entry.subtitle ?: "", null),
-                source = entry.source,
-                permalinkUrl = entry.originalUrl
-            )
-            playerViewModel.playPlaylist(listOf(trackToPlay), 0)
-        } else {
-            playerViewModel.navigateToPlaylistId = when {
-                entry.id.startsWith("playlist:") -> entry.numericId.toString()
-                entry.id.startsWith("spotify_artist:") -> entry.id
-                entry.id.startsWith("spotify_radio:") -> entry.id
-                entry.id.startsWith("spotify:") -> entry.id
-                entry.type == "STATION" && entry.id.contains("spotify") -> {
-                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                    "spotify_radio:$clean"
-                }
-                entry.type == "PROFILE" -> {
-                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                    if (clean.isNotBlank() && clean != "0" && (entry.id.contains("spotify") || clean.length == 22)) {
-                        "spotify_artist:$clean"
-                    } else if (entry.id == "profile:0" || entry.numericId == 0L) {
-                        if (entry.title.isNotBlank()) {
-                            "profile:${entry.title}"
-                        } else {
-                            entry.id
-                        }
+        openHistoryEntry(entry, playerViewModel)
+    }
+}
+
+/** What pressing a history entry does: plays a song, or opens the album, playlist, station or profile it stands for. */
+private fun openHistoryEntry(entry: com.alananasss.kittytune.data.local.HistoryItem, playerViewModel: PlayerViewModel) {
+    if (entry.type == "TRACK" || entry.id.startsWith("track:")) {
+        val trackToPlay = Track(
+            id = entry.numericId,
+            title = entry.title,
+            artworkUrl = entry.imageUrl,
+            durationMs = null,
+            user = User(0, entry.subtitle ?: "", null),
+            source = entry.source,
+            permalinkUrl = entry.originalUrl
+        )
+        playerViewModel.playPlaylist(listOf(trackToPlay), 0)
+    } else {
+        playerViewModel.navigateToPlaylistId = when {
+            entry.id.startsWith("playlist:") -> entry.numericId.toString()
+            entry.id.startsWith("spotify_artist:") -> entry.id
+            entry.id.startsWith("spotify_radio:") -> entry.id
+            entry.id.startsWith("spotify:") -> entry.id
+            entry.type == "STATION" && entry.id.contains("spotify") -> {
+                val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
+                "spotify_radio:$clean"
+            }
+            entry.type == "PROFILE" -> {
+                val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
+                if (clean.isNotBlank() && clean != "0" && (entry.id.contains("spotify") || clean.length == 22)) {
+                    "spotify_artist:$clean"
+                } else if (entry.id == "profile:0" || entry.numericId == 0L) {
+                    if (entry.title.isNotBlank()) {
+                        "profile:${entry.title}"
                     } else {
                         entry.id
                     }
+                } else {
+                    entry.id
                 }
-                else -> entry.id
             }
+            else -> entry.id
         }
     }
 }
@@ -322,10 +332,20 @@ private fun ContinueRow(
     modifier: Modifier,
 ) {
     val isTrack = entry.type == "TRACK" || entry.id.startsWith("track:")
-    val isArtist = entry.id.startsWith("profile:") || entry.id.startsWith("spotify_artist:")
+    val isArtist = entry.type == "PROFILE" || entry.id.startsWith("profile:") || entry.id.startsWith("spotify_artist:")
+    val isStation = entry.type == "STATION"
+    // Collections have no cover of their own; they get the icon they have in the library.
+    val collectionIcon = when {
+        entry.id == "likes" || entry.numericId == -1L || entry.id == "pin_likes" -> Icons.Rounded.Favorite
+        entry.id == "downloads" || entry.numericId == -2L || entry.id == "pin_downloads" -> Icons.Rounded.Download
+        entry.id == "local_files" || entry.id == "pin_local" -> Icons.Rounded.FolderOpen
+        else -> null
+    }
     val kind = when {
         isTrack -> str("release_kind_track")
         isArtist -> str("lib_artists")
+        isStation -> str("lib_stations")
+        collectionIcon != null -> str("lib_playlists")
         else -> str("lib_playlists")
     }
     val interaction = remember { MutableInteractionSource() }
@@ -334,34 +354,21 @@ private fun ContinueRow(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
-                if (isTrack) {
-                    playerViewModel.playPlaylist(
-                        listOf(
-                            Track(
-                                id = entry.numericId,
-                                title = entry.title,
-                                artworkUrl = entry.imageUrl,
-                                durationMs = null,
-                                user = User(0, entry.subtitle ?: "", null),
-                                source = entry.source,
-                                permalinkUrl = entry.originalUrl,
-                            )
-                        ),
-                        0,
-                    )
-                } else {
-                    playerViewModel.navigateToPlaylistId = entry.id.removePrefix("playlist:").ifBlank { entry.numericId.toString() }
-                }
-            },
+            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) { openHistoryEntry(entry, playerViewModel) },
     ) {
         Row(Modifier.fillMaxWidth().height(64.dp), verticalAlignment = Alignment.CenterVertically) {
-            AsyncImage(
-                model = entry.imageUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceVariant),
-            )
+            if (collectionIcon != null) {
+                Box(Modifier.size(64.dp).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.Icon(collectionIcon, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+            } else {
+                AsyncImage(
+                    model = entry.imageUrl,
+                    contentDescription = null,
+                    contentScale = if (isArtist) ContentScale.Crop else ContentScale.Crop,
+                    modifier = Modifier.size(64.dp).background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp), verticalArrangement = Arrangement.Center) {
                 Text(entry.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
