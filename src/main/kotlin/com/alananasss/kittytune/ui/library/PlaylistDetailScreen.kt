@@ -2180,7 +2180,7 @@ fun TrackTableHeaderRow(
                     )
                 }
             }
-            Box(modifier = Modifier.width(60.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+            Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
                 Icon(
                     imageVector = Icons.Rounded.Schedule,
                     contentDescription = null,
@@ -2188,7 +2188,6 @@ fun TrackTableHeaderRow(
                     modifier = Modifier.size(16.dp)
                 )
             }
-            Spacer(Modifier.width(40.dp))
         }
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
@@ -2523,7 +2522,7 @@ fun TrackCompactHeaderRow(
                     )
                 }
             }
-            Box(modifier = Modifier.width(60.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+            Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
                 Icon(
                     imageVector = Icons.Rounded.Schedule,
                     contentDescription = null,
@@ -2531,7 +2530,6 @@ fun TrackCompactHeaderRow(
                     modifier = Modifier.size(16.dp)
                 )
             }
-            Spacer(Modifier.width(40.dp))
         }
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
