@@ -405,16 +405,13 @@ fun ProfileScreen(
                                 if (latest.isNotEmpty()) Column(m) {
                                     ArtistSectionTitle(
                                         str("artist_new_releases"),
-                                        // Albums only, never songs: the page lists the records the artist put out.
-                                        onOpen = {
-                                            val section = if (profileViewModel.albums.isNotEmpty()) "albums" else "releases"
-                                            onNavigate("profile_collection:${user.id}:$section")
-                                        },
+                                        // Every release, songs and records, newest first.
+                                        onOpen = { onNavigate("profile_collection:${user.id}:releases_all") },
                                     )
                                     latest.forEachIndexed { index, release ->
                                         NewReleaseCard(
                                             release, playerViewModel, artistPlaybackContext, onNavigate,
-                                            Modifier.padding(horizontal = 16.dp, vertical = if (index == 0) 0.dp else 4.dp).fillMaxWidth(),
+                                            Modifier.padding(start = 16.dp, end = 16.dp, top = if (index == 0) 0.dp else 16.dp).fillMaxWidth(),
                                             previous = index > 0,
                                         )
                                     }
@@ -2094,6 +2091,22 @@ fun ProfileCollectionScreen(
             playerViewModel.navigateToPlaylistId = if (playlist.urn?.contains("spotify") == true) playlist.urn!! else playlist.id.toString()
         }
         when {
+            section == "releases_all" -> {
+                val records = (profileViewModel.albums + profileViewModel.singles + profileViewModel.compilations).distinctBy { it.id }
+                AllReleasesScreen(
+                    title = str("artist_new_releases"),
+                    releases = ArtistRelease.latestOf(profileViewModel.allTracks.toList(), records, count = Int.MAX_VALUE),
+                    onBack = onBackClick,
+                    onOpen = { release ->
+                        when (release) {
+                            is ArtistRelease.Song -> playerViewModel.playPlaylist(listOf(release.track), 0, artistPlaybackContext)
+                            is ArtistRelease.Record -> openRelease(release.playlist)
+                        }
+                    },
+                    hasMore = profileViewModel.isSpotifyProfile && profileViewModel.hasMoreDiscography(),
+                    onLoadMore = { profileViewModel.loadMoreDiscography() },
+                )
+            }
             // Covers, not a line of five: every album, single or compilation, or all of them as releases.
             section in RELEASE_SECTIONS -> {
                 val (title, releases) = when (section) {
