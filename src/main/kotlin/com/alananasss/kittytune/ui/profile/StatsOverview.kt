@@ -83,11 +83,15 @@ internal fun OverviewStats(
                         title = str("listening_stats_top_artists"),
                         action = if (report.topArtists.size > 6) ({ onOpen(StatsList.ARTISTS) }) else null,
                     ) {
-                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            report.topArtists.take(6).forEachIndexed { index, artist ->
-                                ArtistTile(index + 1, artist, Modifier.weight(1f)) { onArtistClick(artist) }
+                        // One photo for the top artist, the rest as a ranked list: a row of six avatars read as a crowd of
+                        // circles with a time under each, which said little about who was on top.
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TopArtistHero(report.topArtists.first(), Modifier.weight(1f)) { onArtistClick(report.topArtists.first()) }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                report.topArtists.drop(1).take(4).forEachIndexed { index, artist ->
+                                    ArtistRankRow(index + 2, artist) { onArtistClick(artist) }
+                                }
                             }
-                            repeat((6 - report.topArtists.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
@@ -450,35 +454,35 @@ internal fun PlaysAndTime(plays: Int, listenMs: Long) {
 }
 
 @Composable
-private fun ArtistTile(rank: Int, artist: ReportArtist, modifier: Modifier, onClick: () -> Unit) {
+private fun TopArtistHero(artist: ReportArtist, modifier: Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Column(
         modifier.clip(RoundedCornerShape(20.dp))
             .clickable(interactionSource = interaction, indication = ripple(), onClick = onClick)
             .pressScale(interaction)
-            .padding(vertical = 10.dp, horizontal = 4.dp),
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box {
-            StatsCover(artist.imageUrl, Modifier.size(84.dp).clip(CircleShape), placeholder = Icons.Rounded.Person)
-            Surface(
-                shape = CircleShape,
-                color = if (rank == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.align(Alignment.BottomStart).size(26.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        rank.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (rank == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(artist.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        StatsCover(artist.imageUrl, Modifier.size(128.dp).clip(CircleShape), placeholder = Icons.Rounded.Person)
+        Spacer(Modifier.height(10.dp))
+        Text(artist.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    }
+}
+
+@Composable
+private fun ArtistRankRow(rank: Int, artist: ReportArtist, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .clickable(interactionSource = interaction, indication = ripple(), onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(rank.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(22.dp))
+        Text(artist.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(8.dp))
+        Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
 
