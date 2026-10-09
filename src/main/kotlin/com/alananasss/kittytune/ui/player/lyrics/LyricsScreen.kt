@@ -998,14 +998,13 @@ fun UploadYamlDialog(
 
                 androidx.compose.material3.Button(
                     onClick = {
-                        val dialog = java.awt.FileDialog(null as java.awt.Frame?, str("btn_upload_yaml"), java.awt.FileDialog.LOAD)
-                        dialog.isVisible = true
-                        if (dialog.directory != null && dialog.file != null) {
-                            val file = java.io.File(dialog.directory, dialog.file)
-                            if (file.exists()) {
-                                viewModel.loadCustomLyrics(file.readText())
-                                onDismiss()
-                            }
+                        val file = com.alananasss.kittytune.core.NativeFileDialog.openFile(
+                            str("btn_upload_yaml"),
+                            com.alananasss.kittytune.core.NativeFileDialog.FileType("Lyrics", listOf(com.alananasss.kittytune.core.NativeFileDialog.ANY_FILE)),
+                        )
+                        if (file != null && file.exists()) {
+                            viewModel.loadCustomLyrics(file.readText())
+                            onDismiss()
                         }
                     },
                     shapes = androidx.compose.material3.ButtonDefaults.shapes(),

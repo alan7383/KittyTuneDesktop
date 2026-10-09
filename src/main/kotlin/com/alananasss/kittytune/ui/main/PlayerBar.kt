@@ -567,6 +567,8 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
     var drawnMs by remember { mutableLongStateOf(0L) }
+    // What the smoothed playhead says, so the wheel hands the bar back only once the playhead itself has arrived.
+    var playheadMs by remember { mutableLongStateOf(0L) }
     // A trailer's song is shown as its window: 0:00 to its length. Everything below is in that time, and what is
     // asked of the player is turned back into the song's.
     val clip = vm.clipWindow
@@ -574,7 +576,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     val songOf = { shownMs: Long -> clip?.toSong(shownMs) ?: shownMs }
     val wheel = rememberWheelSeek(
         drawnMs = { drawnMs },
-        reportedMs = { shownOf(vm.currentPosition) },
+        reportedMs = { playheadMs },
         durationMs = { clip?.lengthMs ?: vm.duration },
         stepSeconds = { seekWheelSeconds },
         commit = { target -> vm.seekTo(songOf(target)) },
@@ -584,9 +586,10 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
         reportedMs = shownOf(vm.currentPosition),
         isRunning = vm.isPlaying && !vm.isLoading,
-        followsInput = isScrubbingNow,
+        followsInput = scrubbing || vm.isScrubbing,
         trackKey = vm.currentTrack?.id,
     )
+    playheadMs = playhead
     val position = when {
         wheelMs != null -> wheelMs
         isScrubbingNow -> scrubPosition.toLong()
