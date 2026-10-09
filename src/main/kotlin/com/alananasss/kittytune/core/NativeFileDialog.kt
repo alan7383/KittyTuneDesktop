@@ -34,10 +34,21 @@ object NativeFileDialog {
     data class FileType(val name: String, val extensions: List<String>)
 
     /** The chosen file, or null when the dialog was dismissed. */
-    fun openFile(title: String, type: FileType): File? {
+    fun openFile(title: String, type: FileType): File? = open(title, type, folder = false)
+
+    /** The chosen folder, or null. Windows only has the modern dialog for this; elsewhere the caller falls back. */
+    fun openFolder(title: String): File? {
+        if (!isWindows) return null
+        val owner = ownerHandle()
+        val answer = runOffEventThread { WindowsOpenDialog.show(title, FileType("", emptyList()), owner, folder = true) }
+        answer.onFailure { Logger.e("NativeFileDialog", "IFileOpenDialog (folders) failed: $it") }
+        return answer.getOrNull()
+    }
+
+    private fun open(title: String, type: FileType, folder: Boolean): File? {
         if (isWindows) {
             val owner = ownerHandle()
-            val answer = runOffEventThread { WindowsOpenDialog.show(title, type, owner) }
+            val answer = runOffEventThread { WindowsOpenDialog.show(title, type, owner, folder = false) }
             answer.onSuccess { return it }
             Logger.e("NativeFileDialog", "IFileOpenDialog failed, falling back to AWT: ${answer.exceptionOrNull()}")
         }
@@ -45,6 +56,9 @@ object NativeFileDialog {
     }
 
     private val isWindows = System.getProperty("os.name").lowercase().contains("win")
+
+    /** Whether the native dialogs are the Windows ones; elsewhere the caller uses its own chooser. */
+    val isWindowsHost: Boolean get() = isWindows
 
     private fun awtOpenFile(title: String, type: FileType): File? {
         val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD)
@@ -99,6 +113,7 @@ private object WindowsOpenDialog {
     private const val FOS_FORCEFILESYSTEM = 0x40
     private const val FOS_PATHMUSTEXIST = 0x800
     private const val FOS_FILEMUSTEXIST = 0x1000
+    private const val FOS_PICKFOLDERS = 0x20
 
     /** HRESULT_FROM_WIN32(ERROR_CANCELLED): the reader closed the dialog. */
     private const val HR_CANCELLED = 0x800704C7.toInt()
@@ -113,7 +128,7 @@ private object WindowsOpenDialog {
         @JvmField var pszSpec: WString? = null
     }
 
-    fun show(title: String, type: NativeFileDialog.FileType, owner: WinDef.HWND?): File? {
+    fun show(title: String, type: NativeFileDialog.FileType, owner: WinDef.HWND?, folder: Boolean): File? {
         val coInit = Ole32.INSTANCE.CoInitializeEx(Pointer.NULL, Ole32.COINIT_APARTMENTTHREADED).toInt()
         check(coInit == 0 || coInit == 1) { "CoInitializeEx: 0x%08X".format(coInit) }
         try {
@@ -126,7 +141,7 @@ private object WindowsOpenDialog {
             )
             val dialog = ComObject(created.value)
             try {
-                configure(dialog, title, type)
+                configure(dialog, title, type, folder)
                 val shown = dialog.call(SHOW, owner?.pointer)
                 if (shown == HR_CANCELLED) return null
                 checkHr(shown, "Show")
@@ -142,16 +157,22 @@ private object WindowsOpenDialog {
         }
     }
 
-    private fun configure(dialog: ComObject, title: String, type: NativeFileDialog.FileType) {
-        val specs = FilterSpec().toArray(1).map { it as FilterSpec }
-        specs[0].pszName = WString(type.name)
-        specs[0].pszSpec = WString(type.extensions.joinToString(";") { "*.$it" })
-        specs.forEach { it.write() }
-        checkHr(dialog.call(SET_FILE_TYPES, specs.size, specs[0].pointer), "SetFileTypes")
+    private fun configure(dialog: ComObject, title: String, type: NativeFileDialog.FileType, folder: Boolean) {
+        if (!folder) {
+            val specs = FilterSpec().toArray(1).map { it as FilterSpec }
+            specs[0].pszName = WString(type.name)
+            specs[0].pszSpec = WString(type.extensions.joinToString(";") { "*.$it" })
+            specs.forEach { it.write() }
+            checkHr(dialog.call(SET_FILE_TYPES, specs.size, specs[0].pointer), "SetFileTypes")
+        }
 
         val options = IntByReference()
         checkHr(dialog.call(GET_OPTIONS, options), "GetOptions")
-        val wanted = options.value or FOS_FORCEFILESYSTEM or FOS_PATHMUSTEXIST or FOS_FILEMUSTEXIST
+        val wanted = if (folder) {
+            options.value or FOS_FORCEFILESYSTEM or FOS_PATHMUSTEXIST or FOS_PICKFOLDERS
+        } else {
+            options.value or FOS_FORCEFILESYSTEM or FOS_PATHMUSTEXIST or FOS_FILEMUSTEXIST
+        }
         checkHr(dialog.call(SET_OPTIONS, wanted), "SetOptions")
         checkHr(dialog.call(SET_TITLE, WString(title)), "SetTitle")
     }
