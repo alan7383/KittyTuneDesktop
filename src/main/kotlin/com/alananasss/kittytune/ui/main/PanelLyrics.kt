@@ -609,10 +609,8 @@ data class PanelLyricsStyle(
         val Compact = PanelLyricsStyle(
             startPadding = 16.dp,
             endPadding = 16.dp,
-            // The first line sits at the top and the list only starts moving once the sung line is as far down as
-            // the middle; the tail lets the last line reach the middle as well.
-            topInsetFraction = 0.03f,
-            tailFraction = 0.50f,
+            topInsetFraction = 0.40f,
+            tailFraction = 0.40f,
             anchorFraction = 0.50f,
             lineSpacing = 4.dp,
             isFullScreen = false,

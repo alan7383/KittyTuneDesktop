@@ -658,6 +658,21 @@ fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = fals
                 loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
             }
 
+            // A comment that mixes the reader's language with another one: the foreign words, each with its meaning, under it.
+            val glosses by androidx.compose.runtime.produceState(emptyList<Pair<String, String>>(), comment.body, langCode) {
+                value = if (!com.alananasss.kittytune.util.WordGloss.isMixed(comment.body, langCode)) emptyList()
+                else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.alananasss.kittytune.util.WordGloss.glossFor(comment.body, langCode)
+                }
+            }
+            if (glosses.isNotEmpty()) {
+                Text(
+                    text = com.alananasss.kittytune.util.WordGloss.line(glosses),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
             // Hidden until the detector has answered, so it never flashes up on a comment already in the reader's language.
             val needsTranslation by androidx.compose.runtime.produceState(false, comment.body, langCode) {
                 value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
