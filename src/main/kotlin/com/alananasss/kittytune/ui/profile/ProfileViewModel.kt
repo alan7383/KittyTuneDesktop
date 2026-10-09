@@ -748,16 +748,13 @@
         private fun pickImage(onPicked: (BufferedImage) -> Unit) {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    val chooser = javax.swing.JFileChooser().apply {
-                        dialogTitle = str("profile_edit")
-                        fileFilter = javax.swing.filechooser.FileNameExtensionFilter(
-                            "Images (*.jpg, *.png, *.webp)", "jpg", "jpeg", "png", "webp", "bmp"
-                        )
-                    }
-                    val result = chooser.showOpenDialog(null)
-                    if (result != javax.swing.JFileChooser.APPROVE_OPTION) return@launch
-                    val image = ImageIO.read(chooser.selectedFile) ?: run {
-                        Toaster.show(str("profile_update_error", chooser.selectedFile.name))
+                    // The system's own dialog (Windows 11 style on Windows), not the Swing one with the Java icon.
+                    val file = com.alananasss.kittytune.core.NativeFileDialog.openFile(
+                        str("profile_edit"),
+                        com.alananasss.kittytune.core.NativeFileDialog.FileType("Images", listOf("jpg", "jpeg", "png", "webp", "bmp")),
+                    ) ?: return@launch
+                    val image = ImageIO.read(file) ?: run {
+                        Toaster.show(str("profile_update_error", file.name))
                         return@launch
                     }
                     withContext(Dispatchers.Main) { onPicked(image) }
