@@ -30,7 +30,8 @@ import java.util.concurrent.TimeUnit
 object Prefs {
 
     private val file = File(AppDirs.dataDir, "prefs.json")
-    private val json = Json { prettyPrint = true }
+    // Compact on purpose: the file is rewritten after every change, and pretty-printing it only made each write bigger.
+    private val json = Json { prettyPrint = false }
     private val writer = Executors.newSingleThreadScheduledExecutor { r ->
         Thread(r, "prefs-writer").apply { isDaemon = true }
     }
