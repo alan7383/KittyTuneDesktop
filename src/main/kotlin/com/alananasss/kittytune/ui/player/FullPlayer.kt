@@ -176,13 +176,6 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
         )
     }
 
-    if (viewModel.isSearchingLyrics) {
-        SearchLyricsDialog(
-            viewModel = viewModel,
-            onDismiss = { viewModel.isSearchingLyrics = false },
-        )
-    }
-
     // Escape and the mouse's back button leave, through the app's own back stack so this takes precedence
     // over whatever registered before it and gives way to a dialog opened on top. A full-window view whose
     // only exit is a dim glyph in a corner is a trap, and being trapped in a view is the complaint that
@@ -420,6 +413,11 @@ fun FullPlayerScreen(viewModel: PlayerViewModel, onExitFullScreen: () -> Unit) {
                     screensaverActive = false
                 },
             )
+        }
+
+        // Inside this window, not in a window of its own: that one opened behind the full-screen player.
+        if (viewModel.isSearchingLyrics) {
+            SearchLyricsDialog(viewModel = viewModel, onDismiss = { viewModel.isSearchingLyrics = false })
         }
     }
 }

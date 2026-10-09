@@ -20,6 +20,10 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -571,7 +575,9 @@ internal fun Modifier.lyricsWheel(
                         listState.scroll {
                             var previous = 0f
                             animate(0f, distance, animationSpec = tween(WHEEL_SLIDE_MS, easing = LinearOutSlowInEasing)) { value, _ ->
-                                val consumed = scrollBy(value - previous)
+                                // Never past the end of the words, however far the wheel was spun.
+                                val delta = (value - previous).coerceAtMost(listState.roomForwardPx())
+                                val consumed = scrollBy(delta)
                                 previous = value
                                 slidPx += consumed
                             }
@@ -587,6 +593,34 @@ internal fun Modifier.lyricsWheel(
         }
     }
 }
+
+/**
+ * How far the reader may still scroll forward by hand: until the last line has risen to just above the bottom edge.
+ *
+ * The lists keep a tail below the last line (up to half the screen) so that line can be *followed* up to the
+ * middle, and a hand that scrolls into that tail only finds an empty screen. The follow code scrolls the state
+ * directly and is not held by this; only the reader is.
+ */
+internal fun LazyListState.roomForwardPx(): Float {
+    val info = layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return 0f
+    if (last.index != info.totalItemsCount - 1) return Float.MAX_VALUE
+    val bottomEdge = info.viewportEndOffset + info.afterContentPadding
+    val keep = (bottomEdge - info.viewportStartOffset) * LAST_LINE_KEEP_FRACTION
+    return (last.offset + last.size - (bottomEdge - keep)).coerceAtLeast(0f)
+}
+
+/** The last line stops this far (of the viewport) above the bottom edge, clear of its fade. */
+private const val LAST_LINE_KEEP_FRACTION = 0.14f
+
+/** Holds back a drag, a wheel notch or a touch that would scroll past [roomForwardPx]. */
+internal fun Modifier.stopAtLastLine(listState: LazyListState): Modifier = nestedScroll(object : NestedScrollConnection {
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (available.y >= 0f) return Offset.Zero
+        val over = -available.y - listState.roomForwardPx()
+        return if (over > 0f) Offset(0f, over) else Offset.Zero
+    }
+})
 
 /** How long one wheel notch takes to slide the lyrics. */
 private const val WHEEL_SLIDE_MS = 240

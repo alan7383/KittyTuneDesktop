@@ -67,6 +67,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
@@ -76,8 +78,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
@@ -188,16 +188,14 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
     val selected = viewModel.manualSearchProvider
     val isAll = selected.equals(ManualLyricsSearch.ALL, ignoreCase = true)
     // Dragged with the mouse or turned with Shift and the wheel, without arrows, and inset the same as the search
-    // field above it (issue #66).
-    // A soft edge on the right, so a source running off the end of the row fades out rather than being cut.
-    val edge = MaterialTheme.colorScheme.surface
-    Box(Modifier.fillMaxWidth()) {
+    // field above it (issue #66). Both ends fade out, so a source running past an edge dissolves instead of being cut.
+    val rowState = rememberLazyListState()
     com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-        contentPadding = PaddingValues(horizontal = 20.dp),
+        state = rowState,
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        fadeColor = edge,
         showsArrows = false,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().fadedHorizontalEdges(rowState),
     ) {
         item(key = ManualLyricsSearch.ALL) {
             SourceChip(
@@ -216,15 +214,28 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
             )
         }
     }
-    Box(
-        Modifier
-            .align(Alignment.CenterEnd)
-            .width(36.dp)
-            .fillMaxHeight()
-            .background(Brush.horizontalGradient(0f to Color.Transparent, 1f to edge)),
-    )
-    }
 }
+
+/** Fades the row out over its last 28 dp on each side that still has something beyond it. */
+private fun Modifier.fadedHorizontalEdges(state: androidx.compose.foundation.lazy.LazyListState): Modifier =
+    graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+        .drawWithContent {
+            drawContent()
+            val fade = 28.dp.toPx().coerceAtMost(size.width / 4)
+            val start = fade / size.width
+            if (state.canScrollBackward) {
+                drawRect(
+                    Brush.horizontalGradient(0f to Color.Transparent, start to Color.Black, startX = 0f, endX = size.width),
+                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                )
+            }
+            if (state.canScrollForward) {
+                drawRect(
+                    Brush.horizontalGradient(1f - start to Color.Black, 1f to Color.Transparent, startX = 0f, endX = size.width),
+                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                )
+            }
+        }
 
 @Composable
 private fun SourceChip(label: String, selected: Boolean, searching: Boolean, onClick: () -> Unit) {
@@ -467,48 +478,47 @@ private fun ResultPlaceholder(modifier: Modifier = Modifier) {
     }
 }
 
-/** The search as a floating panel, for the full player where there is no lyrics screen to put it in. */
+/**
+ * The search as a floating panel, for the full player where there is no lyrics screen to put it in.
+ *
+ * Drawn inside the window it is called from. As a `Dialog` it was a window of its own, and over the borderless
+ * full-screen player that window came up behind it: the search was running and nothing was to be seen.
+ */
 @Composable
 fun SearchLyricsDialog(
     viewModel: PlayerViewModel,
     onDismiss: () -> Unit,
 ) {
     BackHandler(onBack = onDismiss)
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .escapeDismisses(onDismiss)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))
-                .escapeDismisses(onDismiss)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            BoxWithConstraints(contentAlignment = Alignment.Center, modifier = Modifier.escapeDismisses(onDismiss)) {
-                val panelWidth = min(720.dp, maxWidth * 0.92f)
-                val panelHeight = min(680.dp, maxHeight * 0.88f)
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                    modifier = Modifier
-                        .width(panelWidth)
-                        .height(panelHeight)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        // Swallows clicks so they do not reach the backdrop, which closes the panel.
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
-                        .escapeDismisses(onDismiss),
-                ) {
-                    SearchLyricsView(viewModel = viewModel, onCloseSearch = onDismiss, modifier = Modifier.escapeDismisses(onDismiss))
-                }
+        BoxWithConstraints(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            val panelWidth = min(720.dp, maxWidth * 0.92f)
+            val panelHeight = min(680.dp, maxHeight * 0.88f)
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                modifier = Modifier
+                    .width(panelWidth)
+                    .height(panelHeight)
+                    .clip(RoundedCornerShape(28.dp))
+                    // Swallows clicks so they do not reach the backdrop, which closes the panel.
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
+                    .escapeDismisses(onDismiss),
+            ) {
+                SearchLyricsView(viewModel = viewModel, onCloseSearch = onDismiss, modifier = Modifier.escapeDismisses(onDismiss))
             }
         }
     }

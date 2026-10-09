@@ -65,6 +65,7 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
 import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
 import com.alananasss.kittytune.ui.player.lyrics.FollowPlainLyrics
 import com.alananasss.kittytune.ui.player.lyrics.revealWhenPlaced
+import com.alananasss.kittytune.ui.player.lyrics.stopAtLastLine
 import com.alananasss.kittytune.ui.player.lyrics.lyricsWheel
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import kotlinx.coroutines.isActive
@@ -216,7 +217,7 @@ private fun PanelSyncedLyrics(
         ) + vm.lyricsOffset
 
         LazyColumn(
-            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex, contentKey = lines.size to lines.firstOrNull()?.startTime),
+            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex, contentKey = lines.size to lines.firstOrNull()?.startTime).stopAtLastLine(listState),
             state = listState,
             contentPadding = PaddingValues(
                 start = effectiveStyle.startPadding,
