@@ -3552,4 +3552,6 @@
     <string name="search_source_move_down">Nach unten</string>
     <string name="search_sources_edit">Quellen bearbeiten…</string>
     <string name="together_library_subtitle">Gemeinsam hören</string>
+    <string name="search_all_sources">Alle</string>
+    <string name="search_all_show_source">Alle anzeigen</string>
 </resources>

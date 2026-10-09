@@ -1,6 +1,7 @@
     package com.alananasss.kittytune.ui.home
 
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.SearchSourceOrder
 import com.alananasss.kittytune.core.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -124,6 +125,22 @@ import com.alananasss.kittytune.utils.Logger
         var activeFilter by mutableStateOf(SearchFilter.ALL)
         var isSearchLoading by mutableStateOf(false)
         var activeSearchSource by mutableStateOf(SearchSource.SOUNDCLOUD)
+
+        /**
+         * "All": every source the reader has switched on is asked at once, and the results come back grouped by source
+         * (round 3 of the tester's list, 26). Apple Music and Yandex are left out: their results are names to find
+         * elsewhere, not songs that play from here.
+         */
+        var searchAllPlatforms by mutableStateOf(false)
+
+        fun onSearchAllPlatforms() {
+            if (searchAllPlatforms) return
+            searchAllPlatforms = true
+            if (searchQuery.isNotBlank()) {
+                searchJob?.cancel()
+                searchJob = viewModelScope.launch { performSearch(searchQuery) }
+            }
+        }
     
     
         var isLoading by mutableStateOf(true)
@@ -632,8 +649,9 @@ import com.alananasss.kittytune.utils.Logger
         fun onFilterChanged(filter: SearchFilter) { activeFilter = filter; if (searchQuery.isNotBlank()) { searchJob?.cancel(); searchJob = viewModelScope.launch { performSearch(searchQuery) } } }
     
         fun onSearchSourceChanged(source: SearchSource) {
-            if (activeSearchSource == source) return
+            if (activeSearchSource == source && !searchAllPlatforms) return
             activeSearchSource = source
+            searchAllPlatforms = false
             if (searchQuery.isNotBlank()) {
                 searchJob?.cancel()
                 searchJob = viewModelScope.launch { performSearch(searchQuery) }
@@ -659,16 +677,15 @@ import com.alananasss.kittytune.utils.Logger
             // rather than a prefix. Recording it here is what keeps "lo" out of the history.
             recordSearch(query)
             try {
-                when (activeSearchSource) {
-                    SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
-                    SearchSource.YOUTUBE -> performYoutubeSearch(query)
-                    SearchSource.YOUTUBE_MUSIC -> performYoutubeMusicSearch(query)
-                    SearchSource.SPOTIFY -> performSpotifySearch(query)
-                    SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
-                    SearchSource.YANDEX_MUSIC -> performYandexSearch(query)
-                    SearchSource.DEEZER -> performDeezerSearch(query)
-                    SearchSource.TIDAL -> performTidalSearch(query)
-                    SearchSource.QOBUZ -> performQobuzSearch(query)
+                if (searchAllPlatforms) {
+                    coroutineScope {
+                        SearchSourceOrder.visible()
+                            .filter { it != SearchSource.APPLE_MUSIC && it != SearchSource.YANDEX_MUSIC && it != SearchSource.YOUTUBE }
+                            .map { source -> async { runCatching { performOneSource(source, query) } } }
+                            .awaitAll()
+                    }
+                } else {
+                    performOneSource(activeSearchSource, query)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -676,6 +693,20 @@ import com.alananasss.kittytune.utils.Logger
                 isSearchLoading = false
             }
             warmTopResults(query)
+        }
+
+        private suspend fun performOneSource(source: SearchSource, query: String) {
+            when (source) {
+                SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
+                SearchSource.YOUTUBE -> performYoutubeSearch(query)
+                SearchSource.YOUTUBE_MUSIC -> performYoutubeMusicSearch(query)
+                SearchSource.SPOTIFY -> performSpotifySearch(query)
+                SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
+                SearchSource.YANDEX_MUSIC -> performYandexSearch(query)
+                SearchSource.DEEZER -> performDeezerSearch(query)
+                SearchSource.TIDAL -> performTidalSearch(query)
+                SearchSource.QOBUZ -> performQobuzSearch(query)
+            }
         }
 
         private var warmStreamsJob: kotlinx.coroutines.Job? = null

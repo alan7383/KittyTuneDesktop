@@ -2940,4 +2940,6 @@
     <string name="search_source_move_down">Ниже</string>
     <string name="search_sources_edit">Изменить источники…</string>
     <string name="together_library_subtitle">Слушать вместе</string>
+    <string name="search_all_sources">Все</string>
+    <string name="search_all_show_source">Показать все</string>
 </resources>
