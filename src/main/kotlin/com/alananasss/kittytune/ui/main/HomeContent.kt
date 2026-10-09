@@ -443,7 +443,7 @@ private fun SearchSourceButton(vm: HomeViewModel) {
                 contentPadding = PaddingValues(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 Text(
-                    text = searchSourceName(vm.activeSearchSource),
+                    text = if (vm.searchAllPlatforms) str("search_all_sources") else searchSourceName(vm.activeSearchSource),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                 )
@@ -459,13 +459,24 @@ private fun SearchSourceButton(vm: HomeViewModel) {
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text(str("search_all_sources")) },
+                leadingIcon = {
+                    if (vm.searchAllPlatforms) Icon(Icons.Rounded.Check, contentDescription = null)
+                    else Spacer(Modifier.size(24.dp))
+                },
+                onClick = {
+                    expanded = false
+                    vm.onSearchAllPlatforms()
+                },
+            )
             sources.forEach { source ->
                 androidx.compose.material3.DropdownMenuItem(
                     text = { Text(searchSourceName(source)) },
                     leadingIcon = {
                         // The current one is marked rather than merely styled: a menu of three names with
                         // no indication of which is live reads as three actions, not as a choice.
-                        if (source == vm.activeSearchSource) {
+                        if (source == vm.activeSearchSource && !vm.searchAllPlatforms) {
                             Icon(Icons.Rounded.Check, contentDescription = null)
                         } else {
                             Spacer(Modifier.size(24.dp))
@@ -643,7 +654,9 @@ private fun SearchResults(
             }
         } else {
             // Actual results
-            when (vm.activeSearchSource) {
+            if (vm.searchAllPlatforms) {
+                AllPlatformsResults(vm, playerViewModel, listState)
+            } else when (vm.activeSearchSource) {
                 SearchSource.YOUTUBE -> YoutubeResults(vm, playerViewModel, listState)
                 SearchSource.YOUTUBE_MUSIC -> YoutubeMusicResults(vm, playerViewModel, listState)
                 SearchSource.SPOTIFY -> SpotifyResults(vm, playerViewModel, navController)
@@ -703,6 +716,65 @@ private fun SourceChip(label: String, selected: Boolean, onClick: () -> Unit) {
         )
     }
 }
+
+/**
+ * "All": one group per source that found something, each with its first few songs and a way into the full list of that
+ * source. The source's name is the group's heading, so the reader sees where each song is from.
+ */
+@Composable
+private fun AllPlatformsResults(
+    vm: HomeViewModel,
+    playerViewModel: PlayerViewModel,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+) {
+    val groups = listOf(
+        SearchSource.SOUNDCLOUD to vm.searchResultsTracks.toList(),
+        SearchSource.SPOTIFY to vm.searchResultsSpotify.toList(),
+        SearchSource.DEEZER to vm.searchResultsDeezerTracks.toList(),
+        SearchSource.TIDAL to vm.searchResultsTidalTracks.toList(),
+        SearchSource.QOBUZ to vm.searchResultsQobuzTracks.toList(),
+        SearchSource.YOUTUBE_MUSIC to vm.searchResultsYoutubeMusic.toList(),
+    ).filter { it.second.isNotEmpty() }
+
+    if (groups.isEmpty() && !vm.isSearchLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(str("search_no_results"), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        groups.forEach { (source, tracks) ->
+            item(key = "all-head-${source.name}") {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        searchSourceName(source),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = { vm.onSearchSourceChanged(source) },
+                        shapes = ButtonDefaults.shapes(),
+                    ) { Text(str("search_all_show_source")) }
+                }
+            }
+            items(tracks.take(ALL_PER_SOURCE), key = { "all-${source.name}-${it.id}" }) { track ->
+                SearchTrackRow(track, playerViewModel)
+            }
+        }
+    }
+}
+
+private const val ALL_PER_SOURCE = 5
 
 // ──────────────────────────────────────────────────────────────────────
 //  SoundCloud Search Results

@@ -2941,4 +2941,6 @@
     <string name="search_source_move_down">Move down</string>
     <string name="search_sources_edit">Edit sources…</string>
     <string name="together_library_subtitle">Listen together</string>
+    <string name="search_all_sources">All</string>
+    <string name="search_all_show_source">Show all</string>
 </resources>

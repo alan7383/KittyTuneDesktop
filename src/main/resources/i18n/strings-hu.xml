@@ -2943,4 +2943,6 @@
     <string name="search_source_move_down">Lejjebb</string>
     <string name="search_sources_edit">Források szerkesztése…</string>
     <string name="together_library_subtitle">Együtt hallgatni</string>
+    <string name="search_all_sources">Mind</string>
+    <string name="search_all_show_source">Mind mutatása</string>
 </resources>
