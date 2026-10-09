@@ -3,6 +3,10 @@ package com.alananasss.kittytune.ui.profile
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -83,14 +87,15 @@ internal fun OverviewStats(
                         title = str("listening_stats_top_artists"),
                         action = if (report.topArtists.size > 6) ({ onOpen(StatsList.ARTISTS) }) else null,
                     ) {
-                        // One photo for the top artist, the rest as a ranked list: a row of six avatars read as a crowd of
-                        // circles with a time under each, which said little about who was on top.
-                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                            TopArtistHero(report.topArtists.first(), Modifier.weight(1f)) { onArtistClick(report.topArtists.first()) }
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                report.topArtists.drop(1).take(4).forEachIndexed { index, artist ->
-                                    ArtistRankRow(index + 2, artist) { onArtistClick(artist) }
-                                }
+                        // One row of portrait cards, the artist's photo filling each, ranked: the way a streaming service
+                        // shows who you listen to, instead of a crowd of small circles.
+                        com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                            contentPadding = PaddingValues(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            fadeColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ) {
+                            itemsIndexed(report.topArtists.take(TOP_ARTISTS_SHOWN)) { index, artist ->
+                                TopArtistCard(index + 1, artist) { onArtistClick(artist) }
                             }
                         }
                     }
@@ -454,37 +459,38 @@ internal fun PlaysAndTime(plays: Int, listenMs: Long) {
 }
 
 @Composable
-private fun TopArtistHero(artist: ReportArtist, modifier: Modifier, onClick: () -> Unit) {
+private fun TopArtistCard(rank: Int, artist: ReportArtist, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Column(
-        modifier.clip(RoundedCornerShape(20.dp))
+    Box(
+        Modifier.size(width = 150.dp, height = 190.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .clickable(interactionSource = interaction, indication = ripple(), onClick = onClick)
-            .pressScale(interaction)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .pressScale(interaction),
     ) {
-        StatsCover(artist.imageUrl, Modifier.size(128.dp).clip(CircleShape), placeholder = Icons.Rounded.Person)
-        Spacer(Modifier.height(10.dp))
-        Text(artist.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        StatsCover(artist.imageUrl, Modifier.fillMaxSize(), placeholder = Icons.Rounded.Person)
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.78f)),
+            ),
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+            modifier = Modifier.align(Alignment.TopStart).padding(10.dp).size(28.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(rank.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            }
+        }
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp, vertical = 12.dp)) {
+            Text(artist.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 1)
+        }
     }
 }
 
-@Composable
-private fun ArtistRankRow(rank: Int, artist: ReportArtist, onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .clickable(interactionSource = interaction, indication = ripple(), onClick = onClick)
-            .padding(vertical = 6.dp, horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(rank.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(22.dp))
-        Text(artist.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        Spacer(Modifier.width(8.dp))
-        Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-    }
-}
+private const val TOP_ARTISTS_SHOWN = 12
 
 // ─── Habits ──────────────────────────────────────────────────────
 

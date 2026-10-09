@@ -106,9 +106,6 @@ internal fun HomeFeed(
             }
         }
 
-        // New videos of the artists being listened to, on the home page as on an artist's own (round 3, 24).
-        item { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel) }
-
         if (showHomeListeningStats) {
             item { Box(Modifier.padding(horizontal = HOME_PADDING)) { ListeningStatsCard(navController) } }
         }
@@ -116,6 +113,9 @@ internal fun HomeFeed(
         item {
             com.alananasss.kittytune.ui.home.HomeChartSection(vm, playerViewModel, onOpenCharts = { navController.navigate("charts") })
         }
+
+        // New videos of the artists being listened to, on the home page as on an artist's own (round 3, 24), under the chart.
+        item { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel) }
 
         item { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
 
@@ -301,26 +301,22 @@ private fun openHistoryEntry(entry: com.alananasss.kittytune.data.local.HistoryI
 }
 
 private val HOME_PADDING = 20.dp
-private val CONTINUE_TILE_WIDTH = 240.dp
+private val CONTINUE_TILE_WIDTH = 270.dp
 private const val CONTINUE_COUNT = 16
 
 /**
- * "Continue listening" as two columns of rows, the way Spotify lays it out: a cover, the name, and what kind of thing it
- * is under it. A row of square tiles could not say a track from an album from a playlist.
+ * "Continue listening" as one row that scrolls sideways: a cover, the name, and what kind of thing it is under it. A row of
+ * square tiles could not say a track from an album from a playlist, and two columns of these made the page long.
  */
 @Composable
 private fun ContinueGrid(entries: List<com.alananasss.kittytune.data.local.HistoryItem>, playerViewModel: PlayerViewModel) {
-    Column(
-        Modifier.padding(horizontal = HOME_PADDING),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+        contentPadding = PaddingValues(horizontal = HOME_PADDING),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        entries.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                pair.forEach { entry ->
-                    ContinueRow(entry, playerViewModel, Modifier.weight(1f))
-                }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
+        items(entries, key = { it.id }) { entry ->
+            ContinueRow(entry, playerViewModel, Modifier.width(CONTINUE_TILE_WIDTH))
         }
     }
 }
