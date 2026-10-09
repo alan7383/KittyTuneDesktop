@@ -1028,6 +1028,15 @@ fun ModernProfileHeader(
                         Text(str("history_title"), fontWeight = FontWeight.SemiBold)
                     }
                 }
+                Spacer(Modifier.height(16.dp))
+                // What the listener has, as numbers to open: it was a page of buttons with nothing about the person.
+                OwnProfileStats(
+                    tracks = user.trackCount,
+                    likes = profileViewModel.likedTracks.size,
+                    playlists = profileViewModel.playlists.size,
+                    reposts = profileViewModel.repostedTracks.size,
+                    onOpen = { section -> onNavigate("profile_collection:${user.id}:$section") },
+                )
             } else {
                 if (user.trackCount > 0) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -2340,4 +2349,43 @@ private fun ArtistAboutDialog(user: User, onDismiss: () -> Unit, playerViewModel
         },
         confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_close")) } },
     )
+}
+
+/** Four numbers for the listener's own page, each one opening what it counts. */
+@Composable
+private fun OwnProfileStats(tracks: Int, likes: Int, playlists: Int, reposts: Int, onOpen: (String) -> Unit) {
+    val items = listOf(
+        Triple(tracks, str("profile_tracks"), "tracks"),
+        Triple(likes, str("profile_tab_likes"), "likes"),
+        Triple(playlists, str("artist_more_playlists"), "playlists"),
+        Triple(reposts, str("profile_tab_reposts"), "reposts"),
+    )
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.forEach { (count, label, section) ->
+            Surface(
+                onClick = { onOpen(section) },
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.weight(1f),
+            ) {
+                Column(Modifier.padding(vertical = 14.dp, horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        NumberFormat.getIntegerInstance(com.alananasss.kittytune.core.Strings.locale()).format(count),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
 }
