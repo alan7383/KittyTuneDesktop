@@ -45,7 +45,6 @@ internal object SidebarDestinations {
         Destination(PlayerPreferences.SIDEBAR_NAV_EXPLORE, "genres", "explorer_title", Icons.Filled.Explore, Icons.Outlined.Explore),
         Destination(PlayerPreferences.SIDEBAR_NAV_RECOGNITION, "recognition", "pref_bottom_menu_fab_recognition", Icons.Filled.Mic, Icons.Outlined.Mic),
         Destination(PlayerPreferences.SIDEBAR_NAV_SYNC, "sync_settings", "sync_title", Icons.Filled.Devices, Icons.Outlined.Devices),
-        Destination(PlayerPreferences.SIDEBAR_NAV_TOGETHER, "together_home", "together_title", Icons.Filled.Groups, Icons.Outlined.Groups),
         Destination(PlayerPreferences.SIDEBAR_NAV_STATS, "listening_stats", "listening_stats_title", Icons.Filled.Leaderboard, Icons.Outlined.Leaderboard),
         Destination(PlayerPreferences.SIDEBAR_NAV_HISTORY, "history", "history_title", Icons.Filled.WatchLater, Icons.Outlined.WatchLater),
         Destination(PlayerPreferences.SIDEBAR_NAV_SETTINGS, "settings", "profile_menu_settings", Icons.Filled.Settings, Icons.Outlined.Settings),

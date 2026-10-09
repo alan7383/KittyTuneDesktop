@@ -277,12 +277,9 @@ class PlayerPreferences {
 
         const val SIDEBAR_NAV_HOME = "home"
 
-        /** Shared playlists: listening together by code. */
-        const val SIDEBAR_NAV_TOGETHER = "together"
-
         /** The rows shown by default. Home can be switched off too, as long as one row stays on. */
         val SIDEBAR_NAV_ITEMS = listOf(
-            SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC, SIDEBAR_NAV_TOGETHER,
+            SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC,
         )
 
         // Optional destinations the sidebar can carry; off until someone switches them on.
