@@ -460,15 +460,6 @@ private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, is
             },
         )
     }
-    AnimatedVisibility(knobs.uiStyle != LyricsUiStyle.CLASSIC) {
-        SwitchRow(
-            icon = Icons.Rounded.BlurOn,
-            title = str("pref_lyrics_line_blur_title"),
-            subtitle = str("pref_lyrics_line_blur_desc"),
-            checked = knobs.lineBlur,
-            onChange = { knobs.lineBlur = it },
-        )
-    }
     AnimatedVisibility(knobs.uiStyle == LyricsUiStyle.CLASSIC) {
         ChoiceRow(icon = Icons.Rounded.Subtitles, title = str("pref_lyrics_display_style")) {
             LyricsDisplayStylePicker(selected = knobs.displayStyle, onSelect = { knobs.displayStyle = it })
@@ -484,6 +475,15 @@ private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, is
             labelProvider = {
                 ChoiceLabel(if (it == LyricsFont.APPLE) str("pref_lyrics_font_apple_short") else str("pref_lyrics_font_app_default_short"))
             },
+        )
+    }
+    AnimatedVisibility(knobs.uiStyle != LyricsUiStyle.CLASSIC) {
+        SwitchRow(
+            icon = Icons.Rounded.BlurOn,
+            title = str("pref_lyrics_line_blur_title"),
+            subtitle = str("pref_lyrics_line_blur_desc"),
+            checked = knobs.lineBlur,
+            onChange = { knobs.lineBlur = it },
         )
     }
 }
