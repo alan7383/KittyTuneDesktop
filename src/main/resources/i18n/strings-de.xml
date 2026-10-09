@@ -3570,4 +3570,7 @@
     <string name="chart_country_ie">Irland</string>
     <string name="chart_country_at">Österreich</string>
     <string name="chart_country_cz">Tschechien</string>
+    <string name="full_player_cover_feather">Soften cover edges</string>
+    <string name="full_player_cover_feather_desc">Fade the cover into the background while lyrics are shown</string>
+    <string name="full_player_cover_feather_amount">Edge blur strength</string>
 </resources>

@@ -176,6 +176,8 @@ class PlayerPreferences {
         /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
         private const val LEGACY_ORBS_STYLE = "ORBS"
         private const val KEY_FULL_PLAYER_COVER_SCALE = "full_player_cover_scale"
+        private const val KEY_FULL_PLAYER_COVER_FEATHER = "full_player_cover_feather"
+        private const val KEY_FULL_PLAYER_COVER_FEATHER_AMOUNT = "full_player_cover_feather_amount"
         private const val KEY_FULL_PLAYER_LYRICS_ALIGN = "full_player_lyrics_align"
         private const val KEY_FULL_PLAYER_SCREENSAVER_ENABLED = "full_player_screensaver_enabled"
         private const val KEY_FULL_PLAYER_SCREENSAVER_TIMEOUT = "full_player_screensaver_timeout"
@@ -893,6 +895,13 @@ class PlayerPreferences {
 
     fun getFullPlayerCoverScale(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_SCALE, 1.0f).coerceIn(0.6f, 1.4f)
     fun setFullPlayerCoverScale(scale: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_SCALE, scale.coerceIn(0.6f, 1.4f))
+
+    fun getFullPlayerCoverFeather(): Boolean = Prefs.getBoolean(KEY_FULL_PLAYER_COVER_FEATHER, true)
+    fun setFullPlayerCoverFeather(enabled: Boolean) = Prefs.putBoolean(KEY_FULL_PLAYER_COVER_FEATHER, enabled)
+
+    /** 0..1, how far the soft edge reaches into the cover. */
+    fun getFullPlayerCoverFeatherAmount(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_FEATHER_AMOUNT, 0.6f).coerceIn(0f, 1f)
+    fun setFullPlayerCoverFeatherAmount(amount: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_FEATHER_AMOUNT, amount.coerceIn(0f, 1f))
 
     fun getFullPlayerLyricsAlign(): LyricsAlignment {
         val name = Prefs.getString(KEY_FULL_PLAYER_LYRICS_ALIGN, LyricsAlignment.LEFT.name)
