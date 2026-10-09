@@ -10,6 +10,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -58,29 +59,8 @@ internal fun LyricsDisplayStylePicker(
 
 @Composable
 private fun StyleCard(style: LyricsDisplayStyle, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    val container by animateColorAsState(
-        if (isSelected) scheme.secondaryContainer else scheme.surfaceContainerHigh, label = "styleCard"
-    )
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(14.dp),
-        color = container,
-        border = if (isSelected) BorderStroke(2.dp, scheme.primary) else null,
-        modifier = modifier,
-    ) {
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            StylePreview(style)
-            Text(
-                text = str(style.labelKey),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (isSelected) scheme.onSecondaryContainer else scheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-        }
+    PreviewCard(title = str(style.labelKey), isSelected = isSelected, onClick = onClick, modifier = modifier) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLowest)) { StylePreview(style) }
     }
 }
 
@@ -119,4 +99,4 @@ private val LyricsDisplayStyle.labelKey: String
 
 /** Uneven lengths, so the sample reads as lines of a song rather than as a striped block. */
 private val SAMPLE_WIDTHS = listOf(52.dp, 78.dp, 70.dp, 60.dp, 44.dp)
-private val PREVIEW_HEIGHT = 72.dp
+private val PREVIEW_HEIGHT = 76.dp

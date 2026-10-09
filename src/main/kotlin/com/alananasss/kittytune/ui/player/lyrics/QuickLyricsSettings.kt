@@ -141,7 +141,16 @@ fun QuickLyricsSettingsDialog(
                     .heightIn(max = min(PANEL_MAX_HEIGHT, maxHeight * 0.94f)),
             ) {
                 Column(Modifier.padding(start = 24.dp, end = 12.dp, top = 20.dp, bottom = 20.dp)) {
-                    Box(Modifier.padding(end = 12.dp)) { Header(onDismiss) }
+                    Box(Modifier.padding(end = 12.dp)) {
+                        Header(
+                            onSearch = {
+                                onDismiss()
+                                viewModel.isSearchingLyrics = true
+                            },
+                            onFocusMode = onFocusMode?.let { start -> { onDismiss(); start() } },
+                            onDismiss = onDismiss,
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                     // Everything under the title scrolls as one, beside a scrollbar. Only the tab's content used to
                     // scroll, in what room the sync card and the tabs left it, with no bar to show there was more.
@@ -150,35 +159,6 @@ fun QuickLyricsSettingsDialog(
                     Column(Modifier.padding(end = 12.dp).verticalScroll(scroll)) {
                     SyncCard(viewModel)
                     Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    ) {
-                        // The two ways out to other views, as small icons: they were full-width rows that took a
-                        // third of the panel between the title and the tabs.
-                        com.alananasss.kittytune.ui.common.Tip(str("lyrics_manual_search")) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    onDismiss()
-                                    viewModel.isSearchingLyrics = true
-                                },
-                                shapes = IconButtonDefaults.shapes(),
-                                modifier = Modifier.size(40.dp),
-                            ) { Icon(Icons.Rounded.Search, str("lyrics_manual_search"), modifier = Modifier.size(20.dp)) }
-                        }
-                        if (onFocusMode != null) {
-                            com.alananasss.kittytune.ui.common.Tip(str("screensaver_focus_mode")) {
-                                FilledTonalIconButton(
-                                    onClick = {
-                                        onDismiss()
-                                        onFocusMode()
-                                    },
-                                    shapes = IconButtonDefaults.shapes(),
-                                    modifier = Modifier.size(40.dp),
-                                ) { Icon(Icons.Rounded.DarkMode, str("screensaver_focus_mode"), modifier = Modifier.size(20.dp)) }
-                            }
-                        }
-                    }
                     Spacer(Modifier.height(16.dp))
                     ExpressiveConnectedButtonGroup(
                         options = QuickTab.entries,
@@ -225,7 +205,7 @@ fun QuickLyricsSettingsDialog(
 }
 
 @Composable
-private fun Header(onDismiss: () -> Unit) {
+private fun Header(onSearch: () -> Unit, onFocusMode: (() -> Unit)?, onDismiss: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         RowIcon(Icons.Rounded.Lyrics, large = true)
         Spacer(Modifier.width(14.dp))
@@ -235,6 +215,19 @@ private fun Header(onDismiss: () -> Unit) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f),
         )
+        // Beside the title, where they are found at once: they sat on a row of their own under the sync card.
+        com.alananasss.kittytune.ui.common.Tip(str("lyrics_manual_search")) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onSearch) {
+                Icon(Icons.Rounded.Search, str("lyrics_manual_search"))
+            }
+        }
+        if (onFocusMode != null) {
+            com.alananasss.kittytune.ui.common.Tip(str("screensaver_focus_mode")) {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = onFocusMode) {
+                    Icon(Icons.Rounded.DarkMode, str("screensaver_focus_mode"))
+                }
+            }
+        }
         IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismiss) {
             Icon(Icons.Rounded.Close, str("btn_close"))
         }
@@ -299,8 +292,8 @@ private fun DriftSync(viewModel: PlayerViewModel) {
             str("lyrics_sync_drift_title"),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
         )
+        Spacer(Modifier.width(6.dp))
         com.alananasss.kittytune.ui.common.Tip(str("lyrics_sync_drift_hint")) {
             Icon(
                 Icons.Rounded.Info,

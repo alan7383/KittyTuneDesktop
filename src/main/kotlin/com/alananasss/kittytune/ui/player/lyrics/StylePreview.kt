@@ -1,5 +1,11 @@
 package com.alananasss.kittytune.ui.player.lyrics
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,8 +38,10 @@ import com.alananasss.kittytune.data.local.FullPlayerBgStyle
 import com.alananasss.kittytune.data.local.FullPlayerLayout
 
 /**
- * A row of choices, each drawn as a small sketch of what it does with a name under it, instead of a row of words (round
- * 3 of the tester's list, 36.2). The chosen one has a border in the accent colour.
+ * Choices drawn as cards, two to a row: a sketch of what each does with its name under it.
+ *
+ * The same card as [LyricsDisplayStylePicker] draws, so every picture-choice in these settings looks and
+ * behaves alike: a raised card, the chosen one tinted and outlined in the accent colour.
  */
 @Composable
 internal fun <T> SketchChoices(
@@ -43,40 +51,58 @@ internal fun <T> SketchChoices(
     onSelect: (T) -> Unit,
     sketch: @Composable (T) -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        options.forEach { option ->
-            val isSelected = option == selected
-            Column(
-                Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(14.dp))
-                    .clickable { onSelect(option) }
-                    .padding(vertical = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(
-                            width = if (isSelected) 2.dp else 1.dp,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                            shape = RoundedCornerShape(12.dp),
-                        ),
-                ) { sketch(option) }
-                Text(
-                    label(option),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                )
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.chunked(2).forEach { pair ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { option ->
+                    PreviewCard(
+                        title = label(option),
+                        isSelected = option == selected,
+                        onClick = { onSelect(option) },
+                        modifier = Modifier.weight(1f),
+                    ) { sketch(option) }
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
     }
 }
+
+/** A card with a picture on top and a name under it; the chosen one is tinted and outlined. */
+@Composable
+internal fun PreviewCard(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    picture: @Composable () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val container by animateColorAsState(if (isSelected) scheme.secondaryContainer else scheme.surfaceContainerHigh, label = "previewCard")
+    val outline by animateColorAsState(if (isSelected) scheme.primary else Color.Transparent, label = "previewCardOutline")
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = container,
+        border = BorderStroke(2.dp, outline),
+        modifier = modifier,
+    ) {
+        Column(Modifier.padding(10.dp)) {
+            Box(Modifier.fillMaxWidth().height(PREVIEW_PICTURE_HEIGHT).clip(RoundedCornerShape(10.dp))) { picture() }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = if (isSelected) scheme.onSecondaryContainer else scheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp, start = 2.dp),
+            )
+        }
+    }
+}
+
+private val PREVIEW_PICTURE_HEIGHT = 76.dp
 
 /** What a background style looks like, in a few shapes. */
 @Composable
