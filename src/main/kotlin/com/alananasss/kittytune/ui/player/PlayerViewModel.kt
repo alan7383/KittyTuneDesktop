@@ -842,17 +842,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 }
             }
 
-            val missingLines = originalLines.filter { !translationMap.containsKey(it.trim()) }
-            if (missingLines.isNotEmpty()) {
-                val machineTranslations =
-                    com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(missingLines, targetLang)
-                translationMap.putAll(machineTranslations)
-            }
+            // Only what the reader cannot read already: foreign sentences whole, foreign words in their own language's
+            // lines word by word, and nothing at all under lines in their own language.
+            val smart = com.alananasss.kittytune.util.SmartTranslation.forLines(originalLines, targetLang, known = translationMap)
 
             withContext(Dispatchers.Main) {
                 for (i in lyricsLines.indices) {
                     val oldLine = lyricsLines[i]
-                    val newTranslation = translationMap[oldLine.text.trim()]
+                    val newTranslation = smart[oldLine.text.trim()]
                     lyricsLines[i] = oldLine.copy(translation = newTranslation)
                 }
                 isTranslatingLyrics = false
@@ -2618,8 +2615,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         val texts = lines.map { it.text }.filter { it.isNotBlank() }.distinct()
         val translations = if (wantsTranslation) {
-            com.alananasss.kittytune.data.network.FreeTranslator
-                .translateMissing(texts, variant.translationLang!!)
+            com.alananasss.kittytune.util.SmartTranslation.forLines(texts, variant.translationLang!!)
         } else {
             emptyMap()
         }
