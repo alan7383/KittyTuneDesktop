@@ -371,6 +371,8 @@ fun MiniLyricsPlayerWindow(
                     }
                 }
             }
+            // Restyled while still hidden: nothing to hide and re-show later, which is what froze the window.
+            if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
             window.addComponentListener(shownListener)
             windowReady = true
             onDispose { window.removeComponentListener(shownListener) }

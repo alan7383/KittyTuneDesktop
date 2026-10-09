@@ -93,8 +93,8 @@ internal class WheelSeek(
         /** Quiet time after the last notch before the player is asked to seek. */
         const val SETTLE_MS = 180L
 
-        /** The player's report is this close to the target: handed back. */
-        const val CAUGHT_UP_MS = 900L
+        /** The playhead is this close to the target: handed back. */
+        const val CAUGHT_UP_MS = 350L
         const val CATCH_UP_LIMIT_NANOS = 1_500_000_000L
         const val CATCH_UP_POLL_MS = 40L
 

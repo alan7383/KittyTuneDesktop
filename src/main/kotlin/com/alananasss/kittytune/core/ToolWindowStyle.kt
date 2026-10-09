@@ -1,7 +1,6 @@
 package com.alananasss.kittytune.core
 
 import com.sun.jna.Native
-import com.sun.jna.Pointer
 import com.sun.jna.platform.win32.User32
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
@@ -28,14 +27,17 @@ object ToolWindowStyle {
             val style = user32.GetWindowLong(hwnd, WinUser.GWL_EXSTYLE)
             val toolStyle = (style or WS_EX_TOOLWINDOW) and WS_EX_APPWINDOW.inv()
             if (style == toolStyle) return
-            // The shell only re-reads the style when the window is shown, so hide, restyle, show.
-            user32.ShowWindow(hwnd, WinUser.SW_HIDE)
+            if (!window.isShowing) {
+                // Not on screen yet: the style simply lands before the first show, nothing to hide.
+                user32.SetWindowLong(hwnd, WinUser.GWL_EXSTYLE, toolStyle)
+                return
+            }
+            // The shell only re-reads the style when the window is shown, so hide, restyle, show. Through AWT:
+            // hiding it with a bare ShowWindow left the toolkit believing the window was still up, and the window
+            // came back deaf to the mouse (the mini player could not be dragged, its menu not clicked).
+            window.isVisible = false
             user32.SetWindowLong(hwnd, WinUser.GWL_EXSTYLE, toolStyle)
-            user32.ShowWindow(hwnd, WinUser.SW_SHOWNOACTIVATE)
-            user32.SetWindowPos(
-                hwnd, WinDef.HWND(Pointer.NULL), 0, 0, 0, 0,
-                WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_NOZORDER or WinUser.SWP_FRAMECHANGED or 0x0010, // SWP_NOACTIVATE
-            )
+            window.isVisible = true
         }
     }
 

@@ -346,6 +346,7 @@ private fun formatBytes(bytes: Long): String = when {
 }
 
 private fun pickDirectory(title: String, initial: File?): File? {
+    if (com.alananasss.kittytune.core.NativeFileDialog.isWindowsHost) return com.alananasss.kittytune.core.NativeFileDialog.openFolder(title)
     val chooser = javax.swing.JFileChooser().apply {
         dialogTitle = title
         fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
@@ -364,6 +365,12 @@ private fun pickSaveFile(title: String, defaultName: String): File? {
 }
 
 private fun pickOpenFile(title: String): File? {
+    if (com.alananasss.kittytune.core.NativeFileDialog.isWindowsHost) {
+        return com.alananasss.kittytune.core.NativeFileDialog.openFile(
+            title,
+            com.alananasss.kittytune.core.NativeFileDialog.FileType(title, listOf(com.alananasss.kittytune.core.NativeFileDialog.ANY_FILE)),
+        )
+    }
     val chooser = javax.swing.JFileChooser().apply {
         dialogTitle = title
         fileSelectionMode = javax.swing.JFileChooser.FILES_ONLY

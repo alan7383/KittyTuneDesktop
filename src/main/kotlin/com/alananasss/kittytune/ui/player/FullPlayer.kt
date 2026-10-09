@@ -1507,9 +1507,11 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
     var scrubbing by remember { mutableStateOf(false) }
     var scrubPosition by remember { mutableFloatStateOf(0f) }
     var drawnMs by remember { mutableLongStateOf(0L) }
+    // What the smoothed playhead says, so the wheel hands the bar back only once the playhead itself has arrived.
+    var playheadMs by remember { mutableLongStateOf(0L) }
     val wheel = com.alananasss.kittytune.ui.main.rememberWheelSeek(
         drawnMs = { drawnMs },
-        reportedMs = { shownOf(viewModel.currentPosition) },
+        reportedMs = { playheadMs },
         durationMs = { clip?.lengthMs ?: viewModel.duration },
         stepSeconds = { seekWheelSeconds },
         commit = { target -> viewModel.seekTo(songOf(target)) },
@@ -1520,9 +1522,10 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
         reportedMs = shownOf(viewModel.currentPosition),
         isRunning = viewModel.isPlaying && !viewModel.isLoading,
-        followsInput = isScrubbingNow,
+        followsInput = scrubbing || viewModel.isScrubbing,
         trackKey = viewModel.currentTrack?.id,
     )
+    playheadMs = playhead
     val position = when {
         wheelMs != null -> wheelMs
         isScrubbingNow -> scrubPosition.toLong()

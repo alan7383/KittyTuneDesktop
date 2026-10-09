@@ -32,8 +32,6 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.upload.*
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
-import java.awt.FileDialog
-import java.awt.Frame
 import java.awt.datatransfer.DataFlavor
 import java.awt.dnd.*
 import java.awt.image.BufferedImage
@@ -41,8 +39,6 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.imageio.ImageIO
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -4238,52 +4234,19 @@ private fun SwitchRow(
 }
 
 // ---------------- FILE CHOOSER HELPERS ----------------
+// The dialog Explorer itself uses (AWT's FileDialog froze the app while it was open and surfaced behind it).
 private fun openNativeAudioFileChooser(onFileSelected: (File) -> Unit) {
-    try {
-        val fileDialog = FileDialog(null as Frame?, str("upload_choose_audio"), FileDialog.LOAD)
-        fileDialog.setFilenameFilter { _, name ->
-            val ext = name.substringAfterLast(".", "").lowercase()
-            ext in listOf("mp3", "wav", "flac", "aac", "ogg", "m4a", "aiff")
-        }
-        fileDialog.isVisible = true
-        val file = fileDialog.file
-        val dir = fileDialog.directory
-        if (file != null && dir != null) {
-            onFileSelected(File(dir, file))
-        }
-    } catch (e: Exception) {
-        val chooser = JFileChooser()
-        chooser.dialogTitle = str("upload_choose_audio")
-        chooser.fileFilter = FileNameExtensionFilter("Audio Files (*.mp3, *.wav, *.flac, *.aac, *.ogg, *.m4a, *.aiff)", "mp3", "wav", "flac", "aac", "ogg", "m4a", "aiff")
-        val result = chooser.showOpenDialog(null)
-        if (result == JFileChooser.APPROVE_OPTION && chooser.selectedFile != null) {
-            onFileSelected(chooser.selectedFile)
-        }
-    }
+    com.alananasss.kittytune.core.NativeFileDialog.openFile(
+        str("upload_choose_audio"),
+        com.alananasss.kittytune.core.NativeFileDialog.FileType("Audio", listOf("mp3", "wav", "flac", "aac", "ogg", "m4a", "aiff")),
+    )?.let(onFileSelected)
 }
 
 private fun openNativeImageFileChooser(onFileSelected: (File) -> Unit) {
-    try {
-        val fileDialog = FileDialog(null as Frame?, str("upload_choose_artwork"), FileDialog.LOAD)
-        fileDialog.setFilenameFilter { _, name ->
-            val ext = name.substringAfterLast(".", "").lowercase()
-            ext in listOf("jpg", "jpeg", "png", "webp")
-        }
-        fileDialog.isVisible = true
-        val file = fileDialog.file
-        val dir = fileDialog.directory
-        if (file != null && dir != null) {
-            onFileSelected(File(dir, file))
-        }
-    } catch (e: Exception) {
-        val chooser = JFileChooser()
-        chooser.dialogTitle = str("upload_choose_artwork")
-        chooser.fileFilter = FileNameExtensionFilter("Image Files (*.jpg, *.jpeg, *.png, *.webp)", "jpg", "jpeg", "png", "webp")
-        val result = chooser.showOpenDialog(null)
-        if (result == JFileChooser.APPROVE_OPTION && chooser.selectedFile != null) {
-            onFileSelected(chooser.selectedFile)
-        }
-    }
+    com.alananasss.kittytune.core.NativeFileDialog.openFile(
+        str("upload_choose_artwork"),
+        com.alananasss.kittytune.core.NativeFileDialog.FileType("Images", listOf("jpg", "jpeg", "png", "webp")),
+    )?.let(onFileSelected)
 }
 
 private fun formatFileSize(bytes: Long): String {

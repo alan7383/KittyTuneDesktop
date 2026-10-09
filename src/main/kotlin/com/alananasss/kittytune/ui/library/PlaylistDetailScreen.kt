@@ -92,8 +92,6 @@ import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.utils.NetworkUtils
 import kotlinx.coroutines.flow.first
-import java.awt.FileDialog
-import java.awt.Frame
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
@@ -1624,12 +1622,10 @@ fun PlaylistDetailScreen(
                                             leadingIcon = { Icon(Icons.Outlined.Image, null) },
                                             onClick = {
                                                 showOptionsMenu = false
-                                                val dialog = FileDialog(null as Frame?, str("storage_change_btn"), FileDialog.LOAD)
-                                                dialog.setFilenameFilter { _, name ->
-                                                    name.endsWith(".png", true) || name.endsWith(".jpg", true) || name.endsWith(".jpeg", true) || name.endsWith(".webp", true)
-                                                }
-                                                dialog.isVisible = true
-                                                val file = dialog.files.firstOrNull()
+                                                val file = com.alananasss.kittytune.core.NativeFileDialog.openFile(
+                                                    str("storage_change_btn"),
+                                                    com.alananasss.kittytune.core.NativeFileDialog.FileType("Images", listOf("png", "jpg", "jpeg", "webp")),
+                                                )
                                                 if (file != null && currentIdLong != 0L) DownloadManager.updatePlaylistCover(currentIdLong, file, title = playlistTitle, artist = playlistUser?.username)
                                             }
                                         )

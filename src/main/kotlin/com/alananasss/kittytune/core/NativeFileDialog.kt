@@ -33,6 +33,9 @@ object NativeFileDialog {
     /** A file type the dialog offers: its name, and the extensions it covers without dots. */
     data class FileType(val name: String, val extensions: List<String>)
 
+    /** The extension to list when any file will do: the dialog then shows "*.*". */
+    const val ANY_FILE = "*"
+
     /** The chosen file, or null when the dialog was dismissed. */
     fun openFile(title: String, type: FileType): File? = open(title, type, folder = false)
 
@@ -62,8 +65,10 @@ object NativeFileDialog {
 
     private fun awtOpenFile(title: String, type: FileType): File? {
         val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD)
-        dialog.file = type.extensions.joinToString(";") { "*.$it" }
-        dialog.setFilenameFilter { _, name -> type.extensions.any { name.endsWith(".$it", ignoreCase = true) } }
+        if (ANY_FILE !in type.extensions) {
+            dialog.file = type.extensions.joinToString(";") { "*.$it" }
+            dialog.setFilenameFilter { _, name -> type.extensions.any { name.endsWith(".$it", ignoreCase = true) } }
+        }
         dialog.isVisible = true
         return dialog.files.firstOrNull()
     }
