@@ -8,6 +8,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 
 /**
@@ -95,6 +96,12 @@ private val countryCache = java.util.concurrent.ConcurrentHashMap<String, Pair<L
 private const val COUNTRY_CACHE_MS = 6 * 60 * 60 * 1000L
 
 private suspend fun loadCountryChart(country: ChartCountry?, limit: Int): List<Track> {
+    // Spotify's own "Top 50" for the country first: its songs play as they are, so nothing has to be matched
+    // and the chart opens in a second or two instead of waiting on fifty searches.
+    if (country != null) {
+        val spotify = spotifyCountryChart(country, limit)
+        if (spotify.size >= minOf(limit, MIN_REAL_CHART)) return spotify
+    }
     if (country == null || country.hasDeezerChart) {
         val deezer = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.countryChart(limit, country?.deezerName)
         if (deezer.size >= minOf(limit, MIN_REAL_CHART) || country == null) return deezer
@@ -108,6 +115,45 @@ private suspend fun loadCountryChart(country: ChartCountry?, limit: Int): List<T
     }
     return matched.filterNotNull().take(limit)
 }
+
+/**
+ * Spotify's own "Top 50 - <country>" playlist for [country], or nothing where Spotify keeps none (not Russia, not
+ * Vietnam). The playlists are found in Spotify's search by their name and by Spotify being their owner, once per session,
+ * rather than from a table of ids that would go stale.
+ */
+private suspend fun spotifyCountryChart(country: ChartCountry, limit: Int): List<Track> = runCatching {
+    val index = spotifyTop50Index()
+    val id = listOf(country.deezerName, spotifyCountryAlias(country)).firstNotNullOfOrNull { index[it.lowercase()] }
+        ?: return@runCatching emptyList()
+    com.alananasss.kittytune.data.spotify.SpotifyRepository.getPlaylist(id, maxTracks = limit)
+        ?.tracks.orEmpty().filter { it.isPlayable }.map { it.toTrack() }.take(limit)
+}.getOrDefault(emptyList())
+
+/** How Spotify titles the playlist where it differs from the name Deezer uses. */
+private fun spotifyCountryAlias(country: ChartCountry): String = when (country) {
+    ChartCountry.US -> "USA"
+    else -> country.deezerName
+}
+
+private val spotifyTop50Mutex = kotlinx.coroutines.sync.Mutex()
+private var spotifyTop50: Map<String, String>? = null
+
+/** Country name (lower case) to the id of Spotify's "Top 50 - <country>". A search that comes back empty is not kept. */
+private suspend fun spotifyTop50Index(): Map<String, String> = spotifyTop50Mutex.withLock {
+    spotifyTop50?.let { return it }
+    val found = (0 until TOP50_PAGES).flatMap { page ->
+        // The dash is left out of the query: with it, Spotify's search buried its own playlists under other people's.
+        com.alananasss.kittytune.data.spotify.SpotifyRepository.search("Top 50 Germany", limit = TOP50_PAGE_SIZE, offset = page * TOP50_PAGE_SIZE).playlists
+    }
+    val index = found
+        .filter { it.ownerName.equals("Spotify", ignoreCase = true) && it.name.startsWith("Top 50 - ", ignoreCase = true) }
+        .associate { it.name.removePrefix("Top 50 - ").trim().lowercase() to it.id }
+    if (index.isNotEmpty()) spotifyTop50 = index
+    index
+}
+
+private const val TOP50_PAGES = 3
+private const val TOP50_PAGE_SIZE = 30
 
 /** Fewer songs than this from Deezer is a chart it no longer keeps up. */
 private const val MIN_REAL_CHART = 10
