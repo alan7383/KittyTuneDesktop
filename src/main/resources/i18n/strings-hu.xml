@@ -2946,4 +2946,19 @@
     <string name="search_all_sources">Mind</string>
     <string name="search_all_show_source">Mind mutatása</string>
     <string name="home_clips_title">Klipek</string>
+    <string name="chart_country_fi">Finnország</string>
+    <string name="chart_country_se">Svédország</string>
+    <string name="chart_country_no">Norvégia</string>
+    <string name="chart_country_pl">Lengyelország</string>
+    <string name="chart_country_it">Olaszország</string>
+    <string name="chart_country_es">Spanyolország</string>
+    <string name="chart_country_nl">Hollandia</string>
+    <string name="chart_country_ca">Kanada</string>
+    <string name="chart_country_au">Ausztrália</string>
+    <string name="chart_country_jp">Japán</string>
+    <string name="chart_country_br">Brazília</string>
+    <string name="chart_country_mx">Mexikó</string>
+    <string name="chart_country_ie">Írország</string>
+    <string name="chart_country_at">Ausztria</string>
+    <string name="chart_country_cz">Csehország</string>
 </resources>

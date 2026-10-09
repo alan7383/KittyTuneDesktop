@@ -334,7 +334,7 @@ import com.alananasss.kittytune.utils.Logger
                     limit = CHART_PREVIEW_LENGTH,
                     // The landing previews one market; picking another belongs to the chart screen.
                     countryCode = "US",
-                    country = ChartCountry.forLanguage(com.alananasss.kittytune.core.Strings.resolvedLanguage),
+                    country = ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage),
                 )
                 if (kind == chartPreviewKind) {
                     chartPreview.clear()

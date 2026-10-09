@@ -2944,4 +2944,19 @@
     <string name="search_all_sources">All</string>
     <string name="search_all_show_source">Show all</string>
     <string name="home_clips_title">Clips</string>
+    <string name="chart_country_fi">Finland</string>
+    <string name="chart_country_se">Sweden</string>
+    <string name="chart_country_no">Norway</string>
+    <string name="chart_country_pl">Poland</string>
+    <string name="chart_country_it">Italy</string>
+    <string name="chart_country_es">Spain</string>
+    <string name="chart_country_nl">Netherlands</string>
+    <string name="chart_country_ca">Canada</string>
+    <string name="chart_country_au">Australia</string>
+    <string name="chart_country_jp">Japan</string>
+    <string name="chart_country_br">Brazil</string>
+    <string name="chart_country_mx">Mexico</string>
+    <string name="chart_country_ie">Ireland</string>
+    <string name="chart_country_at">Austria</string>
+    <string name="chart_country_cz">Czech Republic</string>
 </resources>

@@ -84,11 +84,38 @@
         DE("DE", "Germany", "\uD83C\uDDE9\uD83C\uDDEA", "de", "de"),
         FR("FR", "France", "\uD83C\uDDEB\uD83C\uDDF7", "fr", "fr"),
         HU("HU", "Hungary", "\uD83C\uDDED\uD83C\uDDFA", "hu", "hu"),
-        VN("VN", "Vietnam", "\uD83C\uDDFB\uD83C\uDDF3", "vi", "vn");
+        VN("VN", "Vietnam", "\uD83C\uDDFB\uD83C\uDDF3", "vi", "vn"),
+        // Countries where Spotify keeps its own Top 50, so the chart opens at once. No Deezer chart is assumed for them:
+        // Deezer answers an unknown country with its world chart, which would pass for a local one.
+        FI("FI", "Finland", "", "fi", "fi", hasDeezerChart = false),
+        SE("SE", "Sweden", "", "sv", "se", hasDeezerChart = false),
+        NO("NO", "Norway", "", "no", "no", hasDeezerChart = false),
+        PL("PL", "Poland", "", "pl", "pl", hasDeezerChart = false),
+        IT("IT", "Italy", "", "it", "it", hasDeezerChart = false),
+        ES("ES", "Spain", "", "es", "es", hasDeezerChart = false),
+        NL("NL", "Netherlands", "", "nl", "nl", hasDeezerChart = false),
+        CA("CA", "Canada", "", "en", "ca", hasDeezerChart = false),
+        AU("AU", "Australia", "", "en", "au", hasDeezerChart = false),
+        JP("JP", "Japan", "", "ja", "jp", hasDeezerChart = false),
+        BR("BR", "Brazil", "", "pt", "br", hasDeezerChart = false),
+        MX("MX", "Mexico", "", "es", "mx", hasDeezerChart = false),
+        IE("IE", "Ireland", "", "en", "ie", hasDeezerChart = false),
+        AT("AT", "Austria", "", "de", "at", hasDeezerChart = false),
+        CZ("CZ", "Czech Republic", "", "cs", "cz", hasDeezerChart = false);
 
         companion object {
             /** The country whose language the app is in. */
             fun forLanguage(language: String): ChartCountry = entries.firstOrNull { it.language == language } ?: US
+
+            /**
+             * The country the computer is set to: the region of the formats (Windows "Region"), not the language of the
+             * app. A Russian interface in Finland is a listener in Finland, and the chart for "your country" is Finland's.
+             */
+            fun forDevice(language: String): ChartCountry {
+                val region = java.util.Locale.getDefault(java.util.Locale.Category.FORMAT).country.uppercase()
+                val code = if (region == "GB") "UK" else region
+                return entries.firstOrNull { it.code == code } ?: forLanguage(language)
+            }
         }
     }
 
@@ -108,7 +135,7 @@
         // ── The song chart ──
         var chartKind by mutableStateOf(ChartKind.COUNTRY)
         var chartGenre by mutableStateOf(chartGenres.first())
-        var chartCountry by mutableStateOf(ChartCountry.forLanguage(com.alananasss.kittytune.core.Strings.resolvedLanguage))
+        var chartCountry by mutableStateOf(ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage))
         val chartEntries = mutableStateListOf<ChartEntry>()
         var isChartLoading by mutableStateOf(false)
 

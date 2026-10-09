@@ -2943,4 +2943,19 @@
     <string name="search_all_sources">Все</string>
     <string name="search_all_show_source">Показать все</string>
     <string name="home_clips_title">Клипы</string>
+    <string name="chart_country_fi">Финляндия</string>
+    <string name="chart_country_se">Швеция</string>
+    <string name="chart_country_no">Норвегия</string>
+    <string name="chart_country_pl">Польша</string>
+    <string name="chart_country_it">Италия</string>
+    <string name="chart_country_es">Испания</string>
+    <string name="chart_country_nl">Нидерланды</string>
+    <string name="chart_country_ca">Канада</string>
+    <string name="chart_country_au">Австралия</string>
+    <string name="chart_country_jp">Япония</string>
+    <string name="chart_country_br">Бразилия</string>
+    <string name="chart_country_mx">Мексика</string>
+    <string name="chart_country_ie">Ирландия</string>
+    <string name="chart_country_at">Австрия</string>
+    <string name="chart_country_cz">Чехия</string>
 </resources>

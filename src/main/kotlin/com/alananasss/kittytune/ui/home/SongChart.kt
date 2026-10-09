@@ -120,7 +120,8 @@ fun SongChart(
         if (country != null && kind == ChartKind.COUNTRY) {
             Spacer(Modifier.padding(top = 4.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(ChartCountry.entries.toList()) { option ->
+                // The listener's own country first, then the rest in their usual order.
+                items(ChartCountry.entries.sortedBy { if (it == ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage)) 0 else 1 }) { option ->
                     FilterChip(
                         selected = option == country,
                         onClick = { onCountryChange(option) },

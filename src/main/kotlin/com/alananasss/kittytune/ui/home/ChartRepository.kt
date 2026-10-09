@@ -149,8 +149,7 @@ private suspend fun loadCountryChart(country: ChartCountry?, limit: Int): List<T
  * rather than from a table of ids that would go stale.
  */
 private suspend fun spotifyCountryChart(country: ChartCountry, limit: Int): List<Track> = runCatching {
-    val index = spotifyTop50Index()
-    val id = listOf(country.deezerName, spotifyCountryAlias(country)).firstNotNullOfOrNull { index[it.lowercase()] }
+    val id = spotifyTop50Id(listOf(country.deezerName, spotifyCountryAlias(country)).distinct())
         ?: return@runCatching emptyList()
     com.alananasss.kittytune.data.spotify.SpotifyRepository.getPlaylist(id, maxTracks = limit)
         ?.tracks.orEmpty().filter { it.isPlayable }.map { it.toTrack() }.take(limit)
@@ -163,20 +162,36 @@ private fun spotifyCountryAlias(country: ChartCountry): String = when (country) 
 }
 
 private val spotifyTop50Mutex = kotlinx.coroutines.sync.Mutex()
-private var spotifyTop50: Map<String, String>? = null
 
-/** Country name (lower case) to the id of Spotify's "Top 50 - <country>". A search that comes back empty is not kept. */
-private suspend fun spotifyTop50Index(): Map<String, String> = spotifyTop50Mutex.withLock {
-    spotifyTop50?.let { return it }
-    val found = (0 until TOP50_PAGES).flatMap { page ->
-        // The dash is left out of the query: with it, Spotify's search buried its own playlists under other people's.
-        com.alananasss.kittytune.data.spotify.SpotifyRepository.search("Top 50 Germany", limit = TOP50_PAGE_SIZE, offset = page * TOP50_PAGE_SIZE).playlists
+/** Lower-case country name to the id of Spotify's "Top 50 - <country>", filled in as countries are asked for. */
+private val spotifyTop50 = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+/** Countries searched for already, so one that Spotify has no chart for is not searched for again and again. */
+private val spotifyTop50Searched = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+/**
+ * The id of Spotify's own "Top 50 - <country>" for the first of [names] that has one. Each name is looked up in Spotify's
+ * search by "Top 50 <name>" (the dash is left out: with it Spotify's search buried its own playlists under other people's),
+ * and only a playlist owned by Spotify with exactly that title is taken. One search turns up the charts of many countries
+ * at once, so they are all remembered.
+ */
+private suspend fun spotifyTop50Id(names: List<String>): String? = spotifyTop50Mutex.withLock {
+    for (name in names) {
+        spotifyTop50[name.lowercase()]?.let { return it }
     }
-    val index = found
-        .filter { it.ownerName.equals("Spotify", ignoreCase = true) && it.name.startsWith("Top 50 - ", ignoreCase = true) }
-        .associate { it.name.removePrefix("Top 50 - ").trim().lowercase() to it.id }
-    if (index.isNotEmpty()) spotifyTop50 = index
-    index
+    for (name in names) {
+        if (!spotifyTop50Searched.add(name.lowercase())) continue
+        val found = (0 until TOP50_PAGES).flatMap { page ->
+            com.alananasss.kittytune.data.spotify.SpotifyRepository
+                .search("Top 50 $name", limit = TOP50_PAGE_SIZE, offset = page * TOP50_PAGE_SIZE).playlists
+        }
+        found.filter { it.ownerName.equals("Spotify", ignoreCase = true) && it.name.startsWith("Top 50 - ", ignoreCase = true) }
+            .forEach { spotifyTop50[it.name.removePrefix("Top 50 - ").trim().lowercase()] = it.id }
+        for (candidate in names) {
+            spotifyTop50[candidate.lowercase()]?.let { return it }
+        }
+    }
+    null
 }
 
 private const val TOP50_PAGES = 3
