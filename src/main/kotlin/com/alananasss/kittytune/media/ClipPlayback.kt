@@ -200,7 +200,8 @@ class ClipPlayback(
 
     private companion object {
         const val NO_SEEK = -1L
-        const val LINE_BUFFER_MS = 400
+        /** Room for a whole run of sound stored ahead of its pictures, so writing it never holds up decoding the pictures. */
+        const val LINE_BUFFER_MS = 1000
         const val PAUSED_POLL_MS = 40L
 
         /** A picture this far behind the sound is skipped rather than shown late. */
