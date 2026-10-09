@@ -1044,8 +1044,11 @@ private const val SPACING_PER_SP = 0.34f
  * height, capped, so it stays about a third of the window and keeps its air instead of growing to fill
  * whatever it is put in. That cap is the difference between this and the first attempt.
  */
-/** How much of each side of the sleeve fades out: a sixth of it, which reads as a soft edge rather than a vignette. */
-private const val FEATHER_FRACTION = 0.16f
+/**
+ * How much of each side of the sleeve fades out, from the setting's 0..1: from a thin fringe to the outer third of the cover.
+ * The old fixed sixth was reported as hardly blurring the edges at all.
+ */
+private fun featherFraction(amount: Float): Float = 0.10f + 0.30f * amount.coerceIn(0f, 1f)
 
 /** Fades all four edges of what it is drawn over to nothing, so the image melts into whatever is behind it. */
 private fun Modifier.featheredEdges(fraction: Float): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -1110,7 +1113,7 @@ private fun CoverColumn(
                     )
                     .clip(coverShape)
                     // With the words beside it the sleeve's edges melt into the screen rather than stopping at a line.
-                    .then(if (showText) Modifier.featheredEdges(FEATHER_FRACTION) else Modifier)
+                    .then(if (showText && viewModel.fullPlayerCoverFeather) Modifier.featheredEdges(featherFraction(viewModel.fullPlayerCoverFeatherAmount)) else Modifier)
                     // A hairline, so the sleeve's edge and corners read even when it is as dark as the wall.
                     .border(1.dp, Color.White.copy(alpha = 0.08f), coverShape)
                     .pointerInput(Unit) {

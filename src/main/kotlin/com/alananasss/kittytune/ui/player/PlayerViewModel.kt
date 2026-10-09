@@ -219,6 +219,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var fullPlayerHeartSide by mutableStateOf(playerPrefs.getFullPlayerHeartSide())
         private set
     var fullPlayerCoverScale by mutableFloatStateOf(playerPrefs.getFullPlayerCoverScale())
+    var fullPlayerCoverFeather by mutableStateOf(playerPrefs.getFullPlayerCoverFeather())
+    var fullPlayerCoverFeatherAmount by mutableFloatStateOf(playerPrefs.getFullPlayerCoverFeatherAmount())
         private set
     var fullPlayerLyricsAlign by mutableStateOf(playerPrefs.getFullPlayerLyricsAlign())
         private set
@@ -4633,6 +4635,17 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     fun updateFullPlayerHeartSide(side: com.alananasss.kittytune.data.local.FullPlayerHeartSide) {
         fullPlayerHeartSide = side
         playerPrefs.setFullPlayerHeartSide(side)
+    }
+
+    fun updateFullPlayerCoverFeather(enabled: Boolean) {
+        fullPlayerCoverFeather = enabled
+        playerPrefs.setFullPlayerCoverFeather(enabled)
+    }
+
+    fun updateFullPlayerCoverFeatherAmount(amount: Float) {
+        val clamped = amount.coerceIn(0f, 1f)
+        fullPlayerCoverFeatherAmount = clamped
+        playerPrefs.setFullPlayerCoverFeatherAmount(clamped)
     }
 
     fun updateFullPlayerCoverScale(scale: Float) {

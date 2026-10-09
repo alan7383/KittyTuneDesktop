@@ -2958,4 +2958,7 @@
     <string name="chart_country_ie">Ирландия</string>
     <string name="chart_country_at">Австрия</string>
     <string name="chart_country_cz">Чехия</string>
+    <string name="full_player_cover_feather">Размытие краёв обложки</string>
+    <string name="full_player_cover_feather_desc">Края обложки растворяются в фоне, пока показан текст</string>
+    <string name="full_player_cover_feather_amount">Сила размытия краёв</string>
 </resources>

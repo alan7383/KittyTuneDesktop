@@ -430,6 +430,25 @@ private fun ColumnScope.LookTab(viewModel: PlayerViewModel, knobs: ModeKnobs, is
                 )
             }
         }
+        SwitchRow(
+            icon = Icons.Rounded.BlurOn,
+            title = str("full_player_cover_feather"),
+            subtitle = str("full_player_cover_feather_desc"),
+            checked = viewModel.fullPlayerCoverFeather,
+            onChange = { viewModel.updateFullPlayerCoverFeather(it) },
+        )
+        AnimatedVisibility(viewModel.fullPlayerCoverFeather) {
+            SliderRow(
+                icon = Icons.Rounded.BlurLinear,
+                title = str("full_player_cover_feather_amount"),
+                value = viewModel.fullPlayerCoverFeatherAmount,
+                valueText = "${(viewModel.fullPlayerCoverFeatherAmount * 100).roundToInt()}%",
+                range = 0f..1f,
+                steps = 19,
+                onChange = { viewModel.updateFullPlayerCoverFeatherAmount(it) },
+                onReset = { viewModel.updateFullPlayerCoverFeatherAmount(0.6f) },
+            )
+        }
         SliderRow(
             icon = Icons.Rounded.ZoomIn,
             title = str("full_player_cover_zoom"),
