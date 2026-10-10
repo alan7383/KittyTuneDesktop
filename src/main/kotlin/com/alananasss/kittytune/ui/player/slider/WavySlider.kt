@@ -6,6 +6,7 @@ import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -27,6 +28,8 @@ fun WavySlider(
     wavelength: Dp = WavyProgressIndicatorDefaults.LinearDeterminateWavelength,
     waveSpeed: Dp = WavyProgressIndicatorDefaults.LinearDeterminateWavelength / 2f,
     bufferedValue: Float? = null,
+    mix: MixTransition? = null,
+    mixColor: Color = colors.activeTrackColor,
 ) {
     WavySliderExpressive(
         value = { value },
@@ -43,6 +46,8 @@ fun WavySlider(
         strokeWidth = strokeWidth,
         thumbRadius = thumbRadius,
         wavelength = wavelength,
-        waveSpeed = waveSpeed
+        waveSpeed = waveSpeed,
+        mix = mix,
+        mixColor = mixColor,
     )
 }

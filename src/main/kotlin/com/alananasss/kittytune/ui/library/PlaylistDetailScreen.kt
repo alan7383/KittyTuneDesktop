@@ -92,8 +92,6 @@ import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.utils.NetworkUtils
 import kotlinx.coroutines.flow.first
-import java.awt.FileDialog
-import java.awt.Frame
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 import java.io.File
@@ -434,8 +432,6 @@ fun PlaylistDetailScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showOptionsMenu by remember { mutableStateOf(false) }
-    var showSortMenu by remember { mutableStateOf(false) }
-    var showViewModeMenu by remember { mutableStateOf(false) }
     var showDetailsSheet by remember { mutableStateOf(false) }
 
     var playlistSearchQuery by remember { mutableStateOf("") }
@@ -870,7 +866,14 @@ fun PlaylistDetailScreen(
                 playlistId == "likes" -> {
                     playlistTitle = str("lib_liked_tracks")
                     defaultIcon = Icons.Rounded.Favorite
-                    playlistUser = try {
+                    // The profile the library cached, when there is one: asking the API for it every time put
+                    // the "By <you>" line a round-trip behind the rest of the header, popping in last on every
+                    // visit (issue #66).
+                    val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+                    val cachedUsername = prefs.getCachedUsername()
+                    playlistUser = playerViewModel.currentUser ?: if (cachedUsername != null && prefs.getCachedUserId() > 0) {
+                        User(prefs.getCachedUserId(), cachedUsername, null)
+                    } else try {
                         api.getMe()
                     } catch (e: Exception) {
                         User(0, str("me_artist"), null)
@@ -1003,7 +1006,9 @@ fun PlaylistDetailScreen(
                                 artworkUrl = local.localArtworkPath.ifEmpty { local.artworkUrl },
                                 durationMs = local.duration,
                                 user = User(0, local.artist, null),
-                                likedAt = addedAtMap[local.id]?.takeIf { it > 0 }
+                                likedAt = addedAtMap[local.id]?.takeIf { it > 0 },
+                                source = local.source ?: "soundcloud",
+                                permalinkUrl = local.permalinkUrl,
                             )
                         })
                     } else {
@@ -1147,7 +1152,7 @@ fun PlaylistDetailScreen(
             title = { Text(str(if (isUserCreated) "dialog_delete_playlist_title" else "dialog_delete_playlist_from_lib_title")) },
             text = { Text(str("dialog_delete_playlist_msg")) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     if (stableId != 0L) {
                         DownloadManager.deletePlaylist(
                             playlistId = stableId,
@@ -1159,7 +1164,7 @@ fun PlaylistDetailScreen(
                     onBackClick()
                 }) { Text(str("btn_confirm"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1169,7 +1174,7 @@ fun PlaylistDetailScreen(
             title = { Text(str("dialog_remove_download_title")) },
             text = { Text(str("dialog_remove_download_msg")) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     if (playlistId == "likes") {
                         // Full list, not tracksToDisplay — an active search must not
                         // limit the removal to the visible subset.
@@ -1181,7 +1186,7 @@ fun PlaylistDetailScreen(
                     if (isDownloadedView) onBackClick()
                 }) { Text(str("btn_delete"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1199,7 +1204,7 @@ fun PlaylistDetailScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     if (currentIdLong != 0L && newTitle.isNotBlank()) {
                         DownloadManager.editPlaylistMetadata(currentIdLong, newTitle)
                         playlistTitle = newTitle
@@ -1207,7 +1212,7 @@ fun PlaylistDetailScreen(
                     showRenameDialog = false
                 }) { Text(str("btn_confirm")) }
             },
-            dismissButton = { TextButton(onClick = { showRenameDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showRenameDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1285,8 +1290,11 @@ fun PlaylistDetailScreen(
         val creatorName = playlistUser?.username
         val isVerified = playlistUser?.verified == true
         when {
-            playlistId == "likes" -> PlaybackContext(str("context_playlist", str("lib_liked_tracks")), "likes", null, artistName = null)
-            playlistId == "downloads" -> PlaybackContext(str("context_playlist", str("lib_downloads")), "downloads", null, artistName = null)
+            // Named for what they are: "Playlist · Liked tracks" called a list of likes a playlist (issue #66).
+            // Only playlists somebody made keep the word.
+            playlistId == "likes" -> PlaybackContext(str("lib_liked_tracks"), "likes", null, artistName = null)
+            playlistId == "downloads" -> PlaybackContext(str("lib_downloads"), "downloads", null, artistName = null)
+            playlistId == "local_files" -> PlaybackContext(str("local_media_title"), "local_files", null, artistName = null)
             playlistId.startsWith("station") || playlistId.startsWith("yt_radio:") ->
                 PlaybackContext(str("context_station", playlistTitle), playlistId, playlistCover, artistName = null, isVerified = isVerified)
             isAlbum -> PlaybackContext(str("context_album", playlistTitle), playlistId, playlistCover, artistName = creatorName, isVerified = isVerified)
@@ -1326,6 +1334,11 @@ fun PlaylistDetailScreen(
             }
         }
 
+        // The colour of the liked songs, from the top, while one of them plays (issue #66).
+        if (playlistId == "likes" && likedTracksRepo.size >= 4) {
+            LikesAura(likedTracksRepo, playerViewModel, modifier = Modifier.align(Alignment.TopCenter))
+        }
+
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -1333,11 +1346,14 @@ fun PlaylistDetailScreen(
         ) {
             // -------- header: cover + meta + actions
             item {
+                // Narrow, with the right panel open: the cover gives way so the title and the artist keep their room.
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val coverSize = if (maxWidth < 520.dp) 120.dp else 180.dp
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(24.dp).padding(top = 32.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(12.dp), modifier = Modifier.size(180.dp)) {
+                    Card(shape = RoundedCornerShape(12.dp), elevation = CardDefaults.cardElevation(12.dp), modifier = Modifier.size(coverSize)) {
                         if (!playlistCover.isNullOrEmpty()) {
                             AsyncImage(model = playlistCover, contentDescription = null, modifier = Modifier.fillMaxSize().viewableCover(playlistCover), contentScale = ContentScale.Crop)
                         } else if (defaultIcon != null) {
@@ -1413,8 +1429,13 @@ fun PlaylistDetailScreen(
                                         }
                                     }
                             ) {
+                                // The tracks' own credit when they agree on one: the account's name can be a
+                                // shared one, "Kai Angel & 9mice" on a record only one of them sings.
+                                val credit = remember(tracks.size, playlistUser) {
+                                    albumCreditFor(tracks)?.takeIf { playlistUser?.urn?.startsWith("spotify") != true }
+                                }
                                 Text(
-                                    str("playlist_by_user", playlistUser!!.username ?: ""),
+                                    str("playlist_by_user", credit ?: playlistUser!!.username ?: ""),
                                     style = ownerStyle,
                                     color = MaterialTheme.colorScheme.primary,
                                     onTextLayout = { ownerLayout = it },
@@ -1491,7 +1512,7 @@ fun PlaylistDetailScreen(
                                     Text(str("btn_play"), fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylist(tracksToDisplay.toList().shuffled(), context = playbackContext) },
+                                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.playPlaylistShuffled(tracksToDisplay.toList(), context = playbackContext) },
                                     modifier = Modifier.height(44.dp)
                                 ) {
                                     Icon(Icons.Default.Shuffle, null)
@@ -1501,33 +1522,20 @@ fun PlaylistDetailScreen(
                                 Spacer(Modifier.width(8.dp))
                             }
 
-                            if ((isLocalPlaylist || isUserCreated) && !isYoutubeRadio) {
-                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { 
-                                    if (isUserCreated) showEditDialog = true else showRenameDialog = true 
-                                }) {
-                                    Icon(Icons.Outlined.Edit, str("profile_edit"))
-                                }
-                                IconButton(onClick = {
-                                    val dialog = FileDialog(null as Frame?, str("storage_change_btn"), FileDialog.LOAD)
-                                    dialog.setFilenameFilter { _, name ->
-                                        name.endsWith(".png", true) || name.endsWith(".jpg", true) || name.endsWith(".jpeg", true) || name.endsWith(".webp", true)
-                                    }
-                                    dialog.isVisible = true
-                                    val file = dialog.files.firstOrNull()
-                                    if (file != null && currentIdLong != 0L) DownloadManager.updatePlaylistCover(currentIdLong, file, title = playlistTitle, artist = playlistUser?.username)
-                                }) {
-                                    Icon(Icons.Outlined.Image, str("storage_change_btn"))
-                                }
-                            }
+                            // Play and shuffle are the page's two buttons; the heart is the one thing about a
+                            // playlist you flip often. Editing, the cover, downloading and deleting are rarer
+                            // and live in the menu, where a row of five mismatched icons used to sit (issue #66).
+                            val canEdit = (isLocalPlaylist || isUserCreated) && !isYoutubeRadio
+                            val canDownload = !isYoutubeRadio && playlistId != "downloads" && tracksToDisplay.isNotEmpty()
+                            val canDelete = !isYoutubeRadio && stableId != 0L &&
+                                playlistId != "likes" && playlistId != "downloads" && playlistId != "local_files"
 
-                            if (playlistId != "downloads" && playlistId != "likes" && playlistId != "local_files") {
-                                if (isUserCreated) {
-                                    IconButton(onClick = { showDeleteDialog = true }) {
-                                        Icon(Icons.Default.Delete, str("btn_delete"), tint = MaterialTheme.colorScheme.error)
-                                    }
-                                } else {
-                                    val isPlaylistLiked = likedPlaylistsRepo.contains(stableId)
-                                    IconButton(onClick = {
+                            if (playlistId != "downloads" && playlistId != "likes" && playlistId != "local_files" && !isUserCreated) {
+                                val isPlaylistLiked = likedPlaylistsRepo.contains(stableId)
+                                FilledTonalIconButton(
+                                    shapes = IconButtonDefaults.shapes(),
+                                    modifier = Modifier.size(44.dp),
+                                    onClick = {
                                         if (!isPlaylistLiked) {
                                             val targetPlaylist = Playlist(
                                                 id = stableId,
@@ -1555,51 +1563,20 @@ fun PlaylistDetailScreen(
                                                 playlistUrn
                                             )
                                         }
-                                    }) {
-                                        if (isPlaylistLiked) Icon(Icons.Rounded.Favorite, str("lib_liked_tracks"), tint = MaterialTheme.colorScheme.primary)
-                                        else Icon(Icons.Outlined.FavoriteBorder, str("menu_add_playlist"))
-                                    }
+                                    },
+                                ) {
+                                    if (isPlaylistLiked) Icon(Icons.Rounded.Favorite, str("lib_liked_tracks"), tint = MaterialTheme.colorScheme.primary)
+                                    else Icon(Icons.Outlined.FavoriteBorder, str("menu_add_playlist"))
                                 }
+                                Spacer(Modifier.width(8.dp))
                             }
 
-                            if (!isYoutubeRadio && playlistId != "downloads" && tracksToDisplay.isNotEmpty()) {
-                                IconButton(onClick = {
-                                    val targetBatchId = if (playlistId == "likes") DownloadManager.LIKES_BATCH_ID else stableId
-                                    if (isPlaylistDownloading) {
-                                        DownloadManager.cancelBatch(targetBatchId)
-                                    } else if (isFullyDownloaded) {
-                                        showRemoveDownloadDialog = true
-                                    } else {
-                                        if (playlistId == "likes") {
-                                            DownloadManager.downloadBatch(tracksToDisplay.toList(), DownloadManager.LIKES_BATCH_ID)
-                                        } else if (stableId != 0L) {
-                                            val fakePlaylist = Playlist(
-                                                id = stableId,
-                                                title = playlistTitle,
-                                                artworkUrl = playlistCover,
-                                                calculatedArtworkUrl = null,
-                                                trackCount = tracks.size,
-                                                user = playlistUser,
-                                                tracks = null,
-                                                permalinkUrl = playlistPermalinkUrl,
-                                                urn = playlistUrn,
-                                                isAlbum = isAlbum
-                                            )
-                                            DownloadManager.downloadPlaylist(fakePlaylist, tracks.toList())
-                                        }
-                                    }
-                                }) {
-                                    when {
-                                        isPlaylistDownloading -> Icon(Icons.Rounded.Close, str("btn_cancel"))
-                                        isFullyDownloaded -> Icon(Icons.Rounded.Delete, str("btn_delete"), tint = MaterialTheme.colorScheme.error)
-                                        else -> Icon(Icons.Rounded.Download, str("btn_download"))
-                                    }
-                                }
-                            }
-
-                            // Overflow menu: queue actions + share
                             Box {
-                                IconButton(onClick = { showOptionsMenu = true }) {
+                                FilledTonalIconButton(
+                                    onClick = { showOptionsMenu = true },
+                                    shapes = IconButtonDefaults.shapes(),
+                                    modifier = Modifier.size(44.dp),
+                                ) {
                                     Icon(Icons.Default.MoreVert, str("btn_options"))
                                 }
                                 DropdownMenu(expanded = showOptionsMenu, onDismissRequest = { showOptionsMenu = false }) {
@@ -1626,12 +1603,81 @@ fun PlaylistDetailScreen(
                                             leadingIcon = { Icon(Icons.Rounded.Favorite, null) },
                                             onClick = {
                                                 showOptionsMenu = false
-                                                val likedCount =
-                                                    com.alananasss.kittytune.data.LikeRepository.addLikesBulk(tracksToDisplay.toList())
-                                                if (likedCount > 0) {
-                                                    com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_done", likedCount))
+                                                LikeAllPrompt.ask(tracksToDisplay.toList())
+                                            }
+                                        )
+                                    }
+                                    if (canEdit) {
+                                        HorizontalDivider()
+                                        DropdownMenuItem(
+                                            text = { Text(str("profile_edit")) },
+                                            leadingIcon = { Icon(Icons.Outlined.Edit, null) },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                if (isUserCreated) showEditDialog = true else showRenameDialog = true
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(str("playlist_menu_change_cover")) },
+                                            leadingIcon = { Icon(Icons.Outlined.Image, null) },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                val file = com.alananasss.kittytune.core.NativeFileDialog.openFile(
+                                                    str("storage_change_btn"),
+                                                    com.alananasss.kittytune.core.NativeFileDialog.FileType("Images", listOf("png", "jpg", "jpeg", "webp")),
+                                                )
+                                                if (file != null && currentIdLong != 0L) DownloadManager.updatePlaylistCover(currentIdLong, file, title = playlistTitle, artist = playlistUser?.username)
+                                            }
+                                        )
+                                    }
+                                    if (canDownload) {
+                                        DropdownMenuItem(
+                                            text = {
+                                                Text(
+                                                    str(
+                                                        when {
+                                                            isPlaylistDownloading -> "playlist_menu_cancel_download"
+                                                            isFullyDownloaded -> "playlist_menu_remove_download"
+                                                            else -> "playlist_menu_download"
+                                                        }
+                                                    )
+                                                )
+                                            },
+                                            leadingIcon = {
+                                                Icon(
+                                                    when {
+                                                        isPlaylistDownloading -> Icons.Rounded.Close
+                                                        isFullyDownloaded -> Icons.Rounded.DownloadDone
+                                                        else -> Icons.Rounded.Download
+                                                    },
+                                                    null,
+                                                )
+                                            },
+                                            onClick = {
+                                                showOptionsMenu = false
+                                                val targetBatchId = if (playlistId == "likes") DownloadManager.LIKES_BATCH_ID else stableId
+                                                if (isPlaylistDownloading) {
+                                                    DownloadManager.cancelBatch(targetBatchId)
+                                                } else if (isFullyDownloaded) {
+                                                    showRemoveDownloadDialog = true
                                                 } else {
-                                                    com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_nothing"))
+                                                    if (playlistId == "likes") {
+                                                        DownloadManager.downloadBatch(tracksToDisplay.toList(), DownloadManager.LIKES_BATCH_ID)
+                                                    } else if (stableId != 0L) {
+                                                        val fakePlaylist = Playlist(
+                                                            id = stableId,
+                                                            title = playlistTitle,
+                                                            artworkUrl = playlistCover,
+                                                            calculatedArtworkUrl = null,
+                                                            trackCount = tracks.size,
+                                                            user = playlistUser,
+                                                            tracks = null,
+                                                            permalinkUrl = playlistPermalinkUrl,
+                                                            urn = playlistUrn,
+                                                            isAlbum = isAlbum
+                                                        )
+                                                        DownloadManager.downloadPlaylist(fakePlaylist, tracks.toList())
+                                                    }
                                                 }
                                             }
                                         )
@@ -1664,12 +1710,11 @@ fun PlaylistDetailScreen(
                                             }
                                         )
                                     }
-                                    if (!isYoutubeRadio && stableId != 0L &&
-                                        playlistId != "likes" && playlistId != "downloads" && playlistId != "local_files"
-                                    ) {
+                                    if (canDelete) {
+                                        HorizontalDivider()
                                         DropdownMenuItem(
-                                            text = { Text(str(if (isUserCreated) "menu_delete_playlist" else "dialog_delete_playlist_from_lib_title")) },
-                                            leadingIcon = { Icon(Icons.Rounded.Delete, null) },
+                                            text = { Text(str(if (isUserCreated) "menu_delete_playlist" else "dialog_delete_playlist_from_lib_title"), color = MaterialTheme.colorScheme.error) },
+                                            leadingIcon = { Icon(Icons.Rounded.Delete, null, tint = MaterialTheme.colorScheme.error) },
                                             onClick = {
                                                 showOptionsMenu = false
                                                 showDeleteDialog = true
@@ -1680,6 +1725,7 @@ fun PlaylistDetailScreen(
                             }
                         }
                     }
+                }
                 }
             }
 
@@ -1786,7 +1832,7 @@ fun PlaylistDetailScreen(
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     trailingIcon = {
                                         if (playlistSearchQuery.isNotEmpty()) {
-                                            IconButton(onClick = {
+                                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                                                 playlistSearchQuery = ""
                                                 focusManager.clearFocus()
                                             }) { Icon(Icons.Rounded.Close, null) }
@@ -1805,85 +1851,34 @@ fun PlaylistDetailScreen(
                                             focusManager.clearFocus()
                                         }
                                 )
-                                Box {
-                                    FilledTonalIconButton(onClick = { showSortMenu = true }) {
-                                        Icon(Icons.Rounded.Sort, str("btn_options"))
-                                    }
-                                    DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                                        val options = listOf(
-                                            TrackSortBy.FIRST_ADDED to str("sort_first_added"),
-                                            TrackSortBy.RECENTLY_ADDED to str("sort_recently_added"),
-                                            TrackSortBy.TITLE_AZ to str("sort_title_az"),
-                                            TrackSortBy.ARTIST_AZ to str("sort_artist_az")
-                                        )
-                                        options.forEach { (sortType, label) ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        label,
-                                                        fontWeight = if (playlistSortBy == sortType) FontWeight.Bold else FontWeight.Normal,
-                                                        color = if (playlistSortBy == sortType) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                },
-                                                trailingIcon = {
-                                                    if (playlistSortBy == sortType) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
-                                                },
-                                                onClick = { playlistSortBy = sortType; showSortMenu = false }
-                                            )
-                                        }
-                                    }
-                                }
-                                // Spotify-style view mode picker (Compact / List)
-                                Box {
-                                    val viewMode = TrackViewModePref.mode
-                                    TextButton(
-                                        onClick = { showViewModeMenu = true },
-                                        shape = CircleShape,
-                                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    ) {
-                                        Text(
-                                            if (viewMode == TrackViewMode.COMPACT) str("view_mode_compact") else str("view_mode_list"),
-                                            style = MaterialTheme.typography.bodyMedium
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Icon(
-                                            if (viewMode == TrackViewMode.COMPACT) Icons.Rounded.Menu else Icons.AutoMirrored.Rounded.FormatListBulleted,
-                                            str("lib_view_mode"),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                    DropdownMenu(expanded = showViewModeMenu, onDismissRequest = { showViewModeMenu = false }) {
-                                        Text(
-                                            str("lib_view_mode"),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                        )
-                                        val modes = listOf(
-                                            Triple(TrackViewMode.COMPACT, str("view_mode_compact"), Icons.Rounded.Menu),
-                                            Triple(TrackViewMode.LIST, str("view_mode_list"), Icons.AutoMirrored.Rounded.FormatListBulleted)
-                                        )
-                                        modes.forEach { (mode, label, icon) ->
-                                            val selected = viewMode == mode
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text(
-                                                        label,
-                                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                },
-                                                leadingIcon = {
-                                                    Icon(icon, null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                                },
-                                                trailingIcon = {
-                                                    if (selected) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
-                                                },
-                                                onClick = { TrackViewModePref.set(mode); showViewModeMenu = false }
-                                            )
-                                        }
-                                    }
-                                }
+                                // The same buttons every list's sort and view use: the icon of what is chosen, its name
+                                // in the tooltip, the options with their icons in the menu (issue #66).
+                                val sortOptions = listOf(
+                                    Triple(TrackSortBy.FIRST_ADDED, str("sort_first_added"), Icons.Rounded.ArrowUpward),
+                                    Triple(TrackSortBy.RECENTLY_ADDED, str("sort_recently_added"), Icons.Rounded.ArrowDownward),
+                                    Triple(TrackSortBy.TITLE_AZ, str("sort_title_az"), Icons.Rounded.SortByAlpha),
+                                    Triple(TrackSortBy.ARTIST_AZ, str("sort_artist_az"), Icons.Rounded.Person),
+                                )
+                                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                                    options = sortOptions,
+                                    selected = sortOptions.firstOrNull { it.first == playlistSortBy } ?: sortOptions.first(),
+                                    onSelect = { playlistSortBy = it.first },
+                                    icon = { it.third },
+                                    label = { it.second },
+                                    tooltip = { str("lib_sort_by_title") + ": " + it.second },
+                                )
+                                val viewModes = listOf(
+                                    Triple(TrackViewMode.COMPACT, str("view_mode_compact"), Icons.Rounded.Menu),
+                                    Triple(TrackViewMode.LIST, str("view_mode_list"), Icons.AutoMirrored.Rounded.FormatListBulleted),
+                                )
+                                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                                    options = viewModes,
+                                    selected = viewModes.firstOrNull { it.first == TrackViewModePref.mode } ?: viewModes.first(),
+                                    onSelect = { TrackViewModePref.set(it.first) },
+                                    icon = { it.third },
+                                    label = { it.second },
+                                    tooltip = { str("lib_view_mode") + ": " + it.second },
+                                )
                             }
                             Spacer(Modifier.height(8.dp))
                         }
@@ -2113,9 +2108,6 @@ fun TrackListItem(
                     com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track, showLikeIndicator)
                 }
             }
-            IconButton(onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }
@@ -2188,7 +2180,7 @@ fun TrackTableHeaderRow(
                     )
                 }
             }
-            Box(modifier = Modifier.width(60.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+            Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
                 Icon(
                     imageVector = Icons.Rounded.Schedule,
                     contentDescription = null,
@@ -2196,7 +2188,6 @@ fun TrackTableHeaderRow(
                     modifier = Modifier.size(16.dp)
                 )
             }
-            Spacer(Modifier.width(40.dp))
         }
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
@@ -2457,9 +2448,6 @@ fun TrackTableItem(
                 modifier = Modifier.width(60.dp),
                 textAlign = TextAlign.End
             )
-            IconButton(onClick = onOptionClick, modifier = Modifier.size(40.dp)) {
-                Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }
@@ -2534,7 +2522,7 @@ fun TrackCompactHeaderRow(
                     )
                 }
             }
-            Box(modifier = Modifier.width(60.dp).padding(end = 16.dp), contentAlignment = Alignment.CenterEnd) {
+            Box(modifier = Modifier.width(60.dp), contentAlignment = Alignment.CenterEnd) {
                 Icon(
                     imageVector = Icons.Rounded.Schedule,
                     contentDescription = null,
@@ -2542,7 +2530,6 @@ fun TrackCompactHeaderRow(
                     modifier = Modifier.size(16.dp)
                 )
             }
-            Spacer(Modifier.width(40.dp))
         }
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
@@ -2751,9 +2738,6 @@ fun TrackCompactItem(
                 modifier = Modifier.width(60.dp),
                 textAlign = TextAlign.End
             )
-            IconButton(onClick = onOptionClick, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.MoreVert, str("btn_options"), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-            }
         }
     }
 }

@@ -98,14 +98,16 @@ class SettingsSearchTest {
         assertTrue(file.exists())
         val content = file.readText()
 
-        val searchFieldSection = content.substringAfter("OutlinedTextField(").substringBefore("com.alananasss.kittytune.ui.common.ScrollableColumn")
+        // The field is one composable shown in two places: above the categories, filling their column, and in
+        // the pane's title row when the window is too narrow for that column to hold it.
+        val searchFieldSection = content.substringAfter("private fun SettingsSearchField(").substringBefore("@Composable")
         assertTrue(
             !searchFieldSection.contains(".height(48.dp)"),
             "Search field must not constrain height to 48dp to prevent vertical text clipping"
         )
         assertTrue(
-            searchFieldSection.contains("320.dp"),
-            "Search field must have adequate width (320dp) to fit placeholder text without compression"
+            content.contains("SettingsSearchField(searchQuery, onSearchQueryChange, Modifier.width(320.dp))"),
+            "Search field in the pane must have adequate width (320dp) to fit placeholder text without compression"
         )
         assertTrue(
             searchFieldSection.contains("surfaceContainerHigh"),

@@ -36,7 +36,23 @@
      * order, which `/resolve` hands back whole. So the genre row belongs to [ChartKind.TOP] and the
      * trending feed has no genre to pick.
      */
-    enum class ChartKind { TOP, TRENDING }
+    enum class ChartKind {
+        /**
+         * What is played most where the listener is: Deezer's chart for the country its servers see the
+         * request come from. SoundCloud publishes charts for a handful of countries only, so its own were a
+         * US list for everyone else (issue #66).
+         */
+        COUNTRY,
+        TOP,
+        TRENDING,
+    }
+
+    /** The label key for a chart kind. */
+    fun ChartKind.labelKey(): String = when (this) {
+        ChartKind.COUNTRY -> "chart_kind_country"
+        ChartKind.TOP -> "chart_kind_top"
+        ChartKind.TRENDING -> "chart_kind_trending"
+    }
 
     /**
      * A chart playlist, by the slug SoundCloud publishes it under.
@@ -45,6 +61,64 @@
      * is why the same genre has a different chart in a different market.
      */
     data class ChartGenre(val id: String, val slug: String)
+
+    /**
+     * A country whose chart can be chosen. One for each language the app is translated into, plus the UK; the
+     * name is what Deezer calls the country in its "Top <country>" playlists, the storefront where Apple Music
+     * keeps its chart for it.
+     *
+     * @param hasDeezerChart false where Deezer stopped keeping one: it left Russia, and its "Top Russia" has held a
+     *   single track since, so that chart comes from Apple Music straight away (issue #66).
+     */
+    enum class ChartCountry(
+        val code: String,
+        val deezerName: String,
+        val flag: String,
+        val language: String,
+        val appleStorefront: String,
+        val hasDeezerChart: Boolean = true,
+    ) {
+        RU("RU", "Russia", "\uD83C\uDDF7\uD83C\uDDFA", "ru", "ru", hasDeezerChart = false),
+        US("US", "United States", "\uD83C\uDDFA\uD83C\uDDF8", "en", "us"),
+        UK("UK", "United Kingdom", "\uD83C\uDDEC\uD83C\uDDE7", "en", "gb"),
+        DE("DE", "Germany", "\uD83C\uDDE9\uD83C\uDDEA", "de", "de"),
+        FR("FR", "France", "\uD83C\uDDEB\uD83C\uDDF7", "fr", "fr"),
+        HU("HU", "Hungary", "\uD83C\uDDED\uD83C\uDDFA", "hu", "hu"),
+        VN("VN", "Vietnam", "\uD83C\uDDFB\uD83C\uDDF3", "vi", "vn"),
+        // Countries where Spotify keeps its own Top 50, so the chart opens at once. No Deezer chart is assumed for them:
+        // Deezer answers an unknown country with its world chart, which would pass for a local one.
+        FI("FI", "Finland", "", "fi", "fi", hasDeezerChart = false),
+        SE("SE", "Sweden", "", "sv", "se", hasDeezerChart = false),
+        NO("NO", "Norway", "", "no", "no", hasDeezerChart = false),
+        PL("PL", "Poland", "", "pl", "pl", hasDeezerChart = false),
+        IT("IT", "Italy", "", "it", "it", hasDeezerChart = false),
+        ES("ES", "Spain", "", "es", "es", hasDeezerChart = false),
+        NL("NL", "Netherlands", "", "nl", "nl", hasDeezerChart = false),
+        CA("CA", "Canada", "", "en", "ca", hasDeezerChart = false),
+        AU("AU", "Australia", "", "en", "au", hasDeezerChart = false),
+        JP("JP", "Japan", "", "ja", "jp", hasDeezerChart = false),
+        BR("BR", "Brazil", "", "pt", "br", hasDeezerChart = false),
+        MX("MX", "Mexico", "", "es", "mx", hasDeezerChart = false),
+        IE("IE", "Ireland", "", "en", "ie", hasDeezerChart = false),
+        AT("AT", "Austria", "", "de", "at", hasDeezerChart = false),
+        CZ("CZ", "Czech Republic", "", "cs", "cz", hasDeezerChart = false);
+
+        companion object {
+            /** The country whose language the app is in. */
+            fun forLanguage(language: String): ChartCountry = entries.firstOrNull { it.language == language } ?: US
+
+            /**
+             * The country the computer is set to: the region of the formats (Windows "Region"), not the language of the
+             * app. A Russian interface in Finland is a listener in Finland, and the chart for "your country" is Finland's.
+             */
+            fun forDevice(language: String): ChartCountry {
+                // From the computer's own region setting, not the interface language; see DeviceRegion.
+                val region = com.alananasss.kittytune.util.DeviceRegion.code.orEmpty()
+                val code = if (region == "GB") "UK" else region
+                return entries.firstOrNull { it.code == code } ?: forLanguage(language)
+            }
+        }
+    }
 
     /** One song at its place in the chart. [rank] is the position, never the score. */
     data class ChartEntry(val rank: Int, val track: Track, val score: Double)
@@ -60,15 +134,17 @@
         var isLoading by mutableStateOf(false)
 
         // ── The song chart ──
-        var chartKind by mutableStateOf(ChartKind.TOP)
+        var chartKind by mutableStateOf(ChartKind.COUNTRY)
         var chartGenre by mutableStateOf(chartGenres.first())
+        var chartCountry by mutableStateOf(ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage))
         val chartEntries = mutableStateListOf<ChartEntry>()
         var isChartLoading by mutableStateOf(false)
 
         init {
-            loadCountryCharts(0)
-            loadChart(ChartKind.TOP, chartGenres.first())
+            loadChart(ChartKind.COUNTRY, chartGenres.first())
         }
+
+        private var chartJob: kotlinx.coroutines.Job? = null
 
         /**
          * Loads the ranked song list.
@@ -81,21 +157,26 @@
             chartKind = kind
             chartGenre = genre
 
-            viewModelScope.launch {
+            // A switch made mid-flight is cancelled, not raced: when only kind and genre were compared, a slow answer for
+            // the country picked before this one could land after the new one and put the old country's songs back.
+            chartJob?.cancel()
+            val country = chartCountry
+            chartJob = viewModelScope.launch {
                 isChartLoading = true
-                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode())
-                // A switch made mid-flight must not leave the newer request's answer overwritten by
-                // the older one's.
-                if (kind == chartKind && genre == chartGenre) {
-                    chartEntries.clear()
-                    chartEntries.addAll(entries)
-                    isChartLoading = false
-                }
+                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode(), country)
+                chartEntries.clear()
+                chartEntries.addAll(entries)
+                isChartLoading = false
             }
         }
 
-        fun currentCountryCode(): String =
-            ChartsData.charts.getOrNull(selectedCountryIndex)?.countryCode ?: "US"
+        fun selectChartCountry(country: ChartCountry) {
+            chartCountry = country
+            loadChart(chartKind, chartGenre)
+        }
+
+        /** The picked country as SoundCloud's own chart playlists spell it; it used to be a list index nobody could change any more. */
+        fun currentCountryCode(): String = chartCountry.appleStorefront.uppercase()
 
         fun loadCountryCharts(index: Int) {
             selectedCountryIndex = index

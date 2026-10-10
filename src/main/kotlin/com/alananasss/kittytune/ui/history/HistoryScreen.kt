@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.alananasss.kittytune.ui.history
 
 import androidx.compose.animation.*
@@ -5,6 +6,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
@@ -38,6 +40,8 @@ import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,7 +120,7 @@ fun HistoryScreen(
             title = { Text(dialogTitle, fontWeight = FontWeight.Bold) },
             text = { Text(dialogDesc) },
             confirmButton = {
-                Button(
+                Button(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         historyViewModel.clearHistoryForCurrentTab()
                         showClearDialog = false
@@ -130,7 +134,7 @@ fun HistoryScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showClearDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -150,7 +154,7 @@ fun HistoryScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (onBackClick != null) {
-                IconButton(onClick = onBackClick, modifier = Modifier.padding(end = 8.dp)) {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick, modifier = Modifier.padding(end = 8.dp)) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                         contentDescription = str("btn_back")
@@ -173,7 +177,7 @@ fun HistoryScreen(
             }
 
             if (hasItems) {
-                IconButton(onClick = { showClearDialog = true }) {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showClearDialog = true }) {
                     Icon(
                         imageVector = Icons.Rounded.DeleteOutline,
                         contentDescription = str("btn_clear"),
@@ -182,7 +186,7 @@ fun HistoryScreen(
                 }
             }
 
-            IconButton(onClick = { historyViewModel.loadData(forceRefresh = true) }) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { historyViewModel.loadData(forceRefresh = true) }) {
                 Icon(
                     imageVector = Icons.Rounded.Refresh,
                     contentDescription = str("btn_retry")
@@ -312,7 +316,7 @@ fun HistoryScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Button(onClick = { onNavigate("profile") }) {
+                    Button(shapes = ButtonDefaults.shapes(), onClick = { onNavigate("profile") }) {
                         Text(
                             str("login_soundcloud"),
                             style = MaterialTheme.typography.labelMedium
@@ -508,7 +512,7 @@ fun HistoryTrackRow(
         onClick = onClick,
         color = if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f) else Color.Transparent,
         shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().onClick(matcher = androidx.compose.foundation.PointerMatcher.mouse(androidx.compose.ui.input.pointer.PointerButton.Secondary), onClick = onMoreClick)
     ) {
         Row(
             modifier = Modifier
@@ -600,13 +604,6 @@ fun HistoryTrackRow(
                 }
             }
 
-            IconButton(onClick = onMoreClick) {
-                Icon(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }
@@ -794,7 +791,7 @@ fun EmptyHistoryView(
                 )
             }
 
-            Button(onClick = onExploreClick) {
+            Button(shapes = ButtonDefaults.shapes(), onClick = onExploreClick) {
                 Icon(Icons.Rounded.Explore, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(str("explorer_title"))

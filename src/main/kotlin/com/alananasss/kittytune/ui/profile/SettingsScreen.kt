@@ -45,6 +45,8 @@ import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 /** Material's emphasized-decelerate curve: arrives quickly and settles. */
 private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
@@ -83,10 +85,8 @@ fun SettingsScreen(
                     searchQuery = ""
                     SettingsNavigation.go(SettingsPlace(it))
                 },
-                onCredits = {
-                    searchQuery = ""
-                    navController.navigate("credits")
-                },
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
             )
             Spacer(Modifier.width(8.dp))
             AnimatedContent(
@@ -113,6 +113,10 @@ fun SettingsScreen(
                     onBack = if (shown.subPage != null) ({ SettingsNavigation.up() }) else onBackClick,
                     searchQuery = searchQuery,
                     onSearchQueryChange = { searchQuery = it },
+                    // Wide windows have the field above the categories; a narrow column has no room for it.
+                    showsSearchField = !isWide,
+                    // The credits are a lazy list of their own and cannot sit inside the pane's scroll.
+                    isScrollable = searchQuery.isNotBlank() || shown.category != SettingsCategory.CREDITS,
                 ) {
                     if (searchQuery.isNotBlank()) {
                         SettingsSearchResults(
@@ -147,7 +151,13 @@ internal enum class SettingsCategory(val titleKey: String, val icon: ImageVector
     SYNC("settings_cat_sync", Icons.Rounded.Devices),
     NETWORK("pref_proxy_title", Icons.Rounded.Dns),
     MISC("settings_cat_misc", Icons.Rounded.Tune),
+
+    /** Listed apart, at the foot of the column, but opened in the pane like any other (issue #66). */
+    CREDITS("about_credits", Icons.Rounded.Groups),
 }
+
+/** The categories listed at the top of the column; [SettingsCategory.CREDITS] has its own place at the bottom. */
+private val listedCategories = SettingsCategory.entries - SettingsCategory.CREDITS
 
 /** Pages opened inside a category. */
 internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: String? = null, val icon: ImageVector? = null) {
@@ -275,6 +285,7 @@ private fun SettingsPageContent(
             SettingsCategory.SYNC -> CategoryFolderGroup(syncPages, onOpen)
             SettingsCategory.NETWORK -> CategoryFolderGroup(networkPages, onOpen)
             SettingsCategory.MISC -> CategoryFolderGroup(miscPages, onOpen)
+            SettingsCategory.CREDITS -> CreditsContent(Modifier.fillMaxSize())
         }
         // Interface subpages
         SettingsSubPage.THEMES -> ThemesSettingsPage(onOpenCustomTheme = { onOpen(SettingsSubPage.CUSTOM_THEME) })
@@ -339,9 +350,10 @@ private fun SettingsPane(
     onBack: (() -> Unit)?,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
+    showsSearchField: Boolean,
+    isScrollable: Boolean,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier
@@ -356,7 +368,7 @@ private fun SettingsPane(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (onBack != null && searchQuery.isEmpty()) {
-                IconButton(onClick = onBack) {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBack) {
                     Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
                 }
             }
@@ -368,50 +380,66 @@ private fun SettingsPane(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Spacer(Modifier.width(16.dp))
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                placeholder = {
-                    Text(str("search_settings_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = {
-                            onSearchQueryChange("")
-                            focusManager.clearFocus()
-                        }) {
-                            Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = CircleShape,
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    unfocusedBorderColor = Color.Transparent,
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                ),
-                modifier = Modifier
-                    .width(320.dp)
-                    .trackTextInput()
-                    .escapeDismisses {
-                        onSearchQueryChange("")
-                        focusManager.clearFocus()
-                    },
-            )
+            if (showsSearchField) {
+                Spacer(Modifier.width(16.dp))
+                SettingsSearchField(searchQuery, onSearchQueryChange, Modifier.width(320.dp))
+            }
         }
-        com.alananasss.kittytune.ui.common.ScrollableColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = androidx.compose.runtime.key(location) { rememberScrollState() },
-            contentPadding = PaddingValues(bottom = 80.dp),
-            content = content,
-        )
+        if (isScrollable) {
+            com.alananasss.kittytune.ui.common.ScrollableColumn(
+                modifier = Modifier.fillMaxSize(),
+                state = androidx.compose.runtime.key(location) { rememberScrollState() },
+                contentPadding = PaddingValues(bottom = 80.dp),
+                content = content,
+            )
+        } else {
+            Column(Modifier.fillMaxSize(), content = content)
+        }
     }
+}
+
+/** The settings search: a pill-shaped field that clears on Escape or with its own close button. */
+@Composable
+private fun SettingsSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = {
+            Text(str("search_settings_hint"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingIcon = {
+            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                    onQueryChange("")
+                    focusManager.clearFocus()
+                }) {
+                    Icon(Icons.Rounded.Close, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+            }
+        },
+        singleLine = true,
+        shape = CircleShape,
+        colors = OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedBorderColor = Color.Transparent,
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+        ),
+        modifier = modifier
+            .trackTextInput()
+            .escapeDismisses {
+                onQueryChange("")
+                focusManager.clearFocus()
+            },
+    )
 }
 
 internal data class SettingsSearchItem(
@@ -451,6 +479,8 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     var localMedia by remember { mutableStateOf(prefs.getLocalMediaEnabled()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
     var discordRpc by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
+    var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
+    var fullPlayerCoverFeather by remember { mutableStateOf(playerViewModel.fullPlayerCoverFeather) }
 
     return listOf(
         // INTERFACE - Pages
@@ -652,6 +682,61 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             onSwitchChange = { playerViewModel.updateFullPlayerSourceIndicatorEnabled(it) },
             highlightKey = "pref_full_player_source",
         ),
+        SettingsSearchItem(
+            title = str("full_player_cover_feather"),
+            subtitle = str("full_player_cover_feather_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)),
+            icon = Icons.Rounded.BlurOn,
+            keywords = listOf("feather", "soften", "cover", "blur", "edges", "adoucir", "bords", "pochette", "plein écran", "fullscreen", "размытие", "края обложки"),
+            hasSwitch = true,
+            switchState = fullPlayerCoverFeather,
+            onSwitchChange = {
+                fullPlayerCoverFeather = it
+                playerViewModel.updateFullPlayerCoverFeather(it)
+                prefs.setFullPlayerCoverFeather(it)
+            },
+            highlightKey = "full_player_cover_feather",
+        ),
+        SettingsSearchItem(
+            title = str("pref_lyrics_one_line_title"),
+            subtitle = str("pref_lyrics_one_line_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS)),
+            icon = Icons.Rounded.Subtitles,
+            keywords = listOf("one line", "floating lyrics", "lyrics bar", "une ligne", "paroles flottantes", "одна строка", "плавающий текст"),
+            hasSwitch = true,
+            switchState = oneLineLyrics,
+            onSwitchChange = {
+                oneLineLyrics = it
+                prefs.setOneLineLyricsEnabled(it)
+            },
+            highlightKey = "pref_lyrics_one_line",
+        ),
+        SettingsSearchItem(
+            title = str("pref_lyrics_backing_title"),
+            subtitle = str("pref_lyrics_backing_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS)),
+            icon = Icons.Rounded.RecordVoiceOver,
+            keywords = listOf("backing vocals", "backing", "choeurs", "voix secondaires", "бэк вокал"),
+            hasSwitch = true,
+            switchState = playerViewModel.lyricsSplitBackingVocals,
+            onSwitchChange = { playerViewModel.updateLyricsSplitBackingVocals(it) },
+            highlightKey = "pref_lyrics_backing",
+        ),
+        SettingsSearchItem(
+            title = str("pref_lyrics_reveal_words_title"),
+            subtitle = str("pref_lyrics_reveal_words_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS)),
+            icon = Icons.Rounded.Animation,
+            keywords = listOf("reveal words", "word by word", "animation", "mot à mot", "пословное появление"),
+            hasSwitch = true,
+            switchState = playerViewModel.lyricsRevealWords,
+            onSwitchChange = { playerViewModel.updateLyricsRevealWords(it) },
+            highlightKey = "pref_lyrics_reveal_words",
+        ),
 
         // AUDIO - Folders & Direct Options
         SettingsSearchItem(str("settings_cat_audio"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.GraphicEq, keywords = listOf("audio", "sound", "son", "звук")),
@@ -692,7 +777,11 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         ),
         SettingsSearchItem(
             title = str(com.alananasss.kittytune.R.string.automix),
-            subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
+            subtitle = if (com.alananasss.kittytune.data.together.Together.mayChangeAutomix()) {
+                str(com.alananasss.kittytune.R.string.automix_desc)
+            } else {
+                str("together_automix_host_only")
+            },
             category = SettingsCategory.AUDIO,
             place = SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_TRANSITIONS)),
             icon = Icons.Rounded.AutoAwesome,
@@ -700,8 +789,10 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             hasSwitch = true,
             switchState = automix,
             onSwitchChange = {
-                automix = it
-                prefs.setAutomixEnabled(it)
+                if (com.alananasss.kittytune.data.together.Together.mayChangeAutomix()) {
+                    automix = it
+                    prefs.setAutomixEnabled(it)
+                }
             },
             highlightKey = "pref_automix",
         ),
@@ -886,7 +977,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             },
             highlightKey = "pref_discord",
         ),
-        SettingsSearchItem(str("about_credits"), null, SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC), Icons.Rounded.Groups, route = "credits", keywords = listOf("credits", "about", "authors", "team", "crédits", "о программе", "авторы")),
+        SettingsSearchItem(str("about_credits"), null, SettingsCategory.CREDITS, SettingsPlace(SettingsCategory.CREDITS), Icons.Rounded.Groups, keywords = listOf("credits", "about", "authors", "team", "crédits", "о программе", "авторы")),
     )
 }
 
@@ -979,13 +1070,22 @@ private fun CategoryList(
     selected: SettingsCategory,
     isWide: Boolean,
     onSelect: (SettingsCategory) -> Unit,
-    onCredits: () -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
 ) {
     Column(
         Modifier.width(if (isWide) 240.dp else 92.dp).fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (isWide) {
+            // Above the title, in the column the eye and the pointer are already in. At the far right of the
+            // pane it was the one control on the page that meant travelling away from everything else
+            // (issue #66).
+            SettingsSearchField(
+                searchQuery,
+                onSearchQueryChange,
+                Modifier.fillMaxWidth().padding(top = 6.dp),
+            )
             Text(
                 str("settings_title"),
                 style = MaterialTheme.typography.headlineSmall,
@@ -995,7 +1095,7 @@ private fun CategoryList(
         } else {
             Spacer(Modifier.height(12.dp))
         }
-        SettingsCategory.entries.forEach { entry ->
+        listedCategories.forEach { entry ->
             CategoryItem(
                 label = str(entry.titleKey),
                 icon = entry.icon,
@@ -1006,11 +1106,11 @@ private fun CategoryList(
         }
         Spacer(Modifier.weight(1f))
         CategoryItem(
-            label = str("about_credits"),
-            icon = Icons.Rounded.Groups,
-            isSelected = false,
+            label = str(SettingsCategory.CREDITS.titleKey),
+            icon = SettingsCategory.CREDITS.icon,
+            isSelected = selected == SettingsCategory.CREDITS,
             isWide = isWide,
-            onClick = onCredits,
+            onClick = { onSelect(SettingsCategory.CREDITS) },
         )
     }
 }
@@ -1286,7 +1386,7 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
                         if (reveal) androidx.compose.ui.text.input.VisualTransformation.None
                         else androidx.compose.ui.text.input.PasswordVisualTransformation(),
                     trailingIcon = {
-                        IconButton(onClick = { reveal = !reveal }) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { reveal = !reveal }) {
                             Icon(
                                 if (reveal) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
                                 contentDescription = null,
@@ -1297,7 +1397,7 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
                 )
 
                 Spacer(Modifier.height(8.dp))
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         runCatching {
                             java.awt.Desktop.getDesktop()
@@ -1308,14 +1408,14 @@ private fun YandexTokenDialog(onDismiss: () -> Unit) {
 
                 Spacer(Modifier.height(16.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    TextButton(
+                    TextButton(shapes = ButtonDefaults.shapes(),
                         onClick = {
                             client.token = null
                             value = ""
                             onDismiss()
                         }
                     ) { Text(str("pref_yandex_token_clear")) }
-                    TextButton(
+                    TextButton(shapes = ButtonDefaults.shapes(),
                         onClick = {
                             client.token = value
                             onDismiss()

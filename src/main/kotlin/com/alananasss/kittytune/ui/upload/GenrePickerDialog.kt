@@ -25,6 +25,7 @@ import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.upload.SOUNDCLOUD_AUDIO_GENRES
 import com.alananasss.kittytune.data.upload.SOUNDCLOUD_MUSIC_GENRES
 import com.alananasss.kittytune.data.upload.getGenreStringKey
+import androidx.compose.material3.IconButtonDefaults
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -130,7 +131,7 @@ fun GenrePickerDialog(
                     },
                     trailingIcon = {
                         if (searchQuery.isNotBlank()) {
-                            IconButton(onClick = { searchQuery = "" }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { searchQuery = "" }) {
                                 Icon(Icons.Rounded.Close, contentDescription = null)
                             }
                         }

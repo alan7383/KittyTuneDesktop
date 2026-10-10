@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.audio.NormalizationAudioProcessor
+import com.alananasss.kittytune.audio.ANALYSIS_RW_TIMEOUT_US
 import com.alananasss.kittytune.audio.releaseQuietly
 import org.bytedeco.javacv.FFmpegFrameGrabber
 import org.bytedeco.javacv.Frame
@@ -46,6 +47,7 @@ object AudioScannerManager {
                     setOption("headers", headerBlob + "\r\n")
                 }
                 setOption("timeout", "5000000") // 5s timeout
+                setOption("rw_timeout", ANALYSIS_RW_TIMEOUT_US)
                 sampleRate = 44100
                 audioChannels = 2
                 sampleMode = FrameGrabber.SampleMode.FLOAT

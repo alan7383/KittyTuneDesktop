@@ -695,7 +695,7 @@ fun LibraryPlaylistOptionsDialog(
                     withTracks { playerViewModel.playPlaylist(it, 0); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.Rounded.Shuffle, str("btn_shuffle")) {
-                    withTracks { playerViewModel.playPlaylist(it.shuffled(), 0); onDismiss() }
+                    withTracks { playerViewModel.playPlaylistShuffled(it); onDismiss() }
                 })
                 add(LibraryPlaylistActionItem(Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
                     withTracks { playerViewModel.insertNext(it); onDismiss() }
@@ -735,13 +735,8 @@ fun LibraryPlaylistOptionsDialog(
                         tint = primaryColor
                     ) {
                         withTracks { list ->
-                            val likedCount = LikeRepository.addLikesBulk(list)
                             onDismiss()
-                            if (likedCount > 0) {
-                                com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_done", likedCount))
-                            } else {
-                                com.alananasss.kittytune.core.Toaster.show(str("toast_like_all_nothing"))
-                            }
+                            LikeAllPrompt.ask(list)
                         }
                     }
                 )

@@ -46,7 +46,8 @@ class MprisServiceTest {
     data class Changed(val iface: String, val keys: Set<String>)
 
     companion object {
-        private const val BUS = "org.mpris.MediaPlayer2.kittytune"
+        private val BUS_INSTANCE = "kittytune_test_${ProcessHandle.current().pid()}"
+        private val BUS = "org.mpris.MediaPlayer2.$BUS_INSTANCE"
         private const val PATH = "/org/mpris/MediaPlayer2"
         private const val PLAYER = "org.mpris.MediaPlayer2.Player"
         private const val ROOT = "org.mpris.MediaPlayer2"
@@ -84,6 +85,7 @@ class MprisServiceTest {
                 onVolume = { events.offer("volume:$it") },
                 onShuffle = { events.offer("shuffle:$it") },
                 onLoopStatus = { events.offer("loop:${it.mprisName}") },
+                busName = BUS,
             )
             client = DBusConnectionBuilder.forSessionBus().build()
             props = client.getRemoteObject(BUS, PATH, Properties::class.java, false)
@@ -121,7 +123,7 @@ class MprisServiceTest {
         }
 
         private fun ctl(vararg args: String): String {
-            val proc = ProcessBuilder(listOf("playerctl", "-p", "kittytune") + args)
+            val proc = ProcessBuilder(listOf("playerctl", "-p", BUS_INSTANCE) + args)
                 .redirectErrorStream(true).start()
             val out = proc.inputStream.bufferedReader().readText().trim()
             check(proc.waitFor() == 0) { "playerctl ${args.joinToString(" ")} failed: $out" }

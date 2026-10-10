@@ -1,5 +1,10 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.ui.input.pointer.onPointerEvent
+
+import com.alananasss.kittytune.ui.common.notePointerPresses
 import androidx.compose.animation.*
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.togetherWith
@@ -120,6 +125,11 @@ fun MainScreen(
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
     var showNowPlayingPanel by remember { mutableStateOf(playerPrefs.getRightPanelOpen()) }
     var nowPlayingTab by remember { mutableStateOf(NowPlayingTab.TRACK) }
+    // The panel's tabs keep a history of their own for the mouse's side buttons.
+    LaunchedEffect(nowPlayingTab) { PanelHistory.noteTab(nowPlayingTab) }
+    LaunchedEffect(PanelHistory.movedTick) {
+        if (PanelHistory.movedTick > 0) nowPlayingTab = PanelHistory.present.tab
+    }
 
 
     // Close full-screen lyrics when navigation happens (e.g. sidebar click)
@@ -146,6 +156,8 @@ fun MainScreen(
                 destinationId == "recognition" -> "recognition"
                 destinationId == "recognition_history" -> "recognition_history"
                 destinationId == "credits" -> "credits"
+                destinationId == "together" -> "together_home"
+                destinationId.startsWith("together:") -> "together/${destinationId.removePrefix("together:")}"
                 destinationId.startsWith("edit_track:") -> "edit_track/${destinationId.removePrefix("edit_track:")}"
                 destinationId.startsWith("profile:") -> "profile/${destinationId.removePrefix("profile:")}"
                 // Spotify artist profiles route to the profile screen; the string
@@ -362,6 +374,7 @@ fun MainScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .notePointerPresses()
             .mouseHistoryButtons(historyNavigator)
             .clearFocusOnEmptyClick(focusManager)
             .background(MaterialTheme.colorScheme.surfaceContainerLowest)
@@ -1011,6 +1024,22 @@ fun MainScreen(
                                 playerViewModel = playerViewModel
                             )
                         }
+                        composable("together_home") {
+                            com.alananasss.kittytune.ui.together.TogetherHomeScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpen = { code -> navController.navigate("together/$code") }
+                            )
+                        }
+                        composable("together/{code}") { backStackEntry ->
+                            val code = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("code") } }.getOrNull()
+                            } ?: ""
+                            com.alananasss.kittytune.ui.together.TogetherScreen(
+                                code = code,
+                                playerViewModel = playerViewModel,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
                         composable("history") {
                             val historyViewModel: com.alananasss.kittytune.ui.history.HistoryViewModel = androidx.lifecycle.viewmodel.compose.viewModel {
                                 com.alananasss.kittytune.ui.history.HistoryViewModel(com.alananasss.kittytune.core.AppInstance.application)
@@ -1031,7 +1060,8 @@ fun MainScreen(
                                 onAuthRequested = { provider ->
                                     navController.navigate("music_import_auth/$provider")
                                 },
-                                onLoginClick = { navController.navigate("login") }
+                                onLoginClick = { navController.navigate("login") },
+                                onOpenPlaylist = { id -> playerViewModel.navigateToPlaylistId = id.toString() },
                             )
                         }
                         composable("music_import_auth/{provider}") { backStackEntry ->
@@ -1218,7 +1248,10 @@ fun MainScreen(
                         playerPrefs.setRightPanelOpen(false)
                     },
                     onOpenFullLyrics = { playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet },
-                    modifier = Modifier.width(rightPanelWidth)
+                    modifier = Modifier
+                        .width(rightPanelWidth)
+                        .onPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Enter) { PanelHistory.pointerInside = true }
+                        .onPointerEvent(androidx.compose.ui.input.pointer.PointerEventType.Exit) { PanelHistory.pointerInside = false }
                 )
             }
             }
@@ -1238,6 +1271,7 @@ fun MainScreen(
     }
 
     TrackOptionsOverlays(playerViewModel)
+    com.alananasss.kittytune.ui.library.LikeAllPromptHost()
 
     CoverViewerOverlay()
 
@@ -1274,6 +1308,9 @@ fun MainScreen(
             androidx.compose.animation.core.tween(FULLSCREEN_EXIT_MS)
         ),
     ) {
+        // Out here it is not under the root that notes where the pointer pressed, so the track menu opened at the
+        // last press made somewhere else: to the left of its three dots, as if the player were not full screen.
+        Box(Modifier.fillMaxSize().notePointerPresses()) {
         com.alananasss.kittytune.ui.player.FullPlayerScreen(
             viewModel = playerViewModel,
             onExitFullScreen = {
@@ -1286,6 +1323,7 @@ fun MainScreen(
                 com.alananasss.kittytune.core.AppWindowState.fullScreen = false
             },
         )
+        }
     }
 
     if (showShortcutsDialog) {

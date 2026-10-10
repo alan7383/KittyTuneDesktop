@@ -15,13 +15,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.QueueMusic
+import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.automirrored.rounded.TextSnippet
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,6 +52,7 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.slider.PlayerSlider
 import kotlin.math.roundToInt
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * Dedicated Player Design Screen (issue #56).
@@ -105,6 +104,8 @@ fun PlayerDesignContent(
     var fullPlayerSourceEnabled by remember { mutableStateOf(prefs.getFullPlayerSourceIndicatorEnabled()) }
     var localScreensaverEnabled by remember { mutableStateOf(prefs.getFullPlayerScreensaverEnabled()) }
     var localScreensaverTimeout by remember { mutableIntStateOf(prefs.getFullPlayerScreensaverTimeout()) }
+    var fullPlayerCoverFeather by remember { mutableStateOf(playerViewModel?.fullPlayerCoverFeather ?: prefs.getFullPlayerCoverFeather()) }
+    var fullPlayerCoverFeatherAmount by remember { mutableFloatStateOf(playerViewModel?.fullPlayerCoverFeatherAmount ?: prefs.getFullPlayerCoverFeatherAmount()) }
 
     val currentScreensaverEnabled = playerViewModel?.fullPlayerScreensaverEnabled ?: localScreensaverEnabled
     val currentScreensaverTimeout = playerViewModel?.fullPlayerScreensaverTimeoutSeconds ?: localScreensaverTimeout
@@ -209,6 +210,25 @@ fun PlayerDesignContent(
                 onTimeoutChange = { timeout ->
                     localScreensaverTimeout = timeout
                     playerViewModel?.updateFullPlayerScreensaverTimeout(timeout) ?: prefs.setFullPlayerScreensaverTimeout(timeout)
+                }
+            )
+
+            CoverFeatherSection(
+                shape = RoundedCornerShape(
+                    topStart = 4.dp,
+                    topEnd = 4.dp,
+                    bottomStart = 24.dp,
+                    bottomEnd = 24.dp
+                ),
+                enabled = fullPlayerCoverFeather,
+                onEnabledChange = { enabled ->
+                    fullPlayerCoverFeather = enabled
+                    playerViewModel?.updateFullPlayerCoverFeather(enabled) ?: prefs.setFullPlayerCoverFeather(enabled)
+                },
+                amount = fullPlayerCoverFeatherAmount,
+                onAmountChange = { amount ->
+                    fullPlayerCoverFeatherAmount = amount
+                    playerViewModel?.updateFullPlayerCoverFeatherAmount(amount) ?: prefs.setFullPlayerCoverFeatherAmount(amount)
                 }
             )
         }
@@ -607,7 +627,7 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE,
             label = str("player_button_like"),
             desc = str("player_button_like_desc"),
-            mark = rememberVectorPainter(Icons.Filled.Favorite),
+            mark = rememberVectorPainter(Icons.Rounded.Favorite),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_LIKE in visibleButtons
         ),
         ButtonConfigItem(
@@ -629,28 +649,28 @@ private fun PlayerButtonsSection(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL,
             label = str("player_button_panel"),
             desc = str("player_button_panel_desc"),
-            mark = rememberVectorPainter(Icons.Outlined.Tune),
+            mark = rememberVectorPainter(Icons.Rounded.ViewSidebar),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE,
             label = str("player_button_queue"),
             desc = str("player_button_queue_desc"),
-            mark = rememberVectorPainter(Icons.Outlined.QueueMusic),
+            mark = rememberVectorPainter(Icons.AutoMirrored.Rounded.QueueMusic),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE,
             label = str("player_button_shuffle"),
             desc = str("player_button_shuffle_desc"),
-            mark = rememberVectorPainter(Icons.Filled.Shuffle),
+            mark = rememberVectorPainter(Icons.Rounded.Shuffle),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE in visibleButtons
         ),
         ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT,
             label = str("player_button_repeat"),
             desc = str("player_button_repeat_desc"),
-            mark = rememberVectorPainter(Icons.Filled.Repeat),
+            mark = rememberVectorPainter(Icons.Rounded.Repeat),
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_REPEAT in visibleButtons
         ),
     )
@@ -839,10 +859,7 @@ private fun ScreensaverSection(
         }
     }
 
-    val bottomRadius by animateDpAsState(
-        targetValue = if (enabled) 4.dp else 24.dp,
-        label = "ScreensaverCornerAnimation"
-    )
+    val bottomRadius = 4.dp
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -870,12 +887,7 @@ private fun ScreensaverSection(
             exit = shrinkVertically() + fadeOut(),
         ) {
             Surface(
-                shape = RoundedCornerShape(
-                    topStart = 4.dp,
-                    topEnd = 4.dp,
-                    bottomStart = 24.dp,
-                    bottomEnd = 24.dp
-                ),
+                shape = RoundedCornerShape(4.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -953,6 +965,96 @@ private fun ScreensaverSection(
                         },
                         valueRange = 0f..(steps.lastIndex).toFloat(),
                         steps = steps.size - 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverFeatherSection(
+    shape: Shape,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    amount: Float,
+    onAmountChange: (Float) -> Unit,
+) {
+    val bottomRadius by animateDpAsState(
+        targetValue = if (enabled) 4.dp else 24.dp,
+        label = "CoverFeatherCornerAnimation"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        SettingsItem(
+            shape = RoundedCornerShape(
+                topStart = 4.dp,
+                topEnd = 4.dp,
+                bottomStart = bottomRadius,
+                bottomEnd = bottomRadius
+            ),
+            title = str("full_player_cover_feather"),
+            subtitle = str("full_player_cover_feather_desc"),
+            icon = Icons.Rounded.BlurOn,
+            hasSwitch = true,
+            switchState = enabled,
+            onSwitchChange = onEnabledChange,
+            highlightKey = "full_player_cover_feather"
+        )
+
+        AnimatedVisibility(
+            visible = enabled,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 4.dp,
+                    topEnd = 4.dp,
+                    bottomStart = 24.dp,
+                    bottomEnd = 24.dp
+                ),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = str("full_player_cover_feather_amount"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "${(amount * 100).roundToInt()}%",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Slider(
+                        value = amount,
+                        onValueChange = onAmountChange,
+                        valueRange = 0f..1f,
+                        steps = 19,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -1097,7 +1199,7 @@ internal fun MenuTilesSection(title: String, menu: String, catalogue: List<com.a
                     Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(str("menu_tiles_desc"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     prefs.resetMenuTiles(menu)
                     hidden = emptySet()
                 }) { Text(str("menu_tiles_reset")) }
@@ -1140,7 +1242,7 @@ private fun FloatingBarSection() {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(str("floating_bar_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = { update(com.alananasss.kittytune.data.local.FloatingBarLook.DEFAULT) }) { Text(str("btn_reset")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { update(com.alananasss.kittytune.data.local.FloatingBarLook.DEFAULT) }) { Text(str("btn_reset")) }
             }
             // A live miniature of the bar with the chosen corner and width.
             Box(Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerLowest), contentAlignment = Alignment.Center) {

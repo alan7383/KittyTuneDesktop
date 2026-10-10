@@ -361,7 +361,9 @@ object DownloadManager {
                     artworkUrl = track.fullResArtwork,
                     duration = track.durationMs ?: 0L,
                     localAudioPath = "",
-                    localArtworkPath = ""
+                    localArtworkPath = "",
+                    source = track.source?.takeIf { it != "soundcloud" },
+                    permalinkUrl = track.permalinkUrl.takeIf { track.source != null && track.source != "soundcloud" },
                 )
                 dao.insertTrack(localTrack)
             }
@@ -558,7 +560,9 @@ object DownloadManager {
                         artworkUrl = track.fullResArtwork,
                         duration = track.durationMs ?: 0L,
                         localAudioPath = "",
-                        localArtworkPath = ""
+                        localArtworkPath = "",
+                        source = track.source?.takeIf { it != "soundcloud" },
+                        permalinkUrl = track.permalinkUrl.takeIf { track.source != null && track.source != "soundcloud" },
                     )
                     dao.insertTrack(localTrack)
                 }

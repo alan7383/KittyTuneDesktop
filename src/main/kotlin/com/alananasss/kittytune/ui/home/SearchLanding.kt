@@ -27,12 +27,14 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +59,7 @@ import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * What the search screen shows while the field is empty.
@@ -80,82 +83,29 @@ fun SearchLanding(
     onOpenTag: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val visits by vm.recentVisits.collectAsState()
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(SECTION_GAP),
     ) {
-        if (vm.recentSearches.isNotEmpty()) {
+        if (vm.recentSearches.isNotEmpty() || visits.isNotEmpty()) {
             item {
                 RecentSearchesSection(
+                    visits = visits,
                     searches = vm.recentSearches,
                     onRun = { vm.runRecentSearch(it) },
                     onForget = { vm.forgetSearch(it) },
+                    onOpenVisit = { visit ->
+                        when (visit.kind) {
+                            com.alananasss.kittytune.data.search.RecentVisits.Kind.TRACK ->
+                                visit.track?.let { playerViewModel.playPlaylist(listOf(it), 0) }
+                            else -> visit.destination?.let { playerViewModel.navigateToPlaylistId = it }
+                        }
+                    },
+                    onForgetVisit = { vm.forgetVisit(it) },
                     onClearAll = { vm.clearRecentSearches() },
                 )
-            }
-        }
-
-        item {
-            ChartPreviewSection(
-                kind = vm.chartPreviewKind,
-                entries = vm.chartPreview,
-                isLoading = vm.isChartPreviewLoading,
-                currentTrack = playerViewModel.currentTrack,
-                onKindChange = { vm.loadChartPreview(it) },
-                onPlayFrom = { index ->
-                    playerViewModel.playPlaylist(
-                        tracks = vm.chartPreview.map { it.track },
-                        startIndex = index,
-                        context = PlaybackContext(
-                            displayText = str(
-                                if (vm.chartPreviewKind == ChartKind.TOP) "chart_kind_top"
-                                else "chart_kind_trending"
-                            ),
-                            navigationId = "charts",
-                        ),
-                    )
-                },
-                onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
-                onSeeAll = onOpenCharts,
-            )
-        }
-
-        if (vm.likedArtistUpdates.isNotEmpty()) {
-            item {
-                Column {
-                    LandingHeader(str("home_from_your_artists"), action = null)
-                    Text(
-                        text = str("home_from_your_artists_sub"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = CONTENT_PADDING),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    ScrollableLazyRow(
-                        contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        fadeColor = MaterialTheme.colorScheme.surface,
-                    ) {
-                        items(vm.likedArtistUpdates.size) { index ->
-                            val track = vm.likedArtistUpdates[index]
-                            LandingTrackCard(
-                                track = track,
-                                isCurrent = playerViewModel.currentTrack?.id == track.id,
-                                onClick = {
-                                    playerViewModel.playPlaylist(
-                                        tracks = vm.likedArtistUpdates.toList(),
-                                        startIndex = index,
-                                        context = PlaybackContext(
-                                            displayText = str("home_from_your_artists"),
-                                            navigationId = "home",
-                                        ),
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
             }
         }
 
@@ -222,6 +172,78 @@ fun SearchLanding(
 }
 
 /**
+ * The country's chart, a few songs and the way into all of it, for the home page: it moved there from the search
+ * page, where it was a thing to scroll past on the way to typing (issue #66).
+ */
+@Composable
+internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewModel, onOpenCharts: () -> Unit) {
+    ChartPreviewSection(
+        kind = vm.chartPreviewKind,
+        entries = vm.chartPreview,
+        isLoading = vm.isChartPreviewLoading,
+        currentTrack = playerViewModel.currentTrack,
+        onKindChange = { vm.loadChartPreview(it) },
+        onPlayFrom = { index ->
+            playerViewModel.playPlaylist(
+                tracks = vm.chartPreview.map { it.track },
+                startIndex = index,
+                context = PlaybackContext(
+                    displayText = str(
+                        vm.chartPreviewKind.labelKey()
+                    ),
+                    navigationId = "charts",
+                ),
+            )
+        },
+        onArtistClick = { playerViewModel.navigateToTrackArtist(it) },
+        onSeeAll = onOpenCharts,
+        )
+}
+
+/**
+ * New songs from the artists already in the liked list, newest first, in one row; nothing when there are none.
+ *
+ * It used to split them by release Friday under three sub-titles, each with a row and a line of explanation, which on
+ * a page of rows was a lot of small print. One row, each song with its date, is what it is for.
+ */
+@Composable
+internal fun FromYourArtistsSection(vm: HomeViewModel, playerViewModel: PlayerViewModel) {
+    if (vm.likedArtistUpdates.isEmpty()) return
+    val tracks = remember(vm.likedArtistUpdates.toList()) {
+        ReleaseWeeks.group(vm.likedArtistUpdates.toList()).flatMap { it.tracks }.take(FROM_YOUR_ARTISTS_COUNT)
+    }
+    Column {
+        LandingHeader(str("home_from_your_artists"), action = null)
+        ScrollableLazyRow(
+            contentPadding = PaddingValues(horizontal = CONTENT_PADDING),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            items(tracks.size) { index ->
+                val track = tracks[index]
+                LandingTrackCard(
+                    track = track,
+                    isCurrent = playerViewModel.currentTrack?.id == track.id,
+                    releaseDate = ReleaseWeeks.releaseDateOf(track),
+                    onClick = {
+                        playerViewModel.playPlaylist(
+                            tracks = tracks,
+                            startIndex = index,
+                            context = PlaybackContext(
+                                displayText = str("home_from_your_artists"),
+                                navigationId = "home",
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+private const val FROM_YOUR_ARTISTS_COUNT = 16
+
+/**
  * The one way this screen introduces a section: a title, and optionally a link into more.
  *
  * Every section uses it, so the eye learns it once. A section that has nowhere else to go passes
@@ -242,7 +264,7 @@ private fun LandingHeader(title: String, action: Pair<String, () -> Unit>?) {
             modifier = Modifier.weight(1f),
         )
         if (action != null) {
-            TextButton(onClick = action.second) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = action.second) {
                 Text(
                     text = action.first,
                     style = MaterialTheme.typography.labelLarge,
@@ -263,9 +285,12 @@ private fun LandingHeader(title: String, action: Pair<String, () -> Unit>?) {
  */
 @Composable
 private fun RecentSearchesSection(
+    visits: List<com.alananasss.kittytune.data.search.RecentVisits.Visit>,
     searches: List<String>,
     onRun: (String) -> Unit,
     onForget: (String) -> Unit,
+    onOpenVisit: (com.alananasss.kittytune.data.search.RecentVisits.Visit) -> Unit,
+    onForgetVisit: (com.alananasss.kittytune.data.search.RecentVisits.Visit) -> Unit,
     onClearAll: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -276,14 +301,21 @@ private fun RecentSearchesSection(
             action = str("search_clear_all") to onClearAll,
         )
 
-        val visible = if (expanded) searches else searches.take(COLLAPSED_RECENT_SEARCHES)
-        visible.forEach { term ->
+        // What was opened comes first, as itself: the artist with their picture is one click from their page,
+        // where the words typed to find them were two (issue #66).
+        val total = visits.size + searches.size
+        val shownVisits = if (expanded) visits else visits.take(COLLAPSED_RECENT_SEARCHES)
+        shownVisits.forEach { visit ->
+            RecentVisitRow(visit = visit, onOpen = { onOpenVisit(visit) }, onForget = { onForgetVisit(visit) })
+        }
+        val roomForTerms = if (expanded) searches.size else (COLLAPSED_RECENT_SEARCHES - shownVisits.size).coerceAtLeast(0)
+        searches.take(roomForTerms).forEach { term ->
             RecentSearchRow(term = term, onRun = { onRun(term) }, onForget = { onForget(term) })
         }
 
-        if (searches.size > COLLAPSED_RECENT_SEARCHES) {
+        if (total > COLLAPSED_RECENT_SEARCHES) {
             val rotation by animateFloatAsState(if (expanded) 180f else 0f, label = "seeMoreChevron")
-            TextButton(
+            TextButton(shapes = ButtonDefaults.shapes(),
                 onClick = { expanded = !expanded },
                 modifier = Modifier.padding(start = CONTENT_PADDING - 12.dp, top = 2.dp),
             ) {
@@ -303,6 +335,102 @@ private fun RecentSearchesSection(
         }
     }
 }
+
+/** Something opened from search before: an artist, a track or a playlist, with its picture. */
+@Composable
+private fun RecentVisitRow(
+    visit: com.alananasss.kittytune.data.search.RecentVisits.Visit,
+    onOpen: () -> Unit,
+    onForget: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val crossSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val background by animateColorAsState(
+        if (hovered) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+        label = "recentVisitBackground",
+    )
+    val crossAlpha by animateFloatAsState(if (hovered) 1f else 0f, label = "recentVisitCross")
+    val isArtist = visit.kind == com.alananasss.kittytune.data.search.RecentVisits.Kind.ARTIST
+    val subtitle = when (visit.kind) {
+        com.alananasss.kittytune.data.search.RecentVisits.Kind.ARTIST -> str("search_kind_artist")
+        com.alananasss.kittytune.data.search.RecentVisits.Kind.TRACK -> str("search_kind_track", visit.subtitle.orEmpty())
+        com.alananasss.kittytune.data.search.RecentVisits.Kind.PLAYLIST ->
+            listOfNotNull(str("search_kind_playlist"), visit.subtitle?.takeIf { it.isNotBlank() }).joinToString(" · ")
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = CONTENT_PADDING - 6.dp)
+            .height(VISIT_ROW_HEIGHT)
+            .hoverable(interactionSource)
+            .pressScale(interactionSource, pressedScale = 0.98f)
+            .clip(RoundedCornerShape(12.dp))
+            .background(background)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onOpen)
+            .padding(start = 6.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = visit.imageUrl,
+            contentDescription = null,
+            placeholder = if (isArtist) rememberDefaultAvatarPainter() else null,
+            error = if (isArtist) rememberDefaultAvatarPainter() else null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            modifier = Modifier
+                .size(44.dp)
+                .clip(if (isArtist) CircleShape else RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = visit.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (visit.isVerified) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Rounded.Verified,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp),
+                    )
+                }
+            }
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .clickable(interactionSource = crossSource, indication = null, onClick = onForget)
+                .alpha(crossAlpha),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.Close,
+                contentDescription = str("search_remove_recent"),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+private val VISIT_ROW_HEIGHT = 56.dp
 
 /**
  * One stored query.
@@ -386,7 +514,7 @@ private fun RecentSearchRow(
 
 /** The first few songs of a chart, and the way into all of it. */
 @Composable
-private fun ChartPreviewSection(
+internal fun ChartPreviewSection(
     kind: ChartKind,
     entries: List<ChartEntry>,
     isLoading: Boolean,
@@ -396,11 +524,15 @@ private fun ChartPreviewSection(
     onArtistClick: (Track) -> Unit,
     onSeeAll: () -> Unit,
 ) {
-    Column {
-        LandingHeader(
-            title = str("chart_section_title"),
-            action = str("search_see_all") to onSeeAll,
-        )
+    // One card on the page's own inset, like My Wave and the statistics around it, with the title as the way in,
+    // an arrow after its words where the eye is, instead of a "see all" at the far right of the row.
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = CONTENT_PADDING),
+    ) {
+    Column(Modifier.padding(top = 8.dp, bottom = 10.dp)) {
+        com.alananasss.kittytune.ui.profile.ArtistSectionTitle(str("chart_section_title"), onOpen = onSeeAll)
 
         SongChart(
             kind = kind,
@@ -410,6 +542,7 @@ private fun ChartPreviewSection(
             onGenreChange = {},
             // The landing previews one genre; choosing between them belongs to the chart itself.
             showGenreRow = false,
+            compactKinds = true,
             isSwitching = isLoading && entries.isNotEmpty(),
             modifier = Modifier.padding(horizontal = CONTENT_PADDING - 6.dp),
         )
@@ -441,6 +574,7 @@ private fun ChartPreviewSection(
             }
         }
     }
+    }
 }
 
 /** A square cover and two lines, for the horizontal shelves. */
@@ -449,6 +583,7 @@ private fun LandingTrackCard(
     track: Track,
     isCurrent: Boolean,
     onClick: () -> Unit,
+    releaseDate: java.time.LocalDate? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
@@ -491,6 +626,27 @@ private fun LandingTrackCard(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (releaseDate != null) {
+            Text(
+                text = ReleaseWeeks.shortDate(releaseDate, com.alananasss.kittytune.core.Strings.resolvedLanguage),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** "This Friday's releases · since 3 Oct", "Last Friday", "Earlier". */
+@Composable
+private fun releaseWeekTitle(group: ReleaseWeeks.Group): String {
+    val language = com.alananasss.kittytune.core.Strings.resolvedLanguage
+    return when (group.week) {
+        ReleaseWeeks.Week.THIS_FRIDAY ->
+            str("home_releases_this_friday", ReleaseWeeks.shortDate(group.since!!, language))
+        ReleaseWeeks.Week.LAST_FRIDAY ->
+            str("home_releases_last_friday", ReleaseWeeks.shortDate(group.since!!, language))
+        ReleaseWeeks.Week.EARLIER -> str("home_releases_earlier")
     }
 }
 

@@ -214,13 +214,14 @@ fun MainTopBar(
                     Spacer(Modifier.width(8.dp))
                     FilledTonalIconButton(
                         shapes = IconButtonDefaults.shapes(),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
+                        // In the accent for as long as what it opens is open, and plain again once it is left.
+                        colors = cornerButtonColors(isActive = currentRoute == "recognition"),
                         onClick = {
+                            // A second press of the lit button leaves again.
                             if (currentRoute != "recognition") {
                                 navController.navigate("recognition")
+                            } else {
+                                navController.popBackStack()
                             }
                         }
                     ) {
@@ -238,10 +239,7 @@ fun MainTopBar(
             Tip(if (isRightPanelOpen) str("panel_collapse") else str("panel_expand")) {
                 FilledTonalIconButton(
                     shapes = IconButtonDefaults.shapes(),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
+                    colors = cornerButtonColors(isActive = isRightPanelOpen),
                     onClick = onToggleRightPanel
                 ) {
                     RightPanelToggleIcon(isOpen = isRightPanelOpen)
@@ -249,6 +247,19 @@ fun MainTopBar(
             }
         }
     }
+}
+
+/** The top bar's round buttons: quiet, or in the accent's container while what they open is open. */
+@Composable
+private fun cornerButtonColors(isActive: Boolean): androidx.compose.material3.IconButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    val container by androidx.compose.animation.animateColorAsState(
+        if (isActive) scheme.primaryContainer else scheme.surfaceVariant.copy(alpha = 0.6f), label = "cornerContainer",
+    )
+    val content by androidx.compose.animation.animateColorAsState(
+        if (isActive) scheme.onPrimaryContainer else scheme.onSurfaceVariant, label = "cornerContent",
+    )
+    return IconButtonDefaults.filledTonalIconButtonColors(containerColor = container, contentColor = content)
 }
 
 /**

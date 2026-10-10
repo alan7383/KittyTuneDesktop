@@ -115,6 +115,22 @@ object AppDatabase {
             try {
                 st.execute("ALTER TABLE downloaded_playlists ADD COLUMN isDownloaded INTEGER NOT NULL DEFAULT 0")
             } catch (_: Exception) {}
+            // A lyrics sync can have a second point (see LyricsSync); single offsets leave these empty.
+            for (column in listOf("anchorMs INTEGER NOT NULL DEFAULT 0", "endAtMs INTEGER", "endOffsetMs INTEGER")) {
+                try {
+                    st.execute("ALTER TABLE lyrics_offset ADD COLUMN $column")
+                } catch (_: Exception) {}
+            }
+            // A saved track's source and page, for tracks that are not SoundCloud's (see LocalTrack.source).
+            for (column in listOf("source TEXT", "permalinkUrl TEXT")) {
+                try {
+                    st.execute("ALTER TABLE downloaded_tracks ADD COLUMN $column")
+                } catch (_: Exception) {}
+            }
+            // How energetic a track is, for choosing how to blend it (see AutomixManager); older rows have none.
+            try {
+                st.execute("ALTER TABLE beat_info ADD COLUMN energy REAL")
+            } catch (_: Exception) {}
             st.execute("UPDATE library_folders SET parentFolderId = NULL WHERE parentFolderId = 0")
             st.execute("UPDATE library_item_meta SET folderId = NULL WHERE folderId = 0")
 

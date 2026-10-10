@@ -29,6 +29,8 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.SplitSettingsItem
 import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 /**
  * Audio Settings: separated into clean sub-page folders (Playback, Sound & Output, Transitions, Sleep Timer).
@@ -93,7 +95,7 @@ fun AudioPlaybackPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showSeekWheelDialog = false }) { Text(str("btn_ok")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSeekWheelDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }
@@ -183,29 +185,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
     }
 
     val availableDevices = remember {
-        val isLinux = System.getProperty("os.name").lowercase().contains("linux")
-        if (isLinux) {
-            val sinks = com.alananasss.kittytune.util.LinuxAudioManager.getOutputSinks()
-            if (sinks.isNotEmpty()) return@remember sinks.map { it.id to it.description }
-        }
-        val list = mutableListOf<Pair<String, String>>()
-        try {
-            val mixerInfos = javax.sound.sampled.AudioSystem.getMixerInfo()
-            val seenNames = mutableSetOf<String>()
-            for (info in mixerInfos) {
-                val rawName = info.name.trim()
-                if (rawName.isNotEmpty() && !seenNames.contains(rawName) && !rawName.contains("Port")) {
-                    try {
-                        val mixer = javax.sound.sampled.AudioSystem.getMixer(info)
-                        if (mixer.isLineSupported(javax.sound.sampled.DataLine.Info(javax.sound.sampled.SourceDataLine::class.java, null))) {
-                            seenNames.add(rawName)
-                            list.add(rawName to com.alananasss.kittytune.util.LinuxAudioManager.cleanName(rawName))
-                        }
-                    } catch (e: Exception) {}
-                }
-            }
-        } catch (e: Exception) {}
-        list
+        com.alananasss.kittytune.audio.listOutputDevices().map { it.id to it.label }
     }
 
     if (showQualityDialog) {
@@ -232,7 +212,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showQualityDialog = false }) { Text(str("btn_cancel")) } }
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showQualityDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -291,7 +271,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showDeviceDialog = false }) { Text(str("btn_cancel")) } }
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeviceDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -308,7 +288,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                             .align(Alignment.Center)
                             .padding(horizontal = 32.dp)
                     )
-                    IconButton(
+                    IconButton(shapes = IconButtonDefaults.shapes(),
                         onClick = { showNormalizationInfoDialog = true },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
@@ -362,7 +342,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                     )
                 }
             },
-            confirmButton = { TextButton(onClick = { showNormDialog = false }) { Text(str("btn_ok")) } }
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showNormDialog = false }) { Text(str("btn_ok")) } }
         )
     }
 
@@ -398,7 +378,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showNormalizationInfoDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showNormalizationInfoDialog = false }) {
                     Text(str("btn_ok"))
                 }
             }
@@ -458,6 +438,8 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
     var showCrossfadeDurationDialog by remember { mutableStateOf(false) }
 
     var automixEnabled by remember { mutableStateOf(prefs.getAutomixEnabled()) }
+    val togetherCode by com.alananasss.kittytune.data.together.Together.active.collectAsState()
+    val mayChangeAutomix = togetherCode?.let(com.alananasss.kittytune.data.together.Together::isHostOf) ?: true
     var automixOverlapMode by remember { mutableStateOf(prefs.getAutomixOverlapMode()) }
     var automixStartOffsetMode by remember { mutableStateOf(prefs.getAutomixStartOffsetMode()) }
     var automixStartOffsetCustomSec by remember { mutableStateOf(prefs.getAutomixStartOffsetCustomSec()) }
@@ -494,7 +476,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showCrossfadeDurationDialog = false }) { Text(str("btn_ok")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showCrossfadeDurationDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }
@@ -535,7 +517,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showAutomixOverlapDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAutomixOverlapDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -597,7 +579,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     automixStartOffsetMode = tempMode
                     automixStartOffsetCustomSec = tempCustomSec
                     prefs.setAutomixStartOffsetMode(tempMode)
@@ -609,7 +591,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAutomixStartOffsetDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAutomixStartOffsetDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -691,12 +673,15 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                     bottomEnd = automixBottomRadius
                 ),
                 title = str(com.alananasss.kittytune.R.string.automix),
-                subtitle = str(com.alananasss.kittytune.R.string.automix_desc),
+                // A listener in a shared playlist plays it the way the host does, automix included.
+                subtitle = if (mayChangeAutomix) str(com.alananasss.kittytune.R.string.automix_desc) else str("together_automix_host_only"),
                 hasSwitch = true,
                 switchState = automixEnabled,
-                onSwitchChange = { 
-                    automixEnabled = it
-                    prefs.setAutomixEnabled(it)
+                onSwitchChange = {
+                    if (mayChangeAutomix) {
+                        automixEnabled = it
+                        prefs.setAutomixEnabled(it)
+                    }
                 },
                 highlightKey = "pref_automix"
             )
@@ -820,7 +805,7 @@ fun AudioSleepTimerPage() {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showFadeDurationDialog = false }) { Text(str("btn_ok")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFadeDurationDialog = false }) { Text(str("btn_ok")) }
             }
         )
     }

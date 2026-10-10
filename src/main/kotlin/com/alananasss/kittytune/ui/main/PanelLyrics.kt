@@ -8,7 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import com.alananasss.kittytune.ui.player.lyrics.lyricUnderline
+import com.alananasss.kittytune.ui.player.lyrics.lyricHoverHighlight
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -64,6 +64,8 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricLineStyling
 import com.alananasss.kittytune.ui.player.lyrics.LyricLineText
 import com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition
 import com.alananasss.kittytune.ui.player.lyrics.FollowPlainLyrics
+import com.alananasss.kittytune.ui.player.lyrics.revealWhenPlaced
+import com.alananasss.kittytune.ui.player.lyrics.stopAtLastLine
 import com.alananasss.kittytune.ui.player.lyrics.lyricsWheel
 import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import kotlinx.coroutines.isActive
@@ -110,19 +112,11 @@ fun PanelLyrics(
             }
         }
         !vm.rawPlainLyrics.isNullOrBlank() -> PanelPlainLyrics(vm, modifier, style)
-        vm.isLyricsLoading -> Column(
-            modifier = modifier.fillMaxWidth().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
-        ) {
-            androidx.compose.material3.ContainedLoadingIndicator()
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = str("lyrics_searching"),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        vm.isLyricsLoading -> com.alananasss.kittytune.ui.player.lyrics.LyricsSearchingIndicator(
+            fontFamily = com.alananasss.kittytune.ui.theme.rememberLyricsFontFamily(vm.lyricsFont),
+            modifier = modifier.fillMaxWidth(),
+            large = style.isFullScreen,
+        )
         else -> Column(
             modifier = modifier.fillMaxWidth().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -211,7 +205,7 @@ private fun PanelSyncedLyrics(
         val anchorPx =
             (viewportPx * (effectiveStyle.anchorFraction - effectiveStyle.topInsetFraction).coerceAtLeast(0f)).toInt()
 
-        val readingByHand = FollowActiveLine(listState, activeIndex, anchorPx)
+        val readingByHand = FollowActiveLine(listState, activeIndex, anchorPx, contentKey = lines.size to lines.firstOrNull()?.startTime)
         val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
 
         // Interpolated between the player's four-per-second reports, so the word fill in the panel is as
@@ -223,7 +217,7 @@ private fun PanelSyncedLyrics(
         ) + vm.lyricsOffset
 
         LazyColumn(
-            Modifier.fillMaxSize(),
+            Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex, contentKey = lines.size to lines.firstOrNull()?.startTime).stopAtLastLine(listState),
             state = listState,
             contentPadding = PaddingValues(
                 start = effectiveStyle.startPadding,
@@ -243,6 +237,7 @@ private fun PanelSyncedLyrics(
                     // distance is zero for all of them until the song reaches the words.
                     distance = if (focusIndex < 0) 0 else index - focusIndex,
                     isSung = index == activeIndex,
+                    isReadingByHand = readingByHand,
                     positionMs = smoothPosition,
                     // Shared with the full screen, which had its own copy of this and got it
                     // differently wrong — see [LyricsUtils.seekTargetFor] for what the clamp does
@@ -250,7 +245,7 @@ private fun PanelSyncedLyrics(
                     onClick = {
                         LyricsUtils.seekTargetFor(
                             line = line,
-                            lyricsOffsetMs = vm.lyricsOffset,
+                            lyricsOffsetMs = vm.lyricsOffsetAtLyricTime(line.startTime),
                             durationMs = vm.duration,
                         )?.let(vm::seekTo)
                     },
@@ -276,6 +271,7 @@ private fun PanelLyricLine(
     style: PanelLyricsStyle,
     distance: Int,
     isSung: Boolean,
+    isReadingByHand: Boolean,
     positionMs: Float,
     onClick: () -> Unit,
 ) {
@@ -289,7 +285,9 @@ private fun PanelLyricLine(
         // Softer than the full screen's: this text is a third of the size, and the radius that reads as
         // depth behind a headline turns a panel line into a smudge.
         focusBlur = if (style.isFullScreen) 3.dp else 1.dp,
-        blurEnabled = if (style.isFullScreen) vm.lyricsFullScreenLineBlurEnabled else vm.lyricsSidebarLineBlurEnabled,
+        // Off while reading by hand, so the lines scrolled to can be read; see the full screen's copy.
+        blurEnabled = !isReadingByHand &&
+            if (style.isFullScreen) vm.lyricsFullScreenLineBlurEnabled else vm.lyricsSidebarLineBlurEnabled,
     )
 
     val scale by animateFloatAsState(treatment.scale, tween(260), label = "panelLyricScale")
@@ -351,17 +349,16 @@ private fun PanelLyricLine(
 
     val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val isHovered by interaction.collectIsHoveredAsState()
-    var hoverLayout by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
 
     Column(
         horizontalAlignment = columnAlign,
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interaction)
-            // No indication. The default is a ripple, and a ripple across a full-screen line of 34 sp type is
-            // the "gros truc en surbrillance moche" — the lyrics screen has always drawn a rule under the
-            // hovered line instead, and that is the affordance these lines should have too (issue #33).
+            // No ripple: across a full-screen line of 34 sp type it is the "gros truc en surbrillance moche"
+            // (issue #33). The hover shows as a soft box instead, as in the karaoke view.
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .lyricHoverHighlight(isHovered, scheme.onSurface.copy(alpha = 0.07f))
             .padding(vertical = style.lineSpacing)
             .padding(start = linePaddingStart, end = linePaddingEnd)
             .graphicsLayer {
@@ -384,8 +381,13 @@ private fun PanelLyricLine(
             // which is not worth paying for at 0.dp.
             .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)
     ) {
+        // Backing vocals on a smaller line under the words, as in the karaoke view, instead of in brackets inside
+        // them (issue #66).
+        val (mainLine, backingLine) = remember(line, vm.lyricsSplitBackingVocals) {
+            if (vm.lyricsSplitBackingVocals) com.alananasss.kittytune.ui.player.lyrics.separateBackingVocals(line) else line to null
+        }
         LyricLineText(
-            line = line,
+            line = mainLine,
             isActive = isActive,
             positionMs = positionMs,
             wordSync = vm.isWordSyncEnabled,
@@ -396,14 +398,36 @@ private fun PanelLyricLine(
             inactiveColor = scheme.onSurfaceVariant,
             unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.5f),
             textAlign = textAlign,
-            textModifier = Modifier.lyricUnderline(
-                { hoverLayout },
-                isHovered,
-                base.fontSize.value,
-                if (isActive) scheme.onSurface else scheme.onSurfaceVariant,
-            ),
-            onTextLayout = { hoverLayout = it },
         )
+        if (backingLine != null) {
+          // Slides out under the line while it is sung and folds away after, as in the karaoke view, rather than
+          // standing under every line all the time.
+          androidx.compose.animation.AnimatedVisibility(
+            visible = isActive,
+            enter = androidx.compose.animation.fadeIn(tween(BACKING_ANIM_MS)) +
+                androidx.compose.animation.expandVertically(tween(BACKING_ANIM_MS), expandFrom = Alignment.Top) +
+                androidx.compose.animation.slideInVertically(tween(BACKING_ANIM_MS)) { -it / 3 },
+            exit = androidx.compose.animation.fadeOut(tween(BACKING_ANIM_MS)) +
+                androidx.compose.animation.shrinkVertically(tween(BACKING_ANIM_MS), shrinkTowards = Alignment.Top),
+          ) {
+            val backingStyle = { style: androidx.compose.ui.text.TextStyle ->
+                style.copy(fontSize = style.fontSize * BACKING_SCALE, lineHeight = style.lineHeight * BACKING_SCALE)
+            }
+            LyricLineText(
+                line = backingLine,
+                isActive = isActive,
+                positionMs = positionMs,
+                wordSync = vm.isWordSyncEnabled,
+                fillEffect = vm.isAppleMusicEffectEnabled,
+                activeStyle = backingStyle(inactiveStyle),
+                inactiveStyle = backingStyle(inactiveStyle),
+                activeColor = scheme.onSurface.copy(alpha = 0.8f),
+                inactiveColor = scheme.onSurfaceVariant.copy(alpha = 0.8f),
+                unsungColor = scheme.onSurfaceVariant.copy(alpha = 0.4f),
+                textAlign = textAlign,
+            )
+          }
+        }
         // Gated on the switches, which it was not: a fetched translation stayed in the line, so turning the
         // setting *off* left it on screen until the track changed. "Quand on active la traduction,
         // romanization il faut que ça se fasse direct en updatant l'écran avec anim" — direct in both
@@ -478,6 +502,7 @@ private fun PanelPlainLyrics(vm: PlayerViewModel, modifier: Modifier, style: Pan
         LazyColumn(
             Modifier
                 .fillMaxSize()
+                .revealWhenPlaced(listState, activeIndex = -1, contentKey = text)
                 .lyricsWheel(
                     listState = listState,
                     scope = scope,
@@ -571,7 +596,7 @@ data class PanelLyricsStyle(
             startPadding = 16.dp,
             endPadding = 16.dp,
             topInsetFraction = 0.03f,
-            tailFraction = 0.35f,
+            tailFraction = 0.58f,
             anchorFraction = 0.42f,
             lineSpacing = 6.dp,
             isFullScreen = false,
@@ -596,13 +621,20 @@ data class PanelLyricsStyle(
         val FullScreen = PanelLyricsStyle(
             startPadding = 24.dp,
             endPadding = 48.dp,
-            topInsetFraction = 0.34f,
+            // Starts at the top like the side panel and settles in the middle once the song has got that far,
+            // instead of an empty third of the screen above the first line.
+            topInsetFraction = 0.03f,
             tailFraction = 0.55f,
-            // The inset already puts the line a third of the way down, so this asks for nothing on top of it.
-            anchorFraction = 0.34f,
+            anchorFraction = 0.42f,
             // Overwritten by the caller, which scales it to whatever size the reader has chosen.
             lineSpacing = 14.dp,
             isFullScreen = true,
         )
     }
 }
+
+/** How large a backing-vocal line is drawn against the line it is sung under. */
+private const val BACKING_SCALE = 0.72f
+
+/** How long a backing line takes to slide out and fold away. */
+private const val BACKING_ANIM_MS = 420

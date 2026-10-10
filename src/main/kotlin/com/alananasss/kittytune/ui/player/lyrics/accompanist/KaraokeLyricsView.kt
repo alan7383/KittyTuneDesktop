@@ -64,6 +64,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.math.absoluteValue
+import com.alananasss.kittytune.ui.player.lyrics.revealWhenPlaced
+import com.alananasss.kittytune.ui.player.lyrics.returnToLine
+import com.alananasss.kittytune.ui.player.lyrics.LyricsScrolling
+import com.alananasss.kittytune.ui.player.lyrics.glideToLine
+import kotlinx.coroutines.delay
 
 internal data class FocusState(
     val firstIndex: Int,
@@ -134,6 +139,11 @@ fun KaraokeLyricsView(
     showTranslation: Boolean = true,
     showPhonetic: Boolean = true,
     offset: Dp = 32.dp,
+    /**
+     * The first line starts at the top instead of at [offset], and the list only starts moving once the sung line
+     * gets that far down. For the side panel: a song began there on a third of the panel left empty (issue #66).
+     */
+    startsAtTop: Boolean = false,
     keepAliveZone: Dp = 100.dp,
     blurDelta: Float = 3f,
     isScrubbing: Boolean = false,
@@ -269,7 +279,10 @@ fun KaraokeLyricsView(
     val lyricsFocusState by remember(lyrics, effectiveEndTimes, accompanimentToMainMap, haveDotsIntro) {
         derivedStateOf {
             val time = currentTimeMs()
-            val activeIndex = lyrics.lines.indices.find { idx ->
+            // The newest line that has started, not the oldest still sounding: a line whose last word (or
+            // backing vocal) rings on under the next one held the view on it, so the next line could not
+            // start until the previous one was over (issue #66). Both stay lit while they overlap.
+            val activeIndex = lyrics.lines.indices.findLast { idx ->
                 time >= lyrics.lines[idx].start && time < effectiveEndTimes[idx]
             }
 
@@ -312,9 +325,46 @@ fun KaraokeLyricsView(
         lastScrollTime = 0L
     }
 
+    /** The list is sliding back to the sung line after the reader scrolled away; see [returnToLine]. */
+    val isReturning = remember { mutableStateOf(false) }
+
+    // Lines spring into place only while the song moves them. While the reader scrolls, on a jump, and on the
+    // way back from a manual scroll, the list moves as one block: springing each line there made the words
+    // fly in on the way back (issue #66).
     val isManualScrolling by remember {
         derivedStateOf {
-            (listState.isScrollInProgress && !scrollInCode.value) || isSnapScroll.value || isScrubbing
+            (listState.isScrollInProgress && !scrollInCode.value) || isSnapScroll.value || isScrubbing || isReturning.value
+        }
+    }
+
+    // The blur stays off for as long as the reader is reading by hand, not only while the wheel turns: it
+    // came back the moment the scroll stopped, over the very lines just scrolled to (issue #66). It returns
+    // after the same grace the other views give before following the song again.
+    val isUserScrolling by remember { derivedStateOf { listState.isScrollInProgress && !scrollInCode.value } }
+    var isReadingByHand by remember { mutableStateOf(false) }
+    LaunchedEffect(isUserScrolling) {
+        if (isUserScrolling) {
+            isReadingByHand = true
+        } else if (isReadingByHand) {
+            delay(LyricsScrolling.MANUAL_GRACE_MS)
+            // And back to the line being sung, sliding, rather than waiting for the next line to start: on a
+            // pause that never happened, and the view stayed where the reader had left it (issue #66). Done
+            // before following resumes, so the follow below finds the list already there and does not jump.
+            val focus = lyricsFocusState.firstIndex
+            if (focus in lyrics.lines.indices) {
+                scrollInCode.value = true
+                isReturning.value = true
+                try {
+                    // The same spot the follow below settles a line on. The way back used to aim one top inset
+                    // lower, so the follow then pulled the list up again with a jump a moment later (issue #66).
+                    listState.returnToLine(focus) { -followTopPx(listState, stableOffsetPx, keepAliveZonePx) }
+                    lastFocusedIndex = focus
+                } finally {
+                    isReturning.value = false
+                    scrollInCode.value = false
+                }
+            }
+            isReadingByHand = false
         }
     }
 
@@ -323,18 +373,24 @@ fun KaraokeLyricsView(
         stableOffsetPx,
     ) {
         androidx.compose.runtime.snapshotFlow {
-            lyricsFocusState.firstIndex to isScrubbing
-        }.collectLatest { (firstIndex, scrubbing) ->
+            Triple(lyricsFocusState.firstIndex, isScrubbing, isReadingByHand)
+        }.collectLatest { (firstIndex, scrubbing, readingByHand) ->
+            // Left alone while the reader is reading by hand: following on every new line pulled the list out
+            // from under a scroll in progress (issue #66). The way back is the reader's grace running out above.
+            if (readingByHand && !scrubbing) return@collectLatest
             if (firstIndex in lyrics.lines.indices) {
                 val now = System.currentTimeMillis()
                 val timeDelta = now - lastScrollTime
+                // The first placement is a jump, never a glide down from line one: there is no reader
+                // following a line yet, and the glide is what drew lines arriving one under another.
+                val isFirstPlacement = lastFocusedIndex < 0
                 val indexDelta = if (lastFocusedIndex >= 0) kotlin.math.abs(firstIndex - lastFocusedIndex) else 0
                 lastFocusedIndex = firstIndex
 
                 val items = listState.layoutInfo.visibleItemsInfo
                 val targetItem = items.firstOrNull { it.index == firstIndex }
                 val isRapidClick = timeDelta < 280L
-                val isLargeJump = indexDelta > 3
+                val isLargeJump = indexDelta > 3 || isFirstPlacement
                 val shouldSnap = scrubbing || isRapidClick || isLargeJump
 
                 lastScrollTime = now
@@ -345,7 +401,7 @@ fun KaraokeLyricsView(
                         isSnapScroll.value = true
                     }
 
-                    val desiredOffset = (listState.layoutInfo.viewportStartOffset + stableOffsetPx + keepAliveZonePx).toInt()
+                    val desiredOffset = followTopPx(listState, stableOffsetPx, keepAliveZonePx)
 
                     if (targetItem != null && !isLargeJump) {
                         val scrollOffset = targetItem.offset - desiredOffset
@@ -353,7 +409,7 @@ fun KaraokeLyricsView(
                             listState.scrollBy(scrollOffset.toFloat())
                         }
                     } else if (!isLargeJump && !scrubbing && !isRapidClick) {
-                        listState.animateScrollToItem(firstIndex, (-stableOffsetPx - keepAliveZonePx).toInt())
+                        listState.animateScrollToItem(firstIndex, -desiredOffset)
                     } else {
                         listState.scrollToItem(firstIndex)
                         val refreshed = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == firstIndex }
@@ -382,6 +438,7 @@ fun KaraokeLyricsView(
                 state = listState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .revealWhenPlaced(listState, lyricsFocusState.firstIndex, contentKey = lyrics.lines.size to lyrics.lines.firstOrNull()?.start)
                         .graphicsLayer {
                             compositingStrategy = CompositingStrategy.Offscreen
                         }
@@ -414,7 +471,12 @@ fun KaraokeLyricsView(
                                 placeable.place(0, -(keepAliveZone.roundToPx()))
                             }
                         },
-                    contentPadding = PaddingValues(horizontal = horizontalMargin, vertical = stableOffset + keepAliveZone),
+                    contentPadding = PaddingValues(
+                        start = horizontalMargin,
+                        end = horizontalMargin,
+                        top = if (startsAtTop) keepAliveZone + TOP_START_GAP else stableOffset + keepAliveZone,
+                        bottom = stableOffset + keepAliveZone,
+                    ),
                     verticalArrangement = Arrangement.spacedBy(lineSpacing)
                 ) {
                     itemsIndexed(
@@ -463,9 +525,12 @@ fun KaraokeLyricsView(
                             }
                         }
 
+                        // Each line follows a little later than the one nearer the sung line, so the move reads
+                        // as a wave. It used to take most of a second to settle, which made the whole view feel
+                        // a beat behind the song (issue #66).
                         val dynamicStiffness by remember(distanceWeightState.value) {
                             derivedStateOf {
-                                (140f - (distanceWeightState.value * 4f)).coerceAtLeast(115f)
+                                (LINE_STIFFNESS - distanceWeightState.value * LINE_STIFFNESS_STEP).coerceAtLeast(LINE_STIFFNESS_MIN)
                             }
                         }
 
@@ -516,11 +581,11 @@ fun KaraokeLyricsView(
 
                             val blurRadiusState = animateFloatAsState(
                                 targetValue = (
-                                        if (!useBlurEffect) 0f
-                                        else if (distanceWeightState.value > 0 && (!listState.isScrollInProgress || scrollInCode.value)) {
+                                        if (!useBlurEffect || isReadingByHand) 0f
+                                        else if (distanceWeightState.value > 0) {
                                             distanceWeightState.value * blurDelta
                                         } else 0f),
-                                animationSpec = tween(300),
+                                animationSpec = tween(if (isReadingByHand) 250 else 600),
                             )
 
                             when (line) {
@@ -590,3 +655,18 @@ fun KaraokeLyricsView(
             }
         }
     }
+
+/** Room above the first line when the lyrics start at the top; the fade at the top edge needs a little. */
+private val TOP_START_GAP = 12.dp
+
+/** How stiffly the sung line springs into place; the lines around it are a little softer. */
+private const val LINE_STIFFNESS = 300f
+private const val LINE_STIFFNESS_STEP = 18f
+private const val LINE_STIFFNESS_MIN = 190f
+
+/**
+ * Where the sung line's top settles, as a [androidx.compose.foundation.lazy.LazyListItemInfo.offset]: the same
+ * for the follow and for the way back after a manual scroll, so one never undoes the other.
+ */
+private fun followTopPx(listState: LazyListState, stableOffsetPx: Int, keepAliveZonePx: Float): Int =
+    (listState.layoutInfo.viewportStartOffset + stableOffsetPx + keepAliveZonePx).toInt()

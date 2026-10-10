@@ -10,6 +10,7 @@ import androidx.compose.material3.ButtonDefaults
     import androidx.compose.foundation.lazy.items
     import androidx.compose.foundation.shape.RoundedCornerShape
     import androidx.compose.material.icons.Icons
+    import androidx.compose.material.icons.rounded.*
     import androidx.compose.material.icons.rounded.DragIndicator
     import androidx.compose.material.icons.rounded.Add
     import androidx.compose.material.icons.rounded.CropFree
@@ -70,6 +71,7 @@ import com.alananasss.kittytune.ui.common.Slider
         val sidebarAlignment = playerViewModel.lyricsSidebarAlignment
         var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
         var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
+        var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showSidebarAlignmentDialog by remember { mutableStateOf(false) }
@@ -90,8 +92,6 @@ import com.alananasss.kittytune.ui.common.Slider
         var showPaxsenixKeyDialog by remember { mutableStateOf(false) }
         var paxsenixKeyInput by remember { mutableStateOf(prefs.getPaxsenixApiKey()) }
         var showProviderOrderDialog by remember { mutableStateOf(false) }
-        var providerOrder by remember { mutableStateOf(prefs.getLyricsProviderOrder()) }
-        var providerEnabledMap by remember { mutableStateOf(PreferredLyricsProvider.entries.associateWith { prefs.getLyricsProviderEnabled(it) }) }
 
         var showUiStyleDialog by remember { mutableStateOf(false) }
         var showSidebarUiStyleDialog by remember { mutableStateOf(false) }
@@ -134,7 +134,7 @@ import com.alananasss.kittytune.ui.common.Slider
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showProviderDialog = false }) { Text(str("btn_cancel")) } }
+                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showProviderDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
 
@@ -180,7 +180,7 @@ import com.alananasss.kittytune.ui.common.Slider
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showLangDialog = false }) { Text(str("btn_cancel")) } }
+                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showLangDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
 
@@ -203,7 +203,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                         paxsenixKeyInput = tempKey
                         prefs.setPaxsenixApiKey(tempKey)
                         PaxsenixClient.setApiKey(tempKey)
@@ -213,7 +213,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showPaxsenixKeyDialog = false }) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showPaxsenixKeyDialog = false }) {
                         Text(str("btn_cancel", "Cancel"))
                     }
                 }
@@ -221,105 +221,7 @@ import com.alananasss.kittytune.ui.common.Slider
         }
 
         if (showProviderOrderDialog) {
-            var currentOrder by remember { mutableStateOf(prefs.getLyricsProviderOrder().toMutableList()) }
-            var currentEnabled by remember {
-                mutableStateOf(
-                    PreferredLyricsProvider.entries.associateWith { prefs.getLyricsProviderEnabled(it) }
-                )
-            }
-            EscapableAlertDialog(
-                onDismissRequest = { showProviderOrderDialog = false },
-                title = { Text(str("pref_lyrics_order", "Provider Priority Order")) },
-                text = {
-                    com.alananasss.kittytune.ui.common.ScrollableColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp),
-                        contentPadding = PaddingValues(end = 12.dp)
-                    ) {
-                        sh.calvin.reorderable.ReorderableColumn(
-                            list = currentOrder,
-                            onSettle = { from, to ->
-                                currentOrder = currentOrder.toMutableList().apply { add(to, removeAt(from)) }
-                            },
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                        ) { index, provider, isDragging ->
-                            key(provider) {
-                                ReorderableItem {
-                                    val elevation by androidx.compose.animation.core.animateDpAsState(
-                                        if (isDragging) 6.dp else 0.dp,
-                                        label = "providerDrag"
-                                    )
-                                    val isEnabled = currentEnabled[provider] ?: true
-                                    Surface(
-                                        shape = RoundedCornerShape(14.dp),
-                                        color = if (isDragging) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        shadowElevation = elevation,
-                                    ) {
-                                        Row(
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(min = 52.dp)
-                                                .padding(horizontal = 4.dp, vertical = 6.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            IconButton(onClick = {}, modifier = Modifier.draggableHandle()) {
-                                                Icon(
-                                                    androidx.compose.material.icons.Icons.Rounded.DragIndicator,
-                                                    contentDescription = str("action_reorder"),
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            Row(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .alpha(if (isEnabled) 1f else 0.45f),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text(
-                                                    "${index + 1}",
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.width(28.dp)
-                                                )
-                                                Text(
-                                                    provider.displayName,
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    modifier = Modifier.weight(1f)
-                                                )
-                                            }
-                                            Spacer(Modifier.width(8.dp))
-                                            SettingsSwitch(
-                                                checked = isEnabled,
-                                                onCheckedChange = { checked ->
-                                                    currentEnabled = currentEnabled + (provider to checked)
-                                                }
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        providerOrder = currentOrder
-                        providerEnabledMap = currentEnabled
-                        prefs.setLyricsProviderOrder(currentOrder)
-                        currentEnabled.forEach { (p, enabled) ->
-                            prefs.setLyricsProviderEnabled(p, enabled)
-                        }
-                        showProviderOrderDialog = false
-                    }) {
-                        Text(str("btn_save", "Save"))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showProviderOrderDialog = false }) {
-                        Text(str("btn_cancel", "Cancel"))
-                    }
-                }
-            )
+            LyricsProviderOrderDialog(prefs = prefs, onDismiss = { showProviderOrderDialog = false })
         }
     
         // --- DIALOGS ---
@@ -350,7 +252,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showSidebarUiStyleDialog = false }) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSidebarUiStyleDialog = false }) {
                         Text(str("btn_cancel"))
                     }
                 }
@@ -383,7 +285,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showUiStyleDialog = false }) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showUiStyleDialog = false }) {
                         Text(str("btn_cancel"))
                     }
                 }
@@ -416,7 +318,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showFullScreenUiStyleDialog = false }) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenUiStyleDialog = false }) {
                         Text(str("btn_cancel"))
                     }
                 }
@@ -449,7 +351,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showLyricsFontDialog = false }) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showLyricsFontDialog = false }) {
                         Text(str("btn_cancel"))
                     }
                 }
@@ -474,7 +376,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${(playerViewModel.lyricsBounceFactor * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsBounceFactor((playerViewModel.lyricsBounceFactor - 0.1f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsBounceFactor((playerViewModel.lyricsBounceFactor - 0.1f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsBounceFactor,
                                 onValueChange = { playerViewModel.updateLyricsBounceFactor(it) },
@@ -482,12 +384,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 19,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsBounceFactor((playerViewModel.lyricsBounceFactor + 0.1f).coerceAtMost(2f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsBounceFactor((playerViewModel.lyricsBounceFactor + 0.1f).coerceAtMost(2f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsBounceFactor(1f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showBounceFactorDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsBounceFactor(1f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showBounceFactorDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -511,7 +413,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${(playerViewModel.lyricsGlowFactor * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsGlowFactor((playerViewModel.lyricsGlowFactor - 0.1f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsGlowFactor((playerViewModel.lyricsGlowFactor - 0.1f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsGlowFactor,
                                 onValueChange = { playerViewModel.updateLyricsGlowFactor(it) },
@@ -519,12 +421,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 19,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsGlowFactor((playerViewModel.lyricsGlowFactor + 0.1f).coerceAtMost(2f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsGlowFactor((playerViewModel.lyricsGlowFactor + 0.1f).coerceAtMost(2f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsGlowFactor(1f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showGlowFactorDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsGlowFactor(1f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showGlowFactorDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -548,7 +450,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${playerViewModel.lyricsFillTransitionWidth.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsFillTransitionWidth((playerViewModel.lyricsFillTransitionWidth - 2f).coerceAtLeast(2f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFillTransitionWidth((playerViewModel.lyricsFillTransitionWidth - 2f).coerceAtLeast(2f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsFillTransitionWidth,
                                 onValueChange = { playerViewModel.updateLyricsFillTransitionWidth(it) },
@@ -556,12 +458,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 10,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsFillTransitionWidth((playerViewModel.lyricsFillTransitionWidth + 2f).coerceAtMost(24f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFillTransitionWidth((playerViewModel.lyricsFillTransitionWidth + 2f).coerceAtMost(24f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsFillTransitionWidth(8f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showFillTransitionDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFillTransitionWidth(8f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFillTransitionDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -585,7 +487,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${playerViewModel.lyricsLineSpacing.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsLineSpacing((playerViewModel.lyricsLineSpacing - 2f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsLineSpacing((playerViewModel.lyricsLineSpacing - 2f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsLineSpacing,
                                 onValueChange = { playerViewModel.updateLyricsLineSpacing(it) },
@@ -593,12 +495,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 23,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsLineSpacing((playerViewModel.lyricsLineSpacing + 2f).coerceAtMost(48f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsLineSpacing((playerViewModel.lyricsLineSpacing + 2f).coerceAtMost(48f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsLineSpacing(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showLineSpacingDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsLineSpacing(0f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showLineSpacingDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -622,7 +524,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${playerViewModel.lyricsFullScreenLineSpacing.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenLineSpacing((playerViewModel.lyricsFullScreenLineSpacing - 2f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenLineSpacing((playerViewModel.lyricsFullScreenLineSpacing - 2f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsFullScreenLineSpacing,
                                 onValueChange = { playerViewModel.updateLyricsFullScreenLineSpacing(it) },
@@ -630,12 +532,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 31,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenLineSpacing((playerViewModel.lyricsFullScreenLineSpacing + 2f).coerceAtMost(64f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenLineSpacing((playerViewModel.lyricsFullScreenLineSpacing + 2f).coerceAtMost(64f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsFullScreenLineSpacing(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showFullScreenLineSpacingDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenLineSpacing(0f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenLineSpacingDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -661,7 +563,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${(playerViewModel.lyricsActiveScale * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsActiveScale((playerViewModel.lyricsActiveScale - 0.05f).coerceAtLeast(1.00f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsActiveScale((playerViewModel.lyricsActiveScale - 0.05f).coerceAtLeast(1.00f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsActiveScale,
                                 onValueChange = { playerViewModel.updateLyricsActiveScale(it) },
@@ -669,12 +571,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 5,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsActiveScale((playerViewModel.lyricsActiveScale + 0.05f).coerceAtMost(1.30f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsActiveScale((playerViewModel.lyricsActiveScale + 0.05f).coerceAtMost(1.30f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsActiveScale(1.00f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showActiveScaleDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsActiveScale(1.00f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showActiveScaleDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -698,7 +600,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${playerViewModel.lyricsHorizontalMargin.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsHorizontalMargin((playerViewModel.lyricsHorizontalMargin - 4f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsHorizontalMargin((playerViewModel.lyricsHorizontalMargin - 4f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsHorizontalMargin,
                                 onValueChange = { playerViewModel.updateLyricsHorizontalMargin(it) },
@@ -706,12 +608,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 7,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsHorizontalMargin((playerViewModel.lyricsHorizontalMargin + 4f).coerceAtMost(64f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsHorizontalMargin((playerViewModel.lyricsHorizontalMargin + 4f).coerceAtMost(64f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsHorizontalMargin(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showHorizontalMarginDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsHorizontalMargin(0f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showHorizontalMarginDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -735,7 +637,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${playerViewModel.lyricsFullScreenHorizontalMargin.toInt()} dp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin((playerViewModel.lyricsFullScreenHorizontalMargin - 8f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin((playerViewModel.lyricsFullScreenHorizontalMargin - 8f).coerceAtLeast(0f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsFullScreenHorizontalMargin,
                                 onValueChange = { playerViewModel.updateLyricsFullScreenHorizontalMargin(it) },
@@ -743,12 +645,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 19,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin((playerViewModel.lyricsFullScreenHorizontalMargin + 8f).coerceAtMost(160f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin((playerViewModel.lyricsFullScreenHorizontalMargin + 8f).coerceAtMost(160f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin(0f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showFullScreenHorizontalMarginDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenHorizontalMargin(0f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenHorizontalMarginDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -772,7 +674,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${(playerViewModel.lyricsVerticalOffset * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsVerticalOffset((playerViewModel.lyricsVerticalOffset - 0.02f).coerceAtLeast(0.20f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsVerticalOffset((playerViewModel.lyricsVerticalOffset - 0.02f).coerceAtLeast(0.20f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsVerticalOffset,
                                 onValueChange = { playerViewModel.updateLyricsVerticalOffset(it) },
@@ -780,12 +682,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 19,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsVerticalOffset((playerViewModel.lyricsVerticalOffset + 0.02f).coerceAtMost(0.60f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsVerticalOffset((playerViewModel.lyricsVerticalOffset + 0.02f).coerceAtMost(0.60f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsVerticalOffset(0.38f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showVerticalOffsetDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsVerticalOffset(0.38f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showVerticalOffsetDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -809,7 +711,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${(playerViewModel.lyricsFullScreenVerticalOffset * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset((playerViewModel.lyricsFullScreenVerticalOffset - 0.02f).coerceAtLeast(0.20f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset((playerViewModel.lyricsFullScreenVerticalOffset - 0.02f).coerceAtLeast(0.20f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = playerViewModel.lyricsFullScreenVerticalOffset,
                                 onValueChange = { playerViewModel.updateLyricsFullScreenVerticalOffset(it) },
@@ -817,12 +719,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 19,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset((playerViewModel.lyricsFullScreenVerticalOffset + 0.02f).coerceAtMost(0.60f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset((playerViewModel.lyricsFullScreenVerticalOffset + 0.02f).coerceAtMost(0.60f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset(0.38f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showFullScreenVerticalOffsetDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenVerticalOffset(0.38f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenVerticalOffsetDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -846,7 +748,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${fontSize.roundToInt()} sp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsFontSize((fontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFontSize((fontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = fontSize,
                                 onValueChange = { playerViewModel.updateLyricsFontSize(it) },
@@ -854,12 +756,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 43,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFontSize((fontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsFontSize(42f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showFontSizeDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFontSize(42f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFontSizeDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -883,7 +785,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${fullScreenFontSize.roundToInt()} sp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = fullScreenFontSize,
                                 onValueChange = { playerViewModel.updateLyricsFullScreenFontSize(it) },
@@ -891,12 +793,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 43,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenFontSize((fullScreenFontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsFullScreenFontSize(42f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showFullScreenFontSizeDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsFullScreenFontSize(42f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenFontSizeDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -920,7 +822,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text("${sidebarFontSize.roundToInt()} sp", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.width(60.dp))
-                            IconButton(onClick = { playerViewModel.updateLyricsSidebarFontSize((sidebarFontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsSidebarFontSize((sidebarFontSize - 2f).coerceAtLeast(12f)) }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
                                 value = sidebarFontSize,
                                 onValueChange = { playerViewModel.updateLyricsSidebarFontSize(it) },
@@ -928,12 +830,12 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 43,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = { playerViewModel.updateLyricsSidebarFontSize((sidebarFontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsSidebarFontSize((sidebarFontSize + 2f).coerceAtMost(100f)) }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsSidebarFontSize(22f) }) { Text(str("pref_lyrics_reset")) }
-                            TextButton(onClick = { showSidebarFontSizeDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsSidebarFontSize(22f) }) { Text(str("pref_lyrics_reset")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSidebarFontSizeDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -968,7 +870,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.width(60.dp)
                             )
-                            IconButton(onClick = {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                                 playerViewModel.updatePlainAutoScrollSpeed(playerViewModel.plainAutoScrollSpeed - 0.25f)
                             }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
@@ -978,16 +880,16 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 14,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                                 playerViewModel.updatePlainAutoScrollSpeed(playerViewModel.plainAutoScrollSpeed + 0.25f)
                             }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updatePlainAutoScrollSpeed(1.5f) }) {
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updatePlainAutoScrollSpeed(1.5f) }) {
                                 Text(str("pref_lyrics_reset"))
                             }
-                            TextButton(onClick = { showAutoScrollSpeedDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAutoScrollSpeedDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -1022,7 +924,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.width(70.dp)
                             )
-                            IconButton(onClick = {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                                 playerViewModel.updateLyricsWheelLines(playerViewModel.lyricsWheelLines - 0.5f)
                             }) { Icon(Icons.Rounded.Remove, null) }
                             Slider(
@@ -1032,16 +934,16 @@ import com.alananasss.kittytune.ui.common.Slider
                                 steps = 21,
                                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                             )
-                            IconButton(onClick = {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                                 playerViewModel.updateLyricsWheelLines(playerViewModel.lyricsWheelLines + 0.5f)
                             }) { Icon(Icons.Rounded.Add, null) }
                         }
                         Spacer(Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { playerViewModel.updateLyricsWheelLines(3f) }) {
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { playerViewModel.updateLyricsWheelLines(3f) }) {
                                 Text(str("pref_lyrics_reset"))
                             }
-                            TextButton(onClick = { showWheelStepDialog = false }) { Text(str("btn_close")) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { showWheelStepDialog = false }) { Text(str("btn_close")) }
                         }
                     }
                 }
@@ -1059,7 +961,7 @@ import com.alananasss.kittytune.ui.common.Slider
                         AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, sidebarAlignment) { playerViewModel.updateLyricsSidebarAlignment(it); showSidebarAlignmentDialog = false }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showSidebarAlignmentDialog = false }) { Text(str("btn_cancel")) } }
+                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showSidebarAlignmentDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
 
@@ -1074,7 +976,7 @@ import com.alananasss.kittytune.ui.common.Slider
                         AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, alignment) { playerViewModel.updateLyricsAlignment(it); showAlignmentDialog = false }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showAlignmentDialog = false }) { Text(str("btn_cancel")) } }
+                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAlignmentDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
 
@@ -1089,7 +991,7 @@ import com.alananasss.kittytune.ui.common.Slider
                         AlignRadioButton(str("align_right"), LyricsAlignment.RIGHT, fullScreenAlignment) { playerViewModel.updateLyricsFullScreenAlignment(it); showFullScreenAlignmentDialog = false }
                     }
                 },
-                confirmButton = { TextButton(onClick = { showFullScreenAlignmentDialog = false }) { Text(str("btn_cancel")) } }
+                confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenAlignmentDialog = false }) { Text(str("btn_cancel")) } }
             )
         }
     
@@ -1106,7 +1008,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { showDisplayStyleDialog = false }) { Text(str("btn_close")) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDisplayStyleDialog = false }) { Text(str("btn_close")) }
                 }
             )
         }
@@ -1124,7 +1026,7 @@ import com.alananasss.kittytune.ui.common.Slider
                     )
                 },
                 confirmButton = {
-                    TextButton(onClick = { showFullScreenDisplayStyleDialog = false }) { Text(str("btn_close")) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { showFullScreenDisplayStyleDialog = false }) { Text(str("btn_close")) }
                 }
             )
         }
@@ -1181,6 +1083,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_font_title"),
+                                icon = Icons.Rounded.TextFields,
                                 subtitle = when (playerViewModel.lyricsFont) {
                                     com.alananasss.kittytune.data.local.LyricsFont.APPLE -> str("pref_lyrics_font_apple")
                                     com.alananasss.kittytune.data.local.LyricsFont.APP_DEFAULT -> str("pref_lyrics_font_app_default")
@@ -1194,6 +1097,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_autoscroll"),
+                                icon = Icons.Rounded.KeyboardDoubleArrowDown,
                                 subtitle = str("pref_lyrics_autoscroll_sub"),
                                 hasSwitch = true,
                                 switchState = autoScrollOn,
@@ -1204,6 +1108,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_autoscroll_speed"),
+                                icon = Icons.Rounded.Speed,
                                 subtitle = autoScrollSpeedLabel(playerViewModel.plainAutoScrollSpeed),
                                 onClick = { showAutoScrollSpeedDialog = true }
                             )
@@ -1213,6 +1118,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_wheel_step"),
+                                icon = Icons.Rounded.Mouse,
                                 subtitle = str("pref_lyrics_wheel_step_value", wheelLinesLabel(playerViewModel.lyricsWheelLines)),
                                 onClick = { showWheelStepDialog = true }
                             )
@@ -1227,6 +1133,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_word_sync"),
+                                icon = Icons.Rounded.Mic,
                                 subtitle = str("pref_lyrics_word_sync_sub"),
                                 hasSwitch = true,
                                 switchState = playerViewModel.isWordSyncEnabled,
@@ -1237,6 +1144,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_apple_effect"),
+                                icon = Icons.Rounded.AutoAwesome,
                                 subtitle = str("pref_lyrics_apple_effect_sub"),
                                 hasSwitch = true,
                                 switchState = playerViewModel.isAppleMusicEffectEnabled,
@@ -1247,6 +1155,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_duet_title"),
+                                icon = Icons.Rounded.Groups,
                                 subtitle = str("pref_lyrics_duet_desc"),
                                 hasSwitch = true,
                                 switchState = playerViewModel.isDuetViewEnabled,
@@ -1256,7 +1165,47 @@ import com.alananasss.kittytune.ui.common.Slider
                         add { shape ->
                             SettingsItem(
                                 shape = shape,
+                                title = str("pref_lyrics_one_line_title"),
+                                icon = Icons.Rounded.Subtitles,
+                                subtitle = str("pref_lyrics_one_line_sub"),
+                                hasSwitch = true,
+                                switchState = oneLineLyrics,
+                                onSwitchChange = {
+                                    oneLineLyrics = it
+                                    prefs.setOneLineLyricsEnabled(it)
+                                },
+                                highlightKey = "pref_lyrics_one_line",
+                            )
+                        }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_lyrics_backing_title"),
+                                icon = Icons.Rounded.RecordVoiceOver,
+                                subtitle = str("pref_lyrics_backing_sub"),
+                                hasSwitch = true,
+                                switchState = playerViewModel.lyricsSplitBackingVocals,
+                                onSwitchChange = { playerViewModel.updateLyricsSplitBackingVocals(it) },
+                                highlightKey = "pref_lyrics_backing",
+                            )
+                        }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_lyrics_reveal_words_title"),
+                                icon = Icons.Rounded.Animation,
+                                subtitle = str("pref_lyrics_reveal_words_sub"),
+                                hasSwitch = true,
+                                switchState = playerViewModel.lyricsRevealWords,
+                                onSwitchChange = { playerViewModel.updateLyricsRevealWords(it) },
+                                highlightKey = "pref_lyrics_reveal_words",
+                            )
+                        }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
                                 title = str("pref_lyrics_romanization"),
+                                icon = Icons.Rounded.Abc,
                                 subtitle = str("pref_lyrics_romanization_sub"),
                                 hasSwitch = true,
                                 switchState = playerViewModel.isRomanizationEnabled,
@@ -1267,6 +1216,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_translation_title"),
+                                icon = Icons.Rounded.Translate,
                                 subtitle = str("pref_lyrics_translation_sub"),
                                 hasSwitch = true,
                                 switchState = enableTranslation,
@@ -1280,6 +1230,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_translation_lang"),
+                                icon = Icons.Rounded.Language,
                                 subtitle = targetLang.uppercase(),
                                 onClick = { showLangDialog = true }
                             )
@@ -1296,6 +1247,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_lrc_bounce_title"),
+                                    icon = Icons.Rounded.Animation,
                                     subtitle = str("pref_lyrics_lrc_bounce_desc"),
                                     hasSwitch = true,
                                     switchState = playerViewModel.lyricsLrcBounceEnabled,
@@ -1306,6 +1258,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_bounce_factor_title"),
+                                    icon = Icons.Rounded.Height,
                                     subtitle = "${(playerViewModel.lyricsBounceFactor * 100).toInt()}%",
                                     onClick = { showBounceFactorDialog = true }
                                 )
@@ -1314,6 +1267,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_glow_factor_title"),
+                                    icon = Icons.Rounded.LightMode,
                                     subtitle = "${(playerViewModel.lyricsGlowFactor * 100).toInt()}%",
                                     onClick = { showGlowFactorDialog = true }
                                 )
@@ -1322,6 +1276,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_fill_transition_title"),
+                                    icon = Icons.Rounded.Gradient,
                                     subtitle = "${playerViewModel.lyricsFillTransitionWidth.toInt()} dp",
                                     onClick = { showFillTransitionDialog = true }
                                 )
@@ -1330,6 +1285,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_active_scale_title"),
+                                    icon = Icons.Rounded.ZoomOutMap,
                                     subtitle = "${(playerViewModel.lyricsActiveScale * 100).toInt()}%",
                                     onClick = { showActiveScaleDialog = true }
                                 )
@@ -1338,6 +1294,7 @@ import com.alananasss.kittytune.ui.common.Slider
                                 SettingsItem(
                                     shape = shape,
                                     title = str("pref_lyrics_reset_typography"),
+                                    icon = Icons.Rounded.RestartAlt,
                                     subtitle = str("pref_lyrics_reset_typography_desc"),
                                     onClick = { playerViewModel.resetAllLyricsTypography() }
                                 )
@@ -1424,6 +1381,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_local"),
+                                icon = Icons.Rounded.FolderOpen,
                                 subtitle = str("pref_lyrics_local_sub"),
                                 hasSwitch = true,
                                 switchState = preferLocal,
@@ -1437,6 +1395,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_provider_title"),
+                                icon = Icons.Rounded.CloudQueue,
                                 subtitle = if (provider == com.alananasss.kittytune.ui.player.LyricsProvider.MAX_QUALITY) str("pref_lyrics_provider_max_quality") else str("pref_lyrics_provider_open_source"),
                                 onClick = { showProviderDialog = true }
                             )
@@ -1445,6 +1404,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_order", "Provider Priority Order"),
+                                icon = Icons.Rounded.SwapVert,
                                 subtitle = str("pref_lyrics_order_sub", "Order in which providers are searched"),
                                 onClick = { showProviderOrderDialog = true }
                             )
@@ -1453,6 +1413,7 @@ import com.alananasss.kittytune.ui.common.Slider
                             SettingsItem(
                                 shape = shape,
                                 title = str("pref_lyrics_paxsenix_key", "Paxsenix API Key"),
+                                icon = Icons.Rounded.Key,
                                 subtitle = if (paxsenixKeyInput.isNotBlank()) "••••••••" else str("pref_lyrics_paxsenix_key_sub", "Required for Apple Music, Spotify and Paxsenix Musixmatch"),
                                 onClick = { showPaxsenixKeyDialog = true }
                             )
@@ -1545,6 +1506,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_screensaver_title"),
+                    icon = Icons.Rounded.DarkMode,
                     subtitle = str("pref_screensaver_desc"),
                     hasSwitch = true,
                     switchState = screensaverEnabled,
@@ -1556,6 +1518,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_ui_style_title"),
+                    icon = Icons.Rounded.AutoAwesome,
                     subtitle = if (isClassic) str("pref_lyrics_ui_style_classic") else str("pref_lyrics_ui_style_enhanced"),
                     onClick = onStyleClick,
                 )
@@ -1564,6 +1527,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_line_blur_title"),
+                    icon = Icons.Rounded.BlurOn,
                     subtitle = str("pref_lyrics_line_blur_desc"),
                     hasSwitch = true,
                     switchState = lineBlur,
@@ -1574,6 +1538,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_display_style"),
+                    icon = Icons.Rounded.Subtitles,
                     subtitle = displayStyleLabel(displayStyle),
                     onClick = onDisplayStyleClick,
                 )
@@ -1582,6 +1547,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_align"),
+                    icon = Icons.Rounded.FormatAlignCenter,
                     subtitle = when (alignment) {
                         LyricsAlignment.LEFT -> str("align_left")
                         LyricsAlignment.CENTER -> str("align_center_simple")
@@ -1594,6 +1560,7 @@ private fun LyricsModeGroup(
                 SettingsItem(
                     shape = shape,
                     title = str("pref_lyrics_size"),
+                    icon = Icons.Rounded.FormatSize,
                     subtitle = "${fontSize.roundToInt()} sp",
                     onClick = onFontSizeClick,
                 )
@@ -1603,6 +1570,7 @@ private fun LyricsModeGroup(
                     SettingsItem(
                         shape = shape,
                         title = str("pref_lyrics_line_spacing_title"),
+                        icon = Icons.Rounded.FormatLineSpacing,
                         subtitle = "${spacing.lineSpacing.toInt()} dp",
                         onClick = spacing.onLineSpacingClick,
                     )
@@ -1611,6 +1579,7 @@ private fun LyricsModeGroup(
                     SettingsItem(
                         shape = shape,
                         title = str("pref_lyrics_horizontal_margin_title"),
+                        icon = Icons.Rounded.SwapHoriz,
                         subtitle = "${spacing.horizontalMargin.toInt()} dp",
                         onClick = spacing.onHorizontalMarginClick,
                     )
@@ -1619,6 +1588,7 @@ private fun LyricsModeGroup(
                     SettingsItem(
                         shape = shape,
                         title = str("pref_lyrics_vertical_offset_title"),
+                        icon = Icons.Rounded.VerticalAlignCenter,
                         subtitle = "${(spacing.verticalOffset * 100).toInt()}%",
                         onClick = spacing.onVerticalOffsetClick,
                     )

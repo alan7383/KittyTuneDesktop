@@ -3,7 +3,6 @@ package com.alananasss.kittytune.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
@@ -19,8 +18,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.onClick
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,6 +54,14 @@ import com.alananasss.kittytune.ui.common.Tip
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 
 data class AudioFxDefinition(
     val id: String,
@@ -66,8 +71,8 @@ data class AudioFxDefinition(
     val isActive: (AudioEffectsState) -> Boolean,
     val onToggle: (PlayerViewModel, onEarrapeWarning: () -> Unit) -> Unit,
     val onOpenDialog: (() -> Unit)? = null,
-    val activeColor: @Composable () -> Color = { MaterialTheme.colorScheme.primary },
-    val activeContentColor: @Composable () -> Color = { MaterialTheme.colorScheme.onPrimary }
+    /** Drawn in the error colours while on: an effect that can hurt, not one of the ordinary kind. */
+    val isDanger: Boolean = false,
 )
 
 /** What the effect does on hover, and how to reach its settings when it has any. */
@@ -128,8 +133,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isBassBoostEnabled },
                 onToggle = { vm, _ -> vm.toggleBassBoost() },
                 onOpenDialog = { showBassBoostDialog = true },
-                activeColor = { MaterialTheme.colorScheme.primary },
-                activeContentColor = { MaterialTheme.colorScheme.onPrimary }
             ),
             AudioFxDefinition(
                 id = "sub_octaver",
@@ -139,8 +142,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isSubOctaverEnabled },
                 onToggle = { vm, _ -> vm.toggleSubOctaver() },
                 onOpenDialog = { showSubOctaverDialog = true },
-                activeColor = { Color(0xFFD500F9) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "tape_saturation",
@@ -150,8 +151,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isTapeSaturationEnabled },
                 onToggle = { vm, _ -> vm.toggleTapeSaturation() },
                 onOpenDialog = { showTapeSaturationDialog = true },
-                activeColor = { Color(0xFFFF6E40) },
-                activeContentColor = { Color(0xFF3E1200) }
             ),
             AudioFxDefinition(
                 id = "vocal_boost",
@@ -161,8 +160,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVocalBoostEnabled },
                 onToggle = { vm, _ -> vm.toggleVocalBoost() },
                 onOpenDialog = { showVocalBoostDialog = true },
-                activeColor = { Color(0xFF00B0FF) },
-                activeContentColor = { Color(0xFF002244) }
             ),
             AudioFxDefinition(
                 id = "vocal_remover",
@@ -172,8 +169,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVocalRemoverEnabled },
                 onToggle = { vm, _ -> vm.toggleVocalRemover() },
                 onOpenDialog = { showVocalRemoverDialog = true },
-                activeColor = { Color(0xFFE91E63) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "normalization",
@@ -183,8 +178,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isNormalizationEnabled },
                 onToggle = { vm, _ -> vm.toggleNormalization() },
                 onOpenDialog = { showNormalizationDialog = true },
-                activeColor = { MaterialTheme.colorScheme.primary },
-                activeContentColor = { MaterialTheme.colorScheme.onPrimary }
             ),
             AudioFxDefinition(
                 id = "earrape",
@@ -196,8 +189,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     if (!vm.hasSeenEarrapeWarning()) showWarn() else vm.toggleEarrape()
                 },
                 onOpenDialog = { showEarrapeDialog = true },
-                activeColor = { MaterialTheme.colorScheme.error },
-                activeContentColor = { MaterialTheme.colorScheme.onError }
+                isDanger = true,
             ),
 
             AudioFxDefinition(
@@ -208,8 +200,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.is8DEnabled },
                 onToggle = { vm, _ -> vm.toggle8D() },
                 onOpenDialog = { showEightDDialog = true },
-                activeColor = { MaterialTheme.colorScheme.tertiary },
-                activeContentColor = { MaterialTheme.colorScheme.onTertiary }
             ),
             AudioFxDefinition(
                 id = "super_wide",
@@ -219,8 +209,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isSuperWideEnabled },
                 onToggle = { vm, _ -> vm.toggleSuperWide() },
                 onOpenDialog = { showSuperWideDialog = true },
-                activeColor = { Color(0xFF26C6DA) },
-                activeContentColor = { Color(0xFF00363A) }
             ),
             AudioFxDefinition(
                 id = "chorus",
@@ -230,8 +218,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isChorusEnabled },
                 onToggle = { vm, _ -> vm.toggleChorus() },
                 onOpenDialog = { showChorusDialog = true },
-                activeColor = { Color(0xFF5C6BC0) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "flanger",
@@ -241,8 +227,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isFlangerEnabled },
                 onToggle = { vm, _ -> vm.toggleFlanger() },
                 onOpenDialog = { showFlangerDialog = true },
-                activeColor = { Color(0xFF00E5FF) },
-                activeContentColor = { Color(0xFF003840) }
             ),
             AudioFxDefinition(
                 id = "phaser",
@@ -252,8 +236,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isPhaserEnabled },
                 onToggle = { vm, _ -> vm.togglePhaser() },
                 onOpenDialog = { showPhaserDialog = true },
-                activeColor = { Color(0xFF7C4DFF) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "ping_pong",
@@ -263,8 +245,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isPingPongDelayEnabled },
                 onToggle = { vm, _ -> vm.togglePingPongDelay() },
                 onOpenDialog = { showPingPongDelayDialog = true },
-                activeColor = { Color(0xFF64DD17) },
-                activeContentColor = { Color(0xFF1B3B00) }
             ),
             AudioFxDefinition(
                 id = "reverse_echo",
@@ -274,8 +254,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isReverseEchoEnabled },
                 onToggle = { vm, _ -> vm.toggleReverseEcho() },
                 onOpenDialog = { showReverseEchoDialog = true },
-                activeColor = { Color(0xFF00E5FF) },
-                activeContentColor = { Color(0xFF003B46) }
             ),
             AudioFxDefinition(
                 id = "reverb",
@@ -285,8 +263,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isReverbEnabled },
                 onToggle = { vm, _ -> vm.toggleReverb() },
                 onOpenDialog = { showReverbDialog = true },
-                activeColor = { MaterialTheme.colorScheme.primary },
-                activeContentColor = { MaterialTheme.colorScheme.onPrimary }
             ),
             AudioFxDefinition(
                 id = "shimmer_reverb",
@@ -296,8 +272,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isShimmerReverbEnabled },
                 onToggle = { vm, _ -> vm.toggleShimmerReverb() },
                 onOpenDialog = { showShimmerReverbDialog = true },
-                activeColor = { Color(0xFFFF4081) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "stadium",
@@ -307,8 +281,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isStadiumEnabled },
                 onToggle = { vm, _ -> vm.toggleStadium() },
                 onOpenDialog = { showStadiumDialog = true },
-                activeColor = { Color(0xFF00E676) },
-                activeContentColor = { Color(0xFF003815) }
             ),
             AudioFxDefinition(
                 id = "rotary_speaker",
@@ -318,8 +290,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isRotarySpeakerEnabled },
                 onToggle = { vm, _ -> vm.toggleRotarySpeaker() },
                 onOpenDialog = { showRotarySpeakerDialog = true },
-                activeColor = { Color(0xFFFF6D00) },
-                activeContentColor = { Color(0xFF3E1200) }
             ),
             AudioFxDefinition(
                 id = "asmr_vocal",
@@ -329,8 +299,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isAsmrVocalEnabled },
                 onToggle = { vm, _ -> vm.toggleAsmrVocal() },
                 onOpenDialog = { showAsmrVocalDialog = true },
-                activeColor = { Color(0xFFFF4081) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "mono",
@@ -340,8 +308,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isMonoEnabled },
                 onToggle = { vm, _ -> vm.toggleMono() },
                 onOpenDialog = null,
-                activeColor = { MaterialTheme.colorScheme.secondary },
-                activeContentColor = { MaterialTheme.colorScheme.onSecondary }
             ),
 
             AudioFxDefinition(
@@ -352,8 +318,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isRainEnabled },
                 onToggle = { vm, _ -> vm.toggleRain() },
                 onOpenDialog = { showRainVolumeDialog = true },
-                activeColor = { Color(0xFF81D4FA) },
-                activeContentColor = { Color(0xFF004BA0) }
             ),
             AudioFxDefinition(
                 id = "underwater",
@@ -363,8 +327,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isUnderwaterEnabled },
                 onToggle = { vm, _ -> vm.toggleUnderwater() },
                 onOpenDialog = { showUnderwaterDialog = true },
-                activeColor = { Color(0xFF00838F) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "empty_mall",
@@ -374,8 +336,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isEmptyMallEnabled },
                 onToggle = { vm, _ -> vm.toggleEmptyMall() },
                 onOpenDialog = { showEmptyMallDialog = true },
-                activeColor = { Color(0xFF00BFA5) },
-                activeContentColor = { Color(0xFF003730) }
             ),
             AudioFxDefinition(
                 id = "party_next_door",
@@ -385,8 +345,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isPartyNextDoorEnabled },
                 onToggle = { vm, _ -> vm.togglePartyNextDoor() },
                 onOpenDialog = { showPartyNextDoorDialog = true },
-                activeColor = { Color(0xFFAB47BC) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "night_drive",
@@ -396,8 +354,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isNightDriveEnabled },
                 onToggle = { vm, _ -> vm.toggleNightDrive() },
                 onOpenDialog = { showNightDriveDialog = true },
-                activeColor = { Color(0xFF2979FF) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "muffled",
@@ -407,8 +363,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isMuffledEnabled },
                 onToggle = { vm, _ -> vm.toggleMuffled() },
                 onOpenDialog = { showMuffledDialog = true },
-                activeColor = { MaterialTheme.colorScheme.secondary },
-                activeContentColor = { MaterialTheme.colorScheme.onSecondary }
             ),
 
             AudioFxDefinition(
@@ -419,8 +373,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isWalkmanEnabled },
                 onToggle = { vm, _ -> vm.toggleWalkman() },
                 onOpenDialog = { showWalkmanDialog = true },
-                activeColor = { Color(0xFFFFAB00) },
-                activeContentColor = { Color(0xFF3E2700) }
             ),
             AudioFxDefinition(
                 id = "vinyl_lofi",
@@ -430,8 +382,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVinylLoFiEnabled },
                 onToggle = { vm, _ -> vm.toggleVinylLoFi() },
                 onOpenDialog = { showVinylLoFiDialog = true },
-                activeColor = { Color(0xFFFFB300) },
-                activeContentColor = { Color(0xFF3E2723) }
             ),
             AudioFxDefinition(
                 id = "gramophone",
@@ -441,8 +391,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isGramophoneEnabled },
                 onToggle = { vm, _ -> vm.toggleGramophone() },
                 onOpenDialog = { showGramophoneDialog = true },
-                activeColor = { Color(0xFF8D6E63) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "vintage_mp3",
@@ -452,8 +400,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVintageMp3Enabled },
                 onToggle = { vm, _ -> vm.toggleVintageMp3() },
                 onOpenDialog = { showVintageMp3Dialog = true },
-                activeColor = { Color(0xFFFFB74D) },
-                activeContentColor = { Color(0xFF5D2B00) }
             ),
             AudioFxDefinition(
                 id = "chiptune",
@@ -463,8 +409,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isChiptuneEnabled },
                 onToggle = { vm, _ -> vm.toggleChiptune() },
                 onOpenDialog = { showChiptuneDialog = true },
-                activeColor = { Color(0xFFE040FB) },
-                activeContentColor = { Color.White }
             ),
             AudioFxDefinition(
                 id = "megaphone",
@@ -474,8 +418,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isMegaphoneEnabled },
                 onToggle = { vm, _ -> vm.toggleMegaphone() },
                 onOpenDialog = { showMegaphoneDialog = true },
-                activeColor = { Color(0xFFFF7043) },
-                activeContentColor = { Color(0xFF3E1200) }
             ),
             AudioFxDefinition(
                 id = "robot_vocoder",
@@ -485,8 +427,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isRobotVocoderEnabled },
                 onToggle = { vm, _ -> vm.toggleRobotVocoder() },
                 onOpenDialog = { showRobotVocoderDialog = true },
-                activeColor = { Color(0xFF00E676) },
-                activeContentColor = { Color(0xFF003314) }
             ),
             AudioFxDefinition(
                 id = "trance_gate",
@@ -496,8 +436,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isTranceGateEnabled },
                 onToggle = { vm, _ -> vm.toggleTranceGate() },
                 onOpenDialog = { showTranceGateDialog = true },
-                activeColor = { Color(0xFFFF9100) },
-                activeContentColor = { Color(0xFF3E1A00) }
             )
         )
     }
@@ -505,11 +443,6 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     val pinnedTiles = remember(viewModel.pinnedAudioFx, allEffects) {
         viewModel.pinnedAudioFx.mapNotNull { id -> allEffects.find { it.id == id } }
     }
-    val pages = remember(pinnedTiles) {
-        if (pinnedTiles.isEmpty()) emptyList() else pinnedTiles.chunked(6)
-    }
-    val pagerState = rememberPagerState(pageCount = { maxOf(1, pages.size) })
-    val coroutineScope = rememberCoroutineScope()
 
     if (showStudioEditSheet) {
         AudioFxStudioSheet(
@@ -525,94 +458,9 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp)
         ) {
-            Text(
-                text = str("player_audio_settings"),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-
-            // Speed + Pitch Card
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .padding(20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Rounded.Speed,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            text = "${viewModel.effectsState.speed}x",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    val isPitchActive = viewModel.effectsState.isPitchEnabled
-                    val pitchContainerColor by animateColorAsState(
-                        targetValue = if (isPitchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                        label = "pitchContainer"
-                    )
-                    val pitchContentColor by animateColorAsState(
-                        targetValue = if (isPitchActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                        label = "pitchContent"
-                    )
-
-                    Surface(
-                        onClick = { viewModel.togglePitchEnabled(!isPitchActive) },
-                        shape = CircleShape,
-                        color = pitchContainerColor,
-                        border = if (isPitchActive) null else BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                        ),
-                        contentColor = pitchContentColor
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AnimatedVisibility(visible = isPitchActive) {
-                                Row {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                            }
-                            Text(
-                                text = str("player_pitch"),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Slider(
-                    value = viewModel.effectsState.speed,
-                    onValueChange = { viewModel.setCustomSpeed(it) },
-                    valueRange = 0.5f..2.0f,
-                    steps = if (isPrecise) 29 else 14,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(Modifier.height(28.dp))
+            // The tab already says what this is, so the speed card leads (issue #66).
+            SpeedCard(viewModel)
+            Spacer(Modifier.height(24.dp))
 
             // Special Effects Header
             Row(
@@ -623,12 +471,27 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = str("player_special_effects"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    val activeCount = allEffects.count { it.isActive(viewModel.effectsState) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = str("player_special_effects"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (activeCount > 0) {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer) {
+                                Text(
+                                    str("fx_active_count", activeCount),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = str("audio_fx_long_press_hint"),
@@ -636,57 +499,9 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                     )
                 }
-
-                if (pages.size > 1) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                                }
-                            },
-                            enabled = pagerState.currentPage > 0,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.NavigateBefore,
-                                contentDescription = "Previous Page",
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-
-                        Text(
-                            text = "${pagerState.currentPage + 1}/${pages.size}",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                                }
-                            },
-                            enabled = pagerState.currentPage < pages.lastIndex,
-                            shapes = IconButtonDefaults.shapes(),
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Rounded.NavigateNext,
-                                contentDescription = "Next Page",
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                }
             }
 
-            if (pages.isEmpty()) {
+            if (pinnedTiles.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -700,109 +515,30 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                     )
                 }
             } else {
-                val rowHeightDp = 84.dp
-                val rowSpacingDp = 12.dp
-
-                val calculatePageHeight: (Int) -> Dp = { pageIdx ->
-                    val itemsCount = pages.getOrNull(pageIdx)?.size ?: 0
-                    if (itemsCount == 0) 0.dp else {
-                        val rows = (itemsCount + 1) / 2
-                        rowHeightDp * rows + rowSpacingDp * (rows - 1)
-                    }
-                }
-
-                val currentPage = pagerState.currentPage
-                val offsetFraction = pagerState.currentPageOffsetFraction
-                val targetPage = if (offsetFraction > 0f) {
-                    (currentPage + 1).coerceAtMost(pages.lastIndex)
-                } else if (offsetFraction < 0f) {
-                    (currentPage - 1).coerceAtLeast(0)
-                } else {
-                    currentPage
-                }
-
-                val currentHeight = calculatePageHeight(currentPage)
-                val targetHeight = calculatePageHeight(targetPage)
-                val fraction = abs(offsetFraction).coerceIn(0f, 1f)
-                val pagerHeight = currentHeight + (targetHeight - currentHeight) * fraction
-
-                HorizontalPager(
-                    state = pagerState,
-                    verticalAlignment = Alignment.Top,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(pagerHeight)
-                ) { pageIndex ->
-                    val pageItems = pages.getOrElse(pageIndex) { emptyList() }
-                    val pageOffset = abs((pagerState.currentPage - pageIndex) + pagerState.currentPageOffsetFraction)
-                    val pageAlpha = (1f - pageOffset * 0.35f).coerceIn(0f, 1f)
-                    val pageScale = (1f - pageOffset * 0.04f).coerceIn(0.95f, 1f)
-
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                alpha = pageAlpha
-                                scaleX = pageScale
-                                scaleY = pageScale
+                // Every pinned effect at once, in the panel's own scroll. They used to be split into pages of
+                // six, which on a full screen meant flipping pages with half the screen empty below, and in a
+                // window meant two ways of moving through one list (issue #66).
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    pinnedTiles.chunked(2).forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowItems.forEach { fx ->
+                                FxTile(
+                                    label = str(fx.titleKey),
+                                    icon = fx.icon,
+                                    isActive = fx.isActive(viewModel.effectsState),
+                                    onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
+                                    onLongClick = fx.onOpenDialog,
+                                    modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
+                                    isDanger = fx.isDanger,
+                                    tooltip = fx.tooltip(),
+                                )
                             }
-                    ) {
-                        pageItems.chunked(2).forEach { rowItems ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                rowItems.forEach { fx ->
-                                    FxTile(
-                                        label = str(fx.titleKey),
-                                        icon = fx.icon,
-                                        isActive = fx.isActive(viewModel.effectsState),
-                                        onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
-                                        onLongClick = fx.onOpenDialog,
-                                        modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
-                                        activeColor = fx.activeColor(),
-                                        activeContentColor = fx.activeContentColor(),
-                                        tooltip = fx.tooltip(),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (pages.size > 1) {
-                    Spacer(Modifier.height(12.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        repeat(pages.size) { iteration ->
-                            val isSelected = pagerState.currentPage == iteration
-                            val indicatorWidth by animateDpAsState(
-                                targetValue = if (isSelected) 22.dp else 6.dp,
-                                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                                label = "indicatorWidth"
-                            )
-                            val indicatorColor by animateColorAsState(
-                                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                animationSpec = tween(200),
-                                label = "indicatorColor"
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .height(6.dp)
-                                    .width(indicatorWidth)
-                                    .clip(CircleShape)
-                                    .background(indicatorColor)
-                                    .clickable {
-                                        coroutineScope.launch {
-                                            pagerState.animateScrollToPage(iteration)
-                                        }
-                                    }
-                            )
                         }
                     }
                 }
@@ -815,7 +551,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                shape = RoundedCornerShape(18.dp),
+                shapes = ButtonShapes(RoundedCornerShape(20.dp), RoundedCornerShape(14.dp)),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
                 ),
@@ -998,7 +734,15 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
     }
 }
 
-// ── FxTile (Matching Android FxTile) ──
+// ── FxTile ──
+/**
+ * One effect: its icon over its name, in the app's colours.
+ *
+ * Every effect used to carry a colour of its own, a purple, an orange, a lime, and was drawn in it when on, with
+ * its icon in it when off. A panel of those was a row of unrelated neons, and the text on some of them hardly
+ * read. They are all the theme's now, so what is on is the one thing that stands out; only an effect that can
+ * hurt, [isDanger], is drawn apart.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FxTile(
@@ -1008,24 +752,28 @@ fun FxTile(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    activeColor: Color = MaterialTheme.colorScheme.primary,
-    activeContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    isDanger: Boolean = false,
     tooltip: String = "",
 ) {
+    val scheme = MaterialTheme.colorScheme
+    val activeContainer = if (isDanger) scheme.errorContainer else scheme.primaryContainer
+    val activeContent = if (isDanger) scheme.onErrorContainer else scheme.onPrimaryContainer
     val containerColor by animateColorAsState(
-        targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = tween(300), label = "containerColor"
+        targetValue = if (isActive) activeContainer else scheme.surfaceContainerHigh,
+        animationSpec = tween(250), label = "containerColor"
     )
     val contentColor by animateColorAsState(
-        targetValue = if (isActive) activeContentColor else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(300), label = "contentColor"
+        targetValue = if (isActive) activeContent else scheme.onSurface,
+        animationSpec = tween(250), label = "contentColor"
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (isActive) activeContent else scheme.onSurfaceVariant,
+        animationSpec = tween(250), label = "iconColor"
     )
     val iconScale by animateFloatAsState(
-        targetValue = if (isActive) 1.2f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioHighBouncy,
-            stiffness = Spring.StiffnessMedium
-        ), label = "iconScale"
+        targetValue = if (isActive) 1.12f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "iconScale"
     )
 
     val interactionSource = remember { MutableInteractionSource() }
@@ -1062,17 +810,14 @@ fun FxTile(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(84.dp)
+                    .height(88.dp)
                     .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
                         onLongClick?.invoke()
                     },
-                shapes = ButtonDefaults.shapes(),
+                shapes = ButtonShapes(RoundedCornerShape(22.dp), RoundedCornerShape(14.dp)),
                 interactionSource = interactionSource,
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = containerColor,
-                    contentColor = contentColor
-                ),
-                contentPadding = PaddingValues(0.dp)
+                colors = ButtonDefaults.filledTonalButtonColors(containerColor = containerColor, contentColor = contentColor),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
             ) {
                 Column(
                     verticalArrangement = Arrangement.Center,
@@ -1082,25 +827,110 @@ fun FxTile(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
+                        tint = iconColor,
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(26.dp)
                             .graphicsLayer {
                                 scaleX = iconScale
                                 scaleY = iconScale
                             }
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         text = label,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        lineHeight = 14.sp,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
         }
     }
+}
+
+/** Playback speed: the value, whether the pitch moves with it, and the slider. */
+@Composable
+private fun SpeedCard(viewModel: PlayerViewModel) {
+    val speed = viewModel.effectsState.speed
+    val isPitchActive = viewModel.effectsState.isPitchEnabled
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(20.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = formatSpeed(speed),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                if (speed != 1f) {
+                    Tip(str("fx_reset_speed")) {
+                        IconButton(onClick = { viewModel.setCustomSpeed(1f) }, shapes = IconButtonDefaults.shapes()) {
+                            Icon(Icons.Rounded.RestartAlt, contentDescription = str("fx_reset_speed"), modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+
+            val pitchContainerColor by animateColorAsState(
+                targetValue = if (isPitchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                label = "pitchContainer"
+            )
+            val pitchContentColor by animateColorAsState(
+                targetValue = if (isPitchActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                label = "pitchContent"
+            )
+            Surface(
+                onClick = { viewModel.togglePitchEnabled(!isPitchActive) },
+                shape = CircleShape,
+                color = pitchContainerColor,
+                border = if (isPitchActive) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                contentColor = pitchContentColor
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AnimatedVisibility(visible = isPitchActive) {
+                        Row {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                        }
+                    }
+                    Text(text = str("player_pitch"), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Slider(
+            value = speed,
+            onValueChange = { viewModel.setCustomSpeed(it) },
+            valueRange = 0.5f..2.0f,
+            steps = if (viewModel.isPreciseSpeedEnabled) 29 else 14,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+private fun formatSpeed(value: Float): String {
+    val rounded = (value * 100).roundToInt() / 100f
+    val text = if (rounded == rounded.toInt().toFloat()) "${rounded.toInt()}.0" else rounded.toString().trimEnd('0')
+    return "$text×"
 }
 
 // ── AudioFxStudioSheet (Matching Android Studio Sheet) ──
@@ -1404,8 +1234,9 @@ fun ActiveQSTile(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val activeColor = fx.activeColor()
-    val activeContentColor = fx.activeContentColor()
+    val scheme = MaterialTheme.colorScheme
+    val activeColor = if (fx.isDanger) scheme.errorContainer else scheme.primaryContainer
+    val activeContentColor = if (fx.isDanger) scheme.onErrorContainer else scheme.onPrimaryContainer
 
     val containerColor by animateColorAsState(
         targetValue = if (isActive) activeColor else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1438,7 +1269,7 @@ fun ActiveQSTile(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = if (isActive) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    color = if (isActive) activeContentColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainerHigh,
                     modifier = Modifier.size(36.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
@@ -1676,7 +1507,7 @@ private fun BassBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1734,7 +1565,7 @@ private fun EarrapeDialog(viewModel: PlayerViewModel, onShowWarning: () -> Unit,
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1752,7 +1583,7 @@ private fun EarrapeWarningDialog(viewModel: PlayerViewModel, onDismiss: () -> Un
         title = { Text(str("warning_title")) },
         text = { Text(str("earrape_warning")) },
         confirmButton = {
-            TextButton(
+            TextButton(shapes = ButtonDefaults.shapes(),
                 onClick = {
                     viewModel.setHasSeenEarrapeWarning(true)
                     viewModel.toggleEarrape()
@@ -1763,7 +1594,7 @@ private fun EarrapeWarningDialog(viewModel: PlayerViewModel, onDismiss: () -> Un
                 Text(if (countdown > 0) "${str("btn_ok")} (${countdown}s)" else str("btn_ok"))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } }
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_cancel")) } }
     )
 }
 
@@ -1791,7 +1622,7 @@ private fun EightDDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1819,7 +1650,7 @@ private fun MuffledDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1847,7 +1678,7 @@ private fun ReverbDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1917,7 +1748,7 @@ private fun AmbientSoundscapeDialog(viewModel: PlayerViewModel, onDismiss: () ->
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -1973,7 +1804,7 @@ private fun NormalizationDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    IconButton(
+                    IconButton(shapes = IconButtonDefaults.shapes(),
                         onClick = { viewModel.adjustTrackGain(-1) },
                         enabled = viewModel.trackGainDb > com.alananasss.kittytune.audio.TrackGain.MIN_DB
                     ) { Icon(Icons.Rounded.Remove, contentDescription = null) }
@@ -1983,17 +1814,17 @@ private fun NormalizationDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    IconButton(
+                    IconButton(shapes = IconButtonDefaults.shapes(),
                         onClick = { viewModel.adjustTrackGain(1) },
                         enabled = viewModel.trackGainDb < com.alananasss.kittytune.audio.TrackGain.MAX_DB
                     ) { Icon(Icons.Rounded.Add, contentDescription = null) }
                 }
                 if (viewModel.trackGainDb != com.alananasss.kittytune.audio.TrackGain.NONE) {
-                    TextButton(onClick = { viewModel.resetTrackGain() }) { Text(str("btn_reset")) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.resetTrackGain() }) { Text(str("btn_reset")) }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2063,7 +1894,7 @@ private fun VintageMp3Dialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2125,7 +1956,7 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2187,7 +2018,7 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2272,7 +2103,7 @@ private fun FlangerDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2382,7 +2213,7 @@ private fun PartyNextDoorDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2468,7 +2299,7 @@ private fun SuperWideDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2554,7 +2385,7 @@ private fun VinylLoFiDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2640,7 +2471,7 @@ private fun PhaserDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2726,7 +2557,7 @@ private fun MegaphoneDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2812,7 +2643,7 @@ private fun RobotVocoderDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2898,7 +2729,7 @@ private fun ChorusDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -2984,7 +2815,7 @@ private fun UnderwaterDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3089,7 +2920,7 @@ private fun TranceGateDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3175,7 +3006,7 @@ private fun PingPongDelayDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3261,7 +3092,7 @@ private fun ChiptuneDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3347,7 +3178,7 @@ private fun ShimmerReverbDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3433,7 +3264,7 @@ private fun RotarySpeakerDialog(viewModel: PlayerViewModel, onDismiss: () -> Uni
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3519,7 +3350,7 @@ private fun TapeSaturationDialog(viewModel: PlayerViewModel, onDismiss: () -> Un
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3605,7 +3436,7 @@ private fun SubOctaverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3691,7 +3522,7 @@ private fun EmptyMallDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3777,7 +3608,7 @@ private fun GramophoneDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3863,7 +3694,7 @@ private fun ReverseEchoDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit)
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -3949,7 +3780,7 @@ private fun StadiumDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -4035,7 +3866,7 @@ private fun WalkmanDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -4121,7 +3952,7 @@ private fun AsmrVocalDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }
 
@@ -4207,6 +4038,6 @@ private fun NightDriveDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_ok")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_ok")) } }
     )
 }

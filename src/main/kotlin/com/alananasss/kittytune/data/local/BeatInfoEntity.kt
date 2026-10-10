@@ -13,4 +13,6 @@ data class BeatInfoEntity(
     /** 0=C, 1=C#, ... 11=B. Null when track's tonal chroma signal was too weak to call a key. */
     val keyPitchClass: Int? = null,
     val keyIsMinor: Boolean? = null,
+    /** 0..1: how loud and driving the body of the track is, from its middle. Null for tracks analysed before this existed. */
+    val energy: Float? = null,
 )

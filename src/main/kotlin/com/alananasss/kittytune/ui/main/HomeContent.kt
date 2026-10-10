@@ -1,6 +1,12 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
+import com.alananasss.kittytune.ui.home.searchSourceName
+
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.expandVertically
 import com.alananasss.kittytune.core.trackTextInput
 import com.alananasss.kittytune.utils.SoundCloudLocalizationUtils
 import androidx.compose.material3.ButtonDefaults
@@ -10,6 +16,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -193,270 +202,12 @@ fun HomeContent(
 
 private enum class HomeMode { SEARCH, LOADING, FEED }
 
-@Composable
-private fun HomeFeed(
-    vm: HomeViewModel,
-    playerViewModel: PlayerViewModel,
-    navController: NavController,
-) {
-    val history by vm.historyFlow.collectAsState(initial = emptyList())
-    val prefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
-    val showHomeYourMix by prefs.showHomeYourMixFlow().collectAsState(initial = prefs.getShowHomeYourMix())
-    val showHomeListeningStats by prefs.showHomeListeningStatsFlow().collectAsState(initial = prefs.getShowHomeListeningStats())
-
-    val contextHistory = remember(history) {
-        history.filter { it.id != "playlist:0" && !it.title.equals("history", ignoreCase = true) }
-            .distinctBy { it.id }
-    }
-
-    var quickPage by remember { mutableStateOf(0) }
-
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isWideScreen = maxWidth >= 880.dp
-        val pageSize = if (isWideScreen) 9 else 6
-        val maxPages = ((contextHistory.size + pageSize - 1) / pageSize).coerceAtLeast(1)
-        val currentPage = quickPage.coerceIn(0, maxPages - 1)
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            // Greeting
-            item {
-                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-                // Desktop-only greeting (no Android key for this) — localized by app language.
-                val lang = Strings.resolvedLanguage
-                val greeting = when (hour) {
-                    in 5..11 -> when (lang) { "fr" -> "Bonjour"; "hu" -> "Jó reggelt"; "ru" -> "Доброе утро"; else -> "Good morning" }
-                    in 12..17 -> when (lang) { "fr" -> "Bon après-midi"; "hu" -> "Jó napot"; "ru" -> "Добрый день"; else -> "Good afternoon" }
-                    else -> when (lang) { "fr" -> "Bonsoir"; "hu" -> "Jó estét"; "ru" -> "Добрый вечер"; else -> "Good evening" }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = greeting,
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    if (maxPages > 1) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = { if (currentPage > 0) quickPage = currentPage - 1 },
-                                enabled = currentPage > 0,
-                                modifier = Modifier.size(32.dp),
-                                shapes = IconButtonDefaults.shapes()
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(20.dp))
-                            }
-                            IconButton(
-                                onClick = { if (currentPage < maxPages - 1) quickPage = currentPage + 1 },
-                                enabled = currentPage < maxPages - 1,
-                                modifier = Modifier.size(32.dp),
-                                shapes = IconButtonDefaults.shapes()
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(20.dp))
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Quick tiles: recently played contexts (3 rows x 3 cols or 2 rows x 3 cols with pagination)
-            if (contextHistory.isNotEmpty()) {
-                item {
-                    val pageItems = contextHistory.drop(currentPage * pageSize).take(pageSize)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        pageItems.chunked(3).forEach { rowItems ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                rowItems.forEach { entry ->
-                                    val isLikes = entry.id == "likes" || entry.numericId == -1L || entry.id == "pin_likes" ||
-                                            entry.title.equals("Titres Likés", ignoreCase = true) ||
-                                            entry.title.equals(str("lib_liked_tracks"), ignoreCase = true) ||
-                                            entry.title.equals(str("history_title_likes"), ignoreCase = true) ||
-                                            entry.title.equals("Liked Tracks", ignoreCase = true)
-                                    val isDownloads = entry.id == "downloads" || entry.numericId == -2L || entry.id == "pin_downloads" ||
-                                            entry.title.equals(str("lib_downloads"), ignoreCase = true) ||
-                                            entry.title.equals(str("history_title_downloads"), ignoreCase = true) ||
-                                            entry.title.equals("Downloads", ignoreCase = true)
-                                    val isLocalFiles = entry.id == "local_files" || entry.id == "pin_local" ||
-                                            entry.title.equals(str("lib_local_media"), ignoreCase = true)
-
-                                    QuickTile(
-                                        title = entry.title,
-                                        imageUrl = if (isLikes || isDownloads || isLocalFiles) null else entry.imageUrl,
-                                        isLikes = isLikes,
-                                        isDownloads = isDownloads,
-                                        isLocalFiles = isLocalFiles,
-                                        modifier = Modifier.weight(1f),
-                                        // Right-click on tile = playlist/track options sheet.
-                                        onRightClick = when {
-                                            entry.id.startsWith("playlist:") -> {
-                                                {
-                                                    playerViewModel.showPlaylistOptions(
-                                                        Playlist(
-                                                            id = entry.numericId,
-                                                            title = entry.title,
-                                                            artworkUrl = entry.imageUrl,
-                                                            calculatedArtworkUrl = null,
-                                                            trackCount = null,
-                                                            user = null,
-                                                            tracks = null,
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                            entry.type == "TRACK" || entry.id.startsWith("track:") -> {
-                                                {
-                                                    playerViewModel.showTrackOptions(
-                                                        Track(
-                                                            id = entry.numericId,
-                                                            title = entry.title,
-                                                            artworkUrl = entry.imageUrl,
-                                                            durationMs = null,
-                                                            user = User(0, entry.subtitle ?: "", null),
-                                                            source = entry.source,
-                                                            permalinkUrl = entry.originalUrl
-                                                        )
-                                                    )
-                                                }
-                                            }
-                                            else -> null
-                                        },
-                                    ) {
-                                        if (entry.type == "TRACK" || entry.id.startsWith("track:")) {
-                                            val trackToPlay = Track(
-                                                id = entry.numericId,
-                                                title = entry.title,
-                                                artworkUrl = entry.imageUrl,
-                                                durationMs = null,
-                                                user = User(0, entry.subtitle ?: "", null),
-                                                source = entry.source,
-                                                permalinkUrl = entry.originalUrl
-                                            )
-                                            playerViewModel.playPlaylist(listOf(trackToPlay), 0)
-                                        } else {
-                                            playerViewModel.navigateToPlaylistId = when {
-                                                entry.id.startsWith("playlist:") -> entry.numericId.toString()
-                                                entry.id.startsWith("spotify_artist:") -> entry.id
-                                                entry.id.startsWith("spotify_radio:") -> entry.id
-                                                entry.id.startsWith("spotify:") -> entry.id
-                                                entry.type == "STATION" && entry.id.contains("spotify") -> {
-                                                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                                                    "spotify_radio:$clean"
-                                                }
-                                                entry.type == "PROFILE" -> {
-                                                    val clean = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(entry.id)
-                                                    if (clean.isNotBlank() && clean != "0" && (entry.id.contains("spotify") || clean.length == 22)) {
-                                                        "spotify_artist:$clean"
-                                                    } else if (entry.id == "profile:0" || entry.numericId == 0L) {
-                                                        if (entry.title.isNotBlank()) {
-                                                            "profile:${entry.title}"
-                                                        } else {
-                                                            entry.id
-                                                        }
-                                                    } else {
-                                                        entry.id
-                                                    }
-                                                }
-                                                else -> entry.id
-                                            }
-                                        }
-                                    }
-                                }
-                                repeat(3 - rowItems.size) { Spacer(Modifier.weight(1f)) }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // "Your Mix" card
-            if (showHomeYourMix) {
-                item {
-                    StartMixingCard(playerViewModel)
-                }
-            }
-
-            // "Listening Stats" card just below Your mix
-            if (showHomeListeningStats) {
-                item {
-                    ListeningStatsCard(navController)
-                }
-            }
-
-            // Section carousels
-            items(vm.homeSections, key = { it.title }) { section ->
-                Column {
-                    Text(
-                        text = SoundCloudLocalizationUtils.localizeSectionTitle(section.title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    SoundCloudLocalizationUtils.localizeSectionSubtitle(section.subtitle)?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                
-                // Faded into the panel's own colour: the old copy faded into `surface`, which is not what
-                // this panel is drawn on, so every carousel had a band of the wrong colour at each end.
-                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    items(section.content) { item ->
-                        when (item) {
-                            is Track -> MediaCard(
-                                title = item.title ?: "",
-                                subtitle = item.user?.username ?: "",
-                                artworkUrl = item.fullResArtwork,
-                                round = false,
-                                onRightClick = { playerViewModel.showTrackOptions(item) }
-                            ) {
-                                playerViewModel.playPlaylist(listOf(item), 0)
-                            }
-                            is Playlist -> MediaCard(
-                                title = item.title ?: "",
-                                subtitle = item.user?.username ?: "",
-                                artworkUrl = item.fullResArtwork,
-                                round = false,
-                                onRightClick = { playerViewModel.showPlaylistOptions(item) }
-                            ) {
-                                playerViewModel.navigateToPlaylistId = getStationNavId(item)
-                            }
-                            is User -> MediaCard(
-                                title = item.username ?: "",
-                                subtitle = str("lib_artists"),
-                                artworkUrl = item.avatarUrl,
-                                round = true,
-                            ) {
-                                playerViewModel.navigateToPlaylistId = item.profileNavId
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-
 /** Hover highlights ease in and out instead of snapping. */
 private const val HOVER_FADE_MS = 120
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun QuickTile(
+internal fun QuickTile(
     title: String,
     imageUrl: String?,
     isLikes: Boolean = false,
@@ -680,17 +431,9 @@ fun MediaCard(
 @Composable
 private fun SearchSourceButton(vm: HomeViewModel) {
     var expanded by remember { mutableStateOf(false) }
-    val sources = listOf(
-        SearchSource.SOUNDCLOUD,
-        SearchSource.YOUTUBE,
-        SearchSource.YOUTUBE_MUSIC,
-        SearchSource.SPOTIFY,
-        SearchSource.APPLE_MUSIC,
-        SearchSource.YANDEX_MUSIC,
-        SearchSource.DEEZER,
-        SearchSource.TIDAL,
-        SearchSource.QOBUZ,
-    )
+    var editing by remember { mutableStateOf(false) }
+    // The order and what is hidden come from the reader's settings; see SearchSourceOrder.
+    val sources = remember(expanded, editing) { com.alananasss.kittytune.data.local.SearchSourceOrder.visible() }
 
     Box {
         com.alananasss.kittytune.ui.common.Tip(str("search_source_tooltip")) {
@@ -700,7 +443,7 @@ private fun SearchSourceButton(vm: HomeViewModel) {
                 contentPadding = PaddingValues(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             ) {
                 Text(
-                    text = searchSourceLabel(vm.activeSearchSource),
+                    text = if (vm.searchAllPlatforms) str("search_all_sources") else searchSourceName(vm.activeSearchSource),
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                 )
@@ -716,13 +459,24 @@ private fun SearchSourceButton(vm: HomeViewModel) {
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text(str("search_all_sources")) },
+                leadingIcon = {
+                    if (vm.searchAllPlatforms) Icon(Icons.Rounded.Check, contentDescription = null)
+                    else Spacer(Modifier.size(24.dp))
+                },
+                onClick = {
+                    expanded = false
+                    vm.onSearchAllPlatforms()
+                },
+            )
             sources.forEach { source ->
                 androidx.compose.material3.DropdownMenuItem(
-                    text = { Text(searchSourceLabel(source)) },
+                    text = { Text(searchSourceName(source)) },
                     leadingIcon = {
                         // The current one is marked rather than merely styled: a menu of three names with
                         // no indication of which is live reads as three actions, not as a choice.
-                        if (source == vm.activeSearchSource) {
+                        if (source == vm.activeSearchSource && !vm.searchAllPlatforms) {
                             Icon(Icons.Rounded.Check, contentDescription = null)
                         } else {
                             Spacer(Modifier.size(24.dp))
@@ -734,21 +488,26 @@ private fun SearchSourceButton(vm: HomeViewModel) {
                     },
                 )
             }
+            androidx.compose.material3.HorizontalDivider()
+            androidx.compose.material3.DropdownMenuItem(
+                text = { Text(str("search_sources_edit")) },
+                leadingIcon = { Icon(Icons.Rounded.Tune, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    editing = true
+                },
+            )
+        }
+        if (editing) {
+            com.alananasss.kittytune.ui.home.SearchSourceOrderDialog(
+                onDismiss = { editing = false },
+                onSaved = {
+                    val fixed = com.alananasss.kittytune.data.local.SearchSourceOrder.fallbackFor(vm.activeSearchSource)
+                    if (fixed != vm.activeSearchSource) vm.onSearchSourceChanged(fixed)
+                },
+            )
         }
     }
-}
-
-/** Platform names are brands, so they are not translated. */
-private fun searchSourceLabel(source: SearchSource): String = when (source) {
-    SearchSource.SOUNDCLOUD -> "SoundCloud"
-    SearchSource.YOUTUBE -> "YouTube"
-    SearchSource.YOUTUBE_MUSIC -> "YouTube Music"
-    SearchSource.SPOTIFY -> "Spotify"
-    SearchSource.APPLE_MUSIC -> "Apple Music"
-    SearchSource.YANDEX_MUSIC -> "Yandex Music"
-    SearchSource.DEEZER -> "Deezer"
-    SearchSource.TIDAL -> "TIDAL"
-    SearchSource.QOBUZ -> "Qobuz"
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
@@ -765,10 +524,14 @@ private fun SearchResults(
     }
 
     val hasQuery = vm.searchQuery.isNotBlank()
-    val listState = rememberLazyListState()
+    // A fresh list for each source, for All, and for each query: it used to keep its scroll from the last one, which
+    // opened the new results half way down.
+    val listState = remember(vm.activeSearchSource, vm.searchAllPlatforms, vm.searchQuery) {
+        androidx.compose.foundation.lazy.LazyListState()
+    }
 
     // Detect end-of-list for load-more
-    val shouldLoadMore by remember {
+    val shouldLoadMore by remember(listState) {
         derivedStateOf {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
             val totalItems = listState.layoutInfo.totalItemsCount
@@ -794,51 +557,56 @@ private fun SearchResults(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // What you are looking for comes before where to look for it (issue #33).
-            //
-            // "Make the first filter 'All', then 'Tracks', 'Artists', 'Playlists' and only after them make
-            // the platform selection button, again 1 button, and when you click on it you can switch to
-            // another one."
-            //
-            // He is right about the order for a reason worth stating: the platform is set once and then
-            // left alone, while All/Tracks/Artists is touched on every search. The thing you reach for
-            // constantly was sitting to the right of the thing you almost never change, and three
-            // side-by-side platform buttons took as much of the row as the four filters did — which is
-            // also why the row started scrolling sideways on a narrow window.
-            if (vm.activeSearchSource in listOf(SearchSource.SOUNDCLOUD, SearchSource.SPOTIFY, SearchSource.DEEZER, SearchSource.TIDAL, SearchSource.QOBUZ)) {
-                val filters = listOf(
-                    SearchFilter.ALL,
-                    SearchFilter.TRACKS,
-                    SearchFilter.ARTISTS,
-                    SearchFilter.PLAYLISTS,
-                )
-                com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
-                    options = filters,
-                    selectedOption = vm.activeFilter,
-                    onOptionSelected = { vm.onFilterChanged(it) },
-                    fillMaxWidth = false,
-                    labelProvider = { filter ->
-                        val label = when (filter) {
-                            SearchFilter.ALL -> str("search_filter_all")
-                            SearchFilter.TRACKS -> str("search_filter_tracks")
-                            SearchFilter.ARTISTS -> str("lib_artists")
-                            SearchFilter.PLAYLISTS -> str("lib_playlists")
-                        }
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                        )
-                    }
-                )
-
-                VerticalDivider(
-                    modifier = Modifier.height(20.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                )
-            }
-
+            // The platform first, so it stays put. It used to come after the filters, which some platforms do
+            // not have, and jumped across the row whenever they appeared or went (issue #66). The filters now
+            // slide in and out beside it.
             SearchSourceButton(vm)
+
+            val hasFilters = vm.activeSearchSource in listOf(
+                SearchSource.SOUNDCLOUD, SearchSource.SPOTIFY, SearchSource.DEEZER, SearchSource.TIDAL, SearchSource.QOBUZ,
+            )
+            androidx.compose.animation.AnimatedVisibility(
+                visible = hasFilters,
+                enter = androidx.compose.animation.fadeIn(tween(220, delayMillis = 60)) +
+                    androidx.compose.animation.expandHorizontally(tween(260, easing = FastOutSlowInEasing), expandFrom = Alignment.Start),
+                exit = androidx.compose.animation.fadeOut(tween(140)) +
+                    androidx.compose.animation.shrinkHorizontally(tween(240, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Start),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    VerticalDivider(
+                        modifier = Modifier.height(20.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    val filters = listOf(
+                        SearchFilter.ALL,
+                        SearchFilter.TRACKS,
+                        SearchFilter.ARTISTS,
+                        SearchFilter.PLAYLISTS,
+                    )
+                    com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup(
+                        options = filters,
+                        selectedOption = vm.activeFilter,
+                        onOptionSelected = { vm.onFilterChanged(it) },
+                        fillMaxWidth = false,
+                        labelProvider = { filter ->
+                            val label = when (filter) {
+                                SearchFilter.ALL -> str("search_filter_all")
+                                SearchFilter.TRACKS -> str("search_filter_tracks")
+                                SearchFilter.ARTISTS -> str("lib_artists")
+                                SearchFilter.PLAYLISTS -> str("lib_playlists")
+                            }
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                            )
+                        }
+                    )
+                }
+            }
         }
 
         // ── Loading bar ──
@@ -847,6 +615,17 @@ private fun SearchResults(
                 modifier = Modifier.fillMaxWidth(),
                 color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            )
+        }
+
+        // What was searched for instead, when what was typed found nothing like itself (issue #66).
+        val corrected = vm.searchCorrectedQuery
+        if (hasQuery && corrected != null && vm.activeSearchSource == SearchSource.SOUNDCLOUD) {
+            Text(
+                text = str("search_showing_results_for", corrected),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
             )
         }
 
@@ -879,7 +658,9 @@ private fun SearchResults(
             }
         } else {
             // Actual results
-            when (vm.activeSearchSource) {
+            if (vm.searchAllPlatforms) {
+                AllPlatformsResults(vm, playerViewModel, listState)
+            } else when (vm.activeSearchSource) {
                 SearchSource.YOUTUBE -> YoutubeResults(vm, playerViewModel, listState)
                 SearchSource.YOUTUBE_MUSIC -> YoutubeMusicResults(vm, playerViewModel, listState)
                 SearchSource.SPOTIFY -> SpotifyResults(vm, playerViewModel, navController)
@@ -940,6 +721,65 @@ private fun SourceChip(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+/**
+ * "All": one group per source that found something, each with its first few songs and a way into the full list of that
+ * source. The source's name is the group's heading, so the reader sees where each song is from.
+ */
+@Composable
+private fun AllPlatformsResults(
+    vm: HomeViewModel,
+    playerViewModel: PlayerViewModel,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+) {
+    val groups = listOf(
+        SearchSource.SOUNDCLOUD to vm.searchResultsTracks.toList(),
+        SearchSource.SPOTIFY to vm.searchResultsSpotify.toList(),
+        SearchSource.DEEZER to vm.searchResultsDeezerTracks.toList(),
+        SearchSource.TIDAL to vm.searchResultsTidalTracks.toList(),
+        SearchSource.QOBUZ to vm.searchResultsQobuzTracks.toList(),
+        SearchSource.YOUTUBE_MUSIC to vm.searchResultsYoutubeMusic.toList(),
+    ).filter { it.second.isNotEmpty() }
+
+    if (groups.isEmpty() && !vm.isSearchLoading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(str("search_no_results"), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        groups.forEach { (source, tracks) ->
+            item(key = "all-head-${source.name}") {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        searchSourceName(source),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = { vm.onSearchSourceChanged(source) },
+                        shapes = ButtonDefaults.shapes(),
+                    ) { Text(str("search_all_show_source")) }
+                }
+            }
+            items(tracks.take(ALL_PER_SOURCE), key = { "all-${source.name}-${it.id}" }) { track ->
+                SearchTrackRow(track, playerViewModel)
+            }
+        }
+    }
+}
+
+private const val ALL_PER_SOURCE = 5
+
 // ──────────────────────────────────────────────────────────────────────
 //  SoundCloud Search Results
 // ──────────────────────────────────────────────────────────────────────
@@ -956,7 +796,7 @@ private fun SoundCloudResults(
     val playlists = vm.searchResultsPlaylists
 
     val topArtist = remember(artists.size, vm.searchQuery) {
-        TopResultRanker.findTopArtist(artists, vm.searchQuery)
+        TopResultRanker.findTopArtist(artists, vm.searchQuery) { com.alananasss.kittytune.data.search.SearchPicks.timesPicked(vm.searchQuery, it.id) }
     }
 
     if (tracks.isEmpty() && artists.isEmpty() && playlists.isEmpty() && !vm.isSearchLoading) {
@@ -994,6 +834,7 @@ private fun SoundCloudResults(
                                 user = topArtist,
                                 isSpotify = false,
                                 onArtistClick = {
+                                    vm.noteOpenedArtist(topArtist)
                                     playerViewModel.navigateToPlaylistId = topArtist.profileNavId
                                 },
                                 onPlayClick = {
@@ -1015,7 +856,7 @@ private fun SoundCloudResults(
                                 )
                                 Spacer(Modifier.height(6.dp))
                                 tracks.take(4).forEach { track ->
-                                    SearchTrackRow(track, playerViewModel)
+                                    SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                 }
                             }
                         }
@@ -1037,6 +878,7 @@ private fun SoundCloudResults(
                                         user = topArtist,
                                         isSpotify = false,
                                         onArtistClick = {
+                                            vm.noteOpenedArtist(topArtist)
                                             playerViewModel.navigateToPlaylistId = topArtist.profileNavId
                                         },
                                         onPlayClick = {
@@ -1059,7 +901,7 @@ private fun SoundCloudResults(
                                         )
                                         Spacer(Modifier.height(6.dp))
                                         tracks.take(4).forEach { track ->
-                                            SearchTrackRow(track, playerViewModel)
+                                            SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                         }
                                     }
                                 }
@@ -1080,6 +922,7 @@ private fun SoundCloudResults(
                         Spacer(Modifier.height(6.dp))
                         remainingArtists.take(3).forEach { user ->
                             SearchArtistRow(user) {
+                                vm.noteOpenedArtist(user)
                                 playerViewModel.navigateToPlaylistId = user.profileNavId
                             }
                         }
@@ -1107,6 +950,7 @@ private fun SoundCloudResults(
                                     playlist.id < 0 -> "local_playlist:${playlist.id}"
                                     else -> playlist.id.toString()
                                 }
+                                vm.noteOpenedPlaylist(playlist, dest)
                                 playerViewModel.navigateToPlaylistId = dest
                             }
                         }
@@ -1123,7 +967,7 @@ private fun SoundCloudResults(
                             )
                             Spacer(Modifier.height(8.dp))
                             tracks.take(5).forEach { track ->
-                                SearchTrackRow(track, playerViewModel)
+                                SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                             }
                         }
                     }
@@ -1148,6 +992,7 @@ private fun SoundCloudResults(
                                         playlist.id < 0 -> "local_playlist:${playlist.id}"
                                         else -> playlist.id.toString()
                                     }
+                                    vm.noteOpenedPlaylist(playlist, dest)
                                     playerViewModel.navigateToPlaylistId = dest
                                 }
                             }
@@ -1166,7 +1011,7 @@ private fun SoundCloudResults(
                                     )
                                     Spacer(Modifier.height(8.dp))
                                     tracks.take(5).forEach { track ->
-                                        SearchTrackRow(track, playerViewModel)
+                                        SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                     }
                                 }
                             }
@@ -1192,6 +1037,7 @@ private fun SoundCloudResults(
                                                 playlist.id < 0 -> "local_playlist:${playlist.id}"
                                                 else -> playlist.id.toString()
                                             }
+                                            vm.noteOpenedPlaylist(playlist, dest)
                                             playerViewModel.navigateToPlaylistId = dest
                                         }
                                     }
@@ -1205,7 +1051,7 @@ private fun SoundCloudResults(
         // ── TRACKS filter ──
         else if (vm.activeFilter == SearchFilter.TRACKS) {
             items(tracks) { track ->
-                SearchTrackRow(track, playerViewModel)
+                SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
             }
             if (vm.isSearchLoadingMore) {
                 item {
@@ -1219,6 +1065,7 @@ private fun SoundCloudResults(
         else if (vm.activeFilter == SearchFilter.ARTISTS) {
             items(artists) { user ->
                 SearchArtistRow(user) {
+                    vm.noteOpenedArtist(user)
                     playerViewModel.navigateToPlaylistId = user.profileNavId
                 }
             }
@@ -1237,6 +1084,7 @@ private fun SoundCloudResults(
                     playlist,
                     onRightClick = { playerViewModel.showPlaylistOptions(playlist) },
                 ) {
+                    vm.noteOpenedPlaylist(playlist, playlist.id.toString())
                     playerViewModel.navigateToPlaylistId = playlist.id.toString()
                 }
             }
@@ -1268,7 +1116,7 @@ private fun ProviderResults(
 ) {
     val allPlaylists = albums + playlists
     val topArtist = remember(artists.size, vm.searchQuery) {
-        TopResultRanker.findTopArtist(artists, vm.searchQuery)
+        TopResultRanker.findTopArtist(artists, vm.searchQuery) { com.alananasss.kittytune.data.search.SearchPicks.timesPicked(vm.searchQuery, it.id) }
     }
 
     if (tracks.isEmpty() && artists.isEmpty() && allPlaylists.isEmpty() && !vm.isSearchLoading) {
@@ -1326,7 +1174,7 @@ private fun ProviderResults(
                                 )
                                 Spacer(Modifier.height(6.dp))
                                 tracks.take(4).forEach { track ->
-                                    SearchTrackRow(track, playerViewModel)
+                                    SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                 }
                             }
                         }
@@ -1368,7 +1216,7 @@ private fun ProviderResults(
                                         )
                                         Spacer(Modifier.height(6.dp))
                                         tracks.take(4).forEach { track ->
-                                            SearchTrackRow(track, playerViewModel)
+                                            SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                         }
                                     }
                                 }
@@ -1424,7 +1272,7 @@ private fun ProviderResults(
                             )
                             Spacer(Modifier.height(8.dp))
                             tracks.take(5).forEach { track ->
-                                SearchTrackRow(track, playerViewModel)
+                                SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                             }
                         }
                     }
@@ -1459,7 +1307,7 @@ private fun ProviderResults(
                                     )
                                     Spacer(Modifier.height(8.dp))
                                     tracks.take(5).forEach { track ->
-                                        SearchTrackRow(track, playerViewModel)
+                                        SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                     }
                                 }
                             }
@@ -1488,7 +1336,7 @@ private fun ProviderResults(
             }
         } else if (vm.activeFilter == SearchFilter.TRACKS) {
             items(tracks) { track ->
-                SearchTrackRow(track, playerViewModel)
+                SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
             }
         } else if (vm.activeFilter == SearchFilter.ARTISTS) {
             items(artists) { user ->
@@ -1540,7 +1388,7 @@ private fun YoutubeResults(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         items(tracks) { track ->
-            SearchTrackRow(track, playerViewModel)
+            SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
         }
     }
 }
@@ -1571,7 +1419,7 @@ private fun YoutubeMusicResults(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         items(tracks) { track ->
-            SearchTrackRow(track, playerViewModel)
+            SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
         }
         if (vm.isSearchLoadingMore) {
             item {
@@ -1786,7 +1634,7 @@ private fun SpotifyResults(
                                 )
                                 Spacer(Modifier.height(6.dp))
                                 vm.searchResultsSpotify.take(4).forEach { track ->
-                                    SearchTrackRow(track, playerViewModel)
+                                    SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                 }
                             }
                         }
@@ -1832,7 +1680,7 @@ private fun SpotifyResults(
                                         )
                                         Spacer(Modifier.height(6.dp))
                                         vm.searchResultsSpotify.take(4).forEach { track ->
-                                            SearchTrackRow(track, playerViewModel)
+                                            SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                         }
                                     }
                                 }
@@ -1881,13 +1729,13 @@ private fun SpotifyResults(
                 }
                 item {
                     vm.searchResultsSpotify.take(5).forEach { track ->
-                        SearchTrackRow(track, playerViewModel)
+                        SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                     }
                 }
             } else {
                 items(vm.searchResultsSpotify.size) { index ->
                     val track = vm.searchResultsSpotify[index]
-                    SearchTrackRow(track, playerViewModel)
+                    SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                 }
             }
         }
@@ -1934,7 +1782,7 @@ private fun SpotifyResults(
 }
 
 /** Same station-marker resolution as the Android home screen. */
-private fun getStationNavId(playlist: Playlist): String {
+internal fun getStationNavId(playlist: Playlist): String {
     val isLikedBy = playlist.permalinkUrl == "liked_by_marker"
     val isArtistStation = playlist.permalinkUrl == "artist_station_marker"
     val isTrackStation = playlist.permalinkUrl == "track_station_marker"
@@ -1957,51 +1805,67 @@ private fun getStationNavId(playlist: Playlist): String {
 //  Search Result Row Components
 // ──────────────────────────────────────────────────────────────────────
 
+/**
+ * A section's title, which is also the way to see all of it: the title and an arrow right after it. "See all" sat
+ * at the far right of the row, a long way from where the eye and the pointer were (issue #66).
+ */
 @Composable
 private fun SectionHeader(
     title: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onSeeAll: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = str("search_see_all"),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onSeeAll)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        )
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val arrowShift by animateDpAsState(if (hovered) 3.dp else 0.dp, label = "sectionArrow")
+    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Tip(str("search_see_all")) {
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .hoverable(interaction)
+                    .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onSeeAll)
+                    .pointerHoverIcon(PointerIcon.Hand)
+                    .padding(start = 4.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                )
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = str("search_see_all"),
+                    tint = if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 2.dp).offset(x = arrowShift).size(20.dp),
+                )
+            }
+        }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel) {
+private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel, onOpened: () -> Unit = {}) {
     val durationMs = track.durationMs ?: 0L
     val minutes = durationMs / 60000
     val seconds = (durationMs % 60000) / 1000
     val durationText = if (durationMs > 0) "${minutes}:${seconds.toString().padStart(2, '0')}" else ""
 
     TextButton(
-        onClick = { playerViewModel.playPlaylist(listOf(track), 0) },
+        onClick = {
+            onOpened()
+            playerViewModel.playPlaylist(listOf(track), 0)
+        },
         shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
         contentPadding = PaddingValues(0.dp),
@@ -2057,16 +1921,6 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 8.dp),
-            )
-        }
-        IconButton(onClick = { playerViewModel.showTrackOptions(track) },
-            modifier = Modifier.size(32.dp),
-        ) {
-            Icon(
-                Icons.Filled.MoreVert,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
             )
         }
     }
@@ -2209,7 +2063,7 @@ private fun SearchTopMatchHeroCard(
 
                     if (onPlayClick != null) {
                         if (isCompactCard) {
-                            androidx.compose.material3.FilledIconButton(
+                            androidx.compose.material3.FilledIconButton(shapes = IconButtonDefaults.shapes(),
                                 onClick = onPlayClick,
                                 modifier = Modifier.size(42.dp),
                                 colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
@@ -2267,7 +2121,7 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
@@ -2276,7 +2130,7 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
             error = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
             fallback = com.alananasss.kittytune.ui.common.rememberDefaultAvatarPainter(),
             modifier = Modifier
-                .size(48.dp)
+                .size(64.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentScale = ContentScale.Crop,
@@ -2292,7 +2146,10 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                if (user.verified) {
+                // Verified on SoundCloud, or the artist's own streaming profile by that exact name is: the real
+                // artist among the copies that share their name (issue #66).
+                val profile = com.alananasss.kittytune.ui.common.rememberArtistProfile(user.username)
+                if (user.verified || profile?.isVerified == true) {
                     Spacer(Modifier.width(4.dp))
                     Icon(
                         Icons.Rounded.Verified,
@@ -2303,12 +2160,15 @@ private fun SearchArtistRow(user: User, onClick: () -> Unit) {
                 }
             }
             val followersCount = user.followersCount
-            val followersText = when {
-                followersCount >= 1_000_000 -> "${followersCount / 1_000_000}M followers"
-                followersCount >= 1_000 -> "${followersCount / 1_000}K followers"
-                followersCount > 0 -> "$followersCount followers"
-                else -> str("lib_artists")
-            }
+            val followersText = listOfNotNull(
+                com.alananasss.kittytune.ui.common.rememberArtistProfile(user.username)?.monthlyListeners
+                    ?.let { com.alananasss.kittytune.ui.common.monthlyListenersLabel(it) },
+                followersCount.takeIf { it > 0 }?.let {
+                    java.text.NumberFormat.getCompactNumberInstance(Strings.locale(), java.text.NumberFormat.Style.SHORT)
+                        .format(it) + " " + str("profile_followers")
+                },
+                user.trackCount.takeIf { it > 0 }?.let { "$it ${str("search_filter_tracks").lowercase()}" },
+            ).joinToString(" · ").ifBlank { str("lib_artists") }
             Text(
                 text = followersText,
                 style = MaterialTheme.typography.bodySmall,
@@ -2343,15 +2203,15 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = playlist.fullResArtwork,
             contentDescription = null,
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(6.dp))
+                .size(64.dp)
+                .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             contentScale = ContentScale.Crop,
         )
@@ -2417,6 +2277,8 @@ private fun SearchPlaylistRow(playlist: Playlist, onRightClick: (() -> Unit)? = 
  *    answer and it is better than an empty mix that looks like a bug.
  *  - **Found nothing.** Seeds existed and every expansion came back empty, which in practice means the network.
  */
+private var lastMixBasis: com.alananasss.kittytune.data.mix.MixEngine.Basis? = null
+
 private data class VibeStation(
     val id: String,
     val title: String,
@@ -2427,13 +2289,16 @@ private data class VibeStation(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun StartMixingCard(playerViewModel: PlayerViewModel) {
+internal fun StartMixingCard(playerViewModel: PlayerViewModel) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf<MixState>(MixState.Idle) }
     var showOptions by remember { mutableStateOf(false) }
 
-    val basis by produceState<com.alananasss.kittytune.data.mix.MixEngine.Basis?>(initialValue = null) {
-        value = com.alananasss.kittytune.data.mix.MixEngine.basis()
+    // Seeded with the last answer: the card is composed again every time it scrolls back into the list, and
+    // starting from nothing each time made it grow by the artist chip and the basis row after a moment, which
+    // showed as the card's lower edge jumping (issue #66).
+    val basis by produceState<com.alananasss.kittytune.data.mix.MixEngine.Basis?>(initialValue = lastMixBasis) {
+        value = com.alananasss.kittytune.data.mix.MixEngine.basis()?.also { lastMixBasis = it }
     }
 
     val topArtist = basis?.topArtists?.firstOrNull()
@@ -3041,158 +2906,12 @@ private fun MixSectionLabel(icon: androidx.compose.ui.graphics.vector.ImageVecto
 }
 
 /**
- * The week's listening, on the home page (issue #33).
- *
- * Statistics were already being recorded and there was a screen for them, but nothing navigated to
- * it, so they were invisible. A card is the form that was asked for: the three numbers worth
- * knowing at a glance, the artist behind them, and a way through to everything else.
- *
- * Absent entirely until there is something to show. A card reading zero minutes on a fresh install
- * is noise, and it is the state every new listener starts in.
- */
-
-@Composable
-private fun ListeningStatsCard(navController: NavController) {
-    val weekAgo = remember { System.currentTimeMillis() - 7L * 24 * 60 * 60 * 1000 }
-    val summary by produceState<HomeStatsSummary?>(initialValue = null, key1 = weekAgo) {
-        value = withContext(Dispatchers.IO) {
-            runCatching {
-                val repo = com.alananasss.kittytune.data.ListeningStatsRepository
-                HomeStatsSummary(
-                    listenedMs = repo.getTotalListenTime(weekAgo),
-                    uniqueTracks = repo.getUniqueTracks(weekAgo),
-                    uniqueArtists = repo.getUniqueArtists(weekAgo),
-                    topArtist = repo.getTopArtists(weekAgo, limit = 1).firstOrNull(),
-                )
-            }.getOrNull()
-        }
-    }
-
-    val stats = summary ?: return
-    if (stats.listenedMs <= 0L) return
-
-    Surface(
-        onClick = { navController.navigate("listening_stats") },
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    Icons.Rounded.BarChart,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = str("listening_stats_title"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = str("listening_stats_period_week"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Icons.AutoMirrored.Rounded.ArrowForwardIos,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(12.dp),
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatFigure(
-                    value = listenedLabel(stats.listenedMs),
-                    label = str("listening_stats_time_listened"),
-                    modifier = Modifier.weight(1f),
-                )
-                StatFigure(
-                    value = stats.uniqueTracks.toString(),
-                    label = str("listening_stats_unique_tracks"),
-                    modifier = Modifier.weight(1f),
-                )
-                StatFigure(
-                    value = stats.uniqueArtists.toString(),
-                    label = str("listening_stats_unique_artists"),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            stats.topArtist?.let { artist ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = artist.artworkUrl,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = str("listening_stats_top_artists"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = artist.artistName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** What the card needs, fetched in one pass so the card appears whole rather than in pieces. */
-private data class HomeStatsSummary(
-    val listenedMs: Long,
-    val uniqueTracks: Int,
-    val uniqueArtists: Int,
-    val topArtist: com.alananasss.kittytune.data.local.TopArtistResult?,
-)
-
-@Composable
-private fun StatFigure(value: String, label: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-/**
  * Listening time at a glance: hours once there are hours, minutes below that.
  *
  * Never seconds. A card is read in passing and "4 h 12" tells you what you wanted; the exact figure
  * is on the screen behind it.
  */
-private fun listenedLabel(ms: Long): String {
+internal fun listenedLabel(ms: Long): String {
     val totalMinutes = ms / 60_000
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60

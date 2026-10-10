@@ -1,6 +1,7 @@
     package com.alananasss.kittytune.ui.home
 
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.SearchSourceOrder
 import com.alananasss.kittytune.core.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -124,6 +125,22 @@ import com.alananasss.kittytune.utils.Logger
         var activeFilter by mutableStateOf(SearchFilter.ALL)
         var isSearchLoading by mutableStateOf(false)
         var activeSearchSource by mutableStateOf(SearchSource.SOUNDCLOUD)
+
+        /**
+         * "All": every source the reader has switched on is asked at once, and the results come back grouped by source
+         * (round 3 of the tester's list, 26). Apple Music and Yandex are left out: their results are names to find
+         * elsewhere, not songs that play from here.
+         */
+        var searchAllPlatforms by mutableStateOf(false)
+
+        fun onSearchAllPlatforms() {
+            if (searchAllPlatforms) return
+            searchAllPlatforms = true
+            if (searchQuery.isNotBlank()) {
+                searchJob?.cancel()
+                searchJob = viewModelScope.launch { performSearch(searchQuery) }
+            }
+        }
     
     
         var isLoading by mutableStateOf(true)
@@ -167,6 +184,10 @@ import com.alananasss.kittytune.utils.Logger
         var yandexNotice by mutableStateOf<YandexNotice?>(null)
             private set
 
+        /** The spelling a SoundCloud search was retried with when what was typed found nothing; see [SearchQueryRepair]. */
+        var searchCorrectedQuery by mutableStateOf<String?>(null)
+            private set
+
         /** The Apple result currently being looked for on a source that streams, if any. */
         var resolvingAppleSongId by mutableStateOf<String?>(null)
             private set
@@ -195,7 +216,7 @@ import com.alananasss.kittytune.utils.Logger
 
         /** Enough of the chart to preview on the landing; the whole thing lives on the Charts screen. */
         val chartPreview = mutableStateListOf<ChartEntry>()
-        var chartPreviewKind by mutableStateOf(ChartKind.TOP)
+        var chartPreviewKind by mutableStateOf(ChartKind.COUNTRY)
             private set
         var isChartPreviewLoading by mutableStateOf(false)
             private set
@@ -224,6 +245,72 @@ import com.alananasss.kittytune.utils.Logger
 
         fun clearRecentSearches() {
             viewModelScope.launch { RecentSearchRepository.clear() }
+            com.alananasss.kittytune.data.search.RecentVisits.clear()
+        }
+
+        /** Artists, tracks and playlists opened from search, newest first; see [RecentVisits]. */
+        val recentVisits = com.alananasss.kittytune.data.search.RecentVisits.visits
+
+        fun forgetVisit(visit: com.alananasss.kittytune.data.search.RecentVisits.Visit) =
+            com.alananasss.kittytune.data.search.RecentVisits.forget(visit)
+
+        /**
+         * Something was opened from the results: it takes the place of the words typed to find it in the recent
+         * list, and an artist picked for this query counts towards making them its best result next time.
+         */
+        private fun noteOpened(visit: com.alananasss.kittytune.data.search.RecentVisits.Visit) {
+            com.alananasss.kittytune.data.search.RecentVisits.record(visit)
+            searchQuery.trim().takeIf { it.isNotEmpty() }?.let(::forgetSearch)
+        }
+
+        fun noteOpenedArtist(user: User) {
+            com.alananasss.kittytune.data.search.SearchPicks.record(searchQuery, user.id)
+            noteOpened(
+                com.alananasss.kittytune.data.search.RecentVisits.Visit(
+                    kind = com.alananasss.kittytune.data.search.RecentVisits.Kind.ARTIST,
+                    key = user.profileNavId,
+                    title = user.username.orEmpty(),
+                    subtitle = null,
+                    imageUrl = user.avatarUrl,
+                    destination = user.profileNavId,
+                    track = null,
+                    isVerified = user.verified,
+                    at = System.currentTimeMillis(),
+                )
+            )
+        }
+
+        fun noteOpenedTrack(track: Track) {
+            noteOpened(
+                com.alananasss.kittytune.data.search.RecentVisits.Visit(
+                    kind = com.alananasss.kittytune.data.search.RecentVisits.Kind.TRACK,
+                    key = track.id.toString(),
+                    title = track.title.orEmpty(),
+                    subtitle = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
+                    imageUrl = track.fullResArtwork,
+                    destination = null,
+                    // Without what goes stale or weighs a lot; the player fetches the rest again.
+                    track = track.copy(description = null, tagList = null, caption = null, waveformUrl = null, media = null),
+                    isVerified = track.user?.verified == true,
+                    at = System.currentTimeMillis(),
+                )
+            )
+        }
+
+        fun noteOpenedPlaylist(playlist: Playlist, destination: String) {
+            noteOpened(
+                com.alananasss.kittytune.data.search.RecentVisits.Visit(
+                    kind = com.alananasss.kittytune.data.search.RecentVisits.Kind.PLAYLIST,
+                    key = destination,
+                    title = playlist.title.orEmpty(),
+                    subtitle = playlist.user?.username,
+                    imageUrl = playlist.artworkUrl ?: playlist.calculatedArtworkUrl,
+                    destination = destination,
+                    track = null,
+                    isVerified = false,
+                    at = System.currentTimeMillis(),
+                )
+            )
         }
 
         /**
@@ -247,6 +334,7 @@ import com.alananasss.kittytune.utils.Logger
                     limit = CHART_PREVIEW_LENGTH,
                     // The landing previews one market; picking another belongs to the chart screen.
                     countryCode = "US",
+                    country = ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage),
                 )
                 if (kind == chartPreviewKind) {
                     chartPreview.clear()
@@ -305,12 +393,18 @@ import com.alananasss.kittytune.utils.Logger
             /** How many songs the landing's chart preview shows. */
             const val CHART_PREVIEW_LENGTH = 5
 
-            /** How many liked artists are asked for new songs. One request each. */
-            const val ARTIST_UPDATE_SOURCES = 6
+            /** How many of the first search results have their stream looked up ahead of a press. */
+            private const val WARMED_RESULTS = 2
 
-            private const val TRACKS_PER_ARTIST = 5
-            private const val MAX_PER_ARTIST = 2
-            private const val ARTIST_UPDATE_TOTAL = 18
+            /** How long a query has to stand still before its results' streams are looked up. */
+            private const val WARM_AFTER_IDLE_MS = 700L
+
+            /** How many liked artists are asked for new songs. One request each, all at once. */
+            const val ARTIST_UPDATE_SOURCES = 10
+
+            private const val TRACKS_PER_ARTIST = 6
+            private const val MAX_PER_ARTIST = 3
+            private const val ARTIST_UPDATE_TOTAL = 30
         }
 
         init {
@@ -555,8 +649,9 @@ import com.alananasss.kittytune.utils.Logger
         fun onFilterChanged(filter: SearchFilter) { activeFilter = filter; if (searchQuery.isNotBlank()) { searchJob?.cancel(); searchJob = viewModelScope.launch { performSearch(searchQuery) } } }
     
         fun onSearchSourceChanged(source: SearchSource) {
-            if (activeSearchSource == source) return
+            if (activeSearchSource == source && !searchAllPlatforms) return
             activeSearchSource = source
+            searchAllPlatforms = false
             if (searchQuery.isNotBlank()) {
                 searchJob?.cancel()
                 searchJob = viewModelScope.launch { performSearch(searchQuery) }
@@ -572,6 +667,7 @@ import com.alananasss.kittytune.utils.Logger
             searchResultsQobuzTracks.clear(); searchResultsQobuzAlbums.clear(); searchResultsQobuzPlaylists.clear(); searchResultsQobuzArtists.clear()
             searchResultsApple.clear()
             yandexNotice = null
+            searchCorrectedQuery = null
             tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
         }
     
@@ -581,22 +677,85 @@ import com.alananasss.kittytune.utils.Logger
             // rather than a prefix. Recording it here is what keeps "lo" out of the history.
             recordSearch(query)
             try {
-                when (activeSearchSource) {
-                    SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
-                    SearchSource.YOUTUBE -> performYoutubeSearch(query)
-                    SearchSource.YOUTUBE_MUSIC -> performYoutubeMusicSearch(query)
-                    SearchSource.SPOTIFY -> performSpotifySearch(query)
-                    SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
-                    SearchSource.YANDEX_MUSIC -> performYandexSearch(query)
-                    SearchSource.DEEZER -> performDeezerSearch(query)
-                    SearchSource.TIDAL -> performTidalSearch(query)
-                    SearchSource.QOBUZ -> performQobuzSearch(query)
+                if (searchAllPlatforms) {
+                    coroutineScope {
+                        SearchSourceOrder.visible()
+                            .filter { it != SearchSource.APPLE_MUSIC && it != SearchSource.YANDEX_MUSIC && it != SearchSource.YOUTUBE }
+                            .map { source -> async { runCatching { performOneSource(source, query) } } }
+                            .awaitAll()
+                    }
+                } else {
+                    performOneSource(activeSearchSource, query)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isSearchLoading = false
             }
+            warmTopResults(query)
+        }
+
+        private suspend fun performOneSource(source: SearchSource, query: String) {
+            when (source) {
+                SearchSource.SOUNDCLOUD -> performSoundCloudSearch(query)
+                SearchSource.YOUTUBE -> performYoutubeSearch(query)
+                SearchSource.YOUTUBE_MUSIC -> performYoutubeMusicSearch(query)
+                SearchSource.SPOTIFY -> performSpotifySearch(query)
+                SearchSource.APPLE_MUSIC -> performAppleMusicSearch(query)
+                SearchSource.YANDEX_MUSIC -> performYandexSearch(query)
+                SearchSource.DEEZER -> performDeezerSearch(query)
+                SearchSource.TIDAL -> performTidalSearch(query)
+                SearchSource.QOBUZ -> performQobuzSearch(query)
+            }
+        }
+
+        private var warmStreamsJob: kotlinx.coroutines.Job? = null
+
+        /**
+         * Looks up where the first results stream from while the reader is still reading the list, so pressing
+         * one starts at once instead of after the sources have been asked (issue #66). Only once the query has
+         * stood still for a moment, so typing does not set it off at every letter.
+         */
+        private fun warmTopResults(query: String) {
+            warmStreamsJob?.cancel()
+            val top = when (activeSearchSource) {
+                SearchSource.SOUNDCLOUD -> searchResultsTracks
+                SearchSource.SPOTIFY -> searchResultsSpotify
+                SearchSource.DEEZER -> searchResultsDeezerTracks
+                SearchSource.TIDAL -> searchResultsTidalTracks
+                SearchSource.QOBUZ -> searchResultsQobuzTracks
+                SearchSource.YOUTUBE -> searchResultsYoutube
+                SearchSource.YOUTUBE_MUSIC -> searchResultsYoutubeMusic
+                SearchSource.APPLE_MUSIC, SearchSource.YANDEX_MUSIC -> emptyList()
+            }.take(WARMED_RESULTS).toList()
+            if (top.isEmpty()) return
+            warmStreamsJob = viewModelScope.launch {
+                delay(WARM_AFTER_IDLE_MS)
+                if (searchQuery.trim() != query.trim()) return@launch
+                withContext(Dispatchers.IO) {
+                    top.forEach { track ->
+                        runCatching { com.alananasss.kittytune.data.StreamResolver.resolveStreamWithDrm(track) }
+                    }
+                }
+            }
+        }
+
+        /**
+         * When none of the tracks found looks like what was typed, asks Deezer, whose search forgives a missing
+         * space or dash, how the song is spelt, and searches SoundCloud again with that; see [SearchQueryRepair].
+         */
+        private suspend fun retryWithRepairedQuery(query: String) {
+            val found = searchResultsTracks.map { (it.title.orEmpty()) to it.displayArtist.ifBlank { it.user?.username.orEmpty() } }
+            if (!SearchQueryRepair.needsRepair(query, found)) return
+            val candidates = runCatching {
+                com.alananasss.kittytune.data.deezer.DeezerSearchRepository.searchTracks(query, limit = 10)
+            }.getOrDefault(emptyList()).map { it.title.orEmpty() to it.displayArtist.ifBlank { it.user?.username.orEmpty() } }
+            val repaired = SearchQueryRepair.repairedQuery(query, candidates) ?: return
+            if (searchQuery.trim() != query.trim()) return
+            searchResultsTracks.clear(); searchResultsArtists.clear(); searchResultsPlaylists.clear()
+            tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
+            searchCorrectedQuery = repaired
+            performSoundCloudSearch(repaired, isRetry = true)
         }
 
         private suspend fun performDeezerSearch(query: String) {
@@ -873,7 +1032,7 @@ import com.alananasss.kittytune.utils.Logger
                 }
             }
         }
-        private suspend fun performSoundCloudSearch(query: String) {
+        private suspend fun performSoundCloudSearch(query: String, isRetry: Boolean = false) {
             coroutineScope {
                 when (activeFilter) {
                     SearchFilter.ALL -> {
@@ -895,6 +1054,9 @@ import com.alananasss.kittytune.utils.Logger
                         val response = api.searchPlaylists(query, limit = 30); searchResultsPlaylists.addAll(response.collection); playlistsNextUrl = response.next_href
                     }
                 }
+            }
+            if (!isRetry && activeFilter != SearchFilter.ARTISTS && activeFilter != SearchFilter.PLAYLISTS) {
+                retryWithRepairedQuery(query)
             }
         }
     

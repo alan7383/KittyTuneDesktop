@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
@@ -38,6 +39,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.*
@@ -60,7 +62,9 @@ import androidx.compose.material3.TextButton
 
 import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -487,6 +491,8 @@ fun LibraryPanel(
             folderToRename != null || folderToDelete != null || playlistForMenu != null ||
             movingItemKey != null || playlistForDetails != null
     TrackSidebarPopup(isAnyDialogOpen, libraryViewModel)
+    // Esc folds the expanded library back, after any dialog or search on top of it has taken its own Esc.
+    com.alananasss.kittytune.core.BackHandler(enabled = fullScreen) { libraryViewModel.isLibraryFullScreen = false }
 
     val openEntry: (LibEntry) -> Unit = { entry ->
         playerViewModel.showLyricsSheet = false
@@ -805,6 +811,23 @@ private fun rememberFixedLibraryTiles(): List<LibEntry> {
                 )
             )
         }
+        // Listening together lives in the library as a playlist would, with a room's cover, not as a button of its own.
+        val rooms by com.alananasss.kittytune.data.together.Together.saved.collectAsState()
+        val roomCover = rooms.firstOrNull()?.tracks?.firstOrNull()?.artworkUrl
+        add(
+            LibEntry(
+                key = "pin_together",
+                title = str("together_title"),
+                subtitle = str("together_library_subtitle"),
+                artworkUrl = roomCover,
+                icon = if (roomCover == null) Icons.Rounded.Groups else null,
+                gradient = if (themed || roomCover != null) null else listOf(Color(0xFFFF7A1A), Color(0xFFFFB27A)),
+                flatColor = if (themed && roomCover == null) scheme.tertiaryContainer else null,
+                iconTint = if (themed) scheme.onTertiaryContainer else Color.White,
+                destination = "together",
+                isPinned = true,
+            )
+        )
         if (PlayerPreferences.LIBRARY_TILE_LOCAL !in hidden) {
             add(
                 LibEntry(
@@ -978,7 +1001,10 @@ private fun LibraryHeader(
                 end = 8.dp,
                 top = headerVerticalPadding,
                 bottom = 4.dp,
-            ),
+            )
+            // One height whether the buttons are there or not. They are taller than the title alone, so the
+            // header grew by a dozen dp in the frame they arrived and every entry below jumped down with it.
+            .height(LIBRARY_HEADER_HEIGHT),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val currentFolder = libraryViewModel.currentFolder
@@ -1072,13 +1098,16 @@ private fun LibraryHeader(
                     }
                 }
             }
-            if (collapse < 0.9f) {
+            if (collapse < SidebarMorph.FADE_DONE_AT) {
                 Spacer(Modifier.weight(1f))
             }
         }
 
-        if (collapse < 0.9f) {
-            Row(Modifier.receded(collapse), verticalAlignment = Alignment.CenterVertically) {
+        // Only while they can be seen: past FADE_DONE_AT they have faded out, so leaving or arriving there is
+        // invisible. They keep their full size throughout and give up room instead of being squeezed into it,
+        // which is what made them shrink and pop while the panel was still narrow.
+        if (collapse < SidebarMorph.FADE_DONE_AT) {
+            Row(Modifier.overflowingStart().receded(collapse), verticalAlignment = Alignment.CenterVertically) {
         // Extended "+ Créer" with dropdown menu. Outlined rather than filled tonal: next to a row
         // of plain icon buttons the tonal fill made it the loudest thing in the header, which is
         // not what a secondary action should be (issue #33).
@@ -1202,101 +1231,102 @@ private fun LibraryHeader(
 // Search + sort/view-mode row
 // ---------------------------------------------------------------------------
 
+/**
+ * The library's search: one long field that is always there, in Material's search-bar shape, with the filter and
+ * sort buttons after it (issue #66). It used to be an icon that unfolded into a small box. The field says nothing
+ * until it is used: its hint only shows once it has the focus, so the panel does not carry a line of grey text
+ * all the time.
+ */
 @Composable
 private fun LibrarySearchRow(libraryViewModel: LibraryViewModel) {
-    var searchActive by remember { mutableStateOf(libraryViewModel.searchQuery.isNotBlank()) }
-    TrackSidebarPopup(searchActive, libraryViewModel)
-    // One way out, whichever gesture asked for it: the cross, Escape, or a click anywhere else.
-    val dismiss = {
+    val query = libraryViewModel.searchQuery
+    TrackSidebarPopup(query.isNotBlank(), libraryViewModel)
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    var isFocused by remember { mutableStateOf(false) }
+    val clear = {
         libraryViewModel.searchQuery = ""
-        searchActive = false
+        focusManager.clearFocus()
     }
+    val scheme = MaterialTheme.colorScheme
+    val container by androidx.compose.animation.animateColorAsState(
+        if (isFocused) scheme.surfaceContainerHighest else scheme.surfaceContainerHigh,
+        label = "librarySearchContainer",
+    )
 
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(36.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).height(40.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (searchActive) {
-            val focusRequester = remember { FocusRequester() }
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.weight(1f).height(32.dp),
+        Surface(
+            shape = CircleShape,
+            color = container,
+            // No hard outline when focused: the thin accent line was what read as a stripe. The field lifts a shade
+            // and its icon takes the accent instead.
+            border = null,
+            modifier = Modifier.weight(1f).height(40.dp),
+        ) {
+            Row(
+                modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Rounded.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        if (libraryViewModel.searchQuery.isEmpty()) {
-                            Text(
-                                str("lib_search_hint"),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        BasicTextField(
-                            value = libraryViewModel.searchQuery,
-                            onValueChange = { libraryViewModel.searchQuery = it },
-                            singleLine = true,
-                            textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .trackTextInput()
-                                .focusRequester(focusRequester)
-                                // This field is an icon until it is pressed, so both gestures close it
-                                // outright — see [escapeDismisses] for why they are separate modifiers.
-                                .escapeDismisses(dismiss)
-                                .focusLossDismisses(dismiss),
+                Icon(
+                    Icons.Rounded.Search,
+                    contentDescription = str("lib_search_tooltip"),
+                    tint = if (isFocused) scheme.primary else scheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = isFocused && query.isEmpty(),
+                        enter = androidx.compose.animation.fadeIn(),
+                        exit = androidx.compose.animation.fadeOut(),
+                    ) {
+                        Text(
+                            str("lib_search_hint"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { libraryViewModel.searchQuery = it },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = scheme.onSurface),
+                        cursorBrush = SolidColor(scheme.primary),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .trackTextInput()
+                            .onFocusChanged { isFocused = it.isFocused }
+                            .escapeDismisses(clear),
+                    )
+                }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = query.isNotEmpty(),
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(),
+                ) {
                     IconButton(
                         shapes = IconButtonDefaults.shapes(),
-                        onClick = dismiss,
-                        modifier = Modifier.size(20.dp),
+                        onClick = clear,
+                        modifier = Modifier.size(32.dp),
                     ) {
                         Icon(
                             Icons.Rounded.Close,
                             contentDescription = str("btn_cancel"),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(14.dp),
+                            tint = scheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
             }
-            LaunchedEffect(Unit) { focusRequester.requestFocus() }
-        } else {
-            Tip(str("lib_search_tooltip")) {
-                IconButton(
-                    shapes = IconButtonDefaults.shapes(),
-                    onClick = { searchActive = true },
-
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Icon(
-                        Icons.Rounded.Search,
-                        contentDescription = str("lib_search_tooltip"),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-            }
-            Spacer(Modifier.weight(1f))
         }
 
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         LibraryCategoryButton(libraryViewModel)
-        Spacer(Modifier.width(4.dp))
+        Spacer(Modifier.width(2.dp))
         SortAndViewMenuButton(libraryViewModel)
     }
 }
@@ -1323,7 +1353,9 @@ private fun LibraryCategoryButton(libraryViewModel: LibraryViewModel) {
     var expanded by remember { mutableStateOf(false) }
     TrackSidebarPopup(expanded, libraryViewModel)
     val all = str("search_filter_all")
-    val categories = buildList {
+    // null is "All": no filter is a choice with a name and an icon of its own, like the others.
+    val categories = buildList<Pair<String?, ImageVector>> {
+        add(null to Icons.Rounded.LibraryMusic)
         add(str("lib_playlists") to Icons.Rounded.QueueMusic)
         add(str("lib_albums") to Icons.Rounded.Album)
         add(str("lib_artists") to Icons.Rounded.Person)
@@ -1332,66 +1364,19 @@ private fun LibraryCategoryButton(libraryViewModel: LibraryViewModel) {
             add(str("lib_your_uploads") to Icons.Rounded.CloudUpload)
         }
     }
-    val selected = libraryViewModel.selectedFilter
+    val selected = categories.firstOrNull { it.first == libraryViewModel.selectedFilter } ?: categories.first()
 
-    Box {
-        Tip(str("lib_filter_tooltip")) {
-            TextButton(
-                onClick = { expanded = true },
-                shapes = ButtonDefaults.shapes(),
-                contentPadding = PaddingValues(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-            ) {
-                Text(
-                    text = selected ?: all,
-                    style = MaterialTheme.typography.labelMedium,
-                    // Single line and truncated rather than wrapped: this sits in a row that follows the
-                    // panel's width, and a label that wraps takes the row's height with it.
-                    softWrap = false,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (selected == null) MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.onSurface,
-                )
-                Icon(
-                    Icons.Rounded.ArrowDropDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(
-                text = { Text(all) },
-                leadingIcon = { CategoryCheck(isSelected = selected == null) },
-                onClick = {
-                    expanded = false
-                    libraryViewModel.selectedFilter = null
-                },
-            )
-            categories.forEach { (label, icon) ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    leadingIcon = {
-                        if (selected == label) CategoryCheck(isSelected = true)
-                        else Icon(icon, contentDescription = null)
-                    },
-                    onClick = {
-                        expanded = false
-                        libraryViewModel.selectedFilter = label
-                    },
-                )
-            }
-        }
-    }
-}
-
-/** The tick that says which one is live, or the space it would take, so the labels stay in a column. */
-@Composable
-private fun CategoryCheck(isSelected: Boolean) {
-    if (isSelected) Icon(Icons.Rounded.Check, contentDescription = null)
-    else Spacer(Modifier.size(24.dp))
+    com.alananasss.kittytune.ui.common.IconChoiceButton(
+        options = categories,
+        selected = selected,
+        onSelect = { libraryViewModel.selectedFilter = it.first },
+        icon = { it.second },
+        label = { it.first ?: all },
+        tooltip = { str("lib_filter_tooltip") + ": " + (it.first ?: all) },
+        size = 32.dp,
+        iconSize = 18.dp,
+        onExpandedChange = { expanded = it },
+    )
 }
 
 private fun viewModeIcon(mode: LibraryViewMode): ImageVector = when (mode) {
@@ -1408,6 +1393,12 @@ private fun viewModeLabel(mode: LibraryViewMode): String = when (mode) {
     LibraryViewMode.GRID -> str("lib_view_grid")
 }
 
+/**
+ * What the library shows, in what order and how: one button, with the view mode's icon on it.
+ *
+ * It used to read "Recent" whatever was chosen, over a menu offering "All / Created / Liked" with no "Recent"
+ * among them (issue #66). The menu is now three headed groups of the same rows every filter menu uses.
+ */
 @Composable
 private fun SortAndViewMenuButton(libraryViewModel: LibraryViewModel) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -1415,95 +1406,50 @@ private fun SortAndViewMenuButton(libraryViewModel: LibraryViewModel) {
     val shouldShowOwnershipFilter = libraryViewModel.selectedFilter == null ||
             libraryViewModel.selectedFilter == str("lib_playlists") ||
             libraryViewModel.selectedFilter == str("lib_albums")
+    val ownership = listOf(
+        Triple(OwnershipFilter.ALL, str("filter_all"), Icons.Rounded.LibraryMusic),
+        Triple(OwnershipFilter.CREATED, str("filter_created"), Icons.Rounded.Edit),
+        Triple(OwnershipFilter.LIKED, str("filter_liked"), Icons.Rounded.Favorite),
+    )
+    val sortLabel = if (libraryViewModel.isSortDescending) str("sort_recently_added") else str("sort_first_added")
+    val tooltip = listOfNotNull(
+        ownership.first { it.first == libraryViewModel.ownershipFilter }.second.takeIf { shouldShowOwnershipFilter },
+        sortLabel,
+        viewModeLabel(libraryViewModel.viewMode),
+    ).joinToString(" · ")
 
-    val label = if (shouldShowOwnershipFilter && libraryViewModel.ownershipFilter != OwnershipFilter.ALL) {
-        when (libraryViewModel.ownershipFilter) {
-            OwnershipFilter.CREATED -> str("filter_created")
-            OwnershipFilter.LIKED -> str("filter_liked")
-            OwnershipFilter.ALL -> str("lib_recents")
-        }
-    } else str("lib_recents")
-
-    Box {
-        Surface(
-            modifier = Modifier.clickable { menuOpen = true },
-            shape = RoundedCornerShape(8.dp),
-            color = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(text = label, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                Spacer(Modifier.width(6.dp))
-                Icon(viewModeIcon(libraryViewModel.viewMode), contentDescription = str("lib_view_mode"), modifier = Modifier.size(16.dp))
-            }
-        }
-
-        DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
-        ) {
-            if (shouldShowOwnershipFilter) {
-                val options = listOf(
-                    OwnershipFilter.ALL to str("filter_all"),
-                    OwnershipFilter.CREATED to str("filter_created"),
-                    OwnershipFilter.LIKED to str("filter_liked"),
-                )
-                options.forEach { (filter, text) ->
-                    DropdownMenuItem(
-                        text = { Text(text) },
-                        trailingIcon = {
-                            if (libraryViewModel.ownershipFilter == filter) {
-                                Icon(Icons.Rounded.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            }
-                        },
-                        onClick = {
-                            libraryViewModel.ownershipFilter = filter
-                            menuOpen = false
-                        },
-                    )
+    com.alananasss.kittytune.ui.common.IconMenuButton(
+        icon = viewModeIcon(libraryViewModel.viewMode),
+        tooltip = tooltip,
+        size = 32.dp,
+        iconSize = 18.dp,
+        onExpandedChange = { menuOpen = it },
+    ) { dismiss ->
+        if (shouldShowOwnershipFilter) {
+            com.alananasss.kittytune.ui.common.ChoiceMenuHeader(str("lib_menu_show"))
+            ownership.forEach { (filter, text, icon) ->
+                com.alananasss.kittytune.ui.common.ChoiceMenuItem(text, icon, libraryViewModel.ownershipFilter == filter) {
+                    libraryViewModel.ownershipFilter = filter
+                    dismiss()
                 }
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
             }
-
-            DropdownMenuItem(
-                text = { Text(str("sort_date_added")) },
-                trailingIcon = {
-                    Icon(
-                        if (libraryViewModel.isSortDescending) Icons.Rounded.ArrowDownward else Icons.Rounded.ArrowUpward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp),
-                    )
-                },
-                onClick = { libraryViewModel.isSortDescending = !libraryViewModel.isSortDescending },
-            )
-
             HorizontalDivider(Modifier.padding(vertical = 4.dp))
-
-            Text(
-                str("lib_view_mode"),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-            )
-            Row(
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                LibraryViewMode.entries.forEach { mode ->
-                    Tip(viewModeLabel(mode)) {
-                        FilledIconToggleButton(
-                            checked = libraryViewModel.viewMode == mode,
-                            onCheckedChange = { libraryViewModel.viewMode = mode },
-                            modifier = Modifier.size(40.dp),
-                        ) {
-                            Icon(viewModeIcon(mode), contentDescription = viewModeLabel(mode), modifier = Modifier.size(18.dp))
-                        }
-                    }
-                }
+        }
+        com.alananasss.kittytune.ui.common.ChoiceMenuHeader(str("lib_sort_by_title"))
+        com.alananasss.kittytune.ui.common.ChoiceMenuItem(str("sort_recently_added"), Icons.Rounded.ArrowDownward, libraryViewModel.isSortDescending) {
+            libraryViewModel.isSortDescending = true
+            dismiss()
+        }
+        com.alananasss.kittytune.ui.common.ChoiceMenuItem(str("sort_first_added"), Icons.Rounded.ArrowUpward, !libraryViewModel.isSortDescending) {
+            libraryViewModel.isSortDescending = false
+            dismiss()
+        }
+        HorizontalDivider(Modifier.padding(vertical = 4.dp))
+        com.alananasss.kittytune.ui.common.ChoiceMenuHeader(str("lib_view_mode"))
+        LibraryViewMode.entries.forEach { mode ->
+            com.alananasss.kittytune.ui.common.ChoiceMenuItem(viewModeLabel(mode), viewModeIcon(mode), libraryViewModel.viewMode == mode) {
+                libraryViewModel.viewMode = mode
+                dismiss()
             }
         }
     }
@@ -1908,6 +1854,20 @@ private fun EntryArtwork(
  * do not exist at all before then — an invisible button that can still be clicked is worse than no
  * animation.
  */
+/** The library header's height in every state: the height of its tallest button, the outlined "Create". */
+private val LIBRARY_HEADER_HEIGHT = 40.dp
+
+/**
+ * Measures the content at its own width and, when there is less room than that, takes only the room there is,
+ * letting the content run out past its start instead of being squeezed. Used for the header buttons while the
+ * panel is narrower than they are, which only happens as they fade out.
+ */
+private fun Modifier.overflowingStart(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = androidx.compose.ui.unit.Constraints.Infinity))
+    val width = placeable.width.coerceAtMost(constraints.maxWidth)
+    layout(width, placeable.height) { placeable.placeRelative(width - placeable.width, 0) }
+}
+
 @Composable
 private fun RailActions(collapse: Float, onCreate: () -> Unit, onHistory: () -> Unit) {
     val appearance = SidebarMorph.arrivalOf(collapse)

@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,6 +66,8 @@ fun SongChart(
     onGenreChange: (ChartGenre) -> Unit,
     modifier: Modifier = Modifier,
     showGenreRow: Boolean = true,
+    country: ChartCountry? = null,
+    onCountryChange: (ChartCountry) -> Unit = {},
     /**
      * A switch is in flight, so the list below is about to be replaced.
      *
@@ -71,19 +75,32 @@ fun SongChart(
      * request takes, which is indistinguishable from the switch doing nothing.
      */
     isSwitching: Boolean = false,
+    /** The lists as small chips that scroll, for a preview on a page; the chart's own page stretches them across. */
+    compactKinds: Boolean = false,
 ) {
     Column(modifier = modifier) {
         Box {
-            ExpressiveConnectedButtonGroup(
+            if (compactKinds) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ChartKind.entries.forEach { option ->
+                        FilterChip(
+                            selected = option == kind,
+                            onClick = { onKindChange(option) },
+                            label = { Text(str(option.labelKey()), maxLines = 1) },
+                        )
+                    }
+                }
+            } else ExpressiveConnectedButtonGroup(
                 options = ChartKind.entries,
                 selectedOption = kind,
                 onOptionSelected = onKindChange,
                 fillMaxWidth = true,
                 labelProvider = { option ->
                     Text(
-                        text = str(
-                            if (option == ChartKind.TOP) "chart_kind_top" else "chart_kind_trending"
-                        ),
+                        text = str(option.labelKey()),
                         maxLines = 1,
                     )
                 },
@@ -97,6 +114,26 @@ fun SongChart(
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = Color.Transparent,
                 )
+            }
+        }
+
+        if (country != null && kind == ChartKind.COUNTRY) {
+            Spacer(Modifier.padding(top = 4.dp))
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // The listener's own country first, then the rest in their usual order.
+                items(ChartCountry.entries.sortedBy { if (it == ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage)) 0 else 1 }) { option ->
+                    FilterChip(
+                        selected = option == country,
+                        onClick = { onCountryChange(option) },
+                        // The name alone: Windows draws a flag emoji as two letters ("RU", "US"), which read as a stray code.
+                        label = { Text(str("chart_country_${option.code.lowercase()}"), maxLines = 1) },
+                        shape = FilterChipDefaults.shape,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        ),
+                    )
+                }
             }
         }
 

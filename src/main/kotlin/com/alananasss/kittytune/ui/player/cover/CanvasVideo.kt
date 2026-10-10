@@ -50,8 +50,13 @@ fun CanvasVideo(
         animationSpec = tween(durationMillis = 350)
     )
 
-    LaunchedEffect(canvasUrl, isPlaying) {
-        if (canvasUrl.isBlank() || !isPlaying) return@LaunchedEffect
+    // Nobody can see a minimised or covered window, and a decode it does not show still costs a frame a
+    // twentieth of a second: a ~1 MB image on the heap and its native Skia copy, left for the collector to
+    // free. Stopping here and resuming on the last frame is invisible, the way the other ambient effects
+    // already stop (issue #66).
+    val isWindowSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
+    LaunchedEffect(canvasUrl, isPlaying, isWindowSeen) {
+        if (canvasUrl.isBlank() || !isPlaying || !isWindowSeen) return@LaunchedEffect
         // StateFlow replays the latest frame, so resuming shows an image immediately
         // instead of flashing the placeholder while the decoder spins back up.
         val frames = canvasHub.flowFor(canvasUrl)

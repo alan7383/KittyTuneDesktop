@@ -79,7 +79,7 @@ fun EscapableAlertDialog(
     BackHandler(onBack = onDismissRequest)
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        modifier = modifier,
+        modifier = modifier.then(DialogExit.recorder()),
         icon = icon,
         title = title,
         text = text,

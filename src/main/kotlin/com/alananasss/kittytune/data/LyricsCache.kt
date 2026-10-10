@@ -38,6 +38,11 @@ object LyricsCache {
         val translationLang: String? = null,
         val romanized: Boolean = false,
         val savedAtMs: Long = System.currentTimeMillis(),
+        /**
+         * Stamped with [CURRENT_SCHEMA] by [put]; anything else was resolved by rules since changed. Zero by
+         * default, so a file written before the field existed reads as old.
+         */
+        val schema: Int = 0,
     ) {
         @Suppress("SENSELESS_COMPARISON")
         fun sanitized(): Entry {
@@ -55,6 +60,13 @@ object LyricsCache {
             return copy(lines = cleanLines)
         }
     }
+
+    /**
+     * Raised whenever resolving changes enough that old answers are wrong rather than just old: 2 dropped
+     * YouTube Music, which had won with another song's words, and started telling fake timings and
+     * watermark lines apart. Older entries miss and are resolved again.
+     */
+    private const val CURRENT_SCHEMA = 2
 
     private const val MAX_MEMORY_ENTRIES = 64
     private val FOUND_TTL_MS = 90L * 24 * 60 * 60 * 1000 // 90 days
@@ -80,6 +92,7 @@ object LyricsCache {
         romanized: Boolean,
     ): Entry? {
         val entry = memory[trackId] ?: readFromDisk(trackId)?.also { remember(trackId, it) } ?: return null
+        if (entry.schema != CURRENT_SCHEMA) return null
         if (entry.providerPreference != providerPreference) return null
         if (entry.translationLang != translationLang) return null
         if (entry.romanized != romanized) return null
@@ -89,7 +102,7 @@ object LyricsCache {
     }
 
     fun put(trackId: Long, entry: Entry) {
-        val cleanEntry = entry.sanitized()
+        val cleanEntry = entry.sanitized().copy(schema = CURRENT_SCHEMA)
         remember(trackId, cleanEntry)
         runCatching { File(dir, "$trackId.json").writeText(gson.toJson(cleanEntry)) }
     }

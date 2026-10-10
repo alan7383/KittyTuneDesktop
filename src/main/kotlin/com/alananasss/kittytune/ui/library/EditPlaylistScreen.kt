@@ -52,7 +52,9 @@ fun EditPlaylistScreen(
     var genre by remember { mutableStateOf(initialGenre ?: "") }
     var setType by remember { mutableStateOf(initialSetType ?: "") }
     var releaseDate by remember { mutableStateOf(initialReleaseDate ?: "") }
-    var permalink by remember { mutableStateOf(initialPermalink ?: "") }
+    // Filled in from the title when the playlist has none yet. Left empty, the field opened in red and Save
+    // stayed disabled until a link was typed by hand, which is not what anyone opened the dialog to do.
+    var permalink by remember { mutableStateOf(initialPermalink?.takeIf { it.isNotBlank() } ?: permalinkFrom(initialTitle)) }
     
     var showGenreDropdown by remember { mutableStateOf(false) }
     var showSetTypeDropdown by remember { mutableStateOf(false) }
@@ -107,12 +109,12 @@ fun EditPlaylistScreen(
                 TopAppBar(
                     title = { Text(str("edit_playlist_title")) },
                     navigationIcon = {
-                        IconButton(onClick = onDismissRequest) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onDismissRequest) {
                             Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
                         }
                     },
                     actions = {
-                        TextButton(onClick = {
+                        TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                                 onSave(
                                     title,
                                     description,
@@ -132,11 +134,13 @@ fun EditPlaylistScreen(
                 )
             }
         ) { paddingValues ->
+            // The inset belongs to the content, so the scrollbar runs along the dialog's edge instead of
+            // across the right-hand border of every field (issue #66).
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp),
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(start = 20.dp, end = 24.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -251,7 +255,7 @@ fun EditPlaylistScreen(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                             trailingIcon = {
-                                TextButton(onClick = { showDatePicker = true }) {
+                                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDatePicker = true }) {
                                     Text(str("btn_pick"))
                                 }
                             }
@@ -326,7 +330,7 @@ fun EditPlaylistScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         trailingIcon = {
                             if (tagInput.isNotBlank()) {
-                                IconButton(onClick = { 
+                                IconButton(shapes = IconButtonDefaults.shapes(), onClick = { 
                                     if (!tags.contains(tagInput.trim())) {
                                         tags = tags + tagInput.trim()
                                     }
@@ -403,7 +407,7 @@ fun EditPlaylistScreen(
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
                         val calendar = java.util.Calendar.getInstance()
                         calendar.timeInMillis = millis
@@ -416,7 +420,7 @@ fun EditPlaylistScreen(
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text(str("btn_cancel")) }
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDatePicker = false }) { Text(str("btn_cancel")) }
             }
         ) {
             DatePicker(state = datePickerState)
@@ -444,4 +448,18 @@ fun parseTags(tagList: String): List<String> {
         tags.add(currentTag.toString())
     }
     return tags
+}
+
+private val PERMALINK_TRANSLITERATION = mapOf(
+    'а' to "a", 'б' to "b", 'в' to "v", 'г' to "g", 'д' to "d", 'е' to "e", 'ё' to "e", 'ж' to "zh", 'з' to "z",
+    'и' to "i", 'й' to "y", 'к' to "k", 'л' to "l", 'м' to "m", 'н' to "n", 'о' to "o", 'п' to "p", 'р' to "r",
+    'с' to "s", 'т' to "t", 'у' to "u", 'ф' to "f", 'х' to "h", 'ц' to "ts", 'ч' to "ch", 'ш' to "sh", 'щ' to "sch",
+    'ъ' to "", 'ы' to "y", 'ь' to "", 'э' to "e", 'ю' to "yu", 'я' to "ya",
+)
+
+/** A SoundCloud-valid link name from [title]: lowercase Latin letters, digits and hyphens. */
+internal fun permalinkFrom(title: String): String {
+    val latin = buildString { for (char in title.lowercase()) append(PERMALINK_TRANSLITERATION[char] ?: char.toString()) }
+    val normalized = java.text.Normalizer.normalize(latin, java.text.Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+    return normalized.replace(Regex("[^a-z0-9]+"), "-").trim('-').take(80).ifEmpty { "playlist" }
 }

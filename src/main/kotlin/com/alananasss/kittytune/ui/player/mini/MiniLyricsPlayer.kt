@@ -111,6 +111,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import coil3.compose.AsyncImage
@@ -187,7 +188,8 @@ internal class WindowDragHandler(
         window.addMouseListener(dragMouseListener)
         window.addWindowFocusListener(focusListener)
 
-        val nativeStarted = com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
+        // Windows moves it by hand: the system's own move loop swallowed the release and the pointer events with it.
+        val nativeStarted = !isWindows && com.alananasss.kittytune.core.LinuxWindowHelper.startNativeMove(window, xRoot, yRoot)
         isNativeMoveActive = nativeStarted
         if (!loggedDragPath) {
             loggedDragPath = true
@@ -242,6 +244,8 @@ internal class WindowDragHandler(
 }
 
 private var loggedDragPath = false
+
+private val isWindows = System.getProperty("os.name").lowercase().contains("win")
 
 /** At most one manual placement per frame: faster only churns the compositor. */
 private const val MANUAL_MOVE_MIN_INTERVAL_NS = 16_000_000L
@@ -367,6 +371,8 @@ fun MiniLyricsPlayerWindow(
                     }
                 }
             }
+            // Restyled while still hidden: nothing to hide and re-show later, which is what froze the window.
+            if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
             window.addComponentListener(shownListener)
             windowReady = true
             onDispose { window.removeComponentListener(shownListener) }
@@ -487,7 +493,10 @@ fun MiniLyricsPlayerWindow(
                 onDragEnd = {
                     isDragging = false
                     runCatching {
-                        windowState.position = WindowPosition((window.x / density.density).dp, (window.y / density.density).dp)
+                        // The window's own coordinates are the units a Window position is in. Dividing by this
+                        // composition's density put the window somewhere else on a monitor with another scale,
+                        // which read as a mini player that cannot be moved to the second screen (issue #66).
+                        windowState.position = WindowPosition(window.x.dp, window.y.dp)
                     }
                     saveCurrentBounds()
                     com.alananasss.kittytune.core.Prefs.flush()
@@ -540,7 +549,9 @@ fun MiniLyricsPlayerWindow(
 
                 val surfaceAlpha by animateFloatAsState(
                     targetValue = when {
-                        transparentBg && (!hoverIllumination || !isEffectivelyHovered) -> 0.0f
+                        // Never fully clear: a pixel with no opacity at all is click-through on Windows, so the transparent look
+                    // could not be grabbed anywhere but on its words.
+                    transparentBg && (!hoverIllumination || !isEffectivelyHovered) -> 0.02f
                         transparentBg -> 0.35f
                         !hoverIllumination -> if (hoverEffect) 0.82f else 0.96f
                         !hoverEffect || isEffectivelyHovered -> 0.96f
@@ -549,11 +560,7 @@ fun MiniLyricsPlayerWindow(
                     animationSpec = tween(200)
                 )
 
-                val surfaceColor = if (transparentBg && surfaceAlpha == 0.0f) {
-                    Color.Transparent
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = surfaceAlpha)
-                }
+                val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = surfaceAlpha)
 
                 val surfaceBorder = when {
                     transparentBg && (!isEffectivelyHovered || !hoverIllumination) -> null
@@ -582,38 +589,7 @@ fun MiniLyricsPlayerWindow(
                         modifier = Modifier
                             .fillMaxSize()
                             .hoverable(windowInteractionSource)
-                            .pointerInput(Unit) {
-                                awaitEachGesture {
-                                    val down = awaitFirstDown(requireUnconsumed = true)
-                                    if (down.type == PointerType.Mouse && currentEvent.buttons.isPrimaryPressed) {
-                                        // A plain click must never touch the window manager: posting a
-                                        // native move (or grabbing listeners) on every press made clicks
-                                        // jitter the window and risked wedging the EDT in a move loop.
-                                        // Only once the pointer travelled past the slop is this a drag.
-                                        val slop = awaitTouchSlopOrCancellation(down.id) { change, _ ->
-                                            change.consume()
-                                            val cur = java.awt.MouseInfo.getPointerInfo()?.location
-                                            val awt = currentEvent.nativeEvent as? java.awt.event.MouseEvent
-                                            val xRoot = cur?.x ?: awt?.xOnScreen ?: (window.x + change.position.x.toInt())
-                                            val yRoot = cur?.y ?: awt?.yOnScreen ?: (window.y + change.position.y.toInt())
-                                            dragHandler.startDrag(xRoot, yRoot)
-                                        }
-                                        if (slop == null) return@awaitEachGesture
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            if (event.changes.all { !it.pressed }) {
-                                                dragHandler.stopDrag()
-                                                break
-                                            }
-                                            val curMouse = java.awt.MouseInfo.getPointerInfo()?.location
-                                            val curAwt = event.nativeEvent as? java.awt.event.MouseEvent
-                                            val curX = curMouse?.x ?: curAwt?.xOnScreen ?: (window.x + (event.changes.firstOrNull()?.position?.x?.toInt() ?: 0))
-                                            val curY = curMouse?.y ?: curAwt?.yOnScreen ?: (window.y + (event.changes.firstOrNull()?.position?.y?.toInt() ?: 0))
-                                            dragHandler.onPointerMove(curX, curY)
-                                        }
-                                    }
-                                }
-                            }
+                            .dragsWindow(window, dragHandler)
                     ) {
                         // Context menu state: opened by right-click anywhere on the mini player
                         var contextMenuVisible by remember { mutableStateOf(false) }
@@ -712,7 +688,7 @@ fun MiniLyricsPlayerWindow(
                                 }
                             }
                             if (settingsVisible) {
-                                MiniPlayerSettingsWindow(onClose = { settingsVisible = false })
+                                MiniPlayerSettingsWindow(onClose = { settingsVisible = false }, nearWindow = window)
                             }
 
                             // Right edge resize handle
@@ -1048,7 +1024,7 @@ private fun MiniLyricsContent(
 
         // Progress bar along the bottom edge
         if (showProgress && viewModel.duration > 0) {
-            val progress = (adjustedPosition / viewModel.duration).coerceIn(0f, 1f)
+            val progress = viewModel.progressOf(adjustedPosition)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -1287,7 +1263,7 @@ private fun MiniLyricsElongatedContent(
 
         // Hairline progress bar along the bottom edge
         if (showProgress && viewModel.duration > 0) {
-            val progress = (adjustedPosition / viewModel.duration).coerceIn(0f, 1f)
+            val progress = viewModel.progressOf(adjustedPosition)
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -1531,4 +1507,41 @@ private fun sungPath(
         }
     }
     return path
+}
+
+/**
+ * Moves [window] when the pointer is pressed on this and dragged, wherever the press lands: on the words, a button or
+ * an empty pixel alike.
+ *
+ * The press is watched on the way down, before the buttons and the text see it, and only once the pointer has gone
+ * past a few pixels is it taken as a drag and claimed, so a plain click still reaches what was clicked. The pointer is
+ * read in screen coordinates: the window moves under it, so a position relative to the window would chase itself.
+ * The strips along the right and bottom edge and the corner belong to the resize handles and are left to them.
+ */
+internal fun Modifier.dragsWindow(window: java.awt.Window, handler: WindowDragHandler): Modifier = pointerInput(window, handler) {
+    val slopPx = viewConfiguration.touchSlop
+    val edgePx = 10.dp.toPx()
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        val onResizeEdge = down.position.x > size.width - edgePx || down.position.y > size.height - edgePx
+        if (down.type != PointerType.Mouse || !currentEvent.buttons.isPrimaryPressed || onResizeEdge) return@awaitEachGesture
+        val start = java.awt.MouseInfo.getPointerInfo()?.location ?: return@awaitEachGesture
+        var dragging = false
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) {
+                if (dragging) handler.stopDrag()
+                break
+            }
+            val now = java.awt.MouseInfo.getPointerInfo()?.location ?: continue
+            if (!dragging) {
+                if (kotlin.math.hypot((now.x - start.x).toFloat(), (now.y - start.y).toFloat()) < slopPx) continue
+                dragging = true
+                handler.startDrag(start.x, start.y)
+            }
+            change.consume()
+            handler.onPointerMove(now.x, now.y)
+        }
+    }
 }

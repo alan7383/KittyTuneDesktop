@@ -37,7 +37,7 @@ class HomeScreenCardsSettingsTest {
 
     @Test
     fun `home content conditionally renders your mix and listening stats cards`() {
-        val homeContentSource = File("src/main/kotlin/com/alananasss/kittytune/ui/main/HomeContent.kt").readText()
+        val homeContentSource = File("src/main/kotlin/com/alananasss/kittytune/ui/main/HomeFeed.kt").readText()
 
         assertTrue(
             homeContentSource.contains("prefs.showHomeYourMixFlow()"),

@@ -27,6 +27,8 @@ internal object MenuTiles {
         Tile("repeat", "menu_repeat"),
         Tile("play_next", "menu_play_next"),
         Tile("add_queue", "menu_add_queue"),
+        Tile("together_next", "together_play_next"),
+        Tile("together_suggest", "together_suggest"),
         Tile("comments", "menu_comments"),
         Tile("repost", "menu_repost"),
         Tile("details", "menu_details"),

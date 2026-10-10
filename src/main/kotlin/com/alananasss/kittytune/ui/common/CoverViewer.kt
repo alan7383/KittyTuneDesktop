@@ -42,6 +42,7 @@ import java.awt.image.BufferedImage
 import java.io.File
 import java.net.URI
 import javax.imageio.ImageIO
+import androidx.compose.material3.IconButtonDefaults
 
 object CoverViewerState {
     var visible by mutableStateOf(false)
@@ -300,7 +301,7 @@ fun CoverViewerOverlay() {
             }
 
             // Bouton fermer toujours accessible en haut à droite
-            IconButton(
+            IconButton(shapes = IconButtonDefaults.shapes(),
                 onClick = { CoverViewerState.hide() },
                 modifier = Modifier.align(Alignment.TopEnd).padding(24.dp).size(48.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)
             ) {

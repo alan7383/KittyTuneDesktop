@@ -14,15 +14,20 @@ import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.window.PopupPositionProvider
+import kotlinx.coroutines.launch
 
 
 /**
@@ -47,9 +52,18 @@ val LocalSuppressTooltips = compositionLocalOf { false }
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Tip(text: String, enabled: Boolean = true, content: @Composable () -> Unit) {
+fun Tip(
+    text: String,
+    enabled: Boolean = true,
+    instant: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     if (!enabled || text.isBlank() || LocalSuppressTooltips.current) {
         content()
+        return
+    }
+    if (instant) {
+        InstantTip(text, content)
         return
     }
     TooltipBox(
@@ -57,6 +71,30 @@ fun Tip(text: String, enabled: Boolean = true, content: @Composable () -> Unit) 
         tooltip = { PlainTooltip { Text(text) } },
         state = rememberTooltipState(),
         enableUserInput = enabled,
+        content = content,
+    )
+}
+
+/**
+ * A [Tip] that shows the moment the pointer is over its anchor and goes when it leaves.
+ *
+ * Material's own hover handling waits about half a second, which is right for buttons that carry a
+ * label anyway, and too slow for a row of bare icons whose tooltip is the only name they have.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+@Composable
+private fun InstantTip(text: String, content: @Composable () -> Unit) {
+    val state = rememberTooltipState(isPersistent = true)
+    val scope = rememberCoroutineScope()
+    TooltipBox(
+        positionProvider = rememberEdgeSafeTooltipPositionProvider(),
+        tooltip = { PlainTooltip { Text(text) } },
+        state = state,
+        enableUserInput = false,
+        modifier = Modifier
+            .onPointerEvent(PointerEventType.Enter) { scope.launch { state.show() } }
+            .onPointerEvent(PointerEventType.Exit) { state.dismiss() }
+            .onPointerEvent(PointerEventType.Press) { state.dismiss() },
         content = content,
     )
 }
