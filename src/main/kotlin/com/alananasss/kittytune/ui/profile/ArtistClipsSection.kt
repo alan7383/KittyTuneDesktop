@@ -25,6 +25,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Fullscreen
+import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
@@ -53,6 +55,17 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -161,15 +174,39 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
         if (url == null) hasNoStream = true else playback.play(url)
     }
 
-    BackHandler(onBack = onDismiss)
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    var fullscreen by remember { mutableStateOf(false) }
+    // The dialog's own window is stretched over the screen and given its old size back afterwards; Escape and the
+    // back button leave full screen first and close the clip only from the window.
+    val windowBefore = remember { arrayOfNulls<java.awt.Rectangle>(1) }
+    LaunchedEffect(fullscreen) {
+        val window = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow ?: return@LaunchedEffect
+        if (fullscreen) {
+            windowBefore[0] = window.bounds
+            window.bounds = window.graphicsConfiguration.bounds
+        } else {
+            windowBefore[0]?.let { window.bounds = it }
+            windowBefore[0] = null
+        }
+    }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+
+    BackHandler(onBack = { if (fullscreen) fullscreen = false else onDismiss() })
+    Dialog(onDismissRequest = { if (fullscreen) fullscreen = false else onDismiss() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.widthIn(max = 960.dp).fillMaxWidth(0.86f),
+            shape = if (fullscreen) RectangleShape else RoundedCornerShape(28.dp),
+            color = if (fullscreen) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = (if (fullscreen) Modifier.fillMaxSize() else Modifier.widthIn(max = 960.dp).fillMaxWidth(0.86f))
+                .focusRequester(focus)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                        if (fullscreen) fullscreen = false else onDismiss()
+                        true
+                    } else false
+                },
         ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.padding(if (fullscreen) 0.dp else 16.dp), verticalArrangement = Arrangement.spacedBy(if (fullscreen) 0.dp else 12.dp)) {
+                if (!fullscreen) Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(clip.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(clip.uploader, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
@@ -179,12 +216,14 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
                     }
                 }
                 Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .clip(RoundedCornerShape(18.dp))
+                    (if (fullscreen) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(18.dp)))
                         .background(Color.Black)
-                        .clickable(enabled = !playback.isLoading) { playback.togglePause() },
+                        .pointerInput(playback.isLoading) {
+                            detectTapGestures(
+                                onDoubleTap = { fullscreen = !fullscreen },
+                                onTap = { if (!playback.isLoading) playback.togglePause() },
+                            )
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     val frame = playback.frame
@@ -198,7 +237,9 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
                         playback.isLoading -> ContainedLoadingIndicator(Modifier.size(56.dp))
                     }
                 }
-                ClipControls(playback)
+                Box(if (fullscreen) Modifier.padding(16.dp) else Modifier) {
+                    ClipControls(playback, fullscreen, onToggleFullscreen = { fullscreen = !fullscreen })
+                }
             }
         }
     }
@@ -206,7 +247,7 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ClipControls(playback: ClipPlayback) {
+private fun ClipControls(playback: ClipPlayback, fullscreen: Boolean, onToggleFullscreen: () -> Unit) {
     var dragged by remember { mutableStateOf<Float?>(null) }
     val duration = playback.durationMs.coerceAtLeast(1L)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -229,7 +270,10 @@ private fun ClipControls(playback: ClipPlayback) {
                 dragged = null
             },
             enabled = playback.durationMs > 0,
-            modifier = Modifier.weight(1f),
+            // The wheel over the bar moves the clip, five seconds a notch.
+            modifier = Modifier.weight(1f).wheelSteps { notches ->
+                if (playback.durationMs > 0) playback.seekTo((playback.positionMs - (notches * CLIP_WHEEL_SEEK_MS).toLong()).coerceIn(0L, playback.durationMs))
+            },
         )
         Text(formatClock(playback.durationMs), style = MaterialTheme.typography.labelMedium)
         Icon(
@@ -240,8 +284,28 @@ private fun ClipControls(playback: ClipPlayback) {
         Slider(
             value = playback.volume,
             onValueChange = { playback.volume = it },
-            modifier = Modifier.width(110.dp),
+            // And over the volume, five per cent a notch.
+            modifier = Modifier.width(110.dp).wheelSteps { notches -> playback.volume = (playback.volume - notches * 0.05f).coerceIn(0f, 1f) },
         )
+        IconButton(onClick = onToggleFullscreen, shapes = IconButtonDefaults.shapes()) {
+            Icon(if (fullscreen) Icons.Rounded.FullscreenExit else Icons.Rounded.Fullscreen, contentDescription = null)
+        }
+    }
+}
+
+private const val CLIP_WHEEL_SEEK_MS = 5_000f
+
+/** Calls [onNotches] with the wheel's delta over this element, positive down, and keeps the page from scrolling under it. */
+private fun Modifier.wheelSteps(onNotches: (Float) -> Unit): Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            if (event.type != PointerEventType.Scroll) continue
+            val delta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
+            if (delta == 0f) continue
+            onNotches(delta)
+            event.changes.forEach { it.consume() }
+        }
     }
 }
 

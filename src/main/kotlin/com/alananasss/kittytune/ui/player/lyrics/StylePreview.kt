@@ -68,7 +68,10 @@ internal fun <T> SketchChoices(
     }
 }
 
-/** A card with a picture on top and a name under it; the chosen one is tinted and outlined. */
+/**
+ * A card with a picture on top and a name under it, drawn as the player-design settings draw theirs: a faint raised
+ * surface with a hairline, and for the chosen one a tinted surface, a 2 dp accent border and the name in the accent colour.
+ */
 @Composable
 internal fun PreviewCard(
     title: String,
@@ -78,25 +81,27 @@ internal fun PreviewCard(
     picture: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val container by animateColorAsState(if (isSelected) scheme.secondaryContainer else scheme.surfaceContainerHigh, label = "previewCard")
-    val outline by animateColorAsState(if (isSelected) scheme.primary else Color.Transparent, label = "previewCardOutline")
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = container,
-        border = BorderStroke(2.dp, outline),
+        color = if (isSelected) scheme.primaryContainer.copy(alpha = 0.45f) else scheme.surfaceContainerHighest.copy(alpha = 0.5f),
+        border = BorderStroke(
+            if (isSelected) 2.dp else 1.dp,
+            if (isSelected) scheme.primary else scheme.outlineVariant.copy(alpha = 0.35f),
+        ),
         modifier = modifier,
     ) {
-        Column(Modifier.padding(10.dp)) {
+        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.fillMaxWidth().height(PREVIEW_PICTURE_HEIGHT).clip(RoundedCornerShape(10.dp))) { picture() }
             Text(
                 text = title,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = if (isSelected) scheme.onSecondaryContainer else scheme.onSurface,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) scheme.primary else scheme.onSurface,
+                textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp, start = 2.dp),
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
     }

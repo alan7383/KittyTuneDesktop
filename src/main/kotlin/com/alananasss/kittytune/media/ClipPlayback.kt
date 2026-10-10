@@ -27,7 +27,6 @@ import java.nio.ShortBuffer
 import java.util.concurrent.atomic.AtomicLong
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.SourceDataLine
-import kotlin.math.min
 
 /**
  * Plays one video file with its sound: a music video on an artist's page (tester's list, 5.5).
@@ -150,9 +149,15 @@ class ClipPlayback(
                     line.write(bytes, 0, count * 2)
                 }
                 if (next.image != null) {
-                    val aheadUs = next.timestamp - clock.nowUs()
+                    var aheadUs = next.timestamp - clock.nowUs()
                     if (aheadUs < -LATE_FRAME_US) continue
-                    if (aheadUs > 0) delay(min(aheadUs / 1000, MAX_FRAME_WAIT_MS))
+                    // Until the picture is due, however long that is: the sound line holds a second, so pictures arrive well
+                    // ahead of their time, and showing each after a capped wait put them on screen early and then, once the
+                    // sound caught up, dropped the next as late. That alternation was the clip freezing back and forth.
+                    while (aheadUs > 0 && isActive && !isPaused && pendingSeekMs.get() == NO_SEEK) {
+                        delay((aheadUs / 1000).coerceIn(1L, FRAME_WAIT_STEP_MS))
+                        aheadUs = next.timestamp - clock.nowUs()
+                    }
                     toBitmap(next)?.let { frame = it }
                     positionMs = next.timestamp / 1000
                 }
@@ -207,7 +212,7 @@ class ClipPlayback(
         /** A picture this far behind the sound is skipped rather than shown late. */
         const val LATE_FRAME_US = 120_000L
 
-        /** Longest a picture waits for the sound; the line's buffer keeps playing meanwhile. */
-        const val MAX_FRAME_WAIT_MS = 100L
+        /** How often a picture that is not due yet looks at the clock again. */
+        const val FRAME_WAIT_STEP_MS = 12L
     }
 }
