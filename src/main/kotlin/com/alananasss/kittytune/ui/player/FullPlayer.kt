@@ -1568,6 +1568,8 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
             sliderStyle = sliderStyle,
             isPlaying = viewModel.isPlaying,
             valueRange = 0f..duration.toFloat(),
+            mix = mix,
+            mixColor = palette.bright,
             colors = androidx.compose.material3.SliderDefaults.colors(
                 thumbColor = palette.bright,
                 activeTrackColor = palette.bright,
@@ -1575,7 +1577,6 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .mixGlow(mix, palette.bright) { shownFraction }
                 .seekWheel(wheel)
         )
 

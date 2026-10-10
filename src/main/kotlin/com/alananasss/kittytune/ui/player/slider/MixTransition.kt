@@ -21,7 +21,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -48,6 +48,9 @@ private const val LANDED_NEAR_START = 0.15f
 
 /** How long the slide back from the end takes. */
 private const val JUMP_BACK_NANOS = 750_000_000L
+
+/** How closely the bar follows the crossfade's published progress: the time constant of the follow, in seconds. */
+private const val PROGRESS_FOLLOW_SECONDS = 0.07f
 
 /** How often an idle bar checks whether a glide has begun; no frames are asked for in between. */
 private const val IDLE_CHECK_MS = 64L
@@ -101,6 +104,9 @@ class MixTransition internal constructor(
         lastShown = fraction
         catchUpFrom = null
     }
+
+    /** Whether anything about a mix is on screen: the countdown, the fade, or the glide home. Frames are asked for while it is. */
+    val isActive: Boolean get() = isGliding || progress.value > 0f || countdown.value > 0f
 
     /** Whether the bar is gliding home after a track change, as opposed to counting down to one. */
     val isMixing: Boolean get() = glideFrom != null || progress.value > 0f
@@ -180,7 +186,10 @@ class MixTransition internal constructor(
             return rise * (1f - fade).pow(0.6f)
         }
         if (glideFrom != null) return 0.8f
-        return countdown.value * (0.7f + 0.3f * beatPulse.value)
+        // Breathes with the beat, as a smooth swell: the beat clock is a ramp that starts over on every beat, and drawn as it
+        // is it made the glow jump brighter once a beat.
+        val swell = 0.5f + 0.5f * kotlin.math.cos((1f - beatPulse.value) * 2f * Math.PI.toFloat())
+        return FastOutSlowInEasing.transform(countdown.value) * (0.88f + 0.12f * swell)
     }
 
     private companion object {
@@ -190,7 +199,10 @@ class MixTransition internal constructor(
 
 @Composable
 fun rememberMixTransition(): MixTransition {
-    val progress = AutomixManager.mixProgress.collectAsState()
+    val published = AutomixManager.mixProgress.collectAsState()
+    // What the bar uses is the published progress followed frame by frame: the crossfade publishes in steps, and a bar drawn
+    // straight from them moved in the same steps, which read as stuttering ("— - - — -") on a glide that should be one slide.
+    val progress = remember { androidx.compose.runtime.mutableStateOf(0f) }
     val automixing = AutomixManager.isAutomixing.collectAsState()
     val beatsLeft by AutomixManager.mixBeatsLeft.collectAsState()
     val debug by AutomixManager.automixDebugInfo.collectAsState()
@@ -226,9 +238,24 @@ fun rememberMixTransition(): MixTransition {
     // but neither keeps time while the bar catches up after a mix: those steps
     // were drawn as jumps. Frames are asked for only while such a glide runs.
     LaunchedEffect(mix) {
+        var last = 0L
         while (isActive) {
-            if (mix.isGliding) withFrameNanos { mix.frameTick.longValue = it }
-            else delay(IDLE_CHECK_MS)
+            val target = published.value
+            if (mix.isActive || target > 0f) {
+                withFrameNanos { now ->
+                    val dt = if (last == 0L) 0f else ((now - last) / 1_000_000_000f).coerceAtMost(0.1f)
+                    last = now
+                    val current = progress.value
+                    progress.value = when {
+                        target <= 0f -> 0f
+                        else -> current + (target - current) * (1f - kotlin.math.exp(-dt / PROGRESS_FOLLOW_SECONDS))
+                    }
+                    mix.frameTick.longValue = now
+                }
+            } else {
+                last = 0L
+                delay(IDLE_CHECK_MS)
+            }
         }
     }
     return mix
@@ -246,37 +273,33 @@ fun rememberMixTransition(): MixTransition {
 fun Modifier.mixGlow(mix: MixTransition, color: Color, shownFraction: () -> Float): Modifier = drawBehind {
     val intensity = mix.glowIntensity()
     if (intensity <= 0.01f) return@drawBehind
-    val y = size.height / 2f
-    val headX = shownFraction().coerceIn(0f, 1f) * size.width
-    val reach = if (mix.isMixing) 1f else FastOutSlowInEasing.transform(mix.countdownFraction)
-    // Starts clear of the thumb: from the playhead itself, the widest stroke's round end showed around and
-    // behind the dot (issue #66).
-    val startX = headX + GLOW_THUMB_CLEARANCE.dp.toPx()
-    val endX = startX + (size.width - startX) * reach
-    if (endX - startX < 1f) return@drawBehind
-
-    // Three strokes of falling strength and growing width read as one soft band, without a blur pass.
-    clipRect(left = startX) {
-        for ((width, alpha) in GLOW_LAYERS) {
-            drawLine(
-                brush = Brush.horizontalGradient(
-                    0f to color.copy(alpha = alpha * intensity),
-                    0.6f to color.copy(alpha = alpha * intensity * 0.45f),
-                    1f to Color.Transparent,
-                    startX = startX,
-                    endX = endX,
-                ),
-                start = Offset(startX, y),
-                end = Offset(endX, y),
-                strokeWidth = width.dp.toPx(),
-                cap = StrokeCap.Butt,
-            )
-        }
-    }
+    drawMixGlowBand(startX = shownFraction().coerceIn(0f, 1f) * size.width, endX = size.width, centerY = size.height / 2f, color = color, intensity = intensity)
 }
 
-/** Room left for the thumb between the playhead and where the glow begins. */
-private const val GLOW_THUMB_CLEARANCE = 10f
+/**
+ * The glow itself: a soft band from the middle of the thumb to the end of the bar, brightest at the thumb. The seek bars that
+ * draw their own thumb call this with its real position, so the glow starts where the thumb is drawn and not where the value
+ * says it should be.
+ */
+internal fun DrawScope.drawMixGlowBand(startX: Float, endX: Float, centerY: Float, color: Color, intensity: Float) {
+    if (endX - startX < 1f) return
+    // Three strokes of falling strength and growing width read as one soft band, without a blur pass.
+    for ((width, alpha) in GLOW_LAYERS) {
+        drawLine(
+            brush = Brush.horizontalGradient(
+                0f to color.copy(alpha = alpha * intensity),
+                0.6f to color.copy(alpha = alpha * intensity * 0.45f),
+                1f to Color.Transparent,
+                startX = startX,
+                endX = endX,
+            ),
+            start = Offset(startX, centerY),
+            end = Offset(endX, centerY),
+            strokeWidth = width.dp.toPx(),
+            cap = StrokeCap.Butt,
+        )
+    }
+}
 
 /** Width in dp and peak alpha of each stroke of the glow, widest and faintest first. */
 private val GLOW_LAYERS = listOf(18f to 0.10f, 10f to 0.18f, 4f to 0.42f)

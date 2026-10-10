@@ -623,10 +623,11 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
             sliderStyle = sliderStyle,
             isPlaying = vm.isPlaying,
             valueRange = 0f..duration.toFloat(),
+            mix = mix,
+            mixColor = glowColor,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 8.dp)
-                .mixGlow(mix, glowColor) { shownFraction }
                 .seekWheel(wheel),
         )
         // Click to switch between the track's length and the time left, which counts down with a minus, as in
