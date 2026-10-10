@@ -23,6 +23,7 @@ kotlin-js-store/
 *.txt
 context_dump.txt
 *.msi
+*.dll
 TestColor.kt
 first_token_manager.json
 scratch/
