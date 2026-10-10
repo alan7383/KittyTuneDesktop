@@ -79,7 +79,10 @@ fun WavySliderExpressive(
     waveAmplitudeWhenPlaying: Dp = 4.dp,
     thumbLineHeightWhenInteracting: Dp = 24.dp,
     semanticsLabel: String? = null,
-    semanticsProgressStep: Float = 0.01f
+    semanticsProgressStep: Float = 0.01f,
+    /** A mix being shown: the thumb is drawn exactly at the value, per frame, and the glow starts at the thumb. */
+    mix: MixTransition? = null,
+    mixColor: Color = activeTrackColor,
 ) {
     val density = LocalDensity.current
     // Nobody can see the window: stop the wave and the per-frame smoothing, which would otherwise keep
@@ -172,8 +175,17 @@ fun WavySliderExpressive(
             }
         }
     }
-    LaunchedEffect(isGliding, wavelengthPx, waveSpeedPx) {
-        if (!isGliding) return@LaunchedEffect
+    // While a mix is shown the value is already a smooth slide of its own: smoothing it again here lagged the thumb behind the
+    // glow, and ticking at 30 fps made the slide step.
+    val exact = mix?.isActive == true
+    LaunchedEffect(exact, isSeen, wavelengthPx, waveSpeedPx) {
+        if (!exact || !isSeen) return@LaunchedEffect
+        while (isActive) {
+            androidx.compose.runtime.withFrameNanos { wavePhasePx.floatValue = wavePhasePx(waveSpeedPx, wavelengthPx) }
+        }
+    }
+    LaunchedEffect(isGliding, exact, wavelengthPx, waveSpeedPx) {
+        if (!isGliding || exact) return@LaunchedEffect
         var last = System.nanoTime()
         while (isActive) {
             delay(WAVE_TICK_MS)
@@ -227,7 +239,7 @@ fun WavySliderExpressive(
             val trackEnd = size.width - edgePaddingPx
             val trackWidth = (trackEnd - trackStart).coerceAtLeast(0f)
             val thumbY = size.height / 2
-            val renderedProgress = renderedNormalizedProgress.floatValue
+            val renderedProgress = if (exact) normalizedValueState.value else renderedNormalizedProgress.floatValue
 
             fun lerp(start: Float, stop: Float, fraction: Float): Float {
                 return start + (stop - start) * fraction
@@ -245,6 +257,10 @@ fun WavySliderExpressive(
             val halfGap = with(density) { dynamicGapSize.value.toPx() } *
                 (1.0f + 0.1573f * animatedAmplitude * animatedAmplitude)
             val amplitudePx = with(density) { waveAmplitudeWhenPlaying.toPx() } * animatedAmplitude
+            mix?.let { transition ->
+                val glow = transition.glowIntensity()
+                if (glow > 0.01f) drawMixGlowBand(startX = thumbX, endX = trackEnd, centerY = thumbY, color = mixColor, intensity = glow)
+            }
             val activeEnd = (thumbX - halfGap).coerceAtLeast(trackStart)
             val inactiveStart = (thumbX + halfGap).coerceAtMost(trackEnd)
             if (activeEnd > trackStart) {

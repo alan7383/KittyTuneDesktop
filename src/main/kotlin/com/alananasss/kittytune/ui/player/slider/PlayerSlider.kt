@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.data.local.PlayerSliderStyle
 import com.alananasss.kittytune.ui.common.Slider
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,12 +34,20 @@ fun PlayerSlider(
     colors: SliderColors = SliderDefaults.colors(),
     enabled: Boolean = true,
     bufferedValue: Float? = null,
+    /** A mix to show on the bar, with the colour of its glow; the wavy bar draws it from its own thumb, the others behind themselves. */
+    mix: MixTransition? = null,
+    mixColor: Color = colors.activeTrackColor,
 ) {
     val clampedValue = if (valueRange.endInclusive > valueRange.start) {
         value.coerceIn(valueRange.start, valueRange.endInclusive)
     } else {
         0f
     }
+
+    val span = valueRange.endInclusive - valueRange.start
+    val behindGlow = if (mix != null && sliderStyle != PlayerSliderStyle.WAVY) {
+        modifier.mixGlow(mix, mixColor) { if (span > 0f) (clampedValue - valueRange.start) / span else 0f }
+    } else modifier
 
     when (sliderStyle) {
         PlayerSliderStyle.BAR -> {
@@ -49,7 +58,7 @@ fun PlayerSlider(
                 valueRange = valueRange,
                 colors = colors,
                 enabled = enabled,
-                modifier = modifier
+                modifier = behindGlow
             )
         }
         PlayerSliderStyle.WAVY -> {
@@ -62,6 +71,8 @@ fun PlayerSlider(
                 isPlaying = isPlaying,
                 enabled = enabled,
                 bufferedValue = bufferedValue,
+                mix = mix,
+                mixColor = mixColor,
                 modifier = modifier
             )
         }
@@ -97,7 +108,7 @@ fun PlayerSlider(
                 },
                 colors = colors,
                 enabled = enabled,
-                modifier = modifier
+                modifier = behindGlow
             )
         }
         PlayerSliderStyle.SQUIGGLY -> {
@@ -110,7 +121,7 @@ fun PlayerSlider(
                 isPlaying = isPlaying,
                 enabled = enabled,
                 bufferedValue = bufferedValue,
-                modifier = modifier
+                modifier = behindGlow
             )
         }
     }
