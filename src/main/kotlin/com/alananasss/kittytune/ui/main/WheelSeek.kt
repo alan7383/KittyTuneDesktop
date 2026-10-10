@@ -94,7 +94,7 @@ internal class WheelSeek(
         const val SETTLE_MS = 180L
 
         /** The playhead is this close to the target: handed back. */
-        const val CAUGHT_UP_MS = 350L
+        const val CAUGHT_UP_MS = 90L
         const val CATCH_UP_LIMIT_NANOS = 1_500_000_000L
         const val CATCH_UP_POLL_MS = 40L
 
