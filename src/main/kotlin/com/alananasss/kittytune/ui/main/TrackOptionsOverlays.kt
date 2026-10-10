@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.alananasss.kittytune.ui.main
 
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +43,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.automirrored.rounded.Comment
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
@@ -59,6 +66,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Groups
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MicOff
 import androidx.compose.material.icons.rounded.Radio
@@ -158,14 +166,8 @@ private val SpotifyAccentGreen = androidx.compose.ui.graphics.Color(0xFF1DB954)
 fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
     if (viewModel.showMenuSheet) {
         BackHandler(onBack = { viewModel.showMenuSheet = false })
-        Dialog(onDismissRequest = { viewModel.showMenuSheet = false }) {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                modifier = Modifier.width(420.dp),
-            ) {
-                MenuSheetContent(viewModel)
-            }
+        TrackMenuAtPointer(onDismiss = { viewModel.showMenuSheet = false }) {
+            MenuSheetContent(viewModel)
         }
     }
     if (viewModel.showCommentsSheet) {
@@ -209,6 +211,51 @@ fun TrackOptionsOverlays(viewModel: PlayerViewModel) {
     }
     SleepTimerDialog(viewModel)
     TrackTrimDialog(viewModel)
+}
+
+/**
+ * The track's menu where it was asked for: at the pointer, as a context menu, instead of a dialog in the middle of
+ * the window, a long way from the row that was right-clicked (issue #66). It grows out of the pointer and shrinks
+ * back into it, and closes on a click outside or Escape.
+ */
+@Composable
+private fun TrackMenuAtPointer(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+    val anchor = remember {
+        val press = com.alananasss.kittytune.ui.common.PointerAnchor.lastPress.value
+        androidx.compose.ui.unit.IntOffset(press.x.toInt(), press.y.toInt())
+    }
+    val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+    var closing by remember { mutableStateOf(false) }
+    val close = { if (!closing) { closing = true; shown.targetState = false } }
+    LaunchedEffect(shown.currentState, shown.isIdle) {
+        if (closing && shown.isIdle && !shown.currentState) onDismiss()
+    }
+    androidx.compose.ui.window.Popup(
+        popupPositionProvider = remember(anchor) { com.alananasss.kittytune.ui.common.AtPointPositionProvider(anchor) },
+        onDismissRequest = close,
+        properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+        onKeyEvent = { event ->
+            if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.key == androidx.compose.ui.input.key.Key.Escape) { close(); true } else false
+        },
+    ) {
+        androidx.compose.animation.AnimatedVisibility(
+            visibleState = shown,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(140)) +
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(200), initialScale = 0.9f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(110)) +
+                androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(140), targetScale = 0.94f, transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                shadowElevation = 12.dp,
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+                modifier = Modifier.padding(6.dp).width(400.dp).heightIn(max = 600.dp),
+            ) {
+                Box(Modifier.verticalScroll(rememberScrollState())) { content() }
+            }
+        }
+    }
 }
 
 /**
@@ -318,7 +365,7 @@ private fun ArtistPickerRow(
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Rounded.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Spacer(Modifier.width(12.dp))
@@ -371,11 +418,11 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             title = { Text(if (isLocalFile) str("menu_remove_local_q") else str("menu_remove_download_q")) },
             text = { Text(if (isLocalFile) str("menu_remove_local_body") else str("menu_remove_download_body")) },
             confirmButton = {
-                TextButton(onClick = { DownloadManager.deleteTrack(track.id); showDeleteDialog = false; viewModel.showMenuSheet = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { DownloadManager.deleteTrack(track.id); showDeleteDialog = false; viewModel.showMenuSheet = false }) {
                     Text(str("btn_delete"), color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = { TextButton(onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeleteDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -392,11 +439,11 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             title = { Text(str("dialog_repost_delete_title")) },
             text = { Text(str("dialog_repost_delete_msg")) },
             confirmButton = {
-                TextButton(onClick = { viewModel.deleteRepost(track.id); showDeleteRepostConfirm = false; viewModel.showMenuSheet = false },
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.deleteRepost(track.id); showDeleteRepostConfirm = false; viewModel.showMenuSheet = false },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text(str("btn_delete")) }
             },
-            dismissButton = { TextButton(onClick = { showDeleteRepostConfirm = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDeleteRepostConfirm = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -472,6 +519,19 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) { viewModel.insertNext(listOf(track)); viewModel.showMenuSheet = false })
                 add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) { viewModel.addToQueue(listOf(track)); viewModel.showMenuSheet = false })
             }
+            // In a shared playlist a song can go next for everyone, or be offered to the playlist itself.
+            val togetherCode = com.alananasss.kittytune.data.together.Together.active.collectAsState().value
+            if (togetherCode != null) {
+                val shared = com.alananasss.kittytune.data.together.SharedTrack.of(track)
+                add(MenuOptionItem("together_next", Icons.Rounded.Groups, str("together_play_next")) {
+                    com.alananasss.kittytune.data.together.Together.playNext(shared)
+                    viewModel.showMenuSheet = false
+                })
+                add(MenuOptionItem("together_suggest", Icons.Rounded.Groups, str("together_suggest")) {
+                    com.alananasss.kittytune.data.together.Together.suggest(togetherCode, shared)
+                    viewModel.showMenuSheet = false
+                })
+            }
             if (track.source != "youtube" && !isSpotify && !isLocalFile) {
                 add(MenuOptionItem("comments", Icons.AutoMirrored.Rounded.Comment, str("menu_comments")) { viewModel.openComments(track) })
                 if (isReposted) {
@@ -499,7 +559,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     viewModel.toggleTrackDuetBlacklist(track.id)
                 }
             )
-            add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
+            add(MenuOptionItem("add_playlist", Icons.Rounded.Add, str("menu_add_playlist")) { viewModel.showMenuSheet = false; viewModel.showAddToPlaylistSheet = true })
 
             // Catalog tracks carry their album id: jump straight to it.
             val albumId = track.publisherMetadata?.albumId?.takeIf { it.isNotBlank() }
@@ -511,7 +571,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
             }
             if (track.source != "youtube" && !isLocalFile) {
                 add(
-                    MenuOptionItem("go_artist", Icons.Default.Person, str("menu_go_artist")) {
+                    MenuOptionItem("go_artist", Icons.Rounded.Person, str("menu_go_artist")) {
                         if (isSpotify) {
                             viewModel.navigateToTrackArtist(track)
                             viewModel.showMenuSheet = false
@@ -522,7 +582,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 )
                 val isOwnTrack = track.user?.id != null && track.user?.id == viewModel.currentUserId && track.id > 0
                 if (isOwnTrack) {
-                    add(MenuOptionItem("edit_track", Icons.Default.Edit, str("menu_edit_track")) {
+                    add(MenuOptionItem("edit_track", Icons.Rounded.Edit, str("menu_edit_track")) {
                         viewModel.showMenuSheet = false
                         viewModel.navigateToEditTrack(track.id)
                     })
@@ -561,7 +621,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 add(
                     MenuOptionItem(
                         id = "download",
-                        icon = if (isDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                        icon = if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
                         text = when {
                             isDownloaded -> str("btn_delete")
                             isDownloading -> "${downloadProgressVal ?: 0}%"
@@ -582,7 +642,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                                     Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(18.dp))
                                 } else {
                                     Icon(
-                                        if (isDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                                        if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
                                         null,
                                         modifier = Modifier.size(30.dp),
                                         tint = tint,
@@ -626,7 +686,7 @@ private fun AddToPlaylistContent(viewModel: PlayerViewModel) {
                     singleLine = true
                 )
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = {
+                Button(shapes = ButtonDefaults.shapes(), onClick = {
                     if (newName.isNotBlank()) {
                         if (bulkTracks != null) viewModel.createAndAddTracksToPlaylist(newName, bulkTracks)
                         else if (singleTrack != null) viewModel.createAndAddToPlaylist(newName, singleTrack)
@@ -642,7 +702,7 @@ private fun AddToPlaylistContent(viewModel: PlayerViewModel) {
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Icon(Icons.Rounded.Add, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
                     Spacer(Modifier.width(8.dp))
                     Text(
                         str("add_to_playlist_new"),
@@ -714,8 +774,8 @@ private fun RepostDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
                 )
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(caption) }) { Text(str("dialog_repost_confirm")) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } }
+        confirmButton = { Button(shapes = ButtonDefaults.shapes(), onClick = { onConfirm(caption) }) { Text(str("dialog_repost_confirm")) } },
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_cancel")) } }
     )
 }
 
@@ -766,7 +826,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Spacer(Modifier.height(8.dp))
-                            TextButton(
+                            TextButton(shapes = ButtonDefaults.shapes(),
                                 onClick = {
                                     viewModel.cancelSleepTimer()
                                     viewModel.showSleepTimerDialog = false
@@ -825,7 +885,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
                 Spacer(Modifier.height(8.dp))
 
                 // End of track option
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         viewModel.startSleepTimerEndOfTrack()
                         viewModel.showSleepTimerDialog = false
@@ -834,7 +894,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
             }
         },
         confirmButton = {
-            Button(
+            Button(shapes = ButtonDefaults.shapes(),
                 onClick = {
                     viewModel.startSleepTimer(selectedMinutes * 60_000L)
                     viewModel.showSleepTimerDialog = false
@@ -842,7 +902,7 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
             ) { Text(str("btn_ok")) }
         },
         dismissButton = {
-            TextButton(onClick = { viewModel.showSleepTimerDialog = false }) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.showSleepTimerDialog = false }) {
                 Text(str("btn_cancel"))
             }
         }
@@ -945,13 +1005,13 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
             title = { Text(str("dialog_remove_download_title")) },
             text = { Text(str("dialog_remove_download_msg")) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     DownloadManager.removePlaylistDownloads(playlist.id)
                     showRemoveDownloadDialog = false
                     viewModel.showPlaylistMenuSheet = false
                 }) { Text(str("btn_delete"), color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showRemoveDownloadDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 
@@ -1028,7 +1088,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                     withTracks { viewModel.playPlaylist(it, 0); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("shuffle", Icons.Rounded.Shuffle, str("btn_shuffle")) {
-                    withTracks { viewModel.playPlaylist(it.shuffled(), 0); viewModel.showPlaylistMenuSheet = false }
+                    withTracks { viewModel.playPlaylistShuffled(it); viewModel.showPlaylistMenuSheet = false }
                 })
                 add(MenuOptionItem("play_next", Icons.AutoMirrored.Rounded.PlaylistPlay, str("menu_play_next")) {
                     withTracks { viewModel.insertNext(it); viewModel.showPlaylistMenuSheet = false }
@@ -1036,7 +1096,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("add_queue", Icons.AutoMirrored.Rounded.QueueMusic, str("menu_add_queue")) {
                     withTracks { viewModel.addToQueue(it); viewModel.showPlaylistMenuSheet = false }
                 })
-                add(MenuOptionItem("add_playlist", Icons.Default.Add, str("menu_add_playlist")) {
+                add(MenuOptionItem("add_playlist", Icons.Rounded.Add, str("menu_add_playlist")) {
                     withTracks {
                         viewModel.showPlaylistMenuSheet = false
                         viewModel.prepareBulkAdd(it)
@@ -1047,7 +1107,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 add(MenuOptionItem("details", Icons.Rounded.Info, str("menu_playlist_details")) { showDetailsSheet = true })
             }
             playlist.user?.id?.takeIf { it > 0 }?.let { ownerId ->
-                add(MenuOptionItem("go_artist", Icons.Default.Person, str("menu_go_artist")) {
+                add(MenuOptionItem("go_artist", Icons.Rounded.Person, str("menu_go_artist")) {
                     viewModel.showPlaylistMenuSheet = false
                     viewModel.navigateToPlaylistId = "profile:$ownerId"
                 })
@@ -1059,7 +1119,7 @@ private fun PlaylistMenuSheetContent(viewModel: PlayerViewModel) {
                 add(
                     MenuOptionItem(
                         id = "download",
-                        icon = if (isFullyDownloaded) Icons.Default.Delete else Icons.Rounded.Download,
+                        icon = if (isFullyDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
                         text = when {
                             isFullyDownloaded -> str("btn_delete")
                             isPlaylistDownloading -> str("btn_cancel")
@@ -1214,7 +1274,7 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                 }
             }
 
-            IconButton(onClick = { viewModel.showCommentsSheet = false }, modifier = Modifier.size(32.dp)) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.showCommentsSheet = false }, modifier = Modifier.size(32.dp)) {
                 Icon(Icons.Rounded.Close, contentDescription = str("btn_close"))
             }
         }
@@ -1238,46 +1298,14 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                 }
             }
 
-            var isSortMenuExpanded by remember { mutableStateOf(false) }
-            Box {
-                OutlinedButton(
-                    onClick = { isSortMenuExpanded = true },
-                    shapes = ButtonDefaults.shapes(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = str("sorted_by", str(viewModel.commentSort.labelResId)),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-
-                DropdownMenu(
-                    expanded = isSortMenuExpanded,
-                    onDismissRequest = { isSortMenuExpanded = false }
-                ) {
-                    CommentSort.values().forEach { sortOption ->
-                        DropdownMenuItem(
-                            text = { Text(str(sortOption.labelResId)) },
-                            onClick = {
-                                viewModel.onCommentSortChanged(sortOption)
-                                isSortMenuExpanded = false
-                            },
-                            trailingIcon = {
-                                if (sortOption == viewModel.commentSort) {
-                                    Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        )
-                    }
-                }
-            }
+            com.alananasss.kittytune.ui.common.IconChoiceButton(
+                options = CommentSort.entries,
+                selected = viewModel.commentSort,
+                onSelect = viewModel::onCommentSortChanged,
+                icon = { it.icon },
+                label = { str(it.labelResId) },
+                tooltip = { str("sorted_by", str(it.labelResId)) },
+            )
         }
 
         Spacer(Modifier.height(8.dp))
@@ -1364,7 +1392,7 @@ private fun CommentsSheetContent(viewModel: PlayerViewModel) {
                 shape = RoundedCornerShape(24.dp),
                 enabled = !isPosting
             )
-            IconButton(
+            IconButton(shapes = IconButtonDefaults.shapes(),
                 onClick = {
                     if (newCommentText.isNotBlank()) {
                         viewModel.postComment(newCommentText, null)
@@ -1477,20 +1505,26 @@ private fun ReorderableCollectionItemScope.MenuTile(
                 // there (issue #33).
                 .fillMaxWidth()
                 .graphicsLayer { scaleX = scale; scaleY = scale }
-                .clip(RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    if (item.tint != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                )
                 .longPressDraggableHandle()
                 .onClick(
                     matcher = PointerMatcher.mouse(PointerButton.Secondary),
                     onClick = { contextMenuOpen = true },
                 )
                 .clickable { item.onClick() }
-                .padding(vertical = 6.dp)
+                .padding(horizontal = 6.dp, vertical = 12.dp)
         ) {
+            // One size and one tone for every icon: the old per-item outlines and the default set were the
+            // mismatched part of this menu.
             val icon = item.iconContent
             if (icon != null) {
                 icon(tint)
             } else {
-                Icon(item.icon, null, modifier = Modifier.size(30.dp), tint = tint)
+                Icon(item.icon, null, modifier = Modifier.size(26.dp), tint = tint)
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -1499,13 +1533,14 @@ private fun ReorderableCollectionItemScope.MenuTile(
                 textAlign = TextAlign.Center,
                 color = tint,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
 
         DropdownMenu(expanded = contextMenuOpen, onDismissRequest = { contextMenuOpen = false }) {
             DropdownMenuItem(
                 text = { Text(str("menu_tile_hide")) },
-                leadingIcon = { Icon(Icons.Outlined.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
+                leadingIcon = { Icon(Icons.Rounded.VisibilityOff, null, modifier = Modifier.size(18.dp)) },
                 onClick = {
                     onHide()
                     contextMenuOpen = false

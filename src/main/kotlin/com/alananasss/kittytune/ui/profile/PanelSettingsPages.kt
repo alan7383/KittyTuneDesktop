@@ -31,6 +31,7 @@ import com.alananasss.kittytune.ui.common.SettingsSwitch
 import com.alananasss.kittytune.ui.common.getSettingsShape
 import com.alananasss.kittytune.ui.main.SidebarDestinations
 import sh.calvin.reorderable.ReorderableColumn
+import androidx.compose.material3.IconButtonDefaults
 
 /**
  * Interface → Left panel: how it behaves, which destinations it lists and in what order, and the
@@ -125,7 +126,7 @@ private fun SidebarLayoutEditor(prefs: PlayerPreferences) {
                             Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(start = 4.dp, end = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            IconButton(onClick = {}, modifier = Modifier.draggableHandle()) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {}, modifier = Modifier.draggableHandle()) {
                                 Icon(Icons.Rounded.DragIndicator, contentDescription = str("action_reorder"))
                             }
                             if (destination != null) {
@@ -197,7 +198,7 @@ private fun LibraryTilesEditor(prefs: PlayerPreferences) {
                         )
                         Spacer(Modifier.width(16.dp))
                         Text(str(look.labelKey), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        IconButton(onClick = {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                             val picked = pickImageFile(str("lib_tile_choose_icon")) ?: return@IconButton
                             val stored = LibraryTileIcons.import(look.key, picked)
                             rejectedFile = stored == null
@@ -209,7 +210,7 @@ private fun LibraryTilesEditor(prefs: PlayerPreferences) {
                             Icon(Icons.Outlined.Image, contentDescription = str("lib_tile_choose_icon"), modifier = Modifier.size(20.dp))
                         }
                         if (icons[look.key] != null) {
-                            IconButton(onClick = {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                                 LibraryTileIcons.clear(look.key)
                                 prefs.setLibraryTileIcon(look.key, null)
                                 icons = icons + (look.key to null)

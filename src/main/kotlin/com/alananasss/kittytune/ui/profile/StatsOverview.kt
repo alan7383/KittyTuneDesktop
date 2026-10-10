@@ -3,6 +3,10 @@ package com.alananasss.kittytune.ui.profile
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -33,6 +37,7 @@ import com.alananasss.kittytune.data.stats.ListeningReport
 import com.alananasss.kittytune.data.stats.ReportArtist
 import com.alananasss.kittytune.data.stats.ReportPeriod
 import com.alananasss.kittytune.data.stats.ReportTrack
+import com.alananasss.kittytune.ui.common.MorphingGrid
 import com.alananasss.kittytune.ui.common.pressScale
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import kotlin.math.abs
@@ -58,16 +63,9 @@ internal fun OverviewStats(
         ) {
             item { SummaryCard(report, period, onOpen) }
             item {
-                if (isWide) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.height(IntrinsicSize.Max)) {
-                        ActivityCard(report, period, Modifier.weight(1.6f).fillMaxHeight())
-                        HoursCard(report, Modifier.weight(1f).fillMaxHeight())
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        ActivityCard(report, period, Modifier.fillMaxWidth())
-                        HoursCard(report, Modifier.fillMaxWidth())
-                    }
+                MorphingGrid(columns = if (isWide) 2 else 1, spacing = 16.dp, weights = listOf(1.6f, 1f)) {
+                    ActivityCard(report, period, Modifier)
+                    HoursCard(report, Modifier)
                 }
             }
             if (report.topTracks.isNotEmpty()) {
@@ -89,11 +87,16 @@ internal fun OverviewStats(
                         title = str("listening_stats_top_artists"),
                         action = if (report.topArtists.size > 6) ({ onOpen(StatsList.ARTISTS) }) else null,
                     ) {
-                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            report.topArtists.take(6).forEachIndexed { index, artist ->
-                                ArtistTile(index + 1, artist, Modifier.weight(1f)) { onArtistClick(artist) }
+                        // One row of portrait cards, the artist's photo filling each, ranked: the way a streaming service
+                        // shows who you listen to, instead of a crowd of small circles.
+                        com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                            contentPadding = PaddingValues(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            fadeColor = MaterialTheme.colorScheme.surfaceContainer,
+                        ) {
+                            itemsIndexed(report.topArtists.take(TOP_ARTISTS_SHOWN)) { index, artist ->
+                                TopArtistCard(index + 1, artist) { onArtistClick(artist) }
                             }
-                            repeat((6 - report.topArtists.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                         }
                     }
                 }
@@ -133,10 +136,8 @@ private fun SummaryCard(report: ListeningReport, period: ReportPeriod, onOpen: (
                 { m -> SummaryTile(Icons.Rounded.MusicNote, report.uniqueTracks.toString(), str("listening_stats_unique_tracks"), m) { onOpen(StatsList.TRACKS) } },
                 { m -> SummaryTile(Icons.Rounded.People, report.uniqueArtists.toString(), str("listening_stats_unique_artists"), m) { onOpen(StatsList.ARTISTS) } },
             )
-            if (isNarrow) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { it(Modifier.fillMaxWidth()) } }
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { tiles.forEach { it(Modifier.weight(1f)) } }
+            MorphingGrid(columns = if (isNarrow) 1 else tiles.size, spacing = 8.dp) {
+                tiles.forEach { it(Modifier) }
             }
         }
         }
@@ -201,7 +202,7 @@ private fun SummaryTile(icon: ImageVector, value: String, label: String, modifie
 @Composable
 private fun ActivityCard(report: ListeningReport, period: ReportPeriod, modifier: Modifier) {
     val buckets = report.activity
-    var hovered by remember(buckets) { mutableStateOf<Int?>(null) }
+    var hovered by remember(buckets.size) { mutableStateOf<Int?>(null) }
     val shown = hovered?.let { buckets.getOrNull(it) }
     val isMonthly = buckets.firstOrNull()?.isMonth == true
     val subtitle = when {
@@ -235,7 +236,7 @@ private fun ActivityCard(report: ListeningReport, period: ReportPeriod, modifier
 /** Listening by hour of the day, and the same split into night, morning, afternoon and evening. */
 @Composable
 private fun HoursCard(report: ListeningReport, modifier: Modifier) {
-    var hovered by remember(report) { mutableStateOf<Int?>(null) }
+    var hovered by remember { mutableStateOf<Int?>(null) }
     val subtitle = hovered?.let { "${hourLabel(it)}–${hourLabel((it + 1) % 24)} · ${formatDuration(report.hours[it])}" }
         ?: report.peakHour?.let { str("listening_stats_peak_hour", hourLabel(it)) }
     StatsCard(title = str("listening_stats_hours"), subtitle = subtitle, modifier = modifier) {
@@ -259,18 +260,41 @@ private fun PartsOfDay(parts: List<Long>) {
     val labels = listOf("listening_stats_night", "listening_stats_morning", "listening_stats_afternoon", "listening_stats_evening")
     val icons = listOf(Icons.Rounded.Bedtime, Icons.Rounded.WbTwilight, Icons.Rounded.WbSunny, Icons.Rounded.NightsStay)
     val top = parts.indexOf(parts.max())
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        parts.forEachIndexed { index, value ->
-            val isTop = index == top && value > 0
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = if (isTop) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.weight(1f),
-            ) {
-                Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(icons[index], contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${(value * 100 / total)} %", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    Text(str(labels[index]), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    // One bar split by share, with a plain legend under it. Four tinted tiles, one of them highlighted, read as
+    // buttons to be pressed rather than as a breakdown of the day (issue #66).
+    val shades = listOf(0.35f, 0.6f, 1f, 0.8f)
+    val primary = MaterialTheme.colorScheme.primary
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(10.dp).clip(CircleShape)) {
+            drawRect(track)
+            var x = 0f
+            parts.forEachIndexed { index, value ->
+                val width = size.width * value / total
+                if (width > 0f) drawRect(primary.copy(alpha = shades[index]), Offset(x, 0f), Size(width, size.height))
+                x += width
+            }
+        }
+        Row(Modifier.fillMaxWidth()) {
+            parts.forEachIndexed { index, value ->
+                val isTop = index == top && value > 0
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        icons[index],
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = primary.copy(alpha = shades[index].coerceAtLeast(0.5f)),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Column {
+                        Text(
+                            "${(value * 100 / total)} %",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (isTop) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isTop) primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(str(labels[index]), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }
@@ -298,8 +322,10 @@ private fun BarChart(
     onHover: (Int?) -> Unit,
     modifier: Modifier,
 ) {
-    val grow = remember(values) { Animatable(0f) }
-    LaunchedEffect(values) { grow.animateTo(1f, tween(500)) }
+    // Grown in once, when the chart first appears. Keyed on the values it replayed on every listen that
+    // finished while the screen was open; a new value is simply drawn at its new height (issue #66).
+    val grow = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { grow.animateTo(1f, tween(500)) }
     val step = scaleStepMs(values.maxOrNull() ?: 0L)
     val lines = (((values.maxOrNull() ?: 0L) + step - 1) / step).coerceIn(1, 4).toInt()
     val top = step * lines
@@ -433,37 +459,38 @@ internal fun PlaysAndTime(plays: Int, listenMs: Long) {
 }
 
 @Composable
-private fun ArtistTile(rank: Int, artist: ReportArtist, modifier: Modifier, onClick: () -> Unit) {
+private fun TopArtistCard(rank: Int, artist: ReportArtist, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Column(
-        modifier.clip(RoundedCornerShape(20.dp))
+    Box(
+        Modifier.size(width = 150.dp, height = 190.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .clickable(interactionSource = interaction, indication = ripple(), onClick = onClick)
-            .pressScale(interaction)
-            .padding(vertical = 10.dp, horizontal = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .pressScale(interaction),
     ) {
-        Box {
-            StatsCover(artist.imageUrl, Modifier.size(84.dp).clip(CircleShape), placeholder = Icons.Rounded.Person)
-            Surface(
-                shape = CircleShape,
-                color = if (rank == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.align(Alignment.BottomStart).size(26.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        rank.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (rank == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
+        StatsCover(artist.imageUrl, Modifier.fillMaxSize(), placeholder = Icons.Rounded.Person)
+        Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.78f)),
+            ),
+        )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
+            modifier = Modifier.align(Alignment.TopStart).padding(10.dp).size(28.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(rank.toString(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(artist.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Column(Modifier.align(Alignment.BottomStart).padding(horizontal = 12.dp, vertical = 12.dp)) {
+            Text(artist.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(formatDuration(artist.listenMs), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.8f), maxLines = 1)
+        }
     }
 }
+
+private const val TOP_ARTISTS_SHOWN = 12
 
 // ─── Habits ──────────────────────────────────────────────────────
 
@@ -475,13 +502,8 @@ internal fun HabitsGrid(report: ListeningReport, isWide: Boolean) {
         { m -> HabitTile(Icons.Rounded.Timer, formatDuration(report.averageListenMs), str("listening_stats_avg_play"), str("listening_stats_avg_play_desc"), m) },
         { m -> HabitTile(Icons.Rounded.LocalFireDepartment, report.longestStreakDays.toString(), str("listening_stats_streak"), str("listening_stats_active_days", report.activeDays), m) },
     )
-    val perRow = if (isWide) 4 else 2
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        tiles.chunked(perRow).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Max)) {
-                row.forEach { tile -> tile(Modifier.weight(1f).fillMaxHeight()) }
-            }
-        }
+    MorphingGrid(columns = if (isWide) 4 else 2, spacing = 12.dp) {
+        tiles.forEach { tile -> tile(Modifier) }
     }
 }
 

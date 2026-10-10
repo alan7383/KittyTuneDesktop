@@ -22,10 +22,14 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Lyrics
+import com.alananasss.kittytune.ui.common.pressScale
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.animateColorAsState
@@ -71,6 +75,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.material3.IconButtonDefaults
 
 @Composable
 fun TrackInfoTab(vm: PlayerViewModel) {
@@ -152,8 +157,13 @@ fun TrackInfoTab(vm: PlayerViewModel) {
      * lyrics are the only half they have.
      */
     val playerPrefs = remember { com.alananasss.kittytune.data.local.PlayerPreferences() }
-    var showLyricsHalf by remember { mutableStateOf(playerPrefs.infoPanelOpensOnLyrics()) }
+    var showLyricsHalf by remember { mutableStateOf(PanelHistory.present.lyricsHalf ?: playerPrefs.infoPanelOpensOnLyrics()) }
     val lyricsHalf = isSpotifyTrack || showLyricsHalf
+    // Comments or lyrics is part of where the panel is, for the mouse's back and forward buttons.
+    LaunchedEffect(showLyricsHalf) { PanelHistory.noteHalf(showLyricsHalf) }
+    LaunchedEffect(PanelHistory.movedTick) {
+        if (PanelHistory.movedTick > 0) PanelHistory.present.lyricsHalf?.let { showLyricsHalf = it }
+    }
 
     val selectHalf: (Boolean) -> Unit = {
         showLyricsHalf = it
@@ -183,16 +193,30 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         commentsScrollRequest = 0
     }
 
+    // Where the lyrics half starts when the list is at its top, so it can reach down to the panel's bottom edge
+    // instead of stopping at a fixed height with room to spare under it (issue #66).
+    var lyricsTopPx by remember { mutableStateOf(-1) }
+    LaunchedEffect(listState, lyricsHalf) {
+        androidx.compose.runtime.snapshotFlow { listState.layoutInfo }.collect { info ->
+            if (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0) {
+                info.visibleItemsInfo.firstOrNull { it.key == LYRICS_HALF_KEY }?.let { lyricsTopPx = it.offset }
+            }
+        }
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val panelHeight = maxHeight
-        val isCompact = lyricsHalf && panelHeight < 780.dp
-        val isUltraCompact = lyricsHalf && panelHeight < 580.dp
+        // The header's size follows the panel's height alone. Tied to the lyrics half as well, it went small
+        // on Lyrics and back to full size on Comments, and everything under it jumped at each switch (issue #66).
+        val isCompact = panelHeight < 780.dp
+        val isUltraCompact = panelHeight < 580.dp
 
-        val dynamicLyricsHeight = when {
-            !lyricsHalf -> LYRICS_HALF_HEIGHT
-            isUltraCompact -> (panelHeight - 120.dp).coerceAtLeast(180.dp)
-            isCompact -> (panelHeight - 160.dp).coerceAtLeast(220.dp)
-            else -> LYRICS_HALF_HEIGHT
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val dynamicLyricsHeight = if (lyricsTopPx > 0) {
+            (panelHeight - with(density) { lyricsTopPx.toDp() } - LIST_TOP_PADDING - LYRICS_BOTTOM_GAP)
+                .coerceAtLeast(LYRICS_MIN_HEIGHT)
+        } else {
+            LYRICS_HALF_HEIGHT
         }
 
         LazyColumn(
@@ -202,7 +226,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             Modifier.fillMaxSize(),
             state = listState,
             verticalArrangement = Arrangement.spacedBy(if (isCompact) 12.dp else 18.dp),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = LIST_TOP_PADDING, bottom = LYRICS_BOTTOM_GAP)
         ) {
             item {
                 TrackInfoHeader(vm, displayTrack, isSpotifyTrack, isCompact, isUltraCompact, onCommentsClick)
@@ -229,14 +253,12 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        AsyncImage(
-                            model = socialLiker.avatarUrl?.replace("large", "t500x500"),
-                            contentDescription = null,
+                        com.alananasss.kittytune.ui.common.UserAvatar(
+                            url = socialLiker.avatarUrl,
                             modifier = Modifier
                                 .size(32.dp)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.surfaceVariant),
-                            contentScale = ContentScale.Crop
                         )
                         val totalLikes = displayTrack.likesCount ?: 1
                         val otherCount = (totalLikes - 1).coerceAtLeast(0)
@@ -257,26 +279,29 @@ fun TrackInfoTab(vm: PlayerViewModel) {
             }
         }
 
-        // Description (SoundCloud only)
+        // Description (SoundCloud only): the artist's own words, set off by a line beside them rather than boxed in a
+        // card, which next to the numbers' pills looked like a different app.
         if (!isSpotifyTrack && !displayTrack.description.isNullOrBlank()) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            ExpandableDescription(
-                                text = displayTrack.description!!,
-                                onUrlClick = { url ->
-                                    com.alananasss.kittytune.core.openUrl(url)
-                                },
-                                onMentionClick = { username ->
-                                    vm.resolveAndNavigateToArtist(username.removePrefix("@"))
-                                }
-                            )
-                        }
+                Row(Modifier.fillMaxWidth().height(androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+                    Box(
+                        Modifier
+                            .width(3.dp)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.45f))
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Box(Modifier.weight(1f)) {
+                        ExpandableDescription(
+                            text = displayTrack.description!!,
+                            onUrlClick = { url ->
+                                com.alananasss.kittytune.core.openUrl(url)
+                            },
+                            onMentionClick = { username ->
+                                vm.resolveAndNavigateToArtist(username.removePrefix("@"))
+                            }
+                        )
                     }
                 }
             }
@@ -298,7 +323,6 @@ fun TrackInfoTab(vm: PlayerViewModel) {
         // Sorting and writing, in one row: a round sort button, then one long field with the send button
         // inside it (SoundCloud only).
         if (!isSpotifyTrack && !lyricsHalf) item {
-            var isSortMenuExpanded by remember { mutableStateOf(false) }
             var newCommentText by remember { mutableStateOf("") }
             val send = {
                 if (newCommentText.isNotBlank()) {
@@ -311,27 +335,16 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box {
-                    FilledTonalIconButton(onClick = { isSortMenuExpanded = true }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = str("sorted_by", str(vm.commentSort.labelResId)))
-                    }
-                    DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
-                        CommentSort.values().forEach { sortOption ->
-                            DropdownMenuItem(
-                                text = { Text(str(sortOption.labelResId)) },
-                                onClick = {
-                                    vm.onCommentSortChanged(sortOption)
-                                    isSortMenuExpanded = false
-                                },
-                                trailingIcon = {
-                                    if (sortOption == vm.commentSort) {
-                                        Icon(Icons.Rounded.Check, contentDescription = str("desc_selected"), modifier = Modifier.size(16.dp))
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
+                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                    options = CommentSort.entries,
+                    selected = vm.commentSort,
+                    onSelect = vm::onCommentSortChanged,
+                    icon = { it.icon },
+                    label = { str(it.labelResId) },
+                    tooltip = { str("sorted_by", str(it.labelResId)) },
+                    size = 44.dp,
+                    iconSize = 20.dp,
+                )
                 OutlinedTextField(
                     value = newCommentText,
                     onValueChange = { newCommentText = it },
@@ -343,7 +356,7 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { send() }),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
                     trailingIcon = {
-                        IconButton(
+                        IconButton(shapes = IconButtonDefaults.shapes(),
                             onClick = send,
                             enabled = newCommentText.isNotBlank(),
                             colors = IconButtonDefaults.iconButtonColors(
@@ -376,7 +389,17 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                     vm.loadComments(refresh = false)
                 }
             }
-            CommentItemUI(comment, vm)
+            // Faded in and out with the switch to the lyrics and back, not only when they first appear.
+            // Closer to its neighbours than the page's other blocks are: the list's gap suits sections, and between
+            // comment cards it read as empty bands. The box reports a little less height, so the cards sit nearer.
+            val pullUp = if (isCompact) 6.dp else 10.dp
+            Box(
+                Modifier.animateItem().layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    val trim = pullUp.roundToPx().coerceAtMost(placeable.height)
+                    layout(placeable.width, placeable.height - trim) { placeable.place(0, 0) }
+                },
+            ) { CommentItemUI(comment, vm) }
         }
 
         if (!isSpotifyTrack && !lyricsHalf && vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {
@@ -433,12 +456,15 @@ private fun InfoHalfToggle(
         Row(Modifier.padding(3.dp), verticalAlignment = Alignment.CenterVertically) {
             InfoHalfChip(
                 text = str("menu_comments"),
+                icon = if (!lyricsSelected) Icons.Rounded.Forum else Icons.Outlined.Forum,
+                badge = count.takeIf { commentCount > 0 },
                 isSelected = !lyricsSelected,
                 onClick = { onSelect(false) },
                 modifier = Modifier.weight(1f)
             )
             InfoHalfChip(
                 text = str("player_lyrics"),
+                icon = if (lyricsSelected) Icons.Rounded.Lyrics else Icons.Outlined.Lyrics,
                 isSelected = lyricsSelected,
                 onClick = { onSelect(true) },
                 modifier = Modifier.weight(1f)
@@ -447,41 +473,62 @@ private fun InfoHalfToggle(
     }
 }
 
+/**
+ * One half of the switch, drawn like the panel's tab buttons: an icon, filled when chosen, on the tonal pill the
+ * open tab sits on, so the panel speaks one language from the tabs down (issue #66).
+ */
 @Composable
 private fun InfoHalfChip(
     text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    badge: String? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val background by animateColorAsState(
-        targetValue = if (isSelected) scheme.primary else Color.Transparent,
-        animationSpec = tween(300),
+        targetValue = if (isSelected) scheme.secondaryContainer else Color.Transparent,
+        animationSpec = tween(250),
         label = "infoHalfBackground"
     )
     val textColor by animateColorAsState(
-        targetValue = if (isSelected) scheme.onPrimary else scheme.onSurfaceVariant,
-        animationSpec = tween(300),
+        targetValue = if (isSelected) scheme.onSecondaryContainer else scheme.onSurfaceVariant,
+        animationSpec = tween(250),
         label = "infoHalfText"
     )
-    Box(
+    Row(
         modifier = modifier
             .fillMaxHeight()
+            .pressScale(interaction, pressedScale = 0.95f)
             .clip(CircleShape)
             .background(background)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+            .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple(), onClick = onClick)
+            .padding(horizontal = 10.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Icon(icon, contentDescription = null, tint = textColor, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
             color = textColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 8.dp)
+            modifier = Modifier.weight(1f, fill = false),
         )
+        if (badge != null) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = badge,
+                style = MaterialTheme.typography.labelSmall,
+                color = textColor.copy(alpha = 0.75f),
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -501,9 +548,9 @@ private fun LazyListScope.trackLyricsHalf(
     showHeader: Boolean,
     lyricsHeight: androidx.compose.ui.unit.Dp = LYRICS_HALF_HEIGHT,
 ) {
-    item {
+    item(key = LYRICS_HALF_KEY) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().animateItem(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (showHeader) {
@@ -524,29 +571,18 @@ private fun LazyListScope.trackLyricsHalf(
                     ContainedLoadingIndicator()
                 }
             } else {
+                // Down to the panel's bottom edge. The lyrics tab and the full screen are a click away anyway, so
+                // the button that opened them here only took room from the words (issue #66).
                 PanelLyrics(vm, Modifier.fillMaxWidth().height(lyricsHeight))
-            }
-
-            if (vm.hasLyrics) {
-                OutlinedButton(
-                    onClick = { vm.openLyrics() },
-                    shapes = ButtonDefaults.shapes(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Rounded.Lyrics, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = str("info_open_lyrics_view"),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
         }
     }
 }
+
+private const val LYRICS_HALF_KEY = "info_lyrics_half"
+private val LIST_TOP_PADDING = 16.dp
+private val LYRICS_BOTTOM_GAP = 16.dp
+private val LYRICS_MIN_HEIGHT = 240.dp
 
 /**
  * Height of the lyrics pane inside the info tab. Tall enough for the current line to sit a third of
@@ -561,213 +597,264 @@ private fun LazyListScope.trackLyricsHalf(
  */
 private val LYRICS_HALF_HEIGHT = 440.dp
 
+/**
+ * One comment thread: the comment and, under it, its replies.
+ *
+ * The thread is one card. Replies used to be cards inside the comment's own text column, so each level of reply was
+ * narrower than the last until the time chip wrapped one digit to a line. Now they sit flat under the comment, in the
+ * card's full width, beside a thin line that says whose they are; only a top-level comment has the card.
+ */
 @Composable
 fun CommentItemUI(comment: Comment, vm: PlayerViewModel, isReply: Boolean = false) {
-    var replyText by remember { mutableStateOf("") }
-    var showReplyField by remember { mutableStateOf(false) }
+    if (isReply) {
+        CommentThread(comment, vm, isReply = true)
+    } else {
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Box(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) { CommentThread(comment, vm, isReply = false) }
+        }
+    }
+}
 
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(start = if (isReply) 48.dp else 0.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AsyncImage(
-                model = comment.user?.avatarUrl?.replace("large", "t500x500"),
-                contentDescription = null,
-                modifier = Modifier.size(if (isReply) 28.dp else 36.dp).clip(androidx.compose.foundation.shape.CircleShape).clickable { comment.user?.id?.let { vm.navigateToArtist(it) } }
+@Composable
+private fun CommentThread(comment: Comment, vm: PlayerViewModel, isReply: Boolean) {
+    val avatar = if (isReply) 26.dp else 38.dp
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            com.alananasss.kittytune.ui.common.UserAvatar(
+                url = comment.user?.avatarUrl,
+                modifier = Modifier.size(avatar).clip(androidx.compose.foundation.shape.CircleShape).clickable { comment.user?.id?.let { vm.navigateToArtist(it) } },
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = comment.user?.username ?: str("comment_anonymous"),
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { comment.user?.id?.let { vm.navigateToArtist(it) } }
-                    )
-                    if (comment.user?.verified == true) {
-                        Icon(
-                            Icons.Rounded.Verified,
-                            null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                    if (comment.trackTimestamp != null && comment.trackTimestamp > 0) {
-                        val minutes = comment.trackTimestamp / 60000
-                        val seconds = (comment.trackTimestamp % 60000) / 1000
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.clickable { vm.seekTo(comment.trackTimestamp) }
-                        ) {
-                            Text(
-                                String.format(Locale.getDefault(), "%d:%02d", minutes, seconds),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
-            var translatedText by remember { mutableStateOf<String?>(null) }
-            var showTranslation by remember { mutableStateOf(false) }
-            var isTranslating by remember { mutableStateOf(false) }
-            val scope = rememberCoroutineScope()
-
-            if (showTranslation && !translatedText.isNullOrEmpty()) {
-                CommentBodyText(body = translatedText!!, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
-            } else {
-                CommentBodyText(body = comment.body, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
-            }
-
-            val appLang = com.alananasss.kittytune.core.Strings.appLanguage
-            val langCode = if (appLang == "system" || appLang.isBlank()) java.util.Locale.getDefault().language else appLang
-            val langName = remember(langCode) {
-                val loc = java.util.Locale(langCode)
-                loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
-            }
-
-            var isTargetLanguage by remember(comment.body, langCode) { mutableStateOf(false) }
-            LaunchedEffect(comment.body, langCode) {
-                val cleanText = comment.body.replace(Regex("[^\\p{L}\\p{Nd}\\s]"), "").trim()
-                if (cleanText.isBlank()) {
-                    isTargetLanguage = true
-                } else {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val language = com.alananasss.kittytune.util.LanguageDetection.identifyLanguage(cleanText)
-                        if (language == langCode || language == "und") {
-                            isTargetLanguage = true
-                        }
-                    }
-                }
-            }
-
-            if (translatedText == null && !isTranslating && !isTargetLanguage) {
-                Text(
-                    text = str("comment_translate", langName),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable {
-                            isTranslating = true
-                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                                val res = com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(listOf(comment.body), langCode)
-                                val t = res[comment.body.trim()]
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    if (t != null && t.lowercase() != comment.body.trim().lowercase()) {
-                                        translatedText = t
-                                        showTranslation = true
-                                    } else {
-                                        translatedText = "" 
-                                    }
-                                    isTranslating = false
-                                }
-                            }
-                        }
-                        .padding(vertical = 2.dp)
-                )
-            } else if (isTranslating) {
-                Text(
-                    text = str("comment_translating"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(vertical = 2.dp)
-                )
-            } else if (!translatedText.isNullOrEmpty()) {
-                Text(
-                    text = if (showTranslation) str("comment_see_original") else str("comment_translate", langName),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .clickable { showTranslation = !showTranslation }
-                        .padding(vertical = 2.dp)
-                )
-            }
-                
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.clickable { vm.toggleCommentLike(comment) },
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            if (comment.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                            null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (comment.isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if ((comment.likesCount ?: 0) > 0) {
-                            Text(comment.likesCount.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    
-                    Text(
-                        str("comment_reply"),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.clickable { vm.startReplying(comment) }
-                    )
-
-                    val relTime = getRelativeTime(comment.createdAt)
-                    if (relTime.isNotBlank()) {
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            text = relTime,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        )
-                    }
-                }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                CommentHeader(comment, vm)
+                CommentContent(comment, vm)
+                CommentActions(comment, vm)
             }
         }
 
         if (!comment.replies.isNullOrEmpty()) {
-            Column(modifier = Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                comment.replies.forEach { reply ->
-                    CommentItemUI(reply, vm, isReply = true)
+            // The thread line runs under the comment's avatar, so the replies read as hanging off it.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                Box(Modifier.width(avatar).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+                    Box(
+                        Modifier.width(2.dp).fillMaxHeight()
+                            .clip(RoundedCornerShape(1.dp))
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    comment.replies.forEach { reply -> CommentItemUI(reply, vm, isReply = true) }
                 }
             }
         }
 
-        if (vm.replyingToComment == comment) {
-            var replyText by remember { mutableStateOf("") }
-            val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-            
-            Column(modifier = Modifier.padding(top = 8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    val targetUser = comment.user?.username ?: str("comment_anonymous")
-                    Text(str("comment_replying_to", targetUser), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() }, tint = MaterialTheme.colorScheme.primary)
-                }
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = replyText,
-                        onValueChange = { replyText = it },
-                        modifier = Modifier.weight(1f).trackTextInput().focusRequester(focusRequester),
-                        placeholder = { Text(str("comment_write_reply")) },
-                        singleLine = true,
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    IconButton(
-                        onClick = {
-                            if (replyText.isNotBlank()) {
-                                vm.postComment(replyText, null)
-                            }
-                        },
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                    ) {
-                        Icon(Icons.Rounded.Send, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+        if (vm.replyingToComment == comment) ReplyField(comment, vm)
+    }
+}
+
+/** Name, verified mark, the moment of the track it was left at, and how long ago, on one line that never wraps. */
+@Composable
+private fun CommentHeader(comment: Comment, vm: PlayerViewModel) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = comment.user?.username ?: str("comment_anonymous"),
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false).clip(RoundedCornerShape(4.dp)).clickable { comment.user?.id?.let { vm.navigateToArtist(it) } },
+        )
+        if (comment.user?.verified == true) {
+            Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(13.dp))
+        }
+        val at = comment.trackTimestamp
+        if (at != null && at > 0) {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { vm.seekTo(at) },
+            ) {
+                Text(
+                    String.format(Locale.getDefault(), "%d:%02d", at / 60000, (at % 60000) / 1000),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+        }
+        val relTime = getRelativeTime(comment.createdAt)
+        if (relTime.isNotBlank()) {
+            Text(
+                text = relTime,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
+}
+
+/** The words, the foreign words glossed under them, and the translate link when the comment is in another language. */
+@Composable
+private fun CommentContent(comment: Comment, vm: PlayerViewModel) {
+    var translatedText by remember { mutableStateOf<String?>(null) }
+    var showTranslation by remember { mutableStateOf(false) }
+    var isTranslating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    if (showTranslation && !translatedText.isNullOrEmpty()) {
+        CommentBodyText(body = translatedText!!, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
+    } else {
+        CommentBodyText(body = comment.body, onMentionClick = { vm.resolveAndNavigateToArtist(it) })
+    }
+
+    val appLang = com.alananasss.kittytune.core.Strings.appLanguage
+    val langCode = if (appLang == "system" || appLang.isBlank()) java.util.Locale.getDefault().language else appLang
+    val langName = remember(langCode) {
+        val loc = java.util.Locale(langCode)
+        loc.getDisplayLanguage(loc).replaceFirstChar { if (it.isLowerCase()) it.titlecase(loc) else it.toString() }
+    }
+
+    // A comment that mixes the reader's language with another one: the foreign words, each with its meaning, under it.
+    val glosses by androidx.compose.runtime.produceState(emptyList<Pair<String, String>>(), comment.body, langCode) {
+        value = if (!com.alananasss.kittytune.util.WordGloss.isMixed(comment.body, langCode)) emptyList()
+        else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.alananasss.kittytune.util.WordGloss.glossFor(comment.body, langCode)
+        }
+    }
+    if (glosses.isNotEmpty()) {
+        Text(
+            text = com.alananasss.kittytune.util.WordGloss.line(glosses),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+
+    // Hidden until the detector has answered, so it never flashes up on a comment already in the reader's language.
+    val needsTranslation by androidx.compose.runtime.produceState(false, comment.body, langCode) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            com.alananasss.kittytune.util.LanguageDetection.needsTranslation(comment.body, langCode)
+        }
+    }
+
+    val linkStyle = MaterialTheme.typography.labelMedium
+    if (translatedText == null && !isTranslating && needsTranslation) {
+        Text(
+            text = str("comment_translate", langName),
+            style = linkStyle,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable {
+                isTranslating = true
+                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val res = com.alananasss.kittytune.data.network.FreeTranslator.translateMissing(listOf(comment.body), langCode)
+                    val t = res[comment.body.trim()]
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (t != null && t.lowercase() != comment.body.trim().lowercase()) {
+                            translatedText = t
+                            showTranslation = true
+                        } else {
+                            translatedText = ""
+                        }
+                        isTranslating = false
                     }
                 }
+            },
+        )
+    } else if (isTranslating) {
+        Text(
+            text = str("comment_translating"),
+            style = linkStyle,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+        )
+    } else if (!translatedText.isNullOrEmpty()) {
+        Text(
+            text = if (showTranslation) str("comment_see_original") else str("comment_translate", langName),
+            style = linkStyle,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { showTranslation = !showTranslation },
+        )
+    }
+}
+
+/** Like and reply, as quiet pills under the words. */
+@Composable
+private fun CommentActions(comment: Comment, vm: PlayerViewModel) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        val liked = comment.isLiked
+        CommentActionPill(
+            onClick = { vm.toggleCommentLike(comment) },
+            tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            container = if (liked) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent,
+        ) {
+            Icon(if (liked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, null, modifier = Modifier.size(15.dp))
+            if ((comment.likesCount ?: 0) > 0) {
+                Spacer(Modifier.width(4.dp))
+                Text(comment.likesCount.toString(), style = MaterialTheme.typography.labelSmall)
             }
-            LaunchedEffect(Unit) {
-                focusRequester.requestFocus()
+        }
+        CommentActionPill(
+            onClick = { vm.startReplying(comment) },
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            container = Color.Transparent,
+        ) {
+            Text(str("comment_reply"), style = MaterialTheme.typography.labelMedium, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun CommentActionPill(onClick: () -> Unit, tint: Color, container: Color, content: @Composable RowScope.() -> Unit) {
+    CompositionLocalProvider(LocalContentColor provides tint) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(container)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 5.dp),
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun ReplyField(comment: Comment, vm: PlayerViewModel) {
+    var replyText by remember { mutableStateOf("") }
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            val targetUser = comment.user?.username ?: str("comment_anonymous")
+            Text(str("comment_replying_to", targetUser), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Rounded.Close, null, modifier = Modifier.size(16.dp).clickable { vm.cancelReplying() }, tint = MaterialTheme.colorScheme.primary)
+        }
+        Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = replyText,
+                onValueChange = { replyText = it },
+                modifier = Modifier.weight(1f).trackTextInput().focusRequester(focusRequester),
+                placeholder = { Text(str("comment_write_reply")) },
+                singleLine = true,
+                shape = RoundedCornerShape(24.dp),
+            )
+            IconButton(
+                shapes = IconButtonDefaults.shapes(),
+                onClick = { if (replyText.isNotBlank()) vm.postComment(replyText, null) },
+                colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            ) {
+                Icon(Icons.Rounded.Send, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
     }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 }
 
 @Composable
@@ -854,45 +941,16 @@ private fun LazyListScope.trackTagsAndDetails(
 ) {
     item {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            val dateRaw = displayTrack.releaseDate ?: displayTrack.createdAt
-            val releaseDateStr = remember(dateRaw) { formatReleaseDate(dateRaw) }
+            // The date is with the numbers at the top now; the genre stays here, with the tags.
             val genre = displayTrack.genre
-            val isDateValid = !dateRaw.isNullOrBlank() && releaseDateStr != str("detail_unknown")
             val hasGenre = !genre.isNullOrBlank()
 
-            if (isDateValid || hasGenre) {
+            if (hasGenre) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (isDateValid) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Icon(
-                                    Icons.Rounded.CalendarToday,
-                                    contentDescription = str("detail_release_date"),
-                                    modifier = Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = releaseDateStr,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-
                     if (hasGenre) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),

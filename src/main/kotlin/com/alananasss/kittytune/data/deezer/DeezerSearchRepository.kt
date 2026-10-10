@@ -60,6 +60,42 @@ object DeezerSearchRepository {
         }
     }
 
+    /**
+     * The most played tracks in the listener's country. Deezer's chart endpoint answers for the country the
+     * request comes from, so there is nothing to pass.
+     */
+    suspend fun countryChart(limit: Int = 50, countryName: String? = null): List<Track> = withContext(Dispatchers.IO) {
+        if (countryName != null) {
+            // Deezer's own "Top <country>" playlist, found by name: there is no endpoint for a chosen country.
+            val playlistId = fetchJson("$API_BASE/search/playlist?q=${URLEncoder.encode("Top $countryName", "UTF-8")}&limit=15")
+                ?.optJSONArray("data")
+                ?.let { list ->
+                    (0 until list.length()).mapNotNull { list.optJSONObject(it) }.firstOrNull { p ->
+                        p.optString("title").equals("Top $countryName", ignoreCase = true) &&
+                            p.optJSONObject("user")?.optString("name").orEmpty().contains("Deezer", ignoreCase = true)
+                    }?.optLong("id")
+                }
+            val tracks = playlistId?.let {
+                fetchJson("$API_BASE/playlist/$it/tracks?limit=$limit")?.optJSONArray("data")?.mapObjects { t -> t.toDeezerTrack() }
+            }.orEmpty()
+            if (tracks.isNotEmpty()) return@withContext tracks
+        }
+        fetchJson("$API_BASE/chart/0/tracks?limit=$limit")
+            ?.optJSONArray("data")
+            ?.mapObjects { it.toDeezerTrack() }
+            ?: emptyList()
+    }
+
+    /** Tracks alone for [query], for a quick look-up rather than a full search page. */
+    suspend fun searchTracks(query: String, limit: Int = 10): List<Track> = withContext(Dispatchers.IO) {
+        if (query.isBlank()) return@withContext emptyList()
+        val encodedQuery = URLEncoder.encode(query.trim(), "UTF-8")
+        fetchJson("$API_BASE/search/track?q=$encodedQuery&limit=$limit")
+            ?.optJSONArray("data")
+            ?.mapObjects { it.toDeezerTrack() }
+            ?: emptyList()
+    }
+
     suspend fun getAlbum(albumId: String): Playlist? = withContext(Dispatchers.IO) {
         val cleanId = albumId.removePrefix("deezer:album:").trim()
         val json = fetchJson("$API_BASE/album/$cleanId") ?: return@withContext null

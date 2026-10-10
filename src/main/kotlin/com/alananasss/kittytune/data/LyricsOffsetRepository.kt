@@ -5,53 +5,65 @@ import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.data.local.LyricsOffsetRow
 
 /**
- * A track's persistent lyrics synchronization offset in milliseconds.
+ * A track's persistent lyrics synchronization: one offset, or two points the offset drifts between
+ * (see [LyricsSync]).
  *
- * When a user adjusts lyrics timing for a track (e.g. +1s, -0.1s), the offset
- * is remembered per track so returning to the track or replaying it preserves
- * the exact sync.
- *
- * 0L (or absent) means no offset. [NO_OVERRIDE] indicates "no offset set / 0L",
- * since [BoundedCache] cannot store nulls.
+ * When a user adjusts lyrics timing for a track (e.g. +1s, -0.1s), the sync is remembered per track so
+ * returning to the track or replaying it preserves it. Absent means no offset.
  */
 object LyricsOffsetRepository {
 
     private val dao get() = AppDatabase.downloadDao
 
     /**
-     * Bounded and keyed by track id. Sized for a queue rather than a library.
+     * Bounded and keyed by track id. Sized for a queue rather than a library. [LyricsSync.NONE] stands for
+     * "nothing saved", since [BoundedCache] cannot store nulls.
      */
-    private val cache = BoundedCache<Long, Long>(256)
+    private val cache = BoundedCache<Long, LyricsSync>(256)
 
-    /** @return the track's saved offset in milliseconds, or 0L when none is set. */
-    suspend fun get(trackId: Long): Long {
-        cache[trackId]?.let { return if (it == NO_OVERRIDE) 0L else it }
-        val stored = runCatching { dao.getLyricsOffset(trackId)?.offsetMs }.getOrNull()
-        cache[trackId] = stored ?: NO_OVERRIDE
-        return stored ?: 0L
+    /** @return the track's saved sync, or [LyricsSync.NONE] when none is set. */
+    suspend fun get(trackId: Long): LyricsSync {
+        cache[trackId]?.let { return it }
+        val stored = runCatching { dao.getLyricsOffset(trackId) }.getOrNull()?.let { row ->
+            LyricsSync(
+                offsetMs = row.offsetMs,
+                anchorMs = row.anchorMs,
+                endAtMs = row.endAtMs,
+                endOffsetMs = row.endOffsetMs,
+            )
+        } ?: LyricsSync.NONE
+        cache[trackId] = stored
+        return stored
     }
 
-    suspend fun put(trackId: Long, offsetMs: Long) {
-        if (offsetMs == 0L) {
+    suspend fun put(trackId: Long, sync: LyricsSync) {
+        if (sync.isNone) {
             remove(trackId)
             return
         }
-        val clamped = offsetMs.coerceIn(MIN_OFFSET_MS, MAX_OFFSET_MS)
+        val clamped = sync.copy(
+            offsetMs = sync.offsetMs.coerceIn(MIN_OFFSET_MS, MAX_OFFSET_MS),
+            endOffsetMs = sync.endOffsetMs?.coerceIn(MIN_OFFSET_MS, MAX_OFFSET_MS),
+        )
         cache[trackId] = clamped
         runCatching {
             dao.putLyricsOffset(
-                LyricsOffsetRow(trackId, clamped, System.currentTimeMillis())
+                LyricsOffsetRow(
+                    trackId = trackId,
+                    offsetMs = clamped.offsetMs,
+                    updatedAt = System.currentTimeMillis(),
+                    anchorMs = clamped.anchorMs,
+                    endAtMs = clamped.endAtMs,
+                    endOffsetMs = clamped.endOffsetMs,
+                )
             )
         }
     }
 
     suspend fun remove(trackId: Long) {
-        cache[trackId] = NO_OVERRIDE
+        cache[trackId] = LyricsSync.NONE
         runCatching { dao.deleteLyricsOffset(trackId) }
     }
-
-    /** Sentinel value for cache indicating no offset (0L) is saved in DB. */
-    private const val NO_OVERRIDE = Long.MIN_VALUE
 
     const val MIN_OFFSET_MS = -120_000L
     const val MAX_OFFSET_MS = 120_000L

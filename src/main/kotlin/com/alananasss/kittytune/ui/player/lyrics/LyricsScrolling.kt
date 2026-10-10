@@ -1,5 +1,10 @@
 package com.alananasss.kittytune.ui.player.lyrics
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.PressInteraction
@@ -13,13 +18,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.floor
 
 /**
@@ -89,15 +105,15 @@ internal object LyricsScrolling {
     fun wheelStepPx(notches: Float, lines: Float, lineHeightPx: Float): Float =
         notches * lines * lineHeightPx
 
-    /** How long a manual scroll holds the automatic one off. */
-    const val PLAIN_PAUSE_MS = 5_000L
+    /** How long a manual scroll holds the automatic one off, counted from when the scrolling stopped. */
+    const val PLAIN_PAUSE_MS = 3_000L
 
     /**
-     * How long a synced view leaves the reader alone after they scroll by hand before it goes back
-     * to following the track. A gesture ends in well under a second, so resuming on that alone made
-     * reading ahead impossible (issue #33).
+     * How long a synced view leaves the reader alone after they stop scrolling by hand, before it goes
+     * back to following the track: three seconds of the reader not touching it (issue #66). Counted from
+     * the end of the scrolling, not its start, so a long scroll is never interrupted.
      */
-    const val MANUAL_GRACE_MS = 5_000L
+    const val MANUAL_GRACE_MS = 3_000L
 }
 
 /**
@@ -141,21 +157,27 @@ internal fun FollowActiveLine(
     activeIndex: Int,
     anchorPx: Int = 0,
     centred: Boolean = false,
+    contentKey: Any? = null,
 ): Boolean {
     var lastManualScrollMs by remember { mutableStateOf(0L) }
     var readingByHand by remember { mutableStateOf(false) }
 
+    /** True for exactly as long as the scroll below is ours, so the flag cannot be misattributed. */
+    var autoScrolling by remember { mutableStateOf(false) }
+
+    /** The reader's own scroll is under way: a drag held, or the wheel still turning. */
+    var scrollingByHand by remember { mutableStateOf(false) }
+
     // Its own clock, not the follow loop's: that one only runs when the line changes, and a reader who
-    // scrolls during a long line would otherwise stay "by hand" until the next one.
-    LaunchedEffect(lastManualScrollMs) {
+    // scrolls during a long line would otherwise stay "by hand" until the next one. It starts counting when
+    // the scrolling stops; it used to count from when it started, so a long scroll was taken back mid-way.
+    LaunchedEffect(lastManualScrollMs, scrollingByHand) {
         if (lastManualScrollMs == 0L) return@LaunchedEffect
         readingByHand = true
+        if (scrollingByHand) return@LaunchedEffect
         delay(LyricsScrolling.MANUAL_GRACE_MS)
         readingByHand = false
     }
-
-    /** True for exactly as long as the scroll below is ours, so the flag cannot be misattributed. */
-    var autoScrolling by remember { mutableStateOf(false) }
 
     /**
      * Whether this list has ever been put where the song is.
@@ -164,7 +186,9 @@ internal fun FollowActiveLine(
      * starts, not because anybody scrolled it there. The scroll below reads it to decide between
      * putting the list where the song is and animating it there.
      */
-    var placed by remember(listState) { mutableStateOf(false) }
+    // Keyed on the lyrics too: a list kept across tracks would otherwise glide the next song's words in from
+    // line one instead of placing them (issue #66).
+    var placed by remember(listState, contentKey) { mutableStateOf(false) }
 
     // Drags and presses only — a programmatic scroll emits nothing here, which is the whole point.
     LaunchedEffect(listState) {
@@ -176,24 +200,38 @@ internal fun FollowActiveLine(
     }
 
     // The mouse wheel is not a drag and does not reach the interaction source, so it is caught here —
-    // guarded, because this is the flag our own animation also sets.
+    // guarded, because this is the flag our own animation also sets. Noted again when it stops, which is
+    // where the wait before following again starts.
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress && !autoScrolling) {
+            scrollingByHand = true
+            lastManualScrollMs = System.currentTimeMillis()
+        } else if (!listState.isScrollInProgress && scrollingByHand) {
+            scrollingByHand = false
             lastManualScrollMs = System.currentTimeMillis()
         }
     }
 
     // Keyed on the line alone. Keying it on the manual timestamp is what made it cancel itself.
-    LaunchedEffect(activeIndex, anchorPx) {
+    LaunchedEffect(activeIndex, anchorPx, contentKey) {
         if (activeIndex < 0) return@LaunchedEffect
 
-        // Re-read each time round: a second scroll during the wait extends it rather than being ignored.
+        // Re-read each time round: a second scroll during the wait extends it rather than being ignored. The
+        // way back once the wait is over is the effect below, so a line that changed meanwhile has nothing to do.
+        var waited = false
         while (true) {
+            if (scrollingByHand) {
+                waited = true
+                delay(MANUAL_POLL_MS)
+                continue
+            }
             val remaining =
                 LyricsScrolling.MANUAL_GRACE_MS - (System.currentTimeMillis() - lastManualScrollMs)
             if (remaining <= 0) break
+            waited = true
             delay(remaining)
         }
+        if (waited && placed) return@LaunchedEffect
 
         autoScrolling = true
         try {
@@ -212,7 +250,7 @@ internal fun FollowActiveLine(
             // *is* placed, the animation is the point — that is the song moving from one line to the
             // next, and it should glide.
             if (placed) {
-                listState.animateScrollToItem(activeIndex, followOffset(listState, activeIndex, anchorPx, centred))
+                listState.glideToLine(activeIndex) { followOffset(listState, activeIndex, anchorPx, centred) }
             } else {
                 listState.scrollToItem(activeIndex, -anchorPx)
                 // A snap remeasures at once, so the line is laid out now and can be centred before the
@@ -224,7 +262,107 @@ internal fun FollowActiveLine(
             autoScrolling = false
         }
     }
+
+    // Back to the line being sung once the reader has left it alone. Following used to wait for the next line
+    // to start, so on a pause, or in a long line, the view stayed wherever it had been scrolled to while the
+    // blur came back over it (issue #66). The whole list slides back as one; see [returnToLine].
+    val currentActive by rememberUpdatedState(activeIndex)
+    LaunchedEffect(readingByHand) {
+        if (readingByHand || !placed || currentActive < 0) return@LaunchedEffect
+        autoScrolling = true
+        try {
+            listState.returnToLine(currentActive) { followOffset(listState, currentActive, anchorPx, centred) }
+        } finally {
+            autoScrolling = false
+        }
+    }
     return readingByHand
+}
+
+/** How often a wait for the reader to stop scrolling looks again. */
+private const val MANUAL_POLL_MS = 100L
+
+/** The longest a way back scrolls through, in viewport heights; anything further is first brought this close. */
+private const val RETURN_MAX_VIEWPORTS = 2f
+
+/**
+ * Slides the list back to line [index] after the reader scrolled away: one eased movement of the whole list,
+ * over a time that grows a little with the distance.
+ *
+ * [glideToLine] jumped to a few lines short of a far line first and then sprang the rest, and in the karaoke
+ * view every line followed with its own spring, so the way back was a jump and lines flying into place
+ * (issue #66). The distance to a line that is not laid out yet can only be estimated from the lines that are,
+ * and a fixed movement over the estimate landed short or long and then corrected itself in a second, sharper
+ * movement: "it takes me back to the wrong place and then jumps to the line" (issue #66). The way left is
+ * measured again on every frame instead, so the one movement ends exactly on the line.
+ *
+ * @param offset the scroll offset to settle the line at, as for [LazyListState.scrollToItem].
+ */
+internal suspend fun LazyListState.returnToLine(index: Int, offset: () -> Int) {
+    val info = layoutInfo
+    val viewport = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1)
+    var distance = distanceToLine(index, offset) ?: run {
+        scrollToItem(index, offset())
+        return
+    }
+    val maxRun = viewport * RETURN_MAX_VIEWPORTS
+    if (kotlin.math.abs(distance) > maxRun) {
+        // Too far to scroll through in one movement: start the movement from closer.
+        scrollBy(distance - kotlin.math.sign(distance) * maxRun)
+        withFrameNanos { }
+        distance = distanceToLine(index, offset) ?: return
+    }
+    val durationMs = RETURN_BASE_MS + RETURN_PER_VIEWPORT_MS * kotlin.math.abs(distance) / viewport
+    scroll {
+        var travelled = 0f
+        val startNanos = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val t = ((now - startNanos) / 1_000_000f / durationMs).coerceIn(0f, 1f)
+            val left = distanceToLine(index, offset) ?: break
+            val wanted = (travelled + left) * FastOutSlowInEasing.transform(t)
+            val step = wanted - travelled
+            val consumed = scrollBy(step)
+            travelled += consumed
+            // Done, or held at the end of the list.
+            if (t >= 1f || kotlin.math.abs(consumed) + 0.5f < kotlin.math.abs(step)) break
+        }
+    }
+}
+
+/**
+ * How far the list has to scroll for line [index] to sit at [offset]: measured when the line is laid out,
+ * estimated from the average height of the lines that are when it is not, and null for an empty layout.
+ */
+private fun LazyListState.distanceToLine(index: Int, offset: () -> Int): Float? {
+    val visible = layoutInfo.visibleItemsInfo
+    if (visible.isEmpty()) return null
+    visible.firstOrNull { it.index == index }?.let { return (it.offset + offset()).toFloat() }
+    val first = visible.first()
+    val averageStep = (visible.last().offset + visible.last().size - first.offset).toFloat() / visible.size
+    return first.offset + (index - first.index) * averageStep + offset()
+}
+
+private const val RETURN_BASE_MS = 520f
+private const val RETURN_PER_VIEWPORT_MS = 180f
+
+/** How many lines short of a far-away line a glide starts, so it reads as movement rather than a jump. */
+private const val GLIDE_RUN_UP_LINES = 3
+
+/**
+ * Scrolls to [index] with a glide however far away it is.
+ *
+ * [LazyListState.animateScrollToItem] only animates to a line it can measure; anything further away it
+ * reaches with a jump at the end, which is what returning from a long scroll looked like. A line that is not
+ * on screen is first brought within a few lines, then the rest is animated.
+ */
+internal suspend fun LazyListState.glideToLine(index: Int, offset: () -> Int) {
+    val visible = layoutInfo.visibleItemsInfo.any { it.index == index }
+    if (!visible) {
+        val runUp = if (firstVisibleItemIndex < index) index - GLIDE_RUN_UP_LINES else index + GLIDE_RUN_UP_LINES
+        scrollToItem(runUp.coerceIn(0, (layoutInfo.totalItemsCount - 1).coerceAtLeast(0)))
+    }
+    animateScrollToItem(index, offset())
 }
 
 /**
@@ -302,8 +440,14 @@ internal fun FollowPlainLyrics(
      * taking over.
      */
     var lastForeignScrollMs by remember { mutableStateOf(0L) }
+    var foreignScrolling by remember { mutableStateOf(false) }
     LaunchedEffect(listState.isScrollInProgress) {
         if (listState.isScrollInProgress && !autoScrolling) {
+            foreignScrolling = true
+            lastForeignScrollMs = System.currentTimeMillis()
+        } else if (!listState.isScrollInProgress && foreignScrolling) {
+            // The wait starts when the scrolling stops, not when it started.
+            foreignScrolling = false
             lastForeignScrollMs = System.currentTimeMillis()
         }
     }
@@ -332,7 +476,7 @@ internal fun FollowPlainLyrics(
             }
 
             val lastTouched = maxOf(lastManual(), lastForeignScrollMs)
-            if (System.currentTimeMillis() - lastTouched < LyricsScrolling.PLAIN_PAUSE_MS) {
+            if (foreignScrolling || System.currentTimeMillis() - lastTouched < LyricsScrolling.PLAIN_PAUSE_MS) {
                 returningFromManual = true
                 continue
             }
@@ -358,7 +502,7 @@ internal fun FollowPlainLyrics(
                     returningFromManual = false
                     // "Give it more time — 5 seconds after the last scroll — and then it will
                     // smoothly return you, not abruptly as it does now."
-                    listState.animateScrollToItem(target.index, offset)
+                    listState.returnToLine(target.index) { offset }
                 } else {
                     listState.scrollToItem(target.index, offset)
                 }
@@ -392,6 +536,10 @@ private const val MAX_EXTRAPOLATION_MS = 400L
  * was always ours to decide — it was simply never exposed. This intercepts the event before the list
  * sees it, so the list's own step is replaced rather than added to, and notes the scroll as manual so
  * the automatic one stands down.
+ *
+ * Each notch slides rather than jumps: a jump of several lines at once is how a reader lost their place
+ * and skipped the line they were looking for (issue #66). Notches that come while a slide is under way
+ * add to what is left of it, so a fast spin is one continuous movement.
  */
 internal fun Modifier.lyricsWheel(
     listState: LazyListState,
@@ -399,6 +547,10 @@ internal fun Modifier.lyricsWheel(
     lines: () -> Float,
     onManualScroll: () -> Unit,
 ): Modifier = this.pointerInput(listState) {
+    // Main-thread state: the wheel events and the slide's frames all run on the UI thread, one at a time.
+    var pendingPx = 0f
+    var slidPx = 0f
+    var slide: Job? = null
     awaitPointerEventScope {
         while (true) {
             // Initial, so the decision is made before the list's own wheel handling on Main.
@@ -414,12 +566,119 @@ internal fun Modifier.lyricsWheel(
                         lines = lines(),
                         lineHeightPx = lineHeightPx(listState, listState.firstVisibleItemIndex),
                     )
-                    if (step != 0f) scope.launch { listState.scrollBy(step) }
+                    if (step == 0f) continue
+                    pendingPx = pendingPx - slidPx + step
+                    slidPx = 0f
+                    slide?.cancel()
+                    val distance = pendingPx
+                    slide = scope.launch {
+                        listState.scroll {
+                            var previous = 0f
+                            animate(0f, distance, animationSpec = tween(WHEEL_SLIDE_MS, easing = LinearOutSlowInEasing)) { value, _ ->
+                                // Never past the end of the words, however far the wheel was spun.
+                                val delta = (value - previous).coerceAtMost(listState.roomForwardPx())
+                                val consumed = scrollBy(delta)
+                                previous = value
+                                slidPx += consumed
+                            }
+                        }
+                        pendingPx = 0f
+                        slidPx = 0f
+                    }
                 }
                 // A drag is the list's to handle; this only notes that the reader took over.
                 PointerEventType.Press -> onManualScroll()
                 else -> Unit
             }
         }
+    }
+}
+
+/**
+ * How far the reader may still scroll forward by hand: until the last line has risen to just above the bottom edge.
+ *
+ * The lists keep a tail below the last line (up to half the screen) so that line can be *followed* up to the
+ * middle, and a hand that scrolls into that tail only finds an empty screen. The follow code scrolls the state
+ * directly and is not held by this; only the reader is.
+ */
+internal fun LazyListState.roomForwardPx(): Float {
+    val info = layoutInfo
+    val last = info.visibleItemsInfo.lastOrNull() ?: return 0f
+    if (last.index != info.totalItemsCount - 1) return Float.MAX_VALUE
+    val bottomEdge = info.viewportEndOffset + info.afterContentPadding
+    val keep = (bottomEdge - info.viewportStartOffset) * LAST_LINE_KEEP_FRACTION
+    return (last.offset + last.size - (bottomEdge - keep)).coerceAtLeast(0f)
+}
+
+/** The last line stops this far (of the viewport) above the bottom edge, clear of its fade. */
+private const val LAST_LINE_KEEP_FRACTION = 0.14f
+
+/** Holds back a drag, a wheel notch or a touch that would scroll past [roomForwardPx]. */
+internal fun Modifier.stopAtLastLine(listState: LazyListState): Modifier = nestedScroll(object : NestedScrollConnection {
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (available.y >= 0f) return Offset.Zero
+        val over = -available.y - listState.roomForwardPx()
+        return if (over > 0f) Offset(0f, over) else Offset.Zero
+    }
+})
+
+/** How long one wheel notch takes to slide the lyrics. */
+private const val WHEEL_SLIDE_MS = 240
+
+/** What has been revealed already, so a second showing of the same lyrics does not fade. Kept short. */
+private val revealedContent: MutableSet<Any> = java.util.Collections.newSetFromMap(
+    object : java.util.LinkedHashMap<Any, Boolean>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Any, Boolean>?) = size > 24
+    },
+)
+
+/** How long the whole list takes to fade in once it is in place. */
+private const val REVEAL_MS = 420
+
+/** The most a list waits to be placed before it is shown regardless, so a slow layout never hides the words. */
+private const val REVEAL_PLACEMENT_TIMEOUT_MS = 700L
+
+/**
+ * Keeps a lyrics list invisible until it shows the line being sung, then fades it in as one block.
+ *
+ * A list is born at line one and only afterwards moved to where the song is. That move, and the lines
+ * settling around it, used to be on screen: a line at the top first, then three more appearing under it,
+ * "like mush", every time the lyrics were opened (issue #66). Nothing of that is worth seeing, so the list
+ * stays transparent until [activeIndex] is laid out and no scroll is running, and then rises in gently.
+ *
+ * @param activeIndex the line the list is being placed on, or a negative value when there is none
+ *   (plain text, or before the first line), in which case the list fades in as soon as it has content.
+ */
+@Composable
+internal fun Modifier.revealWhenPlaced(listState: LazyListState, activeIndex: Int, contentKey: Any? = null): Modifier {
+    val alpha = remember(listState) { Animatable(0f) }
+    val currentActiveIndex by rememberUpdatedState(activeIndex)
+    val risePx = with(LocalDensity.current) { 14.dp.toPx() }
+    // Again for every new set of lyrics, not just when the view opens: a list kept across tracks showed the
+    // next song's lines arriving piece by piece (issue #66).
+    LaunchedEffect(listState, contentKey) {
+        alpha.snapTo(0f)
+        withTimeoutOrNull(REVEAL_PLACEMENT_TIMEOUT_MS) {
+            snapshotFlow {
+                val layout = listState.layoutInfo
+                val target = currentActiveIndex
+                layout.totalItemsCount > 0 &&
+                    !listState.isScrollInProgress &&
+                    (target < 0 || layout.visibleItemsInfo.any { it.index == target })
+            }.first { it }
+            // One frame more, for the lines that move with the list to land where it put them.
+            withFrameNanos { }
+        }
+        // Lyrics that were already shown (the panel opened again, a tab came back) appear at once, placed: fading
+        // them in again read as the text loading a second time (issue #66).
+        if (contentKey != null && !revealedContent.add(contentKey)) {
+            alpha.snapTo(1f)
+        } else {
+            alpha.animateTo(1f, tween(REVEAL_MS, easing = FastOutSlowInEasing))
+        }
+    }
+    return graphicsLayer {
+        this.alpha = alpha.value
+        translationY = (1f - alpha.value) * risePx
     }
 }

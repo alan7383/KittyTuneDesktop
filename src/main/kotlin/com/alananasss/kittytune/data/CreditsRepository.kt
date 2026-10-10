@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.data
 
+import java.time.LocalDate
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -97,8 +98,18 @@ object CreditsRepository {
             descriptionResKey = role + DESCRIPTION_SUFFIX,
             badge = badge,
             url = link,
-            avatarUrl = avatar ?: github?.let { "https://github.com/$it.png" },
+            avatarUrl = avatar ?: github?.let(::githubAvatarUrl),
             category = category,
         )
     }
 }
+
+/**
+ * A GitHub avatar, fetched again once a day.
+ *
+ * The image cache keeps a file under its URL indefinitely, so with a fixed URL someone who changed
+ * their picture stayed on the old one in Credits for good (issue #66). The day in the query makes
+ * it a new URL each day; GitHub ignores the parameter.
+ */
+internal fun githubAvatarUrl(login: String, today: LocalDate = LocalDate.now()): String =
+    "https://github.com/$login.png?size=160&day=${today.toEpochDay()}"

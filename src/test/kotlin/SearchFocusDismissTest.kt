@@ -24,13 +24,13 @@ class SearchFocusDismissTest {
     }
 
     @Test
-    fun `Sidebar search field has focusLossDismisses and escapeDismisses`() {
+    fun `Sidebar search field clears on escape and stays open`() {
         val file = File("src/main/kotlin/com/alananasss/kittytune/ui/main/Sidebar.kt")
         assertTrue(file.exists(), "Sidebar.kt must exist")
         val content = file.readText()
 
-        assertTrue(content.contains("focusLossDismisses(dismiss)"), "Sidebar must dismiss on focus loss")
-        assertTrue(content.contains("escapeDismisses(dismiss)"), "Sidebar must dismiss on escape")
+        // Always open since issue #66, so losing focus leaves it be; Escape still clears it.
+        assertTrue(content.contains("escapeDismisses(clear)"), "Sidebar search must clear on escape")
     }
 
     @Test

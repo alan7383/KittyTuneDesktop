@@ -146,9 +146,10 @@ object WindowsFullScreen {
                 savedBounds = window.bounds
             }
 
-            if (window is Frame && wasMaximized) {
-                window.extendedState = Frame.NORMAL
-            }
+            // A maximized window is not restored first: that drew it at its old floating size for a frame
+            // before it grew to the whole screen, the "shrinks to a window, then goes big again" flicker.
+            // Dropping WS_MAXIMIZE from the style below is enough for the bounds that follow to take effect,
+            // and the saved placement still knows how to maximize it again on the way out.
 
             // Find monitor where the window currently is (supports multi-monitor setups seamlessly)
             val hMon = User32.INSTANCE.MonitorFromWindow(hwnd, WinUser.MONITOR_DEFAULTTONEAREST)
@@ -240,20 +241,21 @@ object WindowsFullScreen {
 
             val shouldMaximize = restorePlacement == WindowPlacement.Maximized || wasMaximized
             if (shouldMaximize && window is Frame) {
-                val wp = savedWindowPlacement
-                if (wp != null) {
+                // Straight from the screen-sized popup to maximized. SetWindowPlacement on a window that is not
+                // maximized first moves it to its normal rectangle and only then maximizes it, which showed the
+                // window at its floating size for a moment on the way out (issue #66). Once maximized, the saved
+                // placement is applied only to remember that normal rectangle for a later restore; on a
+                // maximized window it does not move anything.
+                User32.INSTANCE.SetWindowPos(
+                    hwnd,
+                    HWND_NOTOPMOST,
+                    0, 0, 0, 0,
+                    WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_NOZORDER or WinUser.SWP_FRAMECHANGED
+                )
+                User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_MAXIMIZE)
+                savedWindowPlacement?.let { wp ->
                     wp.showCmd = WinUser.SW_SHOWMAXIMIZED
                     User32.INSTANCE.SetWindowPlacement(hwnd, wp)
-                } else {
-                    val normal = savedBounds ?: fallbackBounds ?: window.bounds
-                    User32.INSTANCE.SetWindowPos(
-                        hwnd,
-                        HWND_NOTOPMOST,
-                        normal.x, normal.y, normal.width, normal.height,
-                        WinUser.SWP_FRAMECHANGED or WinUser.SWP_NOACTIVATE
-                    )
-                    User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_RESTORE)
-                    User32.INSTANCE.ShowWindow(hwnd, WinUser.SW_MAXIMIZE)
                 }
                 User32.INSTANCE.SetWindowPos(
                     hwnd,
@@ -294,7 +296,40 @@ object WindowsFullScreen {
             savedBounds = null
             savedWindowPlacement = null
             wasMaximized = false
+            remeasureFrameAfterRestore(window)
             true
         }.getOrElse { false }
     }
+
+    /**
+     * Makes AWT measure the restored frame once more.
+     *
+     * The caption and sizing border come back through SetWindowLong, which AWT does not watch: it kept the
+     * zero insets of the borderless window and laid the content out for a client area taller than the real
+     * one, so the player bar sat under the bottom edge until the window was resized by hand (issue #66). A
+     * resize is exactly what makes AWT re-read its insets, so this does one: a pixel taller, then back.
+     *
+     * It runs right away, so the bar is not cut for the moment it took before, and once more after
+     * [FRAME_SETTLE_MS] in case a late placement update lays the content out again with stale insets.
+     * Maximized windows are left alone; maximizing already goes through a real resize.
+     */
+    private fun remeasureFrameAfterRestore(window: Window) {
+        nudgeFrame(window)
+        val timer = javax.swing.Timer(FRAME_SETTLE_MS) { nudgeFrame(window) }
+        timer.isRepeats = false
+        timer.start()
+    }
+
+    private fun nudgeFrame(window: Window) {
+        if (isFullScreen || !window.isDisplayable) return
+        if (window is Frame && (window.extendedState and Frame.MAXIMIZED_BOTH) != 0) return
+        val bounds = window.bounds
+        window.setBounds(bounds.x, bounds.y, bounds.width, bounds.height + 1)
+        window.setBounds(bounds.x, bounds.y, bounds.width, bounds.height)
+        window.revalidate()
+        window.repaint()
+    }
+
+    /** Long enough for a late placement update from Compose to have landed. */
+    private const val FRAME_SETTLE_MS = 350
 }

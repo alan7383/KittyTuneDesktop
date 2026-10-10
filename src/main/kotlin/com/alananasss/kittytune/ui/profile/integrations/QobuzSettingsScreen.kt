@@ -25,6 +25,7 @@ import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsItem
 import com.alananasss.kittytune.ui.common.SettingsScaffold
 import java.util.Locale
+import androidx.compose.material3.ButtonDefaults
 
 @Composable
 fun QobuzSettingsScreen(
@@ -92,7 +93,7 @@ fun QobuzSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         val finalCountry = tempCountry.trim().uppercase(Locale.US).ifBlank { "US" }
                         qobuzCountry = finalCountry
@@ -104,7 +105,7 @@ fun QobuzSettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showCountryDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showCountryDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -163,7 +164,7 @@ fun QobuzSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         val cleaned = tempInstances.trim()
                         qobuzCustomInstances = cleaned
@@ -175,7 +176,7 @@ fun QobuzSettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showInstancesDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showInstancesDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -234,7 +235,7 @@ fun QobuzSettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showQualityDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showQualityDialog = false }) {
                     Text(str("btn_cancel"))
                 }
             }

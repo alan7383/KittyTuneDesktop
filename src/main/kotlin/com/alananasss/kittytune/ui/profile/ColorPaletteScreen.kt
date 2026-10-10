@@ -276,7 +276,7 @@ private fun SeedPaletteCard(
                         targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                         label = "chipText"
                     )
-                    Button(onClick = {
+                    Button(shapes = ButtonDefaults.shapes(), onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.VirtualKey)
                             selectedCategoryIndex = index
                         },

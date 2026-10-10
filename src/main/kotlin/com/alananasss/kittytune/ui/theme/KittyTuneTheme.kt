@@ -62,11 +62,13 @@ fun KittyTuneTheme(content: @Composable () -> Unit) {
         colorSpec = themePrefs.colorSpec,
         typography = typography,
     ) {
+        // Slim and quiet until it is used: an 8 dp grey slab drew more attention than the content it scrolls,
+        // worst in dialogs, where it sat across the fields (issue #66).
         val scrollbarStyle = androidx.compose.foundation.defaultScrollbarStyle().copy(
-            thickness = 8.dp,
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+            thickness = 6.dp,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp),
             hoverColor = androidx.compose.material3.MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-            unhoverColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            unhoverColor = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.28f),
             hoverDurationMillis = 300
         )
 

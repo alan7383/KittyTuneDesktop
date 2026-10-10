@@ -43,6 +43,8 @@ import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.pressScale
 import com.materialkolor.PaletteStyle
 import com.materialkolor.rememberDynamicColorScheme
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 private val isWindows = System.getProperty("os.name").lowercase().contains("win")
 
@@ -262,13 +264,13 @@ private fun FontPickerDialog(
                             Text("Aa Бб 123 — KittyTune", style = MaterialTheme.typography.bodySmall.copy(fontFamily = family), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (font == com.alananasss.kittytune.ui.theme.AppFont.Flex) {
-                            IconButton(onClick = { onSelect(font); onTuneFlex() }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { onSelect(font); onTuneFlex() }) {
                                 Icon(Icons.Rounded.Tune, contentDescription = str("dialog_font_settings_title"))
                             }
                         }
                     }
                 }
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         val picked = pickFontFile(str("font_add")) ?: return@TextButton
                         val stored = fonts.import(picked)
@@ -287,7 +289,7 @@ private fun FontPickerDialog(
                 if (rejected) Text(str("font_rejected"), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_close")) } },
     )
 }
 
@@ -599,7 +601,7 @@ internal fun <T> ChoiceDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_cancel")) } },
     )
 }
 
@@ -632,8 +634,8 @@ private fun UiScaleDialog(prefs: PlayerPreferences, uiScale: Float, onDismiss: (
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
-        dismissButton = { TextButton(onClick = { prefs.setUiScale(1.0f) }) { Text(str("btn_reset")) } },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_close")) } },
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { prefs.setUiScale(1.0f) }) { Text(str("btn_reset")) } },
     )
 }
 
@@ -689,7 +691,7 @@ private fun AppIconDialog(prefs: PlayerPreferences, appIconVariant: String, onDi
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_cancel")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_cancel")) } }
     )
 }
 
@@ -716,10 +718,10 @@ private fun FontAxesDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("font_preset_default")) } }
-                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(600f, 100f, 0f, 100f) }) { Text(str("font_preset_rounded")) } }
-                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(250f, 105f, 0f, 0f) }) { Text(str("font_preset_elegant")) } }
-                    item { OutlinedButton(contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(900f, 110f, 0f, 50f) }) { Text(str("font_preset_chunky")) } }
+                    item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("font_preset_default")) } }
+                    item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(600f, 100f, 0f, 100f) }) { Text(str("font_preset_rounded")) } }
+                    item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(250f, 105f, 0f, 0f) }) { Text(str("font_preset_elegant")) } }
+                    item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(900f, 110f, 0f, 50f) }) { Text(str("font_preset_chunky")) } }
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 Column {
@@ -740,8 +742,8 @@ private fun FontAxesDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(str("btn_close")) } },
-        dismissButton = { TextButton(onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("btn_reset")) } }
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(str("btn_close")) } },
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("btn_reset")) } }
     )
 }
 

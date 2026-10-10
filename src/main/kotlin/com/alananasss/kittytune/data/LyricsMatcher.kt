@@ -376,6 +376,127 @@ object LyricsMatcher {
     }
 
     /**
+     * A dash between an artist and a title in an uploaded title: "9mice - ELA-ELA". Only a dash with a space
+     * on at least one side counts; one inside a word is part of the title. Splitting on any dash turned
+     * "ELA-ELA (feat. kai angel)" into the artist "ELA" and the title "ELA", and the lyrics search into "ELA ELA".
+     */
+    private val ARTIST_TITLE_DASH = Regex("""\s+-\s*|\s*-\s+""")
+
+    /** Two songs released as one track, "your love / narcotic": a slash with spaces around it. */
+    private val DOUBLE_TITLE_SLASH = Regex("""\s+//?\s+""")
+
+    /** Characters an artist credit keeps; the rest of an uploaded name is decoration. */
+    private val ARTIST_DECORATION = Regex("""[^\p{L}\p{Nd}\s\-&'$]""")
+
+    private val BRACKETED_ASIDE = Regex("""(?i)\[.*?]|\(.*?\)""")
+
+    private val TRAILING_CREDIT = Regex("""(?i)\s+(w/|feat\.?|ft\.?|prod\.?|x(?=\s)).*""")
+
+    /**
+     * The artist and the title of an uploaded track, from its title and the name of the account it is credited
+     * to: "Artist - Title" when the title says so, the account's name and the title otherwise. Bracketed asides
+     * and trailing "feat."/"prod." credits are dropped from the title.
+     *
+     * @return the artist first, then the title.
+     */
+    fun splitArtistAndTitle(title: String, uploader: String): Pair<String, String> {
+        val uploaderArtist = uploader.replace(ARTIST_DECORATION, "").trim()
+        val normalizedTitle = title.replace('–', '-').replace('—', '-')
+        val withoutAsides = normalizedTitle.replace(BRACKETED_ASIDE, "").trim()
+
+        var artist = uploaderArtist
+        var songTitle = withoutAsides
+        val parts = when {
+            ARTIST_TITLE_DASH.containsMatchIn(withoutAsides) -> withoutAsides.split(ARTIST_TITLE_DASH, limit = 2)
+            ARTIST_TITLE_DASH.containsMatchIn(normalizedTitle) -> normalizedTitle.split(ARTIST_TITLE_DASH, limit = 2)
+            else -> null
+        }
+        if (parts != null && parts.size == 2 && parts.all { it.isNotBlank() }) {
+            artist = parts[0].replace(ARTIST_DECORATION, "").trim()
+            songTitle = parts[1].replace(BRACKETED_ASIDE, "").trim()
+        }
+        val withoutCredits = songTitle.replace(TRAILING_CREDIT, "").trim()
+        return artist to withoutCredits.ifBlank { songTitle }
+    }
+
+    /**
+     * The songs a title names: "your love / narcotic" is "your love" and "narcotic". A single song gives
+     * an empty list. Lyrics sites list each song on its own, so the whole title finds nothing.
+     */
+    fun titleParts(title: String): List<String> {
+        if (!DOUBLE_TITLE_SLASH.containsMatchIn(title)) return emptyList()
+        return title.split(DOUBLE_TITLE_SLASH).map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    /**
+     * Other spellings of a search to try when it finds nothing: the hyphens and other punctuation turned into
+     * spaces ("New-York" is two words to most lyrics searches), and a word typed run together ("NEWYORK")
+     * spelled out the way the track's own title has it. First is always [query] itself.
+     */
+    fun queryVariants(query: String, trackTitle: String): List<String> {
+        val variants = linkedSetOf(query.trim())
+        val spaced = query.replace(Regex("""[^\p{L}\p{Nd}\s']+"""), " ").replace(WHITESPACE_REGEX, " ").trim()
+        if (spaced.isNotEmpty()) variants += spaced
+        val titleWords = normalize(trackTitle).split(' ').filter { it.isNotBlank() }
+        if (titleWords.size >= 2) {
+            val spelledOut = spaced.split(' ').joinToString(" ") { token ->
+                val compact = normalize(token).replace(" ", "")
+                var replacement: String? = null
+                for (start in titleWords.indices) {
+                    var joined = ""
+                    for (end in start until minOf(titleWords.size, start + 3)) {
+                        joined += titleWords[end]
+                        if (end > start && joined == compact) replacement = titleWords.subList(start, end + 1).joinToString(" ")
+                    }
+                }
+                replacement ?: token
+            }
+            if (spelledOut.isNotEmpty()) variants += spelledOut
+        }
+        return variants.toList()
+    }
+
+    /**
+     * [query] with its run-together words spelled the way [knownTitles] spell them, or null when none matches.
+     *
+     * "NEWYORK" is how the song is titled on SoundCloud; Genius calls it "NEW-YORK" and LrcLib only finds it as
+     * "NEW YORK". The track's own title cannot tell where the words break, so another catalogue's spelling of the
+     * same title is used: a word of the query that is two or three of a known title's words run together is spelled
+     * out as those words (issue #66).
+     */
+    fun respellWith(query: String, knownTitles: List<String>): String? {
+        val titleWords = knownTitles.map { title ->
+            title.replace(Regex("""\(.*?\)|\[.*?]"""), " ")
+                .split(Regex("""[^\p{L}\p{Nd}']+""")).filter { it.isNotBlank() }
+        }
+        var changed = false
+        val respelled = query.trim().split(WHITESPACE_REGEX).joinToString(" ") { token ->
+            val compact = token.lowercase().filter { it.isLetterOrDigit() }
+            if (compact.length < MIN_RUN_TOGETHER) return@joinToString token
+            val spelled = titleWords.firstNotNullOfOrNull { words -> runSpelling(words, compact) }
+            if (spelled != null) changed = true
+            spelled ?: token
+        }
+        return respelled.takeIf { changed }
+    }
+
+    /** The two or three consecutive [words] that read [compact] when run together, joined with spaces. */
+    private fun runSpelling(words: List<String>, compact: String): String? {
+        for (start in words.indices) {
+            var joined = ""
+            for (end in start until minOf(words.size, start + 3)) {
+                joined += words[end].lowercase()
+                if (end > start && joined == compact) return words.subList(start, end + 1).joinToString(" ")
+                if (joined.length >= compact.length) break
+            }
+        }
+        return null
+    }
+
+    /** Shorter than this, a word is not worth looking for as several run together. */
+    private const val MIN_RUN_TOGETHER = 5
+
+    /**
      * Generates intelligent (title, artist) candidate pairs for exact-match providers
      * (BetterLyrics, BetterLyrics Portato, KuGou, Paxsenix, YouLyPlus, Unison).
      *

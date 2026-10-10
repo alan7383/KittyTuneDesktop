@@ -147,8 +147,8 @@ class PlayerButtonRowsTest {
         assertTrue(bar.contains("icons/lyrics.svg"), "The bar really does draw it from there")
 
         for (icon in listOf(
-            "Icons.Filled.Favorite", "Icons.Outlined.Tune", "Icons.Outlined.QueueMusic",
-            "Icons.Filled.Shuffle", "Icons.Filled.Repeat", "Icons.Rounded.PictureInPictureAlt",
+            "Icons.Rounded.Favorite", "Icons.Rounded.ViewSidebar", "Icons.AutoMirrored.Rounded.QueueMusic",
+            "Icons.Rounded.Shuffle", "Icons.Rounded.Repeat", "Icons.Rounded.PictureInPictureAlt",
         )) {
             assertTrue(design.contains("rememberVectorPainter($icon)"), "The list shows $icon")
             assertTrue(bar.contains(icon), "…and the bar is what draws $icon")

@@ -65,6 +65,12 @@ enum class FullPlayerBgStyle { APPLE_MUSIC, BLUR, GRADIENT, PURE_BLACK }
  */
 enum class FullPlayerLayout { LYRICS_RIGHT, LYRICS_LEFT, LYRICS_CENTRED, COVER_AND_LINE }
 
+/** Where the full player sets the title and artist under the cover. The heart goes on the other side. */
+enum class FullPlayerInfoAlign { START, CENTER, END }
+
+/** Which side the heart sits on when the title and artist are centred. */
+enum class FullPlayerHeartSide { START, END }
+
 enum class PlayerBarStyle { DEFAULT, ROUNDED, FLOATING }
 
 enum class TrackSourceBadgeStyle { ICON_AND_TEXT, ICON_ONLY, TEXT_ONLY, HIDDEN }
@@ -164,10 +170,14 @@ class PlayerPreferences {
         const val MINI_PLAYER_ELONGATED_DEFAULT_WIDTH = 500
         private const val KEY_FULL_PLAYER_BG_STYLE = "full_player_bg_style"
         private const val KEY_FULL_PLAYER_LAYOUT = "full_player_layout"
+        private const val KEY_FULL_PLAYER_INFO_ALIGN = "full_player_info_align"
+        private const val KEY_FULL_PLAYER_HEART_SIDE = "full_player_heart_side"
 
         /** What [FullPlayerBgStyle.APPLE_MUSIC] was written as before it drew the sleeve rather than orbs. */
         private const val LEGACY_ORBS_STYLE = "ORBS"
         private const val KEY_FULL_PLAYER_COVER_SCALE = "full_player_cover_scale"
+        private const val KEY_FULL_PLAYER_COVER_FEATHER = "full_player_cover_feather"
+        private const val KEY_FULL_PLAYER_COVER_FEATHER_AMOUNT = "full_player_cover_feather_amount"
         private const val KEY_FULL_PLAYER_LYRICS_ALIGN = "full_player_lyrics_align"
         private const val KEY_FULL_PLAYER_SCREENSAVER_ENABLED = "full_player_screensaver_enabled"
         private const val KEY_FULL_PLAYER_SCREENSAVER_TIMEOUT = "full_player_screensaver_timeout"
@@ -268,8 +278,9 @@ class PlayerPreferences {
         const val SIDEBAR_NAV_HOME = "home"
 
         /** The rows shown by default. Home can be switched off too, as long as one row stays on. */
-        val SIDEBAR_NAV_ITEMS =
-            listOf(SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC)
+        val SIDEBAR_NAV_ITEMS = listOf(
+            SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC,
+        )
 
         // Optional destinations the sidebar can carry; off until someone switches them on.
         const val SIDEBAR_NAV_STATS = "stats"
@@ -311,6 +322,8 @@ class PlayerPreferences {
         private const val KEY_LYRICS_FULLSCREEN_LINE_BLUR = "lyrics_fullscreen_line_blur_enabled"
         private const val KEY_LYRICS_SIDEBAR_LINE_BLUR = "lyrics_sidebar_line_blur_enabled"
         private const val KEY_LYRICS_LRC_BOUNCE_ENABLED = "lyrics_lrc_bounce_enabled"
+        private const val KEY_LYRICS_SPLIT_BACKING_VOCALS = "lyrics_split_backing_vocals"
+        private const val KEY_LYRICS_REVEAL_WORDS = "lyrics_reveal_words"
         private const val KEY_LYRICS_BOUNCE_FACTOR = "lyrics_bounce_factor"
         private const val KEY_LYRICS_GLOW_FACTOR = "lyrics_glow_factor"
         private const val KEY_LYRICS_FILL_TRANSITION_WIDTH = "lyrics_fill_transition_width"
@@ -334,6 +347,8 @@ class PlayerPreferences {
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
+        private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
+        private const val KEY_WAVE_MODE = "wave_mode"
         private const val KEY_DISCORD_TOKEN = "discord_token"
         private const val KEY_DISCORD_ENABLED = "discord_rpc_enabled"
         private const val KEY_PRECISE_LYRICS_SEARCH = "precise_lyrics_search_enabled"
@@ -513,6 +528,13 @@ class PlayerPreferences {
 
     fun getDiscordAssetLogo(): String? = Prefs.getString(KEY_DISCORD_ASSET_LOGO, null)
     fun setDiscordAssetLogo(assetId: String?) = Prefs.putString(KEY_DISCORD_ASSET_LOGO, assetId)
+
+    /** The line being sung, on one row above the player bar's transport (issue #66). */
+    fun getWaveMode(): String = Prefs.getString(KEY_WAVE_MODE, "BALANCED") ?: "BALANCED"
+    fun setWaveMode(mode: String) = Prefs.putString(KEY_WAVE_MODE, mode)
+
+    fun getOneLineLyricsEnabled(): Boolean = Prefs.getBoolean(KEY_ONE_LINE_LYRICS, false)
+    fun setOneLineLyricsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ONE_LINE_LYRICS, enabled)
 
     fun getShowLyricsButtonEnabled(): Boolean = Prefs.getBoolean(KEY_SHOW_LYRICS_BUTTON, true)
     fun setShowLyricsButtonEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_LYRICS_BUTTON, enabled)
@@ -730,6 +752,8 @@ class PlayerPreferences {
     fun showHomeListeningStatsFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_LISTENING_STATS, true)
     fun getShowHomeListeningStatsFlow(): Flow<Boolean> = showHomeListeningStatsFlow()
 
+    // On by default: the card was always on the home screen before it could be switched off, and hiding it in the
+    // same update that added the switch read to people as the mix having disappeared (issue #66).
     fun getShowHomeYourMix(): Boolean = Prefs.getBoolean(KEY_SHOW_HOME_YOUR_MIX, false)
     fun setShowHomeYourMix(enabled: Boolean) = Prefs.putBoolean(KEY_SHOW_HOME_YOUR_MIX, enabled)
     fun showHomeYourMixFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_SHOW_HOME_YOUR_MIX, false)
@@ -856,8 +880,25 @@ class PlayerPreferences {
             ?: FullPlayerLayout.LYRICS_RIGHT
     fun setFullPlayerLayout(layout: FullPlayerLayout) = Prefs.putString(KEY_FULL_PLAYER_LAYOUT, layout.name)
 
+    fun getFullPlayerInfoAlign(): FullPlayerInfoAlign =
+        FullPlayerInfoAlign.entries.firstOrNull { it.name == Prefs.getString(KEY_FULL_PLAYER_INFO_ALIGN, null) }
+            ?: FullPlayerInfoAlign.START
+    fun setFullPlayerInfoAlign(align: FullPlayerInfoAlign) = Prefs.putString(KEY_FULL_PLAYER_INFO_ALIGN, align.name)
+
+    fun getFullPlayerHeartSide(): FullPlayerHeartSide =
+        FullPlayerHeartSide.entries.firstOrNull { it.name == Prefs.getString(KEY_FULL_PLAYER_HEART_SIDE, null) }
+            ?: FullPlayerHeartSide.END
+    fun setFullPlayerHeartSide(side: FullPlayerHeartSide) = Prefs.putString(KEY_FULL_PLAYER_HEART_SIDE, side.name)
+
     fun getFullPlayerCoverScale(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_SCALE, 1.0f).coerceIn(0.6f, 1.4f)
     fun setFullPlayerCoverScale(scale: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_SCALE, scale.coerceIn(0.6f, 1.4f))
+
+    fun getFullPlayerCoverFeather(): Boolean = Prefs.getBoolean(KEY_FULL_PLAYER_COVER_FEATHER, false)
+    fun setFullPlayerCoverFeather(enabled: Boolean) = Prefs.putBoolean(KEY_FULL_PLAYER_COVER_FEATHER, enabled)
+
+    /** 0..1, how far the soft edge reaches into the cover. */
+    fun getFullPlayerCoverFeatherAmount(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_FEATHER_AMOUNT, 0.6f).coerceIn(0f, 1f)
+    fun setFullPlayerCoverFeatherAmount(amount: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_FEATHER_AMOUNT, amount.coerceIn(0f, 1f))
 
     fun getFullPlayerLyricsAlign(): LyricsAlignment {
         val name = Prefs.getString(KEY_FULL_PLAYER_LYRICS_ALIGN, LyricsAlignment.LEFT.name)
@@ -1026,6 +1067,14 @@ class PlayerPreferences {
     fun setLyricsSidebarLineBlurEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_SIDEBAR_LINE_BLUR, enabled)
 
     fun getLyricsLrcBounceEnabled(): Boolean = Prefs.getBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, true)
+
+    /** Backing vocals in round brackets drawn as their own smaller line under the sung one. */
+    fun getLyricsSplitBackingVocals(): Boolean = Prefs.getBoolean(KEY_LYRICS_SPLIT_BACKING_VOCALS, true)
+    fun setLyricsSplitBackingVocals(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_SPLIT_BACKING_VOCALS, enabled)
+
+    /** Lines timed by the line only light up word by word as they start, instead of all at once. */
+    fun getLyricsRevealWords(): Boolean = Prefs.getBoolean(KEY_LYRICS_REVEAL_WORDS, false)
+    fun setLyricsRevealWords(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_REVEAL_WORDS, enabled)
     fun setLyricsLrcBounceEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_LYRICS_LRC_BOUNCE_ENABLED, enabled)
 
     fun getLyricsBounceFactor(): Float = Prefs.getFloat(KEY_LYRICS_BOUNCE_FACTOR, 1.0f)

@@ -145,7 +145,7 @@ class SearchLandingTest {
             "Re-sorting the chart by play count would be second-guessing the server's order",
         )
         assertTrue(
-            vm.contains("kind == chartKind && genre == chartGenre"),
+            vm.contains("chartJob?.cancel()"),
             "A switch made mid-flight must not be overwritten by the older request's answer",
         )
         assertTrue(
@@ -232,7 +232,7 @@ class SearchLandingTest {
             "A song already liked is not news, and would fill the shelf with what is already known",
         )
         assertTrue(
-            vm.contains("ARTIST_UPDATE_SOURCES = 6"),
+            vm.contains("ARTIST_UPDATE_SOURCES = 10"),
             "One request per artist, on the home screen's critical path: a handful, not all of them",
         )
     }
@@ -268,9 +268,7 @@ class SearchLandingTest {
     }
 
     @Test
-    fun testChartKindsAreTheOnlyTwoEnumEntries() {
-        assertEquals(2, ChartKind.entries.size)
-        assertEquals(ChartKind.TOP, ChartKind.entries.first())
-        assertEquals(ChartKind.TRENDING, ChartKind.entries.last())
+    fun testTheCountryChartComesFirst() {
+        assertEquals(listOf(ChartKind.COUNTRY, ChartKind.TOP, ChartKind.TRENDING), ChartKind.entries)
     }
 }

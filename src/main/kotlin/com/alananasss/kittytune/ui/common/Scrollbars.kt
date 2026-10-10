@@ -128,6 +128,9 @@ fun ScrollableColumn(
     }
 }
 
+/** How long the pointer has to have been still before release for a drag to end without coasting on. */
+private const val FLING_REST_MS = 60L
+
 /**
  * Enables smooth horizontal mouse swipe / drag scrolling across horizontal containers (issue #56).
  *
@@ -143,16 +146,22 @@ fun Modifier.horizontalMouseSwipe(
     val scope = rememberCoroutineScope()
     val velocityTracker = remember { VelocityTracker() }
     var flingJob by remember { mutableStateOf<Job?>(null) }
+    var lastMoveMs by remember { mutableStateOf(0L) }
 
     this.pointerInput(state) {
         detectHorizontalDragGestures(
-            onDragStart = { offset ->
+            onDragStart = {
                 flingJob?.cancel()
+                // Every sample on the pointer's own clock. The first one used to be wall-clock time and the
+                // rest event time, two clocks hours apart, which made the velocity whatever it liked.
                 velocityTracker.resetTracking()
-                velocityTracker.addPosition(System.currentTimeMillis(), offset)
             },
             onDragEnd = {
-                val velocity = velocityTracker.calculateVelocity().x
+                // A drag that came to rest before the button was let go stays where it was put. The tracker
+                // only ever saw the movement, so it reported the speed from before the pause, and the row
+                // slid on after a release that meant "stop here" (issue #66).
+                val isStillAtRelease = System.currentTimeMillis() - lastMoveMs > FLING_REST_MS
+                val velocity = if (isStillAtRelease) 0f else velocityTracker.calculateVelocity().x
                 if (abs(velocity) > 100f) {
                     flingJob = scope.launch {
                         var currentVelocity = -velocity
@@ -170,6 +179,7 @@ fun Modifier.horizontalMouseSwipe(
             },
             onHorizontalDrag = { change, dragAmount ->
                 velocityTracker.addPosition(change.uptimeMillis, change.position)
+                lastMoveMs = System.currentTimeMillis()
                 change.consume()
                 scope.launch {
                     state.scrollBy(-dragAmount)

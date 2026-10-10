@@ -1,11 +1,17 @@
 package com.alananasss.kittytune.ui.common
 
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.loadXmlImageVector
 import androidx.compose.ui.unit.Density
+import coil3.compose.AsyncImage
+import com.alananasss.kittytune.domain.getHighResAvatarUrl
 import org.xml.sax.InputSource
 
 /**
@@ -26,3 +32,27 @@ private const val DEFAULT_AVATAR_RESOURCE = "drawable/ic_default_user_artwork_pl
 
 @Composable
 fun rememberDefaultAvatarPainter(): Painter = rememberVectorPainter(defaultAvatarVector)
+
+/**
+ * A user's picture, or SoundCloud's grey silhouette when there is none or it fails to load.
+ *
+ * SoundCloud gives users without a picture `default_avatar_large.png`, and the usual
+ * "large" -> "t500x500" upgrade turns that into a file that does not exist, so those avatars used to
+ * stay an empty circle (issue #66). Default avatars skip the request and draw the silhouette locally.
+ */
+@Composable
+fun UserAvatar(
+    url: String?,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+) {
+    val silhouette = rememberDefaultAvatarPainter()
+    AsyncImage(
+        model = url.getHighResAvatarUrl(),
+        contentDescription = contentDescription,
+        error = silhouette,
+        fallback = silhouette,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.clip(CircleShape),
+    )
+}

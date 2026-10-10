@@ -500,8 +500,6 @@ fun GenreDetailScreen(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(OfficialPlaylistsData.sources[viewModel.selectedSourceIndex].flagEmoji)
-                                    Spacer(Modifier.width(8.dp))
                                     Text(OfficialPlaylistsData.sources[viewModel.selectedSourceIndex].countryName, style = MaterialTheme.typography.labelLarge)
                                     Icon(Icons.Rounded.KeyboardArrowDown, null)
                                 }
@@ -582,7 +580,7 @@ fun SectionTitle(title: String, showMore: Boolean = false, onMoreClick: (() -> U
             fontWeight = FontWeight.Bold
         )
         if (showMore && onMoreClick != null) {
-            TextButton(onClick = onMoreClick) { Text(str("btn_see_all")) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onMoreClick) { Text(str("btn_see_all")) }
         }
     }
 }
@@ -690,9 +688,6 @@ private fun PopularTrackListItem(
                     com.alananasss.kittytune.ui.common.TrackRowSocialMarkers(track)
                 }
             }
-            IconButton(onClick = onOptionClick) {
-                Icon(Icons.Default.MoreVert, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }
@@ -732,8 +727,6 @@ private fun CountrySelectionCard(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = flagEmoji, style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.width(16.dp))
                 Text(
                     text = countryName,
                     style = MaterialTheme.typography.bodyLarge,
@@ -915,11 +908,10 @@ private fun CinematicPlaylistCard(playlist: Playlist, onClick: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (playlist.user?.avatarUrl != null) {
-                        AsyncImage(
-                            model = playlist.user?.avatarUrl,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp).clip(CircleShape)
+                    if (playlist.user != null) {
+                        com.alananasss.kittytune.ui.common.UserAvatar(
+                            url = playlist.user?.avatarUrl,
+                            modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                     }

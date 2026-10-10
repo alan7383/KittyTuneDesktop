@@ -63,6 +63,8 @@ import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.ui.common.SquareCardShimmer
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.profile.ArtistAvatar
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -835,40 +837,32 @@ fun LibraryScreen(
                     )
                 }
             } else if (shouldShowOwnershipFilter) {
-                val filterText = when (viewModel.ownershipFilter) {
-                    OwnershipFilter.ALL -> str("filter_all")
-                    OwnershipFilter.CREATED -> str("filter_created")
-                    OwnershipFilter.LIKED -> str("filter_liked")
-                }
-                Row(
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
-                        viewModel.ownershipFilter = when (viewModel.ownershipFilter) {
-                            OwnershipFilter.ALL -> OwnershipFilter.CREATED
-                            OwnershipFilter.CREATED -> OwnershipFilter.LIKED
-                            OwnershipFilter.LIKED -> OwnershipFilter.ALL
-                        }
-                    }.padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = filterText, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Rounded.FilterList,
-                        contentDescription = filterText, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                // The same button as every other filter: it used to cycle through the three on each click, with
+                // nothing saying that is what it would do (issue #66).
+                val ownership = listOf(
+                    Triple(OwnershipFilter.ALL, str("filter_all"), Icons.Rounded.LibraryMusic),
+                    Triple(OwnershipFilter.CREATED, str("filter_created"), Icons.Rounded.Edit),
+                    Triple(OwnershipFilter.LIKED, str("filter_liked"), Icons.Rounded.Favorite),
+                )
+                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                    options = ownership,
+                    selected = ownership.first { it.first == viewModel.ownershipFilter },
+                    onSelect = { viewModel.ownershipFilter = it.first },
+                    icon = { it.third },
+                    label = { it.second },
+                )
             } else {
-                Row(
-                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { viewModel.isSortDescending = !viewModel.isSortDescending }.padding(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = str("sort_date_added"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = if (viewModel.isSortDescending) Icons.Rounded.ArrowDownward else Icons.Rounded.ArrowUpward,
-                        contentDescription = str("sort_date_added"), modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary
-                    )
-                }
+                val order = listOf(
+                    Triple(true, str("sort_recently_added"), Icons.Rounded.ArrowDownward),
+                    Triple(false, str("sort_first_added"), Icons.Rounded.ArrowUpward),
+                )
+                com.alananasss.kittytune.ui.common.IconChoiceButton(
+                    options = order,
+                    selected = order.first { it.first == viewModel.isSortDescending },
+                    onSelect = { viewModel.isSortDescending = it.first },
+                    icon = { it.third },
+                    label = { it.second },
+                )
             }
             IconButton(
                 onClick = { viewModel.isGridLayout = !viewModel.isGridLayout },
@@ -1332,7 +1326,7 @@ fun LibraryScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
-                IconButton(
+                IconButton(shapes = IconButtonDefaults.shapes(),
                     onClick = onOptionClick,
                     modifier = Modifier.size(28.dp)
                 ) {
@@ -1410,7 +1404,7 @@ fun LibraryScreen(
                     onArtistClick = onArtistClick
                 )
             }
-            IconButton(onClick = onOptionClick) {
+            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onOptionClick) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = str("btn_options"),
@@ -1523,7 +1517,7 @@ fun LibraryScreen(
                 }
             },
             confirmButton = {
-                TextButton(
+                TextButton(shapes = ButtonDefaults.shapes(),
                     onClick = {
                         viewModel.uploadsSortOption = selectedSort
                         viewModel.uploadsPrivacyFilter = selectedPrivacy
@@ -1534,7 +1528,7 @@ fun LibraryScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismiss) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) {
                     Text(str("btn_cancel"))
                 }
             }

@@ -8,12 +8,12 @@ import kotlin.test.assertTrue
 class ManualLyricsProviderListTest {
 
     @Test
-    fun `all 15 providers are included in the manual search list without duplicates`() {
+    fun `every provider is included in the manual search list without duplicates`() {
         val userOrder = DefaultLyricsProviderOrder
         val all = (userOrder + PreferredLyricsProvider.entries).distinct()
 
-        assertEquals(15, all.size, "All 15 providers should be present in the manual provider selector")
-        assertEquals(15, all.distinct().size, "No duplicate providers should exist in the list")
+        assertEquals(PreferredLyricsProvider.entries.size, all.size, "Every provider should be present in the manual provider selector")
+        assertEquals(PreferredLyricsProvider.entries.size, all.distinct().size, "No duplicate providers should exist in the list")
         assertTrue(all.contains(PreferredLyricsProvider.MUSIXMATCH))
         assertTrue(all.contains(PreferredLyricsProvider.BETTER_LYRICS))
         assertTrue(all.contains(PreferredLyricsProvider.LRCLIB))
@@ -30,7 +30,7 @@ class ManualLyricsProviderListTest {
 
         assertEquals(PreferredLyricsProvider.LRCLIB, all[0])
         assertEquals(PreferredLyricsProvider.GENIUS, all[1])
-        assertEquals(15, all.size)
+        assertEquals(PreferredLyricsProvider.entries.size, all.size)
     }
 
     @Test

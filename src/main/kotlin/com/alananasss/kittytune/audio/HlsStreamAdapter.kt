@@ -23,7 +23,8 @@ import java.net.URL
 class HlsStreamAdapter(
     val playlistUrl: String,
     val headers: Map<String, String>,
-    private val refreshPlaylistUrl: ((failedUrl: String) -> String?)? = null
+    /** Settable so an adapter built ahead of time can be handed to the engine that ends up playing it. */
+    internal var refreshPlaylistUrl: ((failedUrl: String) -> String?)? = null
 ) {
 
     class Segment(val url: String, val durationMs: Long, val startTimeMs: Long)
@@ -36,6 +37,10 @@ class HlsStreamAdapter(
 
     private var initSegmentUrl: String? = null
     private var initSegmentData: ByteArray? = null
+
+    /** The first fragment, fetched ahead of time for a track that is up next; see [prefetchOpening]. */
+    @Volatile
+    private var openingSegmentData: ByteArray? = null
     private var segments: List<Segment> = emptyList()
 
     var totalDurationMs = 0L
@@ -114,6 +119,22 @@ class HlsStreamAdapter(
             }
         } catch (e: Exception) {
             Logger.e("HlsStreamAdapter", "Failed to cache init segment", e)
+            null
+        }
+    }
+
+    /**
+     * Downloads the first fragment now, so a stream opened from the start has its first seconds in memory and
+     * plays at once. Used for the track up next, which is often skipped to within seconds (issue #66).
+     */
+    fun prefetchOpening() {
+        if (openingSegmentData != null) return
+        val url = segmentUrlAt(0) ?: return
+        openingSegmentData = try {
+            val request = Request.Builder().url(url).apply { headers.forEach { (k, v) -> header(k, v) } }.build()
+            client.newCall(request).execute().use { response -> if (response.isSuccessful) response.body?.bytes() else null }
+        } catch (e: Exception) {
+            Logger.e("HlsStreamAdapter", "Could not prefetch the first fragment: ${e.message}")
             null
         }
     }
@@ -240,7 +261,12 @@ class HlsStreamAdapter(
                         }
                         emittedInit = true
                     } else if (currentSegmentIndex < segmentCount()) {
-                        currentStream = openSigned { segmentUrlAt(currentSegmentIndex) }
+                        val prefetched = openingSegmentData.takeIf { currentSegmentIndex == 0 }
+                        currentStream = if (prefetched != null) {
+                            java.io.ByteArrayInputStream(prefetched)
+                        } else {
+                            openSigned { segmentUrlAt(currentSegmentIndex) }
+                        }
                         currentSegmentIndex++
                     } else {
                         return -1 // EOF

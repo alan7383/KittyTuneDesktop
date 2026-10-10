@@ -88,6 +88,9 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
     }
 }
 
+/** How long the main window stays built after being closed to the tray, so a quick reopen is instant. */
+private const val DROP_HIDDEN_WINDOW_AFTER_MS = 20_000L
+
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
 fun main(args: Array<String>) {
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
@@ -123,6 +126,23 @@ fun main(args: Array<String>) {
             com.alananasss.kittytune.core.AppIconRuntime.loadTrayPainter(appIconVariant) ?: appIcon
         }
         var isWindowVisible by remember { mutableStateOf(true) }
+
+        // Whether the main window exists at all. Closed to the tray it used to be merely hidden, keeping its
+        // whole interface, its GPU surfaces and every screen's state alive: measured, the app held the same
+        // half a gigabyte in the tray as with the window open (issue #66). Playback, the mini player and the
+        // tray menu live outside the window, so once it has been away for a while it is dropped and built
+        // again when it is opened. Its size and position are hoisted below and survive that.
+        var isWindowComposed by remember { mutableStateOf(true) }
+        LaunchedEffect(isWindowVisible) {
+            if (isWindowVisible) {
+                com.alananasss.kittytune.core.restoreMemorySizing()
+                isWindowComposed = true
+            } else {
+                kotlinx.coroutines.delay(DROP_HIDDEN_WINDOW_AFTER_MS)
+                isWindowComposed = false
+                com.alananasss.kittytune.core.releaseMemoryNow()
+            }
+        }
 
         fun showMainWindow() {
             isWindowVisible = true
@@ -328,29 +348,12 @@ fun main(args: Array<String>) {
                 isAppFullScreen = false
                 isRestoringFromFullScreen = true
                 try {
-                    // On Windows the window never left Compose's placement; WindowsFullScreen.exit restores
-                    // it natively from inside the window. Synchronize Compose's windowState cleanly so the
-                    // internal Skiko surface re-measures properly above the taskbar.
+                    // On Windows the window never left Compose's placement, and WindowsFullScreen.exit restores it
+                    // natively from inside the window (see below). Compose is told only after that, with what the
+                    // window already is. Setting it here as well raced the native restore: Compose shrank the
+                    // still borderless window to its floating size, or maximized it, before the frame came back,
+                    // and the window was seen going small and then big again (issue #66).
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
-                        val restorePlacement = savedPlacement.takeIf { it != androidx.compose.ui.window.WindowPlacement.Fullscreen }
-                            ?: androidx.compose.ui.window.WindowPlacement.Floating
-                        if (restorePlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
-                            windowState.placement = androidx.compose.ui.window.WindowPlacement.Maximized
-                        } else {
-                            windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
-                            val reqX = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.x?.value?.toInt()
-                            val reqY = (savedFloatingPosition as? androidx.compose.ui.window.WindowPosition.Absolute)?.y?.value?.toInt()
-                            val metrics = getScreenMetricsDp(null, reqX, reqY)
-                            val clamped = clampFloatingBounds(
-                                savedFloatingSize.width.value.toInt(),
-                                savedFloatingSize.height.value.toInt(),
-                                reqX,
-                                reqY,
-                                metrics.usableBoundsDp
-                            )
-                            windowState.size = DpSize(clamped.width.dp, clamped.height.dp)
-                            windowState.position = androidx.compose.ui.window.WindowPosition(clamped.x.dp, clamped.y.dp)
-                        }
                         kotlinx.coroutines.delay(300)
                         return@LaunchedEffect
                     }
@@ -414,7 +417,7 @@ fun main(args: Array<String>) {
         // full player had been clicked with the mouse it kept the focus, and Space then paused on the press and
         // played again on the release — the pause that "only works every other time".
         val shortcutKeysHeld = remember { mutableSetOf<Key>() }
-        Window(
+        if (isWindowComposed) Window(
             visible = isWindowVisible,
             onCloseRequest = {
                     if (stopOnTaskClear) {
@@ -559,6 +562,15 @@ fun main(args: Array<String>) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                         javax.swing.SwingUtilities.invokeLater {
                             com.alananasss.kittytune.data.theme.WindowsFullScreen.exit(window, savedPlacement, clamped)
+                            // Now that the window is restored, Compose learns where it is. These match the window,
+                            // so applying them changes nothing on screen.
+                            if (savedPlacement == androidx.compose.ui.window.WindowPlacement.Maximized) {
+                                windowState.placement = androidx.compose.ui.window.WindowPlacement.Maximized
+                            } else {
+                                windowState.placement = androidx.compose.ui.window.WindowPlacement.Floating
+                                windowState.size = DpSize(window.width.dp, window.height.dp)
+                                windowState.position = androidx.compose.ui.window.WindowPosition(window.x.dp, window.y.dp)
+                            }
                         }
                     } else {
                         runCatching {
@@ -607,6 +619,7 @@ fun main(args: Array<String>) {
             )
 
             val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
+            com.alananasss.kittytune.core.TrimMemoryWhileHidden(window)
 
             CompositionLocalProvider(
                 LocalDensity provides customDensity,
@@ -621,7 +634,11 @@ fun main(args: Array<String>) {
                     val menuDark = androidx.compose.material3.MaterialTheme.colorScheme.surface.luminance() < 0.5f
                     LaunchedEffect(menuDark) { com.alananasss.kittytune.core.Win32TrayMenu.setDark(menuDark) }
                     ThemedWindowBackgroundEffect(window)
-                    Surface { AppRouter(playerViewModel = playerViewModel) }
+                    androidx.compose.foundation.layout.Box(propagateMinConstraints = true) {
+                        Surface { AppRouter(playerViewModel = playerViewModel) }
+                        // Closing dialogs fade out over the app, drawn above it.
+                        com.alananasss.kittytune.core.DialogExitHost()
+                    }
                 }
             }
         } // End Window

@@ -29,6 +29,7 @@ import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.getSettingsShape
 
 import com.alananasss.kittytune.ui.player.PlayerViewModel
+import androidx.compose.material3.ButtonDefaults
 
 @Composable
 fun DiscordSettingsScreen(
@@ -88,7 +89,7 @@ fun DiscordSettingsScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showStatusDialog = false }) { Text(str("btn_cancel")) } }
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { showStatusDialog = false }) { Text(str("btn_cancel")) } }
         )
     }
 

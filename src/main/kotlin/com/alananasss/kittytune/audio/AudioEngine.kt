@@ -167,7 +167,9 @@ class AudioEngine {
         seekRequestMs = if (startPositionMs > 0) startPositionMs else -1L
         Logger.e("AudioEngine", "setMediaItem called with url: $url")
         try {
-            hlsAdapter = if (url.contains(".m3u8")) HlsStreamAdapter(url, headers, ::reResolveUrl) else null
+            hlsAdapter = if (url.contains(".m3u8")) {
+                HlsHeadCache.take(url, ::reResolveUrl) ?: HlsStreamAdapter(url, headers, ::reResolveUrl)
+            } else null
             Logger.e("AudioEngine", "hlsAdapter initialized: ${hlsAdapter != null}")
         } catch (e: Exception) {
             Logger.e("AudioEngine", "Failed to init HlsStreamAdapter: ${e.message}")
@@ -564,7 +566,11 @@ class AudioEngine {
                 adapter = HlsStreamAdapter(targetUrl, headers, ::reResolveUrl)
                 hlsAdapter = adapter
             }
-            return FFmpegFrameGrabber(adapter.getInputStream(startPositionMs)).apply {
+            // A maximum size of 0 reads the fragments in order and nothing else. javacv's default treats the stream as
+            // seekable: it keeps every byte read in memory, and FFmpeg asking for the stream's size made it read to
+            // the end first, so a track only started once all of it had been downloaded, the longer the slower
+            // (issue #66).
+            return FFmpegFrameGrabber(adapter.getInputStream(startPositionMs), 0).apply {
                 format = "mp4" // Fragments are ISOBMFF (mp4)
                 setOption("probesize", "32768") // 32KB is enough for MOOV atom + some audio
                 setOption("analyzeduration", "0")
@@ -626,7 +632,7 @@ class AudioEngine {
         resumePosMs: Long,
         maxAttempts: Int = Int.MAX_VALUE
     ): Pair<FFmpegFrameGrabber?, String?> {
-        oldGrabber?.releaseQuietly()
+        oldGrabber?.releaseUnlockedQuietly()
 
         var currentUrlToTry = url
         var attempt = 0
@@ -646,7 +652,7 @@ class AudioEngine {
             var newG: FFmpegFrameGrabber? = null
             try {
                 newG = createGrabber(currentUrlToTry, headers, resumePosMs)
-                newG.start()
+                newG.startUnlocked()
                 val isHls = currentUrlToTry.contains(".m3u8")
                 if (!isHls && resumePosMs > 0) {
                     try {
@@ -665,7 +671,7 @@ class AudioEngine {
             } catch (e: Exception) {
                 Logger.e("AudioEngine", "Reopen attempt $attempt failed (${e.message}).")
             }
-            newG?.releaseQuietly()
+            newG?.releaseUnlockedQuietly()
 
             val backoffMs = (attempt * 400L).coerceAtMost(2000L)
             try {
@@ -696,7 +702,7 @@ class AudioEngine {
                 // Both halves can fail on a dead URL: an HLS playlist 403s while the grabber is
                 // still being built, a progressive one only on start().
                 opening = createGrabber(activeUrl, headers, positionMs)
-                opening.start()
+                opening.startUnlocked()
                 grabber = opening
             } catch (e: Exception) {
                 // A dead URL that slipped past the check above (unsigned, or the CDN disagrees
@@ -760,11 +766,11 @@ class AudioEngine {
                     var seekFrame: Frame? = null
                     if (!urlExpired) try {
                         if (isHls) {
-                            grabber?.releaseQuietly()
+                            grabber?.releaseUnlockedQuietly()
                             grabber = null
 
                             grabber = createGrabber(activeUrl, headers, seek)
-                            grabber.start()
+                            grabber.startUnlocked()
                             seekFrame = try { grabber.grabSamples() } catch (_: Exception) { null }
                             seekOk = seekFrame != null
                         } else {
@@ -853,9 +859,15 @@ class AudioEngine {
                 }
 
                 if (paused) {
+                    // A line left running with nothing written to it underruns, and on some Windows drivers
+                    // an underrun replays the last bit of the buffer: a short fragment of the song every few
+                    // seconds for as long as it stayed paused (issue #66). Stopped, it holds still, and the
+                    // buffer is picked up where it stopped when playback resumes.
+                    localLine?.let { if (it.isRunning) it.stop() }
                     Thread.sleep(20)
                     continue
                 }
+                localLine?.let { if (!it.isRunning) it.start() }
 
                 var frame: Frame? = null
                 try {
@@ -908,7 +920,7 @@ class AudioEngine {
                 onError?.invoke(t)
             }
         } finally {
-            grabber?.releaseQuietly()
+            grabber?.releaseUnlockedQuietly()
             closeLineInstance(localLine)
         }
     }
@@ -1067,15 +1079,7 @@ class AudioEngine {
                 } catch (_: Exception) {
                 }
             } else {
-                val mixerInfos = AudioSystem.getMixerInfo()
-                val targetInfo = mixerInfos.firstOrNull { it.name.trim() == deviceName }
-                if (targetInfo != null) {
-                    try {
-                        val m = AudioSystem.getMixer(targetInfo)
-                        if (m.isLineSupported(info)) mixer = m
-                    } catch (_: Exception) {
-                    }
-                }
+                mixer = mixerNamed(deviceName, info)
             }
         }
 

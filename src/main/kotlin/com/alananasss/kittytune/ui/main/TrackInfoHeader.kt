@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Comment
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
@@ -135,7 +136,8 @@ private fun TitleAndArtist(
             ArtistLinkText(
                 track = track,
                 onArtistClick = { vm.navigateToTrackArtist(it) },
-                text = track.user?.username ?: "",
+                // The track's own credit, not the account that posted it, which can be shared by two artists.
+                text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
                 style = if (isLarge) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
                 hoverColor = MaterialTheme.colorScheme.primary,
@@ -151,6 +153,12 @@ private fun TitleAndArtist(
                 )
             }
         }
+        // The lead artist's monthly listeners, for a sense of who this is.
+        com.alananasss.kittytune.ui.common.MonthlyListenersText(
+            artistName = remember(track.id) { com.alananasss.kittytune.data.lyrics.GeniusVoices.splitNames(track.displayArtist).firstOrNull() },
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -194,6 +202,8 @@ private fun SoundCloudStats(vm: PlayerViewModel, track: Track, onCommentsClick: 
                 onCommentsClick()
             }
         }
+        // The date sits with the numbers, in the same pill, in the room the row has left after them.
+        ReleaseDatePill(track)
         if (showInfo) {
             FilledTonalIconButton(
                 onClick = { vm.navigateToTrackDetails(track.id, 0) },
@@ -225,7 +235,17 @@ private fun SpotifyStats(track: Track) {
             StatPill(Icons.Rounded.PlayArrow, compactCount(streams) + " " + str("spotify_streams_formatted"))
         }
         if (track.publisherMetadata?.explicit == true) StatPill(label = "E")
+        ReleaseDatePill(track)
     }
+}
+
+/** When the track came out, as one more of the numbers; nothing when it has no date. */
+@Composable
+private fun ReleaseDatePill(track: Track) {
+    val date = remember(track.id, track.releaseDate, track.createdAt) {
+        com.alananasss.kittytune.ui.profile.ReleaseDate.shortText(track.releaseDate ?: track.createdAt)
+    }
+    if (date.isNotEmpty()) StatPill(Icons.Rounded.CalendarToday, date)
 }
 
 @Composable

@@ -15,6 +15,7 @@ class BeatInfoDao(private val db: AppDatabase) {
             mixOutPointMs = rs.getLong("mixOutPointMs").let { if (rs.wasNull()) null else it },
             keyPitchClass = rs.getInt("keyPitchClass").let { if (rs.wasNull()) null else it },
             keyIsMinor = rs.getInt("keyIsMinor").let { if (rs.wasNull()) null else it == 1 },
+            energy = rs.getFloat("energy").let { if (rs.wasNull()) null else it },
         )
     }
 
@@ -22,8 +23,8 @@ class BeatInfoDao(private val db: AppDatabase) {
         db.execSilent(
             """INSERT OR REPLACE INTO beat_info(
                 songId, bpm, firstBeatOffsetMs, confidence, analyzedAt,
-                mixInPointMs, mixOutPointMs, keyPitchClass, keyIsMinor
-            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                mixInPointMs, mixOutPointMs, keyPitchClass, keyIsMinor, energy
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             beatInfo.songId,
             beatInfo.bpm,
             beatInfo.firstBeatOffsetMs,
@@ -32,7 +33,8 @@ class BeatInfoDao(private val db: AppDatabase) {
             beatInfo.mixInPointMs,
             beatInfo.mixOutPointMs,
             beatInfo.keyPitchClass,
-            beatInfo.keyIsMinor?.let { if (it) 1 else 0 }
+            beatInfo.keyIsMinor?.let { if (it) 1 else 0 },
+            beatInfo.energy,
         )
     }
 
