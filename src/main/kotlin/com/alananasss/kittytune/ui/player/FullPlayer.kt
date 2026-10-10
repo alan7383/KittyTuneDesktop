@@ -974,8 +974,9 @@ private fun LyricsOnCoverColour(viewModel: PlayerViewModel, palette: FullPlayerP
     // because in a panel the list is short enough not to need it.
     val fade = remember {
         Brush.verticalGradient(
+            // A short fade at the top only: the words start up there and the first lines have to be readable.
             0f to Color.Transparent,
-            0.10f to Color.Black,
+            0.035f to Color.Black,
             0.78f to Color.Black,
             1f to Color.Transparent,
         )

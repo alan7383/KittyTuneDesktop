@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
@@ -389,7 +390,16 @@ fun TrackInfoTab(vm: PlayerViewModel) {
                 }
             }
             // Faded in and out with the switch to the lyrics and back, not only when they first appear.
-            Box(Modifier.animateItem()) { CommentItemUI(comment, vm) }
+            // Closer to its neighbours than the page's other blocks are: the list's gap suits sections, and between
+            // comment cards it read as empty bands. The box reports a little less height, so the cards sit nearer.
+            val pullUp = if (isCompact) 6.dp else 10.dp
+            Box(
+                Modifier.animateItem().layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    val trim = pullUp.roundToPx().coerceAtMost(placeable.height)
+                    layout(placeable.width, placeable.height - trim) { placeable.place(0, 0) }
+                },
+            ) { CommentItemUI(comment, vm) }
         }
 
         if (!isSpotifyTrack && !lyricsHalf && vm.isCommentsLoading && vm.commentsList.isNotEmpty()) {

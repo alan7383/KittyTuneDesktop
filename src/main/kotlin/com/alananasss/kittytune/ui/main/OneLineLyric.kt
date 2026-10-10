@@ -56,7 +56,8 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
     val syncedLines = vm.lyricsLines
     val plainText = vm.rawPlainLyrics.orEmpty()
     val plainSpeed = vm.effectivePlainAutoScrollSpeed
-    val followsPlain = vm.lyricsMode == LyricsMode.PLAIN && vm.isPlainAutoScrollEnabled && plainText.isNotBlank()
+    // Whenever the words have no timings, whatever the auto-scroll switch says: the card is the only place they move.
+    val followsPlain = plainText.isNotBlank() && (vm.lyricsMode == LyricsMode.PLAIN || syncedLines.isEmpty())
     // Untimed text is paced the way the full screen scrolls it, line after line at the reader's chosen speed, so the card
     // moves through it at the same rate as the page does and fills each line the same smooth way.
     val plainLines = remember(plainText, plainSpeed, followsPlain) {

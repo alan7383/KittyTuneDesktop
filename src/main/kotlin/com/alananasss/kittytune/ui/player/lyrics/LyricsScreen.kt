@@ -422,7 +422,7 @@ import kotlin.math.roundToInt
         val fadeBrush = remember {
             Brush.verticalGradient(
                 0f to Color.Transparent,
-                0.15f to Color.Black,
+                0.04f to Color.Black,
                 0.85f to Color.Black,
                 1f to Color.Transparent
             )
@@ -680,7 +680,7 @@ import kotlin.math.roundToInt
         val fadeBrush = remember {
             Brush.verticalGradient(
                 0f to Color.Transparent,
-                0.15f to Color.Black,
+                0.04f to Color.Black,
                 0.85f to Color.Black,
                 1f to Color.Transparent
             )
