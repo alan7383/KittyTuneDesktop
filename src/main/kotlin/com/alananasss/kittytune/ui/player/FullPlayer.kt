@@ -81,6 +81,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1399,6 +1400,9 @@ private fun FullPlayerVolumeBar(
 ) {
     val volume = viewModel.volume.coerceIn(0f, 1f)
     val isMuted = volume <= 0.001f
+    // The wheel moves a target and the level glides to it, so a notch is a short slide and not a step of five per cent.
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val glide = remember { androidx.compose.animation.core.Animatable(0f) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1408,8 +1412,16 @@ private fun FullPlayerVolumeBar(
                         val event = awaitPointerEvent()
                         val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
                         if (scrollDelta != 0f) {
-                            viewModel.updateVolume((viewModel.volume - scrollDelta * 0.05f).coerceIn(0f, 1f))
-                            viewModel.persistVolumeSoon()
+                            val base = if (glide.isRunning) glide.targetValue else viewModel.volume
+                            val next = (base - scrollDelta * 0.04f).coerceIn(0f, 1f)
+                            scope.launch {
+                                if (!glide.isRunning) glide.snapTo(viewModel.volume)
+                                glide.animateTo(
+                                    next,
+                                    androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy, stiffness = 420f, visibilityThreshold = 0.002f),
+                                ) { viewModel.updateVolume(value) }
+                                viewModel.persistVolumeSoon()
+                            }
                         }
                     }
                 }
