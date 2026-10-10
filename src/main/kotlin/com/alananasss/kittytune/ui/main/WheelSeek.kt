@@ -98,7 +98,7 @@ internal class WheelSeek(
         const val CATCH_UP_LIMIT_NANOS = 1_500_000_000L
         const val CATCH_UP_POLL_MS = 40L
 
-        val WHEEL_SPRING = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = 380f, visibilityThreshold = 1f)
+        val WHEEL_SPRING = spring<Float>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = 1f)
     }
 }
 

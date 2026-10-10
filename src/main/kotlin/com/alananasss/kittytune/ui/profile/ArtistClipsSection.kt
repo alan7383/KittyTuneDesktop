@@ -158,6 +158,13 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
     val playback = remember(clip) { ClipPlayback(scope) }
     var hasNoStream by remember(clip) { mutableStateOf(false) }
 
+    var fullscreen by remember { mutableStateOf(false) }
+    // The dialog's own window is put into fullscreen via the screen device and given its old size back afterwards;
+    // Escape and the back button leave full screen first and close the clip only from the window.
+    val windowBefore = remember { arrayOfNulls<java.awt.Rectangle>(1) }
+    val windowRef = remember { arrayOfNulls<java.awt.Window>(1) }
+    val deviceRef = remember { arrayOfNulls<java.awt.GraphicsDevice>(1) }
+
     DisposableEffect(clip) {
         // Watching something else leaves a shared playlist, the way playing your own music does; otherwise the
         // pause below would pause it for everyone.
@@ -165,6 +172,16 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
         val wasPlaying = playerViewModel.isPlaying
         playerViewModel.pause()
         onDispose {
+            runCatching {
+                val d = deviceRef[0]
+                val w = windowRef[0]
+                if (d != null && d.fullScreenWindow == w) {
+                    d.fullScreenWindow = null
+                }
+                windowBefore[0]?.let { bounds ->
+                    w?.bounds = bounds
+                }
+            }
             playback.stop()
             if (wasPlaying) playerViewModel.play()
         }
@@ -174,18 +191,35 @@ internal fun ClipPlayerDialog(clip: Clip, playerViewModel: PlayerViewModel, onDi
         if (url == null) hasNoStream = true else playback.play(url)
     }
 
-    var fullscreen by remember { mutableStateOf(false) }
-    // The dialog's own window is stretched over the screen and given its old size back afterwards; Escape and the
-    // back button leave full screen first and close the clip only from the window.
-    val windowBefore = remember { arrayOfNulls<java.awt.Rectangle>(1) }
     LaunchedEffect(fullscreen) {
-        val window = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow ?: return@LaunchedEffect
+        val window = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow
+            ?: java.awt.Window.getWindows().firstOrNull { it.isShowing && it is javax.swing.JDialog }
+            ?: java.awt.Window.getWindows().lastOrNull { it.isShowing }
+            ?: return@LaunchedEffect
+        val device = window.graphicsConfiguration?.device
         if (fullscreen) {
+            windowRef[0] = window
+            deviceRef[0] = device
             windowBefore[0] = window.bounds
-            window.bounds = window.graphicsConfiguration.bounds
+            if (device != null && device.isFullScreenSupported) {
+                device.fullScreenWindow = window
+            } else {
+                window.bounds = window.graphicsConfiguration.bounds
+            }
+            window.toFront()
+            window.requestFocus()
         } else {
-            windowBefore[0]?.let { window.bounds = it }
+            val d = deviceRef[0] ?: device
+            val w = windowRef[0] ?: window
+            if (d?.fullScreenWindow == w) {
+                d.fullScreenWindow = null
+            }
+            windowBefore[0]?.let { bounds ->
+                w?.bounds = bounds
+            }
             windowBefore[0] = null
+            deviceRef[0] = null
+            windowRef[0] = null
         }
     }
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
@@ -324,19 +358,10 @@ private val CLIP_CARD_WIDTH = 260.dp
  * artists come from the liked songs, the most liked first, and each one's clips are looked up once and kept.
  */
 @Composable
-internal fun HomeClipsShelf(playerViewModel: PlayerViewModel) {
-    val likes by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
-    val artists = remember(likes.size) {
-        likes.mapNotNull { it.displayArtist.takeIf { name -> name.isNotBlank() } }
-            .groupingBy { it }.eachCount()
-            .entries.sortedByDescending { it.value }
-            .take(HOME_CLIP_ARTISTS).map { it.key }
-    }
-    val clips by produceState(emptyList<Clip>(), artists) {
-        value = withContext(Dispatchers.IO) {
-            coroutineScope { artists.map { async { ArtistClips.clipsFor(it).take(HOME_CLIPS_EACH) } }.awaitAll().flatten() }
-        }.distinctBy { it.url }.take(HOME_CLIPS_MAX)
-    }
+internal fun HomeClipsShelf(
+    playerViewModel: PlayerViewModel,
+    clips: List<Clip> = ArtistClips.homeClips.collectAsState().value,
+) {
     var watching by remember { mutableStateOf<Clip?>(null) }
     if (clips.isEmpty()) return
 
@@ -353,6 +378,3 @@ internal fun HomeClipsShelf(playerViewModel: PlayerViewModel) {
     watching?.let { clip -> ClipPlayerDialog(clip, playerViewModel, onDismiss = { watching = null }) }
 }
 
-private const val HOME_CLIP_ARTISTS = 4
-private const val HOME_CLIPS_EACH = 3
-private const val HOME_CLIPS_MAX = 12

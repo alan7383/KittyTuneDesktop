@@ -73,4 +73,15 @@ class ArtistClipsTest {
             ArtistClips.pickClips(listOf("Rihanna"), found).map { it.title },
         )
     }
+
+    @Test
+    fun `homeClips retains clips in state flow and returns empty for empty likes`() = kotlinx.coroutines.runBlocking {
+        val testClips = listOf(clip("Rihanna - Umbrella (Official Music Video)", "Rihanna"))
+        ArtistClips.setHomeClipsForTesting(testClips)
+        assertEquals(testClips, ArtistClips.homeClips.value)
+
+        val emptyResult = ArtistClips.loadHomeClips(emptyList())
+        assertEquals(emptyList(), emptyResult)
+    }
 }
+

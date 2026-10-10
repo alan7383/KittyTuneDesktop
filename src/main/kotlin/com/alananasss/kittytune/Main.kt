@@ -93,6 +93,7 @@ private const val DROP_HIDDEN_WINDOW_AFTER_MS = 20_000L
 
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
 fun main(args: Array<String>) {
+    com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
     // Before anything heavy loads: a second launch only has to wake the first one up.
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).

@@ -115,6 +115,7 @@ dependencies {
 // which is why it is a JVM argument of the test task and not something a test could set for itself.
 tasks.withType<Test>().configureEach {
     providers.gradleProperty("uiScale").orNull?.let { systemProperty("sun.java2d.uiScale", it) }
+    jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
 }
 
 compose.desktop {
@@ -136,6 +137,7 @@ compose.desktop {
         // stop printing it", and it also keeps that code working once the default flips to
         // deny. The day Unsafe actually goes, jnr needs a release either way.
         if (buildJdk >= 24) jvmArgs += "--sun-misc-unsafe-memory-access=allow"
+        jvmArgs += "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED"
 
         // Memory, and why an audio app cares about the collector it gets (issue #33).
         //
@@ -329,6 +331,7 @@ compose.desktop {
 
 tasks.withType<JavaExec>().configureEach {
     systemProperty("sun.java2d.wm.className", "kitty-tune")
+    jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
 }
 java {
     sourceCompatibility = JavaVersion.VERSION_21

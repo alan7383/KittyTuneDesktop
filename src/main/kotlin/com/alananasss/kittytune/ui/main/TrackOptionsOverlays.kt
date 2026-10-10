@@ -629,7 +629,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                         },
                         tint = MaterialTheme.colorScheme.error.takeIf { isDownloaded },
                         iconContent = { tint ->
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(30.dp)) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(26.dp)) {
                                 if (isDownloading) {
                                     val animatedProgress by animateFloatAsState(
                                         targetValue = (downloadProgressVal ?: 0) / 100f,
@@ -639,12 +639,12 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                                         progress = { animatedProgress },
                                         modifier = Modifier.fillMaxSize(),
                                     )
-                                    Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Outlined.Cancel, null, modifier = Modifier.size(16.dp))
                                 } else {
                                     Icon(
                                         if (isDownloaded) Icons.Rounded.Delete else Icons.Rounded.Download,
                                         null,
-                                        modifier = Modifier.size(30.dp),
+                                        modifier = Modifier.size(26.dp),
                                         tint = tint,
                                     )
                                 }
@@ -1461,7 +1461,7 @@ private fun MenuTileGrid(menu: String, items: List<MenuOptionItem>) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
         state = gridState,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.heightIn(max = 420.dp)
     ) {
@@ -1490,20 +1490,17 @@ private fun ReorderableCollectionItemScope.MenuTile(
     // Lifted rather than shadowed: the tile has no container of its own to cast one.
     val scale by animateFloatAsState(if (isDragging) 1.12f else 1f, label = "menuTileScale")
 
-    Box {
+    Box(modifier = Modifier.fillMaxWidth().height(88.dp)) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                // Fills its cell, which it used to get for free.
+                // Fills its cell with uniform width and height for every tile in the grid.
                 //
-                // A grid cell hands its item an exact width, so the tile filled it and its icon sat in
-                // the middle. [ReorderableItem] wraps what it is given in a Box, and a Box does not
-                // pass a minimum width down, so the tile started measuring itself against its own
-                // label instead: short labels ended up hugging the left of their cell and long ones
-                // reaching the middle, and no two icons in a column lined up. Asking for the width
-                // back restores it, and gives the click and its ripple the whole tile while it is
-                // there (issue #33).
-                .fillMaxWidth()
+                // A grid cell hands its item an exact width, and giving every tile a matching fixed
+                // height (88.dp) ensures all tiles have identical size and rounded container boundaries
+                // regardless of whether their label is 1 or 2 lines. Icons line up in straight rows
+                // and labels sit vertically centered in their allocated slot.
+                .fillMaxSize()
                 .graphicsLayer { scaleX = scale; scaleY = scale }
                 .clip(RoundedCornerShape(16.dp))
                 .background(
@@ -1516,25 +1513,32 @@ private fun ReorderableCollectionItemScope.MenuTile(
                     onClick = { contextMenuOpen = true },
                 )
                 .clickable { item.onClick() }
-                .padding(horizontal = 6.dp, vertical = 12.dp)
+                .pointerHoverIcon(PointerIcon.Hand)
+                .padding(horizontal = 6.dp, vertical = 10.dp)
         ) {
-            // One size and one tone for every icon: the old per-item outlines and the default set were the
-            // mismatched part of this menu.
+            // One size and one tone for every icon: 26.dp centered in a matching slot.
             val icon = item.iconContent
-            if (icon != null) {
-                icon(tint)
-            } else {
-                Icon(item.icon, null, modifier = Modifier.size(26.dp), tint = tint)
+            Box(modifier = Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+                if (icon != null) {
+                    icon(tint)
+                } else {
+                    Icon(item.icon, null, modifier = Modifier.size(26.dp), tint = tint)
+                }
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = item.text,
-                style = MaterialTheme.typography.labelMedium,
-                textAlign = TextAlign.Center,
-                color = tint,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Spacer(Modifier.height(6.dp))
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                    color = tint,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         DropdownMenu(expanded = contextMenuOpen, onDismissRequest = { contextMenuOpen = false }) {

@@ -77,6 +77,15 @@ internal fun HomeFeed(
     val showHomeYourMix by prefs.showHomeYourMixFlow().collectAsState(initial = prefs.getShowHomeYourMix())
     val showHomeListeningStats by prefs.showHomeListeningStatsFlow().collectAsState(initial = prefs.getShowHomeListeningStats())
 
+    val homeClips by com.alananasss.kittytune.data.artist.ArtistClips.homeClips.collectAsState()
+    val likes by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
+
+    LaunchedEffect(likes) {
+        if (likes.isNotEmpty() && com.alananasss.kittytune.data.artist.ArtistClips.homeClips.value.isEmpty()) {
+            com.alananasss.kittytune.data.artist.ArtistClips.loadHomeClips(likes)
+        }
+    }
+
     val contextHistory = remember(history) {
         history.filter { it.id != "playlist:0" && !it.title.equals("history", ignoreCase = true) }
             .distinctBy { it.id }
@@ -115,9 +124,13 @@ internal fun HomeFeed(
         }
 
         // New videos of the artists being listened to, on the home page as on an artist's own (round 3, 24), under the chart.
-        item(key = "clips") { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel) }
+        if (homeClips.isNotEmpty()) {
+            item(key = "clips") { com.alananasss.kittytune.ui.profile.HomeClipsShelf(playerViewModel, homeClips) }
+        }
 
-        item(key = "from_artists") { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
+        if (vm.likedArtistUpdates.isNotEmpty()) {
+            item(key = "from_artists") { com.alananasss.kittytune.ui.home.FromYourArtistsSection(vm, playerViewModel) }
+        }
 
         if (showHomeYourMix) {
             item(key = "mix") { Box(Modifier.padding(horizontal = HOME_PADDING)) { StartMixingCard(playerViewModel) } }

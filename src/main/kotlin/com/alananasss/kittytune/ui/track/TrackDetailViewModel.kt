@@ -53,6 +53,10 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
     var isPlaylistsLoadingMore by mutableStateOf(false)
     var isRelatedLoadingMore by mutableStateOf(false)
 
+    // loading state for sort toggle (full re-fetch)
+    var isPlaylistsSortLoading by mutableStateOf(false)
+    var isUsersSortLoading by mutableStateOf(false)
+
     var isUsersSortedByFollowers by mutableStateOf(true)
         private set
     var isPlaylistsSortedByLikes by mutableStateOf(true)
@@ -135,16 +139,26 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
 
     fun toggleUsersSort() {
         isUsersSortedByFollowers = !isUsersSortedByFollowers
-        showUsers()
-        save()
+        // When sorting by followers, wait for all pages to load before displaying,
+        // otherwise the user sees a partial list that "refreshes" later.
+        if (isUsersSortedByFollowers) {
+            prefetchUsers()
+        } else {
+            showUsers()
+            save()
+        }
     }
 
     fun toggleSortPlaylists() {
         isPlaylistsSortedByLikes = !isPlaylistsSortedByLikes
-        showPlaylists()
-        // By likes it is worth having them all before choosing the top.
-        if (isPlaylistsSortedByLikes) fetchRestOfPlaylists()
-        save()
+        // When sorting by likes, wait for all pages to load before displaying,
+        // otherwise the user sees a partial list that "refreshes" later.
+        if (isPlaylistsSortedByLikes) {
+            fetchRestOfPlaylists()
+        } else {
+            showPlaylists()
+            save()
+        }
     }
 
     /**
@@ -156,6 +170,7 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
         prefetchJob?.cancel()
         prefetchJob = viewModelScope.launch {
             val id = loadedTrackId
+            isUsersSortLoading = true
             try {
                 repeat(PREFETCH_PAGES) {
                     val nextLikers = likersNextUrl
@@ -173,6 +188,8 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
                 throw e
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                isUsersSortLoading = false
             }
             if (id == loadedTrackId) {
                 showUsers()
@@ -187,6 +204,7 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
         playlistsFetchJob?.cancel()
         playlistsFetchJob = viewModelScope.launch {
             val id = loadedTrackId
+            isPlaylistsSortLoading = true
             isPlaylistsLoadingMore = true
             try {
                 var next = playlistsNextUrl
@@ -202,6 +220,7 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
+                isPlaylistsSortLoading = false
                 isPlaylistsLoadingMore = false
                 save()
             }

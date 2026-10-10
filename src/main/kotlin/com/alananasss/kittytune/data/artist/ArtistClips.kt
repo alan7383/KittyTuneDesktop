@@ -2,11 +2,14 @@ package com.alananasss.kittytune.data.artist
 
 import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.lyrics.GeniusVoices
+import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.search.SearchInfo
@@ -36,12 +39,38 @@ data class Clip(
  */
 object ArtistClips {
 
+    const val HOME_CLIP_ARTISTS = 4
+    const val HOME_CLIPS_EACH = 3
+    const val HOME_CLIPS_MAX = 12
+
+    private val _homeClips = MutableStateFlow<List<Clip>>(emptyList())
+    val homeClips = _homeClips.asStateFlow()
+
     private const val MAX_CLIPS = 10
     private const val MAX_CLIPS_DUO = 14
     private const val ENOUGH_CLIPS = 6
     private const val MIN_CLIP_SEC = 90L
     private const val MAX_CLIP_SEC = 15 * 60L
     private const val CACHE_SIZE = 32
+
+    suspend fun loadHomeClips(likes: List<Track>): List<Clip> {
+        val artists = likes.mapNotNull { it.displayArtist.takeIf { name -> name.isNotBlank() } }
+            .groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }
+            .take(HOME_CLIP_ARTISTS).map { it.key }
+        if (artists.isEmpty()) return emptyList()
+        val clips = withContext(Dispatchers.IO) {
+            coroutineScope { artists.map { async { clipsFor(it).take(HOME_CLIPS_EACH) } }.awaitAll().flatten() }
+        }.distinctBy { it.url }.take(HOME_CLIPS_MAX)
+        if (clips.isNotEmpty()) {
+            _homeClips.value = clips
+        }
+        return clips
+    }
+
+    fun setHomeClipsForTesting(clips: List<Clip>) {
+        _homeClips.value = clips
+    }
 
     /** Highest muxed resolution asked for; YouTube rarely offers more than 360p with sound in one file. */
     private const val MAX_HEIGHT = 720

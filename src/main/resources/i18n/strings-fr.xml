@@ -523,7 +523,6 @@
     <string name="discord_status_soundcloud">Nom de l\'activité (SoundCloud)</string>
     <string name="discord_token_present">Token présent</string>
     <string name="download_comment">Via KittyTune</string>
-    <string name="drm_explanation_text">Les pistes protégées par DRM sont cryptées par les ayants droit pour empêcher leur extraction et garantir les droits d\'auteur.\n\n• Activé (Recommandé) : La musique est téléchargée dans sa qualité d\'origine au sein du cache sécurisé de KittyTune. Elle ne sera lisible qu\'à l\'intérieur de l\'application et n\'apparaîtra pas dans votre dossier de téléchargement configuré.\n\n• Désactivé : KittyTune ignorera la version protégée et tentera de télécharger la chanson via YouTube. Le fichier sera converti en MP3 standard et sauvegardé dans le dossier de votre choix. Attention : la recherche étant automatique, il est possible de télécharger un contenu erroné (comme un clip vidéo ou une reprise) si le titre n\'est pas très connu.</string>
     <string name="earrape_warning">Cet effet est extrêmement fort et saturé. À utiliser avec prudence pour éviter des dommages auditifs.</string>
     <string name="edit_tiles_subtitle">Sélectionne les tuiles à épingler au dock rapide</string>
     <string name="edit_tiles_title">Modifier les tuiles</string>
@@ -1267,8 +1266,6 @@
     <string name="pref_discord_status_display">Choix de l\'affichage du statut</string>
     <string name="pref_discord_subtitle">Rich Presence</string>
     <string name="pref_discord_title">Intégration Discord</string>
-    <string name="pref_download_drm">Télécharger les flux DRM natifs</string>
-    <string name="pref_download_drm_sub">Activez pour garder les DRM en cache interne. Désactivez pour forcer la conversion MP3 via YouTube (NewPipe).</string>
     <string name="pref_app_icon">Icône de l'application</string>
     <string name="pref_vertical_volume_slider">Curseur de volume vertical</string>
     <string name="pref_vertical_volume_slider_sub">Affiche un curseur de volume vertical au-dessus de l'icône haut-parleur de la barre de lecture</string>
@@ -2963,4 +2960,8 @@
     <string name="full_player_cover_feather">Soften cover edges</string>
     <string name="full_player_cover_feather_desc">Fade the cover into the background while lyrics are shown</string>
     <string name="full_player_cover_feather_amount">Edge blur strength</string>
+    <string name="time_hours_minutes">%1$dh %2$02dmin</string>
+    <string name="time_hours">%1$dh</string>
+    <string name="time_minutes">%1$d min</string>
+    <string name="time_seconds">%1$ds</string>
 </resources>

@@ -51,6 +51,15 @@ class WavyVolumeSliderTest {
     }
 
     @Test
+    fun `full player volume bar uses volumeWheel for smooth mouse wheel adjustments`() {
+        val fullPlayerSource = java.io.File("src/main/kotlin/com/alananasss/kittytune/ui/player/FullPlayer.kt").readText()
+        assertTrue(
+            fullPlayerSource.contains(".volumeWheel("),
+            "FullPlayerVolumeBar must use volumeWheel modifier for smooth scrolling identical to player bar",
+        )
+    }
+
+    @Test
     fun `volume icon and labels reflect mute down and up states`() {
         assertEquals(Icons.AutoMirrored.Filled.VolumeOff, com.alananasss.kittytune.ui.main.volumeIcon(0f))
         assertEquals(Icons.AutoMirrored.Filled.VolumeOff, com.alananasss.kittytune.ui.main.volumeIcon(0.001f))

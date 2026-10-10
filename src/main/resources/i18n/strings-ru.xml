@@ -523,7 +523,6 @@
     <string name="discord_status_soundcloud">Название активности (SoundCloud)</string>
     <string name="discord_token_present">Токен включён</string>
     <string name="download_comment">Через KittyTune</string>
-    <string name="drm_explanation_text">Защищенные DRM-треки зашифрованы правообладателями для предотвращения извлечения и защиты авторских прав.\n\n• Включено (рекомендуется): Трек загружается в оригинальном высоком качестве в безопасный внутренний кэш KittyTune. Он воспроизводится только внутри приложения и не появится в обычной папке загрузок.\n\n• Отключено: KittyTune проигнорирует зашифрованную версию и попытается найти и скачать песню через YouTube в формате MP3. Предупреждение: так как поиск автоматический, может загрузиться неправильная версия (клип или кавер), если трек малоизвестен.</string>
     <string name="earrape_warning">Этот эффект очень громкий. Используйте с осторожностью, чтобы избежать повреждения слуха.</string>
     <string name="edit_tiles_subtitle">Выберите эффекты для панели быстрого доступа</string>
     <string name="edit_tiles_title">Изменение плиток</string>
@@ -1267,8 +1266,6 @@
     <string name="pref_discord_status_display">Выбрать отображение статуса</string>
     <string name="pref_discord_subtitle">Статус активности</string>
     <string name="pref_discord_title">Интеграция с Discord</string>
-    <string name="pref_download_drm">Скачать оригинальный DRM</string>
-    <string name="pref_download_drm_sub">Оставьте включённым для сохранения оригинальных DRM-треков во внутренний кэш. Отключите для принудительного скачивания MP3-версий через YouTube.</string>
     <string name="pref_app_icon">Значок приложения</string>
     <string name="pref_vertical_volume_slider">Вертикальный ползунок громкости</string>
     <string name="pref_vertical_volume_slider_sub">Показывать вертикальный ползунок громкости над значком динамика</string>
@@ -2961,4 +2958,8 @@
     <string name="full_player_cover_feather">Размытие краёв обложки</string>
     <string name="full_player_cover_feather_desc">Края обложки растворяются в фоне, пока показан текст</string>
     <string name="full_player_cover_feather_amount">Сила размытия краёв</string>
+    <string name="time_hours_minutes">%1$d ч. %2$d мин.</string>
+    <string name="time_hours">%1$d ч.</string>
+    <string name="time_minutes">%1$d мин.</string>
+    <string name="time_seconds">%1$d с</string>
 </resources>

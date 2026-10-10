@@ -69,6 +69,7 @@ import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.player.AnchorCurrentQueueItem
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.ui.player.queueItemKeys
+import com.alananasss.kittytune.utils.formatQueueDuration
 import com.alananasss.kittytune.utils.makeTimeString
 import com.alananasss.kittytune.ui.common.PlayingBars
 import sh.calvin.reorderable.ReorderableCollectionItemScope
@@ -226,7 +227,7 @@ private fun QueueToolbar(vm: PlayerViewModel, upNextCount: Int) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = str("queue_time_left", makeTimeString(leftMs)),
+            text = str("queue_time_left", formatQueueDuration(leftMs)),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,

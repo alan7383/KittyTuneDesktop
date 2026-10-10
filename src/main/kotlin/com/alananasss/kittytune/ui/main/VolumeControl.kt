@@ -660,7 +660,7 @@ internal fun volumePercentLabel(volume: Float): String {
  * moved one step either side of that stale value.
  */
 @Composable
-private fun Modifier.volumeWheel(
+internal fun Modifier.volumeWheel(
     currentVolume: () -> Float,
     onVolumeChange: (Float) -> Unit,
 ): Modifier {

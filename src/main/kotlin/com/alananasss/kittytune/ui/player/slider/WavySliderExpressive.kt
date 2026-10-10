@@ -160,46 +160,17 @@ fun WavySliderExpressive(
     // `delay`, which — unlike awaiting frames — does not itself ask for any. The previous version ran
     // Material's wave animation and a per-frame glide, each requesting every frame: the whole window
     // was re-rendered at 60 fps for as long as music played, about a quarter of a CPU core.
-    val renderedNormalizedProgress = remember { mutableFloatStateOf(normalizedValueState.value) }
     val wavePhasePx = remember { mutableFloatStateOf(0f) }
     val wavelengthPx = with(density) { wavelength.toPx() }.coerceAtLeast(1f)
     val waveSpeedPx = with(density) { waveSpeed.toPx() }
 
-    // Jumps land at once: a seek, a new track, a drag, or anything while the glide is not running.
-    val isGliding = isSeen && isPlaying && enabled && !isInteracting
-    LaunchedEffect(isGliding, valueRange) {
-        snapshotFlow { normalizedValueState.value }.collect { target ->
-            val current = renderedNormalizedProgress.floatValue
-            if (!isGliding || target == 0f || abs(current - target) > 0.08f) {
-                renderedNormalizedProgress.floatValue = target
-            }
-        }
-    }
-    // While a mix is shown the value is already a smooth slide of its own: smoothing it again here lagged the thumb behind the
-    // glow, and ticking at 30 fps made the slide step.
-    val exact = mix?.isActive == true
-    LaunchedEffect(exact, isSeen, wavelengthPx, waveSpeedPx) {
-        if (!exact || !isSeen) return@LaunchedEffect
+    // Wave travels only while music is playing, window is visible, and user is not dragging
+    val isWaveMoving = isSeen && isPlaying && enabled && !isInteracting
+    LaunchedEffect(isWaveMoving, wavelengthPx, waveSpeedPx) {
+        if (!isWaveMoving) return@LaunchedEffect
         while (isActive) {
-            androidx.compose.runtime.withFrameNanos { wavePhasePx.floatValue = wavePhasePx(waveSpeedPx, wavelengthPx) }
-        }
-    }
-    LaunchedEffect(isGliding, exact, wavelengthPx, waveSpeedPx) {
-        if (!isGliding || exact) return@LaunchedEffect
-        var last = System.nanoTime()
-        while (isActive) {
-            delay(WAVE_TICK_MS)
-            val now = System.nanoTime()
-            val seconds = (now - last) / 1_000_000_000f
-            last = now
             wavePhasePx.floatValue = wavePhasePx(waveSpeedPx, wavelengthPx)
-            // Position updates arrive about every 250 ms; closing the gap over that span keeps the
-            // thumb moving steadily instead of stepping four times a second.
-            val target = normalizedValueState.value
-            val current = renderedNormalizedProgress.floatValue
-            renderedNormalizedProgress.floatValue =
-                if (abs(target - current) < 0.0005f) target
-                else current + (target - current) * (seconds / 0.25f).coerceAtMost(1f)
+            delay(WAVE_TICK_MS)
         }
     }
 
@@ -239,7 +210,7 @@ fun WavySliderExpressive(
             val trackEnd = size.width - edgePaddingPx
             val trackWidth = (trackEnd - trackStart).coerceAtLeast(0f)
             val thumbY = size.height / 2
-            val renderedProgress = if (exact) normalizedValueState.value else renderedNormalizedProgress.floatValue
+            val renderedProgress = normalizedValueState.value
 
             fun lerp(start: Float, stop: Float, fraction: Float): Float {
                 return start + (stop - start) * fraction

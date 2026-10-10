@@ -3020,7 +3020,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     isLocalDetailsMode = false
                     localFilePathForDetails = null
                     showMenuSheet = false
-                    showDetailsSheet = true
+                    showDetailsSheet = false
+                    navigateToTrackDetails(target.id)
 
                     if (target.source == "soundcloud" && target.id > 0 && (target.user?.id == 0L || target.playbackCount == 0)) {
                         try {
