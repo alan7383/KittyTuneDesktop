@@ -141,9 +141,10 @@
         var isChartLoading by mutableStateOf(false)
 
         init {
-            loadCountryCharts(0)
             loadChart(ChartKind.COUNTRY, chartGenres.first())
         }
+
+        private var chartJob: kotlinx.coroutines.Job? = null
 
         /**
          * Loads the ranked song list.
@@ -156,16 +157,16 @@
             chartKind = kind
             chartGenre = genre
 
-            viewModelScope.launch {
+            // A switch made mid-flight is cancelled, not raced: when only kind and genre were compared, a slow answer for
+            // the country picked before this one could land after the new one and put the old country's songs back.
+            chartJob?.cancel()
+            val country = chartCountry
+            chartJob = viewModelScope.launch {
                 isChartLoading = true
-                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode(), chartCountry)
-                // A switch made mid-flight must not leave the newer request's answer overwritten by
-                // the older one's.
-                if (kind == chartKind && genre == chartGenre) {
-                    chartEntries.clear()
-                    chartEntries.addAll(entries)
-                    isChartLoading = false
-                }
+                val entries = fetchChart(api, kind, genre, CHART_LENGTH, currentCountryCode(), country)
+                chartEntries.clear()
+                chartEntries.addAll(entries)
+                isChartLoading = false
             }
         }
 
@@ -174,8 +175,8 @@
             loadChart(chartKind, chartGenre)
         }
 
-        fun currentCountryCode(): String =
-            ChartsData.charts.getOrNull(selectedCountryIndex)?.countryCode ?: "US"
+        /** The picked country as SoundCloud's own chart playlists spell it; it used to be a list index nobody could change any more. */
+        fun currentCountryCode(): String = chartCountry.appleStorefront.uppercase()
 
         fun loadCountryCharts(index: Int) {
             selectedCountryIndex = index
