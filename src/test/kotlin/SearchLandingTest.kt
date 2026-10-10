@@ -145,7 +145,7 @@ class SearchLandingTest {
             "Re-sorting the chart by play count would be second-guessing the server's order",
         )
         assertTrue(
-            vm.contains("kind == chartKind && genre == chartGenre"),
+            vm.contains("chartJob?.cancel()"),
             "A switch made mid-flight must not be overwritten by the older request's answer",
         )
         assertTrue(
