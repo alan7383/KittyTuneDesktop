@@ -36,6 +36,7 @@ class MprisService(
     private val onVolume: (Double) -> Unit,
     private val onShuffle: (Boolean) -> Unit,
     private val onLoopStatus: (LoopStatus) -> Unit,
+    private val busName: String = BUS_NAME,
 ) : Closeable {
 
     enum class LoopStatus(val mprisName: String) {
@@ -73,11 +74,11 @@ class MprisService(
         if (isLinux()) {
             runCatching {
                 val conn = DBusConnectionBuilder.forSessionBus().build()
-                conn.requestBusName(BUS_NAME)
+                conn.requestBusName(busName)
                 conn.exportObject(OBJECT_PATH, Mpris2Object())
                 connection = conn
             }.onFailure { e ->
-                println("MPRIS: could not register $BUS_NAME: ${e.message}")
+                println("MPRIS: could not register $busName: ${e.message}")
                 runCatching { connection?.disconnect() }
                 connection = null
             }

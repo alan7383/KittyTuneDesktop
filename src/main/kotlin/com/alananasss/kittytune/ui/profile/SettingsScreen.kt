@@ -479,6 +479,8 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     var localMedia by remember { mutableStateOf(prefs.getLocalMediaEnabled()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
     var discordRpc by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
+    var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
+    var fullPlayerCoverFeather by remember { mutableStateOf(playerViewModel.fullPlayerCoverFeather) }
 
     return listOf(
         // INTERFACE - Pages
@@ -679,6 +681,61 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             switchState = playerViewModel.fullPlayerSourceIndicatorEnabled,
             onSwitchChange = { playerViewModel.updateFullPlayerSourceIndicatorEnabled(it) },
             highlightKey = "pref_full_player_source",
+        ),
+        SettingsSearchItem(
+            title = str("full_player_cover_feather"),
+            subtitle = str("full_player_cover_feather_desc"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PLAYER)),
+            icon = Icons.Rounded.BlurOn,
+            keywords = listOf("feather", "soften", "cover", "blur", "edges", "adoucir", "bords", "pochette", "plein écran", "fullscreen", "размытие", "края обложки"),
+            hasSwitch = true,
+            switchState = fullPlayerCoverFeather,
+            onSwitchChange = {
+                fullPlayerCoverFeather = it
+                playerViewModel.updateFullPlayerCoverFeather(it)
+                prefs.setFullPlayerCoverFeather(it)
+            },
+            highlightKey = "full_player_cover_feather",
+        ),
+        SettingsSearchItem(
+            title = str("pref_lyrics_one_line_title"),
+            subtitle = str("pref_lyrics_one_line_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS)),
+            icon = Icons.Rounded.Subtitles,
+            keywords = listOf("one line", "floating lyrics", "lyrics bar", "une ligne", "paroles flottantes", "одна строка", "плавающий текст"),
+            hasSwitch = true,
+            switchState = oneLineLyrics,
+            onSwitchChange = {
+                oneLineLyrics = it
+                prefs.setOneLineLyricsEnabled(it)
+            },
+            highlightKey = "pref_lyrics_one_line",
+        ),
+        SettingsSearchItem(
+            title = str("pref_lyrics_backing_title"),
+            subtitle = str("pref_lyrics_backing_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS)),
+            icon = Icons.Rounded.RecordVoiceOver,
+            keywords = listOf("backing vocals", "backing", "choeurs", "voix secondaires", "бэк вокал"),
+            hasSwitch = true,
+            switchState = playerViewModel.lyricsSplitBackingVocals,
+            onSwitchChange = { playerViewModel.updateLyricsSplitBackingVocals(it) },
+            highlightKey = "pref_lyrics_backing",
+        ),
+        SettingsSearchItem(
+            title = str("pref_lyrics_reveal_words_title"),
+            subtitle = str("pref_lyrics_reveal_words_sub"),
+            category = SettingsCategory.INTERFACE,
+            place = SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS)),
+            icon = Icons.Rounded.Animation,
+            keywords = listOf("reveal words", "word by word", "animation", "mot à mot", "пословное появление"),
+            hasSwitch = true,
+            switchState = playerViewModel.lyricsRevealWords,
+            onSwitchChange = { playerViewModel.updateLyricsRevealWords(it) },
+            highlightKey = "pref_lyrics_reveal_words",
         ),
 
         // AUDIO - Folders & Direct Options

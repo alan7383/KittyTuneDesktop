@@ -533,7 +533,7 @@ class PlayerPreferences {
     fun getWaveMode(): String = Prefs.getString(KEY_WAVE_MODE, "BALANCED") ?: "BALANCED"
     fun setWaveMode(mode: String) = Prefs.putString(KEY_WAVE_MODE, mode)
 
-    fun getOneLineLyricsEnabled(): Boolean = Prefs.getBoolean(KEY_ONE_LINE_LYRICS, true)
+    fun getOneLineLyricsEnabled(): Boolean = Prefs.getBoolean(KEY_ONE_LINE_LYRICS, false)
     fun setOneLineLyricsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_ONE_LINE_LYRICS, enabled)
 
     fun getShowLyricsButtonEnabled(): Boolean = Prefs.getBoolean(KEY_SHOW_LYRICS_BUTTON, true)
@@ -893,7 +893,7 @@ class PlayerPreferences {
     fun getFullPlayerCoverScale(): Float = Prefs.getFloat(KEY_FULL_PLAYER_COVER_SCALE, 1.0f).coerceIn(0.6f, 1.4f)
     fun setFullPlayerCoverScale(scale: Float) = Prefs.putFloat(KEY_FULL_PLAYER_COVER_SCALE, scale.coerceIn(0.6f, 1.4f))
 
-    fun getFullPlayerCoverFeather(): Boolean = Prefs.getBoolean(KEY_FULL_PLAYER_COVER_FEATHER, true)
+    fun getFullPlayerCoverFeather(): Boolean = Prefs.getBoolean(KEY_FULL_PLAYER_COVER_FEATHER, false)
     fun setFullPlayerCoverFeather(enabled: Boolean) = Prefs.putBoolean(KEY_FULL_PLAYER_COVER_FEATHER, enabled)
 
     /** 0..1, how far the soft edge reaches into the cover. */

@@ -104,6 +104,8 @@ fun PlayerDesignContent(
     var fullPlayerSourceEnabled by remember { mutableStateOf(prefs.getFullPlayerSourceIndicatorEnabled()) }
     var localScreensaverEnabled by remember { mutableStateOf(prefs.getFullPlayerScreensaverEnabled()) }
     var localScreensaverTimeout by remember { mutableIntStateOf(prefs.getFullPlayerScreensaverTimeout()) }
+    var fullPlayerCoverFeather by remember { mutableStateOf(playerViewModel?.fullPlayerCoverFeather ?: prefs.getFullPlayerCoverFeather()) }
+    var fullPlayerCoverFeatherAmount by remember { mutableFloatStateOf(playerViewModel?.fullPlayerCoverFeatherAmount ?: prefs.getFullPlayerCoverFeatherAmount()) }
 
     val currentScreensaverEnabled = playerViewModel?.fullPlayerScreensaverEnabled ?: localScreensaverEnabled
     val currentScreensaverTimeout = playerViewModel?.fullPlayerScreensaverTimeoutSeconds ?: localScreensaverTimeout
@@ -208,6 +210,25 @@ fun PlayerDesignContent(
                 onTimeoutChange = { timeout ->
                     localScreensaverTimeout = timeout
                     playerViewModel?.updateFullPlayerScreensaverTimeout(timeout) ?: prefs.setFullPlayerScreensaverTimeout(timeout)
+                }
+            )
+
+            CoverFeatherSection(
+                shape = RoundedCornerShape(
+                    topStart = 4.dp,
+                    topEnd = 4.dp,
+                    bottomStart = 24.dp,
+                    bottomEnd = 24.dp
+                ),
+                enabled = fullPlayerCoverFeather,
+                onEnabledChange = { enabled ->
+                    fullPlayerCoverFeather = enabled
+                    playerViewModel?.updateFullPlayerCoverFeather(enabled) ?: prefs.setFullPlayerCoverFeather(enabled)
+                },
+                amount = fullPlayerCoverFeatherAmount,
+                onAmountChange = { amount ->
+                    fullPlayerCoverFeatherAmount = amount
+                    playerViewModel?.updateFullPlayerCoverFeatherAmount(amount) ?: prefs.setFullPlayerCoverFeatherAmount(amount)
                 }
             )
         }
@@ -838,10 +859,7 @@ private fun ScreensaverSection(
         }
     }
 
-    val bottomRadius by animateDpAsState(
-        targetValue = if (enabled) 4.dp else 24.dp,
-        label = "ScreensaverCornerAnimation"
-    )
+    val bottomRadius = 4.dp
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -869,12 +887,7 @@ private fun ScreensaverSection(
             exit = shrinkVertically() + fadeOut(),
         ) {
             Surface(
-                shape = RoundedCornerShape(
-                    topStart = 4.dp,
-                    topEnd = 4.dp,
-                    bottomStart = 24.dp,
-                    bottomEnd = 24.dp
-                ),
+                shape = RoundedCornerShape(4.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -952,6 +965,96 @@ private fun ScreensaverSection(
                         },
                         valueRange = 0f..(steps.lastIndex).toFloat(),
                         steps = steps.size - 2,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CoverFeatherSection(
+    shape: Shape,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    amount: Float,
+    onAmountChange: (Float) -> Unit,
+) {
+    val bottomRadius by animateDpAsState(
+        targetValue = if (enabled) 4.dp else 24.dp,
+        label = "CoverFeatherCornerAnimation"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        SettingsItem(
+            shape = RoundedCornerShape(
+                topStart = 4.dp,
+                topEnd = 4.dp,
+                bottomStart = bottomRadius,
+                bottomEnd = bottomRadius
+            ),
+            title = str("full_player_cover_feather"),
+            subtitle = str("full_player_cover_feather_desc"),
+            icon = Icons.Rounded.BlurOn,
+            hasSwitch = true,
+            switchState = enabled,
+            onSwitchChange = onEnabledChange,
+            highlightKey = "full_player_cover_feather"
+        )
+
+        AnimatedVisibility(
+            visible = enabled,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 4.dp,
+                    topEnd = 4.dp,
+                    bottomStart = 24.dp,
+                    bottomEnd = 24.dp
+                ),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = str("full_player_cover_feather_amount"),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "${(amount * 100).roundToInt()}%",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Slider(
+                        value = amount,
+                        onValueChange = onAmountChange,
+                        valueRange = 0f..1f,
+                        steps = 19,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

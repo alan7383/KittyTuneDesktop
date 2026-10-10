@@ -71,6 +71,7 @@ import com.alananasss.kittytune.ui.common.Slider
         val sidebarAlignment = playerViewModel.lyricsSidebarAlignment
         var preferLocal by remember { mutableStateOf(prefs.getLyricsPreferLocal()) }
         var showLyricsButton by remember { mutableStateOf(prefs.getShowLyricsButtonEnabled()) }
+        var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
     
         var showAlignmentDialog by remember { mutableStateOf(false) }
         var showSidebarAlignmentDialog by remember { mutableStateOf(false) }
@@ -1159,6 +1160,45 @@ import com.alananasss.kittytune.ui.common.Slider
                                 hasSwitch = true,
                                 switchState = playerViewModel.isDuetViewEnabled,
                                 onSwitchChange = { playerViewModel.toggleDuetView(it) }
+                            )
+                        }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_lyrics_one_line_title"),
+                                icon = Icons.Rounded.Subtitles,
+                                subtitle = str("pref_lyrics_one_line_sub"),
+                                hasSwitch = true,
+                                switchState = oneLineLyrics,
+                                onSwitchChange = {
+                                    oneLineLyrics = it
+                                    prefs.setOneLineLyricsEnabled(it)
+                                },
+                                highlightKey = "pref_lyrics_one_line",
+                            )
+                        }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_lyrics_backing_title"),
+                                icon = Icons.Rounded.RecordVoiceOver,
+                                subtitle = str("pref_lyrics_backing_sub"),
+                                hasSwitch = true,
+                                switchState = playerViewModel.lyricsSplitBackingVocals,
+                                onSwitchChange = { playerViewModel.updateLyricsSplitBackingVocals(it) },
+                                highlightKey = "pref_lyrics_backing",
+                            )
+                        }
+                        add { shape ->
+                            SettingsItem(
+                                shape = shape,
+                                title = str("pref_lyrics_reveal_words_title"),
+                                icon = Icons.Rounded.Animation,
+                                subtitle = str("pref_lyrics_reveal_words_sub"),
+                                hasSwitch = true,
+                                switchState = playerViewModel.lyricsRevealWords,
+                                onSwitchChange = { playerViewModel.updateLyricsRevealWords(it) },
+                                highlightKey = "pref_lyrics_reveal_words",
                             )
                         }
                         add { shape ->
