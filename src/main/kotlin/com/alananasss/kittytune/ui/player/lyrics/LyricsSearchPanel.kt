@@ -121,7 +121,7 @@ fun SearchLyricsView(
     var showUpload by remember { mutableStateOf(false) }
     if (showUpload) UploadYamlDialog(viewModel = viewModel, onDismiss = { showUpload = false })
 
-    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    Column(modifier = modifier.fillMaxSize().entersGently(0.985f).background(MaterialTheme.colorScheme.surface)) {
         SearchField(
             query = query,
             onQueryChange = { query = it },
@@ -493,6 +493,7 @@ fun SearchLyricsDialog(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .entersGently(1f)
             .background(Color.Black.copy(alpha = 0.5f))
             .escapeDismisses(onDismiss)
             .clickable(
@@ -513,6 +514,7 @@ fun SearchLyricsDialog(
                 modifier = Modifier
                     .width(panelWidth)
                     .height(panelHeight)
+                    .entersGently(0.93f)
                     .clip(RoundedCornerShape(28.dp))
                     // Swallows clicks so they do not reach the backdrop, which closes the panel.
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
@@ -521,5 +523,18 @@ fun SearchLyricsDialog(
                 SearchLyricsView(viewModel = viewModel, onCloseSearch = onDismiss, modifier = Modifier.escapeDismisses(onDismiss))
             }
         }
+    }
+}
+
+/** Fades in and grows from [fromScale] when it first appears, so the search arrives instead of being there on the next frame. */
+@Composable
+private fun Modifier.entersGently(fromScale: Float): Modifier {
+    val progress = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) { progress.animateTo(1f, tween(300, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+    return graphicsLayer {
+        alpha = progress.value
+        val scale = fromScale + (1f - fromScale) * progress.value
+        scaleX = scale
+        scaleY = scale
     }
 }
