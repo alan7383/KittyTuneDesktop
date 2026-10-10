@@ -118,52 +118,26 @@ import java.text.NumberFormat
  * songs, follow, pin to the library, and a menu with the rest.
  */
 /**
- * The stand-in banner for an artist with none: the best songs' covers melted into one wash.
+ * The stand-in banner for an artist with none: the best songs' covers side by side in one row, blurred together.
  *
- * The first cover fills the banner, blurred and enlarged so no edge of it shows; the others are soft patches of colour
- * laid over it at different places, each fading to nothing towards its rim. It used to be a 2 by 2 grid of four blurred
- * squares, and the seams between them showed as hard lines through the colour.
+ * The blur is applied to the whole row, not to each cover, so the joins between covers dissolve into each other. The
+ * earlier version laid separately blurred patches over a base cover, and where a patch ended it left a hard stripe across
+ * the banner.
  */
 @Composable
 private fun ArtistCoverCollage(covers: List<String>, modifier: Modifier = Modifier) {
-    BoxWithConstraints(modifier.clipToBounds()) {
-        AsyncImage(
-            model = covers.first(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().blur(70.dp).graphicsLayer { scaleX = 1.5f; scaleY = 1.5f },
-        )
-        // Where each of the other covers sits: a fraction across and down, and how wide its patch is against the banner.
-        val patches = listOf(Triple(0.15f, 0.30f, 0.62f), Triple(0.55f, 0.75f, 0.58f), Triple(0.88f, 0.25f, 0.55f))
-        covers.drop(1).take(patches.size).forEachIndexed { index, url ->
-            val (x, y, share) = patches[index]
-            val patchWidth = maxWidth * share
-            val patchHeight = maxHeight * 1.5f
-            AsyncImage(
-                model = url,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(patchWidth, patchHeight)
-                    .offset(x = maxWidth * x - patchWidth / 2, y = maxHeight * y - patchHeight / 2)
-                    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-                    .blur(56.dp)
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(
-                            Brush.radialGradient(
-                                0f to Color.Black.copy(alpha = 0.95f),
-                                0.45f to Color.Black.copy(alpha = 0.6f),
-                                1f to Color.Transparent,
-                                center = center,
-                                radius = size.maxDimension / 2f,
-                            ),
-                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                        )
-                    },
-            )
+    Box(modifier.clipToBounds()) {
+        Row(Modifier.fillMaxSize().blur(64.dp).graphicsLayer { scaleX = 1.35f; scaleY = 1.35f }) {
+            covers.take(4).forEach { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
     }
 }
 
@@ -548,8 +522,8 @@ internal fun NewReleaseCard(
         },
         label = "newReleaseContainer",
     )
-    val cover = if (previous) 88.dp else 132.dp
-    val shape = RoundedCornerShape(if (previous) 18.dp else 24.dp)
+    val cover = if (previous) 64.dp else 132.dp
+    val shape = RoundedCornerShape(if (previous) 16.dp else 24.dp)
     Surface(
         shape = shape,
         color = container,
@@ -566,14 +540,14 @@ internal fun NewReleaseCard(
                 }
             },
     ) {
-        Row(Modifier.padding(if (previous) 12.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(if (previous) 10.dp else 16.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
                 model = release.artworkUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(cover).clip(RoundedCornerShape(if (previous) 12.dp else 16.dp)).background(scheme.surfaceVariant),
+                modifier = Modifier.size(cover).clip(RoundedCornerShape(if (previous) 10.dp else 16.dp)).background(scheme.surfaceVariant),
             )
-            Spacer(Modifier.width(if (previous) 12.dp else 16.dp))
+            Spacer(Modifier.width(if (previous) 10.dp else 16.dp))
             Column(Modifier.weight(1f)) {
                 Surface(shape = CircleShape, color = if (previous) scheme.surfaceVariant else scheme.primaryContainer) {
                     Text(
@@ -584,10 +558,10 @@ internal fun NewReleaseCard(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
-                Spacer(Modifier.height(if (previous) 6.dp else 10.dp))
+                Spacer(Modifier.height(if (previous) 4.dp else 10.dp))
                 Text(
                     release.title,
-                    style = if (previous) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                    style = if (previous) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = if (previous) scheme.onSurface.copy(alpha = 0.85f) else scheme.onSurface,
                     maxLines = if (previous) 1 else 2,
