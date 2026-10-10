@@ -324,7 +324,7 @@ object Together {
 
     // ─── Incoming ─────────────────────────────────────────────────────────────────────────────
 
-    private suspend fun handle(code: String, message: TogetherMessage) {
+    internal suspend fun handle(code: String, message: TogetherMessage) {
         if (message.from == memberId) return
         val now = System.currentTimeMillis()
         when (message) {
@@ -399,7 +399,7 @@ object Together {
      * of the host's made every follower play ten seconds ahead of them. Only the excess over the quickest message seen
      * is real delay, since the quickest is as close to zero travel as the connection ever gets.
      */
-    private fun flightTime(host: String, arrivedMinusSent: Long): Long {
+    internal fun flightTime(host: String, arrivedMinusSent: Long): Long {
         val floor = synchronized(quickestTrip) {
             val known = quickestTrip[host]
             if (known == null || arrivedMinusSent < known) { quickestTrip[host] = arrivedMinusSent; arrivedMinusSent } else known
@@ -435,4 +435,17 @@ object Together {
     private fun loadSaved(): List<Saved> = runCatching {
         Prefs.getString(KEY_SAVED, null)?.let { gson.fromJson<List<Saved>>(it, object : TypeToken<List<Saved>>() {}.type) }
     }.getOrNull().orEmpty()
+
+    @androidx.annotation.VisibleForTesting
+    internal fun resetForTesting() {
+        _rooms.value = emptyMap()
+        _saved.value = emptyList()
+        _active.value = null
+        player = null
+        started = false
+        tickJob?.cancel()
+        tickJob = null
+        quickestTrip.clear()
+        Prefs.remove(KEY_SAVED)
+    }
 }

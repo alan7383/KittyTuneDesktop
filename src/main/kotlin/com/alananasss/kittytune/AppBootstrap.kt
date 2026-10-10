@@ -31,6 +31,8 @@ object AppBootstrap {
         if (done) return
         done = true
 
+        com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
+
         runCatching {
             androidx.compose.ui.platform.registerSkikoComposeImplementation()
         }

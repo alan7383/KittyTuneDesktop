@@ -586,7 +586,7 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
         reportedMs = shownOf(vm.currentPosition),
         isRunning = vm.isPlaying && !vm.isLoading,
-        followsInput = scrubbing || vm.isScrubbing,
+        followsInput = isScrubbingNow,
         trackKey = vm.currentTrack?.id,
     )
     playheadMs = playhead

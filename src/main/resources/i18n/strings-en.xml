@@ -523,7 +523,6 @@
     <string name="discord_status_soundcloud">Activity Name (SoundCloud)</string>
     <string name="discord_token_present">Token active</string>
     <string name="download_comment">Via KittyTune</string>
-    <string name="drm_explanation_text">DRM-protected tracks are encrypted by rightsholders to prevent extraction and protect copyrights.\n\n• Enabled (Recommended): The track is downloaded in its native high quality to KittyTune\'s secure internal cache. It can only be played inside the app and will not appear in your configured download folder.\n\n• Disabled: KittyTune will ignore the encrypted version and attempt to find and download the song via YouTube. The file will be converted to a standard MP3 and saved in your designated folder. Warning: Since the search is automatic, it may download incorrect content (such as a music video or a cover) if the track is not well-known.</string>
     <string name="earrape_warning">This effect is extremely loud and saturated. Use with caution to avoid hearing damage.</string>
     <string name="edit_tiles_subtitle">Select tiles to pin to the quick dock</string>
     <string name="edit_tiles_title">Edit tiles</string>
@@ -1267,8 +1266,6 @@
     <string name="pref_discord_status_display">Pick Status Display</string>
     <string name="pref_discord_subtitle">Rich Presence</string>
     <string name="pref_discord_title">Discord Integration</string>
-    <string name="pref_download_drm">Download Native DRM</string>
-    <string name="pref_download_drm_sub">Keep enabled to cache DRM natively for internal playback. Disable to force unencrypted MP3 downloads via YouTube fallback.</string>
     <string name="pref_app_icon">App icon</string>
     <string name="pref_vertical_volume_slider">Vertical volume slider</string>
     <string name="pref_vertical_volume_slider_sub">Show a vertical volume popup above the speaker icon in the player bar</string>
@@ -2962,4 +2959,8 @@
     <string name="full_player_cover_feather">Soften cover edges</string>
     <string name="full_player_cover_feather_desc">Fade the cover into the background while lyrics are shown</string>
     <string name="full_player_cover_feather_amount">Edge blur strength</string>
+    <string name="time_hours_minutes">%1$dh %2$02dmin</string>
+    <string name="time_hours">%1$dh</string>
+    <string name="time_minutes">%1$d min</string>
+    <string name="time_seconds">%1$ds</string>
 </resources>

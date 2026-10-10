@@ -131,6 +131,7 @@ fun TrackDetailScreen(
                                 isLoadingMore = detailViewModel.isLikersLoadingMore,
                                 isSortedByFollowers = detailViewModel.isUsersSortedByFollowers,
                                 onToggleSort = { detailViewModel.toggleUsersSort() },
+                                isSortLoading = detailViewModel.isUsersSortLoading,
                             )
                             1 -> UserList(
                                 users = detailViewModel.reposters,
@@ -139,6 +140,7 @@ fun TrackDetailScreen(
                                 isLoadingMore = detailViewModel.isRepostersLoadingMore,
                                 isSortedByFollowers = detailViewModel.isUsersSortedByFollowers,
                                 onToggleSort = { detailViewModel.toggleUsersSort() },
+                                isSortLoading = detailViewModel.isUsersSortLoading,
                             )
                             2 -> PlaylistList(
                                 playlists = detailViewModel.inPlaylists,
@@ -146,7 +148,8 @@ fun TrackDetailScreen(
                                 onLoadMore = { detailViewModel.loadMorePlaylists() },
                                 isLoadingMore = detailViewModel.isPlaylistsLoadingMore,
                                 isSortedByLikes = detailViewModel.isPlaylistsSortedByLikes,
-                                onToggleSort = { detailViewModel.toggleSortPlaylists() }
+                                onToggleSort = { detailViewModel.toggleSortPlaylists() },
+                                isSortLoading = detailViewModel.isPlaylistsSortLoading,
                             )
                             3 -> TrackList(
                                 tracks = detailViewModel.relatedTracks,
@@ -172,13 +175,17 @@ fun UserList(
     /** Whether the list is by followers; null where it is not offered a choice of order. */
     isSortedByFollowers: Boolean? = null,
     onToggleSort: () -> Unit = {},
+    isSortLoading: Boolean = false,
 ) {
     if (users.isEmpty() && !isLoadingMore) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str("detail_no_one_yet"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else Column(Modifier.fillMaxSize()) {
-        if (isSortedByFollowers != null) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        if (isSortedByFollowers != null) Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             FilterChip(
                 selected = isSortedByFollowers,
                 onClick = onToggleSort,
@@ -192,6 +199,10 @@ fun UserList(
                 },
                 shape = CircleShape,
             )
+            if (isSortLoading) {
+                Spacer(Modifier.width(8.dp))
+                CircularWavyProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.primary)
+            }
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.weight(1f)) {
             itemsIndexed(users) { index, user ->
@@ -245,11 +256,15 @@ fun PlaylistList(
     onLoadMore: () -> Unit,
     isLoadingMore: Boolean,
     isSortedByLikes: Boolean,
-    onToggleSort: () -> Unit
+    onToggleSort: () -> Unit,
+    isSortLoading: Boolean = false,
 ) {
     val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Column(modifier = Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             FilterChip(
                 selected = isSortedByLikes,
                 onClick = onToggleSort,
@@ -264,6 +279,10 @@ fun PlaylistList(
                 shape = CircleShape,
                 interactionSource = interactionSource,
             )
+            if (isSortLoading) {
+                Spacer(Modifier.width(8.dp))
+                CircularWavyProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.primary)
+            }
         }
 
         if (playlists.isEmpty() && !isLoadingMore) {

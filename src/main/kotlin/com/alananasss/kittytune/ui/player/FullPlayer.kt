@@ -65,6 +65,7 @@ import com.alananasss.kittytune.ui.player.lyrics.SearchLyricsDialog
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Pause
 import com.alananasss.kittytune.ui.main.seekWheel
+import com.alananasss.kittytune.ui.main.volumeWheel
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
@@ -1400,32 +1401,16 @@ private fun FullPlayerVolumeBar(
 ) {
     val volume = viewModel.volume.coerceIn(0f, 1f)
     val isMuted = volume <= 0.001f
-    // The wheel moves a target and the level glides to it, so a notch is a short slide and not a step of five per cent.
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val glide = remember { androidx.compose.animation.core.Animatable(0f) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val scrollDelta = event.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                        if (scrollDelta != 0f) {
-                            val base = if (glide.isRunning) glide.targetValue else viewModel.volume
-                            val next = (base - scrollDelta * 0.04f).coerceIn(0f, 1f)
-                            scope.launch {
-                                if (!glide.isRunning) glide.snapTo(viewModel.volume)
-                                glide.animateTo(
-                                    next,
-                                    androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy, stiffness = 420f, visibilityThreshold = 0.002f),
-                                ) { viewModel.updateVolume(value) }
-                                viewModel.persistVolumeSoon()
-                            }
-                        }
-                    }
-                }
-            },
+            .volumeWheel(
+                currentVolume = { viewModel.volume },
+                onVolumeChange = {
+                    viewModel.updateVolume(it)
+                    viewModel.persistVolumeSoon()
+                },
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         com.alananasss.kittytune.ui.main.OutputDevicePicker(onSelect = { viewModel.changeOutputDevice(it) }) { pickerModifier ->
@@ -1536,7 +1521,7 @@ private fun FullPlayerSeekBar(viewModel: PlayerViewModel, palette: FullPlayerPal
     val playhead by com.alananasss.kittytune.ui.player.slider.rememberSmoothPlayhead(
         reportedMs = shownOf(viewModel.currentPosition),
         isRunning = viewModel.isPlaying && !viewModel.isLoading,
-        followsInput = scrubbing || viewModel.isScrubbing,
+        followsInput = isScrubbingNow,
         trackKey = viewModel.currentTrack?.id,
     )
     playheadMs = playhead

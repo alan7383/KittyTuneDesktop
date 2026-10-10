@@ -523,11 +523,6 @@
     <string name="discord_status_soundcloud">Tevékenység neve (SoundCloud)</string>
     <string name="discord_token_present">Token aktív</string>
     <string name="download_comment">Via KittyTune</string>
-    <string name="drm_explanation_text">A DRM-mel védett zeneszámokat a jogtulajdonosok titkosítják, hogy megakadályozzák a kinyerésüket és védjék a szerzői jogokat.
-
-• Engedélyezve (Ajánlott): A zeneszám az eredeti kiváló minőségben töltődik le a KittyTune biztonságos belső gyorsítótárába. Csak az alkalmazáson belül játszható le, és nem jelenik meg a beállított letöltési mappában.
-
-• Letiltva: A KittyTune figyelmen kívül hagyja a titkosított verziót, és megpróbálja letölteni a dalt a YouTube-ról. A fájlt szabványos MP3-formátumba konvertálja, és a megadott mappába menti. Figyelem: Mivel a keresés automatikus, előfordulhat, hogy helytelen tartalmat (például videoklipet vagy feldolgozást) tölt le, ha a dal nem annyira ismert.</string>
     <string name="earrape_warning">Ez az effekt rendkívül hangos és telített. Használja óvatosan a halláskárosodás elkerülése érdekében.</string>
     <string name="edit_tiles_subtitle">Válassz csempéket a gyorspanelhez</string>
     <string name="edit_tiles_title">Csempék szerkesztése</string>
@@ -1271,8 +1266,6 @@
     <string name="pref_discord_status_display">Állapot megjelenítés kiválasztása</string>
     <string name="pref_discord_subtitle">Rich Presence</string>
     <string name="pref_discord_title">Discord integráció</string>
-    <string name="pref_download_drm">Natív DRM letöltés</string>
-    <string name="pref_download_drm_sub">Beolvassa a DRM tartalmat a belső lejátszáshoz. Tiltsd le az MP3 letöltés kényszerítéséhez YouTube-on keresztül.</string>
     <string name="pref_app_icon">Alkalmazás ikon</string>
     <string name="pref_vertical_volume_slider">Függőleges hangerőcsúszka</string>
     <string name="pref_vertical_volume_slider_sub">Függőleges hangerőcsúszka megjelenítése a lejátszó sáv hangszóró ikonja fölött</string>
@@ -2964,4 +2957,8 @@
     <string name="full_player_cover_feather">Soften cover edges</string>
     <string name="full_player_cover_feather_desc">Fade the cover into the background while lyrics are shown</string>
     <string name="full_player_cover_feather_amount">Edge blur strength</string>
+    <string name="time_hours_minutes">%1$dó %2$dp</string>
+    <string name="time_hours">%1$dó</string>
+    <string name="time_minutes">%1$d perc</string>
+    <string name="time_seconds">%1$dmp</string>
 </resources>

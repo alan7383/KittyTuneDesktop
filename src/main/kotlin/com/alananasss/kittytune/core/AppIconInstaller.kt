@@ -70,38 +70,47 @@ object AppIconInstaller {
 
     private fun applyLinux(variantKey: String) {
         try {
-            val pngBytes = variantPng(variantKey) ?: return
+            val pngBytes = variantPng(variantKey) ?: variantPng(AppIconVariants.DEFAULT_KEY) ?: return
             val source = IconEncoders.decode(pngBytes) ?: return
 
-            val iconsRoot = File(System.getProperty("user.home"), ".local/share/icons")
+            val userHome = System.getProperty("user.home") ?: return
+            val iconsRoot = File(userHome, ".local/share/icons")
             val hicolor = File(iconsRoot, "hicolor")
+            val pixmaps = File(userHome, ".local/share/pixmaps").apply { mkdirs() }
+            val userApps = File(userHome, ".local/share/applications").apply { mkdirs() }
 
             for (size in LINUX_SIZES) {
-                if (size > maxOf(source.width, source.height)) continue
                 val dir = File(hicolor, "${size}x${size}/apps")
                 if (!dir.isDirectory && !dir.mkdirs()) continue
                 val scaled = IconEncoders.png(IconEncoders.scaled(source, size))
-                // Variant-specific icon name: launchers cache pixmaps per icon NAME,
-                // so switching variant must switch name to bust the cache.
+
+                // Variant-specific icon names: launchers cache pixmaps per icon NAME,
+                // so switching variant switches name to bust the cache cleanly.
+                File(dir, "kitty-tune-$variantKey.png").writeBytes(scaled)
                 File(dir, "kittytune-$variantKey.png").writeBytes(scaled)
-                // Keep the plain name in sync for other consumers (taskbar pins, GTK).
+                File(dir, "com-alananasss-kittytune-MainKt-$variantKey.png").writeBytes(scaled)
+
+                // Un-suffixed current active icons for standard theme / window lookups
+                File(dir, "kitty-tune.png").writeBytes(scaled)
                 File(dir, "kittytune.png").writeBytes(scaled)
+                File(dir, "com-alananasss-kittytune-MainKt.png").writeBytes(scaled)
             }
 
-            // User-level .desktop override pointing at the variant icon — takes
-            // precedence over the package's desktop file, per XDG spec.
+            // Standard XDG pixmaps fallback directory
+            val pixmapScaled = IconEncoders.png(IconEncoders.scaled(source, 256))
+            File(pixmaps, "kitty-tune.png").writeBytes(pixmapScaled)
+            File(pixmaps, "kittytune.png").writeBytes(pixmapScaled)
+            File(pixmaps, "com-alananasss-kittytune-MainKt.png").writeBytes(pixmapScaled)
+
+            // User-level .desktop overrides pointing at the variant icon
             overrideDesktopFile(variantKey)
-            // Same for shortcuts living on the desktop itself (real files or
-            // symlinks to the system entry — symlinks are replaced by real files
-            // so the icon name can change).
+            // Same for shortcuts living on the desktop itself
             rewriteDesktopShortcuts(variantKey)
 
             // Gentle cache invalidation — no shell restart:
             //  - GTK apps: icon theme cache
+            //  - update-desktop-database for XDG application entries
             //  - KDE: KSycoca (app entries) + icon-cache.kcache (KIconLoader disk cache)
-            //  - touch the theme dirs so inotify watchers notice (writing only the
-            //    leaf apps/ dir does not bump the watched theme root mtime)
-            val userApps = File(System.getProperty("user.home"), ".local/share/applications")
             listOf(
                 ProcessBuilder("gtk-update-icon-cache", "-f", "-t", hicolor.canonicalPath),
                 ProcessBuilder("update-desktop-database", userApps.canonicalPath),
@@ -115,7 +124,7 @@ object AppIconInstaller {
             }
 
             runCatching {
-                File(System.getProperty("user.home"), ".cache/icon-cache.kcache").delete()
+                File(userHome, ".cache/icon-cache.kcache").delete()
             }
             runCatching {
                 val now = System.currentTimeMillis()
@@ -125,43 +134,91 @@ object AppIconInstaller {
                 }
                 hicolor.setLastModified(now)
                 iconsRoot.setLastModified(now)
+                pixmaps.setLastModified(now)
+                userApps.setLastModified(now)
             }
         } catch (e: Throwable) {
             println("[AppIconInstaller] Failed to install launcher icon: ${e.message}")
         }
     }
 
+    private fun findExecutablePath(): String {
+        val systemDesktop = findInstalledDesktopFile()
+        if (systemDesktop != null) {
+            val exec = runCatching { systemDesktop.readLines() }.getOrNull()
+                ?.firstOrNull { it.startsWith("Exec=") }
+                ?.removePrefix("Exec=")
+                ?.trim()
+            if (!exec.isNullOrBlank()) return exec
+        }
+        val optBin = File("/opt/kitty-tune/bin/KittyTune")
+        if (optBin.exists()) return optBin.absolutePath
+
+        val procCmd = runCatching { ProcessHandle.current().info().command().orElse(null) }.getOrNull()
+        if (!procCmd.isNullOrBlank() && File(procCmd).exists() && !procCmd.endsWith("java")) return procCmd
+
+        return "kitty-tune"
+    }
+
     /**
-     * Copies the system KittyTune .desktop into ~/.local/share/applications with
-     * `Icon=kittytune-<variant>` so the launcher resolves a fresh (uncached) icon
-     * name on every switch. User desktop files shadow system ones per XDG spec.
+     * Ensures user-level .desktop files in ~/.local/share/applications point to the
+     * active variant icon and state StartupWMClass=kitty-tune. Covers all three
+     * naming variants (kitty-tune, kittytune, com-alananasss-kittytune-MainKt) so any
+     * desktop shell (Quickshell / Hyprland / KDE / GNOME) immediately identifies the app.
      */
     private fun overrideDesktopFile(variantKey: String) {
-        val systemDesktop = findInstalledDesktopFile() ?: run {
-            println("[AppIconInstaller] No system .desktop found; skipping override")
-            return
-        }
-
         val userApps = File(System.getProperty("user.home"), ".local/share/applications").apply { mkdirs() }
-        val userDesktop = File(userApps, systemDesktop.name)
-        val original = systemDesktop.readLines()
+        val systemDesktop = findInstalledDesktopFile()
+        val execPath = findExecutablePath()
 
-        val rewritten = original.map { line ->
-            if (line.startsWith("Icon=")) "Icon=kittytune-$variantKey" else line
-        }.toMutableList()
+        val baseLines = systemDesktop?.readLines() ?: listOf(
+            "[Desktop Entry]",
+            "Name=KittyTune",
+            "Comment=KittyTune Music Player",
+            "Exec=$execPath",
+            "Icon=kitty-tune-$variantKey",
+            "Terminal=false",
+            "Type=Application",
+            "Categories=AudioVideo;Audio;Player;",
+            "StartupWMClass=$LINUX_WM_CLASS"
+        )
 
-        if (original.none { it.startsWith("Icon=") }) {
-            rewritten += "Icon=kittytune-$variantKey"
+        val targets = listOf(
+            "kitty-tune.desktop" to "kitty-tune-$variantKey",
+            "kittytune.desktop" to "kittytune-$variantKey",
+            "com-alananasss-kittytune-MainKt.desktop" to "kitty-tune-$variantKey"
+        )
+
+        for ((fileName, iconName) in targets) {
+            runCatching {
+                val targetFile = File(userApps, fileName)
+                val lines = (if (targetFile.exists()) targetFile.readLines() else baseLines).toMutableList()
+
+                var hasIcon = false
+                var hasWmClass = false
+                var hasExec = false
+
+                for (i in lines.indices) {
+                    val line = lines[i]
+                    if (line.startsWith("Icon=")) {
+                        lines[i] = "Icon=$iconName"
+                        hasIcon = true
+                    } else if (line.startsWith("StartupWMClass=")) {
+                        lines[i] = "StartupWMClass=$LINUX_WM_CLASS"
+                        hasWmClass = true
+                    } else if (line.startsWith("Exec=")) {
+                        hasExec = true
+                        if (lines[i].isBlank()) lines[i] = "Exec=$execPath"
+                    }
+                }
+
+                if (!hasIcon) lines += "Icon=$iconName"
+                if (!hasWmClass) lines += "StartupWMClass=$LINUX_WM_CLASS"
+                if (!hasExec) lines += "Exec=$execPath"
+
+                targetFile.writeText(lines.joinToString("\n") + "\n")
+            }
         }
-        // Without StartupWMClass the shell has to guess which entry an open window belongs to.
-        // KDE guesses right because the WM_CLASS Main.kt sets matches the entry's file name,
-        // but GNOME and wlroots-based shells do not, and then the running window shows a
-        // generic icon while the pinned launcher shows the variant. Stating it removes the guess.
-        if (original.none { it.startsWith("StartupWMClass=") }) {
-            rewritten += "StartupWMClass=$LINUX_WM_CLASS"
-        }
-
-        userDesktop.writeText(rewritten.joinToString("\n") + "\n")
     }
 
     /**
@@ -229,17 +286,25 @@ object AppIconInstaller {
                 val lines = target.readLines()
                 if (lines.any { it.trim() == "NoDisplay=true" }) return@runCatching
 
-                val content = lines.joinToString("\n") { line ->
-                    if (line.startsWith("Icon=")) "Icon=kittytune-$variantKey" else line
-                } + if (lines.any { it.startsWith("Icon=") }) "" else "\nIcon=kittytune-$variantKey"
+                val updated = lines.map { line ->
+                    when {
+                        line.startsWith("Icon=") -> "Icon=kitty-tune-$variantKey"
+                        line.startsWith("StartupWMClass=") -> "StartupWMClass=$LINUX_WM_CLASS"
+                        else -> line
+                    }
+                }.toMutableList()
 
+                if (updated.none { it.startsWith("Icon=") }) updated += "Icon=kitty-tune-$variantKey"
+                if (updated.none { it.startsWith("StartupWMClass=") }) updated += "StartupWMClass=$LINUX_WM_CLASS"
+
+                val content = updated.joinToString("\n") + "\n"
                 if (java.nio.file.Files.isSymbolicLink(shortcut.toPath())) {
                     shortcut.delete()
-                    shortcut.writeText(content + "\n")
+                    shortcut.writeText(content)
                     shortcut.setExecutable(true)   // Plasma "trusted" flag
                 } else {
                     runCatching { shortcut.setWritable(true) }
-                    shortcut.writeText(content + "\n")
+                    shortcut.writeText(content)
                     shortcut.setExecutable(true)
                 }
                 desktopDir.setLastModified(System.currentTimeMillis())
