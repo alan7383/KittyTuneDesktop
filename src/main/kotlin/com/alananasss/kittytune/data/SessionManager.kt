@@ -268,16 +268,25 @@ object SessionManager {
     }
 
     /** Show the embedded-browser captcha challenge; resolved by [completeDataDomeChallenge]. */
+    @Volatile
     private var pendingDataDome: CompletableDeferred<Boolean>? = null
 
     suspend fun awaitDataDomeChallenge(captchaUrl: String, timeoutMs: Long = 120_000L): Boolean {
-        val deferred = CompletableDeferred<Boolean>()
-        pendingDataDome = deferred
-        _captchaUrlFlow.value = captchaUrl
-        _showCaptchaFlow.value = true
+        // Shared: two requests hitting DataDome at once used to overwrite each other's deferred —
+        // solving the captcha completed only the second one, and the first waited out its full
+        // two-minute timeout and failed (the audit's "captcha DataDome concurrent écrasé").
+        // Both now await the same challenge, and the UI slot is only driven by the first caller.
+        val deferred = pendingDataDome ?: CompletableDeferred<Boolean>().also {
+            pendingDataDome = it
+            _captchaUrlFlow.value = captchaUrl
+            _showCaptchaFlow.value = true
+        }
         val solved = withTimeoutOrNull(timeoutMs) { deferred.await() } ?: false
-        _showCaptchaFlow.value = false
-        _captchaUrlFlow.value = null
+        if (pendingDataDome === deferred) {
+            _showCaptchaFlow.value = false
+            _captchaUrlFlow.value = null
+            pendingDataDome = null
+        }
         return solved
     }
 
