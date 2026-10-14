@@ -277,7 +277,7 @@ fun SettingsItem(
     if (isClickable) {
         Card(
             onClick = { onToggleOrClick() },
-            enabled = true,
+            enabled = onClick != null || hasSwitch,
             colors = cardColors,
             shape = shape,
             modifier = Modifier

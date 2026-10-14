@@ -91,16 +91,21 @@ fun PlayerSlider(
                 label = "trackHeight"
             )
 
-            androidx.compose.material3.Slider(
+            val sliderState = androidx.compose.material3.rememberSliderState(
                 value = clampedValue,
+                trackRange = valueRange
+            )
+            sliderState.value = clampedValue
+
+            androidx.compose.material3.Slider(
+                state = sliderState,
                 onValueChange = onValueChange,
                 onValueChangeFinished = onValueChangeFinished,
-                valueRange = valueRange,
                 interactionSource = trackInteractionSource,
                 thumb = { Spacer(modifier = Modifier.size(0.dp)) },
-                track = { sliderState ->
+                track = { state ->
                     PlayerSliderTrack(
-                        sliderState = sliderState,
+                        sliderState = state,
                         trackHeight = trackHeight,
                         colors = colors,
                         bufferedValue = bufferedValue

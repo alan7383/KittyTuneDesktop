@@ -32,7 +32,7 @@ fun PlayerSliderTrack(
     val bufferedTrackColor = activeTrackColor.copy(alpha = 0.46f)
     val inactiveTickColor = colors.inactiveTickColor
     val activeTickColor = colors.activeTickColor
-    val trackRange = sliderState.valueRange
+    val trackRange = sliderState.trackRange
     val activeFraction = sliderState.coercedValueAsFraction
     val bufferedFraction =
         bufferedValue

@@ -167,10 +167,12 @@ fun SliderStyleDialog(
                             }
                             .padding(12.dp)
                     ) {
-                        androidx.compose.material3.Slider(
+                        val previewSliderState = androidx.compose.material3.rememberSliderState(
                             value = 0.65f,
-                            onValueChange = {},
-                            valueRange = 0f..1f,
+                            trackRange = 0f..1f
+                        )
+                        androidx.compose.material3.Slider(
+                            state = previewSliderState,
                             thumb = { Spacer(modifier = Modifier.size(0.dp)) },
                             track = { sliderState ->
                                 PlayerSliderTrack(
