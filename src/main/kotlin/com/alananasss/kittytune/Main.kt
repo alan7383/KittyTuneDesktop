@@ -15,7 +15,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Density
+import com.alananasss.kittytune.ui.theme.withUiScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.CompositionLocalProvider
@@ -614,10 +614,7 @@ fun main(args: Array<String>) {
             val prefs = remember { PlayerPreferences() }
             val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
             val currentDensity = LocalDensity.current
-            val customDensity = Density(
-                density = currentDensity.density * uiScale,
-                fontScale = currentDensity.fontScale * uiScale
-            )
+            val customDensity = currentDensity.withUiScale(uiScale)
 
             val windowSeen = com.alananasss.kittytune.core.rememberWindowSeen(window)
             com.alananasss.kittytune.core.TrimMemoryWhileHidden(window)

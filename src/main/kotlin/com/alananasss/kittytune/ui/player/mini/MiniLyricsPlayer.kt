@@ -40,7 +40,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
+import com.alananasss.kittytune.ui.theme.withUiScale
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -382,10 +382,7 @@ fun MiniLyricsPlayerWindow(
         val density = LocalDensity.current
         val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
         val customDensity = remember(density, uiScale) {
-            Density(
-                density = density.density * uiScale,
-                fontScale = density.fontScale * uiScale
-            )
+            density.withUiScale(uiScale)
         }
 
         // Exact physical pixel limits for window sizing and OS window manager hints

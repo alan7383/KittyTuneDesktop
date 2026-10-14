@@ -186,6 +186,7 @@ pre-built binaries for linux, windows, and macos are available on the [**release
 | **Fedora / RHEL / openSUSE** | RPM package (`.rpm`) | `sudo dnf install ./kitty-tune-*.rpm` |
 | **Universal Linux** | Standalone AppImage | `chmod +x KittyTune-*.AppImage && ./KittyTune-*.AppImage` |
 | **Windows & macOS** | Installer / DMG *(Experimental)* | [GitHub Releases](https://github.com/alan7383/KittyTuneDesktop/releases) |
+| **Windows x64** | Portable ZIP with Java runtime *(Experimental)* | [Build and run instructions](WINDOWS.md) |
 
 <br>
 

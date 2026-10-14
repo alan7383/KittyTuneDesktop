@@ -24,4 +24,6 @@ rootProject.name = "KittyTuneWindows"
 include(":shazamkit")
 include(":kizzy")
 include(":innertube")
-include(":website")
+// The Windows entry point can configure only the desktop modules; the website
+// remains available in the normal multi-project build.
+if (providers.gradleProperty("desktopOnly").orNull != "true") include(":website")

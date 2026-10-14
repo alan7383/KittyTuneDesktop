@@ -20,6 +20,9 @@ kotlin-js-store/
 *.py
 *.ps1
 !scripts/build-smtc-bridge.ps1
+!scripts/build-native-windows.ps1
+!scripts/build-windows.ps1
+/release/
 *.txt
 context_dump.txt
 *.msi

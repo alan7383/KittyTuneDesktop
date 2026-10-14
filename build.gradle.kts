@@ -10,6 +10,12 @@ plugins {
 group = "com.alananasss"
 version = "1.4.2"
 
+val desktopIsWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+// Keep Windows app images separate by version, including when an older build is running.
+val desktopDistributionDirectory = layout.buildDirectory.dir(
+    if (desktopIsWindows) "compose/binaries/${project.version}" else "compose/binaries"
+)
+
 repositories {
     google()
     mavenCentral()
@@ -275,6 +281,7 @@ compose.desktop {
         }
 
         nativeDistributions {
+            outputBaseDir.set(desktopDistributionDirectory)
             targetFormats(
                 TargetFormat.Dmg,
                 TargetFormat.Msi,
@@ -376,15 +383,14 @@ java {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     compilerOptions.freeCompilerArgs.addAll("-opt-in=androidx.compose.material3.ExperimentalMaterial3Api", "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi")
-    // Compose stability diagnostics for the perf issue: which composables the compiler
-    // could NOT make skippable (recomposition risk). Reports land in build/compose-*.
-    // See build/compose-reports/<module>-compose-metrics.txt after compiling.
-    val composeMetricsDir = layout.buildDirectory.dir("compose-metrics").get().asFile.apply { mkdirs() }
-    val composeReportsDir = layout.buildDirectory.dir("compose-reports").get().asFile.apply { mkdirs() }
-    compilerOptions.freeCompilerArgs.addAll(
-        "-P", "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=${composeMetricsDir.absolutePath}",
-        "-P", "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=${composeReportsDir.absolutePath}"
-    )
+}
+
+composeCompiler {
+    // Use the compiler DSL rather than raw -P arguments containing Windows drive paths.
+    if (providers.gradleProperty("composeReports").orNull == "true") {
+        reportsDestination.set(layout.buildDirectory.dir("compose-reports"))
+        metricsDestination.set(layout.buildDirectory.dir("compose-metrics"))
+    }
 }
 
 // Auto-generate BuildConfig.kt from the project version so it's always in sync.
@@ -411,36 +417,46 @@ val generateBuildConfig by tasks.registering {
 
 tasks.named("compileKotlin") { dependsOn(generateBuildConfig) }
 
-val compileNativeDSP by tasks.registering(Exec::class) {
+val compileNativeDSP = tasks.register<Exec>("compileNativeDSP") {
     val cppDir = project.file("src/main/cpp")
-    val outDir = project.file("src/main/resources/native")
-    val linuxNativeDir = project.file("src/main/resources/native/linux-x86_64")
-    
-    doFirst { 
-        outDir.mkdirs() 
-        linuxNativeDir.mkdirs()
-    }
+    val outDir = layout.buildDirectory.dir("generated/native-resources/native").get().asFile
+    val linuxNativeDir = File(outDir, "linux-x86_64")
     
     val osName = System.getProperty("os.name").lowercase()
     val isMac = osName.contains("mac")
     val isWin = osName.contains("win")
     val libExt = if (isWin) "dll" else if (isMac) "dylib" else "so"
     val osIncludeDir = if (isWin) "win32" else if (isMac) "darwin" else "linux"
+
+    doFirst {
+        outDir.mkdirs()
+        if (!isWin && !isMac) linuxNativeDir.mkdirs()
+    }
     
     val outFile = File(outDir, "libkittytune_audio_dsp.$libExt")
     
     val javaHome = System.getProperty("java.home")
-    val compiler = if (isWin) "g++" else "g++" // assuming MSYS2 or MinGW on Windows, or just gcc/clang
-    
-    commandLine(
-        compiler, "-shared", "-fPIC", "-O3",
-        "-I$javaHome/include",
-        "-I$javaHome/include/$osIncludeDir",
-        "-I${File(cppDir, "ebur128/queue").absolutePath}",
-        File(cppDir, "KittyTuneAudioDSP.cpp").absolutePath,
-        File(cppDir, "ebur128/ebur128.c").absolutePath,
-        "-o", outFile.absolutePath
-    )
+    inputs.dir(cppDir)
+    inputs.file("scripts/build-native-windows.ps1")
+    inputs.property("javaHome", javaHome)
+    inputs.property("osName", osName)
+    outputs.file(outFile)
+    if (!isWin && !isMac) outputs.file(File(linuxNativeDir, "libkt_vk_priority.so"))
+
+    if (isWin) {
+        commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+            "-File", project.file("scripts/build-native-windows.ps1").absolutePath,
+            "-JavaHome", javaHome, "-OutputDirectory", outDir.absolutePath)
+    } else {
+        commandLine(
+            "g++", "-shared", "-fPIC", "-O3",
+            "-I$javaHome/include", "-I$javaHome/include/$osIncludeDir",
+            "-I${File(cppDir, "ebur128/queue").absolutePath}",
+            File(cppDir, "KittyTuneAudioDSP.cpp").absolutePath,
+            File(cppDir, "ebur128/ebur128.c").absolutePath,
+            "-o", outFile.absolutePath
+        )
+    }
 
     doLast {
         if (!isWin && !isMac) {
@@ -458,6 +474,68 @@ val compileNativeDSP by tasks.registering(Exec::class) {
     }
 }
 
-tasks.named("processResources") {
+val compileWindowsSmtcBridge = tasks.register<Exec>("compileWindowsSmtcBridge") {
+    description = "Builds the Windows media bridge from source into generated resources."
+    enabled = desktopIsWindows
+    val outDir = layout.buildDirectory.dir("generated/native-resources/native")
+    inputs.files("scripts/build-smtc-bridge.ps1", "src/main/resources/native/WindowsSmtcBridge.cs",
+        "src/main/resources/icons/kittytune.ico")
+    outputs.file(outDir.map { it.file("WindowsSmtcBridge.exe") })
+    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+        "-File", project.file("scripts/build-smtc-bridge.ps1").absolutePath,
+        "-OutDir", outDir.get().asFile.absolutePath)
+}
+
+// Exclude only the source copies replaced on this platform. Otherwise a checked-in
+// library can win over the freshly compiled one when resources are copied.
+sourceSets.main {
+    val osName = System.getProperty("os.name").lowercase()
+    val extension = if (desktopIsWindows) "dll" else if (osName.contains("mac")) "dylib" else "so"
+    resources.exclude("native/libkittytune_audio_dsp.$extension")
+    if (desktopIsWindows) resources.exclude("native/WindowsSmtcBridge.exe")
+    if (!desktopIsWindows && !osName.contains("mac")) resources.exclude("native/linux-x86_64/libkt_vk_priority.so")
+}
+
+tasks.named<ProcessResources>("processResources") {
     dependsOn(compileNativeDSP)
+    if (desktopIsWindows) dependsOn(compileWindowsSmtcBridge)
+    from(layout.buildDirectory.dir("generated/native-resources")) {
+        include("native/*.dll", "native/*.so", "native/*.dylib",
+            "native/WindowsSmtcBridge.exe", "native/linux-x86_64/*.so")
+    }
+}
+
+tasks.register<Test>("headlessTest") {
+    description = "Runs deterministic desktop regressions without windows or audio output."
+    group = "verification"
+    testClassesDirs = sourceSets.test.get().output.classesDirs
+    classpath = sourceSets.test.get().runtimeClasspath
+    systemProperty("java.awt.headless", "true")
+    val profile = layout.buildDirectory.dir("test-profile").get().asFile
+    systemProperty("user.home", File(profile, "home").absolutePath)
+    environment("APPDATA", File(profile, "roaming").absolutePath)
+    environment("LOCALAPPDATA", File(profile, "local").absolutePath)
+    systemProperty("java.io.tmpdir", File(profile, "tmp").absolutePath)
+    doFirst { listOf("home", "roaming", "local", "tmp").forEach { File(profile, it).mkdirs() } }
+    maxHeapSize = "768m"
+    maxParallelForks = 1
+    filter {
+        listOf("SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
+            "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
+            "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest",
+            "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
+            "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest"
+        ).forEach(::includeTestsMatching)
+    }
+}
+
+tasks.register<Zip>("zipWindowsPortable") {
+    description = "Packages a Windows app with its Java runtime; no installer or system Java required."
+    group = "distribution"
+    dependsOn("createReleaseDistributable")
+    from(desktopDistributionDirectory.map { it.dir("main-release/app") })
+    destinationDirectory.set(layout.projectDirectory.dir("release"))
+    archiveFileName.set("KittyTune-${project.version}-Windows-Portable-x64.zip")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
 }

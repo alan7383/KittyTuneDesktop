@@ -292,7 +292,7 @@ fun SoundTuneTheme(
 
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
-        typography = typography,
+        typography = remember(typography) { typography.withDesktopTextRendering() },
         // Menus, tooltips and snackbars use the extra-small shape; the stock 4 dp made every dropdown look
         // square next to the app's 16–28 dp cards, so they all get the same softer corner.
         shapes = androidx.compose.material3.Shapes(
