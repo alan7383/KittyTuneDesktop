@@ -1880,7 +1880,7 @@
     <string name="trim_field_start">Début</string>
     <string name="trim_field_end">Fin</string>
     <string name="sync_title">Synchro entre appareils</string>
-    <string name="sync_intro">Tes appareils échangent l'historique d'écoute directement sur ton réseau local. Rien n'est envoyé ailleurs, et il n'y a pas de compte.</string>
+    <string name="sync_intro">Les appareils associés échangent l&apos;historique, les favoris et l&apos;état de lecture sur votre réseau local. Un relais Internet facultatif transmet les commandes et l&apos;état de lecture chiffrés, sans audio.</string>
     <string name="sync_device_name">Nom</string>
     <string name="sync_listener">Accepter les connexions</string>
     <string name="sync_listener_sub">Permet à un appareil associé d'appeler. Ça ouvre un port sur ton réseau, alors laisse-le éteint quand tu ne synchronises pas.</string>
@@ -2492,4 +2492,7 @@
     <string name="time_hours">%1$dh</string>
     <string name="time_minutes">%1$d min</string>
     <string name="time_seconds">%1$ds</string>
+    <string name="connect_devices">Appareils</string>
+    <string name="sync_playback_title">File d&apos;attente et position de lecture</string>
+    <string name="sync_playback_sub">Reprendre le dernier morceau et la file d&apos;attente en ouvrant un autre appareil</string>
 </resources>

@@ -1758,7 +1758,7 @@
     <string name="trim_plays_for">Spielt %1$s von %2$s</string>
     <string name="trim_clear">Zuschnitt entfernen</string>
     <string name="sync_title">Gerätesynchronisierung</string>
-    <string name="sync_intro">Dein Smartphone und dein Computer tauschen den Hörverlauf direkt über dein lokales Netzwerk aus. Es wird nirgendwohin etwas hochgeladen, und es ist kein Konto nötig.</string>
+    <string name="sync_intro">Gekoppelte Geräte tauschen Verlauf, Favoriten und Wiedergabestatus im lokalen Netzwerk aus. Ein optionaler Internet-Relay überträgt verschlüsselte Steuerbefehle und Wiedergabestatus, kein Audio.</string>
     <string name="sync_device_name">Name dieses Geräts</string>
     <string name="sync_peer_code">Kopplungscode von deinem Computer</string>
     <string name="sync_now">Jetzt synchronisieren</string>
@@ -2710,4 +2710,7 @@
     <string name="time_hours">%1$d Std.</string>
     <string name="time_minutes">%1$d Min.</string>
     <string name="time_seconds">%1$d Sek.</string>
+    <string name="connect_devices">Geräte</string>
+    <string name="sync_playback_title">Warteschlange und Wiedergabeposition</string>
+    <string name="sync_playback_sub">Beim Öffnen eines anderen Geräts den letzten Titel und die Warteschlange fortsetzen</string>
 </resources>

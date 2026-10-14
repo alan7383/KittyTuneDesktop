@@ -509,6 +509,16 @@ fun main(args: Array<String>) {
         ) {
             setSingletonImageLoaderFactory { ImageLoaderFactory.create() }
 
+            androidx.compose.runtime.DisposableEffect(window) {
+                val listener = object : java.awt.event.WindowAdapter() {
+                    override fun windowGainedFocus(event: java.awt.event.WindowEvent?) {
+                        playerViewModel.refreshSyncedPlaybackOnForeground()
+                    }
+                }
+                window.addWindowFocusListener(listener)
+                onDispose { window.removeWindowFocusListener(listener) }
+            }
+
             // Set dark background immediately on the AWT window before composition to prevent white flash on Win32/DirectX resize
             runCatching {
                 val darkBg = java.awt.Color(0x13, 0x13, 0x13)

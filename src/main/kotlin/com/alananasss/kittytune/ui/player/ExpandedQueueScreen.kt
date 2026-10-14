@@ -63,11 +63,11 @@ fun ExpandedQueueScreen(
     viewModel: PlayerViewModel,
     onClose: () -> Unit
 ) {
-    val queueState = viewModel.queueState
+    val queueState = viewModel.uiQueueState
         val listState = rememberLazyListState()
 
-    LaunchedEffect(viewModel.currentTrack) {
-        val track = viewModel.currentTrack
+    LaunchedEffect(viewModel.uiCurrentTrack) {
+        val track = viewModel.uiCurrentTrack
         if (track != null && queueState.isNotEmpty()) {
             val index = queueState.indexOfFirst { it.id == track.id }
             if (index >= 0) {
@@ -102,7 +102,7 @@ fun ExpandedQueueScreen(
                     }
                 },
                 actions = {
-                    val shuffleColor = if (viewModel.shuffleEnabled)
+                    val shuffleColor = if (viewModel.uiShuffleEnabled)
                         MaterialTheme.colorScheme.primary
                     else
                         MaterialTheme.colorScheme.onSurface
@@ -115,11 +115,11 @@ fun ExpandedQueueScreen(
                         )
                     }
 
-                    val repeatIcon = when (viewModel.repeatMode) {
+                    val repeatIcon = when (viewModel.uiRepeatMode) {
                         RepeatMode.ONE -> Icons.Rounded.RepeatOne
                         else -> Icons.Rounded.Repeat
                     }
-                    val repeatColor = if (viewModel.repeatMode == RepeatMode.NONE)
+                    val repeatColor = if (viewModel.uiRepeatMode == RepeatMode.NONE)
                         MaterialTheme.colorScheme.onSurface
                     else
                         MaterialTheme.colorScheme.primary
@@ -156,8 +156,8 @@ fun ExpandedQueueScreen(
                     state = reorderableState,
                     key = itemKey
                 ) { isDragging ->
-                    val isCurrent = track.id == viewModel.currentTrack?.id
-                    val shouldDarken = viewModel.repeatMode == RepeatMode.ONE && !isCurrent
+                    val isCurrent = track.id == viewModel.uiCurrentTrack?.id
+                    val shouldDarken = viewModel.uiRepeatMode == RepeatMode.ONE && !isCurrent
                     val itemAlpha by animateFloatAsState(
                         targetValue = if (shouldDarken) 0.3f else 1.0f,
                         label = "dim_alpha"

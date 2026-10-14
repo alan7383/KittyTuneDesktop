@@ -125,7 +125,7 @@ import kotlin.math.roundToInt
         onClose: () -> Unit
     ) {
         val isSearching = viewModel.isSearchingLyrics
-        val currentTrack = viewModel.currentTrack
+        val currentTrack = viewModel.uiCurrentTrack
         var showQuickSettingsDialog by remember { mutableStateOf(false) }
         var showUploadYamlDialog by remember { mutableStateOf(false) }
 
@@ -393,12 +393,12 @@ import kotlin.math.roundToInt
     
     @Composable
     fun SyncedLyricsView(viewModel: PlayerViewModel) {
-        val currentPosition = viewModel.currentPosition
+        val currentPosition = viewModel.uiCurrentPosition
         val adjustedPosition = currentPosition + viewModel.lyricsOffset
         val lyrics = viewModel.lyricsLines
         // Built on the line being sung, not on line one: the placement below runs after the first frame, and
         // that frame — the top of the song, mid-fade — was the jolt at every opening (issue #33, round 5).
-        val listState = key(viewModel.currentTrack?.id) {
+        val listState = key(viewModel.uiCurrentTrack?.id) {
             rememberLazyListState(
                 initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lyrics, adjustedPosition).coerceAtLeast(0)
             )
@@ -416,7 +416,7 @@ import kotlin.math.roundToInt
         // the State is handed on rather than read here.
         val smoothDrawPosition = rememberSmoothPosition(
             positionMs = currentPosition,
-            isPlaying = viewModel.isPlaying,
+            isPlaying = viewModel.uiIsPlaying,
             speed = viewModel.effectsState.speed,
         )
     
@@ -491,7 +491,7 @@ import kotlin.math.roundToInt
                     }
 
                     // For duet lines, override alignment per singer (normal style, no bubbles)
-                    val isDuetActive = viewModel.isDuetActiveForTrack(viewModel.currentTrack)
+                    val isDuetActive = viewModel.isDuetActiveForTrack(viewModel.uiCurrentTrack)
                     val effectiveSinger = if (isDuetActive) {
                         line.singer?.takeIf { it != LyricSinger.DEFAULT }
                             ?: when (line.agent?.trim()?.lowercase()) {
@@ -559,7 +559,7 @@ import kotlin.math.roundToInt
                                 LyricsUtils.seekTargetFor(
                                     line = line,
                                     lyricsOffsetMs = viewModel.lyricsOffsetAtLyricTime(line.startTime),
-                                    durationMs = viewModel.duration,
+                                    durationMs = viewModel.uiDuration,
                                 )?.let(viewModel::seekTo)
                             }
                     ) {
@@ -689,7 +689,7 @@ import kotlin.math.roundToInt
             )
         }
 
-        val listState = key(viewModel.currentTrack?.id) { rememberLazyListState() }
+        val listState = key(viewModel.uiCurrentTrack?.id) { rememberLazyListState() }
         val scrollScope = androidx.compose.runtime.rememberCoroutineScope()
         // Wheel and drag always win: the reader is following the words, and having the view creep
         // out from under them would be worse than no auto-scroll at all. Any manual scroll parks
@@ -704,8 +704,8 @@ import kotlin.math.roundToInt
             enabled = viewModel.isPlainAutoScrollEnabled,
             speed = viewModel.effectivePlainAutoScrollSpeed,
             lineCount = lines.size,
-            positionMs = { viewModel.currentPosition },
-            isPlaying = { viewModel.isPlaying },
+            positionMs = { viewModel.uiCurrentPosition },
+            isPlaying = { viewModel.uiIsPlaying },
             playbackSpeed = { viewModel.effectsState.speed },
             lastManualScrollMs = { lastUserScrollMs },
         )

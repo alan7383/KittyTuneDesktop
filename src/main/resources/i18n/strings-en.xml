@@ -1880,7 +1880,9 @@
     <string name="trim_field_start">Start</string>
     <string name="trim_field_end">End</string>
     <string name="sync_title">Device sync</string>
-    <string name="sync_intro">Your devices exchange listening history directly over your local network. Nothing is uploaded anywhere, and there is no account.</string>
+    <string name="sync_intro">Paired devices exchange history, favorites and playback state on your local network. An optional Internet relay forwards encrypted playback controls and state, not audio.</string>
+    <string name="sync_playback_title">Queue and playback position</string>
+    <string name="sync_playback_sub">Continue the latest track and queue when opening another device</string>
     <string name="sync_device_name">Name</string>
     <string name="sync_listener">Accept connections</string>
     <string name="sync_listener_sub">Lets a paired device call in. This opens a port on your network, so leave it off when you are not syncing.</string>
@@ -2491,4 +2493,5 @@
     <string name="time_hours">%1$dh</string>
     <string name="time_minutes">%1$d min</string>
     <string name="time_seconds">%1$ds</string>
+    <string name="connect_devices">Devices</string>
 </resources>

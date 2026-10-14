@@ -59,6 +59,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("org.java-websocket:Java-WebSocket:1.6.0")
     implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
 
     val ktorVersion = "3.6.0"
@@ -524,7 +525,10 @@ tasks.register<Test>("headlessTest") {
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
             "VolumeCurveTest", "TrackTrimTest", "TrimTimeParseTest", "SyncMergeTest",
             "WindowBoundsRestorationTest", "TextFieldShortcutGuardTest", "PaletteCacheTest", "PeakLimiterTest",
-            "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest"
+            "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest",
+            "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
+            "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
+            "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest"
         ).forEach(::includeTestsMatching)
     }
 }
@@ -538,4 +542,13 @@ tasks.register<Zip>("zipWindowsPortable") {
     archiveFileName.set("KittyTune-${project.version}-Windows-Portable-x64.zip")
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
+}
+
+tasks.register<JavaExec>("connectBenchmark") {
+    description = "Reports Connect allocation and packet-size baselines without audio or user profiles."
+    group = "verification"
+    dependsOn("testClasses")
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("ConnectBenchmark")
+    systemProperty("java.awt.headless", "true")
 }

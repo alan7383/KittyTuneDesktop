@@ -1879,7 +1879,7 @@
     <string name="trim_field_start">Kezdet</string>
     <string name="trim_field_end">Vége</string>
     <string name="sync_title">Eszközök szinkronizálása</string>
-    <string name="sync_intro">Az eszközeid közvetlenül, a helyi hálózaton osztják meg a hallgatási előzményeket. Semmi nem kerül fel sehová, és nincs fiók.</string>
+    <string name="sync_intro">A párosított eszközök a helyi hálózaton megosztják az előzményeket, a kedvenceket és a lejátszási állapotot. Az opcionális internetes közvetítő titkosított vezérlést és lejátszási állapotot továbbít, hangot nem.</string>
     <string name="sync_device_name">Név</string>
     <string name="sync_listener">Kapcsolatok fogadása</string>
     <string name="sync_listener_sub">Engedi, hogy egy párosított eszköz bejelentkezzen. Ez portot nyit a hálózaton, ezért hagyd kikapcsolva, amikor nem szinkronizálsz.</string>
@@ -2489,4 +2489,7 @@
     <string name="time_hours">%1$dó</string>
     <string name="time_minutes">%1$d perc</string>
     <string name="time_seconds">%1$dmp</string>
+    <string name="connect_devices">Eszközök</string>
+    <string name="sync_playback_title">Lejátszási sor és pozíció</string>
+    <string name="sync_playback_sub">Az utolsó szám és a lejátszási sor folytatása másik eszköz megnyitásakor</string>
 </resources>

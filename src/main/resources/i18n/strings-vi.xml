@@ -1618,7 +1618,7 @@
     <string name="trim_plays_for">Phát %1$s trên tổng số %2$s</string>
     <string name="trim_clear">Xóa thiết lập cắt</string>
     <string name="sync_title">Đồng bộ thiết bị</string>
-    <string name="sync_intro">Điện thoại và máy tính của bạn trao đổi lịch sử nghe trực tiếp thông qua mạng cục bộ. Không có dữ liệu nào được tải lên máy chủ ngoài và không cần tạo tài khoản.</string>
+    <string name="sync_intro">Các thiết bị đã ghép đôi trao đổi lịch sử, mục yêu thích và trạng thái phát trên mạng cục bộ. Máy chủ chuyển tiếp Internet tùy chọn chỉ chuyển lệnh và trạng thái phát đã mã hóa, không chuyển âm thanh.</string>
     <string name="sync_device_name">Tên của thiết bị này</string>
     <string name="sync_peer_code">Mã ghép nối từ máy tính của bạn</string>
     <string name="sync_now">Đồng bộ ngay</string>
@@ -2571,4 +2571,7 @@
     <string name="time_hours">%1$d giờ</string>
     <string name="time_minutes">%1$d phút</string>
     <string name="time_seconds">%1$d giây</string>
+    <string name="connect_devices">Thiết bị</string>
+    <string name="sync_playback_title">Hàng đợi và vị trí phát</string>
+    <string name="sync_playback_sub">Tiếp tục bài hát và hàng đợi mới nhất khi mở thiết bị khác</string>
 </resources>
