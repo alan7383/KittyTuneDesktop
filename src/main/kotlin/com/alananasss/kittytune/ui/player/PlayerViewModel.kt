@@ -37,6 +37,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -335,6 +337,159 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var trackForMenu by mutableStateOf<Track?>(null)
     var menuContextPlaylistId by mutableStateOf<Long?>(null)
     var isMenuContextFromPlayer by mutableStateOf(false)
+
+    // ─── Content filtering + AI detection (issue #41, ported from Android) ────
+
+    /** Desktop-adapted details dialog for the AI badge (Android: bottom sheet). */
+    var showAiDetectionSheet by mutableStateOf(false)
+
+    /** Undo bar shown after an AI auto-skip, with a session-whitelist Undo action. */
+    var showAiSkipUndoBar by mutableStateOf(false)
+
+    /**
+     * Bumps on every auto-skip so the undo bar's auto-dismiss timer restarts
+     * when a second skip lands while it is still visible.
+     */
+    var aiSkipUndoNonce by mutableIntStateOf(0)
+        private set
+    var aiSkippedTrack: Track? = null
+        private set
+    private var aiSkippedQueueIndex: Int = -1
+    private var aiSkippedWasBlocked: Boolean = false
+
+    /** Tracks the user restored via Undo: never auto-skip them again this session. */
+    val whitelistedAiTrackIds = mutableSetOf<Long>()
+
+    fun onAiTrackSkipped(track: Track, queueIndex: Int, wasBlocked: Boolean) {
+        aiSkippedTrack = track
+        aiSkippedQueueIndex = queueIndex
+        aiSkippedWasBlocked = wasBlocked
+        showAiSkipUndoBar = true
+        aiSkipUndoNonce++
+    }
+
+    fun undoAiSkip() {
+        val track = aiSkippedTrack ?: return
+        val queueIdx = aiSkippedQueueIndex
+        showAiSkipUndoBar = false
+        whitelistedAiTrackIds.add(track.id)
+        viewModelScope.launch {
+            if (aiSkippedWasBlocked) {
+                com.alananasss.kittytune.data.BlockManager.unblockTrack(track.id)
+            }
+            val existingIdx = _queue.indexOfFirst { it.id == track.id }
+            val targetIdx = if (existingIdx != -1) {
+                existingIdx
+            } else {
+                val insertAt = queueIdx.coerceIn(0, _queue.size)
+                _queue.add(insertAt, track)
+                val origInsertAt = queueIdx.coerceIn(0, _originalQueue.size)
+                _originalQueue.add(origInsertAt, track)
+                queueState = _queue.toList()
+                insertAt
+            }
+            skipToQueueItem(targetIdx)
+        }
+        aiSkippedTrack = null
+    }
+
+    fun hideAiSkipUndoBar() {
+        showAiSkipUndoBar = false
+        aiSkippedTrack = null
+    }
+
+    /**
+     * Content filtering wiring (issue #41, ported from Android).
+     *
+     * - A block that lands on the current track (manual or AI) skips forward and
+     *   purges the queue, so hidden content never plays and never reappears.
+     * - ArtifactNet verdicts drive auto-skip / auto-block when the user enabled them,
+     *   sparing liked tracks and session-whitelisted (Undo) tracks.
+     */
+    private fun initContentFiltering() {
+        com.alananasss.kittytune.data.BlockManager.init()
+
+        var lastSkipTime = 0L
+        fun safePlayNextOnBlock() {
+            val now = System.currentTimeMillis()
+            if (now - lastSkipTime < 800) return
+            lastSkipTime = now
+            playNext(manual = false, isCrossfade = false, ignoreRepeatOne = true)
+        }
+
+        // Auto-skip when the current track is blocked
+        com.alananasss.kittytune.data.BlockManager.onCurrentTrackBlocked = {
+            viewModelScope.launch(Dispatchers.Main) {
+                safePlayNextOnBlock()
+            }
+        }
+
+        com.alananasss.kittytune.data.BlockManager.onTrackBlocked = { blockedTrackId ->
+            viewModelScope.launch(Dispatchers.Main) {
+                if (currentTrack?.id == blockedTrackId) {
+                    safePlayNextOnBlock()
+                }
+                val removed = _queue.removeAll { it.id == blockedTrackId }
+                _originalQueue.removeAll { it.id == blockedTrackId }
+                if (removed) {
+                    currentQueueIndex = _queue.indexOfFirst { it.id == currentTrack?.id }
+                    queueState = _queue.toList()
+                }
+            }
+        }
+
+        com.alananasss.kittytune.data.BlockManager.onArtistBlocked = { blockedArtistId ->
+            viewModelScope.launch(Dispatchers.Main) {
+                if (currentTrack?.user?.id == blockedArtistId) {
+                    safePlayNextOnBlock()
+                }
+                val removed = _queue.removeAll { it.user?.id == blockedArtistId }
+                _originalQueue.removeAll { it.user?.id == blockedArtistId }
+                if (removed) {
+                    currentQueueIndex = _queue.indexOfFirst { it.id == currentTrack?.id }
+                    queueState = _queue.toList()
+                }
+            }
+        }
+
+        // Observe ArtifactNet results: auto-skip + block if user enabled it
+        viewModelScope.launch {
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.result
+                .filterNotNull()
+                .filter { it.status == com.alananasss.kittytune.audio.ai.AiDetectionManager.Status.DONE }
+                .collect { result ->
+                    val isAi = result.score >= playerPrefs.aiScoreThreshold
+                    if (isAi && playerPrefs.aiAutoSkip) {
+                        val track = currentTrack ?: return@collect
+                        // Check if whitelisted for this session (e.g. user previously clicked Undo)
+                        if (whitelistedAiTrackIds.contains(track.id)) {
+                            return@collect
+                        }
+                        // Spare favorite / liked tracks (default true)
+                        if (playerPrefs.aiSpareFavorites &&
+                            (isLiked || com.alananasss.kittytune.data.LikeRepository.isTrackLiked(track.id))
+                        ) {
+                            return@collect
+                        }
+
+                        val skippedTrack = track
+                        val queueIdx = currentQueueIndex
+                        val wasBlocked = playerPrefs.aiAutoBlock
+                        if (wasBlocked) {
+                            com.alananasss.kittytune.data.BlockManager.blockTrack(
+                                skippedTrack,
+                                reason = com.alananasss.kittytune.data.BlockManager.REASON_AI_GENERATED,
+                                skipIfCurrent = true,
+                                currentlyPlayingId = skippedTrack.id,
+                            )
+                        } else {
+                            playNext(manual = false, isCrossfade = false, ignoreRepeatOne = true)
+                        }
+                        onAiTrackSkipped(skippedTrack, queueIdx, wasBlocked)
+                    }
+                }
+        }
+    }
 
     var showPlaylistMenuSheet by mutableStateOf(false)
     var playlistForMenu by mutableStateOf<Playlist?>(null)
@@ -1494,6 +1649,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
             val trackId = parseIdFromMediaId(mediaItem.mediaId)
 
+            // Auto-skip when the incoming track is blocked (issue #41).
+            // ignoreRepeatOne guarantees forward progress under Repeat-One.
+            if (trackId != 0L && com.alananasss.kittytune.data.BlockManager.isTrackBlocked(trackId)) {
+                playNext(manual = false, ignoreRepeatOne = true)
+                return
+            }
+
             val expectedTrackId = _queue.getOrNull(currentQueueIndex)?.id
             if (expectedTrackId != null && expectedTrackId != trackId) {
                 return
@@ -1545,6 +1707,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO && trackActuallyChanged) {
                 currentTrack?.let { loadLyrics(it) }
             }
+
+            if (trackActuallyChanged || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+                currentTrack?.let { checkAndTriggerKaraokeSeparation(it) }
+            }
         }
     }
 
@@ -1576,6 +1742,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
             playNext(manual = true, isCrossfade = crossfadeEnabled)
         }
+        initContentFiltering()
         MusicManager.onPreviousClick = {
             val crossfadeEnabled = playerPrefs.getCrossfadeEnabled()
             smartPrevious(isCrossfade = crossfadeEnabled)
@@ -1652,6 +1819,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 }
             } catch (_: Exception) {
             }
+
+            checkAndTriggerKaraokeSeparation(finalTrack)
         }
 
         viewModelScope.launch {
@@ -3598,6 +3767,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         respectShuffle: Boolean = true,
     ) {
         if (tracks.isEmpty()) return
+        // Content filtering (issue #41): blocked tracks/artists never enter the queue.
+        val cleanTracks = com.alananasss.kittytune.data.BlockManager.filterBlocked(tracks)
+        if (cleanTracks.isEmpty()) return
         // Playing something of one's own leaves the shared playlist; the others carry on without us.
         if (!applyingTogether && context?.navigationId?.startsWith(TOGETHER_NAV_PREFIX) != true) {
             com.alananasss.kittytune.data.together.Together.stopListening()
@@ -3607,23 +3779,25 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
         SoundCloudTelemetryTracker.onQueueReset()
         playedTrackIds = emptySet()
-        _originalQueue.clear(); _originalQueue.addAll(tracks)
+        _originalQueue.clear(); _originalQueue.addAll(cleanTracks)
         _queue.clear()
         this.currentContext = context
         MusicManager.updateContext(context)
 
-        val effectiveStartIndex = if (startIndex in tracks.indices) startIndex else 0
+        val targetTrack = tracks.getOrNull(startIndex)
+        val effectiveStartIndex = cleanTracks.indexOfFirst { it.id == targetTrack?.id }
+            .takeIf { it != -1 } ?: (if (startIndex in cleanTracks.indices) startIndex else 0)
         val isHistoryContext = context?.navigationId == "history" || context?.navigationId?.startsWith("history") == true
 
         if (shuffleEnabled && respectShuffle) {
-            val clickedTrack = tracks[effectiveStartIndex]
+            val clickedTrack = cleanTracks[effectiveStartIndex]
             val rest =
-                tracks.filterIndexed { index, _ -> index != effectiveStartIndex }.shuffled()
+                cleanTracks.filterIndexed { index, _ -> index != effectiveStartIndex }.shuffled()
             _queue.add(clickedTrack)
             _queue.addAll(rest)
             playTrackAtIndex(0, addToHistory = (context == null || isHistoryContext))
         } else {
-            _queue.addAll(tracks)
+            _queue.addAll(cleanTracks)
             playTrackAtIndex(effectiveStartIndex, addToHistory = (context == null || isHistoryContext))
         }
 
@@ -3658,12 +3832,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 title = cleanTitle,
                 artworkUrl = safeArtworkUrl,
                 calculatedArtworkUrl = null,
-                trackCount = tracks.size,
+                trackCount = cleanTracks.size,
                 user = playlistCreator,
                 tracks = null,
                 permalinkUrl = safePermalink
             )
-
             HistoryRepository.addToHistory(historyPlaylist, isStation, isProfile)
         }
     }
@@ -3703,6 +3876,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true, isCrossfade: Boolean = false, autoPlay: Boolean = true) {
         if (index < 0 || index >= _queue.size) {
             currentContext = null; return
+        }
+        val candidate = _queue[index]
+        if (com.alananasss.kittytune.data.BlockManager.isBlocked(candidate)) {
+            _queue.removeAt(index)
+            _originalQueue.removeAll { it.id == candidate.id }
+            queueState = _queue.toList()
+            playTrackAtIndex(index, addToHistory, isCrossfade, autoPlay)
+            return
         }
         currentQueueIndex = index
         val trackToPlay = _queue[index]
@@ -3771,6 +3952,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             saveStateAsync(saveQueue = false)
             // Hydration backfills title/artwork the queue entry lacked: re-announce it.
             updateMprisMedia()
+            checkAndTriggerKaraokeSeparation(finalTrack)
 
             SoundCloudTelemetryTracker.onTrackStarted(
                 track = finalTrack,
@@ -3920,7 +4102,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             }
 
             if (radioTracks.isNotEmpty()) {
-                val newTracks = radioTracks.filter { track -> _queue.none { it.id == track.id } }
+                val newTracks = com.alananasss.kittytune.data.BlockManager.filterBlocked(
+                    radioTracks.filter { track -> _queue.none { it.id == track.id } },
+                )
 
                 _queue.addAll(newTracks)
                 _originalQueue.addAll(newTracks)
@@ -3944,7 +4128,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 if (newTrackIds.isNotEmpty()) {
                     val unorderedFullTracks = api.getTracksByIds(newTrackIds.joinToString(","))
                     val trackMap = unorderedFullTracks.associateBy { it.id }
-                    val orderedFullTracks = newTrackIds.mapNotNull { id -> trackMap[id] }
+                    val orderedFullTracks = com.alananasss.kittytune.data.BlockManager.filterBlocked(
+                        newTrackIds.mapNotNull { id -> trackMap[id] },
+                    )
                     _queue.addAll(orderedFullTracks); _originalQueue.addAll(orderedFullTracks); updateQueueState()
                 }
                 if (currentContext == null) {
@@ -3992,8 +4178,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             val rawTracks = radioPlaylist?.tracks
                 ?: com.alananasss.kittytune.data.spotify.SpotifyRepository.getRadioTracks(spotifyId)
 
-            val tracksToAdd = rawTracks.drop(1).map { it.toTrack() }
-                .filter { track -> _queue.none { it.id == track.id } }
+            val tracksToAdd = com.alananasss.kittytune.data.BlockManager.filterBlocked(
+                rawTracks.drop(1).map { it.toTrack() },
+            ).filter { track -> _queue.none { it.id == track.id } }
 
             if (tracksToAdd.isNotEmpty()) {
                 _queue.addAll(tracksToAdd)
@@ -4035,6 +4222,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 player.play()
                 isPlaying = true
             }
+            currentTrack?.let { checkAndTriggerKaraokeSeparation(it) }
         } else {
             if (currentTrack != null) flushListenSession("SKIP_PREVIOUS")
             playTrackAtIndex(prev, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
@@ -4227,9 +4415,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun insertNext(tracks: List<Track>) {
         if (tracks.isEmpty()) return
+        val cleanTracks = com.alananasss.kittytune.data.BlockManager.filterBlocked(tracks)
+        if (cleanTracks.isEmpty()) return
         val insertIndex = currentQueueIndex + 1
 
-        val uniqueTracks = tracks.map { it.copy() }
+        val uniqueTracks = cleanTracks.map { it.copy() }
 
         _queue.addAll(insertIndex, uniqueTracks)
         _originalQueue.addAll(insertIndex, uniqueTracks)
@@ -4411,7 +4601,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     private fun appendToQueue(tracks: List<Track>) {
         val known = _queue.map { it.id }.toHashSet()
-        val fresh = tracks.filter { it.id !in known }
+        val fresh = com.alananasss.kittytune.data.BlockManager.filterBlocked(
+            tracks.filter { it.id !in known },
+        )
         _queue.addAll(fresh)
         _originalQueue.addAll(fresh)
         updateQueueState()
@@ -4758,10 +4950,110 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     fun toggleVintageMp3() { val n = !effectsState.isVintageMp3Enabled; effectsState = effectsState.copy(isVintageMp3Enabled = n); applyEffectsAndSave() }
     fun setVintageMp3Compression(v: Float) { effectsState = effectsState.copy(vintageMp3Compression = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
 
-    fun toggleVocalRemover() { val n = !effectsState.isVocalRemoverEnabled; effectsState = effectsState.copy(isVocalRemoverEnabled = n); applyEffectsAndSave() }
+    fun toggleVocalRemover() {
+        val n = !effectsState.isVocalRemoverEnabled
+        effectsState = effectsState.copy(isVocalRemoverEnabled = n)
+        applyEffectsAndSave()
+        if (n) {
+            val track = currentTrack
+            val prefs = PlayerPreferences()
+            if (track != null) {
+                if (com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady()) {
+                    if (prefs.karaokeEngineMode != com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER) {
+                        prefs.karaokeEngineMode = com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER
+                    }
+                    if (com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.hasStem(track.id)) {
+                        com.alananasss.kittytune.core.Toaster.show(str("karaoke_stem_active_toast"))
+                    } else {
+                        com.alananasss.kittytune.core.Toaster.show(str("karaoke_processing_cool_toast"))
+                    }
+                }
+                checkAndTriggerKaraokeSeparation(track)
+            }
+        }
+    }
     fun setVocalRemoverLevel(v: Float) { effectsState = effectsState.copy(vocalRemoverLevel = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
 
-    fun toggleVocalBoost() { val n = !effectsState.isVocalBoostEnabled; effectsState = effectsState.copy(isVocalBoostEnabled = n); applyEffectsAndSave() }
+    fun checkAndTriggerKaraokeSeparation(track: Track, force: Boolean = false, requireVocalStem: Boolean = false) {
+        val prefs = PlayerPreferences()
+        val isModelReady = com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady()
+        val shouldTrigger = isModelReady &&
+            (force || effectsState.isVocalRemoverEnabled || effectsState.isVocalBoostEnabled || prefs.karaokeAutoSeparateOnPlay)
+        val needVocals = requireVocalStem || effectsState.isVocalBoostEnabled
+        if (shouldTrigger) {
+            if (prefs.karaokeEngineMode != com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER) {
+                prefs.karaokeEngineMode = com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                // 1. Check local cache and download first (instant, offline, zero latency)
+                var url: String? = com.alananasss.kittytune.data.cache.AudioCache.lookup(track.id)?.absolutePath
+                if (url == null) {
+                    url = com.alananasss.kittytune.data.DownloadManager.getLocalTrack(track.id)?.localAudioPath?.takeIf { java.io.File(it).exists() }
+                }
+                if (url == null) {
+                    val mediaItem = MusicManager.player.currentMediaItem
+                    url = mediaItem?.uri?.takeIf {
+                        it.startsWith("http://") || it.startsWith("https://") || it.startsWith("file:") || java.io.File(it).exists()
+                    }
+                }
+                if (url == null) {
+                    url = MusicManager.player.activeEngine.currentUrl?.takeIf {
+                        it.startsWith("http://") || it.startsWith("https://") || it.startsWith("file:") || java.io.File(it).exists()
+                    }
+                }
+                if (url == null) {
+                    url = com.alananasss.kittytune.data.StreamResolver.cachedStreamUrl(track.id)
+                        ?: com.alananasss.kittytune.data.StreamResolver.resolveStream(track)
+                }
+                if (!url.isNullOrEmpty()) {
+                    val headers = MusicManager.player.buildHeaders(track)
+                    com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.triggerAutoSeparationIfNeeded(
+                        track = track,
+                        audioSourceUrl = url,
+                        headers = headers,
+                        force = force,
+                        requireVocalStem = needVocals,
+                        onCompleted = { trackId ->
+                            MusicManager.onKaraokeStemReady(trackId)
+                            if (currentTrack?.id == trackId) {
+                                if (effectsState.isVocalRemoverEnabled) {
+                                    com.alananasss.kittytune.core.Toaster.show(str("karaoke_separation_complete_toast"))
+                                } else if (effectsState.isVocalBoostEnabled) {
+                                    com.alananasss.kittytune.core.Toaster.show(str("karaoke_stem_vocal_ready"))
+                                }
+                            }
+                        }
+                    )
+                } else {
+                    com.alananasss.kittytune.utils.Logger.w("PlayerViewModel", "checkAndTriggerKaraokeSeparation: could not resolve URL for track ${track.id}")
+                    com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.reportSeparationError(track.id, "Source audio inaccessible")
+                }
+            }
+        }
+    }
+
+    fun toggleVocalBoost() {
+        val n = !effectsState.isVocalBoostEnabled
+        effectsState = effectsState.copy(isVocalBoostEnabled = n)
+        applyEffectsAndSave()
+        if (n) {
+            val track = currentTrack
+            val prefs = PlayerPreferences()
+            if (track != null) {
+                if (com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady()) {
+                    if (prefs.karaokeEngineMode != com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER) {
+                        prefs.karaokeEngineMode = com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER
+                    }
+                    if (com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.hasVocalStem(track.id)) {
+                        com.alananasss.kittytune.core.Toaster.show(str("karaoke_stem_vocal_ready"))
+                    } else {
+                        com.alananasss.kittytune.core.Toaster.show(str("karaoke_processing_cool_toast"))
+                    }
+                }
+                checkAndTriggerKaraokeSeparation(track)
+            }
+        }
+    }
     fun setVocalBoostIntensity(v: Float) { effectsState = effectsState.copy(vocalBoostIntensity = v.coerceIn(0f, 1f)); applyEffectsAndSave() }
 
     fun toggleFlanger() { val n = !effectsState.isFlangerEnabled; effectsState = effectsState.copy(isFlangerEnabled = n); applyEffectsAndSave() }
@@ -4987,8 +5279,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun addToQueue(tracks: List<Track>) {
         if (tracks.isEmpty()) return
+        val cleanTracks = com.alananasss.kittytune.data.BlockManager.filterBlocked(tracks)
+        if (cleanTracks.isEmpty()) return
 
-        val uniqueTracks = tracks.map { it.copy() }
+        val uniqueTracks = cleanTracks.map { it.copy() }
 
         _queue.addAll(uniqueTracks)
         _originalQueue.addAll(uniqueTracks)
@@ -5380,8 +5674,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private fun restoreSession() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val lastQueue = playerPrefs.getLastQueue()
-                val lastTrack = playerPrefs.getLastTrack()
+                val lastQueue = com.alananasss.kittytune.data.BlockManager.filterBlocked(playerPrefs.getLastQueue())
+                val lastTrack = playerPrefs.getLastTrack()?.takeUnless {
+                    com.alananasss.kittytune.data.BlockManager.isBlocked(it)
+                }
                 val lastPosition = playerPrefs.getLastPosition()
                 val lastContext = playerPrefs.getLastContext()
                 val lastShuffle = playerPrefs.getLastShuffleEnabled()
@@ -5457,7 +5753,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             }
 
             withContext(Dispatchers.IO) {
-                val savedQueue = playerPrefs.getLastQueue()
+                val savedQueue = com.alananasss.kittytune.data.BlockManager.filterBlocked(playerPrefs.getLastQueue())
                 val savedContext = playerPrefs.getLastContext()
 
                 withContext(Dispatchers.Main) {
@@ -5836,6 +6132,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         } else nextIndex
 
         val nextTrack = _queue[targetIndex]
+        if (com.alananasss.kittytune.data.BlockManager.isBlocked(nextTrack)) return
 
         viewModelScope.launch(Dispatchers.IO) {
             try {

@@ -238,7 +238,10 @@ fun PlayerBar(
                                 label = "barTitleWidth",
                             )
                             Spacer(Modifier.width(artworkGap))
-                            Column(Modifier.weight(1f, fill = false).widthIn(max = titleMaxWidth)) {
+                            Column(
+                                modifier = Modifier.weight(1f, fill = false).widthIn(max = titleMaxWidth),
+                                verticalArrangement = Arrangement.Center,
+                            ) {
                                 Text(
                                     text = track.title.orEmpty(),
                                     style = MaterialTheme.typography.bodyMedium,
@@ -264,6 +267,14 @@ fun PlayerBar(
                                             modifier = Modifier.size(12.dp)
                                         )
                                     }
+                                    // ArtifactNet AI-detection badge (issue #41)
+                                    val aiResult by com.alananasss.kittytune.audio.ai.AiDetectionManager.result.collectAsState()
+                                    com.alananasss.kittytune.ui.player.ai.AiDetectionBadge(
+                                        result = aiResult,
+                                        textColor = MaterialTheme.colorScheme.onSurface,
+                                        onClick = { vm.showAiDetectionSheet = true },
+                                        modifier = Modifier.padding(start = 6.dp),
+                                    )
                                 }
 
                             }
