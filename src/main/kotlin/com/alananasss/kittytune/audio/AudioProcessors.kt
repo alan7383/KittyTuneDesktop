@@ -846,6 +846,32 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
     private var envL = 100f
     private var envR = 100f
 
+    @Volatile
+    private var currentTrackId: Long? = null
+    @Volatile
+    private var currentSamplePosition: Long = 0L
+    @Volatile
+    private var isAiMode: Boolean = false
+
+    private var stemBufferL = FloatArray(4096)
+    private var stemBufferR = FloatArray(4096)
+
+    fun setTrack(trackId: Long?) {
+        currentTrackId = trackId
+        currentSamplePosition = 0L
+    }
+
+    fun getCurrentTrackId(): Long? = currentTrackId
+
+    fun setKaraokeAiMode(aiMode: Boolean) {
+        this.isAiMode = aiMode
+    }
+
+    fun seekToPositionMs(posMs: Long) {
+        val sr = if (sampleRate > 0) sampleRate else 44100
+        currentSamplePosition = (posMs * sr) / 1000L
+    }
+
     fun setEnabled(enabled: Boolean) {
         this.enabled = enabled
         if (!enabled) resetFilterState()
@@ -938,14 +964,54 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
+        val numFrames = remaining / (inputAudioFormat.channelCount * 2)
+
         if (!enabled || inputAudioFormat.channelCount != 2) {
             val buffer = replaceOutputBuffer(remaining)
             buffer.put(inputBuffer)
             buffer.flip()
+            currentSamplePosition += numFrames
             return
         }
 
+        val trackId = currentTrackId
+        val hasStem = trackId != null && com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isStemAvailableForCurrentTrack(trackId)
+
         val buffer = replaceOutputBuffer(remaining)
+
+        if (isAiMode && hasStem && trackId != null) {
+            if (stemBufferL.size < numFrames) {
+                stemBufferL = FloatArray(numFrames)
+                stemBufferR = FloatArray(numFrames)
+            }
+            val readOk = com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.readStemSlice(
+                trackId, currentSamplePosition, stemBufferL, stemBufferR, numFrames
+            )
+            currentSamplePosition += numFrames
+
+            if (readOk) {
+                var frame = 0
+                while (inputBuffer.remaining() >= 4 && frame < numFrames) {
+                    val inL = inputBuffer.getShort().toFloat()
+                    val inR = inputBuffer.getShort().toFloat()
+
+                    val instL = stemBufferL[frame] * 32767f
+                    val instR = stemBufferR[frame] * 32767f
+                    frame++
+
+                    val outL = ((1f - suppressionLevel) * inL + suppressionLevel * instL).coerceIn(-32768f, 32767f)
+                    val outR = ((1f - suppressionLevel) * inR + suppressionLevel * instR).coerceIn(-32768f, 32767f)
+
+                    buffer.putShort(outL.toInt().toShort())
+                    buffer.putShort(outR.toInt().toShort())
+                }
+                buffer.flip()
+                return
+            }
+        } else {
+            currentSamplePosition += numFrames
+        }
+
         val makeupGain = 1.0f + 1.15f * suppressionLevel
         val notchBlend = (suppressionLevel * 0.55f).coerceIn(0f, 0.55f)
 
@@ -989,7 +1055,7 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
             val sideB = ap_a6 * (y_b4 - ap_y_b6) + ap_x_b6; ap_x_b6 = y_b4; ap_y_b6 = sideB
 
             val cleanL = subBass + sideA * makeupGain
-            val cleanR = subBass + sideB * makeupGain
+            val cleanR = subBass - sideB * makeupGain
 
             val outL = ((inL * (1f - suppressionLevel)) + cleanL * suppressionLevel)
                 .coerceIn(Short.MIN_VALUE.toFloat(), Short.MAX_VALUE.toFloat()).toInt().toShort()
@@ -1006,6 +1072,11 @@ class VocalRemoverAudioProcessor : BaseAudioProcessor() {
 class VocalBoostAudioProcessor : BaseAudioProcessor() {
     private var enabled = false
     private var intensity = 0.75f
+    private var isAiMode = false
+    private var currentTrackId: Long? = null
+    private var currentSamplePosition = 0L
+    private var vocalStemBufferL = FloatArray(4096)
+    private var vocalStemBufferR = FloatArray(4096)
 
     private var sampleRate = 44100
 
@@ -1042,6 +1113,23 @@ class VocalBoostAudioProcessor : BaseAudioProcessor() {
     fun setEnabled(enabled: Boolean) {
         this.enabled = enabled
         if (!enabled) resetFilterState()
+    }
+
+    fun setKaraokeAiMode(ai: Boolean) {
+        this.isAiMode = ai
+    }
+
+    fun setTrack(trackId: Long?) {
+        if (this.currentTrackId != trackId) {
+            this.currentTrackId = trackId
+            this.currentSamplePosition = 0L
+        }
+    }
+
+    fun getCurrentTrackId(): Long? = currentTrackId
+
+    fun seekToPositionMs(posMs: Long) {
+        currentSamplePosition = (posMs * sampleRate) / 1000L
     }
 
     fun setIntensity(intensity: Float) {
@@ -1114,17 +1202,55 @@ class VocalBoostAudioProcessor : BaseAudioProcessor() {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
+        val numFrames = remaining / (inputAudioFormat.channelCount * 2)
+
         if (!enabled || inputAudioFormat.channelCount != 2) {
             val buffer = replaceOutputBuffer(remaining)
             buffer.put(inputBuffer)
             buffer.flip()
+            currentSamplePosition += numFrames
             return
         }
 
+        val trackId = currentTrackId
+        val hasVocalStem = trackId != null && com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isVocalStemAvailableForCurrentTrack(trackId)
+
         val buffer = replaceOutputBuffer(remaining)
 
-        val sideGain = 1.0f - (intensity * 0.65f)
+        if (isAiMode && hasVocalStem && trackId != null) {
+            if (vocalStemBufferL.size < numFrames) {
+                vocalStemBufferL = FloatArray(numFrames)
+                vocalStemBufferR = FloatArray(numFrames)
+            }
+            val readOk = com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.readVocalStemSlice(
+                trackId, currentSamplePosition, vocalStemBufferL, vocalStemBufferR, numFrames
+            )
+            currentSamplePosition += numFrames
 
+            if (readOk) {
+                var frame = 0
+                while (inputBuffer.remaining() >= 4 && frame < numFrames) {
+                    val inL = inputBuffer.getShort().toFloat()
+                    val inR = inputBuffer.getShort().toFloat()
+
+                    val vocL = vocalStemBufferL[frame] * 32767f
+                    val vocR = vocalStemBufferR[frame] * 32767f
+                    frame++
+
+                    val outL = ((1f - intensity) * inL + intensity * vocL).coerceIn(-32768f, 32767f)
+                    val outR = ((1f - intensity) * inR + intensity * vocR).coerceIn(-32768f, 32767f)
+
+                    buffer.putShort(outL.toInt().toShort())
+                    buffer.putShort(outR.toInt().toShort())
+                }
+                buffer.flip()
+                return
+            }
+        } else {
+            currentSamplePosition += numFrames
+        }
+
+        val sideGain = 1.0f - (intensity * 0.65f)
         val centerGain = 1.0f + (intensity * 0.40f)
 
         while (inputBuffer.remaining() >= 4) {

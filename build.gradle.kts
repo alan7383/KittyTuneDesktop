@@ -87,6 +87,27 @@ dependencies {
         implementation("org.bytedeco:javacpp:$javacvVersion:$platformClassifier")
     }
 
+    // ArtifactNet AI-music detection (issue #41): genuine TensorFlow Lite runtime with
+    // desktop natives (Linux/Windows/macOS) + XNNPACK, via the JavaCPP preset. Runs the
+    // exact same .tflite model file as the Android app. The classifier mirrors the
+    // ffmpeg setup above: the main jar plus the current OS's native jar only.
+    val tfliteVersion = "2.21.0-1.5.14"
+    implementation("org.bytedeco:tensorflow-lite:$tfliteVersion")
+    val tfliteClassifier = when {
+        osName.contains("win") -> "windows-x86_64"
+        osName.contains("mac") && osArch.contains("aarch64") -> "macosx-arm64"
+        osName.contains("mac") -> "macosx-x86_64"
+        osName.contains("linux") && osArch.contains("aarch64") -> "linux-arm64"
+        osName.contains("linux") -> "linux-x86_64"
+        else -> null
+    }
+    if (tfliteClassifier != null) {
+        implementation("org.bytedeco:tensorflow-lite:$tfliteVersion:$tfliteClassifier")
+    }
+
+    val onnxVersion = "1.29.0"
+    implementation("com.microsoft.onnxruntime:onnxruntime:$onnxVersion")
+
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("com.materialkolor:material-kolor:5.0.1")
     implementation("org.xerial:sqlite-jdbc:3.53.4.0")
@@ -379,8 +400,12 @@ tasks.named("compileKotlin") { dependsOn(generateBuildConfig) }
 val compileNativeDSP by tasks.registering(Exec::class) {
     val cppDir = project.file("src/main/cpp")
     val outDir = project.file("src/main/resources/native")
+    val linuxNativeDir = project.file("src/main/resources/native/linux-x86_64")
     
-    doFirst { outDir.mkdirs() }
+    doFirst { 
+        outDir.mkdirs() 
+        linuxNativeDir.mkdirs()
+    }
     
     val osName = System.getProperty("os.name").lowercase()
     val isMac = osName.contains("mac")
@@ -402,6 +427,21 @@ val compileNativeDSP by tasks.registering(Exec::class) {
         File(cppDir, "ebur128/ebur128.c").absolutePath,
         "-o", outFile.absolutePath
     )
+
+    doLast {
+        if (!isWin && !isMac) {
+            val vkPriorityC = File(cppDir, "KittyTuneVkPriority.c")
+            val vkPrioritySo = File(linuxNativeDir, "libkt_vk_priority.so")
+            if (vkPriorityC.exists()) {
+                val proc = ProcessBuilder("gcc", "-shared", "-fPIC", "-O2", "-Wall", vkPriorityC.absolutePath, "-ldl", "-o", vkPrioritySo.absolutePath).start()
+                val exit = proc.waitFor()
+                if (exit != 0) {
+                    val err = proc.errorStream.bufferedReader().readText()
+                    throw GradleException("Failed compiling libkt_vk_priority.so: $err")
+                }
+            }
+        }
+    }
 }
 
 tasks.named("processResources") {

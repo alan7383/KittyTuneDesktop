@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.audio
 
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.AudioEffectsState
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.SignedUrl
@@ -93,7 +94,15 @@ class AudioEngine {
     private val nightDrive = NightDriveAudioProcessor()
     val automixDuck = com.alananasss.kittytune.audio.automix.AutomixDuckAudioProcessor()
 
+    /**
+     * ArtifactNet AI-music tap (issue #41): transparent pass-through that collects the
+     * first seconds of PCM for on-device AI detection. First in the chain so it
+     * analyzes the cleanest signal, before any effect touches it.
+     */
+    val aiDetection = com.alananasss.kittytune.audio.ai.AiDetectionAudioProcessor()
+
     private val chain: List<AudioProcessor> = listOf(
+        aiDetection,
         automixDuck,
         fx, reverb, eightD, earrape, normalization, mono,
         vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
@@ -154,18 +163,44 @@ class AudioEngine {
     init {
         val fmt = AudioFormat(outputSampleRate, outputChannels)
         chain.forEach { it.configure(fmt) }
+        aiDetection.setPreferences(PlayerPreferences())
+        if (!com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelLoaded() &&
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady()
+        ) {
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.initAsync()
+        }
     }
 
 
     @Synchronized
-    fun setMediaItem(url: String, headers: Map<String, String> = emptyMap(), startPositionMs: Long = 0L) {
+    fun setMediaItem(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        startPositionMs: Long = 0L,
+        trackId: Long? = null,
+    ) {
         stopInternal()
+        // New track: restart AI collection from zero and drop the previous verdict,
+        // mirroring the Android MusicManager resetForNewTrack + resetResult pair.
+        aiDetection.resetForNewTrack()
+        com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
+        vocalRemover.setTrack(trackId)
+        vocalBoost.setTrack(trackId)
+        if (trackId != null) {
+            com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.notifyTrackChanged(trackId)
+        }
         currentUrl = url
         currentHeaders = headers
         positionMs = startPositionMs
         durationMs = 0L
         seekRequestMs = if (startPositionMs > 0) startPositionMs else -1L
+        if (startPositionMs > 0) {
+            aiDetection.notifySeek(startPositionMs)
+            vocalRemover.seekToPositionMs(startPositionMs)
+            vocalBoost.seekToPositionMs(startPositionMs)
+        }
         Logger.e("AudioEngine", "setMediaItem called with url: $url")
+
         try {
             hlsAdapter = if (url.contains(".m3u8")) {
                 HlsHeadCache.take(url, ::reResolveUrl) ?: HlsStreamAdapter(url, headers, ::reResolveUrl)
@@ -174,6 +209,15 @@ class AudioEngine {
         } catch (e: Exception) {
             Logger.e("AudioEngine", "Failed to init HlsStreamAdapter: ${e.message}")
             hlsAdapter = null
+        }
+
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        if (prefs.aiShowBadge || prefs.aiAutoSkip) {
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.analyzeTrackUpfront(
+                urlOrPath = url,
+                headers = headers,
+                hlsAdapter = hlsAdapter,
+            )
         }
         
         setState(State.BUFFERING)
@@ -370,6 +414,9 @@ class AudioEngine {
         val coerced = ms.coerceAtLeast(0)
         seekRequestMs = coerced
         positionMs = coerced
+        aiDetection.notifySeek(coerced)
+        vocalRemover.seekToPositionMs(coerced)
+        vocalBoost.seekToPositionMs(coerced)
     }
 
     fun setVolume(v: Float) {
@@ -399,6 +446,8 @@ class AudioEngine {
     @Synchronized
     fun stop() {
         stopInternal()
+        aiDetection.resetForNewTrack()
+        com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         currentUrl = null
         currentHeaders = emptyMap()
         positionMs = 0L
@@ -409,7 +458,24 @@ class AudioEngine {
 
     fun release() {
         stop()
+        aiDetection.resetForNewTrack()
+        com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         scope.coroutineContext[Job]?.cancel()
+    }
+
+    fun onKaraokeStemReady(trackId: Long) {
+        val curId = vocalRemover.getCurrentTrackId() ?: vocalBoost.getCurrentTrackId()
+        if (curId == trackId || curId == null) {
+            vocalRemover.setTrack(trackId)
+            vocalBoost.setTrack(trackId)
+            val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+            val isAiMode = prefs.karaokeEngineMode == com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER
+            vocalRemover.setKaraokeAiMode(isAiMode)
+            vocalBoost.setKaraokeAiMode(isAiMode)
+            com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.loadStemSync(trackId)
+            vocalRemover.seekToPositionMs(positionMs)
+            vocalBoost.seekToPositionMs(positionMs)
+        }
     }
 
     fun applyEffects(state: AudioEffectsState) {
@@ -429,9 +495,13 @@ class AudioEngine {
         vintageMp3.setEnabled(state.isVintageMp3Enabled)
         vintageMp3.setCompression(state.vintageMp3Compression)
 
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val isAiMode = prefs.karaokeEngineMode == com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER
+        vocalRemover.setKaraokeAiMode(isAiMode)
         vocalRemover.setEnabled(state.isVocalRemoverEnabled)
         vocalRemover.setSuppressionLevel(state.vocalRemoverLevel)
 
+        vocalBoost.setKaraokeAiMode(isAiMode)
         vocalBoost.setEnabled(state.isVocalBoostEnabled)
         vocalBoost.setIntensity(state.vocalBoostIntensity)
 
@@ -843,6 +913,9 @@ class AudioEngine {
                     }
 
                     positionMs = seek
+                    aiDetection.notifySeek(seek)
+                    vocalRemover.seekToPositionMs(seek)
+                    vocalBoost.seekToPositionMs(seek)
                     stretcher.flush()
                     limiter.flush()
                     chain.forEach { it.flush() }

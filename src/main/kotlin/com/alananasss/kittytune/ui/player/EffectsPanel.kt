@@ -48,6 +48,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.KaraokeEngineMode
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.ui.common.Slider
 import com.alananasss.kittytune.ui.common.Tip
@@ -71,6 +73,7 @@ data class AudioFxDefinition(
     val isActive: (AudioEffectsState) -> Boolean,
     val onToggle: (PlayerViewModel, onEarrapeWarning: () -> Unit) -> Unit,
     val onOpenDialog: (() -> Unit)? = null,
+    val onSecondaryClick: ((PlayerViewModel) -> Unit)? = null,
     /** Drawn in the error colours while on: an effect that can hurt, not one of the ordinary kind. */
     val isDanger: Boolean = false,
 )
@@ -160,6 +163,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVocalBoostEnabled },
                 onToggle = { vm, _ -> vm.toggleVocalBoost() },
                 onOpenDialog = { showVocalBoostDialog = true },
+                onSecondaryClick = { showVocalBoostDialog = true },
             ),
             AudioFxDefinition(
                 id = "vocal_remover",
@@ -169,6 +173,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                 isActive = { it.isVocalRemoverEnabled },
                 onToggle = { vm, _ -> vm.toggleVocalRemover() },
                 onOpenDialog = { showVocalRemoverDialog = true },
+                onSecondaryClick = { showVocalRemoverDialog = true },
             ),
             AudioFxDefinition(
                 id = "normalization",
@@ -534,6 +539,7 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
                                     isActive = fx.isActive(viewModel.effectsState),
                                     onClick = { fx.onToggle(viewModel) { showEarrapeWarning = true } },
                                     onLongClick = fx.onOpenDialog,
+                                    onSecondaryClick = fx.onSecondaryClick?.let { { it(viewModel) } },
                                     modifier = if (rowItems.size == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
                                     isDanger = fx.isDanger,
                                     tooltip = fx.tooltip(),
@@ -546,16 +552,15 @@ fun EffectsPanel(viewModel: PlayerViewModel, modifier: Modifier = Modifier) {
 
             Spacer(Modifier.height(14.dp))
 
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { showStudioEditSheet = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shapes = ButtonShapes(RoundedCornerShape(20.dp), RoundedCornerShape(14.dp)),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f)
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                 ),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -751,6 +756,7 @@ fun FxTile(
     isActive: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
+    onSecondaryClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     isDanger: Boolean = false,
     tooltip: String = "",
@@ -812,7 +818,11 @@ fun FxTile(
                     .fillMaxWidth()
                     .height(88.dp)
                     .onClick(matcher = PointerMatcher.mouse(PointerButton.Secondary)) {
-                        onLongClick?.invoke()
+                        if (onSecondaryClick != null) {
+                            onSecondaryClick()
+                        } else {
+                            onLongClick?.invoke()
+                        }
                     },
                 shapes = ButtonShapes(RoundedCornerShape(22.dp), RoundedCornerShape(14.dp)),
                 interactionSource = interactionSource,
@@ -897,7 +907,6 @@ private fun SpeedCard(viewModel: PlayerViewModel) {
                 onClick = { viewModel.togglePitchEnabled(!isPitchActive) },
                 shape = CircleShape,
                 color = pitchContainerColor,
-                border = if (isPitchActive) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
                 contentColor = pitchContentColor
             ) {
                 Row(
@@ -982,7 +991,6 @@ fun AudioFxStudioSheet(
                 onClick = { viewModel.resetPinnedAudioFx() },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -1032,7 +1040,6 @@ fun AudioFxStudioSheet(
         Surface(
             shape = RoundedCornerShape(32.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-            border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Box(
@@ -1253,7 +1260,6 @@ fun ActiveQSTile(
         shape = RoundedCornerShape(22.dp),
         color = containerColor,
         contentColor = contentColor,
-        border = if (isActive) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         modifier = modifier.fillMaxSize()
     ) {
         Row(
@@ -1397,7 +1403,6 @@ fun AvailableTile(
                 shape = RoundedCornerShape(22.dp),
                 color = containerColor,
                 contentColor = contentColor,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (isPinned) 0.2f else 0.4f)),
                 modifier = Modifier.fillMaxWidth().height(72.dp)
             ) {
                 Row(
@@ -1900,20 +1905,323 @@ private fun VintageMp3Dialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
 
 @Composable
 private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
+    val prefs = remember { PlayerPreferences() }
+    var engineMode by remember { mutableStateOf(prefs.karaokeEngineMode) }
+    val downloadState by com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.downloadState.collectAsState()
+    val separationState by com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.separationState.collectAsState()
+    val stemVersion by com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.stemVersion.collectAsState()
+    val currentTrack = viewModel.currentTrack
+
+    val isProcessing = remember(currentTrack?.id, separationState) {
+        val sep = separationState
+        currentTrack != null && sep is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing && sep.trackId == currentTrack.id
+    }
+    val isReady = remember(currentTrack?.id, separationState, stemVersion) {
+        val sep = separationState
+        if (currentTrack == null) false
+        else com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.hasStem(currentTrack.id) ||
+                (sep is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Completed && sep.trackId == currentTrack.id)
+    }
+    val errorState = remember(currentTrack?.id, separationState) {
+        val sep = separationState
+        if (currentTrack != null && sep is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Error && sep.trackId == currentTrack.id) sep
+        else null
+    }
+
+    // Automatically trigger AI separation when dialog is opened with Mel-Band RoFormer / HTDemucs mode
+    LaunchedEffect(currentTrack?.id, engineMode) {
+        if (engineMode == KaraokeEngineMode.MEL_BAND_ROFORMER && currentTrack != null) {
+            val isProcessingCurrent = separationState is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing &&
+                (separationState as com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing).trackId == currentTrack.id
+            if (com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady() &&
+                !com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.hasStem(currentTrack.id) &&
+                !isProcessingCurrent
+            ) {
+                viewModel.checkAndTriggerKaraokeSeparation(currentTrack, force = true)
+            }
+        }
+    }
+
     EscapableAlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.MicOff, null) },
         title = { Text(str("effect_vocal_remover")) },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // Engine Selector
+                val engineOptions = remember {
+                    listOf(
+                        KaraokeEngineMode.DSP to str("karaoke_mode_dsp_short"),
+                        KaraokeEngineMode.MEL_BAND_ROFORMER to str("karaoke_mode_roformer_short"),
+                    )
+                }
+                val selectedOption = engineOptions.firstOrNull { it.first == engineMode }
+                ExpressiveConnectedButtonGroup(
+                    options = engineOptions,
+                    selectedOption = selectedOption,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                    onOptionSelected = { opt ->
+                        engineMode = opt.first
+                        prefs.karaokeEngineMode = opt.first
+                        com.alananasss.kittytune.data.MusicManager.applyEffects(viewModel.effectsState)
+                        if (opt.first == KaraokeEngineMode.MEL_BAND_ROFORMER) {
+                            currentTrack?.let { viewModel.checkAndTriggerKaraokeSeparation(it, force = true) }
+                        }
+                    },
+                    labelProvider = { opt ->
+                        Text(opt.second, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                if (engineMode == KaraokeEngineMode.MEL_BAND_ROFORMER) {
+                    if (!com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady()) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    text = str("karaoke_model_required_notice"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                when (val state = downloadState) {
+                                    is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.ModelDownloadState.Downloading -> {
+                                        LinearProgressIndicator(
+                                            progress = { state.progress },
+                                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                        )
+                                        Text(
+                                            text = "${(state.progress * 100).toInt()}% (${state.bytesRead / 1048576} Mo / ${state.totalBytes / 1048576} Mo)",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                    else -> {
+                                        FilledTonalButton(
+                                            onClick = { com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.startModelDownload() },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(12.dp),
+                                        ) {
+                                            Icon(Icons.Rounded.CloudDownload, null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            val sizeMo = "${com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.MODEL_TOTAL_BYTES / 1048576} Mo"
+                                            Text(str("karaoke_download_btn", sizeMo))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if (currentTrack != null) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isReady && !isProcessing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                if (isProcessing) {
+                                    val sep = separationState as com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.AutoAwesome,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp),
+                                                )
+                                                Text(
+                                                    text = str("karaoke_separating_track", (sep.progress * 100).toInt()),
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                            }
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            ) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                                ) {
+                                                    Text(
+                                                        text = "${(sep.progress * 100).toInt()}%",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                    )
+                                                }
+                                                FilledTonalIconButton(
+                                                    onClick = {
+                                                        com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.cancelSeparation()
+                                                        com.alananasss.kittytune.core.Toaster.show(str("karaoke_separation_cancelled"))
+                                                    },
+                                                    modifier = Modifier.size(28.dp),
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Rounded.Close,
+                                                        contentDescription = str("btn_cancel"),
+                                                        modifier = Modifier.size(16.dp),
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        LinearWavyProgressIndicator(
+                                            progress = { sep.progress },
+                                            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                        )
+
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.GraphicEq,
+                                                    contentDescription = null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                                Column {
+                                                    Text(
+                                                        text = sep.statusDetail ?: str("karaoke_dsp_fallback_notice"),
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                    Text(
+                                                        text = str("karaoke_cancel_tip"),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else if (isReady) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Verified,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                        Column {
+                                            Text(
+                                                text = str("karaoke_stem_studio_ready"),
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            )
+                                            Text(
+                                                text = str("karaoke_stem_active"),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                            )
+                                        }
+                                    }
+                                } else if (errorState != null) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Warning,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                            Text(
+                                                text = str("karaoke_separation_failed_title"),
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
+                                        Text(
+                                            text = errorState.message,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                        FilledTonalButton(
+                                            onClick = {
+                                                viewModel.checkAndTriggerKaraokeSeparation(currentTrack, force = true)
+                                            },
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(str("btn_retry"))
+                                        }
+                                    }
+                                } else {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(20.dp),
+                                            strokeWidth = 2.dp,
+                                        )
+                                        Column {
+                                            Text(
+                                                text = "Préparation de l'isolation IA...",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Medium,
+                                            )
+                                            Text(
+                                                text = str("karaoke_dsp_fallback_notice"),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Level Slider
                 val level = viewModel.effectsState.vocalRemoverLevel
                 val percent = (level * 100).toInt()
                 Text(
-                    str("label_vocal_remover_level", percent),
+                    text = str("label_vocal_remover_level", percent),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
-                Spacer(Modifier.height(16.dp))
+
                 Slider(
                     value = level,
                     onValueChange = {
@@ -1921,14 +2229,14 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                         if (!viewModel.effectsState.isVocalRemoverEnabled) viewModel.toggleVocalRemover()
                     },
                     valueRange = 0f..1f,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(16.dp))
+
                 val presets = remember {
                     listOf(
                         0.50f to "50%",
                         0.80f to "80%",
-                        1.00f to "100%"
+                        1.00f to "100%",
                     )
                 }
                 val selectedPreset = presets.firstOrNull {
@@ -1937,7 +2245,7 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                 ExpressiveConnectedButtonGroup(
                     options = presets,
                     selectedOption = selectedPreset,
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp),
                     onOptionSelected = { (value, _) ->
                         viewModel.setVocalRemoverLevel(value)
                         if (!viewModel.effectsState.isVocalRemoverEnabled) viewModel.toggleVocalRemover()
@@ -1945,14 +2253,18 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                     labelProvider = { (_, label) ->
                         Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(12.dp))
+
                 Text(
-                    text = str("fx_vocal_remover_desc"),
+                    text = if (engineMode == KaraokeEngineMode.MEL_BAND_ROFORMER) {
+                        str("karaoke_engine_roformer_desc")
+                    } else {
+                        str("fx_vocal_remover_desc")
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }
         },
@@ -1962,20 +2274,296 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
 
 @Composable
 private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) {
+    val prefs = remember { PlayerPreferences() }
+    val downloadState by com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.downloadState.collectAsState()
+    val separationState by com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.separationState.collectAsState()
+    val stemVersion by com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.stemVersion.collectAsState()
+    val currentTrack = viewModel.currentTrack
+
+    val isProcessing = remember(currentTrack?.id, separationState) {
+        val sep = separationState
+        currentTrack != null && sep is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing && sep.trackId == currentTrack.id
+    }
+    val isReady = remember(currentTrack?.id, separationState, stemVersion) {
+        val sep = separationState
+        if (currentTrack == null) false
+        else com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.hasVocalStem(currentTrack.id) ||
+                (sep is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Completed && sep.trackId == currentTrack.id)
+    }
+    val errorState = remember(currentTrack?.id, separationState) {
+        val sep = separationState
+        if (currentTrack != null && sep is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Error && sep.trackId == currentTrack.id) sep
+        else null
+    }
+
+    // Automatically trigger AI isolation for Acapella Studio when dialog is opened
+    LaunchedEffect(currentTrack?.id) {
+        if (currentTrack != null && com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady()) {
+            val isProcessingCurrent = separationState is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing &&
+                (separationState as com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing).trackId == currentTrack.id
+            if (!com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.hasVocalStem(currentTrack.id) &&
+                !isProcessingCurrent
+            ) {
+                viewModel.checkAndTriggerKaraokeSeparation(currentTrack, force = true, requireVocalStem = true)
+            }
+        }
+    }
+
     EscapableAlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.RecordVoiceOver, null) },
-        title = { Text(str("effect_vocal_boost")) },
+        title = { Text(str("karaoke_acapella_title")) },
         text = {
-            Column {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // Acapella Studio Card
+                if (!com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady()) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = str("karaoke_model_required_notice"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            when (val state = downloadState) {
+                                is com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.ModelDownloadState.Downloading -> {
+                                    LinearProgressIndicator(
+                                        progress = { state.progress },
+                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                    )
+                                    Text(
+                                        text = "${(state.progress * 100).toInt()}% (${state.bytesRead / 1048576} Mo / ${state.totalBytes / 1048576} Mo)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                else -> {
+                                    FilledTonalButton(
+                                        onClick = { com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.startModelDownload() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(12.dp),
+                                    ) {
+                                        Icon(Icons.Rounded.CloudDownload, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        val sizeMo = "${com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.MODEL_TOTAL_BYTES / 1048576} Mo"
+                                        Text(str("karaoke_download_btn", sizeMo))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if (currentTrack != null) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isReady && !isProcessing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (isProcessing) {
+                                val sep = separationState as com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.SeparationState.Processing
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.AutoAwesome,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(18.dp),
+                                            )
+                                            Text(
+                                                text = str("karaoke_separating_track", (sep.progress * 100).toInt()),
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                            )
+                                        }
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                            ) {
+                                                Text(
+                                                    text = "${(sep.progress * 100).toInt()}%",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                                )
+                                            }
+                                            FilledTonalIconButton(
+                                                onClick = {
+                                                    com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.cancelSeparation()
+                                                    com.alananasss.kittytune.core.Toaster.show(str("karaoke_separation_cancelled"))
+                                                },
+                                                modifier = Modifier.size(28.dp),
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Rounded.Close,
+                                                    contentDescription = str("btn_cancel"),
+                                                    modifier = Modifier.size(16.dp),
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    LinearWavyProgressIndicator(
+                                        progress = { sep.progress },
+                                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)),
+                                    )
+
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.GraphicEq,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                            Column {
+                                                Text(
+                                                    text = sep.statusDetail ?: "Extraction des stems vocaux HTDemucs...",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                                Text(
+                                                    text = str("karaoke_cancel_tip"),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (isReady) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Verified,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(22.dp),
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Studio Acapella IA actif",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        )
+                                        Text(
+                                            text = "Voix pures isolées · Instruments coupés",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                                        )
+                                    }
+                                }
+                            } else if (errorState != null) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Warning,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                        Text(
+                                            text = str("karaoke_separation_failed_title"),
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.error,
+                                        )
+                                    }
+                                    Text(
+                                        text = errorState.message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    FilledTonalButton(
+                                        onClick = {
+                                            viewModel.checkAndTriggerKaraokeSeparation(currentTrack, force = true, requireVocalStem = true)
+                                        },
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Icon(Icons.Rounded.Refresh, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(str("btn_retry"))
+                                    }
+                                }
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Préparation de l'isolation Acapella...",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                        Text(
+                                            text = "Filtre vocal actif en attendant la séparation studio",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Slider
                 val level = viewModel.effectsState.vocalBoostIntensity
                 val percent = (level * 100).toInt()
                 Text(
-                    str("label_vocal_boost_level", percent),
+                    text = if (percent >= 99) "Acapella Studio Pure (100% voix)" else str("label_vocal_boost_level", percent),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    fontWeight = if (percent >= 99) FontWeight.Bold else FontWeight.Normal,
+                    color = if (percent >= 99) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
-                Spacer(Modifier.height(16.dp))
+
                 Slider(
                     value = level,
                     onValueChange = {
@@ -1983,14 +2571,14 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                         if (!viewModel.effectsState.isVocalBoostEnabled) viewModel.toggleVocalBoost()
                     },
                     valueRange = 0f..1f,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(16.dp))
+
                 val presets = remember {
                     listOf(
                         0.50f to "50%",
                         0.75f to "75%",
-                        1.00f to "100%"
+                        1.00f to "100% Acapella",
                     )
                 }
                 val selectedPreset = presets.firstOrNull {
@@ -1999,7 +2587,7 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                 ExpressiveConnectedButtonGroup(
                     options = presets,
                     selectedOption = selectedPreset,
-                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp, vertical = 6.dp),
                     onOptionSelected = { (value, _) ->
                         viewModel.setVocalBoostIntensity(value)
                         if (!viewModel.effectsState.isVocalBoostEnabled) viewModel.toggleVocalBoost()
@@ -2007,14 +2595,14 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                     labelProvider = { (_, label) ->
                         Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(12.dp))
+
                 Text(
-                    text = str("fx_vocal_boost_desc"),
+                    text = str("karaoke_acapella_desc"),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }
         },

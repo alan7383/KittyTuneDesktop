@@ -157,7 +157,12 @@ class Player {
     private var fadingEngine: AudioEngine? = null
     
     @Volatile var isCrossfadingOut = false
-    private var lastEffectsState: AudioEffectsState? = null
+    var lastEffectsState: AudioEffectsState? = null
+        private set
+
+    fun reapplyEffects() {
+        lastEffectsState?.let { applyEffects(it) }
+    }
 
     data class PrebufferedTransition(
         val engine: AudioEngine,
@@ -217,7 +222,7 @@ class Player {
 
                 val startPos = automixPlan?.incomingStartMs ?: 0L
                 engine.setVolume(0f)
-                engine.setMediaItem(url, headers, startPos)
+                engine.setMediaItem(url, headers, startPos, nextTrack.id)
                 engine.prepare()
 
                 prebufferedTransition = PrebufferedTransition(engine, item, nextTrack.id, automixPlan, url, headers)
@@ -331,7 +336,7 @@ class Player {
     fun removeListener(l: Listener) { listeners.remove(l) }
 
     fun setMediaItemUrl(url: String, headers: Map<String, String>, startPositionMs: Long = 0L) {
-        activeEngine.setMediaItem(url, headers, startPositionMs)
+        activeEngine.setMediaItem(url, headers, startPositionMs, currentMediaItem?.track?.id)
     }
 
     fun setMediaItem(item: MediaItem, startPositionMs: Long = 0L) {
@@ -374,7 +379,7 @@ class Player {
             }
             activeEngine.setVolume(volumeAmplitude)
             activeEngine.setTrackGainDb(trackGainDb)
-            activeEngine.setMediaItem(url, headers, startPositionMs)
+            activeEngine.setMediaItem(url, headers, startPositionMs, track?.id)
         } else {
             activeEngine.stop()
         }
@@ -497,7 +502,7 @@ class Player {
                         newEngine.clearTrackLoudness()
                     }
 
-                    newEngine.setMediaItem(url, headers, startPositionMs)
+                    newEngine.setMediaItem(url, headers, startPositionMs, track?.id)
                     newEngine.prepare()
                 }
 
@@ -723,7 +728,7 @@ class Player {
             activeEngine.setVolume(volumeAmplitude)
             activeEngine.setTrackGainDb(trackGainDb)
             if (activeEngine.currentUrl != url) {
-                activeEngine.setMediaItem(url, headers, startPositionMs)
+                activeEngine.setMediaItem(url, headers, startPositionMs, currentMediaItem?.track?.id)
                 activeEngine.prepare()
                 if (playWhenReady) activeEngine.play()
             } else {
@@ -749,6 +754,11 @@ class Player {
         lastEffectsState = state
         activeEngine.applyEffects(state)
         fadingEngine?.applyEffects(state)
+    }
+
+    fun onKaraokeStemReady(trackId: Long) {
+        activeEngine.onKaraokeStemReady(trackId)
+        fadingEngine?.onKaraokeStemReady(trackId)
     }
 }
 
