@@ -34,20 +34,15 @@ jobs:
         run: git update-index --chmod=+x gradlew
         shell: bash
 
-      # Same source-built SMTC bridge as the release build, so the diagnostic build differs from a
-      # release by launcher flags alone.
-      - name: Build SMTC bridge from source
-        run: powershell -ExecutionPolicy Bypass -File scripts/build-smtc-bridge.ps1
-        shell: powershell
-
       # -PmemDiag is the whole difference from a release build: it adds
       # -XX:NativeMemoryTracking=summary and -Dkittytune.memlog=true to the launcher options.
       - name: Build portable app with memory diagnostics
-        run: .\gradlew.bat createReleaseDistributable -PmemDiag
+        run: .\gradlew.bat zipWindowsPortable -PmemDiag -PdesktopOnly=true --max-workers=2
 
       - name: Confirm the launcher really carries the flags
         run: |
-          $cfg = Get-ChildItem -Recurse -Path build\compose\binaries\main-release\app -Filter *.cfg | Select-Object -First 1
+          $version = (Select-String -Path build.gradle.kts -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
+          $cfg = Get-ChildItem -Recurse -LiteralPath "build\compose\binaries\$version\main-release\app" -Filter *.cfg | Select-Object -First 1
           Write-Host "--- $($cfg.FullName) ---"
           Get-Content $cfg.FullName
           if (-not (Select-String -Path $cfg.FullName -Pattern 'NativeMemoryTracking' -Quiet)) {
@@ -58,7 +53,8 @@ jobs:
       - name: Package portable zip
         run: |
           mkdir dist-diag
-          Compress-Archive -Path build\compose\binaries\main-release\app\* -DestinationPath dist-diag\KittyTune-memdiag-Windows-Portable-x64.zip
+          $version = (Select-String -Path build.gradle.kts -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
+          Copy-Item -LiteralPath "release\KittyTune-$version-Windows-Portable-x64.zip" -Destination dist-diag\KittyTune-memdiag-Windows-Portable-x64.zip
         shell: powershell
 
       - name: Upload diagnostic build

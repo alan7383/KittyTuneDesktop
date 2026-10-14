@@ -25,28 +25,21 @@ jobs:
         run: git update-index --chmod=+x gradlew
         shell: bash
 
-      # The SMTC bridge ships as a prebuilt exe; this keeps it built from the source in the tree.
-      # Without it, the "Unknown Application" fix (issue #66) would live in the .cs and never in the
-      # binary users get.
-      - name: Build SMTC bridge from source
-        run: powershell -ExecutionPolicy Bypass -File scripts/build-smtc-bridge.ps1
-        shell: powershell
-
       - name: Build Windows MSI & Portable App
-        run: .\gradlew.bat packageReleaseMsi createReleaseDistributable
+        run: .\gradlew.bat packageReleaseMsi zipWindowsPortable -PdesktopOnly=true --max-workers=2
 
-      - name: Get version from tag
+      - name: Get Windows package version
         id: get_version
         run: |
-          $version = "${{ github.ref_name }}".TrimStart("v")
+          $version = (Select-String -Path build.gradle.kts -Pattern '^version = "([^"]+)"').Matches[0].Groups[1].Value
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
         shell: powershell
 
       - name: Prepare Windows Distribution Binaries
         run: |
           mkdir dist-win
-          Get-ChildItem -Path build\compose\binaries\main-release\msi\*.msi | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-${{ steps.get_version.outputs.VERSION }}-x64.msi" }
-          Compress-Archive -Path build\compose\binaries\main-release\app\* -DestinationPath dist-win\KittyTune-${{ steps.get_version.outputs.VERSION }}-Windows-Portable-x64.zip
+          Get-ChildItem -Path "build\compose\binaries\${{ steps.get_version.outputs.VERSION }}\main-release\msi\*.msi" | ForEach-Object { Copy-Item $_.FullName -Destination "dist-win\KittyTune-${{ steps.get_version.outputs.VERSION }}-x64.msi" }
+          Copy-Item -LiteralPath "release\KittyTune-${{ steps.get_version.outputs.VERSION }}-Windows-Portable-x64.zip" -Destination dist-win
         shell: powershell
 
       - name: Upload Windows Artifacts
