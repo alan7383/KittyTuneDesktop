@@ -28,7 +28,7 @@ dependencies {
     implementation("com.github.z-huang.InnerTune:kugou:0.5.10")
     implementation(compose.desktop.currentOs)
     implementation("com.mocharealm.accompanist:lyrics-ui:1.0.19")
-    implementation("com.mocharealm.accompanist:lyrics-core:0.4.7")
+    implementation("com.mocharealm.accompanist:lyrics-core:0.5.0")
     implementation("org.jetbrains.compose.material3:material3:1.13.0-alpha01")
     implementation(compose.materialIconsExtended)
     implementation(compose.components.resources)
