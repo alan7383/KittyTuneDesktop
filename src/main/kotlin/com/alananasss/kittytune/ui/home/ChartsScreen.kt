@@ -54,6 +54,7 @@ import com.alananasss.kittytune.data.ChartsData
 import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.ui.common.SquareCardShimmer
 import com.alananasss.kittytune.ui.common.ShimmerBox
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.player.ArtworkPalette
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.PlayerViewModel
@@ -91,6 +92,14 @@ fun ChartsScreen(
     viewModel: ChartsViewModel = viewModel { ChartsViewModel(AppInstance.application) }
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    // Hide blocked tracks/artists (issue #41); playback uses this same visible
+    // list so the start index stays aligned with what is rendered.
+    val visibleTracks = rememberFilteredTracks(viewModel.chartEntries.map { it.track })
+    val chartEntries = remember(viewModel.chartEntries, visibleTracks) {
+        val visibleIds = visibleTracks.map { it.id }.toSet()
+        viewModel.chartEntries.filter { it.track.id in visibleIds }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -132,13 +141,13 @@ fun ChartsScreen(
                 )
             }
 
-            if (viewModel.isChartLoading && viewModel.chartEntries.isEmpty()) {
+            if (viewModel.isChartLoading && chartEntries.isEmpty()) {
                 items(6) {
                     Box(Modifier.fillMaxWidth().height(72.dp)) { ShimmerBox(Modifier.fillMaxWidth().height(64.dp)) }
                 }
-            } else if (viewModel.chartEntries.isNotEmpty()) {
-                items(viewModel.chartEntries.size) { index ->
-                    val entry = viewModel.chartEntries[index]
+            } else if (chartEntries.isNotEmpty()) {
+                items(chartEntries.size) { index ->
+                    val entry = chartEntries[index]
                     ChartTrackRow(
                         track = entry.track,
                         rank = entry.rank,
@@ -147,7 +156,7 @@ fun ChartsScreen(
                             // A chart is a queue: pressing a song plays the chart from there, so the
                             // songs either side of it are what comes next.
                             playerViewModel.playPlaylist(
-                                tracks = viewModel.chartEntries.map { it.track },
+                                tracks = chartEntries.map { it.track },
                                 startIndex = index,
                                 context = PlaybackContext(
                                     displayText = str(

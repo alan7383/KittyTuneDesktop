@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonOff
 import androidx.compose.material.icons.automirrored.rounded.Comment
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
@@ -594,6 +595,54 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                 })
                 add(MenuOptionItem("share", Icons.Outlined.Share, str("btn_share")) { viewModel.shareTrack(track) })
             }
+            // Content filtering (issue #41): hide track / block artist, like Android.
+            run {
+                val blockedTrackIds by com.alananasss.kittytune.data.BlockManager.blockedTrackIdsFlow.collectAsState()
+                val blockedArtistIds by com.alananasss.kittytune.data.BlockManager.blockedArtistIdsFlow.collectAsState()
+                val isTrackBlocked = track.id in blockedTrackIds
+                val menuArtistId = track.user?.id
+                val menuArtistName = track.user?.username
+                val isArtistBlocked = menuArtistId != null && menuArtistId in blockedArtistIds
+                add(
+                    MenuOptionItem(
+                        id = "block_track",
+                        icon = if (isTrackBlocked) Icons.Outlined.VisibilityOff else Icons.Rounded.VisibilityOff,
+                        text = if (isTrackBlocked) str("menu_unblock_track") else str("menu_block_track"),
+                    ) {
+                        if (isTrackBlocked) {
+                            com.alananasss.kittytune.data.BlockManager.unblockTrack(track.id)
+                        } else {
+                            com.alananasss.kittytune.data.BlockManager.blockTrack(
+                                track,
+                                currentlyPlayingId = viewModel.currentTrack?.id,
+                            )
+                        }
+                        viewModel.showMenuSheet = false
+                    }
+                )
+                if (menuArtistId != null && menuArtistId != 0L && !menuArtistName.isNullOrBlank()) {
+                    add(
+                        MenuOptionItem(
+                            id = "block_artist",
+                            icon = if (isArtistBlocked) Icons.Rounded.Person else Icons.Rounded.PersonOff,
+                            text = if (isArtistBlocked) str("menu_unblock_artist") else str("menu_block_artist"),
+                        ) {
+                            if (isArtistBlocked) {
+                                com.alananasss.kittytune.data.BlockManager.unblockArtist(menuArtistId)
+                            } else {
+                                com.alananasss.kittytune.data.BlockManager.blockArtist(
+                                    artistId = menuArtistId,
+                                    artistName = menuArtistName,
+                                    avatarUrl = track.user?.avatarUrl,
+                                    source = track.source ?: "soundcloud",
+                                    currentlyPlayingTrack = viewModel.currentTrack,
+                                )
+                            }
+                            viewModel.showMenuSheet = false
+                        }
+                    )
+                }
+            }
             if (viewModel.menuContextPlaylistId != null && (viewModel.menuContextPlaylistId!! < 0 || viewModel.menuContextPlaylistId == -2L)) {
                 add(MenuOptionItem("remove_from_playlist", Icons.Outlined.Delete, str("menu_remove")) { viewModel.removeFromContextPlaylist(viewModel.menuContextPlaylistId!!, track) })
             }
@@ -866,7 +915,11 @@ private fun SleepTimerDialog(viewModel: PlayerViewModel) {
                 Spacer(Modifier.height(12.dp))
 
                 // Quick-select chips row
-                androidx.compose.foundation.lazy.LazyRow(
+                val chipsState = androidx.compose.foundation.lazy.rememberLazyListState()
+                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                    state = chipsState,
+                    showsArrows = false,
+                    fadeLength = 20.dp,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     contentPadding = PaddingValues(horizontal = 2.dp),
                 ) {

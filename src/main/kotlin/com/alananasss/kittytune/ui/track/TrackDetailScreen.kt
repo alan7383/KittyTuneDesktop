@@ -36,6 +36,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.rememberFilteredArtists
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.domain.Playlist
@@ -177,7 +179,8 @@ fun UserList(
     onToggleSort: () -> Unit = {},
     isSortLoading: Boolean = false,
 ) {
-    if (users.isEmpty() && !isLoadingMore) {
+    val visibleUsers = rememberFilteredArtists(users)
+    if (visibleUsers.isEmpty() && !isLoadingMore) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str("detail_no_one_yet"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -205,8 +208,8 @@ fun UserList(
             }
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.weight(1f)) {
-            itemsIndexed(users) { index, user ->
-                if (index >= users.size - 5) {
+            itemsIndexed(visibleUsers) { index, user ->
+                if (index >= visibleUsers.size - 5) {
                     LaunchedEffect(Unit) { onLoadMore() }
                 }
 
@@ -350,7 +353,8 @@ fun TrackList(
     val downloadProgress by DownloadManager.downloadProgress.collectAsState()
     val downloadedIds by DownloadManager.downloadedIds.collectAsState()
 
-    if (tracks.isEmpty() && !isLoadingMore) {
+    val visibleTracks = rememberFilteredTracks(tracks)
+    if (visibleTracks.isEmpty() && !isLoadingMore) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(str("detail_no_similar"), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -358,7 +362,7 @@ fun TrackList(
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
                 Button(
-                    onClick = { playerViewModel.playPlaylist(tracks, 0) },
+                    onClick = { playerViewModel.playPlaylist(visibleTracks, 0) },
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
@@ -367,8 +371,8 @@ fun TrackList(
                     Text(str("artist_listen"))
                 }
             }
-            itemsIndexed(tracks) { index, track ->
-                if (index >= tracks.size - 5) {
+            itemsIndexed(visibleTracks) { index, track ->
+                if (index >= visibleTracks.size - 5) {
                     LaunchedEffect(Unit) { onLoadMore() }
                 }
 
@@ -385,7 +389,7 @@ fun TrackList(
                     isDownloading = isDownloading,
                     isDownloaded = isDownloaded,
                     downloadProgress = progress ?: 0,
-                    onClick = { playerViewModel.playPlaylist(tracks, index) },
+                    onClick = { playerViewModel.playPlaylist(visibleTracks, index) },
                     onOptionClick = { playerViewModel.showTrackOptions(track) },
                     onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                 )

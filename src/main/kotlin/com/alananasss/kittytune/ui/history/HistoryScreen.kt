@@ -33,6 +33,7 @@ import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.EscapableAlertDialog
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
+import com.alananasss.kittytune.data.BlockManager
 import com.alananasss.kittytune.ui.common.ArtistLinkText
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
 import com.alananasss.kittytune.domain.Track
@@ -54,8 +55,20 @@ fun HistoryScreen(
     var showClearDialog by remember { mutableStateOf(false) }
 
     val currentTab = historyViewModel.selectedTab
-    val displayedTracks = historyViewModel.displayedTracks
-    val displayedContexts = historyViewModel.displayedContexts
+    // HistoryTrackItem wraps a Track (one row per play), so filter the wrappers
+    // via BlockManager.isBlocked and recompose when a block lands.
+    val blockedTrackIds by BlockManager.blockedTrackIdsFlow.collectAsState()
+    val blockedArtistIds by BlockManager.blockedArtistIdsFlow.collectAsState()
+    val displayedTracks = remember(historyViewModel.displayedTracks, blockedTrackIds, blockedArtistIds) {
+        historyViewModel.displayedTracks.filter { !BlockManager.isBlocked(it.track) }
+    }
+    // Contexts are mostly playlists/stations (never filtered); only ARTIST-type
+    // rows whose id is a blocked artist id are hidden.
+    val displayedContexts = remember(historyViewModel.displayedContexts, blockedArtistIds) {
+        historyViewModel.displayedContexts.filter { item ->
+            item.type != HistoryContextType.ARTIST || item.id.toLongOrNull()?.let { !BlockManager.isArtistBlocked(it) } ?: true
+        }
+    }
 
     val tracksListState = androidx.compose.foundation.lazy.rememberLazyListState()
     val contextsListState = androidx.compose.foundation.lazy.rememberLazyListState()

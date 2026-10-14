@@ -1,4 +1,4 @@
-﻿    package com.alananasss.kittytune.ui.home
+    package com.alananasss.kittytune.ui.home
     
     import com.alananasss.kittytune.core.Application
     import androidx.compose.runtime.getValue
@@ -175,8 +175,11 @@
             loadChart(chartKind, chartGenre)
         }
 
-        /** The picked country as SoundCloud's own chart playlists spell it; it used to be a list index nobody could change any more. */
-        fun currentCountryCode(): String = chartCountry.appleStorefront.uppercase()
+        /** The picked country as SoundCloud's own chart playlists spell it; SoundCloud only keeps curated charts for US and UK. */
+        fun currentCountryCode(): String = when (chartCountry) {
+            ChartCountry.UK -> "UK"
+            else -> "US"
+        }
 
         fun loadCountryCharts(index: Int) {
             selectedCountryIndex = index
@@ -282,8 +285,10 @@
             )
 
             /** The curated chart playlist URL, for a country code as [ChartsData] spells it. */
-            fun chartPlaylistUrl(countryCode: String, genre: ChartGenre): String =
-                "https://soundcloud.com/music-charts-${countryCode.lowercase()}/sets/${genre.slug}"
+            fun chartPlaylistUrl(countryCode: String, genre: ChartGenre): String {
+                val safeCountry = if (countryCode.equals("UK", ignoreCase = true) || countryCode.equals("GB", ignoreCase = true)) "uk" else "us"
+                return "https://soundcloud.com/music-charts-$safeCountry/sets/${genre.slug}"
+            }
         }
     }
 

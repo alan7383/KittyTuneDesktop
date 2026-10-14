@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.BlockManager
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
@@ -79,6 +80,10 @@ internal fun HomeFeed(
 
     val homeClips by com.alananasss.kittytune.data.artist.ArtistClips.homeClips.collectAsState()
     val likes by com.alananasss.kittytune.data.LikeRepository.likedTracks.collectAsState()
+    // Content filtering (issue #41): collected so shelves recompose when a block lands;
+    // the guards below read the matching BlockManager checks.
+    val blockedTrackIds by BlockManager.blockedTrackIdsFlow.collectAsState()
+    val blockedArtistIds by BlockManager.blockedArtistIdsFlow.collectAsState()
 
     LaunchedEffect(likes) {
         if (likes.isNotEmpty() && com.alananasss.kittytune.data.artist.ArtistClips.homeClips.value.isEmpty()) {
@@ -137,43 +142,54 @@ internal fun HomeFeed(
         }
 
         items(vm.homeSections, key = { it.title }) { section ->
-            Column {
-                HomeShelfTitle(
-                    SoundCloudLocalizationUtils.localizeSectionTitle(section.title),
-                    SoundCloudLocalizationUtils.localizeSectionSubtitle(section.subtitle),
-                )
-                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = HOME_PADDING),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ) {
-                    items(section.content) { item ->
-                        when (item) {
-                            is Track -> MediaCard(
-                                title = item.title ?: "",
-                                subtitle = item.displayArtist.ifBlank { item.user?.username.orEmpty() },
-                                artworkUrl = item.fullResArtwork,
-                                round = false,
-                                onRightClick = { playerViewModel.showTrackOptions(item) }
-                            ) {
-                                playerViewModel.playPlaylist(listOf(item), 0)
-                            }
-                            is Playlist -> MediaCard(
-                                title = item.title ?: "",
-                                subtitle = item.user?.username ?: "",
-                                artworkUrl = item.fullResArtwork,
-                                round = false,
-                                onRightClick = { playerViewModel.showPlaylistOptions(item) }
-                            ) {
-                                playerViewModel.navigateToPlaylistId = getStationNavId(item)
-                            }
-                            is User -> MediaCard(
-                                title = item.username ?: "",
-                                subtitle = str("lib_artists"),
-                                artworkUrl = item.avatarUrl,
-                                round = true,
-                            ) {
-                                playerViewModel.navigateToPlaylistId = item.profileNavId
+            val visibleContent = remember(section.content, blockedTrackIds, blockedArtistIds) {
+                section.content.filter { item ->
+                    when (item) {
+                        is Track -> !BlockManager.isBlocked(item)
+                        is User -> !BlockManager.isArtistBlocked(item.id)
+                        else -> true
+                    }
+                }
+            }
+            if (visibleContent.isNotEmpty()) {
+                Column {
+                    HomeShelfTitle(
+                        SoundCloudLocalizationUtils.localizeSectionTitle(section.title),
+                        SoundCloudLocalizationUtils.localizeSectionSubtitle(section.subtitle),
+                    )
+                    com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = HOME_PADDING),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        fadeColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ) {
+                        items(visibleContent) { item ->
+                            when (item) {
+                                is Track -> MediaCard(
+                                    title = item.title ?: "",
+                                    subtitle = item.displayArtist.ifBlank { item.user?.username.orEmpty() },
+                                    artworkUrl = item.fullResArtwork,
+                                    round = false,
+                                    onRightClick = { playerViewModel.showTrackOptions(item) }
+                                ) {
+                                    playerViewModel.playPlaylist(listOf(item), 0)
+                                }
+                                is Playlist -> MediaCard(
+                                    title = item.title ?: "",
+                                    subtitle = item.user?.username ?: "",
+                                    artworkUrl = item.fullResArtwork,
+                                    round = false,
+                                    onRightClick = { playerViewModel.showPlaylistOptions(item) }
+                                ) {
+                                    playerViewModel.navigateToPlaylistId = getStationNavId(item)
+                                }
+                                is User -> MediaCard(
+                                    title = item.username ?: "",
+                                    subtitle = str("lib_artists"),
+                                    artworkUrl = item.avatarUrl,
+                                    round = true,
+                                ) {
+                                    playerViewModel.navigateToPlaylistId = item.profileNavId
+                                }
                             }
                         }
                     }

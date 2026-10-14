@@ -37,6 +37,8 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PersonOff
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Radio
@@ -100,6 +102,7 @@ import com.alananasss.kittytune.domain.isDefaultAvatar
 import com.alananasss.kittytune.ui.common.Tip
 import com.alananasss.kittytune.ui.common.monthlyListenersLabel
 import com.alananasss.kittytune.ui.common.pressScale
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.common.rememberArtistProfile
 import com.alananasss.kittytune.ui.common.viewableCover
 import com.alananasss.kittytune.ui.library.LibraryViewModel
@@ -278,7 +281,8 @@ private fun ArtistActions(
     var menuOpen by remember { mutableStateOf(false) }
     var showShare by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val topTracks = profileViewModel.popularTracks.ifEmpty { profileViewModel.allTracks }
+    // Content filtering (issue #41): the listen/trailer queues skip blocked tracks.
+    val topTracks = rememberFilteredTracks(profileViewModel.popularTracks.ifEmpty { profileViewModel.allTracks })
     val context = artistContext ?: PlaybackContext(user.username.orEmpty(), "profile:${user.id}")
 
     // What is playing says what these buttons are: listening to this artist, or their trailer. They show it, and a
@@ -393,6 +397,26 @@ private fun ArtistActions(
                 ArtistMenuItem(Icons.Rounded.Info, str("artist_about")) {
                     menuOpen = false
                     onAbout()
+                }
+                val blockedArtistIds by com.alananasss.kittytune.data.BlockManager.blockedArtistIdsFlow.collectAsState()
+                val isArtistBlocked = user.id in blockedArtistIds
+                ArtistMenuItem(
+                    icon = if (isArtistBlocked) Icons.Rounded.Person else Icons.Rounded.PersonOff,
+                    text = if (isArtistBlocked) str("menu_unblock_artist") else str("menu_block_artist"),
+                    danger = !isArtistBlocked,
+                ) {
+                    menuOpen = false
+                    if (isArtistBlocked) {
+                        com.alananasss.kittytune.data.BlockManager.unblockArtist(user.id)
+                    } else {
+                        com.alananasss.kittytune.data.BlockManager.blockArtist(
+                            artistId = user.id,
+                            artistName = user.username.orEmpty(),
+                            avatarUrl = user.avatarUrl,
+                            source = if (profileViewModel.isSpotifyProfile) "spotify" else "soundcloud",
+                            currentlyPlayingTrack = playerViewModel.currentTrack,
+                        )
+                    }
                 }
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 ArtistMenuItem(Icons.Rounded.Block, str("artist_dislike"), danger = true) {

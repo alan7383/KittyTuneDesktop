@@ -52,6 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.BlockManager
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.ScrollableLazyRow
@@ -177,15 +179,22 @@ fun SearchLanding(
  */
 @Composable
 internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewModel, onOpenCharts: () -> Unit) {
+    // Content filtering (issue #41): chart entries whose track (or artist) is blocked are hidden,
+    // and play positions map over the same visible list so the index still hits the right song.
+    val blockedTrackIds by BlockManager.blockedTrackIdsFlow.collectAsState()
+    val blockedArtistIds by BlockManager.blockedArtistIdsFlow.collectAsState()
+    val entries = remember(vm.chartPreview.toList(), blockedTrackIds, blockedArtistIds) {
+        vm.chartPreview.filter { !BlockManager.isBlocked(it.track) }
+    }
     ChartPreviewSection(
         kind = vm.chartPreviewKind,
-        entries = vm.chartPreview,
+        entries = entries,
         isLoading = vm.isChartPreviewLoading,
         currentTrack = playerViewModel.currentTrack,
         onKindChange = { vm.loadChartPreview(it) },
         onPlayFrom = { index ->
             playerViewModel.playPlaylist(
-                tracks = vm.chartPreview.map { it.track },
+                tracks = entries.map { it.track },
                 startIndex = index,
                 context = PlaybackContext(
                     displayText = str(
@@ -209,9 +218,10 @@ internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewMode
 @Composable
 internal fun FromYourArtistsSection(vm: HomeViewModel, playerViewModel: PlayerViewModel) {
     if (vm.likedArtistUpdates.isEmpty()) return
-    val tracks = remember(vm.likedArtistUpdates.toList()) {
+    val unfilteredTracks = remember(vm.likedArtistUpdates.toList()) {
         ReleaseWeeks.group(vm.likedArtistUpdates.toList()).flatMap { it.tracks }.take(FROM_YOUR_ARTISTS_COUNT)
     }
+    val tracks = rememberFilteredTracks(unfilteredTracks)
     Column {
         LandingHeader(str("home_from_your_artists"), action = null)
         ScrollableLazyRow(

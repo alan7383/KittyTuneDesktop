@@ -5,6 +5,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
+import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.hoverable
@@ -72,8 +74,14 @@ internal fun <T> SortChips(
     modifier: Modifier = Modifier,
     sidePadding: androidx.compose.ui.unit.Dp = 24.dp,
 ) {
+    val scrollState = rememberScrollState()
     Row(
-        modifier = modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = sidePadding, vertical = 4.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(scrollState)
+            .horizontalMouseSwipe(scrollState)
+            .fadedHorizontalEdges(scrollState, fadeLength = 24.dp)
+            .padding(horizontal = sidePadding, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         options.forEach { option ->

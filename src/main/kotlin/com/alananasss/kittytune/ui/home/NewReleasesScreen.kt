@@ -11,6 +11,7 @@ import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.*
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
+import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -43,6 +44,7 @@ import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.SquareCardShimmer
 import com.alananasss.kittytune.ui.common.TrackListItemShimmer
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.util.Locale
 
@@ -54,6 +56,10 @@ fun NewReleasesScreen(
     viewModel: NewReleasesViewModel = viewModel { NewReleasesViewModel(AppInstance.application) }
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    // Hide blocked tracks (issue #41); playback uses the same visible list so the
+    // paged index stays aligned. Playlists are never filtered.
+    val popularTracks = rememberFilteredTracks(viewModel.popularTracks)
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -134,7 +140,9 @@ fun NewReleasesScreen(
                         val playlistsRowState = rememberLazyListState()
                         LazyRow(
                             state = playlistsRowState,
-                            modifier = Modifier.horizontalMouseSwipe(playlistsRowState),
+                            modifier = Modifier
+                                .horizontalMouseSwipe(playlistsRowState)
+                                .fadedHorizontalEdges(playlistsRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -149,7 +157,7 @@ fun NewReleasesScreen(
                 }
 
                 // popular tracks section with horizontal swiping by groups of 5
-                if (viewModel.popularTracks.isNotEmpty()) {
+                if (popularTracks.isNotEmpty()) {
                     item {
                         Text(
                             text = str("new_releases_popular_tracks"),
@@ -160,12 +168,14 @@ fun NewReleasesScreen(
                     }
 
                     // split the list into pages of 5 tracks
-                    val pages = viewModel.popularTracks.chunked(5)
+                    val pages = popularTracks.chunked(5)
                     item {
                         val popularRowState = rememberLazyListState()
                         LazyRow(
                             state = popularRowState,
-                            modifier = Modifier.horizontalMouseSwipe(popularRowState),
+                            modifier = Modifier
+                                .horizontalMouseSwipe(popularRowState)
+                                .fadedHorizontalEdges(popularRowState),
                             contentPadding = PaddingValues(horizontal = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
@@ -181,7 +191,7 @@ fun NewReleasesScreen(
                                             track = track,
                                             rank = absoluteIndex + 1,
                                             currentlyPlayingTrack = playerViewModel.currentTrack,
-                                            onClick = { playerViewModel.playPlaylist(viewModel.popularTracks, absoluteIndex) },
+                                            onClick = { playerViewModel.playPlaylist(popularTracks, absoluteIndex) },
                                             onOptionClick = { playerViewModel.showTrackOptions(track) },
                                             onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                                         )

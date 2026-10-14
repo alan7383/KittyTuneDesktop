@@ -35,6 +35,7 @@ import com.alananasss.kittytune.core.AppInstance
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.ui.library.TrackListItem
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -54,11 +55,14 @@ fun TagScreen(
         tagViewModel.loadTag(tagName)
     }
 
-    val currentTracks = if (tagViewModel.selectedTabIndex == 0) {
+    val sourceTracks = if (tagViewModel.selectedTabIndex == 0) {
         tagViewModel.popularTracks
     } else {
         tagViewModel.recentTracks
     }
+    // Hide blocked tracks/artists (issue #41); playback uses this same visible
+    // list so the tapped index stays aligned with what is rendered.
+    val currentTracks = rememberFilteredTracks(sourceTracks)
 
     Scaffold(
         topBar = {

@@ -47,7 +47,11 @@ private fun UserFilterChips(
     val artistsCount = remember(users) { users.count { it.isArtist } }
     val profilesCount = remember(users) { users.count { !it.isArtist } }
 
-    androidx.compose.foundation.lazy.LazyRow(
+    val chipsState = androidx.compose.foundation.lazy.rememberLazyListState()
+    com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+        state = chipsState,
+        showsArrows = false,
+        fadeLength = 24.dp,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {

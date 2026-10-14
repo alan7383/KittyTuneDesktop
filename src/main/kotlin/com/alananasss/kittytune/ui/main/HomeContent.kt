@@ -2,6 +2,8 @@
 package com.alananasss.kittytune.ui.main
 
 import com.alananasss.kittytune.ui.home.searchSourceName
+import com.alananasss.kittytune.ui.common.rememberFilteredArtists
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -40,6 +42,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
 import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
+import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -549,10 +552,13 @@ private fun SearchResults(
         Modifier.fillMaxSize()
     ) {
         // ── Top bar: Source toggle + Filter chips ──
+        val searchFilterScrollState = rememberScrollState()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
+                .horizontalScroll(searchFilterScrollState)
+                .horizontalMouseSwipe(searchFilterScrollState)
+                .fadedHorizontalEdges(searchFilterScrollState, fadeLength = 24.dp)
                 .padding(horizontal = 20.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -731,13 +737,19 @@ private fun AllPlatformsResults(
     playerViewModel: PlayerViewModel,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
+    val scTracks = rememberFilteredTracks(vm.searchResultsTracks)
+    val spTracks = rememberFilteredTracks(vm.searchResultsSpotify)
+    val dzTracks = rememberFilteredTracks(vm.searchResultsDeezerTracks)
+    val tdTracks = rememberFilteredTracks(vm.searchResultsTidalTracks)
+    val qbTracks = rememberFilteredTracks(vm.searchResultsQobuzTracks)
+    val ymTracks = rememberFilteredTracks(vm.searchResultsYoutubeMusic)
     val groups = listOf(
-        SearchSource.SOUNDCLOUD to vm.searchResultsTracks.toList(),
-        SearchSource.SPOTIFY to vm.searchResultsSpotify.toList(),
-        SearchSource.DEEZER to vm.searchResultsDeezerTracks.toList(),
-        SearchSource.TIDAL to vm.searchResultsTidalTracks.toList(),
-        SearchSource.QOBUZ to vm.searchResultsQobuzTracks.toList(),
-        SearchSource.YOUTUBE_MUSIC to vm.searchResultsYoutubeMusic.toList(),
+        SearchSource.SOUNDCLOUD to scTracks,
+        SearchSource.SPOTIFY to spTracks,
+        SearchSource.DEEZER to dzTracks,
+        SearchSource.TIDAL to tdTracks,
+        SearchSource.QOBUZ to qbTracks,
+        SearchSource.YOUTUBE_MUSIC to ymTracks,
     ).filter { it.second.isNotEmpty() }
 
     if (groups.isEmpty() && !vm.isSearchLoading) {
@@ -791,8 +803,8 @@ private fun SoundCloudResults(
     navController: NavController,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val tracks = vm.searchResultsTracks
-    val artists = vm.searchResultsArtists
+    val tracks = rememberFilteredTracks(vm.searchResultsTracks)
+    val artists = rememberFilteredArtists(vm.searchResultsArtists)
     val playlists = vm.searchResultsPlaylists
 
     val topArtist = remember(artists.size, vm.searchQuery) {
@@ -1114,6 +1126,8 @@ private fun ProviderResults(
     playerViewModel: PlayerViewModel,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
+    val tracks = rememberFilteredTracks(tracks)
+    val artists = rememberFilteredArtists(artists)
     val allPlaylists = albums + playlists
     val topArtist = remember(artists.size, vm.searchQuery) {
         TopResultRanker.findTopArtist(artists, vm.searchQuery) { com.alananasss.kittytune.data.search.SearchPicks.timesPicked(vm.searchQuery, it.id) }
@@ -1368,7 +1382,7 @@ private fun YoutubeResults(
     playerViewModel: PlayerViewModel,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val tracks = vm.searchResultsYoutube
+    val tracks = rememberFilteredTracks(vm.searchResultsYoutube)
 
     if (tracks.isEmpty() && !vm.isSearchLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1399,7 +1413,7 @@ private fun YoutubeMusicResults(
     playerViewModel: PlayerViewModel,
     listState: androidx.compose.foundation.lazy.LazyListState,
 ) {
-    val tracks = vm.searchResultsYoutubeMusic
+    val tracks = rememberFilteredTracks(vm.searchResultsYoutubeMusic)
 
     if (tracks.isEmpty() && !vm.isSearchLoading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1566,14 +1580,16 @@ private fun SpotifyResults(
     playerViewModel: PlayerViewModel,
     navController: NavController,
 ) {
-    val hasTracks = vm.searchResultsSpotify.isNotEmpty()
-    val hasArtists = vm.searchResultsSpotifyArtists.isNotEmpty()
-    val hasPlaylistsOrAlbums = vm.searchResultsSpotifyPlaylists.isNotEmpty() || vm.searchResultsSpotifyAlbums.isNotEmpty()
-
-    val spotifyUsers = remember(vm.searchResultsSpotifyArtists.size) {
+    val spotifyTracks = rememberFilteredTracks(vm.searchResultsSpotify)
+    val rawSpotifyUsers = remember(vm.searchResultsSpotifyArtists.toList()) {
         vm.searchResultsSpotifyArtists.map { it.toUser() }
     }
-    val topSpotifyArtist = remember(spotifyUsers.size, vm.searchQuery) {
+    val spotifyUsers = rememberFilteredArtists(rawSpotifyUsers)
+    val hasTracks = spotifyTracks.isNotEmpty()
+    val hasArtists = spotifyUsers.isNotEmpty()
+    val hasPlaylistsOrAlbums = vm.searchResultsSpotifyPlaylists.isNotEmpty() || vm.searchResultsSpotifyAlbums.isNotEmpty()
+
+    val topSpotifyArtist = remember(spotifyUsers, vm.searchQuery) {
         TopResultRanker.findTopArtist(spotifyUsers, vm.searchQuery)
     }
 
@@ -1616,7 +1632,7 @@ private fun SpotifyResults(
                                 },
                                 onPlayClick = {
                                     if (hasTracks) {
-                                        playerViewModel.playPlaylist(vm.searchResultsSpotify.toList(), 0)
+                                        playerViewModel.playPlaylist(spotifyTracks, 0)
                                     } else {
                                         val cleanId = topSpotifyArtist.permalink ?: topSpotifyArtist.urn?.removePrefix("spotify:artist:") ?: topSpotifyArtist.id.toString()
                                         playerViewModel.navigateToPlaylistId = "spotify_artist:$cleanId"
@@ -1633,7 +1649,7 @@ private fun SpotifyResults(
                                     onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
                                 )
                                 Spacer(Modifier.height(6.dp))
-                                vm.searchResultsSpotify.take(4).forEach { track ->
+                                spotifyTracks.take(4).forEach { track ->
                                     SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                 }
                             }
@@ -1661,7 +1677,7 @@ private fun SpotifyResults(
                                         },
                                         onPlayClick = {
                                             if (hasTracks) {
-                                                playerViewModel.playPlaylist(vm.searchResultsSpotify.toList(), 0)
+                                                playerViewModel.playPlaylist(spotifyTracks, 0)
                                             } else {
                                                 val cleanId = topSpotifyArtist.permalink ?: topSpotifyArtist.urn?.removePrefix("spotify:artist:") ?: topSpotifyArtist.id.toString()
                                                 playerViewModel.navigateToPlaylistId = "spotify_artist:$cleanId"
@@ -1679,7 +1695,7 @@ private fun SpotifyResults(
                                             onSeeAll = { vm.onFilterChanged(SearchFilter.TRACKS) }
                                         )
                                         Spacer(Modifier.height(6.dp))
-                                        vm.searchResultsSpotify.take(4).forEach { track ->
+                                        spotifyTracks.take(4).forEach { track ->
                                             SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                                         }
                                     }
@@ -1709,10 +1725,10 @@ private fun SpotifyResults(
                 }
             }
         } else if (hasArtists && vm.activeFilter == SearchFilter.ARTISTS) {
-            items(vm.searchResultsSpotifyArtists.size) { index ->
-                val artist = vm.searchResultsSpotifyArtists[index]
-                SearchArtistRow(artist.toUser()) {
-                    playerViewModel.navigateToPlaylistId = "spotify_artist:${artist.id}"
+            items(spotifyUsers.size) { index ->
+                val artist = spotifyUsers[index]
+                SearchArtistRow(artist) {
+                    playerViewModel.navigateToPlaylistId = "spotify_artist:${artist.permalink ?: artist.id.toString()}"
                 }
             }
         }
@@ -1728,13 +1744,13 @@ private fun SpotifyResults(
                     )
                 }
                 item {
-                    vm.searchResultsSpotify.take(5).forEach { track ->
+                    spotifyTracks.take(5).forEach { track ->
                         SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                     }
                 }
             } else {
-                items(vm.searchResultsSpotify.size) { index ->
-                    val track = vm.searchResultsSpotify[index]
+                items(spotifyTracks.size) { index ->
+                    val track = spotifyTracks[index]
                     SearchTrackRow(track, playerViewModel, onOpened = { vm.noteOpenedTrack(track) })
                 }
             }

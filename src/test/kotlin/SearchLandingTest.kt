@@ -271,4 +271,15 @@ class SearchLandingTest {
     fun testTheCountryChartComesFirst() {
         assertEquals(listOf(ChartKind.COUNTRY, ChartKind.TOP, ChartKind.TRENDING), ChartKind.entries)
     }
+
+    @Test
+    fun testChartPlaylistUrlNormalizesToSupportedAccounts() {
+        val genre = com.alananasss.kittytune.ui.home.ChartsViewModel.chartGenres.first()
+        val frUrl = com.alananasss.kittytune.ui.home.ChartsViewModel.chartPlaylistUrl("FR", genre)
+        val usUrl = com.alananasss.kittytune.ui.home.ChartsViewModel.chartPlaylistUrl("US", genre)
+        val ukUrl = com.alananasss.kittytune.ui.home.ChartsViewModel.chartPlaylistUrl("UK", genre)
+        assertEquals("https://soundcloud.com/music-charts-us/sets/all-music-genres", frUrl)
+        assertEquals("https://soundcloud.com/music-charts-us/sets/all-music-genres", usUrl)
+        assertEquals("https://soundcloud.com/music-charts-uk/sets/all-music-genres", ukUrl)
+    }
 }

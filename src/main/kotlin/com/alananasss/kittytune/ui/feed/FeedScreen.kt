@@ -40,6 +40,7 @@ import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.StreamItem
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
+import com.alananasss.kittytune.ui.common.rememberFilteredTracks
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.time.Instant
 import java.time.ZoneId
@@ -69,6 +70,13 @@ fun FeedScreen(
         if (shouldLoadMore && !feedViewModel.isLoadingMore) {
             feedViewModel.loadMore()
         }
+    }
+
+    // Hide blocked tracks/artists (issue #41); playlists are never filtered.
+    val visibleTracks = rememberFilteredTracks(feedViewModel.feedItems.mapNotNull { it.track })
+    val feedItems = remember(feedViewModel.feedItems, visibleTracks) {
+        val visibleIds = visibleTracks.map { it.id }.toSet()
+        feedViewModel.feedItems.filter { it.track == null || it.track.id in visibleIds }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -107,7 +115,7 @@ fun FeedScreen(
                     }
                 }
             }
-            feedViewModel.feedItems.isEmpty() -> {
+            feedItems.isEmpty() -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(Icons.Rounded.DynamicFeed, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -122,8 +130,8 @@ fun FeedScreen(
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    items(feedViewModel.feedItems.size) { index ->
-                        val item = feedViewModel.feedItems[index]
+                    items(feedItems.size) { index ->
+                        val item = feedItems[index]
                         FeedItem(
                             item = item,
                             playerViewModel = playerViewModel,

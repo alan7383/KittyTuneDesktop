@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import com.alananasss.kittytune.data.DownloadManager
+import com.alananasss.kittytune.data.BlockManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.data.local.LibraryFolder
 import com.alananasss.kittytune.data.local.LocalArtist
@@ -486,6 +487,17 @@ fun LibraryScreen(
         val playlistsFilter = str("lib_playlists")
         val uploadsFilter = str("lib_your_uploads")
         val shouldShowPlaylists = (viewModel.selectedFilter == null || viewModel.selectedFilter == playlistsFilter) && viewModel.currentFolderId == null
+
+        // Content filtering (issue #41): artists are LocalArtist here, not User,
+        // so the ArtistItems are filtered via the block flow directly. Playlists
+        // themselves are never filtered.
+        val blockedArtistIds by BlockManager.blockedArtistIdsFlow.collectAsState()
+        val blockedTrackIds by BlockManager.blockedTrackIdsFlow.collectAsState()
+        val visibleItems = remember(viewModel.displayedItems, blockedArtistIds) {
+            viewModel.displayedItems.filter { item ->
+                (item as? LibraryItem.ArtistItem)?.artist?.id?.let { !BlockManager.isArtistBlocked(it) } ?: true
+            }
+        }
     
         LazyVerticalGrid(
             state = listState,
@@ -523,23 +535,29 @@ fun LibraryScreen(
                     UploadsSortOption.ARTIST -> privacyFiltered.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.user?.username.orEmpty() })
                 }
 
-                if (sortedTracks.isEmpty()) {
+                // Content filtering (issue #41): plain filter — this is the grid's
+                // non-composable DSL scope, so the block flows collected in the
+                // body above are applied directly. The queue and the rows share
+                // the filtered list so indices stay aligned.
+                val visibleTracks = sortedTracks.filter { !BlockManager.isBlocked(it) }
+
+                if (visibleTracks.isEmpty()) {
                     item(span = { GridItemSpan(if (viewModel.isGridLayout) 2 else 1) }, key = "empty_uploads") {
                         EmptyUploadsView()
                     }
                 } else {
                     items(
-                        items = sortedTracks,
+                        items = visibleTracks,
                         key = { track -> "upload_track_${track.id}" }
                     ) { track ->
-                        val index = sortedTracks.indexOf(track)
+                        val index = visibleTracks.indexOf(track)
                         val trackIndex = if (index >= 0) index else 0
                         Box(modifier = Modifier.animateItem()) {
                             if (viewModel.isGridLayout) {
                                 UploadTrackGridCard(
                                     track = track,
                                     onClick = {
-                                        playerViewModel.playPlaylist(sortedTracks, trackIndex)
+                                        playerViewModel.playPlaylist(visibleTracks, trackIndex)
                                     },
                                     onOptionClick = {
                                         playerViewModel.showTrackOptions(track)
@@ -550,7 +568,7 @@ fun LibraryScreen(
                                 UploadTrackListCard(
                                     track = track,
                                     onClick = {
-                                        playerViewModel.playPlaylist(sortedTracks, trackIndex)
+                                        playerViewModel.playPlaylist(visibleTracks, trackIndex)
                                     },
                                     onOptionClick = {
                                         playerViewModel.showTrackOptions(track)
@@ -614,7 +632,7 @@ fun LibraryScreen(
             }
     
             items(
-                items = viewModel.displayedItems,
+                items = visibleItems,
                 key = { item -> item.key }
             ) { item ->
                 val showPin = item.isPinned && !isInsideFolder

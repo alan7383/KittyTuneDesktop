@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import com.alananasss.kittytune.ui.common.horizontalMouseSwipe
+import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -81,8 +83,12 @@ fun SongChart(
     Column(modifier = modifier) {
         Box {
             if (compactKinds) {
+                val kindScrollState = rememberScrollState()
                 Row(
-                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    Modifier.fillMaxWidth()
+                        .horizontalScroll(kindScrollState)
+                        .horizontalMouseSwipe(kindScrollState)
+                        .fadedHorizontalEdges(kindScrollState, fadeLength = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     ChartKind.entries.forEach { option ->
@@ -119,7 +125,13 @@ fun SongChart(
 
         if (country != null && kind == ChartKind.COUNTRY) {
             Spacer(Modifier.padding(top = 4.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val countryRowState = androidx.compose.foundation.lazy.rememberLazyListState()
+            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                state = countryRowState,
+                showsArrows = false,
+                fadeLength = 24.dp,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 // The listener's own country first, then the rest in their usual order.
                 items(ChartCountry.entries.sortedBy { if (it == ChartCountry.forDevice(com.alananasss.kittytune.core.Strings.resolvedLanguage)) 0 else 1 }) { option ->
                     FilterChip(
@@ -142,7 +154,13 @@ fun SongChart(
             // returns an empty chart — so a genre row shown there would be a control that does
             // nothing, which is worse than no control.
             Spacer(Modifier.padding(top = 4.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val genreRowState = androidx.compose.foundation.lazy.rememberLazyListState()
+            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                state = genreRowState,
+                showsArrows = false,
+                fadeLength = 24.dp,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 items(genres) { option ->
                     val selected = option == genre
                     FilterChip(

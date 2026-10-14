@@ -54,11 +54,14 @@ internal suspend fun fetchChart(
 
         ChartKind.TOP -> {
             val url = ChartsViewModel.chartPlaylistUrl(countryCode, genre)
-            val resolved = api.resolveUrl(url)
+            val resolved = runCatching { api.resolveUrl(url) }.getOrNull()
+                ?: if (!url.contains("music-charts-us")) {
+                    runCatching { api.resolveUrl(ChartsViewModel.chartPlaylistUrl("US", genre)) }.getOrNull()
+                } else null
             // The chart playlists are the only place a `kind` other than trending comes from, and
             // they are ordinary playlists: a resolve that answers with something else is a slug that
             // has moved, not a chart.
-            if (resolved.get("kind")?.asString == "playlist") {
+            if (resolved != null && resolved.get("kind")?.asString == "playlist") {
                 val listed = Gson().fromJson(resolved, Playlist::class.java)?.tracks.orEmpty()
                 fillInMissingTracks(api, listed.take(limit))
             } else {
