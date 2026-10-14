@@ -190,7 +190,7 @@ internal fun HomeChartSection(vm: HomeViewModel, playerViewModel: PlayerViewMode
         kind = vm.chartPreviewKind,
         entries = entries,
         isLoading = vm.isChartPreviewLoading,
-        currentTrack = playerViewModel.currentTrack,
+        currentTrack = playerViewModel.uiCurrentTrack,
         onKindChange = { vm.loadChartPreview(it) },
         onPlayFrom = { index ->
             playerViewModel.playPlaylist(
@@ -233,7 +233,7 @@ internal fun FromYourArtistsSection(vm: HomeViewModel, playerViewModel: PlayerVi
                 val track = tracks[index]
                 LandingTrackCard(
                     track = track,
-                    isCurrent = playerViewModel.currentTrack?.id == track.id,
+                    isCurrent = playerViewModel.uiCurrentTrack?.id == track.id,
                     releaseDate = ReleaseWeeks.releaseDateOf(track),
                     onClick = {
                         playerViewModel.playPlaylist(

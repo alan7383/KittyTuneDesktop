@@ -56,6 +56,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -109,7 +113,8 @@ fun NowPlayingPanel(
     val vm = playerViewModel
     // The panel going away under the pointer sends no Exit; without this the side buttons stay bound to it.
     androidx.compose.runtime.DisposableEffect(Unit) { onDispose { PanelHistory.pointerInside = false } }
-    val track = vm.currentTrack ?: return
+    val track = vm.uiCurrentTrack
+    if (track == null && tab != NowPlayingTab.DEVICES) return
 
     Surface(
         modifier = modifier,
@@ -134,8 +139,8 @@ fun NowPlayingPanel(
                 modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val context = vm.currentContext
-                if (context != null && vm.canNavigateToContext()) {
+                val context = vm.uiCurrentContext
+                if (tab != NowPlayingTab.DEVICES && context != null && vm.canNavigateToContext()) {
                     val contextInteraction = remember(context.navigationId) { MutableInteractionSource() }
                     val contextHovered by contextInteraction.collectIsHoveredAsState()
                     // Same fix as the lyrics (issue #33): TextDecoration.Underline is drawn
@@ -164,7 +169,8 @@ fun NowPlayingPanel(
                     )
                 } else {
                     Text(
-                        text = context?.displayText ?: track.title ?: "",
+                        text = if (tab == NowPlayingTab.DEVICES) panelTabLabel(tab)
+                            else context?.displayText ?: track?.title.orEmpty(),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -198,6 +204,9 @@ fun NowPlayingPanel(
                     NowPlayingTab.QUEUE -> QueueList(vm)
                     NowPlayingTab.LYRICS -> LyricsPreview(vm, onOpenFullLyrics)
                     NowPlayingTab.EFFECTS -> com.alananasss.kittytune.ui.player.EffectsPanel(vm)
+                    NowPlayingTab.DEVICES -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
+                        com.alananasss.kittytune.ui.profile.ConnectPanel()
+                    }
                     else -> TrackInfoTab(vm)
                 }
             }
@@ -392,6 +401,7 @@ private fun PanelTabButton(tab: NowPlayingTab, label: String, isSelected: Boolea
 
 /** The filled drawing for the open tab, the outlined one for the rest. */
 private fun panelTabIcon(tab: NowPlayingTab, filled: Boolean): ImageVector = when (tab) {
+    NowPlayingTab.DEVICES -> if (filled) Icons.Filled.Devices else Icons.Outlined.Devices
     NowPlayingTab.TRACK -> if (filled) Icons.Filled.Info else Icons.Outlined.Info
     NowPlayingTab.QUEUE -> if (filled) Icons.AutoMirrored.Filled.QueueMusic else Icons.AutoMirrored.Outlined.QueueMusic
     NowPlayingTab.LYRICS -> if (filled) Icons.Filled.Lyrics else Icons.Outlined.Lyrics
@@ -400,6 +410,7 @@ private fun panelTabIcon(tab: NowPlayingTab, filled: Boolean): ImageVector = whe
 
 @Composable
 private fun panelTabLabel(tab: NowPlayingTab): String = when (tab) {
+    NowPlayingTab.DEVICES -> str("connect_devices")
     NowPlayingTab.TRACK -> str("detail_track_title")
     NowPlayingTab.QUEUE -> str("player_queue")
     NowPlayingTab.LYRICS -> str("player_lyrics")

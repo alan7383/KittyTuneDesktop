@@ -1880,7 +1880,7 @@
     <string name="trim_field_start">Début</string>
     <string name="trim_field_end">Fin</string>
     <string name="sync_title">Synchro entre appareils</string>
-    <string name="sync_intro">Tes appareils échangent l'historique d'écoute directement sur ton réseau local. Rien n'est envoyé ailleurs, et il n'y a pas de compte.</string>
+    <string name="sync_intro">Les appareils associés échangent l&apos;historique, les favoris et l&apos;état de lecture sur votre réseau local. Un relais Internet facultatif transmet les commandes et l&apos;état de lecture chiffrés, sans audio.</string>
     <string name="sync_device_name">Nom</string>
     <string name="sync_listener">Accepter les connexions</string>
     <string name="sync_listener_sub">Permet à un appareil associé d'appeler. Ça ouvre un port sur ton réseau, alors laisse-le éteint quand tu ne synchronises pas.</string>
@@ -2492,7 +2492,7 @@
     <string name="time_minutes">%1$d min</string>
     <string name="time_seconds">%1$ds</string>
 
-    <!-- Additional / newly localized UI strings -->
+<!-- Additional / newly localized UI strings -->
     <string name="player_dismissed_message">Piste masquée</string>
     <string name="karaoke_auto_separate_sub">Isole automatiquement en arrière-plan dès le lancement ou redémarrage de la lecture sans intervention manuelle.</string>
     <string name="karaoke_audio_track_id">Piste audio #%1$s</string>
@@ -2523,4 +2523,7 @@
     <string name="upload_release_datetime">Date et heure de sortie (UTC/Locale)</string>
     <string name="upload_discard_title">Abandonner les modifications non enregistrées ?</string>
     <string name="upload_discard_message">Vous avez modifié les détails de la piste. Si vous quittez maintenant, vos modifications seront perdues.</string>
+<string name="connect_devices">Appareils</string>
+    <string name="sync_playback_title">File d&apos;attente et position de lecture</string>
+    <string name="sync_playback_sub">Reprendre le dernier morceau et la file d&apos;attente en ouvrant un autre appareil</string>
 </resources>
