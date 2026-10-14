@@ -1880,7 +1880,9 @@
     <string name="trim_field_start">Start</string>
     <string name="trim_field_end">End</string>
     <string name="sync_title">Device sync</string>
-    <string name="sync_intro">Your devices exchange listening history directly over your local network. Nothing is uploaded anywhere, and there is no account.</string>
+    <string name="sync_intro">Paired devices exchange history, favorites and playback state on your local network. An optional Internet relay forwards encrypted playback controls and state, not audio.</string>
+    <string name="sync_playback_title">Queue and playback position</string>
+    <string name="sync_playback_sub">Continue the latest track and queue when opening another device</string>
     <string name="sync_device_name">Name</string>
     <string name="sync_listener">Accept connections</string>
     <string name="sync_listener_sub">Lets a paired device call in. This opens a port on your network, so leave it off when you are not syncing.</string>
@@ -2491,7 +2493,7 @@
     <string name="time_minutes">%1$d min</string>
     <string name="time_seconds">%1$ds</string>
 
-    <!-- Additional / newly localized UI strings -->
+<!-- Additional / newly localized UI strings -->
     <string name="player_dismissed_message">Track dismissed</string>
     <string name="karaoke_auto_separate_sub">Automatically separates audio in the background as soon as playback starts or restarts, with no manual action needed.</string>
     <string name="karaoke_audio_track_id">Audio track #%1$s</string>
@@ -2522,4 +2524,5 @@
     <string name="upload_release_datetime">Release Date &amp; Time (UTC/Local)</string>
     <string name="upload_discard_title">Discard unsaved changes?</string>
     <string name="upload_discard_message">You have modified track details. If you leave now, your changes will be discarded.</string>
+<string name="connect_devices">Devices</string>
 </resources>

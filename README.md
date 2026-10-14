@@ -188,6 +188,8 @@ pre-built binaries for linux, windows, and macos are available on the [**release
 | **Windows & macOS** | Installer / DMG *(Experimental)* | [GitHub Releases](https://github.com/alan7383/KittyTuneDesktop/releases) |
 | **Windows x64** | Portable ZIP with Java runtime *(Experimental)* | [Build and run instructions](WINDOWS.md) |
 
+Connect playback between paired Android and desktop clients: [setup and limits](CONNECT.md).
+
 <br>
 
 #### **arch linux**

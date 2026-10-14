@@ -79,7 +79,7 @@ import androidx.compose.material3.IconButtonDefaults
 
 @Composable
 fun TrackInfoTab(vm: PlayerViewModel) {
-    val currentTrack = vm.currentTrack ?: return
+    val currentTrack = vm.uiCurrentTrack ?: return
     val trackId = currentTrack.id
 
     val isSpotifyTrack = remember(trackId) { vm.isSpotifyTrack(currentTrack) }

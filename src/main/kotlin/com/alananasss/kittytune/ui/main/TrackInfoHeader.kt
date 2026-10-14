@@ -70,8 +70,8 @@ internal fun TrackInfoHeader(
     isUltraCompact: Boolean,
     onCommentsClick: () -> Unit = {},
 ) {
-    val isCurrentTrack = track.id == vm.currentTrack?.id ||
-        (track.title == vm.currentTrack?.title && track.user?.username == vm.currentTrack?.user?.username)
+    val isCurrentTrack = track.id == vm.uiCurrentTrack?.id ||
+        (track.title == vm.uiCurrentTrack?.title && track.user?.username == vm.uiCurrentTrack?.user?.username)
     val animatedCoverUrl = if (isCurrentTrack) vm.currentAnimatedCoverUrl else null
 
     Column(verticalArrangement = Arrangement.spacedBy(if (isCompact) 10.dp else 14.dp)) {
@@ -85,7 +85,7 @@ internal fun TrackInfoHeader(
                 AnimatedArtwork(
                     artworkUrl = track.fullResArtwork,
                     animatedCoverUrl = animatedCoverUrl,
-                    isPlaying = vm.isPlaying,
+                    isPlaying = vm.uiIsPlaying,
                     contentDescription = null,
                     modifier = Modifier
                         .size(if (isUltraCompact) 64.dp else 96.dp)
@@ -99,7 +99,7 @@ internal fun TrackInfoHeader(
             AnimatedArtwork(
                 artworkUrl = track.fullResArtwork,
                 animatedCoverUrl = animatedCoverUrl,
-                isPlaying = vm.isPlaying,
+                isPlaying = vm.uiIsPlaying,
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxWidth()

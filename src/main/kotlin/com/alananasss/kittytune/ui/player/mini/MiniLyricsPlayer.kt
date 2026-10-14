@@ -813,10 +813,10 @@ private fun MiniLyricsContent(
     transparentBg: Boolean = false,
     isDragging: Boolean = false,
 ) {
-    val track = viewModel.currentTrack
-    val isPlaying = viewModel.isPlaying
+    val track = viewModel.uiCurrentTrack
+    val isPlaying = viewModel.uiIsPlaying
     val lyrics = viewModel.lyricsLines
-    val rawPosition = viewModel.currentPosition
+    val rawPosition = viewModel.uiCurrentPosition
     val smoothPosition = com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition(
         positionMs = rawPosition,
         isPlaying = isPlaying,
@@ -962,9 +962,9 @@ private fun MiniLyricsContent(
                                     shapes = IconButtonDefaults.shapes()
                                 ) {
                                     Icon(
-                                        imageVector = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                        imageVector = if (viewModel.uiIsLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                                         contentDescription = "Like",
-                                        tint = if (viewModel.isLiked) MaterialTheme.colorScheme.primary
+                                        tint = if (viewModel.uiIsLiked) MaterialTheme.colorScheme.primary
                                                else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -1026,7 +1026,7 @@ private fun MiniLyricsContent(
         }
 
         // Progress bar along the bottom edge
-        if (showProgress && viewModel.duration > 0) {
+        if (showProgress && viewModel.uiDuration > 0) {
             LinearProgressIndicator(
                 // Read inside the indicator's draw phase: the per-frame interpolated position
                 // redraws the hairline without recomposing the mini-player around it.
@@ -1065,10 +1065,10 @@ private fun MiniLyricsElongatedContent(
     transparentBg: Boolean = false,
     isDragging: Boolean = false,
 ) {
-    val track = viewModel.currentTrack
-    val isPlaying = viewModel.isPlaying
+    val track = viewModel.uiCurrentTrack
+    val isPlaying = viewModel.uiIsPlaying
     val lyrics = viewModel.lyricsLines
-    val rawPosition = viewModel.currentPosition
+    val rawPosition = viewModel.uiCurrentPosition
     val smoothPosition = com.alananasss.kittytune.ui.player.lyrics.rememberSmoothPosition(
         positionMs = rawPosition,
         isPlaying = isPlaying,
@@ -1208,9 +1208,9 @@ private fun MiniLyricsElongatedContent(
                                 shapes = IconButtonDefaults.shapes()
                             ) {
                                 Icon(
-                                    imageVector = if (viewModel.isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                    imageVector = if (viewModel.uiIsLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                                     contentDescription = "Like",
-                                    tint = if (viewModel.isLiked) MaterialTheme.colorScheme.primary
+                                    tint = if (viewModel.uiIsLiked) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp)
                                 )
@@ -1271,7 +1271,7 @@ private fun MiniLyricsElongatedContent(
         }
 
         // Hairline progress bar along the bottom edge
-        if (showProgress && viewModel.duration > 0) {
+        if (showProgress && viewModel.uiDuration > 0) {
             LinearProgressIndicator(
                 // Read inside the indicator's draw phase: the per-frame interpolated position
                 // redraws the hairline without recomposing the mini-player around it.
