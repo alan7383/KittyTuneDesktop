@@ -3,6 +3,7 @@ package com.alananasss.kittytune.data
 import com.alananasss.kittytune.core.AppDirs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -50,10 +51,19 @@ object TokenManager {
     }
 
     private fun save() {
-        try {
-            val obj = buildJsonObject { values.forEach { (k, v) -> put(k, v) } }
-            file.writeText(json.encodeToString(JsonElement.serializer(), obj))
-        } catch (_: Exception) {
+        // The lock this object always declared but never used: two concurrent save() calls wrote
+        // the same file at once, and a crash mid-write left a half-JSON token store behind — the
+        // corrupted-then-logged-out sessions the audit flagged. Serialized, and written through a
+        // temp file + atomic replace so the token file is either the old one or the new one, never
+        // a torn mix of both.
+        synchronized(lock) {
+            try {
+                val obj = buildJsonObject { values.forEach { (k, v) -> put(k, v) } }
+                val tmp = File(file.parentFile, "soundtune_auth.json.tmp")
+                tmp.writeText(json.encodeToString(JsonElement.serializer(), obj))
+                com.alananasss.kittytune.core.AtomicFiles.replace(tmp, file)
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -161,7 +171,7 @@ object TokenManager {
         com.alananasss.kittytune.data.network.CookieStore.clear()
         logoutFlow.tryEmit(Unit)
 
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
                 dao.deleteNonDownloadedOnlinePlaylists()

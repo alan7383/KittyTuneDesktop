@@ -19,7 +19,8 @@ object SpotifyTokenManager {
     private const val FALLBACK_TOKEN_URL = "https://open.spotify.com/get_access_token?reason=transport&productType=web_player"
     private const val EXPIRY_SKEW_MS = 60_000L
 
-    private val baseClient = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this module's own.
+    private val baseClient = ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .followRedirects(true)

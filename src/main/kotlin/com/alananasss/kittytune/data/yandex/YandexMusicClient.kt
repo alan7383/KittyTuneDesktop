@@ -66,8 +66,9 @@ object YandexMusicClient {
      */
     private const val CLIENT_HEADER = "YandexMusicAndroid/24023621"
 
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this client's own.
     private val baseClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .build()

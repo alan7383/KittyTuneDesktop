@@ -25,6 +25,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -79,9 +81,14 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
             layout(chip.width, 0) { chip.place(0, -chip.height - gapPx) }
         },
     ) {
-        val position = rememberSmoothPosition(vm.currentPosition, vm.isPlaying, vm.effectsState.speed) +
-            if (followsPlain) 0L else vm.lyricsOffset
-        val activeIndex = LyricsUtils.activeLineIndex(lines, position.toLong())
+        // The smooth state feeds two derived things only: the active index (recomputed per frame,
+        // but observed only when the line actually changes) and the fill (read in its draw phase).
+        // Reading it as a value here, as this used to, recomposed the whole chip at 60 fps.
+        val positionState = rememberSmoothPosition(vm.currentPosition, vm.isPlaying, vm.effectsState.speed)
+        val lyricsOffset = if (followsPlain) 0L else vm.lyricsOffset
+        val activeIndex by remember(lines, lyricsOffset) {
+            derivedStateOf { LyricsUtils.activeLineIndex(lines, (positionState.value + lyricsOffset).toLong()) }
+        }
         val active = lines.getOrNull(activeIndex)
         val showsWords = active != null && !active.isInstrumental && active.text.isNotBlank()
         val scheme = MaterialTheme.colorScheme
@@ -118,7 +125,7 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
                     } else {
                         // A line timed only as a whole gets the words spread across it, so it fills in as smoothly as one
                         // timed word by word; the next line's start is where it ends when it has no end of its own.
-                        SungLine(vm, line.withEvenWords(lines.getOrNull(index + 1)?.startTime), position, isEven = line.words.isEmpty())
+                        SungLine(vm, line.withEvenWords(lines.getOrNull(index + 1)?.startTime), { positionState.value + lyricsOffset }, isEven = line.words.isEmpty())
                     }
                 }
             }
@@ -141,7 +148,7 @@ private fun pacedPlainLines(text: String, speed: Float): List<LyricLine> {
 }
 
 @Composable
-private fun SungLine(vm: PlayerViewModel, line: LyricLine, position: Float, isEven: Boolean) {
+private fun SungLine(vm: PlayerViewModel, line: LyricLine, position: () -> Float, isEven: Boolean) {
     val scheme = MaterialTheme.colorScheme
     val main = remember(line) { separateBackingVocals(line).first }
     val style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)

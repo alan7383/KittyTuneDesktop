@@ -25,7 +25,8 @@ data class QobuzSearchResult(
 object QobuzSearchRepository {
     private const val DEFAULT_BASE = "https://qobuz-dll.vercel.app"
 
-    private val client = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this repository's own.
+    private val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .build()

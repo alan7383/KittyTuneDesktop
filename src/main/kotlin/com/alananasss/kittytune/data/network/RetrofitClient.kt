@@ -70,13 +70,6 @@ object RetrofitClient {
                 .header("App-Version", "330120")
                 .header("UDID", deviceId)
 
-            // DataDome cookie (harvested separately) merged in if present.
-            SessionManager.getStoredDataDomeCookie()?.let { dd ->
-                val existing = originalRequest.header("Cookie")
-                val merged = if (existing.isNullOrBlank()) dd else "$existing; $dd"
-                requestBuilder.header("Cookie", merged)
-            }
-
             if (!token.isNullOrEmpty()) {
                 requestBuilder.header("Authorization", "OAuth $token")
             } else {
@@ -129,7 +122,9 @@ object RetrofitClient {
             }
         }
 
-        val builder = OkHttpClient.Builder()
+        // Rooted on ProxyManager's shared client so the connection pool and dispatcher are the
+        // app's one pool; the cookie jar, interceptors and timeouts below stay this API's own.
+        val builder = ProxyManager.getOkHttpClient().newBuilder()
             .retryOnConnectionFailure(true)
             .cookieJar(CookieStore)
             .addInterceptor(authInterceptor)

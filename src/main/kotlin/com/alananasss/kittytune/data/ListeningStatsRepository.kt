@@ -13,6 +13,7 @@ import com.alananasss.kittytune.data.sync.SyncLog
 import com.alananasss.kittytune.data.sync.SyncScheduler
 import com.alananasss.kittytune.domain.Track
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +36,7 @@ import kotlinx.coroutines.launch
  */
 object ListeningStatsRepository {
     private val dao get() = AppDatabase.downloadDao
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Bumped whenever the table changes, by a listen here or a listen merged from another device.

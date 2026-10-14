@@ -13,6 +13,7 @@ import com.alananasss.kittytune.audio.automix.AutomixManager
 import com.alananasss.kittytune.audio.automix.AutomixPlan
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -147,7 +148,7 @@ class Player {
     private val listeners = mutableListOf<Listener>()
     private val items = mutableListOf<MediaItem>()
     private var currentIndex = 0
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var resolveJob: Job? = null
     
     var onCompletion: (() -> Unit)? = null
@@ -411,6 +412,18 @@ class Player {
         val targetTrackId = item.track?.id
         val isAdopted = prebufferedTransition != null && prebufferedTransition?.trackId == targetTrackId
         val pre = if (isAdopted) prebufferedTransition else null
+        if (!isAdopted) {
+            // Skip during crossfade: the prebuffered engine was warmed up for a
+            // different track. Dropping the reference alone keeps its decoder, line
+            // and DSP state alive until GC (which never frees the native DSP handle) —
+            // stop+release it explicitly instead (issue #33 RAM drift).
+            prebufferedTransition?.let { pb ->
+                try {
+                    pb.engine.stop()
+                    pb.engine.release()
+                } catch (_: Exception) {}
+            }
+        }
         prebufferedTransition = null
 
         val newEngine = pre?.engine ?: AudioEngine()

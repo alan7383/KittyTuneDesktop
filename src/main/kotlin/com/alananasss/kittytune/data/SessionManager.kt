@@ -1,6 +1,5 @@
 package com.alananasss.kittytune.data
 
-import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.data.network.CookieStore
 import com.alananasss.kittytune.utils.Config
 import com.google.gson.Gson
@@ -21,7 +20,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -30,20 +28,19 @@ import java.util.concurrent.TimeUnit
  * The Android version harvested SoundCloud session/DataDome cookies from a
  * headless WebView. On desktop:
  *   - The pure-OkHttp OAuth `refresh_token` grant (the portable core) is kept
- *     verbatim â€” this is the primary token-refresh path.
- *   - The WebView cookie jar is replaced by [CookieStore]; the login flow (an
- *     embedded browser, handled by the login UI) populates it.
- *   - DataDome cookie is persisted to a small JSON file instead of WebView storage.
- *
- * The captcha WebView challenge flow is exposed as StateFlow signals for the UI,
- * which shows an embedded browser when a challenge is required.
+ *     verbatim - this is the primary token-refresh path.
+ *   - The WebView cookie jar is replaced by [CookieStore]; the PKCE login flow
+ *     (handled by the login UI) populates it through OkHttp responses.
+ *   - The DataDome captcha machinery was dropped entirely, mirroring Android:
+ *     PKCE-issued OAuth tokens with the official client_id no longer trip
+ *     DataDome's bot detection, and the desktop port never had the captcha
+ *     browser UI anyway (the challenge flows had no collectors, so a 403 just
+ *     waited out the full 120 s timeout before failing).
  */
 object SessionManager {
     private const val REFRESH_INTERVAL = 20 * 60 * 1000L
     private const val SESSION_REFRESH_TIMEOUT_MS = 12_000L
     private const val AUTH_API_BASE_URL = "https://api-auth.soundcloud.com/"
-
-    private val dataDomeFile = File(AppDirs.dataDir, "soundcloud_datadome.txt")
 
     private data class OAuthTokenResponse(
         @SerializedName("access_token") val accessToken: String?,
@@ -60,8 +57,9 @@ object SessionManager {
     private val apiRefreshLock = Any()
     private var pendingApiRefresh: CompletableDeferred<String?>? = null
 
+    // Shares ProxyManager's pool and dispatcher; the cookie jar is this session's own.
     private val baseAuthClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
@@ -79,13 +77,6 @@ object SessionManager {
 
     private val _sessionReadyEvent = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
     val sessionReadyEvent = _sessionReadyEvent.asSharedFlow()
-
-    private val _showCaptchaFlow = MutableStateFlow(false)
-    val showCaptchaFlow = _showCaptchaFlow.asStateFlow()
-
-    /** URL the login/captcha embedded browser should load, if any. */
-    private val _captchaUrlFlow = MutableStateFlow<String?>(null)
-    val captchaUrlFlow = _captchaUrlFlow.asStateFlow()
 
     fun start() {
         startKeepAliveCycle()
@@ -115,9 +106,7 @@ object SessionManager {
         keepAliveJob = scope.launch {
             while (true) {
                 delay(REFRESH_INTERVAL)
-                if (!_showCaptchaFlow.value) {
-                    requestSessionRefresh(force = false)
-                }
+                requestSessionRefresh(force = false)
             }
         }
     }
@@ -126,7 +115,7 @@ object SessionManager {
         harvestStoredSession()
         if (tokenManager.isGuestMode()) return
         val shouldRefreshToken = tokenManager.shouldRefreshAccessToken()
-        if (!_showCaptchaFlow.value && (force || shouldRefreshToken)) {
+        if (force || shouldRefreshToken) {
             scope.launch {
                 withTimeoutOrNull(SESSION_REFRESH_TIMEOUT_MS) {
                     refreshAccessTokenFromApi()
@@ -240,66 +229,11 @@ object SessionManager {
         "${Config.BASE_URL.trimEnd('/')}/oauth/token"
     ).distinct()
 
-    // --- DataDome ------------------------------------------------------------------------
-
-    fun getStoredDataDomeCookie(): String? = try {
-        if (dataDomeFile.exists()) dataDomeFile.readText().takeIf { it.isNotBlank() } else null
-    } catch (_: Exception) {
-        null
-    }
-
-    fun saveDataDomeCookie(cookie: String) {
-        val normalized = normalizeDataDomeCookie(cookie) ?: return
-        try {
-            dataDomeFile.writeText(normalized)
-        } catch (_: Exception) {
-        }
-    }
-
-    fun extractDataDomeCaptchaUrl(body: String?): String? {
-        if (body.isNullOrBlank()) return null
-        return Regex("\"url\"\\s*:\\s*\"([^\"]+)\"")
-            .find(body)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.replace("\\/", "/")
-            ?.takeIf { it.contains("captcha-delivery.com") }
-    }
-
-    /** Show the embedded-browser captcha challenge; resolved by [completeDataDomeChallenge]. */
-    private var pendingDataDome: CompletableDeferred<Boolean>? = null
-
-    suspend fun awaitDataDomeChallenge(captchaUrl: String, timeoutMs: Long = 120_000L): Boolean {
-        val deferred = CompletableDeferred<Boolean>()
-        pendingDataDome = deferred
-        _captchaUrlFlow.value = captchaUrl
-        _showCaptchaFlow.value = true
-        val solved = withTimeoutOrNull(timeoutMs) { deferred.await() } ?: false
-        _showCaptchaFlow.value = false
-        _captchaUrlFlow.value = null
-        return solved
-    }
-
-    fun completeDataDomeChallenge(cookie: String?, solved: Boolean) {
-        cookie?.let { saveDataDomeCookie(it) }
-        _showCaptchaFlow.value = false
-        _captchaUrlFlow.value = null
-        pendingDataDome?.complete(solved)
-        pendingDataDome = null
-    }
-
-    fun cancelCaptcha() = completeDataDomeChallenge(null, solved = false)
+    // --- Client id capture ---------------------------------------------------------------
 
     fun onClientIdCaptured(newId: String) {
         if (newId != Config.CLIENT_ID) Config.updateClientId(newId)
         _isClientIdValid.value = true
-    }
-
-    private fun normalizeDataDomeCookie(cookie: String?): String? {
-        if (cookie.isNullOrBlank()) return null
-        return cookie.split(";")
-            .map { it.trim() }
-            .firstOrNull { it.startsWith("datadome=") && it.length > "datadome=".length }
     }
 
     private fun String?.cleanOAuthValue(): String? = this

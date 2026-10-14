@@ -160,7 +160,7 @@ class AudioRecorder {
                         val linuxPcm = recordWithParec(defaultMonitor, durationMs, control, onProgress)
                         if (linuxPcm != null && linuxPcm.isNotEmpty()) {
                             println("DEBUG: [AudioRecorder] parec desktop capture returned ${linuxPcm.size} bytes successfully")
-                            saveWavFile(linuxPcm, File("last_recorded_audio.wav"))
+                            saveWavFile(linuxPcm, AppDirs.lastRecordedAudioFile)
                             return@withContext linuxPcm
                         }
                         println("DEBUG: [AudioRecorder] parec desktop capture returned empty/null, trying Java Sound fallback...")
@@ -173,7 +173,7 @@ class AudioRecorder {
                         val wasapiPcm = WasapiLoopbackRecorder.recordDesktopAudio(durationMs, control, onProgress)
                         if (wasapiPcm != null && wasapiPcm.isNotEmpty()) {
                             println("DEBUG: [AudioRecorder] WASAPI Loopback capture returned ${wasapiPcm.size} bytes successfully")
-                            saveWavFile(wasapiPcm, File("last_recorded_audio.wav"))
+                            saveWavFile(wasapiPcm, AppDirs.lastRecordedAudioFile)
                             return@withContext wasapiPcm
                         }
                         println("DEBUG: [AudioRecorder] WASAPI Loopback returned null or empty, falling back to Java Sound mixers...")
@@ -248,7 +248,7 @@ class AudioRecorder {
                 try {
                     val pcm = recordWithParec(selectedDeviceName, durationMs, control, onProgress)
                     if (pcm != null && pcm.isNotEmpty()) {
-                        saveWavFile(pcm, File("last_recorded_audio.wav"))
+                        saveWavFile(pcm, AppDirs.lastRecordedAudioFile)
                         return@withContext pcm
                     }
                 } catch (e: Exception) {
@@ -306,7 +306,7 @@ class AudioRecorder {
             }
 
             val finalPcm = convertTo16kHzMono(rawStream.toByteArray(), fmt)
-            saveWavFile(finalPcm, File("last_recorded_audio.wav"))
+            saveWavFile(finalPcm, AppDirs.lastRecordedAudioFile)
             finalPcm
         }
     }
@@ -468,7 +468,7 @@ class AudioRecorder {
             resultBuffer.putShort(s)
         }
         val finalPcm = resultBuffer.array()
-        saveWavFile(finalPcm, File("last_recorded_audio.wav"))
+        saveWavFile(finalPcm, AppDirs.lastRecordedAudioFile)
         return finalPcm
     }
 

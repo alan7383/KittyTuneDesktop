@@ -5,6 +5,7 @@ import com.alananasss.kittytune.ui.player.AudioEffectsState
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.SignedUrl
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -153,7 +154,7 @@ class AudioEngine {
 
     @Volatile
     private var line: SourceDataLine? = null
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     var currentUrl: String? = null
         private set
@@ -460,6 +461,11 @@ class AudioEngine {
         stop()
         aiDetection.resetForNewTrack()
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
+        // Terminal: this engine is being discarded. stopInternal() only flush()es the
+        // chain, which keeps native DSP state (normalisation handle, ebur128 histograms)
+        // allocated. Every crossfade releases an engine, so without this reset each
+        // played track leaked ~0.4 MB of native memory (issue #66: 500 MB -> 1 GB+).
+        chain.forEach { runCatching { it.reset() } }
         scope.coroutineContext[Job]?.cancel()
     }
 

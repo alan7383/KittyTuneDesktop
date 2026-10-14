@@ -36,8 +36,10 @@ import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 private object ExtractorDownloader : Downloader() {
+    // Derived from the shared client so the pool and dispatcher are ProxyManager's; the cookie
+    // jar and interceptor are this downloader's own (RAM, issue #33).
     private val baseClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .retryOnConnectionFailure(true)
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -120,8 +122,9 @@ private object ExtractorDownloader : Downloader() {
  */
 object StreamResolver {
 
+    // Shares ProxyManager's pool and dispatcher; the cookie jar is this resolver's own.
     private val baseClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .retryOnConnectionFailure(true)
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)

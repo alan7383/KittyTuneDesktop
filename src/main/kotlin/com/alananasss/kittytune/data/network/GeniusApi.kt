@@ -34,8 +34,9 @@ object GeniusClient {
 
     private const val CLIENT_VERSION = "8.1.5"
 
+    // Shares ProxyManager's pool and dispatcher; the header interceptor is this API's own.
     private val baseHttpClient by lazy {
-        okhttp3.OkHttpClient.Builder()
+        ProxyManager.getOkHttpClient().newBuilder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .header("Authorization", "Bearer $LOGGED_OUT_TOKEN")

@@ -29,7 +29,8 @@ object TidalAnimatedCoverProvider {
     private val negativeCache = ConcurrentHashMap<String, Long>()
     private const val NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000L
 
-    private val client = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this provider's own.
+    private val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(6, TimeUnit.SECONDS)
         .build()

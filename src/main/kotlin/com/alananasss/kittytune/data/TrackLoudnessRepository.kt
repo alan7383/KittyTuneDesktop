@@ -4,6 +4,7 @@ import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.domain.Track
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -13,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 object TrackLoudnessRepository {
 
     private val cache = BoundedCache<Long, TrackLoudnessInfo>(1000)
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeScans = ConcurrentHashMap<Long, Job>()
 
     fun getLoudness(trackId: Long): TrackLoudnessInfo? {
@@ -61,6 +62,11 @@ object TrackLoudnessRepository {
         activeScans[track.id] = job
     }
 
+    /**
+     * Read-only and cache-fronted: safe to run off the DB dispatcher (worst case is a
+     * stale read, never a lost write — track_loudness writes are serialized in
+     * [saveToDatabase]).
+     */
     private fun loadFromDatabase(trackId: Long): TrackLoudnessInfo? {
         return try {
             val conn = AppDatabase.raw()
@@ -80,18 +86,23 @@ object TrackLoudnessRepository {
         }
     }
 
-    private fun saveToDatabase(trackId: Long, lufs: Float, truePeakDb: Float) {
+    private suspend fun saveToDatabase(trackId: Long, lufs: Float, truePeakDb: Float) {
         try {
-            val conn = AppDatabase.raw()
-            conn.prepareStatement(
-                "INSERT INTO track_loudness (trackId, integratedLufs, truePeakDb, updatedAt) VALUES (?, ?, ?, ?) " +
-                    "ON CONFLICT(trackId) DO UPDATE SET integratedLufs = excluded.integratedLufs, truePeakDb = excluded.truePeakDb, updatedAt = excluded.updatedAt"
-            ).use { st ->
-                st.setLong(1, trackId)
-                st.setFloat(2, lufs)
-                st.setFloat(3, truePeakDb)
-                st.setLong(4, System.currentTimeMillis())
-                st.executeUpdate()
+            // Routed through the database's single-thread dispatcher: on the raw
+            // connection this write could land inside an open execBatch transaction
+            // and commit it mid-flight, or be rolled back with it (issue #33).
+            AppDatabase.withDb {
+                val conn = AppDatabase.raw()
+                conn.prepareStatement(
+                    "INSERT INTO track_loudness (trackId, integratedLufs, truePeakDb, updatedAt) VALUES (?, ?, ?, ?) " +
+                        "ON CONFLICT(trackId) DO UPDATE SET integratedLufs = excluded.integratedLufs, truePeakDb = excluded.truePeakDb, updatedAt = excluded.updatedAt"
+                ).use { st ->
+                    st.setLong(1, trackId)
+                    st.setFloat(2, lufs)
+                    st.setFloat(3, truePeakDb)
+                    st.setLong(4, System.currentTimeMillis())
+                    st.executeUpdate()
+                }
             }
         } catch (_: Throwable) {}
     }

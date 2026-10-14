@@ -1712,7 +1712,9 @@ class PlayerPreferences {
                 try {
                     val tempFile = File(queueFile.parentFile, "queue_cache.tmp")
                     tempFile.writeText(gson.toJson(queue))
-                    tempFile.renameTo(queueFile)
+                    // renameTo silently fails on Windows while the target exists, leaving the
+                    // persistent queue never updated; see AtomicFiles.replace for the why.
+                    com.alananasss.kittytune.core.AtomicFiles.replace(tempFile, queueFile)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }

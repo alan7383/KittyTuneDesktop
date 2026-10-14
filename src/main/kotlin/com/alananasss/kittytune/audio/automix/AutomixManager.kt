@@ -9,6 +9,7 @@ import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +44,7 @@ object AutomixManager {
     private val lookaheadAnalysisMutex = Mutex()
     private val failedSongIds = ConcurrentHashMap<String, Long>()
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _automixDebugInfo = MutableStateFlow<AutomixDebugInfo?>(null)
     val automixDebugInfo = _automixDebugInfo.asStateFlow()

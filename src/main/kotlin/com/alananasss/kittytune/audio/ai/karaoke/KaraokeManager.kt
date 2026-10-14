@@ -17,6 +17,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -79,7 +80,7 @@ object KaraokeManager {
         data class Error(val trackId: Long, val message: String) : SeparationState()
     }
 
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var downloadJob: Job? = null
     private var separationJob: Job? = null
 
@@ -109,15 +110,15 @@ object KaraokeManager {
     private var activeProcess: Process? = null
     private val completionListeners = java.util.concurrent.ConcurrentHashMap<Long, java.util.concurrent.CopyOnWriteArrayList<(Long) -> Unit>>()
 
-    // Stem playback synchronization
+    // Stem playback synchronization. Stems are file-backed readers swapped per track:
+    // the WAV stays on disk and slices are read on demand out of the OS page cache
+    // (evictable, not heap) instead of living as full FloatArrays in the JVM.
     @Volatile
     private var currentActiveStemTrackId: Long? = null
     @Volatile
-    private var currentStemBuffer: FloatArray? = null
+    private var currentStemAccess: StemFileAccess? = null
     @Volatile
-    private var currentVocalStemBuffer: FloatArray? = null
-    @Volatile
-    private var currentStemSampleRate: Int = 44100
+    private var currentVocalStemAccess: StemFileAccess? = null
 
     init {
         com.alananasss.kittytune.audio.NormalizationAudioProcessor.loadNativeLibrary()
@@ -525,9 +526,7 @@ object KaraokeManager {
     }
 
     fun clearCache() {
-        currentActiveStemTrackId = null
-        currentStemBuffer = null
-        currentVocalStemBuffer = null
+        releaseCurrentStems()
         val files = getStemsDir().listFiles() ?: return
         for (f in files) {
             runCatching { f.delete() }
@@ -539,9 +538,7 @@ object KaraokeManager {
 
     fun deleteStem(trackId: Long) {
         if (currentActiveStemTrackId == trackId) {
-            currentActiveStemTrackId = null
-            currentStemBuffer = null
-            currentVocalStemBuffer = null
+            releaseCurrentStems()
         }
         val inst = getStemFile(trackId)
         val voc = getVocalStemFile(trackId)
@@ -622,98 +619,189 @@ object KaraokeManager {
 
     fun notifyTrackChanged(trackId: Long?) {
         if (trackId == null) {
-            currentActiveStemTrackId = null
-            currentStemBuffer = null
-            currentVocalStemBuffer = null
+            releaseCurrentStems()
             return
         }
-        if (currentActiveStemTrackId == trackId && currentStemBuffer != null) return
+        if (currentActiveStemTrackId == trackId && currentStemAccess != null) return
 
         if (hasStem(trackId) || hasVocalStem(trackId)) {
             loadStemIntoMemory(trackId)
         } else {
-            currentActiveStemTrackId = null
-            currentStemBuffer = null
-            currentVocalStemBuffer = null
+            releaseCurrentStems()
         }
     }
 
-    private fun readWavFloats(file: File): Pair<Int, FloatArray>? {
-        if (!file.exists()) return null
+    private fun releaseCurrentStems() {
+        currentActiveStemTrackId = null
+        currentStemAccess?.close()
+        currentStemAccess = null
+        currentVocalStemAccess?.close()
+        currentVocalStemAccess = null
+    }
+
+    /**
+     * Opens a stem WAV for on-demand slice reads. Same header parsing as the old
+     * full-file reader (fixed fields at 22/24/34, then the chunk walk from offset 12),
+     * but the samples stay on disk instead of being materialised as a FloatArray:
+     * one ~85 MB anonymous heap array per 4-minute stem, two stems while karaoke
+     * plays, was the single biggest controllable RAM cost in the app (issue #66).
+     */
+    private fun openStemAccess(file: File): StemFileAccess? {
+        if (!file.exists() || file.length() < 44) return null
         return try {
-            val bytes = Files.readAllBytes(file.toPath())
-            if (bytes.size < 44) return null
+            RandomAccessFile(file, "r").use { raf ->
+                val header = ByteArray(44)
+                raf.seek(0)
+                raf.readFully(header)
+                val bb = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
+                val channels = bb.getShort(22).toInt()
+                val sampleRate = bb.getInt(24)
+                val bitsPerSample = bb.getShort(34).toInt()
+                if ((bitsPerSample != 16 && bitsPerSample != 32) || (channels != 1 && channels != 2)) return null
 
-            val bb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-            val channels = bb.getShort(22).toInt()
-            val sr = bb.getInt(24)
-            val bitsPerSample = bb.getShort(34).toInt()
-            if (bitsPerSample != 16 && bitsPerSample != 32) return null
-
-            var dataOffset = 44
-            var dataSize = bytes.size - 44
-            bb.position(12)
-            while (bb.remaining() >= 8) {
-                val c0 = bb.get().toInt().toChar()
-                val c1 = bb.get().toInt().toChar()
-                val c2 = bb.get().toInt().toChar()
-                val c3 = bb.get().toInt().toChar()
-                val chunkSize = bb.getInt()
-                if (c0 == 'd' && c1 == 'a' && c2 == 't' && c3 == 'a') {
-                    dataOffset = bb.position()
-                    dataSize = if (chunkSize in 1..(bytes.size - dataOffset)) chunkSize else (bytes.size - dataOffset)
-                    break
+                val fileLen = file.length()
+                var dataOffset = 44L
+                var dataSize = fileLen - 44L
+                var pos = 12L
+                val id = ByteArray(4)
+                val sizeBytes = ByteArray(4)
+                while (pos + 8 <= fileLen) {
+                    raf.seek(pos)
+                    if (raf.read(id) < 4) break
+                    raf.readFully(sizeBytes)
+                    val chunkSize = ((sizeBytes[0].toInt() and 0xFF) or ((sizeBytes[1].toInt() and 0xFF) shl 8)
+                        or ((sizeBytes[2].toInt() and 0xFF) shl 16) or (sizeBytes[3].toInt() shl 24)).toLong() and 0xFFFFFFFFL
+                    if (id[0] == 'd'.code.toByte() && id[1] == 'a'.code.toByte() &&
+                        id[2] == 't'.code.toByte() && id[3] == 'a'.code.toByte()
+                    ) {
+                        dataOffset = pos + 8
+                        dataSize = if (chunkSize in 1..(fileLen - dataOffset)) chunkSize else (fileLen - dataOffset)
+                        break
+                    }
+                    if (chunkSize <= 0L || pos + 8 + chunkSize > fileLen) break
+                    pos += 8 + chunkSize
                 }
-                if (chunkSize <= 0 || chunkSize > bb.remaining()) break
-                bb.position(bb.position() + chunkSize)
+
+                val clampedLen = minOf(dataSize, fileLen - dataOffset)
+                StemFileAccess(file, sampleRate, channels, bitsPerSample, dataOffset, clampedLen)
             }
+        } catch (e: Exception) {
+            Logger.e(TAG, "Error opening stem file ${file.name}: ${e.message}")
+            null
+        }
+    }
 
-            val numBytes = minOf(dataSize, bytes.size - dataOffset)
-            val bytesPerSample = bitsPerSample / 8
-            val numRawSamples = numBytes / bytesPerSample
-            bb.position(dataOffset)
+    /**
+     * File-backed stem reader. Slices are read on demand — one seek plus one bulk read
+     * per audio block — straight out of the OS page cache, instead of holding the entire
+     * stem in the JVM heap. Touched pages are file-backed and evictable, so the karaoke
+     * engine's steady-state footprint on the heap drops from ~170 MB to kilobytes, and
+     * [close] runs before every delete so stem removal keeps working on Windows.
+     */
+    private class StemFileAccess(
+        file: File,
+        val sampleRate: Int,
+        private val channels: Int,
+        private val bitsPerSample: Int,
+        private val dataOffset: Long,
+        private val dataLen: Long,
+    ) : AutoCloseable {
+        private val bytesPerSample = bitsPerSample / 8
+        private val frameSize = bytesPerSample * channels
+        internal val totalFrames: Long = if (frameSize > 0) dataLen / frameSize else 0L
+        private val raf = RandomAccessFile(file, "r")
+        private var scratch = ByteArray(16 * 1024)
 
-            val floatSamples = if (bitsPerSample == 32) {
-                if (channels == 1) {
-                    val floats = FloatArray(numRawSamples * 2)
-                    var idx = 0
-                    while (bb.remaining() >= 4 && idx < floats.size) {
-                        val s = bb.getFloat().coerceIn(-1f, 1f)
-                        floats[idx++] = s
-                        floats[idx++] = s
+        /**
+         * Fills [outLeft]/[outRight] with [numFrames] frames starting at [frame];
+         * out-of-range frames are silence, matching the old in-RAM reader exactly.
+         * Synchronized: the audio thread(s) read while [close] may swap the accessor
+         * out on a track change — a close then waits for the in-flight block instead
+         * of invalidating the handle under it, and the scratch buffer stays single-owner.
+         */
+        @Synchronized
+        fun readSlice(frame: Long, outLeft: FloatArray, outRight: FloatArray, numFrames: Int) {
+            if (frameSize <= 0 || numFrames <= 0) return
+            val first = frame.coerceAtLeast(0L)
+            val end = (frame + numFrames).coerceAtMost(totalFrames)
+            if (end <= first) {
+                java.util.Arrays.fill(outLeft, 0, numFrames, 0f)
+                java.util.Arrays.fill(outRight, 0, numFrames, 0f)
+                return
+            }
+            if (frame < 0) {
+                val head = (first - frame).coerceAtMost(numFrames.toLong()).toInt()
+                java.util.Arrays.fill(outLeft, 0, head, 0f)
+                java.util.Arrays.fill(outRight, 0, head, 0f)
+            }
+            val framesToRead = (end - first).toInt()
+            val outStart = (first - frame).toInt()
+            val byteLen = framesToRead * frameSize
+            if (scratch.size < byteLen) scratch = ByteArray(byteLen)
+            try {
+                raf.seek(dataOffset + first * frameSize)
+                raf.readFully(scratch, 0, byteLen)
+                decode(framesToRead, outStart, outLeft, outRight)
+            } catch (_: Exception) {
+                // The old accessor was swapped out mid-read (track change): one silent
+                // block, masked by the crossfade, then the new track's stems take over.
+                java.util.Arrays.fill(outLeft, outStart, outStart + framesToRead, 0f)
+                java.util.Arrays.fill(outRight, outStart, outStart + framesToRead, 0f)
+            }
+            val tailStart = outStart + framesToRead
+            if (tailStart < numFrames) {
+                java.util.Arrays.fill(outLeft, tailStart, numFrames, 0f)
+                java.util.Arrays.fill(outRight, tailStart, numFrames, 0f)
+            }
+        }
+
+        private fun decode(frames: Int, outStart: Int, outLeft: FloatArray, outRight: FloatArray) {
+            var p = 0
+            if (channels == 1) {
+                var i = 0
+                if (bitsPerSample == 32) {
+                    while (i < frames) {
+                        val v = Float.fromBits(le32(scratch, p)).coerceIn(-1f, 1f)
+                        outLeft[outStart + i] = v
+                        outRight[outStart + i] = v
+                        i++; p += 4
                     }
-                    floats
                 } else {
-                    val floats = FloatArray(numRawSamples)
-                    var idx = 0
-                    while (bb.remaining() >= 4 && idx < numRawSamples) {
-                        floats[idx++] = bb.getFloat().coerceIn(-1f, 1f)
+                    while (i < frames) {
+                        val v = le16(scratch, p) / 32768f
+                        outLeft[outStart + i] = v
+                        outRight[outStart + i] = v
+                        i++; p += 2
                     }
-                    floats
                 }
             } else {
-                if (channels == 1) {
-                    val floats = FloatArray(numRawSamples * 2)
-                    var idx = 0
-                    while (bb.remaining() >= 2 && idx < floats.size) {
-                        val s = bb.getShort().toFloat() / 32768f
-                        floats[idx++] = s
-                        floats[idx++] = s
+                var i = 0
+                if (bitsPerSample == 32) {
+                    while (i < frames) {
+                        outLeft[outStart + i] = Float.fromBits(le32(scratch, p))
+                        outRight[outStart + i] = Float.fromBits(le32(scratch, p + 4))
+                        i++; p += 8
                     }
-                    floats
                 } else {
-                    val floats = FloatArray(numRawSamples)
-                    var idx = 0
-                    while (bb.remaining() >= 2 && idx < numRawSamples) {
-                        floats[idx++] = bb.getShort().toFloat() / 32768f
+                    while (i < frames) {
+                        outLeft[outStart + i] = le16(scratch, p) / 32768f
+                        outRight[outStart + i] = le16(scratch, p + 2) / 32768f
+                        i++; p += 4
                     }
-                    floats
                 }
             }
-            Pair(sr, floatSamples)
-        } catch (e: Exception) {
-            Logger.e(TAG, "Error decoding WAV file ${file.name}: ${e.message}")
-            null
+        }
+
+        private fun le16(b: ByteArray, p: Int): Int =
+            (((b[p].toInt() and 0xFF) or ((b[p + 1].toInt() and 0xFF) shl 8)).toShort()).toInt()
+
+        private fun le32(b: ByteArray, p: Int): Int =
+            (b[p].toInt() and 0xFF) or ((b[p + 1].toInt() and 0xFF) shl 8) or
+                ((b[p + 2].toInt() and 0xFF) shl 16) or (b[p + 3].toInt() shl 24)
+
+        @Synchronized
+        override fun close() {
+            try { raf.close() } catch (_: Exception) {}
         }
     }
 
@@ -722,27 +810,22 @@ object KaraokeManager {
         val vocalFile = getVocalStemFile(trackId)
         if (!instFile.exists() && !vocalFile.exists()) return false
 
-        var loadedAny = false
-        val instRes = readWavFloats(instFile)
-        if (instRes != null) {
-            currentStemSampleRate = instRes.first
-            currentStemBuffer = instRes.second
-            loadedAny = true
-        } else {
-            currentStemBuffer = null
-        }
-
-        val vocRes = readWavFloats(vocalFile)
-        if (vocRes != null) {
-            currentVocalStemBuffer = vocRes.second
-            loadedAny = true
-        } else {
-            currentVocalStemBuffer = null
-        }
-
+        // Swap in the new file-backed readers before closing the old ones: an
+        // in-flight audio block on the old track either fails its availability
+        // check or catches the closed file (one silent block) instead of racing
+        // an unprotected close.
+        val oldInst = currentStemAccess
+        val oldVoc = currentVocalStemAccess
+        val inst = openStemAccess(instFile)
+        val voc = openStemAccess(vocalFile)
+        currentStemAccess = inst
+        currentVocalStemAccess = voc
+        val loadedAny = inst != null || voc != null
+        currentActiveStemTrackId = if (loadedAny) trackId else null
+        oldInst?.close()
+        oldVoc?.close()
         if (loadedAny) {
-            currentActiveStemTrackId = trackId
-            Logger.d(TAG, "Loaded stems for track $trackId (inst: ${currentStemBuffer != null}, vocal: ${currentVocalStemBuffer != null})")
+            Logger.d(TAG, "Loaded stems for track $trackId (inst: ${inst != null}, vocal: ${voc != null})")
         }
         return loadedAny
     }
@@ -755,12 +838,12 @@ object KaraokeManager {
 
     fun isStemAvailableForCurrentTrack(trackId: Long?): Boolean {
         if (trackId == null) return false
-        return currentActiveStemTrackId == trackId && currentStemBuffer != null
+        return currentActiveStemTrackId == trackId && currentStemAccess != null
     }
 
     fun isVocalStemAvailableForCurrentTrack(trackId: Long?): Boolean {
         if (trackId == null) return false
-        return currentActiveStemTrackId == trackId && currentVocalStemBuffer != null
+        return currentActiveStemTrackId == trackId && currentVocalStemAccess != null
     }
 
     /**
@@ -774,22 +857,9 @@ object KaraokeManager {
         outRight: FloatArray,
         numFrames: Int
     ): Boolean {
-        val buf = currentStemBuffer ?: return false
+        val access = currentStemAccess ?: return false
         if (currentActiveStemTrackId != trackId) return false
-
-        val totalAvailableFrames = (buf.size / 2)
-
-        for (i in 0 until numFrames) {
-            val frameIdx = (samplePosition + i).toInt()
-            if (frameIdx in 0 until totalAvailableFrames) {
-                val idx = frameIdx * 2
-                outLeft[i] = buf[idx]
-                outRight[i] = buf[idx + 1]
-            } else {
-                outLeft[i] = 0f
-                outRight[i] = 0f
-            }
-        }
+        access.readSlice(samplePosition, outLeft, outRight, numFrames)
         return true
     }
 
@@ -804,22 +874,9 @@ object KaraokeManager {
         outRight: FloatArray,
         numFrames: Int
     ): Boolean {
-        val buf = currentVocalStemBuffer ?: return false
+        val access = currentVocalStemAccess ?: return false
         if (currentActiveStemTrackId != trackId) return false
-
-        val totalAvailableFrames = (buf.size / 2)
-
-        for (i in 0 until numFrames) {
-            val frameIdx = (samplePosition + i).toInt()
-            if (frameIdx in 0 until totalAvailableFrames) {
-                val idx = frameIdx * 2
-                outLeft[i] = buf[idx]
-                outRight[i] = buf[idx + 1]
-            } else {
-                outLeft[i] = 0f
-                outRight[i] = 0f
-            }
-        }
+        access.readSlice(samplePosition, outLeft, outRight, numFrames)
         return true
     }
 

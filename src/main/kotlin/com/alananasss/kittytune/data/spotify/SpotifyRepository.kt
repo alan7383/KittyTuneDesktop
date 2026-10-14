@@ -40,7 +40,8 @@ object SpotifyRepository {
 
     private enum class FetchOutcome { SUCCESS, RETRY_NEW_TOKEN, RETRY_BACKOFF, GIVE_UP }
 
-    private val baseClient = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this module's own.
+    private val baseClient = ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()

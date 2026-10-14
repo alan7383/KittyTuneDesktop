@@ -201,24 +201,35 @@ object MusixmatchClient {
         chain.proceed(newRequest)
     }
 
+    // Shares ProxyManager's pool and dispatcher; the auth interceptor is this API's own.
     private val baseHttpClient by lazy {
-        OkHttpClient.Builder()
+        ProxyManager.getOkHttpClient().newBuilder()
             .addInterceptor(authInterceptor)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
             .build()
     }
 
-    private val httpClient: OkHttpClient
-        get() = ProxyManager.configureOkHttpClient(baseHttpClient.newBuilder()).build()
+    // Cached, and invalidated only when ProxyManager hands out a different base client (proxy
+    // changes): the getter this replaces built a fresh OkHttpClient AND a fresh Retrofit — with a
+    // new service instance and new connection bookkeeping — on every single API call.
+    @Volatile private var cachedApi: MusixmatchApiService? = null
+    @Volatile private var cachedBaseClient: OkHttpClient? = null
 
     val api: MusixmatchApiService
-        get() = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .client(httpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(MusixmatchApiService::class.java)
+        get() {
+            val base = ProxyManager.getOkHttpClient()
+            cachedApi?.takeIf { cachedBaseClient == base }?.let { return it }
+            val built = Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .client(ProxyManager.configureOkHttpClient(baseHttpClient.newBuilder()).build())
+                .addConverterFactory(GsonConverterFactory.create())
+                .build()
+                .create(MusixmatchApiService::class.java)
+            cachedBaseClient = base
+            cachedApi = built
+            return built
+        }
 
     private fun generateGuid(): String {
         return UUID.randomUUID().toString().replace("-", "").substring(0, 16)

@@ -78,7 +78,8 @@ object DiscordRemoteAuth {
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
 
-    private val client = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; the WebSocket-specific timeouts are this flow's own.
+    private val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .pingInterval(0, TimeUnit.MILLISECONDS)

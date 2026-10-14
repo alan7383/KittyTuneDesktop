@@ -6,6 +6,7 @@ import com.alananasss.kittytune.ui.player.AudioEffectsState
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.utils.Config
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,7 +81,7 @@ object MusicManager {
 
     private var rainPlayer: RainPlayer? = null
     private val tokenManager = TokenManager
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @Volatile private var initialized = false
 

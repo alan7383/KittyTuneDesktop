@@ -19,7 +19,8 @@ object HlsVariantResolver {
 
     private val cache = ConcurrentHashMap<String, String>()
 
-    private val httpClient = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this resolver's own.
+    private val httpClient = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.SECONDS)
         .build()

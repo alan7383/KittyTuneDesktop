@@ -165,19 +165,32 @@ compose.desktop {
         // Reported as "500 MB at launch, 1000 MB later, sometimes 4000 MB, and the song freezes for
         // an instant and then stops". Without -Xmx the JVM sets the ceiling to a quarter of physical
         // RAM, so on a 16 GB machine it will happily grow to 4 GB before collecting in earnest —
-        // which is exactly the number reported. Nothing needs that: the image cache is capped at
-        // 128 MB and everything else is small.
+        // which is exactly the number reported.
         //
         // The freeze and the stop are one event. A stop-the-world collection of a multi-gigabyte
         // heap takes long enough to starve the decode loop, the output line runs dry, and playback
         // stops. G1 is named explicitly rather than left to ergonomics because a machine the JVM
         // judges "client class" gets SerialGC, whose full collections are the longest of the lot,
         // and a pause target tells it to work in short increments instead of one long sweep.
-        // 2 GB, not the quarter of physical RAM the JVM defaults to. The ceiling exists to stop the
-        // 4 GB balloon that was reported, not to squeeze the app: a library of tens of thousands of
-        // liked tracks genuinely needs several hundred megabytes while it hydrates, and a tighter
-        // cap turns a stutter into an OutOfMemoryError in the middle of playback.
-        jvmArgs += "-Xmx2g"
+        //
+        // 512 MB, down from the 2 GB this ceiling used to allow. That 2 GB was never sized for
+        // what the app needed to stay alive — it was headroom for the drift it used to accumulate:
+        // native DSP state leaked per crossfade, karaoke stems held whole in the heap, the likes
+        // library as one resident JSON string, a sync log with no end, and a doubled image cache.
+        // Those are fixed in code now rather than tolerated in memory (issue #33), and what
+        // legitimately lives on the heap is the UI state, a liked library that reaches tens of
+        // megabytes for tens of thousands of tracks, bounded caches, and the transient churn of a
+        // track change. 512 MB accommodates that with G1 room to evacuate into; being close to the
+        // live set is also itself the pressure that makes the collector work rather than let the
+        // committed heap wander up to wherever the ceiling allows.
+        jvmArgs += "-Xmx512m"
+        // The size G1 aims at day to day: expand past it only under real allocation pressure, and
+        // give the expansion back once it passes. G1 honours this from JDK 24 (JDK-8302927); a
+        // runtime built from an older JDK ignores the option rather than refusing to start, which
+        // is why it is gated like the flags above. With the periodic concurrent cycle below it
+        // keeps the committed heap near the live set without buying the number back in full-GC
+        // pauses the way the free-ratio flags once did.
+        if (buildJdk >= 24) jvmArgs += "-XX:SoftMaxHeapSize=384m"
         jvmArgs += "-XX:+UseG1GC"
         jvmArgs += "-XX:MaxGCPauseMillis=50"
         // Measured idle on the home screen with native memory tracking (issue #66), 505 MB private at the
@@ -241,11 +254,12 @@ compose.desktop {
         /**
          * Where the memory actually goes, on demand: `./gradlew packageReleaseMsi -PmemDiag`.
          *
-         * The heap is capped at 2 GB above, so the 4 GB that was reported has at least half of itself
-         * somewhere the heap cannot account for, and no figure a task manager shows can say where.
-         * Native memory tracking can, but the JVM only collects it when asked at startup, so it takes
-         * a build of its own. `MemoryDiagnostics` reads the result from inside the process and writes
-         * it to a file, so nobody has to install a JDK or open a terminal to send it back.
+         * The heap is capped at 512 MB above, so any number the system monitor shows beyond a few
+         * hundred megabytes is somewhere the heap cannot account for, and no figure a task manager
+         * shows can say where. Native memory tracking can, but the JVM only collects it when asked
+         * at startup, so it takes a build of its own. `MemoryDiagnostics` reads the result from
+         * inside the process and writes it to a file, so nobody has to install a JDK or open a
+         * terminal to send it back.
          *
          * Deliberately not on by default: tracking costs a few percent and a little memory of its
          * own, which is a poor trade for everyone who is not currently being asked about it.
