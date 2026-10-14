@@ -96,7 +96,12 @@ object AudioCache {
             } else {
                 FileOutputStream(partial).use { out -> DownloadManager.downloadFileToStream(stream.url, out) {} }
             }
-            if (partial.length() > 0 && partial.renameTo(File(dir, "${track.id}.$ext"))) trim()
+            if (partial.length() > 0) {
+                // renameTo returns false on Windows when the target exists, which skipped trim()
+                // and left the track forever uncached; the atomic replace works in both cases.
+                com.alananasss.kittytune.core.AtomicFiles.replace(partial, File(dir, "${track.id}.$ext"))
+                trim()
+            }
         } finally {
             partial.delete()
         }

@@ -50,10 +50,19 @@ object TokenManager {
     }
 
     private fun save() {
-        try {
-            val obj = buildJsonObject { values.forEach { (k, v) -> put(k, v) } }
-            file.writeText(json.encodeToString(JsonElement.serializer(), obj))
-        } catch (_: Exception) {
+        // The lock this object always declared but never used: two concurrent save() calls wrote
+        // the same file at once, and a crash mid-write left a half-JSON token store behind — the
+        // corrupted-then-logged-out sessions the audit flagged. Serialized, and written through a
+        // temp file + atomic replace so the token file is either the old one or the new one, never
+        // a torn mix of both.
+        synchronized(lock) {
+            try {
+                val obj = buildJsonObject { values.forEach { (k, v) -> put(k, v) } }
+                val tmp = File(file.parentFile, "soundtune_auth.json.tmp")
+                tmp.writeText(json.encodeToString(JsonElement.serializer(), obj))
+                com.alananasss.kittytune.core.AtomicFiles.replace(tmp, file)
+            } catch (_: Exception) {
+            }
         }
     }
 

@@ -57,8 +57,9 @@ object Prefs {
             val obj = buildJsonObject { state.value.forEach { (k, v) -> put(k, v) } }
             val tmp = File(file.parentFile, "prefs.json.tmp")
             tmp.writeText(json.encodeToString(JsonElement.serializer(), obj))
-            if (file.exists()) file.delete()
-            tmp.renameTo(file)
+            // The delete-then-rename this replaced had a window with no file at all, and plain
+            // renameTo fails on Windows while a reader holds prefs.json open.
+            AtomicFiles.replace(tmp, file)
         } catch (_: Exception) {
         }
     }
