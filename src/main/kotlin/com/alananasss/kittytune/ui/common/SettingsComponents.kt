@@ -182,17 +182,15 @@ fun SettingsItem(
     // branching at the draw site, so both kinds take one path through it instead of two.
     val rowMark = icon?.let { androidx.compose.ui.graphics.vector.rememberVectorPainter(it) } ?: mark
 
-    Card(
-        onClick = { onToggleOrClick() },
-        enabled = onClick != null || hasSwitch,
-        colors = CardDefaults.cardColors(containerColor = animatedContainerColor),
-        shape = shape,
-        modifier = Modifier
-            .fillMaxWidth()
-            .bringIntoViewRequester(bringIntoViewRequester)
-            .onGloballyPositioned { itemCoordinates = it },
-        interactionSource = interactionSource
-    ) {
+    val isClickable = onClick != null || hasSwitch
+    val cardColors = CardDefaults.cardColors(
+        containerColor = animatedContainerColor,
+        disabledContainerColor = animatedContainerColor,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        disabledContentColor = MaterialTheme.colorScheme.onSurface,
+    )
+
+    val content = @Composable {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -273,6 +271,33 @@ fun SettingsItem(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
             }
+        }
+    }
+
+    if (isClickable) {
+        Card(
+            onClick = { onToggleOrClick() },
+            enabled = true,
+            colors = cardColors,
+            shape = shape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .onGloballyPositioned { itemCoordinates = it },
+            interactionSource = interactionSource
+        ) {
+            content()
+        }
+    } else {
+        Card(
+            colors = cardColors,
+            shape = shape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .onGloballyPositioned { itemCoordinates = it },
+        ) {
+            content()
         }
     }
 }

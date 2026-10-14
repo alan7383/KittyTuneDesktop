@@ -115,8 +115,12 @@ fun SettingsScreen(
                     onSearchQueryChange = { searchQuery = it },
                     // Wide windows have the field above the categories; a narrow column has no room for it.
                     showsSearchField = !isWide,
-                    // The credits are a lazy list of their own and cannot sit inside the pane's scroll.
-                    isScrollable = searchQuery.isNotBlank() || shown.category != SettingsCategory.CREDITS,
+                    // The credits, content filter, and karaoke pages handle their own scrolling (pinned tabs/headers).
+                    isScrollable = searchQuery.isNotBlank() || (
+                        shown.category != SettingsCategory.CREDITS &&
+                        shown.subPage != SettingsSubPage.MISC_CONTENT_FILTER &&
+                        shown.subPage != SettingsSubPage.AUDIO_KARAOKE
+                    ),
                 ) {
                     if (searchQuery.isNotBlank()) {
                         SettingsSearchResults(
@@ -177,6 +181,7 @@ internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: Strin
     AUDIO_PLAYBACK("settings_cat_playback", "settings_audio_playback_sub", Icons.Rounded.PlayArrow),
     AUDIO_QUALITY("settings_audio_quality_title", "settings_audio_quality_sub", Icons.Rounded.GraphicEq),
     AUDIO_TRANSITIONS("settings_audio_transitions_title", "settings_audio_transitions_sub", Icons.Rounded.AutoAwesome),
+    AUDIO_KARAOKE("karaoke_settings_title", "karaoke_settings_sub", Icons.Rounded.Mic),
     AUDIO_SLEEP_TIMER("sleep_timer_title", "settings_audio_sleep_sub", Icons.Rounded.Timer),
 
     // Sources
@@ -202,6 +207,7 @@ internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: Strin
     // Misc
     MISC_GENERAL("settings_cat_general", "misc_general_sub", Icons.Rounded.Tune),
     MISC_DISCORD("pref_discord_title", "misc_discord_sub", Icons.Rounded.Forum),
+    MISC_CONTENT_FILTER("pref_content_filter_title", "pref_content_filter_subtitle", Icons.Rounded.Block),
 }
 
 private val interfacePages = listOf(
@@ -217,6 +223,7 @@ private val audioPages = listOf(
     SettingsSubPage.AUDIO_PLAYBACK,
     SettingsSubPage.AUDIO_QUALITY,
     SettingsSubPage.AUDIO_TRANSITIONS,
+    SettingsSubPage.AUDIO_KARAOKE,
     SettingsSubPage.AUDIO_SLEEP_TIMER,
 )
 
@@ -247,6 +254,7 @@ private val networkPages = listOf(
 private val miscPages = listOf(
     SettingsSubPage.MISC_GENERAL,
     SettingsSubPage.MISC_DISCORD,
+    SettingsSubPage.MISC_CONTENT_FILTER,
 )
 
 @Composable
@@ -314,6 +322,7 @@ private fun SettingsPageContent(
         SettingsSubPage.AUDIO_PLAYBACK -> AudioPlaybackPage(playerViewModel)
         SettingsSubPage.AUDIO_QUALITY -> AudioQualityPage(playerViewModel)
         SettingsSubPage.AUDIO_TRANSITIONS -> AudioTransitionsPage(playerViewModel)
+        SettingsSubPage.AUDIO_KARAOKE -> KaraokeSettingsPage(playerViewModel)
         SettingsSubPage.AUDIO_SLEEP_TIMER -> AudioSleepTimerPage()
 
         // Sources subpages
@@ -339,6 +348,7 @@ private fun SettingsPageContent(
         // Misc subpages
         SettingsSubPage.MISC_GENERAL -> MiscGeneralPage()
         SettingsSubPage.MISC_DISCORD -> MiscDiscordPage(navController, playerViewModel)
+        SettingsSubPage.MISC_CONTENT_FILTER -> ContentFilterSettingsPage()
     }
 }
 
@@ -479,6 +489,11 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     var localMedia by remember { mutableStateOf(prefs.getLocalMediaEnabled()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
     var discordRpc by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
+    var aiAutoSkip by remember { mutableStateOf(prefs.aiAutoSkip) }
+    var aiAutoBlock by remember { mutableStateOf(prefs.aiAutoBlock) }
+    var aiSpareFavorites by remember { mutableStateOf(prefs.aiSpareFavorites) }
+    var aiShowBadge by remember { mutableStateOf(prefs.aiShowBadge) }
+    var aiShowHumanBadge by remember { mutableStateOf(prefs.aiShowHumanBadge) }
     var oneLineLyrics by remember { mutableStateOf(prefs.getOneLineLyricsEnabled()) }
     var fullPlayerCoverFeather by remember { mutableStateOf(playerViewModel.fullPlayerCoverFeather) }
 
@@ -743,6 +758,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         SettingsSearchItem(str("settings_cat_playback"), str("settings_audio_playback_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_PLAYBACK)), Icons.Rounded.PlayArrow, keywords = listOf("playback", "autoplay", "queue", "воспроизведение")),
         SettingsSearchItem(str("settings_audio_quality_title"), str("settings_audio_quality_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_QUALITY)), Icons.Rounded.GraphicEq, keywords = listOf("quality", "sound", "output", "bitrate", "high", "flac", "качество")),
         SettingsSearchItem(str("settings_audio_transitions_title"), str("settings_audio_transitions_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_TRANSITIONS)), Icons.Rounded.AutoAwesome, keywords = listOf("transitions", "crossfade", "automix", "dj", "mix")),
+        SettingsSearchItem(str("karaoke_settings_title"), str("karaoke_settings_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_KARAOKE)), Icons.Rounded.Mic, keywords = listOf("karaoke", "vocal remover", "roformer", "stems", "voix", "instrumental")),
         SettingsSearchItem(str("sleep_timer_title"), str("settings_audio_sleep_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_SLEEP_TIMER)), Icons.Rounded.Timer, keywords = listOf("timer", "sleep", "fade", "таймер сна")),
         SettingsSearchItem(str("pref_quality"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_QUALITY)), Icons.Rounded.Tune, keywords = listOf("quality", "bitrate", "high", "low", "flac", "aac", "качество")),
         SettingsSearchItem(str("pref_audio_device_title"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_QUALITY)), Icons.Rounded.Speaker, keywords = listOf("device", "speaker", "output", "устройство", "вывод")),
@@ -976,6 +992,92 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 prefs.setDiscordRpcEnabled(it)
             },
             highlightKey = "pref_discord",
+        ),
+        // MISC - Content filtering & AI detection (issue #41)
+        SettingsSearchItem(str("pref_content_filter_title"), str("pref_content_filter_subtitle"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.Block, keywords = listOf("content filter", "ai detection", "block music", "auto skip", "blocked tracks", "blocked artists", "suno", "udio", "artifactnet", "filtrage contenu", "détection ia", "bloquer musique", "titres bloqués", "artistes bloqués", "фильтр контента", "ии", "заблокированные")),
+        SettingsSearchItem(str("block_section_ai"), str("block_model_card_title"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.SmartToy, keywords = listOf("suno", "udio", "artifactnet", "ai music", "musique ia", "ии музыка")),
+        SettingsSearchItem(
+            title = str("block_ai_auto_skip"),
+            subtitle = str("block_ai_auto_skip_sub"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)),
+            icon = Icons.Rounded.SkipNext,
+            keywords = listOf("auto skip", "ai skip", "passer auto", "автопро пропуск"),
+            hasSwitch = true,
+            switchState = aiAutoSkip,
+            onSwitchChange = {
+                aiAutoSkip = it
+                prefs.aiAutoSkip = it
+                if (!it) {
+                    aiAutoBlock = false
+                    prefs.aiAutoBlock = false
+                }
+            },
+            highlightKey = "ai_auto_skip",
+        ),
+        SettingsSearchItem(
+            title = str("block_ai_auto_block"),
+            subtitle = str("block_ai_auto_block_sub"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)),
+            icon = Icons.Rounded.Block,
+            keywords = listOf("auto block", "block list", "bloquer auto", "автоблокировка"),
+            hasSwitch = true,
+            switchState = aiAutoBlock,
+            onSwitchChange = {
+                aiAutoBlock = it
+                prefs.aiAutoBlock = it
+            },
+            highlightKey = "ai_auto_block",
+        ),
+        SettingsSearchItem(
+            title = str("block_ai_spare_favorites"),
+            subtitle = str("block_ai_spare_favorites_sub"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)),
+            icon = Icons.Rounded.Favorite,
+            keywords = listOf("spare favorites", "favoris", "épargner", "избранное"),
+            hasSwitch = true,
+            switchState = aiSpareFavorites,
+            onSwitchChange = {
+                aiSpareFavorites = it
+                prefs.aiSpareFavorites = it
+            },
+            highlightKey = "ai_spare_favorites",
+        ),
+        SettingsSearchItem(str("block_ai_threshold", (prefs.aiScoreThreshold * 100).toInt()), str("block_ai_threshold_sub", (prefs.aiScoreThreshold * 100).toInt()), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.Tune, keywords = listOf("threshold", "seuil", "порог", "confidence"), highlightKey = "ai_threshold"),
+        SettingsSearchItem(str("block_ai_window_title"), str("block_ai_window_dialog_title"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.Speed, keywords = listOf("window", "fenêtre", "detection", "analyse", "4s", "1s", "accurate", "fast", "окно", "анализ"), highlightKey = "ai_detection_window"),
+        SettingsSearchItem(str("block_tab_tracks"), str("block_empty_tracks"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.VisibilityOff, keywords = listOf("hidden tracks", "titres masqués", "ausgeblendete titel", "скрытые треки", "unhide"), highlightKey = "block_section_tracks"),
+        SettingsSearchItem(str("block_tab_artists"), str("block_empty_artists"), SettingsCategory.MISC, SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)), Icons.Rounded.PersonOff, keywords = listOf("blocked artists", "artistes bloqués", "blockierte künstler", "заблокированные артисты", "unblock"), highlightKey = "block_section_artists"),
+        SettingsSearchItem(
+            title = str("pref_ai_show_badge"),
+            subtitle = str("pref_ai_show_badge_sub"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)),
+            icon = Icons.Rounded.SmartToy,
+            keywords = listOf("badge", "tag", "player", "плеер"),
+            hasSwitch = true,
+            switchState = aiShowBadge,
+            onSwitchChange = {
+                aiShowBadge = it
+                prefs.aiShowBadge = it
+            },
+            highlightKey = "ai_show_badge",
+        ),
+        SettingsSearchItem(
+            title = str("pref_ai_show_human_badge"),
+            subtitle = str("pref_ai_show_human_badge_sub"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_CONTENT_FILTER)),
+            icon = Icons.Rounded.VerifiedUser,
+            keywords = listOf("human badge", "humain", "аудио человек"),
+            hasSwitch = true,
+            switchState = aiShowHumanBadge,
+            onSwitchChange = {
+                aiShowHumanBadge = it
+                prefs.aiShowHumanBadge = it
+            },
+            highlightKey = "ai_show_human_badge",
         ),
         SettingsSearchItem(str("about_credits"), null, SettingsCategory.CREDITS, SettingsPlace(SettingsCategory.CREDITS), Icons.Rounded.Groups, keywords = listOf("credits", "about", "authors", "team", "crédits", "о программе", "авторы")),
     )
