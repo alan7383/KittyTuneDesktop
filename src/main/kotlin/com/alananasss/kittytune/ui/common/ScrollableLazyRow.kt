@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
+import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
+
 /**
  * A horizontal row you can actually move with a mouse (issue #33).
  *
@@ -47,7 +49,7 @@ import kotlinx.coroutines.launch
  *
  * Two ways in, because people reach for both:
  *
- * - **Arrows**, at each end, shown only while there is something in that direction. Behind a gradient that
+ * - **Arrows**, at each end, shown only while there is something in that direction. Behind a soft gradient mask that
  *   fades the row out beneath them, so the button sits on a soft edge instead of on top of a half-cut card.
  * - **Shift + wheel, or a touchpad's sideways swipe.** Compose already scrolls a row with those, animated.
  *   The plain vertical wheel is left to the page: it used to be turned into sideways motion whenever the
@@ -69,6 +71,10 @@ fun ScrollableLazyRow(
     itemsPerJump: Int = 3,
     /** Off for a short row of chips, which is plainly dragged and where arrows only crowd it (issue #66). */
     showsArrows: Boolean = true,
+    /** Whether to softly fade edges that still have content beyond them. */
+    fadeEdges: Boolean = true,
+    /** Width of the fade on each edge. */
+    fadeLength: androidx.compose.ui.unit.Dp = 36.dp,
     content: LazyListScope.() -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -86,7 +92,8 @@ fun ScrollableLazyRow(
             horizontalArrangement = horizontalArrangement,
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalMouseSwipe(state),
+                .horizontalMouseSwipe(state)
+                .fadedHorizontalEdges(state, fadeLength = fadeLength, enabled = fadeEdges),
             content = content,
         )
 

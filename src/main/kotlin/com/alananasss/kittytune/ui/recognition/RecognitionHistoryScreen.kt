@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.data.RecognitionHistoryRepository
+import com.alananasss.kittytune.data.BlockManager
 import com.alananasss.kittytune.data.local.RecognitionHistoryItem
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.domain.Track
@@ -53,11 +54,17 @@ fun RecognitionHistoryScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     
-    val filteredItems = remember(searchQuery, historyItems) {
+    // Recognition items carry no artist id, so only track blocks can apply here.
+    val blockedTrackIds by BlockManager.blockedTrackIdsFlow.collectAsState()
+    val unblockedHistory = remember(historyItems, blockedTrackIds) {
+        historyItems.filter { it.trackId == null || !BlockManager.isTrackBlocked(it.trackId) }
+    }
+
+    val filteredItems = remember(searchQuery, unblockedHistory) {
         if (searchQuery.isBlank()) {
-            historyItems
+            unblockedHistory
         } else {
-            historyItems.filter {
+            unblockedHistory.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||
                 it.artist.contains(searchQuery, ignoreCase = true)
             }

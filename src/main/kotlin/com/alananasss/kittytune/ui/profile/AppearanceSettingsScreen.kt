@@ -717,7 +717,12 @@ private fun FontAxesDialog(prefs: PlayerPreferences, onDismiss: () -> Unit) {
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                    showsArrows = false,
+                    fadeLength = 24.dp,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(400f, 100f, 0f, 0f) }) { Text(str("font_preset_default")) } }
                     item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(600f, 100f, 0f, 100f) }) { Text(str("font_preset_rounded")) } }
                     item { OutlinedButton(shapes = ButtonDefaults.shapes(), contentPadding = PaddingValues(horizontal = 12.dp), onClick = { applyPreset(250f, 105f, 0f, 0f) }) { Text(str("font_preset_elegant")) } }

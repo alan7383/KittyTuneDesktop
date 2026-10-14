@@ -261,10 +261,12 @@ private fun SeedPaletteCard(
                 }
             }
 
-                        LazyRow(
+            com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                showsArrows = false,
+                fadeLength = 24.dp,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 2.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 itemsIndexed(groupedKeyColorOptions) { index, group ->
                     val isSelected = selectedCategoryIndex == index

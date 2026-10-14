@@ -2585,9 +2585,11 @@ private fun ArtistStorefrontDialog(
                 }
 
                 Spacer(Modifier.height(16.dp))
-                LazyRow(
+                com.alananasss.kittytune.ui.common.ScrollableLazyRow(
+                    showsArrows = false,
+                    fadeLength = 24.dp,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     items(BuyModuleType.entries) { type ->
                         val isSelected = viewModel.storefrontType == type

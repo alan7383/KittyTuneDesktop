@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import com.alananasss.kittytune.ui.utils.fadedHorizontalEdges
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -243,7 +244,8 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                                         LazyRow(
                                             state = listState,
                                             horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            contentPadding = PaddingValues(horizontal = 4.dp)
+                                            contentPadding = PaddingValues(horizontal = 4.dp),
+                                            modifier = Modifier.fadedHorizontalEdges(listState, fadeLength = 20.dp),
                                         ) {
                                             items(ExtendedColors) { setupColor ->
                                                 val isSelected = selectedColor == setupColor.color && !useEnd4 && !useWindowsAccent

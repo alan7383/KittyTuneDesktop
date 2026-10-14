@@ -1326,6 +1326,8 @@ fun MainScreen(
         }
     }
 
+    AiDetectionOverlays(playerViewModel, navController)
+
     if (showShortcutsDialog) {
         KeyboardShortcutsDialog(onDismiss = { showShortcutsDialog = false })
     }
