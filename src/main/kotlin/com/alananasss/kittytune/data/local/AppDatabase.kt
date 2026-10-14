@@ -32,6 +32,7 @@ object AppDatabase {
     val folderDao: FolderDao by lazy { FolderDao(this) }
     val beatInfoDao: BeatInfoDao by lazy { BeatInfoDao(this) }
     val recentSearchDao: RecentSearchDao by lazy { RecentSearchDao(this) }
+    val blockedContentDao: BlockedContentDao by lazy { BlockedContentDao(this) }
 
     fun init() {
         Class.forName("org.sqlite.JDBC")
@@ -109,6 +110,14 @@ object AppDatabase {
             // stacking two identical ones (issue #56).
             """CREATE TABLE IF NOT EXISTS recent_search (
                 query TEXT PRIMARY KEY NOT NULL, timestamp INTEGER NOT NULL)""",
+            // Hidden tracks and blocked artists (issue #41, ported from Android).
+            // Exactly one of trackId / artistId is non-null per row; reason is
+            // "MANUAL" or "AI_GENERATED". Unique indexes mirror the Room entity.
+            """CREATE TABLE IF NOT EXISTS blocked_content (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, trackId INTEGER,
+                trackTitle TEXT, trackArtworkUrl TEXT, artistId INTEGER,
+                artistName TEXT, artistAvatarUrl TEXT, source TEXT NOT NULL DEFAULT 'soundcloud',
+                reason TEXT NOT NULL DEFAULT 'MANUAL', blockedAt INTEGER NOT NULL)""",
         )
         conn.createStatement().use { st ->
             ddl.forEach { st.execute(it) }
@@ -156,6 +165,10 @@ object AppDatabase {
             )
             st.execute("CREATE INDEX IF NOT EXISTS idx_stats_track ON listening_stats(trackId)")
             st.execute("CREATE INDEX IF NOT EXISTS idx_stats_artist ON listening_stats(artistName)")
+            // Unique indexes for the blocked-content table (Room parity: one block per
+            // track / artist, INSERT OR IGNORE keeps re-blocks idempotent).
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_track ON blocked_content(trackId)")
+            st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_artist ON blocked_content(artistId)")
             // What makes applying a synced listen twice impossible rather than merely unlikely. SQLite
             // treats NULLs as distinct in a unique index, so the rows from before sync existed — all of
             // which have no id — do not collide with each other (issue #33).

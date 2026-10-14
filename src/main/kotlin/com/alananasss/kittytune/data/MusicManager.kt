@@ -101,6 +101,14 @@ object MusicManager {
 
         com.alananasss.kittytune.audio.automix.AutomixManager.init()
 
+        // Content filtering (issue #41): warm the block cache and load the
+        // ArtifactNet model if already downloaded (mirrors PlaybackService.onCreate).
+        // Model load is off the main thread: mmap + XNNPACK delegate init is seconds.
+        BlockManager.init()
+        scope.launch(Dispatchers.IO) {
+            com.alananasss.kittytune.audio.ai.AiDetectionManager.init()
+        }
+
         // The saved level has to be applied here rather than from the ViewModel: AppBootstrap
         // calls init() before any ViewModel exists, and plenty of code drives playback through
         // MusicManager.player directly, so anything that waits for PlayerViewModel.player to be
@@ -204,6 +212,10 @@ object MusicManager {
         rainPlayer?.setAmbientType(state.ambientType)
         rainPlayer?.setEnabled(state.isRainEnabled)
         rainPlayer?.setVolume(state.rainVolume)
+    }
+
+    fun onKaraokeStemReady(trackId: Long) {
+        player.onKaraokeStemReady(trackId)
     }
 
     fun hotSwapDevice() {
