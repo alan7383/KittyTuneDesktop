@@ -100,6 +100,104 @@ enum class AppLanguage(val code: String) {
     VIETNAMESE("vi")
 }
 
+/**
+ * Audio duration analyzed before classifying AI music (issue #41, ported from Android).
+ *
+ * - [ACCURATE] (4s): full native 4.0s ArtifactNet segment without tiling.
+ * - [FAST] (1s): ~1.0s segment tiled with loop crossfading for immediate skips.
+ */
+enum class AiDetectionWindow(
+    val id: String,
+    val seconds: Int,
+    val titleKey: String,
+    val descKey: String,
+) {
+    ACCURATE(
+        id = "4s",
+        seconds = 4,
+        titleKey = "block_ai_window_4s_title",
+        descKey = "block_ai_window_4s_desc",
+    ),
+    FAST(
+        id = "1s",
+        seconds = 1,
+        titleKey = "block_ai_window_1s_title",
+        descKey = "block_ai_window_1s_desc",
+    );
+
+    companion object {
+        fun fromId(id: String?): AiDetectionWindow =
+            entries.firstOrNull { it.id == id } ?: ACCURATE
+    }
+}
+
+/**
+ * AI music detection model architecture choices.
+ *
+ * - ARTIFACTNET: Ultra-fast forensic artifact CNN via LiteRT/TFLite + XNNPACK (CPU).
+ * - AUDIO_TRANSFORMER: Contextual audio transformer (AST/CLAP) via ONNX Runtime with DirectML/Vulkan/GPU acceleration.
+ */
+enum class AiModelType(
+    val id: String,
+    val titleKey: String,
+    val descKey: String,
+    val noteKey: String,
+    val modelFileName: String,
+    val totalBytes: Long,
+    val runtimeTag: String,
+    val downloadUrl: String,
+    val fallbackUrls: List<String> = emptyList(),
+    val manualDownloadUrl: String = "https://huggingface.co/intrect/artifactnet",
+) {
+    ARTIFACTNET(
+        id = "artifactnet",
+        titleKey = "block_model_artifactnet_title",
+        descKey = "block_model_artifactnet_desc",
+        noteKey = "block_model_artifactnet_note",
+        modelFileName = "artifactnet_v94_full.onnx",
+        totalBytes = 16_986_745L,
+        runtimeTag = "DirectML · Vulkan / XNNPACK",
+        downloadUrl = "https://github.com/alan7383/kittytune/releases/download/v2.68.0/artifactnet_v94_full.onnx",
+        fallbackUrls = listOf(
+            "https://github.com/alan7383/KittyTuneDesktop/releases/download/v1.4.1/artifactnet_v94_full.onnx",
+            "https://github.com/alan7383/kittytune/releases/download/v2.68.0/artifactnet_v94_full.tflite",
+            "https://github.com/alan7383/KittyTuneDesktop/releases/download/v1.4.1/artifactnet_v94_full.tflite",
+        ),
+        manualDownloadUrl = "https://huggingface.co/intrect/artifactnet",
+    );
+
+    companion object {
+        fun fromId(id: String?): AiModelType = ARTIFACTNET
+    }
+}
+
+/**
+ * Karaoke / Vocal suppression engine choices.
+ * - DSP: Ultra-low latency mid/side phase cancellation filter (instant, 0 MB).
+ * - MEL_BAND_ROFORMER: Studio-grade AI neural source separation via ONNX Runtime with DirectML/Vulkan GPU acceleration.
+ */
+enum class KaraokeEngineMode(
+    val id: String,
+    val titleKey: String,
+    val descKey: String,
+) {
+    DSP(
+        id = "dsp",
+        titleKey = "karaoke_engine_dsp_title",
+        descKey = "karaoke_engine_dsp_desc",
+    ),
+    MEL_BAND_ROFORMER(
+        id = "roformer",
+        titleKey = "karaoke_engine_roformer_title",
+        descKey = "karaoke_engine_roformer_desc",
+    );
+
+    companion object {
+        fun fromId(id: String?): KaraokeEngineMode =
+            entries.firstOrNull { it.id == id } ?: DSP
+    }
+}
+
 val DEFAULT_PINNED_AUDIO_FX = listOf(
     "bass_boost",
     "earrape",
@@ -123,6 +221,10 @@ class PlayerPreferences {
             "rain"
         )
         const val KEY_LISTENING_STATS_ENABLED = "listening_stats_enabled"
+        const val KEY_KARAOKE_ENGINE_MODE = "karaoke_engine_mode"
+        const val KEY_KARAOKE_GPU_ACCELERATION = "karaoke_gpu_acceleration_enabled"
+        const val KEY_KARAOKE_SELECTED_GPU = "karaoke_selected_gpu_id"
+        const val KEY_KARAOKE_AUTO_SEPARATE = "karaoke_auto_separate_enabled"
         private const val KEY_PINNED_AUDIO_FX = "pinned_audio_fx_list_v1"
         private const val KEY_SOUNDCLOUD_HISTORY_SYNC = "soundcloud_history_sync_enabled"
         private const val KEY_TRACK_JSON = "last_track_json"
@@ -432,6 +534,19 @@ class PlayerPreferences {
         const val KEY_DEEZER_COOKIE = "deezer_cookie"
         const val KEY_DEEZER_USE_ACCOUNT = "deezer_use_account"
 
+        // AI music detection (issue #41, ported from Android — same key names so
+        // a backup imported from Android keeps these settings).
+        private const val KEY_AI_AUTO_SKIP = "ai_auto_skip_enabled"
+        private const val KEY_AI_AUTO_BLOCK = "ai_auto_block_enabled"
+        private const val KEY_AI_SPARE_FAVORITES = "ai_spare_favorites"
+        private const val KEY_AI_SCORE_THRESHOLD = "ai_score_threshold"
+        private const val KEY_AI_DETECTION_WINDOW = "ai_detection_window"
+        const val KEY_AI_SHOW_BADGE = "ai_show_badge"
+        const val KEY_AI_SHOW_HUMAN_BADGE = "ai_show_human_badge"
+        private const val KEY_AI_SELECTED_MODEL = "ai_selected_model"
+        private const val KEY_AI_GPU_ACCELERATION = "ai_gpu_acceleration_enabled"
+        private const val KEY_AI_SELECTED_GPU = "ai_selected_gpu_device"
+
         private val queueLock = Any()
     }
 
@@ -443,6 +558,82 @@ class PlayerPreferences {
     /** Whether listens are shared with paired devices. Off keeps them on this device only. */
     fun getSyncListensEnabled(): Boolean = Prefs.getBoolean("sync_listens_enabled", true)
     fun setSyncListensEnabled(enabled: Boolean) = Prefs.putBoolean("sync_listens_enabled", enabled)
+
+    // ─── AI music detection (issue #41, ported from Android) ─────────────────
+
+    /** Auto-skip tracks detected as AI-generated (P(AI) ≥ threshold). Default: off. */
+    var aiAutoSkip: Boolean
+        get() = Prefs.getBoolean(KEY_AI_AUTO_SKIP, false)
+        set(value) = Prefs.putBoolean(KEY_AI_AUTO_SKIP, value)
+
+    /**
+     * When [aiAutoSkip] is true, also add the track to the block list so it
+     * never reappears in queues or recommendations. Default: false.
+     */
+    var aiAutoBlock: Boolean
+        get() = Prefs.getBoolean(KEY_AI_AUTO_BLOCK, false)
+        set(value) = Prefs.putBoolean(KEY_AI_AUTO_BLOCK, value)
+
+    /** Never auto-skip tracks that the user has liked / saved to favorites. Default: true. */
+    var aiSpareFavorites: Boolean
+        get() = Prefs.getBoolean(KEY_AI_SPARE_FAVORITES, true)
+        set(value) = Prefs.putBoolean(KEY_AI_SPARE_FAVORITES, value)
+
+    /** P(AI) threshold above which a track is considered AI-generated. Range [0.5, 0.95]. Default: 0.85 (85% Strict). */
+    var aiScoreThreshold: Float
+        get() = Prefs.getFloat(KEY_AI_SCORE_THRESHOLD, 0.85f).coerceIn(0.5f, 0.95f)
+        set(value) = Prefs.putFloat(KEY_AI_SCORE_THRESHOLD, value.coerceIn(0.5f, 0.95f))
+
+    /** Show AI detection badge in the player during playback. Default: false. */
+    var aiShowBadge: Boolean
+        get() = Prefs.getBoolean(KEY_AI_SHOW_BADGE, false)
+        set(value) = Prefs.putBoolean(KEY_AI_SHOW_BADGE, value)
+
+    /** Also show the badge when a track is classified as human music. Default: true. */
+    var aiShowHumanBadge: Boolean
+        get() = Prefs.getBoolean(KEY_AI_SHOW_HUMAN_BADGE, true)
+        set(value) = Prefs.putBoolean(KEY_AI_SHOW_HUMAN_BADGE, value)
+
+    /** Audio duration analyzed before classifying AI music (1s or 4s). Default: ACCURATE (4s). */
+    var aiDetectionWindow: AiDetectionWindow
+        get() = AiDetectionWindow.fromId(Prefs.getString(KEY_AI_DETECTION_WINDOW, AiDetectionWindow.ACCURATE.id))
+        set(value) = Prefs.putString(KEY_AI_DETECTION_WINDOW, value.id)
+
+    /** Selected AI music detection model architecture. Default: ARTIFACTNET. */
+    var aiSelectedModel: AiModelType
+        get() = AiModelType.fromId(Prefs.getString(KEY_AI_SELECTED_MODEL, AiModelType.ARTIFACTNET.id))
+        set(value) = Prefs.putString(KEY_AI_SELECTED_MODEL, value.id)
+
+    /** Hardware GPU acceleration toggle for ONNX Runtime (DirectML / Vulkan / GPU). Default: true. */
+    var aiGpuAccelerationEnabled: Boolean
+        get() = Prefs.getBoolean(KEY_AI_GPU_ACCELERATION, true)
+        set(value) = Prefs.putBoolean(KEY_AI_GPU_ACCELERATION, value)
+
+    /** Selected GPU device ID (e.g. "auto", "cpu", or "gpu:0"). Default: "auto". */
+    var aiSelectedGpuId: String
+        get() = Prefs.getString(KEY_AI_SELECTED_GPU, com.alananasss.kittytune.audio.ai.GpuDevice.ID_AUTO) ?: com.alananasss.kittytune.audio.ai.GpuDevice.ID_AUTO
+        set(value) = Prefs.putString(KEY_AI_SELECTED_GPU, value)
+
+    /** Karaoke / Vocal separation engine mode. Default: DSP. */
+    var karaokeEngineMode: KaraokeEngineMode
+        get() = KaraokeEngineMode.fromId(Prefs.getString(KEY_KARAOKE_ENGINE_MODE, KaraokeEngineMode.DSP.id))
+        set(value) = Prefs.putString(KEY_KARAOKE_ENGINE_MODE, value.id)
+
+    /** GPU hardware acceleration for Karaoke AI (DirectML / Vulkan). Default: true. */
+    var karaokeGpuAccelerationEnabled: Boolean
+        get() = Prefs.getBoolean(KEY_KARAOKE_GPU_ACCELERATION, true)
+        set(value) = Prefs.putBoolean(KEY_KARAOKE_GPU_ACCELERATION, value)
+
+    /** Selected GPU device ID for Karaoke AI. Default: "auto". */
+    var karaokeSelectedGpuId: String
+        get() = Prefs.getString(KEY_KARAOKE_SELECTED_GPU, com.alananasss.kittytune.audio.ai.GpuDevice.ID_AUTO) ?: com.alananasss.kittytune.audio.ai.GpuDevice.ID_AUTO
+        set(value) = Prefs.putString(KEY_KARAOKE_SELECTED_GPU, value)
+
+    /** Auto-separate playing tracks in background when Karaoke is toggled on. Default: true. */
+    var karaokeAutoSeparateOnPlay: Boolean
+        get() = Prefs.getBoolean(KEY_KARAOKE_AUTO_SEPARATE, true)
+        set(value) = Prefs.putBoolean(KEY_KARAOKE_AUTO_SEPARATE, value)
+
     fun setSyncLikesEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SYNC_LIKES, enabled)
 
     fun getHasCompletedSetup(): Boolean = Prefs.getBoolean(KEY_HAS_COMPLETED_SETUP, false)

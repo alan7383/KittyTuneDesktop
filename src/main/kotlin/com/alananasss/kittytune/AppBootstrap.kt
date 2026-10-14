@@ -31,6 +31,11 @@ object AppBootstrap {
         if (done) return
         done = true
 
+        // Prevent JavaCPP from falsely throwing OutOfMemoryError when host physical memory > 8GB
+        System.setProperty("org.bytedeco.javacpp.maxphysicalbytes", "0")
+        System.setProperty("org.bytedeco.javacpp.maxbytes", "0")
+
+        com.alananasss.kittytune.audio.ai.OnnxHelper.ensureNativeLibrariesLoaded()
         com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
 
         runCatching {
