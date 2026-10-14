@@ -92,18 +92,12 @@ object DownloadManager {
     )
 
     private suspend fun updateRemotePlaylist(playlistId: Long, request: PlaylistUpdateRequest) {
-        var response = api.updatePlaylist(playlistId, request)
+        val response = api.updatePlaylist(playlistId, request)
         if (!response.isSuccessful) {
-            var errorBody = runCatching { response.errorBody()?.string() }.getOrNull()
-            val captchaUrl = SessionManager.extractDataDomeCaptchaUrl(errorBody)
-            if (response.code() == 403 && captchaUrl != null) {
-                val solved = SessionManager.awaitDataDomeChallenge(captchaUrl)
-                if (solved) {
-                    response = api.updatePlaylist(playlistId, request)
-                    if (response.isSuccessful) return
-                    errorBody = runCatching { response.errorBody()?.string() }.getOrNull()
-                }
-            }
+            // DataDome captcha handling was dropped with the PKCE auth migration (same call
+            // as Android): OAuth tokens no longer trip the bot detection, and the desktop
+            // port never had the captcha browser anyway — fail fast with the server's body.
+            val errorBody = runCatching { response.errorBody()?.string() }.getOrNull()
             throw Exception("SoundCloud playlist update failed (${response.code()}): ${errorBody ?: response.message()}")
         }
     }

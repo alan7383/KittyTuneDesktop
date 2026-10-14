@@ -70,13 +70,6 @@ object RetrofitClient {
                 .header("App-Version", "330120")
                 .header("UDID", deviceId)
 
-            // DataDome cookie (harvested separately) merged in if present.
-            SessionManager.getStoredDataDomeCookie()?.let { dd ->
-                val existing = originalRequest.header("Cookie")
-                val merged = if (existing.isNullOrBlank()) dd else "$existing; $dd"
-                requestBuilder.header("Cookie", merged)
-            }
-
             if (!token.isNullOrEmpty()) {
                 requestBuilder.header("Authorization", "OAuth $token")
             } else {

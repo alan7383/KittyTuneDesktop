@@ -1265,9 +1265,9 @@ fun PlaylistDetailScreen(
             onDismissRequest = { showEditDialog = false },
             onSave = { title, description, sharing, tagList, genre, setType, releaseDate, permalink ->
                 showEditDialog = false
-                // Routes through DownloadManager so the local DB stays in sync, the
-                // online track list is preserved (trackUrns re-fetched) and DataDome
-                // 403 captchas are handled — same path as Android.
+                // Routes through DownloadManager so the local DB stays in sync and the
+                // online track list is preserved (trackUrns re-fetched) — same path as
+                // Android.
                 DownloadManager.editPlaylistMetadata(
                     playlistId = currentIdLong,
                     newTitle = title,
