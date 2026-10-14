@@ -31,7 +31,8 @@ object TidalSearchRepository {
     private const val CLIENT_ID = "txNoH4kkV41MfH25"
     private const val CLIENT_SECRET = "dQjy0MinCEvxi1O4UmxvxWnDjt4cgHBPw8ll6nYBk98="
 
-    private val client = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this repository's own.
+    private val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()

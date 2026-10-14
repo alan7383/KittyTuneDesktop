@@ -129,7 +129,9 @@ object RetrofitClient {
             }
         }
 
-        val builder = OkHttpClient.Builder()
+        // Rooted on ProxyManager's shared client so the connection pool and dispatcher are the
+        // app's one pool; the cookie jar, interceptors and timeouts below stay this API's own.
+        val builder = ProxyManager.getOkHttpClient().newBuilder()
             .retryOnConnectionFailure(true)
             .cookieJar(CookieStore)
             .addInterceptor(authInterceptor)

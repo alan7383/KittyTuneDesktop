@@ -201,8 +201,9 @@ object MusixmatchClient {
         chain.proceed(newRequest)
     }
 
+    // Shares ProxyManager's pool and dispatcher; the auth interceptor is this API's own.
     private val baseHttpClient by lazy {
-        OkHttpClient.Builder()
+        ProxyManager.getOkHttpClient().newBuilder()
             .addInterceptor(authInterceptor)
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)

@@ -77,7 +77,8 @@ object QobuzAudioProvider {
         val captchaRequired: Boolean = false,
     )
 
-    private val client = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this module's own.
+    private val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .build()

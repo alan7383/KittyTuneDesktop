@@ -47,6 +47,7 @@ object AppDatabase {
     val beatInfoDao: BeatInfoDao by lazy { BeatInfoDao(this) }
     val recentSearchDao: RecentSearchDao by lazy { RecentSearchDao(this) }
     val blockedContentDao: BlockedContentDao by lazy { BlockedContentDao(this) }
+    val likeDao: LikeDao by lazy { LikeDao(this) }
 
     fun init() {
         Class.forName("org.sqlite.JDBC")
@@ -132,6 +133,15 @@ object AppDatabase {
                 trackTitle TEXT, trackArtworkUrl TEXT, artistId INTEGER,
                 artistName TEXT, artistAvatarUrl TEXT, source TEXT NOT NULL DEFAULT 'soundcloud',
                 reason TEXT NOT NULL DEFAULT 'MANUAL', blockedAt INTEGER NOT NULL)""",
+            // The liked-tracks library, one row per like (RAM, issue #33). It used to live as a
+            // single JSON string inside the preferences map — resident for the process lifetime,
+            // re-serialised in full on every save, and re-encoded into the whole prefs file each
+            // time. A row per track writes and reads only what changed, and the RAM copy is the
+            // StateFlow alone. likedAt is a column only so the library can come back out in the
+            // order it was saved in; the track itself (including its own likedAt) is the JSON.
+            """CREATE TABLE IF NOT EXISTS liked_tracks (
+                trackId INTEGER PRIMARY KEY NOT NULL, likedAt INTEGER NOT NULL,
+                trackJson TEXT NOT NULL)""",
         )
         conn.createStatement().use { st ->
             ddl.forEach { st.execute(it) }
@@ -270,6 +280,29 @@ object AppDatabase {
         conn.prepareStatement(sql).use { ps ->
             bind(ps, args)
             ps.executeUpdate()
+        }
+    }
+
+    /**
+     * Arbitrary statements, one transaction, on the single [dbDispatcher] thread.
+     *
+     * For the writes that do not fit the shaped helpers — a replace-all is a DELETE plus a batch
+     * INSERT, and doing them as two [exec]s would leave a window where a crash drops the table to
+     * empty between the two commits. Same autoCommit discipline as [execBatch]/[execTogether];
+     * no invalidation, because the one caller so far (the likes table) has nothing observing it.
+     */
+    internal suspend fun <T> execTransaction(block: () -> T): T = withContext(dbDispatcher) {
+        val previousAutoCommit = conn.autoCommit
+        conn.autoCommit = false
+        try {
+            val result = block()
+            conn.commit()
+            result
+        } catch (t: Throwable) {
+            runCatching { conn.rollback() }
+            throw t
+        } finally {
+            conn.autoCommit = previousAutoCommit
         }
     }
 

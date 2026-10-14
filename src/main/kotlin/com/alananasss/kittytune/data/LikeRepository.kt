@@ -26,8 +26,14 @@ import java.lang.reflect.Type
  * Desktop port of the Android LikeRepository.
  * SharedPreferences("soundtune_likes_v3") -> NamedPrefs; StringSet stored as a
  * separator-joined string. Same keys, same optimistic + blacklist sync semantics.
+ *
+ * The tracks themselves moved to the [com.alananasss.kittytune.data.local.LikeDao] table: the
+ * old single JSON string of the whole library sat resident in the preferences map for the
+ * process lifetime and was rebuilt on every save (RAM, issue #33). What stays in prefs is small
+ * by nature — playlist ids and the unlike blacklist — and is migrated away on first launch.
  */
 object LikeRepository {
+    /** Legacy: the whole library as one JSON string, before it moved to the [com.alananasss.kittytune.data.local.LikeDao] table. Kept only to migrate it away. */
     private const val KEY_LIKED_TRACKS = "liked_tracks_full"
     private const val KEY_LIKED_PLAYLISTS = "liked_playlists_ids"
     private const val KEY_LOCALLY_UNLIKED_IDS = "locally_unliked_ids"
@@ -51,6 +57,7 @@ object LikeRepository {
 
     private val tokenManager = TokenManager
     private val playerPrefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+    private val likeDao get() = com.alananasss.kittytune.data.local.AppDatabase.likeDao
 
     private fun getStringSet(key: String): Set<String> =
         prefs.getString(key, null)?.split(SET_SEP)?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
@@ -130,21 +137,21 @@ object LikeRepository {
 
     fun init() {
         pruneBlacklist()
-        loadFromPrefs()
+        loadFromDb()
 
         scope.launch {
             com.alananasss.kittytune.data.sync.SyncLikes.seedMissing()
             com.alananasss.kittytune.data.sync.SyncLikes.seedMissingPlaylists()
         }
 
-        // Closes the coalescing window. Prefs has a hook of its own, but the order between shutdown
-        // hooks is undefined, so this forces the flush rather than hoping ours ran first.
+        // Closes the coalescing window: a burst of likes still in the 1 s delay would otherwise
+        // be lost to process exit. The database commit is already durable, so there is no
+        // second store left to flush behind this hook.
         Runtime.getRuntime().addShutdownHook(
             Thread {
                 if (pendingSave?.isActive == true) {
                     pendingSave?.cancel()
-                    saveToPrefs()
-                    com.alananasss.kittytune.core.Prefs.flush(force = true)
+                    kotlinx.coroutines.runBlocking { saveToDb() }
                 }
             }
         )
@@ -597,6 +604,10 @@ object LikeRepository {
         _likedTracks.value = emptyList()
         _likedPlaylists.value = emptySet()
         _isSyncing.value = false
+        // The table goes with the session: a login that did not clear it would meet its likes
+        // again on the next launch, from a store nobody had written to since.
+        pendingSave?.cancel()
+        runCatching { kotlinx.coroutines.runBlocking { likeDao.clear() } }
         prefs.remove(KEY_LIKED_TRACKS)
         prefs.remove(KEY_LIKED_PLAYLISTS)
         prefs.remove(KEY_LOCALLY_UNLIKED_IDS)
@@ -632,43 +643,73 @@ object LikeRepository {
         pendingSave?.cancel()
         pendingSave = scope.launch {
             delay(SAVE_COALESCE_MS)
-            saveToPrefs()
+            saveToDb()
         }
     }
 
-    private fun saveToPrefs() {
-        val json = gson.toJson(_likedTracks.value)
-        prefs.putString(KEY_LIKED_TRACKS, json)
+    /**
+     * Writes the liked list to the database, at most once per burst (issue #33).
+     *
+     * ## Why this is coalesced
+     *
+     * The save is a whole-library transaction: DELETE plus one INSERT per track. For a library of
+     * several thousand that is thousands of rows paid per burst, and [removeLike] used to pay for
+     * the whole-library serialisation on the caller's thread — so unliking from a list did a
+     * multi-megabyte write on the UI thread.
+     *
+     * Liking half a dozen tracks in a row therefore did the same library-sized write over and
+     * over in a few seconds. That is the shape of churn that turns into a collection pause, and a
+     * pause in the wrong place is the audio drop-out that was reported alongside the memory
+     * figures. Coalescing collapses a burst into one write of the final state, which is the only
+     * state anyone wanted written.
+     *
+     * The window is short and the shutdown hook closes it, so nothing is lost by waiting; a like is
+     * also already on its way to the server, which is where the next launch reads it from anyway.
+     */
+    private suspend fun saveToDb() {
+        runCatching { likeDao.replaceAll(_likedTracks.value) }
+            .onFailure { e ->
+                e.printStackTrace()
+            }
         putStringSet(KEY_LIKED_PLAYLISTS, _likedPlaylists.value.map { it.toString() }.toSet())
     }
 
     /** Long enough to swallow a run of likes, short enough that nobody could close the app inside it. */
     private const val SAVE_COALESCE_MS = 1_000L
 
-    private fun loadFromPrefs() {
-        val json = prefs.getString(KEY_LIKED_TRACKS, null)
-        if (json != null) {
-            try {
+    private fun loadFromDb() {
+        // One-time migration. The library used to be one JSON string in the preferences map; it
+        // moves to the table here and the prefs key goes, because leaving it would keep the
+        // several-megabyte string resident in that map for the whole process (RAM, issue #33).
+        // Reading it once on the startup path costs the same parse the old load did.
+        val legacyJson = prefs.getString(KEY_LIKED_TRACKS, null)
+        val loaded: List<Track> = if (legacyJson != null) {
+            val parsed: List<Track> = try {
                 val type: Type = object : TypeToken<List<Track>>() {}.type
-                val loadedList: List<Track> = gson.fromJson(json, type) ?: emptyList()
-
-                val now = System.currentTimeMillis()
-                val maxAllowedTime = now + 86_400_000L
-                val migratedList = loadedList.mapIndexed { index, track ->
-                    val validLikedAt = track.likedAt?.takeIf { it in 1..maxAllowedTime }
-                    if (validLikedAt == null) {
-                        track.copy(likedAt = now - (index * 1000))
-                    } else {
-                        track.copy(likedAt = validLikedAt)
-                    }
-                }
-
-                val blacklist = getBlacklist()
-                _likedTracks.value = migratedList.filter { !blacklist.contains(it.id) }
+                gson.fromJson(legacyJson, type) ?: emptyList()
             } catch (e: Exception) {
-                _likedTracks.value = emptyList()
+                emptyList()
+            }
+            prefs.remove(KEY_LIKED_TRACKS)
+            runCatching { kotlinx.coroutines.runBlocking { likeDao.replaceAll(parsed) } }
+            parsed
+        } else {
+            kotlinx.coroutines.runBlocking { likeDao.loadAll() }
+        }
+
+        val now = System.currentTimeMillis()
+        val maxAllowedTime = now + 86_400_000L
+        val migratedList = loaded.mapIndexed { index, track ->
+            val validLikedAt = track.likedAt?.takeIf { it in 1..maxAllowedTime }
+            if (validLikedAt == null) {
+                track.copy(likedAt = now - (index * 1000))
+            } else {
+                track.copy(likedAt = validLikedAt)
             }
         }
+
+        val blacklist = getBlacklist()
+        _likedTracks.value = migratedList.filter { !blacklist.contains(it.id) }
 
         val savedPlaylistIds = getStringSet(KEY_LIKED_PLAYLISTS).mapNotNull { it.toLongOrNull() }.toSet()
         _likedPlaylists.value = savedPlaylistIds

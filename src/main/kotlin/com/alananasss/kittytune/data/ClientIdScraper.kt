@@ -15,8 +15,9 @@ import java.util.concurrent.TimeUnit
  */
 object ClientIdScraper {
 
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this scraper's own.
     private val baseClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .followRedirects(true)

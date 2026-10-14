@@ -45,8 +45,9 @@ object AppleMusicClient {
     /** One scrape at a time: a cold start fires several searches at once and they would all scrape. */
     private val tokenLock = Mutex()
 
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this client's own.
     private val baseClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .followRedirects(true)

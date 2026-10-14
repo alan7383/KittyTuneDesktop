@@ -17,8 +17,9 @@ import kotlin.coroutines.resumeWithException
 import com.alananasss.kittytune.data.lyrics.parsers.QRCParser
 
 object MegalobizClient {
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this client's own.
     private val client by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .callTimeout(8, TimeUnit.SECONDS)
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)

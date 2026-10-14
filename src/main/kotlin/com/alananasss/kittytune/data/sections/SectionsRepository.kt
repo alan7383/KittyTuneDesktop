@@ -50,8 +50,9 @@ object SectionsRepository {
 
     private const val HOST = "https://api-mobile.soundcloud.com"
 
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this repository's own.
     private val baseClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
             .build()

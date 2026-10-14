@@ -70,7 +70,8 @@ private const val REDIRECT_URI = "sc://auth"
 private const val AUTH_API_BASE = "https://api-auth.soundcloud.com"
 
 private val baseAuthHttpClient by lazy {
-    OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this screen's own.
+    com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)

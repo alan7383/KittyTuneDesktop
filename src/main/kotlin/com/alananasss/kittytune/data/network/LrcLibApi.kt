@@ -50,8 +50,9 @@ interface LrcLibApiService {
 object LrcLibClient {
     private const val BASE_URL = "https://lrclib.net/api/"
 
+    // Shares ProxyManager's pool and dispatcher; the User-Agent interceptor is this API's own.
     private val baseHttpClient by lazy {
-        okhttp3.OkHttpClient.Builder()
+        ProxyManager.getOkHttpClient().newBuilder()
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
                     .header("User-Agent", "KittyTuneWindows/1.0 (https://github.com/alan7383/KittyTuneDesktop)")

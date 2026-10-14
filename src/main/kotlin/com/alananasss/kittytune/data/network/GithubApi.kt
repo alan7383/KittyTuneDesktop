@@ -43,8 +43,9 @@ object GithubClient {
         chain.proceed(request)
     }
 
+    // Shares ProxyManager's pool and dispatcher; the auth interceptor is this API's own.
     private val baseOkHttpClient by lazy {
-        OkHttpClient.Builder()
+        ProxyManager.getOkHttpClient().newBuilder()
             .addInterceptor(authInterceptor)
             .build()
     }

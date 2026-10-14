@@ -12,8 +12,9 @@ import kotlin.math.min
 
 object ArtworkPalette {
 
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this module's own.
     private val httpClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(5, TimeUnit.SECONDS)
             .build()

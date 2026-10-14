@@ -60,8 +60,9 @@ object SessionManager {
     private val apiRefreshLock = Any()
     private var pendingApiRefresh: CompletableDeferred<String?>? = null
 
+    // Shares ProxyManager's pool and dispatcher; the cookie jar is this session's own.
     private val baseAuthClient by lazy {
-        OkHttpClient.Builder()
+        com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)

@@ -52,12 +52,14 @@ object AppleMusicCanvasProvider {
     @Volatile private var cachedToken: String? = null
     @Volatile private var tokenFetchedAt: Long = 0L
 
-    private val http = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this provider's own.
+    private val http = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
-    private val tokenHttp = OkHttpClient.Builder()
+    // Shares ProxyManager's pool and dispatcher; only the timeouts are this provider's own.
+    private val tokenHttp = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()

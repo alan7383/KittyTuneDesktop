@@ -22,11 +22,14 @@ object ImageLoaderFactory {
                 add(OkHttpNetworkFetcherFactory(callFactory = { okHttp }))
             }
             // Decoded bitmaps are Skia memory, outside the Java heap and invisible to -Xmx, and the
-            // GPU keeps its own texture copy of whatever is on screen. 64 MB still holds several
-            // screens of covers; anything evicted comes back from the disk cache below in a few ms.
+            // GPU keeps its own texture copy of whatever is on screen. 32 MB still holds a couple of
+            // screens of covers — enough that scrolling back a page is a cache hit while the
+            // footprint stays flat — and anything evicted comes back from the disk cache below in a
+            // few ms (RAM target, issue #33). It was 64 MB, which for the same working set simply
+            // kept twice as many covers resident in native memory.
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizeBytes(64L * 1024 * 1024)
+                    .maxSizeBytes(32L * 1024 * 1024)
                     .build()
             }
             .diskCache {
