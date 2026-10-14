@@ -20,6 +20,20 @@ object AppDatabase {
     private val dbFile = File(AppDirs.dataDir, "soundtune_db.sqlite")
     private lateinit var conn: Connection
 
+    /**
+     * One thread for the one shared connection. Every statement and transaction below
+     * runs here, so an [execBatch]/[execTogether] transaction can never interleave with
+     * another write on another IO thread: previously a concurrent exec could commit the
+     * batch's half-applied rows, or land inside the transaction and be rolled back with
+     * it (lost likes, issue #33). Reads keep their cache-first path and stay cheap.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    private val dbDispatcher = Dispatchers.IO.limitedParallelism(1)
+
+    /** Raw-connection access point for callers outside the helpers (e.g. loudness repo):
+     * hop onto the same single thread so autoCommit toggling stays race-free. */
+    internal suspend fun <T> withDb(block: () -> T): T = withContext(dbDispatcher) { block() }
+
     private val invalidation = MutableStateFlow(0L)
 
     private fun invalidate() {
@@ -188,7 +202,7 @@ object AppDatabase {
 
 
     internal suspend fun <T> query(sql: String, vararg args: Any?, mapper: (ResultSet) -> T): List<T> =
-        withContext(Dispatchers.IO) {
+        withContext(dbDispatcher) {
             conn.prepareStatement(sql).use { ps ->
                 bind(ps, args)
                 ps.executeQuery().use { rs ->
@@ -200,7 +214,7 @@ object AppDatabase {
     internal suspend fun <T> queryOne(sql: String, vararg args: Any?, mapper: (ResultSet) -> T): T? =
         query(sql, *args, mapper = mapper).firstOrNull()
 
-    internal suspend fun exec(sql: String, vararg args: Any?) = withContext(Dispatchers.IO) {
+    internal suspend fun exec(sql: String, vararg args: Any?) = withContext(dbDispatcher) {
         conn.prepareStatement(sql).use { ps ->
             bind(ps, args)
             ps.executeUpdate()
@@ -216,17 +230,17 @@ object AppDatabase {
      * and thousands of cache invalidations, each waking every screen watching the database. Here it is one
      * of each (issue #33).
      *
-     * The transaction is on the one shared connection, so a write issued from elsewhere during these few
-     * milliseconds joins it and would be rolled back with it. That is worth stating rather than hiding, and
-     * it is an acceptable trade here: the only way this rolls back is a failing disk, and the alternative —
-     * a commit per row — is the cost this exists to remove.
+     * The transaction runs on the one shared connection, on the single [dbDispatcher] thread —
+     * a write issued from elsewhere now queues behind it instead of joining it, so nothing can
+     * be rolled back with it that did not ask to be. The only way this rolls back is a failing
+     * disk, and the alternative — a commit per row — is the cost this exists to remove.
      *
      * @return how many rows the statement actually changed. With `INSERT OR IGNORE` a duplicate reports
      *   zero, so this is the count of genuinely new rows and no separate counting query is needed.
      */
     internal suspend fun execBatch(sql: String, rows: List<Array<out Any?>>): Int {
         if (rows.isEmpty()) return 0
-        val changed = withContext(Dispatchers.IO) {
+        val changed = withContext(dbDispatcher) {
             val previousAutoCommit = conn.autoCommit
             conn.autoCommit = false
             try {
@@ -252,7 +266,7 @@ object AppDatabase {
         return changed
     }
 
-    internal suspend fun execSilent(sql: String, vararg args: Any?) = withContext(Dispatchers.IO) {
+    internal suspend fun execSilent(sql: String, vararg args: Any?) = withContext(dbDispatcher) {
         conn.prepareStatement(sql).use { ps ->
             bind(ps, args)
             ps.executeUpdate()
@@ -267,11 +281,12 @@ object AppDatabase {
      * its own commit and its own invalidation, so a crash between them would leave the table one row
      * over the cap, and every screen watching the database would recompute twice for one keystroke.
      *
-     * The transaction is on the one shared connection, as [execBatch]'s is, with the same trade.
+     * The transaction runs on the one shared connection, on the single [dbDispatcher] thread, with
+     * the same guarantees as [execBatch].
      */
     internal suspend fun execTogether(vararg statements: Pair<String, Array<out Any?>>) {
         if (statements.isEmpty()) return
-        withContext(Dispatchers.IO) {
+        withContext(dbDispatcher) {
             val previousAutoCommit = conn.autoCommit
             conn.autoCommit = false
             try {

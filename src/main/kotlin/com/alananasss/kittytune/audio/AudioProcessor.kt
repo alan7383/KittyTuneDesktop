@@ -20,6 +20,14 @@ interface AudioProcessor {
     fun queueInput(input: ByteBuffer)
     fun getOutput(): ByteBuffer
     fun flush()
+
+    /**
+     * Frees everything [configure] allocated. Terminal: the owning engine is being
+     * discarded, so unlike [flush] the processor is not expected to run again.
+     * Without this, every crossfaded engine leaked its native DSP handle
+     * (~0.4 MB of ebur128 + work buffers each, issue #66 RAM drift).
+     */
+    fun reset()
 }
 
 /**
@@ -48,6 +56,12 @@ abstract class BaseAudioProcessor : AudioProcessor {
     final override fun flush() {
         outputBuffer = EMPTY
         onFlush()
+    }
+
+    final override fun reset() {
+        outputBuffer = EMPTY
+        buffer = EMPTY
+        onReset()
     }
 
     /** Allocates (or reuses) a little-endian output buffer of [size] bytes. */

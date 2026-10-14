@@ -411,6 +411,18 @@ class Player {
         val targetTrackId = item.track?.id
         val isAdopted = prebufferedTransition != null && prebufferedTransition?.trackId == targetTrackId
         val pre = if (isAdopted) prebufferedTransition else null
+        if (!isAdopted) {
+            // Skip during crossfade: the prebuffered engine was warmed up for a
+            // different track. Dropping the reference alone keeps its decoder, line
+            // and DSP state alive until GC (which never frees the native DSP handle) —
+            // stop+release it explicitly instead (issue #33 RAM drift).
+            prebufferedTransition?.let { pb ->
+                try {
+                    pb.engine.stop()
+                    pb.engine.release()
+                } catch (_: Exception) {}
+            }
+        }
         prebufferedTransition = null
 
         val newEngine = pre?.engine ?: AudioEngine()
