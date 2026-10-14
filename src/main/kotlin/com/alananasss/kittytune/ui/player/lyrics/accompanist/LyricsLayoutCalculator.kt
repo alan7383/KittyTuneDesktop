@@ -128,6 +128,7 @@ fun measureSyllablesAndDetermineAnimation(
     spaceWidth: Float
 ): List<SyllableLayout> {
     val words = groupIntoWords(syllables)
+    val isUntimedLine = syllables.size > 1 && syllables.all { it.start == syllables.first().start }
     val fastCharAnimationThresholdMs = 200f
 
     return words.flatMapIndexed { wordIndex, word ->
@@ -140,7 +141,8 @@ fun measureSyllablesAndDetermineAnimation(
         }
 
         val useAwesomeAnimation =
-            perCharDuration > fastCharAnimationThresholdMs && wordDuration >= 1000
+            !isUntimedLine
+                    && perCharDuration > fastCharAnimationThresholdMs && wordDuration >= 1000
                     && !wordContent.shouldUseSimpleAnimation()
                     && !isAccompanimentLine
 

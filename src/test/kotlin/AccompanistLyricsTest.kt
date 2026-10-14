@@ -280,6 +280,53 @@ class AccompanistLyricsTest {
             )
         }
     }
+
+    @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
+    @Test
+    fun testDuetLineSyncedSyllablesDoNotTriggerAwesomeAnimation() {
+        androidx.compose.ui.platform.registerSkikoComposeImplementation()
+        val density = androidx.compose.ui.unit.Density(1f)
+        val resolver = androidx.compose.ui.text.font.createFontFamilyResolver()
+        val measurer = androidx.compose.ui.text.TextMeasurer(resolver, density, androidx.compose.ui.unit.LayoutDirection.Ltr)
+        val style = com.alananasss.kittytune.ui.theme.Typography.titleMedium.copy(
+            fontSize = androidx.compose.ui.unit.TextUnit(28f, androidx.compose.ui.unit.TextUnitType.Sp)
+        )
+
+        val line = com.alananasss.kittytune.ui.player.lyrics.LyricLine(
+            text = "Чтобы закончить наше с тобой свидание утром",
+            startTime = 1000L,
+            endTime = 5000L,
+            singer = com.alananasss.kittytune.ui.player.lyrics.LyricSinger.SINGER_2
+        )
+
+        val duetLyrics = com.alananasss.kittytune.ui.player.lyrics.buildSyncedLyrics(
+            listOf(line),
+            isWordSynced = false,
+            isDuetEnabled = true
+        )
+
+        val mainLine = duetLyrics.lines[0] as KaraokeLine.MainKaraokeLine
+        assertEquals(KaraokeAlignment.End, mainLine.alignment)
+
+        val layouts = com.alananasss.kittytune.ui.player.lyrics.accompanist.measureSyllablesAndDetermineAnimation(
+            syllables = mainLine.syllables,
+            textMeasurer = measurer,
+            style = style,
+            phoneticStyle = style,
+            isAccompanimentLine = false,
+            spaceWidth = measurer.measure(" ", style).size.width.toFloat()
+        )
+
+        // None of the line-synced syllables should trigger character-level awesome animation!
+        for (layout in layouts) {
+            kotlin.test.assertFalse(
+                layout.useAwesomeAnimation,
+                "Syllable '${layout.syllable.content}' should not have useAwesomeAnimation enabled"
+            )
+            kotlin.test.assertNull(layout.charLayouts)
+            kotlin.test.assertNull(layout.charOriginalBounds)
+        }
+    }
 }
 
 

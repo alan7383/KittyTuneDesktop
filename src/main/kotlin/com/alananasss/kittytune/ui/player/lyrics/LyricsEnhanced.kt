@@ -512,7 +512,7 @@ fun buildSyncedLyrics(
                         // break anywhere, and a long right-aligned line ran off the left edge (issue #66).
                         isRightDuet && backing == null -> buildWrappingKaraokeSyllables(
                             content = cleanText,
-                            romanizedText = "",
+                            romanizedText = entry.romanization ?: "",
                             start = lineStart,
                             end = lineEnd,
                         )
@@ -591,11 +591,12 @@ private fun buildWrappingKaraokeSyllables(
         }
     }
 
+    val syllableEnd = (start + 1).coerceAtMost(end)
     return contentUnits.mapIndexed { index, unit ->
         KaraokeSyllable(
             content = unit,
             start = start,
-            end = end,
+            end = syllableEnd,
             phonetic = phoneticsByUnit[index]
         )
     }

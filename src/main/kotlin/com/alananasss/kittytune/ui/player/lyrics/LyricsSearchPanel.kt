@@ -195,7 +195,8 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         showsArrows = false,
-        modifier = Modifier.fillMaxWidth().fadedHorizontalEdges(rowState),
+        fadeLength = 28.dp,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         item(key = ManualLyricsSearch.ALL) {
             SourceChip(
@@ -216,26 +217,6 @@ private fun SourceChips(viewModel: PlayerViewModel, onPick: (String) -> Unit) {
     }
 }
 
-/** Fades the row out over its last 28 dp on each side that still has something beyond it. */
-private fun Modifier.fadedHorizontalEdges(state: androidx.compose.foundation.lazy.LazyListState): Modifier =
-    graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            val fade = 28.dp.toPx().coerceAtMost(size.width / 4)
-            val start = fade / size.width
-            if (state.canScrollBackward) {
-                drawRect(
-                    Brush.horizontalGradient(0f to Color.Transparent, start to Color.Black, startX = 0f, endX = size.width),
-                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                )
-            }
-            if (state.canScrollForward) {
-                drawRect(
-                    Brush.horizontalGradient(1f - start to Color.Black, 1f to Color.Transparent, startX = 0f, endX = size.width),
-                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
-                )
-            }
-        }
 
 @Composable
 private fun SourceChip(label: String, selected: Boolean, searching: Boolean, onClick: () -> Unit) {
