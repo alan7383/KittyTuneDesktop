@@ -412,7 +412,8 @@ import kotlin.math.roundToInt
 
         // Interpolated between the player's four-per-second reports so the word fill moves per frame.
         // Shared with the panel, which needs exactly the same thing for exactly the same reason
-        // (issue #33) — see [rememberSmoothPosition] for why the estimate is bounded.
+        // (issue #33) — see [rememberSmoothPosition] for why the estimate is bounded, and for why
+        // the State is handed on rather than read here.
         val smoothDrawPosition = rememberSmoothPosition(
             positionMs = currentPosition,
             isPlaying = viewModel.isPlaying,
@@ -574,8 +575,10 @@ import kotlin.math.roundToInt
                         LyricLineText(
                             line = line,
                             isActive = isActive,
-                            // Interpolated, so the fill moves per frame rather than per report.
-                            positionMs = smoothDrawPosition + viewModel.lyricsOffset,
+                            // Interpolated, so the fill moves per frame rather than per report — and
+                            // read inside the fill's draw phase, so that per-frame motion redraws
+                            // the line instead of recomposing it.
+                            positionMs = { smoothDrawPosition.value + viewModel.lyricsOffset },
                             wordSync = viewModel.isWordSyncEnabled,
                             fillEffect = viewModel.isAppleMusicEffectEnabled,
                             activeStyle = lineFont.copy(fontWeight = FontWeight.ExtraBold),

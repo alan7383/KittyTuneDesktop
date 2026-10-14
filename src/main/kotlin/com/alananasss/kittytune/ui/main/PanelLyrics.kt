@@ -209,12 +209,14 @@ private fun PanelSyncedLyrics(
         val focusIndex = rememberFocusLine(listState, activeIndex, readingByHand)
 
         // Interpolated between the player's four-per-second reports, so the word fill in the panel is as
-        // smooth as it is on the full screen instead of stepping (issue #33).
+        // smooth as it is on the full screen instead of stepping (issue #33). The State is read inside
+        // the line's draw phase and in the derived active index — never here, where reading it would
+        // recompose the whole panel at the frame rate.
         val smoothPosition = rememberSmoothPosition(
             positionMs = vm.currentPosition,
             isPlaying = vm.isPlaying,
             speed = vm.effectsState.speed,
-        ) + vm.lyricsOffset
+        )
 
         LazyColumn(
             Modifier.fillMaxSize().revealWhenPlaced(listState, activeIndex, contentKey = lines.size to lines.firstOrNull()?.startTime).stopAtLastLine(listState),
@@ -238,7 +240,7 @@ private fun PanelSyncedLyrics(
                     distance = if (focusIndex < 0) 0 else index - focusIndex,
                     isSung = index == activeIndex,
                     isReadingByHand = readingByHand,
-                    positionMs = smoothPosition,
+                    positionMs = { smoothPosition.value + vm.lyricsOffset },
                     // Shared with the full screen, which had its own copy of this and got it
                     // differently wrong — see [LyricsUtils.seekTargetFor] for what the clamp does
                     // with a duration that is not known yet and with a line past the end.
@@ -272,7 +274,7 @@ private fun PanelLyricLine(
     distance: Int,
     isSung: Boolean,
     isReadingByHand: Boolean,
-    positionMs: Float,
+    positionMs: () -> Float,
     onClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme

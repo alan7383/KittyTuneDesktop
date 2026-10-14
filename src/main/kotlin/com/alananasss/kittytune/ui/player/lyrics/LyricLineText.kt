@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -132,8 +134,10 @@ internal object LyricLineStyling {
  * The panel used to have only the third, whatever the setting said. It now shares all three with the full
  * screen, which is the only way "highlight the lyrics word by word" can mean the same thing in both.
  *
- * @param positionMs the playback position the drawing should reflect, already adjusted by the user's offset.
- *   A float because the position is interpolated between progress ticks to keep the fill smooth.
+ * @param positionMs supplies the playback position the drawing should reflect, already adjusted by
+ *   the user's offset. A provider rather than a value so the per-frame interpolation is read where
+ *   it lands — in the draw phase for the fill, in a derived state for the word colouring — instead
+ *   of recomposing this whole composable sixty times a second.
  * @param inactiveColor a line that is not the current one.
  * @param unsungColor the part of the *current* line that has not been reached yet. A separate colour because
  *   it is a separate thing: text waiting its turn inside the line being sung, not a line out of focus.
@@ -144,7 +148,7 @@ internal object LyricLineStyling {
 internal fun LyricLineText(
     line: LyricLine,
     isActive: Boolean,
-    positionMs: Float,
+    positionMs: () -> Float,
     wordSync: Boolean,
     fillEffect: Boolean,
     activeStyle: TextStyle,
@@ -179,11 +183,18 @@ internal fun LyricLineText(
     val text = remember(words) { words.joinToString("") { it.text } }
 
     if (!fillEffect) {
-        val coloured = buildAnnotatedString {
-            for (word in words) {
-                val reached = positionMs >= word.startTime
-                withStyle(SpanStyle(color = if (reached) activeColor else unsungColor)) {
-                    append(word.text)
+        // Derived rather than built during composition: the string only differs from the previous
+        // one when a word flips from unsung to sung, so this recomposes on word boundaries instead
+        // of every frame.
+        val coloured by remember(words, activeColor, unsungColor, positionMs) {
+            derivedStateOf {
+                buildAnnotatedString {
+                    for (word in words) {
+                        val reached = positionMs() >= word.startTime
+                        withStyle(SpanStyle(color = if (reached) activeColor else unsungColor)) {
+                            append(word.text)
+                        }
+                    }
                 }
             }
         }
@@ -228,11 +239,13 @@ internal fun LyricLineText(
             textAlign = textAlign,
             modifier = fullWidth.drawWithContent {
                 val result = layout ?: return@drawWithContent
-                // Clamped to this line's own end so the fill can only ever complete, never overrun and
-                // then snap back when the next line takes over.
+                // Read here, in the draw phase: the frame-clock state write invalidates the draw
+                // only, not the composition. Clamped to this line's own end so the fill can only
+                // ever complete, never overrun and then snap back when the next line takes over.
+                val rawPosition = positionMs()
                 val position =
-                    if (line.endTime > line.startTime) positionMs.coerceAtMost(line.endTime.toFloat())
-                    else positionMs
+                    if (line.endTime > line.startTime) rawPosition.coerceAtMost(line.endTime.toFloat())
+                    else rawPosition
                 val region = sungRegion(result, words, ranges, text.length, position)
                 // The bright copy is drawn in a layer and the part not sung yet rubbed out of it, with the playhead's
                 // edge fading instead of cut straight: the same soft fill the full screen's karaoke has.
@@ -330,17 +343,22 @@ private const val SOFT_EDGE_EMS = 1.6f
  * when the real position finally arrived — reported as "one line goes straight to the end and jumps around".
  *
  * Shared so the panel's fill is as smooth as the full screen's rather than stepping four times a second.
+ *
+ * Returns the raw State on purpose: read it where it is used — inside a draw lambda (redraw only) or a
+ * [derivedStateOf] (recomposition only when the derived value changes) — never straight into a composition.
+ * The old Float-returning signature forced every caller to read the per-frame value during composition,
+ * which recomposed the visible lyric lines and the mini-player at 60 fps for the whole song.
  */
 @Composable
 internal fun rememberSmoothPosition(
     positionMs: Long,
     isPlaying: Boolean,
     speed: Float,
-): Float {
-    var smooth by remember { mutableFloatStateOf(positionMs.toFloat()) }
+): State<Float> {
+    val smooth = remember { mutableFloatStateOf(positionMs.toFloat()) }
     LaunchedEffect(positionMs, isPlaying, speed) {
         if (!isPlaying) {
-            smooth = positionMs.toFloat()
+            smooth.floatValue = positionMs.toFloat()
             return@LaunchedEffect
         }
         val startedAtMs = System.currentTimeMillis()
@@ -348,7 +366,7 @@ internal fun rememberSmoothPosition(
         while (isActive) {
             withFrameMillis {
                 val elapsed = (System.currentTimeMillis() - startedAtMs).coerceAtMost(MAX_EXTRAPOLATION_MS)
-                smooth = startedAt + (elapsed * speed)
+                smooth.floatValue = startedAt + (elapsed * speed)
             }
         }
     }
