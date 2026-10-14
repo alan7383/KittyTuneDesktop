@@ -1,0 +1,50 @@
+# ProGuard rules for KittyTune Desktop
+-dontobfuscate
+-dontoptimize
+
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,Exceptions
+
+# Application entry point & all application classes
+-keep class com.alananasss.kittytune.MainKt { *; }
+-keep class com.alananasss.kittytune.** { *; }
+-keep class com.my.kizzy.** { *; }
+-keep class com.alananasss.shazamkit.** { *; }
+-keep class com.zhuang.innertube.** { *; }
+
+# Compose Multiplatform & Skiko
+-keep class androidx.compose.ui.** { *; }
+-keep class androidx.compose.runtime.** { *; }
+-keep class androidx.compose.animation.** { *; }
+-keep class androidx.compose.foundation.** { *; }
+-keep class !androidx.compose.material.icons.**,androidx.compose.material.** { *; }
+-keep class androidx.compose.material3.** { *; }
+# Allow unused icons in material-icons-extended to be pruned:
+-keep class androidx.compose.material.icons.Icons** { *; }
+-keep class org.jetbrains.compose.** { *; }
+-keep class org.jetbrains.skiko.** { *; }
+-keep class org.jetbrains.skia.** { *; }
+
+# Native bridges & JNI (JavaCPP, FFmpeg, ONNX, TFLite, SQLite, JNA, DBus, JNR)
+-keep class org.bytedeco.** { *; }
+-keep class ai.onnxruntime.** { *; }
+-keep class org.sqlite.** { *; }
+-keep class com.sun.jna.** { *; }
+-keep class jnr.** { *; }
+-keep class com.github.hypfvieh.** { *; }
+-keep class org.freedesktop.dbus.** { *; }
+
+# Networking, Serialization, Media
+-keep class okhttp3.** { *; }
+-keep class retrofit2.** { *; }
+-keep class io.ktor.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class kotlinx.serialization.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-keep class io.coil-kt.** { *; }
+-keep class coil3.** { *; }
+-keep class io.github.alexzhirkevich.compottie.** { *; }
+-keep class net.jthink.jaudiotagger.** { *; }
+-keep class com.mpatric.mp3agic.** { *; }
+-keep class org.schabi.newpipe.extractor.** { *; }
+
+-dontwarn **

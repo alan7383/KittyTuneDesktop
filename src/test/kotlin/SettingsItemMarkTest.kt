@@ -20,7 +20,7 @@ class SettingsItemMarkTest {
     private fun components(): String {
         val file = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt")
         assertTrue(file.exists(), "SettingsComponents.kt should exist")
-        return file.readText()
+        return file.readText().replace("\r\n", "\n")
     }
 
     private fun settingsItem(): String {

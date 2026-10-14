@@ -734,17 +734,20 @@ internal fun ArtistMixCard(mix: ArtistMix, accentIndex: Int = 0, onPlay: (List<T
     val scope = rememberCoroutineScope()
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val cardShape = RoundedCornerShape(12.dp)
 
     Column(Modifier.width(MIX_CARD_SIZE)) {
         Box(
             modifier = Modifier
                 .size(MIX_CARD_SIZE)
                 .pressScale(interaction)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Brush.linearGradient(listOf(mid, deep)))
-                .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                .clip(cardShape)
+                .background(deep)
                 .hoverable(interaction)
-                .clickable(interactionSource = interaction, indication = androidx.compose.material3.ripple()) {
+                .clickable(
+                    interactionSource = interaction,
+                    indication = androidx.compose.material3.ripple(color = Color.White.copy(alpha = 0.2f), bounded = true),
+                ) {
                     if (isLoading) return@clickable
                     scope.launch {
                         isLoading = true
@@ -785,56 +788,83 @@ internal fun ArtistMixCard(mix: ArtistMix, accentIndex: Int = 0, onPlay: (List<T
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
-                        0f to accent.copy(alpha = if (mix.imageUrl != null) 0.34f else 0f),
-                        0.45f to deep.copy(alpha = if (mix.imageUrl != null) 0.38f else 0f),
-                        1f to Color(0xFF08080B).copy(alpha = 0.88f),
+                        0f to accent.copy(alpha = if (mix.imageUrl != null) 0.25f else 0f),
+                        0.45f to deep.copy(alpha = if (mix.imageUrl != null) 0.35f else 0f),
+                        1f to Color(0xFF08080B).copy(alpha = 0.90f),
                     )
                 )
             )
+
+            // Top-left frosted icon badge
             Box(
-                Modifier
-                    .padding(12.dp)
-                    .size(30.dp)
+                modifier = Modifier
+                    .padding(10.dp)
+                    .size(28.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.16f)),
+                    .background(Color.Black.copy(alpha = 0.45f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(mix.icon, null, tint = Color.White, modifier = Modifier.size(17.dp))
+                Icon(mix.icon, null, tint = Color.White, modifier = Modifier.size(15.dp))
             }
-            Text(
-                mix.label,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Black,
-                color = Color.White,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.BottomStart).padding(start = 14.dp, bottom = 14.dp, end = 58.dp),
-            )
-            androidx.compose.animation.AnimatedVisibility(
-                visible = hovered || isLoading,
-                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.7f),
-                exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.7f),
-                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
-            ) {
-                Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(Color.White),
-                    contentAlignment = Alignment.Center,
+
+                // Category / mix title on cover: bold, stylish, and sized to preserve word integrity
+                Text(
+                    text = mix.label,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.4.sp,
+                        lineHeight = 18.sp,
+                    ),
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                )
+
+                // Hover play button: smoothly animated and elevated
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = hovered || isLoading,
+                    enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.8f),
+                    exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.8f),
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp),
                 ) {
-                    if (isLoading) {
-                        ContainedLoadingIndicator(modifier = Modifier.size(34.dp))
-                    } else {
-                        Icon(Icons.Rounded.PlayArrow, null, tint = Color(0xFF101014), modifier = Modifier.size(26.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        shadowElevation = 6.dp,
+                        modifier = Modifier.size(38.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (isLoading) {
+                                ContainedLoadingIndicator(modifier = Modifier.size(24.dp))
+                            } else {
+                                Icon(
+                                    Icons.Rounded.PlayArrow,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
         Spacer(Modifier.height(8.dp))
-        Text(mix.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(
+            text = mix.title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
 private val HERO_HEIGHT = 380.dp
 private val AVATAR_SIZE = 132.dp
-private val MIX_CARD_SIZE = 168.dp
+private val MIX_CARD_SIZE = 152.dp
 private const val MIX_CARD_GLOW_X = 460f
 private const val MIX_CARD_GLOW_RADIUS = 520f

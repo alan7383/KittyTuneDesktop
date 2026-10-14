@@ -2267,7 +2267,6 @@
     <string name="sync_firewall_hint">Wenn das Smartphone diesen Computer immer noch nicht erreichen kann, erlaube eingehende Verbindungen auf Port %1$d in deiner Firewall.</string>
     <string name="sync_hide_code">Ausblenden</string>
     <string name="sync_pair_instructions">Öffne auf deinem Smartphone KittyTune → Einstellungen → Gerätesynchronisierung und scanne diesen Code.</string>
-    <string name="sync_paired_devices_sub">Diese Geräte synchronisieren sich selbstständig. Du koppelst sie nur einmal, selbst wenn sich ihre IP-Adresse ändert.</string>
     <string name="sync_regenerate_code">Neuen Code generieren (entkoppelt alle Geräte)</string>
     <string name="sync_show_code">Anzeigen</string>
     <string name="sync_waiting_for_device">Warte darauf, dass ein Gerät den Code scannt…</string>
@@ -2710,4 +2709,36 @@
     <string name="time_hours">%1$d Std.</string>
     <string name="time_minutes">%1$d Min.</string>
     <string name="time_seconds">%1$d Sek.</string>
+
+    <!-- Additional / newly localized UI strings -->
+    <string name="player_dismissed_message">Titel ausgeblendet</string>
+    <string name="karaoke_auto_separate_sub">Trennt Audio automatisch im Hintergrund, sobald die Wiedergabe startet oder neu startet, ohne manuellen Eingriff.</string>
+    <string name="karaoke_audio_track_id">Audiospur #%1$s</string>
+    <string name="karaoke_acapella_ready">Acapella bereit</string>
+    <string name="karaoke_auto_separate_playback_notice">Die Isolierung startet automatisch während der Wiedergabe</string>
+    <string name="karaoke_isolate_now">Jetzt isolieren</string>
+    <string name="karaoke_no_track_playing_notice">Kein Titel wird abgespielt · Starte die Wiedergabe, um Live-Acapella zu testen</string>
+    <string name="karaoke_enable_vocal_boost_title">Vocal Boost / Studio-Acapella aktivieren</string>
+    <string name="karaoke_effect_live_active">Live-Effekt aktiv</string>
+    <string name="karaoke_effect_disabled">Deaktiviert</string>
+    <string name="karaoke_pure_acapella_desc">Reines Studio-Acapella (100% Gesang · Instrumente stumm)</string>
+    <string name="karaoke_preparing_ai_isolation">KI-Isolierung wird vorbereitet…</string>
+    <string name="karaoke_ai_studio_active">KI-Studio-Acapella aktiv</string>
+    <string name="karaoke_pure_vocals_desc">Reiner Gesang isoliert · Instrumente stummgeschaltet</string>
+    <string name="karaoke_preparing_acapella">Acapella-Isolierung wird vorbereitet…</string>
+    <string name="karaoke_dsp_waiting_studio">Gesangsfilter aktiv während des Wartens auf Studio-Trennung</string>
+    <string name="karaoke_extracting_stems">HTDemucs Gesangsspuren werden extrahiert…</string>
+    <string name="karaoke_prep_audio">Audio wird vorbereitet…</string>
+    <string name="karaoke_decoding_audio">High-Fidelity-Audiodekodierung…</string>
+    <string name="karaoke_separating_neural_gpu">Neuronale Trennung (GPU)…</string>
+    <string name="karaoke_separating_neural_gpu_eco">Neuronale Trennung (Energiesparend)…</string>
+    <string name="karaoke_separating_neural_cpu">Neuronale Trennung (CPU)…</string>
+    <string name="karaoke_separating_gpu_pct">Neuronale Trennung (GPU): %1$d%%</string>
+    <string name="karaoke_separating_gpu_eco_pct">Neuronale Trennung (Energiesparend): %1$d%%</string>
+    <string name="karaoke_separating_chunk">Neuronale Trennung: Block %1$d/%2$d (%3$d%%)</string>
+    <string name="karaoke_saving_stems">Studio-Stems werden gespeichert…</string>
+    <string name="upload_drop_hint">Audiodatei hier ablegen, um zu beginnen</string>
+    <string name="upload_release_datetime">Veröffentlichungsdatum und -uhrzeit (UTC/Lokal)</string>
+    <string name="upload_discard_title">Nicht gespeicherte Änderungen verwerfen?</string>
+    <string name="upload_discard_message">Du hast die Trackdetails geändert. Wenn du jetzt gehst, werden deine Änderungen verworfen.</string>
 </resources>

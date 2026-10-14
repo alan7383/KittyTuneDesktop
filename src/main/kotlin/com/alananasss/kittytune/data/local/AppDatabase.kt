@@ -58,6 +58,8 @@ object AppDatabase {
             st.execute("PRAGMA foreign_keys=ON")
             st.execute("PRAGMA synchronous=NORMAL")
             st.execute("PRAGMA busy_timeout=5000")
+            st.execute("PRAGMA cache_size=-1000")
+            st.execute("PRAGMA mmap_size=0")
         }
         createSchema()
     }

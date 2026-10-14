@@ -2196,7 +2196,7 @@ private fun VocalRemoverDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit
                                         )
                                         Column {
                                             Text(
-                                                text = "Préparation de l'isolation IA...",
+                                                text = str("karaoke_preparing_ai_isolation"),
                                                 style = MaterialTheme.typography.titleSmall,
                                                 fontWeight = FontWeight.Medium,
                                             )
@@ -2447,7 +2447,7 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                                             )
                                             Column {
                                                 Text(
-                                                    text = sep.statusDetail ?: "Extraction des stems vocaux HTDemucs...",
+                                                    text = sep.statusDetail ?: str("karaoke_extracting_stems"),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
@@ -2473,13 +2473,13 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                                     )
                                     Column {
                                         Text(
-                                            text = "Studio Acapella IA actif",
+                                            text = str("karaoke_ai_studio_active"),
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         )
                                         Text(
-                                            text = "Voix pures isolées · Instruments coupés",
+                                            text = str("karaoke_pure_vocals_desc"),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                                         )
@@ -2537,12 +2537,12 @@ private fun VocalBoostDialog(viewModel: PlayerViewModel, onDismiss: () -> Unit) 
                                     )
                                     Column {
                                         Text(
-                                            text = "Préparation de l'isolation Acapella...",
+                                            text = str("karaoke_preparing_acapella"),
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Medium,
                                         )
                                         Text(
-                                            text = "Filtre vocal actif en attendant la séparation studio",
+                                            text = str("karaoke_dsp_waiting_studio"),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )

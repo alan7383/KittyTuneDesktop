@@ -471,10 +471,25 @@ fun ProfileScreen(
                     }
                 }
 
-                if (!isArtistPage && allTracks.isNotEmpty()) {
-                    item { ProfileSectionTitle(title = str("profile_latest_tracks"), showMore = true, onMoreClick = { onNavigate("profile_collection:${user.id}:tracks") }) }
-                    itemsIndexed(allTracks.take(5)) { index, track ->
-                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, allTracks, artistPlaybackContext, showPlays = true, showDate = false)
+                if (allTracks.isNotEmpty()) {
+                    item {
+                        if (isArtistPage) {
+                            ArtistSectionTitle(
+                                str("profile_tab_tracks"),
+                                onOpen = { onNavigate("profile_collection:${user.id}:tracks") },
+                                modifier = Modifier.padding(top = 16.dp)
+                            )
+                        } else {
+                            ProfileSectionTitle(
+                                title = str("profile_latest_tracks"),
+                                showMore = true,
+                                onMoreClick = { onNavigate("profile_collection:${user.id}:tracks") }
+                            )
+                        }
+                    }
+                    val tracksToShow = if (isArtistPage) allTracks.take(8) else allTracks.take(5)
+                    itemsIndexed(tracksToShow) { index, track ->
+                        ProfileTrackItem(track, index, playerViewModel, downloadProgress, allTracks, artistPlaybackContext, showPlays = true, showDate = true)
                     }
                 }
 
@@ -646,6 +661,7 @@ fun ProfileScreen(
                 // at the foot, not five reposted songs of other people between their music and the artists like them.
                 if (isArtistPage) {
                     val entries = listOfNotNull(
+                        profileViewModel.allTracks.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.MusicNote, str("profile_tab_tracks"), it, "tracks") },
                         profileViewModel.playlists.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.QueueMusic, str("artist_more_playlists"), it, "playlists") },
                         profileViewModel.likedTracks.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.FavoriteBorder, str("profile_tab_likes"), it, "likes") },
                         profileViewModel.repostedTracks.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.Repeat, str("profile_tab_reposts"), it, "reposts") },

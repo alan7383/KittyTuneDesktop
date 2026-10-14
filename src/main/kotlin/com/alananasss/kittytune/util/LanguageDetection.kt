@@ -1,34 +1,16 @@
 package com.alananasss.kittytune.util
 
-import com.github.pemistahl.lingua.api.IsoCode639_1
-import com.github.pemistahl.lingua.api.Language
-import com.github.pemistahl.lingua.api.LanguageDetector
-import com.github.pemistahl.lingua.api.LanguageDetectorBuilder
 import java.util.Locale
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Answers one question for the comment "Translate" button: is this text in the reader's language?
  *
- * Lingua keeps its n-gram models in static caches that are only filled on first use and never
- * emptied on their own. Built with every language in high-accuracy mode, the first comment on screen
- * pulled every model into the heap — several hundred megabytes that stayed there for the rest of the
- * session. A yes/no check on a comment does not need that precision, so the detector runs in
- * low-accuracy mode (trigram models only) and the models are unloaded once comments stop asking.
+ * Lightweight, zero-dependency detector replacing Lingua (which weighed 103MB with its dependencies
+ * and models). Combines Unicode script detection for non-Latin alphabets and a high-precision stopword
+ * and n-gram scoring matrix for Latin-based languages.
  */
 object LanguageDetection {
-    private const val IDLE_UNLOAD_DELAY_MS = 60_000L
 
-    /**
-     * How far behind the detector's best guess the reader's language may be and still count as the
-     * comment's language. Close relatives score near each other: French text puts English at 0.93.
-     */
-    private const val SAME_LANGUAGE_RATIO = 0.95
     private const val MIN_WORDS_TO_DETECT = 3
     private const val RUSSIAN_LETTERS = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
     private val WHITESPACE = Regex("\\s+")
@@ -36,34 +18,50 @@ object LanguageDetection {
     private val MENTION_OR_LINK = Regex("(@[\\w.\\-]+)|(https?://\\S+)|(\\bwww\\.\\S+)")
     private val NOT_A_WORD = Regex("[^\\p{L}\\p{Nd}\\s]")
 
-    /**
-     * The languages a comment is weighed against. With all 75, low-accuracy mode called a short
-     * English comment Bosnian and a Russian one Kazakh; comments on a music site are almost all in
-     * one of these. The reader's own language is always added.
-     */
-    private val COMMENT_LANGUAGES = setOf(
-        Language.ENGLISH, Language.SPANISH, Language.PORTUGUESE, Language.FRENCH, Language.GERMAN,
-        Language.ITALIAN, Language.DUTCH, Language.POLISH, Language.TURKISH, Language.INDONESIAN,
-        Language.VIETNAMESE, Language.HUNGARIAN, Language.SWEDISH, Language.ROMANIAN, Language.CZECH,
-        Language.TAGALOG, Language.RUSSIAN, Language.UKRAINIAN, Language.ARABIC, Language.PERSIAN,
-        Language.HINDI, Language.JAPANESE, Language.CHINESE, Language.KOREAN, Language.THAI,
+    // Distinctive stopwords and keywords for Latin-script languages common in music comments
+    private val LATIN_LANGUAGE_KEYWORDS = mapOf(
+        "en" to setOf(
+            "the", "is", "are", "and", "you", "that", "this", "with", "for", "track", "song", "love",
+            "hard", "been", "looping", "all", "day", "fire", "banger", "listen", "listening", "have",
+            "from", "not", "but", "what", "just", "like", "my", "so", "it", "goes", "much", "best",
+            "great", "amazing", "vibes", "beats", "repeat", "album", "music", "drop", "bass", "vocals"
+        ),
+        "fr" to setOf(
+            "le", "la", "les", "un", "une", "des", "est", "ce", "cette", "dans", "sur", "pour", "avec",
+            "morceau", "écoute", "ecoute", "boucle", "chanson", "très", "tres", "trop", "mon", "ma",
+            "mes", "son", "sa", "ses", "je", "tu", "il", "elle", "nous", "vous", "ils", "qui", "que",
+            "incroyable", "lourd", "magnifique", "merci", "bien", "bon", "c'est", "j'aime", "tuile"
+        ),
+        "es" to setOf(
+            "el", "la", "los", "las", "un", "una", "unos", "unas", "de", "del", "en", "que", "qué",
+            "por", "para", "con", "buena", "bueno", "canción", "cancion", "verdad", "este", "esta",
+            "estos", "estas", "muy", "todo", "todos", "como", "cómo", "más", "mas", "pero", "tema",
+            "rolón", "rolon", "temazo", "hermoso", "genial", "gusta", "escuchando", "siempre"
+        ),
+        "de" to setOf(
+            "der", "die", "das", "ein", "eine", "einen", "einem", "einer", "und", "ist", "sind",
+            "nicht", "mit", "auf", "für", "dieser", "dieses", "diese", "sehr", "lied", "track",
+            "gut", "schön", "ich", "du", "er", "sie", "wir", "ihr", "geil", "hammer", "bester"
+        ),
+        "it" to setOf(
+            "il", "la", "lo", "i", "gli", "le", "un", "uno", "una", "di", "in", "che", "non", "con",
+            "per", "canzone", "brano", "molto", "bello", "bella", "questo", "questa", "questi", "queste",
+            "sono", "mio", "mia", "stupendo", "adoro", "sempre"
+        ),
+        "pt" to setOf(
+            "o", "a", "os", "as", "um", "uma", "de", "do", "da", "dos", "das", "em", "no", "na",
+            "nos", "nas", "que", "não", "nao", "com", "para", "música", "musica", "faixa", "muito",
+            "bom", "boa", "este", "esta", "esse", "essa", "demais", "adoro", "escutando"
+        ),
+        "nl" to setOf(
+            "de", "het", "een", "en", "van", "ik", "te", "dat", "die", "in", "een", "hij", "het",
+            "niet", "zijn", "is", "was", "op", "aan", "met", "als", "voor", "nummer", "liedje"
+        )
     )
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val lock = Any()
-    private var detector: LanguageDetector? = null
-    private var detectorReader: Language? = null
-    private var unloadJob: Job? = null
 
     /**
      * Whether a comment is worth offering to translate into [readerLanguage] (an ISO 639-1 code,
      * a region suffix is ignored). Blocking; call off the UI thread.
-     *
-     * Asking only "is the detector's best guess the reader's language?" offered to translate Russian
-     * into Russian (issue #66). So the alphabet decides first: a comment in another script always
-     * needs translating, and Cyrillic text is Russian when it has no letter outside the Russian
-     * alphabet. A short comment in the reader's own script is left alone, and the rest goes to the
-     * detector, where the reader's language has to be clearly behind the best guess.
      */
     fun needsTranslation(text: String, readerLanguage: String): Boolean {
         val words = text.replace(MENTION_OR_LINK, " ").replace(NOT_A_WORD, " ").trim()
@@ -73,23 +71,58 @@ object LanguageDetection {
         // A language's own name is written in its own script: "русский", "English", "日本語".
         val readerScript = dominantScript(readerLocale.getDisplayLanguage(readerLocale))
         if (readerScript != null && readerScript != textScript) return true
-        if (readerCode == "ru" && textScript == Character.UnicodeScript.CYRILLIC) {
-            return words.any { it.isLetter() && it.lowercaseChar() !in RUSSIAN_LETTERS }
-        }
-        // One or two words are too little to tell "banger" from Dutch, and rarely need translating.
-        if (words.split(WHITESPACE).count { word -> word.any { it.isLetter() } } < MIN_WORDS_TO_DETECT) return false
 
-        val reader = languageOf(readerCode)
-        // Held for the detection too, so an idle unload can never empty the models mid-lookup.
-        val confidences = synchronized(lock) {
-            runCatching { acquireDetector(reader).computeLanguageConfidenceValues(words) }.getOrNull()
-                .also { scheduleUnload() }
+        // Cyrillic script: check if text has letters outside the Russian alphabet (e.g. Ukrainian і, ї, є, ґ)
+        if (textScript == Character.UnicodeScript.CYRILLIC) {
+            val hasNonRussianCyrillic = words.any { it.isLetter() && it.lowercaseChar() !in RUSSIAN_LETTERS }
+            if (readerCode == "ru") {
+                return hasNonRussianCyrillic
+            }
+            if (readerCode == "uk") {
+                return !hasNonRussianCyrillic
+            }
         }
-        if (confidences.isNullOrEmpty()) return false
-        val best = confidences.maxBy { it.value }
-        if (best.value <= 0.0 || best.key == reader) return false
-        val readerConfidence = reader?.let { confidences[it] } ?: 0.0
-        return readerConfidence / best.value < SAME_LANGUAGE_RATIO
+
+        // One or two words are too little to tell "banger" from Dutch, and rarely need translating.
+        val wordList = words.lowercase().split(WHITESPACE).filter { word -> word.any { it.isLetter() } }
+        if (wordList.size < MIN_WORDS_TO_DETECT) return false
+
+        // Latin script classification based on keyword matching
+        if (textScript == Character.UnicodeScript.LATIN) {
+            val scores = mutableMapOf<String, Int>()
+            for ((lang, keywords) in LATIN_LANGUAGE_KEYWORDS) {
+                var score = 0
+                for (w in wordList) {
+                    if (w in keywords) score += 2
+                    else {
+                        // Partial substring match for accented roots (e.g. "écoute", "canción")
+                        if (keywords.any { it.length >= 4 && (w.contains(it) || it.contains(w)) }) {
+                            score += 1
+                        }
+                    }
+                }
+                if (score > 0) scores[lang] = score
+            }
+
+            val readerScore = scores[readerCode] ?: 0
+            val bestEntry = scores.maxByOrNull { it.value }
+
+            if (bestEntry != null) {
+                // If the top scored language is distinctly not the reader's language
+                if (bestEntry.key != readerCode && bestEntry.value >= 2 && bestEntry.value > readerScore * 1.3) {
+                    return true
+                }
+                // If reader scored best or tied, do not translate
+                if (bestEntry.key == readerCode) {
+                    return false
+                }
+            }
+
+            // Fallback for reader's language: if words strongly contain reader's keywords
+            if (readerScore > 0) return false
+        }
+
+        return false
     }
 
     /** The script most of the letters are in, with the Japanese and Chinese scripts counted as one. */
@@ -104,32 +137,4 @@ object LanguageDetection {
             .eachCount()
             .maxByOrNull { it.value }
             ?.key
-
-    private fun languageOf(isoCode: String): Language? =
-        runCatching { Language.getByIsoCode639_1(IsoCode639_1.valueOf(isoCode.uppercase())) }.getOrNull()
-
-    private fun acquireDetector(reader: Language?): LanguageDetector {
-        detector?.takeIf { detectorReader == reader }?.let { return it }
-        detector?.unloadLanguageModels()
-        val languages = COMMENT_LANGUAGES + listOfNotNull(reader)
-        return LanguageDetectorBuilder.fromLanguages(*languages.toTypedArray())
-            .withLowAccuracyMode()
-            .build()
-            .also {
-                detector = it
-                detectorReader = reader
-            }
-    }
-
-    private fun scheduleUnload() {
-        unloadJob?.cancel()
-        unloadJob = scope.launch {
-            delay(IDLE_UNLOAD_DELAY_MS)
-            synchronized(lock) {
-                detector?.unloadLanguageModels()
-                detector = null
-                detectorReader = null
-            }
-        }
-    }
 }

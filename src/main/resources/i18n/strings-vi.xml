@@ -2128,7 +2128,6 @@
     <string name="sync_firewall_hint">Nếu điện thoại vẫn không thể kết nối tới máy tính này, hãy cho phép các kết nối đến trên cổng %1$d trong tường lửa (firewall).</string>
     <string name="sync_hide_code">Ẩn mã</string>
     <string name="sync_pair_instructions">Trên điện thoại, mở KittyTune → Cài đặt → Đồng bộ thiết bị, rồi quét mã này.</string>
-    <string name="sync_paired_devices_sub">Các thiết bị này sẽ tự động đồng bộ. Bạn chỉ cần ghép nối một lần, ngay cả khi địa chỉ mạng thay đổi.</string>
     <string name="sync_regenerate_code">Tạo mã mới (hủy ghép nối tất cả thiết bị)</string>
     <string name="sync_show_code">Hiện mã</string>
     <string name="sync_waiting_for_device">Đang chờ thiết bị quét mã…</string>
@@ -2571,4 +2570,36 @@
     <string name="time_hours">%1$d giờ</string>
     <string name="time_minutes">%1$d phút</string>
     <string name="time_seconds">%1$d giây</string>
+
+    <!-- Additional / newly localized UI strings -->
+    <string name="player_dismissed_message">Đã ẩn bài hát</string>
+    <string name="karaoke_auto_separate_sub">Tự động tách âm thanh trong nền ngay khi bắt đầu hoặc khởi động lại phát nhạc mà không cần thao tác thủ công.</string>
+    <string name="karaoke_audio_track_id">Bản nhạc âm thanh #%1$s</string>
+    <string name="karaoke_acapella_ready">Acapella đã sẵn sàng</string>
+    <string name="karaoke_auto_separate_playback_notice">Quá trình tách âm sẽ tự động bắt đầu khi phát nhạc</string>
+    <string name="karaoke_isolate_now">Tách âm ngay</string>
+    <string name="karaoke_no_track_playing_notice">Hiện không có bài hát nào đang phát · Hãy phát một bản nhạc để thử nghiệm acapella trực tiếp</string>
+    <string name="karaoke_enable_vocal_boost_title">Bật tăng cường giọng hát / Phòng thu Acapella</string>
+    <string name="karaoke_effect_live_active">Hiệu ứng trực tiếp đang bật</string>
+    <string name="karaoke_effect_disabled">Đã tắt</string>
+    <string name="karaoke_pure_acapella_desc">Phòng thu Acapella thuần túy (100% giọng hát · đã tắt nhạc cụ)</string>
+    <string name="karaoke_preparing_ai_isolation">Đang chuẩn bị tách âm bằng AI…</string>
+    <string name="karaoke_ai_studio_active">Phòng thu Acapella AI đang hoạt động</string>
+    <string name="karaoke_pure_vocals_desc">Giọng hát thuần khiết được tách riêng · Đã tắt nhạc cụ</string>
+    <string name="karaoke_preparing_acapella">Đang chuẩn bị tách acapella…</string>
+    <string name="karaoke_dsp_waiting_studio">Bộ lọc giọng hát đang hoạt động trong khi chờ tách phòng thu</string>
+    <string name="karaoke_extracting_stems">Đang trích xuất stem giọng hát HTDemucs…</string>
+    <string name="karaoke_prep_audio">Đang chuẩn bị âm thanh…</string>
+    <string name="karaoke_decoding_audio">Đang giải mã âm thanh chất lượng cao…</string>
+    <string name="karaoke_separating_neural_gpu">Tách âm nơ-ron (GPU)…</string>
+    <string name="karaoke_separating_neural_gpu_eco">Tách âm nơ-ron (Tiết kiệm điện)…</string>
+    <string name="karaoke_separating_neural_cpu">Tách âm nơ-ron (CPU)…</string>
+    <string name="karaoke_separating_gpu_pct">Tách âm nơ-ron (GPU): %1$d%%</string>
+    <string name="karaoke_separating_gpu_eco_pct">Tách âm nơ-ron (Tiết kiệm điện): %1$d%%</string>
+    <string name="karaoke_separating_chunk">Tách âm nơ-ron: phần %1$d/%2$d (%3$d%%)</string>
+    <string name="karaoke_saving_stems">Đang lưu stem phòng thu…</string>
+    <string name="upload_drop_hint">Kéo và thả tệp âm thanh để bắt đầu</string>
+    <string name="upload_release_datetime">Ngày &amp; giờ phát hành (UTC/Địa phương)</string>
+    <string name="upload_discard_title">Hủy các thay đổi chưa lưu?</string>
+    <string name="upload_discard_message">Bạn đã sửa đổi thông tin chi tiết của bài hát. Nếu thoát bây giờ, các thay đổi sẽ bị hủy.</string>
 </resources>

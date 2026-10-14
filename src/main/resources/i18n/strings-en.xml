@@ -1897,7 +1897,6 @@
     <string name="sync_unauthorized">It refused the code. Generate a new one on that device and paste it here.</string>
     <string name="sync_failed">Could not reach it: %1$s</string>
     <string name="sync_events_held">%1$d events in the log.</string>
-    <string name="sync_paired_devices_sub">These stay in step on their own. You only pair once, even if their address changes.</string>
     <string name="sync_forget_device">Forget</string>
     <string name="sync_all_done">Sync finished.</string>
     <string name="sync_firewall_hint">If the phone still cannot reach this computer, allow incoming connections on port %1$d in your firewall.</string>
@@ -2491,4 +2490,36 @@
     <string name="time_hours">%1$dh</string>
     <string name="time_minutes">%1$d min</string>
     <string name="time_seconds">%1$ds</string>
+
+    <!-- Additional / newly localized UI strings -->
+    <string name="player_dismissed_message">Track dismissed</string>
+    <string name="karaoke_auto_separate_sub">Automatically separates audio in the background as soon as playback starts or restarts, with no manual action needed.</string>
+    <string name="karaoke_audio_track_id">Audio track #%1$s</string>
+    <string name="karaoke_acapella_ready">Acapella Ready</string>
+    <string name="karaoke_auto_separate_playback_notice">Isolation starts automatically during playback</string>
+    <string name="karaoke_isolate_now">Isolate now</string>
+    <string name="karaoke_no_track_playing_notice">No track currently playing · Start playback to test live acapella</string>
+    <string name="karaoke_enable_vocal_boost_title">Enable Vocal Boost / Studio Acapella</string>
+    <string name="karaoke_effect_live_active">Live effect active</string>
+    <string name="karaoke_effect_disabled">Disabled</string>
+    <string name="karaoke_pure_acapella_desc">Pure Studio Acapella (100% vocals · instruments muted)</string>
+    <string name="karaoke_preparing_ai_isolation">Preparing AI isolation…</string>
+    <string name="karaoke_ai_studio_active">AI Studio Acapella active</string>
+    <string name="karaoke_pure_vocals_desc">Pristine vocals isolated · Instruments muted</string>
+    <string name="karaoke_preparing_acapella">Preparing acapella isolation…</string>
+    <string name="karaoke_dsp_waiting_studio">Vocal filter active while awaiting studio separation</string>
+    <string name="karaoke_extracting_stems">Extracting HTDemucs vocal stems…</string>
+    <string name="karaoke_prep_audio">Preparing audio…</string>
+    <string name="karaoke_decoding_audio">High-fidelity audio decoding…</string>
+    <string name="karaoke_separating_neural_gpu">Neural separation (GPU)…</string>
+    <string name="karaoke_separating_neural_gpu_eco">Neural separation (Power saving)…</string>
+    <string name="karaoke_separating_neural_cpu">Neural separation (CPU)…</string>
+    <string name="karaoke_separating_gpu_pct">Neural separation (GPU): %1$d%%</string>
+    <string name="karaoke_separating_gpu_eco_pct">Neural separation (Power saving): %1$d%%</string>
+    <string name="karaoke_separating_chunk">Neural separation: chunk %1$d/%2$d (%3$d%%)</string>
+    <string name="karaoke_saving_stems">Saving studio stems…</string>
+    <string name="upload_drop_hint">Drop audio file to start</string>
+    <string name="upload_release_datetime">Release Date &amp; Time (UTC/Local)</string>
+    <string name="upload_discard_title">Discard unsaved changes?</string>
+    <string name="upload_discard_message">You have modified track details. If you leave now, your changes will be discarded.</string>
 </resources>

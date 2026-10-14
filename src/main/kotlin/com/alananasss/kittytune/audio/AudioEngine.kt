@@ -467,6 +467,7 @@ class AudioEngine {
         // played track leaked ~0.4 MB of native memory (issue #66: 500 MB -> 1 GB+).
         chain.forEach { runCatching { it.reset() } }
         scope.coroutineContext[Job]?.cancel()
+        com.alananasss.kittytune.utils.NativeMemoryManager.trim()
     }
 
     fun onKaraokeStemReady(trackId: Long) {
