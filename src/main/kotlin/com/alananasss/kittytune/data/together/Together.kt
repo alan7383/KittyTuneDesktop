@@ -123,6 +123,13 @@ object Together {
     private var player: TogetherPlayer? = null
     private var started = false
     private var tickJob: Job? = null
+
+    // queueVersion, lastSentQueueVersion and lastUpcomingIds are touched from the tick job, the
+    // relay's incoming-collect and publishStateSoon coroutines — three threads on the IO pool.
+    // The unguarded read-modify-write in publishQueue could interleave: two publishes could ship
+    // the same version for different queues, and a follower comparing them would miss a queue
+    // change (the audit's "queueVersion Together non synchronisé").
+    private val queueStateLock = Any()
     private var lastSentQueueVersion = -1
     private var queueVersion = 0
     private var lastUpcomingIds: List<Long> = emptyList()
@@ -305,21 +312,25 @@ object Together {
         val p = player ?: return
         val now = System.currentTimeMillis()
         val current = p.sharedCurrent()
+        val version = synchronized(queueStateLock) { queueVersion }
         updateRoom(code) { it.copy(hostId = memberId, hostSeenAt = now, nowPlaying = current, isPlaying = p.sharedIsPlaying(), automix = p.sharedAutomix()) }
-        send(code, TogetherMessage.State(memberId, now, current, p.sharedPositionMs(), p.sharedIsPlaying(), p.sharedAutomix(), queueVersion))
+        send(code, TogetherMessage.State(memberId, now, current, p.sharedPositionMs(), p.sharedIsPlaying(), p.sharedAutomix(), version))
     }
 
     private fun publishQueue(code: String, force: Boolean) {
         val p = player ?: return
         val upcoming = p.sharedUpcoming().take(MAX_SHARED_UPCOMING)
         val ids = upcoming.map { it.id }
-        if (!force && ids == lastUpcomingIds && lastSentQueueVersion == queueVersion) return
-        if (ids != lastUpcomingIds) queueVersion++
-        lastUpcomingIds = ids
-        lastSentQueueVersion = queueVersion
+        val version = synchronized(queueStateLock) {
+            if (!force && ids == lastUpcomingIds && lastSentQueueVersion == queueVersion) return
+            if (ids != lastUpcomingIds) queueVersion++
+            lastUpcomingIds = ids
+            lastSentQueueVersion = queueVersion
+            queueVersion
+        }
         val room = _rooms.value[code] ?: Room(code, "")
-        updateRoom(code) { it.copy(upcoming = upcoming, queueVersion = queueVersion) }
-        send(code, TogetherMessage.Queue(memberId, System.currentTimeMillis(), queueVersion, upcoming, room.playlist, room.name))
+        updateRoom(code) { it.copy(upcoming = upcoming, queueVersion = version) }
+        send(code, TogetherMessage.Queue(memberId, System.currentTimeMillis(), version, upcoming, room.playlist, room.name))
     }
 
     // ─── Incoming ─────────────────────────────────────────────────────────────────────────────

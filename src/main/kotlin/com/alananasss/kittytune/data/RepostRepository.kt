@@ -4,6 +4,7 @@ import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.data.network.SoundCloudApi
 import com.alananasss.kittytune.domain.User
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +16,7 @@ object RepostRepository {
     private val tokenManager = TokenManager
     private var currentUserId: Long = 0L
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _repostedTrackIds = MutableStateFlow<Set<Long>>(emptySet())
     val repostedTrackIds = _repostedTrackIds.asStateFlow()

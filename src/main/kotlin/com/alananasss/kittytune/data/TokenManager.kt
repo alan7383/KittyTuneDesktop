@@ -3,6 +3,7 @@ package com.alananasss.kittytune.data
 import com.alananasss.kittytune.core.AppDirs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -170,7 +171,7 @@ object TokenManager {
         com.alananasss.kittytune.data.network.CookieStore.clear()
         logoutFlow.tryEmit(Unit)
 
-        CoroutineScope(Dispatchers.IO).launch {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
                 dao.deleteNonDownloadedOnlinePlaylists()

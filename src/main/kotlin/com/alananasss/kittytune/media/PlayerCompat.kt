@@ -13,6 +13,7 @@ import com.alananasss.kittytune.audio.automix.AutomixManager
 import com.alananasss.kittytune.audio.automix.AutomixPlan
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -147,7 +148,7 @@ class Player {
     private val listeners = mutableListOf<Listener>()
     private val items = mutableListOf<MediaItem>()
     private var currentIndex = 0
-    private val scope = CoroutineScope(Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var resolveJob: Job? = null
     
     var onCompletion: (() -> Unit)? = null

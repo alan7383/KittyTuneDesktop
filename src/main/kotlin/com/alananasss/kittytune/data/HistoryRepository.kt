@@ -6,12 +6,13 @@ import com.alananasss.kittytune.data.local.HistoryItem
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 object HistoryRepository {
     private val dao get() = AppDatabase.downloadDao
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun init() {
         // Database is initialized globally; nothing to wire here.

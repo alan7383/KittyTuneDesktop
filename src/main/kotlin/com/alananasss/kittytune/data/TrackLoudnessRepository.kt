@@ -4,6 +4,7 @@ import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.domain.Track
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -13,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 object TrackLoudnessRepository {
 
     private val cache = BoundedCache<Long, TrackLoudnessInfo>(1000)
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val activeScans = ConcurrentHashMap<Long, Job>()
 
     fun getLoudness(trackId: Long): TrackLoudnessInfo? {

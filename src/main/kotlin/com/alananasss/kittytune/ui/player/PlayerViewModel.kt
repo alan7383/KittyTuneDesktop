@@ -4617,6 +4617,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     private var applyingTogether = false
 
+    // Bumped by every incoming host State so a stale deferred action knows it was overtaken; see
+    // followHost's 600 ms pause for why that matters.
+    private var togetherFollowGeneration = 0
+
     /** How many "play next" requests have gone in after the song playing, so the next one goes after them. */
     private var togetherNextOffset = 0
 
@@ -4641,12 +4645,29 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     ) {
         applyingTogether = true
         try {
+            // Every State bumps this: a pending deferred pause from an older State is overtaken by
+            // any newer one, whether it pauses (l.4674 applies it immediately) or resumes (the
+            // stale pause must not fire after it).
+            val generation = ++togetherFollowGeneration
             if (playerPrefs.getAutomixEnabled() != automix) playerPrefs.setAutomixEnabled(automix)
             if (currentTrack?.id != track.id) {
                 pendingSeekPosition = positionMs
                 val tracks = listOf(track) + upcoming.orEmpty().filter { it.id != track.id }
                 playPlaylist(tracks.map { it.toTrack() }, 0, togetherContext(), maintainPlayerState = true, respectShuffle = false)
-                if (!isPlaying) viewModelScope.launch { delay(600); applyingTogether = true; pause(); applyingTogether = false }
+                // The 600 ms grace lets playPlaylist spin up before pausing into the host's state.
+                // It must not outlive a newer State: a host that resumed within the window had its
+                // older "paused" State still pause the follower afterwards, contradicting the
+                // fresher one — so the deferred pause only fires when no newer State has arrived.
+                if (!isPlaying) {
+                    viewModelScope.launch {
+                        delay(600)
+                        if (generation == togetherFollowGeneration) {
+                            applyingTogether = true
+                            pause()
+                            applyingTogether = false
+                        }
+                    }
+                }
                 return
             }
             if (kotlin.math.abs(currentPosition - positionMs) > TOGETHER_MAX_DRIFT_MS) seekTo(positionMs)

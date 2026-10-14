@@ -11,6 +11,7 @@ import com.alananasss.kittytune.domain.Track
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +45,7 @@ object LikeRepository {
     private val gson = Gson()
     private var cachedUserId: Long? = null
 
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _likedTracks = MutableStateFlow<List<Track>>(emptyList())
     val likedTracks = _likedTracks.asStateFlow()
