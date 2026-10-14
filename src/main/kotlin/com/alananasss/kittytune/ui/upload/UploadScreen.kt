@@ -529,7 +529,7 @@ private fun HeroFilePickerSection(
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    text = if (isDraggingOver) "Glissez-déposez le fichier audio pour commencer" else str("upload_picker_hero_subtitle"),
+                    text = if (isDraggingOver) str("upload_drop_hint") else str("upload_picker_hero_subtitle"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -3709,7 +3709,7 @@ private fun ScheduleReleaseDialog(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Release Date & Time (UTC/Local)",
+                            text = str("upload_release_datetime"),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -3852,13 +3852,13 @@ private fun DiscardChangesDialog(
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
                 Text(
-                    text = "Discard unsaved changes?",
+                    text = str("upload_discard_title"),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    text = "You have modified track details. If you leave now, your changes will be discarded.",
+                    text = str("upload_discard_message"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

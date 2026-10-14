@@ -1896,7 +1896,6 @@
     <string name="sync_unauthorized">Код отклонён. Создайте новый на том устройстве и вставьте здесь.</string>
     <string name="sync_failed">Не удалось связаться: %1$s</string>
     <string name="sync_events_held">Событий в журнале: %1$d.</string>
-    <string name="sync_paired_devices_sub">Они синхронизируются сами. Связать нужно один раз, даже если адрес изменится.</string>
     <string name="sync_forget_device">Забыть</string>
     <string name="sync_all_done">Синхронизировано устройств: %1$d.</string>
     <string name="sync_firewall_hint">Если телефон всё равно не может связаться с компьютером, разрешите входящие подключения на порт %1$d в брандмауэре.</string>
@@ -2490,4 +2489,36 @@
     <string name="time_hours">%1$d ч.</string>
     <string name="time_minutes">%1$d мин.</string>
     <string name="time_seconds">%1$d с</string>
+
+    <!-- Additional / newly localized UI strings -->
+    <string name="player_dismissed_message">Трек скрыт</string>
+    <string name="karaoke_auto_separate_sub">Автоматически разделяет аудио в фоне сразу после запуска или перезапуска воспроизведения без ручных действий.</string>
+    <string name="karaoke_audio_track_id">Аудиодорожка #%1$s</string>
+    <string name="karaoke_acapella_ready">Акапелла готова</string>
+    <string name="karaoke_auto_separate_playback_notice">Изоляция запускается автоматически во время воспроизведения</string>
+    <string name="karaoke_isolate_now">Изолировать сейчас</string>
+    <string name="karaoke_no_track_playing_notice">Сейчас ничего не играет · Включите трек для проверки акапеллы в реальном времени</string>
+    <string name="karaoke_enable_vocal_boost_title">Включить усиление вокала / Студийную акапеллу</string>
+    <string name="karaoke_effect_live_active">Живой эффект активен</string>
+    <string name="karaoke_effect_disabled">Отключено</string>
+    <string name="karaoke_pure_acapella_desc">Чистая студийная акапелла (100% вокал · инструменты заглушены)</string>
+    <string name="karaoke_preparing_ai_isolation">Подготовка ИИ-изоляции…</string>
+    <string name="karaoke_ai_studio_active">ИИ студийная акапелла активна</string>
+    <string name="karaoke_pure_vocals_desc">Чистый вокал изолирован · Инструменты заглушены</string>
+    <string name="karaoke_preparing_acapella">Подготовка акапелла-изоляции…</string>
+    <string name="karaoke_dsp_waiting_studio">Вокальный фильтр активен в ожидании студийного разделения</string>
+    <string name="karaoke_extracting_stems">Извлечение вокальных стемов HTDemucs…</string>
+    <string name="karaoke_prep_audio">Подготовка аудио…</string>
+    <string name="karaoke_decoding_audio">Декодирование аудио высокой четкости…</string>
+    <string name="karaoke_separating_neural_gpu">Нейронное разделение (GPU)…</string>
+    <string name="karaoke_separating_neural_gpu_eco">Нейронное разделение (Энергосбережение)…</string>
+    <string name="karaoke_separating_neural_cpu">Нейронное разделение (CPU)…</string>
+    <string name="karaoke_separating_gpu_pct">Нейронное разделение (GPU): %1$d%%</string>
+    <string name="karaoke_separating_gpu_eco_pct">Нейронное разделение (Энергосбережение): %1$d%%</string>
+    <string name="karaoke_separating_chunk">Нейронное разделение: блок %1$d/%2$d (%3$d%%)</string>
+    <string name="karaoke_saving_stems">Сохранение студийных стемов…</string>
+    <string name="upload_drop_hint">Перетащите аудиофайл, чтобы начать</string>
+    <string name="upload_release_datetime">Дата и время релиза (UTC/Местное)</string>
+    <string name="upload_discard_title">Отменить несохранённые изменения?</string>
+    <string name="upload_discard_message">Вы изменили сведения о треке. Если вы выйдете сейчас, изменения будут потеряны.</string>
 </resources>

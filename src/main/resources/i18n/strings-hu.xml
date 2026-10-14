@@ -1896,7 +1896,6 @@
     <string name="sync_unauthorized">Elutasította a kódot. Készíts újat azon az eszközön, és illeszd be ide.</string>
     <string name="sync_failed">Nem sikerült elérni: %1$s</string>
     <string name="sync_events_held">%1$d esemény a naplóban.</string>
-    <string name="sync_paired_devices_sub">Ezek maguktól szinkronban maradnak. A párosítás egyszeri, még ha a címük meg is változik.</string>
     <string name="sync_forget_device">Elfelejtés</string>
     <string name="sync_all_done">%1$d eszköz szinkronizálva.</string>
     <string name="sync_firewall_hint">Ha a telefon továbbra sem éri el ezt a gépet, engedélyezd a bejövő kapcsolatokat a %1$d porton a tűzfaladban.</string>
@@ -2489,4 +2488,36 @@
     <string name="time_hours">%1$dó</string>
     <string name="time_minutes">%1$d perc</string>
     <string name="time_seconds">%1$dmp</string>
+
+    <!-- Additional / newly localized UI strings -->
+    <string name="player_dismissed_message">Szám elrejtve</string>
+    <string name="karaoke_auto_separate_sub">Automatikusan szétválasztja a hangsávokat a háttérben a lejátszás elindításakor, manuális beavatkozás nélkül.</string>
+    <string name="karaoke_audio_track_id">Hangsáv #%1$s</string>
+    <string name="karaoke_acapella_ready">Acapella kész</string>
+    <string name="karaoke_auto_separate_playback_notice">Az elkülönítés automatikusan elindul lejátszás közben</string>
+    <string name="karaoke_isolate_now">Elkülönítés most</string>
+    <string name="karaoke_no_track_playing_notice">Nincs lejátszott szám · Indíts el egy zenét az élő acapella kipróbálásához</string>
+    <string name="karaoke_enable_vocal_boost_title">Énekerősítés / Stúdió acapella bekapcsolása</string>
+    <string name="karaoke_effect_live_active">Élő effekt aktív</string>
+    <string name="karaoke_effect_disabled">Kikapcsolva</string>
+    <string name="karaoke_pure_acapella_desc">Tiszta stúdió acapella (100% ének · hangszerek némítva)</string>
+    <string name="karaoke_preparing_ai_isolation">MI elkülönítés előkészítése…</string>
+    <string name="karaoke_ai_studio_active">MI Stúdió acapella aktív</string>
+    <string name="karaoke_pure_vocals_desc">Tiszta énekhang elkülönítve · Hangszerek némítva</string>
+    <string name="karaoke_preparing_acapella">Acapella elkülönítés előkészítése…</string>
+    <string name="karaoke_dsp_waiting_studio">Hangszűrő aktív a stúdió elválasztásra várva</string>
+    <string name="karaoke_extracting_stems">HTDemucs éneksávok kinyerése…</string>
+    <string name="karaoke_prep_audio">Hang előkészítése…</string>
+    <string name="karaoke_decoding_audio">Nagy pontosságú hangdekódolás…</string>
+    <string name="karaoke_separating_neural_gpu">Neurális szétválasztás (GPU)…</string>
+    <string name="karaoke_separating_neural_gpu_eco">Neurális szétválasztás (Energiatakarékos)…</string>
+    <string name="karaoke_separating_neural_cpu">Neurális szétválasztás (CPU)…</string>
+    <string name="karaoke_separating_gpu_pct">Neurális szétválasztás (GPU): %1$d%%</string>
+    <string name="karaoke_separating_gpu_eco_pct">Neurális szétválasztás (Energiatakarékos): %1$d%%</string>
+    <string name="karaoke_separating_chunk">Neurális szétválasztás: szelet %1$d/%2$d (%3$d%%)</string>
+    <string name="karaoke_saving_stems">Stúdió sávok mentése…</string>
+    <string name="upload_drop_hint">Húzd ide az audiofájlt a kezdéshez</string>
+    <string name="upload_release_datetime">Megjelenés dátuma és ideje (UTC/Helyi)</string>
+    <string name="upload_discard_title">Elveted a nem mentett módosításokat?</string>
+    <string name="upload_discard_message">Módosítottad a szám részleteit. Ha most kilépsz, a módosítások elvesznek.</string>
 </resources>

@@ -146,7 +146,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var currentStreamSource by mutableStateOf<String?>(initialTrack?.source)
     var isPlaying by mutableStateOf(false)
     var isLoading by mutableStateOf(false)
-    var duration by mutableLongStateOf(initialTrack?.durationMs ?: 0L)
+    var duration by mutableLongStateOf(initialTrack?.effectiveFullDurationMs ?: initialTrack?.durationMs ?: 0L)
     var currentPosition by mutableLongStateOf(
         if (playerPrefs.getPersistentQueueEnabled() && playerPrefs.getSavePositionEnabled()) playerPrefs.getLastPosition() else 0L
     )
@@ -1950,6 +1950,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         saveStateAsync(saveQueue = false)
                     }
                 },
+                onRate = { speed ->
+                    setCustomSpeed(speed.toFloat())
+                },
             )
         }.onFailure { e -> println("MPRIS service init failed: ${e.message}") }.getOrNull()
     }
@@ -1974,7 +1977,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     fun updateMprisMedia() {
         initMprisService()
         mprisService?.let { service ->
-            service.updateMedia(currentTrack, isPlaying, currentPosition)
+            service.updateRate(effectsState.speed.toDouble())
+            service.updateMedia(currentTrack, isPlaying, currentPosition, duration.takeIf { it > 0L })
             service.updateVolume(volume.toDouble())
             service.updateShuffle(shuffleEnabled)
             service.updateLoopStatus(repeatMode.toMprisLoopStatus())
@@ -3893,7 +3897,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             isPlaying = false
         }
 
-        isLoading = true; duration = trackToPlay.durationMs ?: 0L; currentPosition = 0L
+        isLoading = true; duration = trackToPlay.effectiveFullDurationMs ?: trackToPlay.durationMs ?: 0L; currentPosition = 0L
         beginListenSession(trackToPlay)
         // Alongside the session rather than anywhere else, so "played" means the same to the queue as
         // it does to the statistics.
@@ -3946,6 +3950,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             }
             currentTrack = finalTrack
             MusicManager.currentTrack = finalTrack
+            val effectiveDuration = finalTrack.effectiveFullDurationMs ?: finalTrack.durationMs ?: 0L
+            if (effectiveDuration > 0L && (duration == 0L || duration < effectiveDuration)) {
+                duration = effectiveDuration
+            }
             isLiked = LikeRepository.isTrackLiked(finalTrack.id)
             loadLyrics(finalTrack)
             loadSocialProof(finalTrack)
@@ -4493,6 +4501,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             if (repeatMode == RepeatMode.ONE) {
                 currentPosition = 0L
                 player.seekTo(0)
+                mprisService?.updatePosition(0L, emitSeeked = true)
                 player.play()
             } else {
                 playNext(manual = false, isCrossfade = playerPrefs.getCrossfadeEnabled())
@@ -4505,6 +4514,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         player.seekTo(target)
         SoundCloudTelemetryTracker.onTrackSeeked(target)
         saveStateAsync(savePositionOnly = true)
+        mprisService?.updatePosition(target, emitSeeked = true)
         updateDiscordPresence()
     }
 
@@ -5205,7 +5215,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private fun applyEffectsAndSave() {
-        MusicManager.applyEffects(effectsState); viewModelScope.launch(Dispatchers.IO) {
+        MusicManager.applyEffects(effectsState)
+        mprisService?.updateRate(effectsState.speed.toDouble())
+        viewModelScope.launch(Dispatchers.IO) {
             playerPrefs.saveEffects(
                 effectsState
             )
@@ -5437,6 +5449,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         } else {
                             currentPosition = enginePos
                         }
+                        mprisService?.syncPosition(enginePos)
                         ensureListenSession()
                         listenSession?.onPosition(currentPosition)
 
@@ -5734,7 +5747,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         )
                         if (currentPlayerMediaId == lastTrack.id.toString() && MusicManager.player.isPlaying) {
                             isPlaying = true
-                            duration = MusicManager.player.duration.coerceAtLeast(lastTrack.durationMs ?: 0L)
+                            duration = MusicManager.player.duration.coerceAtLeast(lastTrack.effectiveFullDurationMs ?: lastTrack.durationMs ?: 0L)
                             currentPosition = MusicManager.player.currentPosition
                             MusicManager.applyEffects(effectsState)
                             Logger.e(
@@ -5743,12 +5756,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                             )
                         } else {
                             currentPosition = lastPosition
-                            duration = lastTrack.durationMs ?: 0L
+                            duration = lastTrack.effectiveFullDurationMs ?: lastTrack.durationMs ?: 0L
                             Logger.e("PlayerViewModel", "calling playRobustly with startPosition = $lastPosition")
                             if (currentQueueIndex >= 0) {
                                 playRobustly(currentQueueIndex, autoPlay = false, startPosition = lastPosition)
                             }
                         }
+                        updateMprisMedia()
                         delay(200.milliseconds)
                     }
                     isRestoringSession = false
@@ -5901,7 +5915,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 val title = track.title?.trim().orEmpty()
                 val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.trim()
                 val album = track.publisherMetadata?.albumTitle ?: track.publisherMetadata?.releaseTitle
-                val durationSec = ((track.durationMs ?: 0L) / 1000L).toInt().takeIf { it > 0 }
+                val durationSec = (((track.effectiveFullDurationMs ?: track.durationMs) ?: 0L) / 1000L).toInt().takeIf { it > 0 }
                 val isrc = track.publisherMetadata?.isrc
 
                 val resolved = AnimatedCoverResolver.resolve(

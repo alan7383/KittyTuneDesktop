@@ -88,6 +88,7 @@ fun releaseMemoryNow() {
     SingletonImageLoader.get(PlatformContext.INSTANCE).memoryCache?.clear()
     HeapSizing.tighten()
     System.gc()
+    com.alananasss.kittytune.utils.NativeMemoryManager.trim()
 }
 
 /** Gives G1 its usual headroom back, for an interface that is about to allocate again. */

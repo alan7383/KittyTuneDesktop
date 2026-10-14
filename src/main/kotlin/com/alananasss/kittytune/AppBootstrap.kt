@@ -14,6 +14,7 @@ import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.utils.Config
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -31,9 +32,13 @@ object AppBootstrap {
         if (done) return
         done = true
 
+        // Initialize native memory allocator (M_ARENA_MAX=2 on Linux to eliminate 96-arena multi-gigabyte bloat)
+        com.alananasss.kittytune.utils.NativeMemoryManager.init()
+
+        // Cap JavaCPP off-heap memory to 64MB so FFmpeg/native decoders release frame buffers promptly
+        System.setProperty("org.bytedeco.javacpp.maxbytes", "67108864")
         // Prevent JavaCPP from falsely throwing OutOfMemoryError when host physical memory > 8GB
         System.setProperty("org.bytedeco.javacpp.maxphysicalbytes", "0")
-        System.setProperty("org.bytedeco.javacpp.maxbytes", "0")
 
         com.alananasss.kittytune.audio.ai.OnnxHelper.ensureNativeLibrariesLoaded()
         com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
@@ -136,6 +141,14 @@ object AppBootstrap {
         // 6. End4 dotfiles Material You watcher (live color updates)
         if (com.alananasss.kittytune.data.theme.End4ThemeManager.isInstalled()) {
             com.alananasss.kittytune.data.theme.End4ThemeManager.startWatching()
+        }
+
+        // 7. Periodic native memory cleanup (JavaCPP Pointer + Linux glibc arena trim)
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(15_000L)
+                com.alananasss.kittytune.utils.NativeMemoryManager.trim()
+            }
         }
     }
 }

@@ -379,6 +379,7 @@
         @SerializedName("policy") val policy: String? = null,
         @SerializedName("monetization_model") val monetizationModel: String? = null,
         @SerializedName("sharing") val sharing: String? = null,
+        @SerializedName("full_duration") val fullDurationMs: Long? = null,
     
         // fixed: source is now nullable to prevent gson crashes
         val source: String? = "soundcloud",
@@ -448,6 +449,15 @@
                 ?: soloArtistFromTitle(title, user?.username)
                 ?: user?.username?.takeIf { it.isNotBlank() }
                 ?: ""
+
+        val isSnipped: Boolean
+            get() = policy.equals("SNIP", ignoreCase = true) ||
+                monetizationModel.equals("SUB_HIGH_TIER", ignoreCase = true) ||
+                media?.transcodings?.any { it.snipped == true } == true ||
+                (fullDurationMs != null && durationMs != null && fullDurationMs > durationMs)
+
+        val effectiveFullDurationMs: Long?
+            get() = fullDurationMs?.takeIf { it > 0L } ?: durationMs
 
         val fullResArtwork: String
             get() {
@@ -789,7 +799,13 @@
     data class Visuals(val visuals: List<VisualItem>?)
     data class VisualItem(@SerializedName("visual_url") val visualUrl: String)
     data class Media(val transcodings: List<Transcoding>?)
-    data class Transcoding(val url: String, val preset: String, val format: Format?)
+    data class Transcoding(
+        val url: String,
+        val preset: String,
+        val format: Format?,
+        val snipped: Boolean? = null,
+        val duration: Long? = null
+    )
     data class Format(val protocol: String?, @SerializedName("mime_type") val mimeType: String?)
     data class StreamUrlResponse(
         val url: String?,

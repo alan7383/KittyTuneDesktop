@@ -22,11 +22,11 @@ class PlayerButtonRowsTest {
     private fun design(): String {
         val file = File("src/main/kotlin/com/alananasss/kittytune/ui/profile/PlayerDesignScreen.kt")
         assertTrue(file.exists(), "PlayerDesignScreen.kt should exist")
-        return file.readText()
+        return file.readText().replace("\r\n", "\n")
     }
 
     private fun settingsItem(): String {
-        val text = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt").readText()
+        val text = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt").readText().replace("\r\n", "\n")
         val start = text.indexOf("fun SettingsItem(")
         assertTrue(start >= 0, "SettingsItem should exist")
         return text.substring(start, text.indexOf("\nfun ", start + 10).takeIf { it > 0 } ?: (start + 6000))
@@ -105,7 +105,7 @@ class PlayerButtonRowsTest {
     fun testTheSharedRowCarriesACheckInTheThumb() {
         val body = settingsItem()
         assertTrue(body.contains("SettingsSwitch("), "The shared switch, not a bare one")
-        val shared = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt").readText()
+        val shared = File("src/main/kotlin/com/alananasss/kittytune/ui/common/SettingsComponents.kt").readText().replace("\r\n", "\n")
         val start = shared.indexOf("fun SettingsSwitch(")
         val switch = shared.substring(start, shared.indexOf("\n}\n", start))
         assertTrue(switch.contains("thumbContent"))

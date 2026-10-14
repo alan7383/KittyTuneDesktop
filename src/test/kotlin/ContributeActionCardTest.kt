@@ -17,7 +17,7 @@ class ContributeActionCardTest {
     private fun credits(): String {
         val file = File("src/main/kotlin/com/alananasss/kittytune/ui/profile/CreditsScreen.kt")
         assertTrue(file.exists(), "CreditsScreen.kt should exist")
-        return file.readText()
+        return file.readText().replace("\r\n", "\n")
     }
 
     private fun cardSignature(): String {

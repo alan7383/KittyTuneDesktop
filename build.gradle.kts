@@ -1,4 +1,8 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.io.FileOutputStream
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
+import java.util.zip.ZipOutputStream
 
 plugins {
     kotlin("jvm") version "2.4.21"
@@ -29,11 +33,20 @@ repositories {
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
 }
 
+configurations.all {
+    exclude(group = "org.jetbrains.skiko", module = "skiko-awt-runtime-all")
+}
+
 dependencies {
     implementation("com.github.z-huang.InnerTune:lrclib:0.5.10")
     implementation("com.github.z-huang.InnerTune:kugou:0.5.10")
     implementation(compose.desktop.currentOs)
-    implementation("com.mocharealm.accompanist:lyrics-ui:1.0.19")
+    implementation("com.mocharealm.accompanist:lyrics-ui:1.0.19") {
+        if (!desktopIsWindows) {
+            exclude(group = "org.jetbrains.compose.desktop", module = "desktop-jvm-windows-x64")
+            exclude(group = "org.jetbrains.skiko", module = "skiko-awt-runtime-windows-x64")
+        }
+    }
     implementation("com.mocharealm.accompanist:lyrics-core:0.5.0")
     implementation("org.jetbrains.compose.material3:material3:1.13.0-alpha02")
     implementation(compose.materialIconsExtended)
@@ -127,7 +140,6 @@ dependencies {
 
     implementation("org.json:json:20260814")
     implementation("org.yaml:snakeyaml:2.7")
-    implementation("com.github.pemistahl:lingua:1.2.2")
     implementation("net.java.dev.jna:jna:5.19.1")
     implementation("net.java.dev.jna:jna-platform:5.19.1")
 
@@ -148,6 +160,10 @@ tasks.withType<Test>().configureEach {
 compose.desktop {
     application {
         mainClass = "com.alananasss.kittytune.MainKt"
+        val localJdk21 = File(System.getProperty("user.home"), ".gradle/jdks/eclipse_adoptium-21-amd64-linux.2")
+        if (localJdk21.exists()) {
+            javaHome = localJdk21.absolutePath
+        }
 
         // Grants what the app already does, so the JDK stops warning about it on every launch:
         // sqlite-jdbc loads its native library, and Gson writes final fields when it
@@ -155,7 +171,7 @@ compose.desktop {
         // errors in a later JDK, so declaring them now is also what keeps the app running then.
         // Gated on the build JDK because the packaged runtime is built from it, and an older
         // one would refuse to start on an option it does not know.
-        val buildJdk = JavaVersion.current().majorVersion.toIntOrNull() ?: 0
+        val buildJdk = if (localJdk21.exists()) 21 else (JavaVersion.current().majorVersion.toIntOrNull() ?: 0)
         if (buildJdk >= 24) jvmArgs += "--enable-native-access=ALL-UNNAMED"
         // JEP 500's option only exists from JDK 26; a JDK 25 launcher refuses to start on it.
         if (buildJdk >= 26) jvmArgs += "--enable-final-field-mutation=ALL-UNNAMED"
@@ -277,7 +293,8 @@ compose.desktop {
 
 
         buildTypes.release.proguard {
-            isEnabled.set(false)
+            isEnabled.set(true)
+            configurationFiles.from(project.file("proguard-rules.pro"))
         }
 
         nativeDistributions {
@@ -375,9 +392,8 @@ tasks.withType<JavaExec>().configureEach {
     systemProperty("sun.java2d.wm.className", "kitty-tune")
     jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
 }
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+kotlin {
+    jvmToolchain(21)
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
@@ -486,22 +502,152 @@ val compileWindowsSmtcBridge = tasks.register<Exec>("compileWindowsSmtcBridge") 
         "-OutDir", outDir.get().asFile.absolutePath)
 }
 
-// Exclude only the source copies replaced on this platform. Otherwise a checked-in
-// library can win over the freshly compiled one when resources are copied.
+// Exclude non-target native resources so packages don't bundle binaries from other operating systems.
 sourceSets.main {
     val osName = System.getProperty("os.name").lowercase()
-    val extension = if (desktopIsWindows) "dll" else if (osName.contains("mac")) "dylib" else "so"
+    val osArch = System.getProperty("os.arch").lowercase()
+    val isMac = osName.contains("mac")
+    val isLinux = osName.contains("linux")
+    val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
+
+    val extension = if (desktopIsWindows) "dll" else if (isMac) "dylib" else "so"
     resources.exclude("native/libkittytune_audio_dsp.$extension")
-    if (desktopIsWindows) resources.exclude("native/WindowsSmtcBridge.exe")
-    if (!desktopIsWindows && !osName.contains("mac")) resources.exclude("native/linux-x86_64/libkt_vk_priority.so")
+    if (desktopIsWindows) {
+        resources.exclude("icons/kittytune.icns")
+        resources.exclude("native/WindowsSmtcBridge.exe")
+        resources.exclude("native/linux-x86_64/**")
+        resources.exclude("native/*.so")
+        resources.exclude("native/*.dylib")
+    } else if (isLinux) {
+        resources.exclude("icons/kittytune.icns")
+        resources.exclude("native/windows-x86_64/**")
+        resources.exclude("native/WindowsSmtcBridge.*")
+        resources.exclude("native/*.dll")
+        resources.exclude("native/*.dylib")
+        if (isArm64) {
+            resources.exclude("native/linux-x86_64/demucs")
+        }
+        resources.exclude("native/linux-x86_64/libkt_vk_priority.so")
+    } else if (isMac) {
+        resources.exclude("icons/kittytune.ico")
+        resources.exclude("native/windows-x86_64/**")
+        resources.exclude("native/linux-x86_64/**")
+        resources.exclude("native/WindowsSmtcBridge.*")
+        resources.exclude("native/*.dll")
+        resources.exclude("native/*.so")
+    }
 }
 
 tasks.named<ProcessResources>("processResources") {
     dependsOn(compileNativeDSP)
     if (desktopIsWindows) dependsOn(compileWindowsSmtcBridge)
     from(layout.buildDirectory.dir("generated/native-resources")) {
-        include("native/*.dll", "native/*.so", "native/*.dylib",
-            "native/WindowsSmtcBridge.exe", "native/linux-x86_64/*.so")
+        if (desktopIsWindows) {
+            include("native/*.dll", "native/WindowsSmtcBridge.exe")
+        } else if (System.getProperty("os.name").lowercase().contains("mac")) {
+            include("native/*.dylib")
+        } else {
+            include("native/*.so", "native/linux-x86_64/*.so")
+        }
+    }
+}
+
+abstract class StripForeignNativesTask : DefaultTask() {
+    @get:InputDirectory
+    abstract val targetDirectory: DirectoryProperty
+
+    @TaskAction
+    fun execute() {
+        val dir = targetDirectory.get().asFile
+        if (!dir.exists()) return
+        val osName = System.getProperty("os.name").lowercase()
+        val osArch = System.getProperty("os.arch").lowercase()
+        val isWin = osName.contains("win")
+        val isMac = osName.contains("mac")
+        val isArm64 = osArch.contains("aarch64") || osArch.contains("arm64")
+
+        val targetOnnxSubdir = when {
+            isWin -> "ai/onnxruntime/native/win-x64/"
+            isMac && isArm64 -> "ai/onnxruntime/native/osx-aarch64/"
+            !isWin && !isMac && isArm64 -> "ai/onnxruntime/native/linux-aarch64/"
+            else -> "ai/onnxruntime/native/linux-x64/"
+        }
+
+        val targetSqliteSubdir = when {
+            isWin -> "org/sqlite/native/Windows/x86_64/"
+            isMac && isArm64 -> "org/sqlite/native/Mac/aarch64/"
+            isMac -> "org/sqlite/native/Mac/x86_64/"
+            !isWin && !isMac && isArm64 -> "org/sqlite/native/Linux/aarch64/"
+            else -> "org/sqlite/native/Linux/x86_64/"
+        }
+
+        fun stripJar(jarFile: File, predicate: (String) -> Boolean) {
+            val tmp = File(jarFile.parentFile, jarFile.name + ".tmp")
+            try {
+                ZipFile(jarFile).use { zipIn ->
+                    ZipOutputStream(FileOutputStream(tmp)).use { zipOut ->
+                        val entries = zipIn.entries()
+                        while (entries.hasMoreElements()) {
+                            val entry = entries.nextElement()
+                            if (predicate(entry.name)) {
+                                zipOut.putNextEntry(ZipEntry(entry.name))
+                                zipIn.getInputStream(entry).use { it.copyTo(zipOut) }
+                                zipOut.closeEntry()
+                            }
+                        }
+                    }
+                }
+                tmp.copyTo(jarFile, overwrite = true)
+            } catch (e: Exception) {
+                logger.warn("Failed stripping ${jarFile.name}: ${e.message}")
+            } finally {
+                tmp.delete()
+            }
+        }
+
+        dir.listFiles { file -> file.name.startsWith("onnxruntime-") && file.name.endsWith(".jar") }?.forEach { jar ->
+            stripJar(jar) { name -> !name.startsWith("ai/onnxruntime/native/") || name.startsWith(targetOnnxSubdir) }
+        }
+
+        dir.listFiles { file -> file.name.startsWith("sqlite-jdbc-") && file.name.endsWith(".jar") }?.forEach { jar ->
+            stripJar(jar) { name -> !name.startsWith("org/sqlite/native/") || name.startsWith(targetSqliteSubdir) }
+        }
+    }
+}
+
+val stripForeignNativesDistributable = tasks.register<StripForeignNativesTask>("stripForeignNativesDistributable") {
+    targetDirectory.set(desktopDistributionDirectory.map { it.dir("main-release/app/KittyTune/lib/app") })
+}
+
+tasks.matching { it.name == "createReleaseDistributable" }.configureEach {
+    finalizedBy(stripForeignNativesDistributable)
+}
+
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask>().configureEach {
+    val localJdk21 = File(System.getProperty("user.home"), ".gradle/jdks/eclipse_adoptium-21-amd64-linux.2")
+    if (localJdk21.exists()) {
+        javaHome.set(localJdk21.absolutePath)
+    }
+}
+
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask>().configureEach {
+    runCatching {
+        @Suppress("UNCHECKED_CAST")
+        val stripProp = this::class.java.methods.firstOrNull { it.name.startsWith("getStripDebug") }?.invoke(this) as? org.gradle.api.provider.Property<Boolean>
+        stripProp?.set(true)
+        @Suppress("UNCHECKED_CAST")
+        val noHeadersProp = this::class.java.methods.firstOrNull { it.name.startsWith("getNoHeaderFiles") }?.invoke(this) as? org.gradle.api.provider.Property<Boolean>
+        noHeadersProp?.set(true)
+        @Suppress("UNCHECKED_CAST")
+        val noManProp = this::class.java.methods.firstOrNull { it.name.startsWith("getNoManPages") }?.invoke(this) as? org.gradle.api.provider.Property<Boolean>
+        noManProp?.set(true)
+        @Suppress("UNCHECKED_CAST")
+        val stripCmdsProp = this::class.java.methods.firstOrNull { it.name.startsWith("getStripNativeCommands") }?.invoke(this) as? org.gradle.api.provider.Property<Boolean>
+        stripCmdsProp?.set(true)
+        @Suppress("UNCHECKED_CAST")
+        val compressProp = this::class.java.methods.firstOrNull { it.name.startsWith("getCompressionLevel") }?.invoke(this) as? org.gradle.api.provider.Property<Any>
+        val zipLevel = Class.forName("org.jetbrains.compose.desktop.application.internal.RuntimeCompressionLevel").enumConstants?.firstOrNull { it.toString() == "ZIP" }
+        if (zipLevel != null) compressProp?.set(zipLevel)
     }
 }
 
@@ -533,9 +679,11 @@ tasks.register<Zip>("zipWindowsPortable") {
     description = "Packages a Windows app with its Java runtime; no installer or system Java required."
     group = "distribution"
     dependsOn("createReleaseDistributable")
+    dependsOn(stripForeignNativesDistributable)
     from(desktopDistributionDirectory.map { it.dir("main-release/app") })
     destinationDirectory.set(layout.projectDirectory.dir("release"))
     archiveFileName.set("KittyTune-${project.version}-Windows-Portable-x64.zip")
+    entryCompression = ZipEntryCompression.DEFLATED
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
 }

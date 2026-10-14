@@ -150,7 +150,7 @@ fun RecognitionScreen(
         ) {
             Icon(
                 Icons.Rounded.History,
-                contentDescription = "Historique"
+                contentDescription = str("recognition_history_title")
             )
         }
 

@@ -125,6 +125,29 @@ jobs:
           ar x "$DEB_FILE"
           tar -xf data.tar.* -C arch_build/pkg
           
+          # Strip foreign native binaries from onnxruntime and sqlite-jdbc
+          python3 -c '
+          import zipfile, os, glob
+          lib_dir = "arch_build/pkg/opt/kitty-tune/lib/app"
+          for f in glob.glob(os.path.join(lib_dir, "onnxruntime-*.jar")):
+              tmp = f + ".tmp"
+              with zipfile.ZipFile(f, "r") as zin, zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+                  for item in zin.infolist():
+                      if item.filename.startswith("ai/onnxruntime/native/") and not item.filename.startswith("ai/onnxruntime/native/linux-x64/"):
+                          continue
+                      zout.writestr(item, zin.read(item.filename))
+              os.replace(tmp, f)
+          for f in glob.glob(os.path.join(lib_dir, "sqlite-jdbc-*.jar")):
+              tmp = f + ".tmp"
+              with zipfile.ZipFile(f, "r") as zin, zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+                  for item in zin.infolist():
+                      if item.filename.startswith("org/sqlite/native/") and not item.filename.startswith("org/sqlite/native/Linux/x86_64/"):
+                          continue
+                      zout.writestr(item, zin.read(item.filename))
+              os.replace(tmp, f)
+          '
+          dpkg-deb -Zxz -b arch_build/pkg "$DEB_FILE"
+          
           mkdir -p arch_build/pkg/usr/share/applications
           mkdir -p arch_build/pkg/usr/share/icons/hicolor/256x256/apps
           
@@ -161,7 +184,7 @@ jobs:
           sed -i "s/REPLACE_BUILDDATE/$PKG_DATE/" arch_build/pkg/.PKGINFO
           
           cd arch_build/pkg
-          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-${VERSION}-1-x86_64.pkg.tar.zst
+          tar -cf - .PKGINFO * | zstd -19 -T0 -q - -o ../../kitty-tune-${VERSION}-1-x86_64.pkg.tar.zst
           cd ../..
 
       - name: Prepare Linux x64 Distribution Binaries
@@ -219,6 +242,29 @@ jobs:
           ar x "$DEB_FILE"
           tar -xf data.tar.* -C arch_build_arm/pkg
           
+          # Strip foreign native binaries from onnxruntime and sqlite-jdbc
+          python3 -c '
+          import zipfile, os, glob
+          lib_dir = "arch_build_arm/pkg/opt/kitty-tune/lib/app"
+          for f in glob.glob(os.path.join(lib_dir, "onnxruntime-*.jar")):
+              tmp = f + ".tmp"
+              with zipfile.ZipFile(f, "r") as zin, zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+                  for item in zin.infolist():
+                      if item.filename.startswith("ai/onnxruntime/native/") and not item.filename.startswith("ai/onnxruntime/native/linux-aarch64/"):
+                          continue
+                      zout.writestr(item, zin.read(item.filename))
+              os.replace(tmp, f)
+          for f in glob.glob(os.path.join(lib_dir, "sqlite-jdbc-*.jar")):
+              tmp = f + ".tmp"
+              with zipfile.ZipFile(f, "r") as zin, zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+                  for item in zin.infolist():
+                      if item.filename.startswith("org/sqlite/native/") and not item.filename.startswith("org/sqlite/native/Linux/aarch64/"):
+                          continue
+                      zout.writestr(item, zin.read(item.filename))
+              os.replace(tmp, f)
+          '
+          dpkg-deb -Zxz -b arch_build_arm/pkg "$DEB_FILE"
+          
           mkdir -p arch_build_arm/pkg/usr/share/applications
           mkdir -p arch_build_arm/pkg/usr/share/icons/hicolor/256x256/apps
           
@@ -255,7 +301,7 @@ jobs:
           sed -i "s/REPLACE_BUILDDATE/$PKG_DATE/" arch_build_arm/pkg/.PKGINFO
           
           cd arch_build_arm/pkg
-          tar -cf - .PKGINFO * | zstd -z -q - -o ../../kitty-tune-${VERSION}-1-aarch64.pkg.tar.zst
+          tar -cf - .PKGINFO * | zstd -19 -T0 -q - -o ../../kitty-tune-${VERSION}-1-aarch64.pkg.tar.zst
           cd ../..
 
       - name: Prepare Linux ARM64 Distribution Binaries

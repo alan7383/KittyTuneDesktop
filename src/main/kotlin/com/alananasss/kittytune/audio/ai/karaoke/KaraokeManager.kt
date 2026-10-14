@@ -13,6 +13,7 @@ import com.alananasss.kittytune.data.cache.AudioCache
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.utils.Logger
+import com.alananasss.kittytune.core.str
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
@@ -968,7 +969,7 @@ object KaraokeManager {
                 _separationState.value = SeparationState.Processing(safe, trackId, track.title, statusDetail)
             }
 
-            _separationState.value = SeparationState.Processing(0f, trackId, track.title, "Préparation de l'audio...")
+            _separationState.value = SeparationState.Processing(0f, trackId, track.title, str("karaoke_prep_audio"))
             val stemTmp = File(getStemsDir(), "inst_${trackId}.wav.tmp")
             val stemFinal = getStemFile(trackId)
 
@@ -1022,7 +1023,7 @@ object KaraokeManager {
                     }
                 }
 
-                updateProgress(0.05f, "Décodage audio haute fidélité...")
+                updateProgress(0.05f, str("karaoke_decoding_audio"))
                 grabber.start()
 
                 val durationUs = grabber.lengthInTime
@@ -1045,7 +1046,7 @@ object KaraokeManager {
                             pcmBuffer.add(interleaved)
                             totalSamplesCollected += interleaved.size
                             val decodeProgress = 0.05f + (((totalSamplesCollected.toFloat() / (estimatedFrames * 2)).coerceIn(0f, 1f)) * 0.20f)
-                            updateProgress(decodeProgress, "Décodage audio haute fidélité...")
+                            updateProgress(decodeProgress, str("karaoke_decoding_audio"))
                         }
                     }
                     frame = grabber.grabSamples()
@@ -1084,7 +1085,7 @@ object KaraokeManager {
                         writeWavFile(tempInWav, fullPcm, 44100, 2)
                         processSeparationWithDemucs(nativeBinary, tempInWav, stemTmp, trackId, useGpu) { inferProgress, detail ->
                             val overallProgress = 0.26f + (inferProgress * 0.70f)
-                            updateProgress(overallProgress, detail ?: (if (useGpu) "Séparation neuronale GPU..." else "Séparation neuronale économique..."))
+                            updateProgress(overallProgress, detail ?: (if (useGpu) str("karaoke_separating_neural_gpu") else str("karaoke_separating_neural_gpu_eco")))
                         }
                         processedWithDemucs = true
                     } catch (c: CancellationException) {
@@ -1099,9 +1100,9 @@ object KaraokeManager {
                 if (!processedWithDemucs) {
                     val separatedPcm = processSeparationWithOnnx(fullPcm, trackId) { inferProgress, chunkDetail ->
                         val overallProgress = 0.26f + (inferProgress * 0.69f)
-                        updateProgress(overallProgress, chunkDetail ?: "Séparation neuronale CPU...")
+                        updateProgress(overallProgress, chunkDetail ?: str("karaoke_separating_neural_cpu"))
                     }
-                    updateProgress(0.96f, "Sauvegarde des stems studio...")
+                    updateProgress(0.96f, str("karaoke_saving_stems"))
                     writeWavFile(stemTmp, separatedPcm.first, 44100, 2)
                     val vocTmp = File(getStemsDir(), "vocals_${trackId}.wav.tmp")
                     writeWavFile(vocTmp, separatedPcm.second, 44100, 2)
@@ -1139,6 +1140,7 @@ object KaraokeManager {
                 }
                 runCatching { grabber?.stop() }
                 runCatching { grabber?.release() }
+                com.alananasss.kittytune.utils.NativeMemoryManager.trim()
             }
         }
     }
@@ -1264,7 +1266,7 @@ object KaraokeManager {
                         val pct = line.removePrefix("PROGRESS:").trim().toFloatOrNull()
                         if (pct != null) {
                             val pctInt = (pct * 100).toInt()
-                            val label = if (useGpu) "Séparation neuronale GPU : $pctInt%" else "Séparation neuronale économique : $pctInt%"
+                            val label = if (useGpu) str("karaoke_separating_gpu_pct", pctInt) else str("karaoke_separating_gpu_eco_pct", pctInt)
                             onProgress(pct, label)
                         }
                     }
@@ -1334,8 +1336,8 @@ object KaraokeManager {
 
             val sessionOpts = OrtSession.SessionOptions().apply {
                 setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                setMemoryPatternOptimization(true)
-                setCPUArenaAllocator(true)
+                setMemoryPatternOptimization(false)
+                setCPUArenaAllocator(false)
             }
 
             var session: OrtSession? = null
@@ -1368,8 +1370,8 @@ object KaraokeManager {
                 val safeThreads = (availableCores - 2).coerceIn(1, 4)
                 val cpuOpts = OrtSession.SessionOptions().apply {
                     setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                    setMemoryPatternOptimization(true)
-                    setCPUArenaAllocator(true)
+                    setMemoryPatternOptimization(false)
+                    setCPUArenaAllocator(false)
                     setIntraOpNumThreads(safeThreads)
                     setInterOpNumThreads(2)
                 }
@@ -1517,7 +1519,7 @@ object KaraokeManager {
 
                 val chunkProgress = (chunkIdx + 1).toFloat() / numChunks
                 val chunkPct = (chunkProgress * 100).toInt()
-                val detail = "Séparation neuronale : fenêtre ${chunkIdx + 1}/$numChunks ($chunkPct%)"
+                val detail = str("karaoke_separating_chunk", chunkIdx + 1, numChunks, chunkPct)
                 onProgress(chunkProgress, detail)
                 delay(35)
                 Logger.d(TAG, "Separation chunk ${chunkIdx + 1}/$numChunks ($chunkPct%) complete")

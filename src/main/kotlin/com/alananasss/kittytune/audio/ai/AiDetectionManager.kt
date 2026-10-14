@@ -401,8 +401,11 @@ object AiDetectionManager {
                 targetGpu.id.removePrefix("gpu:").toIntOrNull() ?: 0
             } else 0
 
-            val sessionOpts = OrtSession.SessionOptions()
-            sessionOpts.setIntraOpNumThreads(2)
+            val sessionOpts = OrtSession.SessionOptions().apply {
+                setIntraOpNumThreads(2)
+                setCPUArenaAllocator(false)
+                setMemoryPatternOptimization(false)
+            }
 
             val appliedProvider = OnnxHelper.applyGpuProvider(sessionOpts, targetGpu, gpuIndex)
             if (appliedProvider != null) {
@@ -422,9 +425,12 @@ object AiDetectionManager {
                 return null
             }
 
-            val cpuOpts = OrtSession.SessionOptions()
+            val cpuOpts = OrtSession.SessionOptions().apply {
+                setIntraOpNumThreads(2)
+                setCPUArenaAllocator(false)
+                setMemoryPatternOptimization(false)
+            }
             try {
-                cpuOpts.setIntraOpNumThreads(2)
                 val session = env.createSession(modelFile.absolutePath, cpuOpts)
                 return Pair(session, "CPU Fallback (SIMD) · GPU: ${targetGpu.name}")
             } catch (_: Throwable) {
@@ -438,9 +444,12 @@ object AiDetectionManager {
             return null
         }
 
-        val cpuOpts = OrtSession.SessionOptions()
+        val cpuOpts = OrtSession.SessionOptions().apply {
+            setIntraOpNumThreads(2)
+            setCPUArenaAllocator(false)
+            setMemoryPatternOptimization(false)
+        }
         try {
-            cpuOpts.setIntraOpNumThreads(2)
             val session = env.createSession(modelFile.absolutePath, cpuOpts)
             return Pair(session, "CPU Only (Software SIMD)")
         } catch (_: Throwable) {
@@ -862,41 +871,45 @@ object AiDetectionManager {
                             if (!isActive || epoch != currentAnalysisEpoch) break
                             val startMs = if (durationMs > 16_000L) (durationMs * r).toLong() else 0L
                             val inStream = try { adapter.getInputStream(startMs) } catch (_: Exception) { null } ?: continue
-                            val grabber = FFmpegFrameGrabber(inStream, 0).apply {
-                                format = "mp4"
-                                setOption("probesize", "32768")
-                                setOption("analyzeduration", "0")
-                                sampleRate = TARGET_SR
-                                audioChannels = 2
-                                sampleMode = FrameGrabber.SampleMode.FLOAT
-                            }
-                            try {
-                                grabber.start()
-                                val samples = extractFourSecondsMono(grabber)
-                                if (samples != null) {
-                                    val s = analyzePcmSamples(samples)
-                                    if (s != null) chunkScores.add(s)
+                            inStream.use { stream ->
+                                val grabber = FFmpegFrameGrabber(stream, 0).apply {
+                                    format = "mp4"
+                                    setOption("probesize", "32768")
+                                    setOption("analyzeduration", "0")
+                                    sampleRate = TARGET_SR
+                                    audioChannels = 2
+                                    sampleMode = FrameGrabber.SampleMode.FLOAT
                                 }
-                            } catch (_: Exception) {
-                                runCatching {
-                                    val altStream = adapter.getInputStream(startMs)
-                                    val altGrabber = FFmpegFrameGrabber(altStream, 0).apply {
-                                        sampleRate = TARGET_SR
-                                        audioChannels = 2
-                                        sampleMode = FrameGrabber.SampleMode.FLOAT
-                                    }
-                                    altGrabber.start()
-                                    val samples = extractFourSecondsMono(altGrabber)
-                                    altGrabber.stop()
-                                    altGrabber.release()
+                                try {
+                                    grabber.start()
+                                    val samples = extractFourSecondsMono(grabber)
                                     if (samples != null) {
                                         val s = analyzePcmSamples(samples)
                                         if (s != null) chunkScores.add(s)
                                     }
+                                } catch (_: Exception) {
+                                    runCatching {
+                                        val altStream = adapter.getInputStream(startMs)
+                                        altStream.use { aStream ->
+                                            val altGrabber = FFmpegFrameGrabber(aStream, 0).apply {
+                                                sampleRate = TARGET_SR
+                                                audioChannels = 2
+                                                sampleMode = FrameGrabber.SampleMode.FLOAT
+                                            }
+                                            altGrabber.start()
+                                            val samples = extractFourSecondsMono(altGrabber)
+                                            altGrabber.stop()
+                                            altGrabber.release()
+                                            if (samples != null) {
+                                                val s = analyzePcmSamples(samples)
+                                                if (s != null) chunkScores.add(s)
+                                            }
+                                        }
+                                    }
+                                } finally {
+                                    grabber.stop()
+                                    runCatching { grabber.release() }
                                 }
-                            } finally {
-                                grabber.stop()
-                                runCatching { grabber.release() }
                             }
                         }
                     }
@@ -956,6 +969,8 @@ object AiDetectionManager {
             } catch (_: CancellationException) {
             } catch (e: Exception) {
                 println("AiDetectionManager: Upfront scan error: ${e.message}")
+            } finally {
+                com.alananasss.kittytune.utils.NativeMemoryManager.trim()
             }
         }
     }

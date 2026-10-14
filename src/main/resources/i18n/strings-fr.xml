@@ -1897,7 +1897,6 @@
     <string name="sync_unauthorized">Le code a été refusé. Génère-en un nouveau sur cet appareil et colle-le ici.</string>
     <string name="sync_failed">Impossible de le joindre : %1$s</string>
     <string name="sync_events_held">%1$d évènements dans le journal.</string>
-    <string name="sync_paired_devices_sub">Ils restent synchronisés tout seuls. L'association se fait une seule fois, même si leur adresse change.</string>
     <string name="sync_forget_device">Oublier</string>
     <string name="sync_all_done">Synchronisation terminée.</string>
     <string name="sync_firewall_hint">Si le téléphone n'arrive toujours pas à joindre cet ordinateur, autorise les connexions entrantes sur le port %1$d dans ton pare-feu.</string>
@@ -2492,4 +2491,36 @@
     <string name="time_hours">%1$dh</string>
     <string name="time_minutes">%1$d min</string>
     <string name="time_seconds">%1$ds</string>
+
+    <!-- Additional / newly localized UI strings -->
+    <string name="player_dismissed_message">Piste masquée</string>
+    <string name="karaoke_auto_separate_sub">Isole automatiquement en arrière-plan dès le lancement ou redémarrage de la lecture sans intervention manuelle.</string>
+    <string name="karaoke_audio_track_id">Piste audio #%1$s</string>
+    <string name="karaoke_acapella_ready">Acapella prêt</string>
+    <string name="karaoke_auto_separate_playback_notice">L'isolation se lance automatiquement lors de la lecture</string>
+    <string name="karaoke_isolate_now">Isoler maintenant</string>
+    <string name="karaoke_no_track_playing_notice">Aucun morceau en cours de lecture · Lancez une piste pour tester l'acapella en direct</string>
+    <string name="karaoke_enable_vocal_boost_title">Activer le Boost Vocal / Studio Acapella</string>
+    <string name="karaoke_effect_live_active">Effet actif en direct</string>
+    <string name="karaoke_effect_disabled">Désactivé</string>
+    <string name="karaoke_pure_acapella_desc">Studio Acapella Pure (100% voix · instruments coupés)</string>
+    <string name="karaoke_preparing_ai_isolation">Préparation de l'isolation IA…</string>
+    <string name="karaoke_ai_studio_active">Studio Acapella IA actif</string>
+    <string name="karaoke_pure_vocals_desc">Voix pures isolées · Instruments coupés</string>
+    <string name="karaoke_preparing_acapella">Préparation de l'isolation Acapella…</string>
+    <string name="karaoke_dsp_waiting_studio">Filtre vocal actif en attendant la séparation studio</string>
+    <string name="karaoke_extracting_stems">Extraction des stems vocaux HTDemucs…</string>
+    <string name="karaoke_prep_audio">Préparation de l'audio…</string>
+    <string name="karaoke_decoding_audio">Décodage audio haute fidélité…</string>
+    <string name="karaoke_separating_neural_gpu">Séparation neuronale GPU…</string>
+    <string name="karaoke_separating_neural_gpu_eco">Séparation neuronale économique…</string>
+    <string name="karaoke_separating_neural_cpu">Séparation neuronale CPU…</string>
+    <string name="karaoke_separating_gpu_pct">Séparation neuronale GPU : %1$d%%</string>
+    <string name="karaoke_separating_gpu_eco_pct">Séparation neuronale économique : %1$d%%</string>
+    <string name="karaoke_separating_chunk">Séparation neuronale : fenêtre %1$d/%2$d (%3$d%%)</string>
+    <string name="karaoke_saving_stems">Sauvegarde des stems studio…</string>
+    <string name="upload_drop_hint">Glissez-déposez le fichier audio pour commencer</string>
+    <string name="upload_release_datetime">Date et heure de sortie (UTC/Locale)</string>
+    <string name="upload_discard_title">Abandonner les modifications non enregistrées ?</string>
+    <string name="upload_discard_message">Vous avez modifié les détails de la piste. Si vous quittez maintenant, vos modifications seront perdues.</string>
 </resources>

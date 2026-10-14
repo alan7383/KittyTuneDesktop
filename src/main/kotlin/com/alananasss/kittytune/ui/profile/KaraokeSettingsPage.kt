@@ -324,7 +324,7 @@ fun KaraokeSettingsPage(
                             SettingsItem(
                                 shape = RoundedCornerShape(24.dp),
                                 title = str("karaoke_auto_separate_label"),
-                                subtitle = "Isole automatiquement en arrière-plan dès le lancement ou redémarrage de la lecture sans intervention manuelle.",
+                                subtitle = str("karaoke_auto_separate_sub"),
                                 icon = Icons.Rounded.AutoAwesome,
                                 hasSwitch = true,
                                 switchState = autoSeparate,
@@ -507,7 +507,7 @@ fun KaraokeSettingsPage(
 
                                                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                                         Text(
-                                                            text = "Piste audio #${stem.trackId}",
+                                                            text = str("karaoke_audio_track_id", stem.trackId),
                                                             style = MaterialTheme.typography.bodyMedium,
                                                             fontWeight = FontWeight.Bold,
                                                             maxLines = 1,
@@ -695,7 +695,7 @@ fun KaraokeSettingsPage(
                                                             modifier = Modifier.size(14.dp),
                                                         )
                                                         Text(
-                                                            text = "Acapella Prêt",
+                                                            text = str("karaoke_acapella_ready"),
                                                             style = MaterialTheme.typography.labelSmall,
                                                             fontWeight = FontWeight.Bold,
                                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -753,7 +753,7 @@ fun KaraokeSettingsPage(
                                                             verticalAlignment = Alignment.CenterVertically,
                                                         ) {
                                                             Text(
-                                                                text = "L'isolation se lance automatiquement lors de la lecture",
+                                                                text = str("karaoke_auto_separate_playback_notice"),
                                                                 style = MaterialTheme.typography.bodySmall,
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                             )
@@ -765,7 +765,7 @@ fun KaraokeSettingsPage(
                                                             ) {
                                                                 Icon(Icons.Rounded.AutoAwesome, null, modifier = Modifier.size(16.dp))
                                                                 Spacer(Modifier.width(6.dp))
-                                                                Text("Isoler maintenant")
+                                                                Text(str("karaoke_isolate_now"))
                                                             }
                                                         }
                                                     }
@@ -783,7 +783,7 @@ fun KaraokeSettingsPage(
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                             Text(
-                                                text = "Aucun morceau en cours de lecture · Lancez une piste pour tester l'acapella en direct",
+                                                text = str("karaoke_no_track_playing_notice"),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -811,12 +811,12 @@ fun KaraokeSettingsPage(
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = "Activer le Boost Vocal / Studio Acapella",
+                                                text = str("karaoke_enable_vocal_boost_title"),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                             )
                                             Text(
-                                                text = if (playerViewModel.effectsState.isVocalBoostEnabled) "Effet actif en direct" else "Désactivé",
+                                                text = if (playerViewModel.effectsState.isVocalBoostEnabled) str("karaoke_effect_live_active") else str("karaoke_effect_disabled"),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = if (playerViewModel.effectsState.isVocalBoostEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
@@ -830,7 +830,7 @@ fun KaraokeSettingsPage(
                                     val level = playerViewModel.effectsState.vocalBoostIntensity
                                     val percent = (level * 100).toInt()
                                     Text(
-                                        text = if (percent >= 99) "Studio Acapella Pure (100% voix · instruments coupés)" else str("label_vocal_boost_level", percent),
+                                        text = if (percent >= 99) str("karaoke_pure_acapella_desc") else str("label_vocal_boost_level", percent),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = if (percent >= 99) FontWeight.Bold else FontWeight.Normal,
                                         color = if (percent >= 99) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,

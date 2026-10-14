@@ -161,63 +161,70 @@ object AppIconInstaller {
     }
 
     /**
-     * Ensures user-level .desktop files in ~/.local/share/applications point to the
-     * active variant icon and state StartupWMClass=kitty-tune. Covers all three
-     * naming variants (kitty-tune, kittytune, com-alananasss-kittytune-MainKt) so any
-     * desktop shell (Quickshell / Hyprland / KDE / GNOME) immediately identifies the app.
+     * Ensures user-level .desktop file in ~/.local/share/applications points to the
+     * active variant icon and states StartupWMClass=kitty-tune.
+     * Uses a single canonical desktop file name (kitty-tune.desktop) and removes any legacy
+     * duplicate desktop entries (kittytune.desktop, com-alananasss-kittytune-MainKt.desktop)
+     * so application launchers don't display duplicate KittyTune entries.
      */
     private fun overrideDesktopFile(variantKey: String) {
         val userApps = File(System.getProperty("user.home"), ".local/share/applications").apply { mkdirs() }
         val systemDesktop = findInstalledDesktopFile()
         val execPath = findExecutablePath()
 
+        val primaryName = systemDesktop?.name ?: "kitty-tune.desktop"
+        val iconName = "kitty-tune-$variantKey"
+
+        // Clean up legacy duplicate desktop files that cause multiple launcher entries
+        val obsoleteFiles = listOf("kittytune.desktop", "com-alananasss-kittytune-MainKt.desktop")
+        for (obs in obsoleteFiles) {
+            if (obs != primaryName) {
+                runCatching {
+                    val obsFile = File(userApps, obs)
+                    if (obsFile.exists()) obsFile.delete()
+                }
+            }
+        }
+
         val baseLines = systemDesktop?.readLines() ?: listOf(
             "[Desktop Entry]",
             "Name=KittyTune",
             "Comment=KittyTune Music Player",
             "Exec=$execPath",
-            "Icon=kitty-tune-$variantKey",
+            "Icon=$iconName",
             "Terminal=false",
             "Type=Application",
             "Categories=AudioVideo;Audio;Player;",
             "StartupWMClass=$LINUX_WM_CLASS"
         )
 
-        val targets = listOf(
-            "kitty-tune.desktop" to "kitty-tune-$variantKey",
-            "kittytune.desktop" to "kittytune-$variantKey",
-            "com-alananasss-kittytune-MainKt.desktop" to "kitty-tune-$variantKey"
-        )
+        runCatching {
+            val targetFile = File(userApps, primaryName)
+            val lines = (if (targetFile.exists()) targetFile.readLines() else baseLines).toMutableList()
 
-        for ((fileName, iconName) in targets) {
-            runCatching {
-                val targetFile = File(userApps, fileName)
-                val lines = (if (targetFile.exists()) targetFile.readLines() else baseLines).toMutableList()
+            var hasIcon = false
+            var hasWmClass = false
+            var hasExec = false
 
-                var hasIcon = false
-                var hasWmClass = false
-                var hasExec = false
-
-                for (i in lines.indices) {
-                    val line = lines[i]
-                    if (line.startsWith("Icon=")) {
-                        lines[i] = "Icon=$iconName"
-                        hasIcon = true
-                    } else if (line.startsWith("StartupWMClass=")) {
-                        lines[i] = "StartupWMClass=$LINUX_WM_CLASS"
-                        hasWmClass = true
-                    } else if (line.startsWith("Exec=")) {
-                        hasExec = true
-                        if (lines[i].isBlank()) lines[i] = "Exec=$execPath"
-                    }
+            for (i in lines.indices) {
+                val line = lines[i]
+                if (line.startsWith("Icon=")) {
+                    lines[i] = "Icon=$iconName"
+                    hasIcon = true
+                } else if (line.startsWith("StartupWMClass=")) {
+                    lines[i] = "StartupWMClass=$LINUX_WM_CLASS"
+                    hasWmClass = true
+                } else if (line.startsWith("Exec=")) {
+                    hasExec = true
+                    if (lines[i].isBlank()) lines[i] = "Exec=$execPath"
                 }
-
-                if (!hasIcon) lines += "Icon=$iconName"
-                if (!hasWmClass) lines += "StartupWMClass=$LINUX_WM_CLASS"
-                if (!hasExec) lines += "Exec=$execPath"
-
-                targetFile.writeText(lines.joinToString("\n") + "\n")
             }
+
+            if (!hasIcon) lines += "Icon=$iconName"
+            if (!hasWmClass) lines += "StartupWMClass=$LINUX_WM_CLASS"
+            if (!hasExec) lines += "Exec=$execPath"
+
+            targetFile.writeText(lines.joinToString("\n") + "\n")
         }
     }
 
