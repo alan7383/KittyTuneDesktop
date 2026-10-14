@@ -37,6 +37,13 @@ object DownloadManager {
 
     private const val CONCURRENT_DOWNLOAD_LIMIT = 4
     private val downloadSemaphore = Semaphore(CONCURRENT_DOWNLOAD_LIMIT)
+
+    // Deliberately never purged: downloadBatch starts jobs without the activeJobs guard, so this map
+    // is what actually serializes two downloads of the same track (they would otherwise interleave
+    // writes into the same temp file). Entries are ~100 bytes per unique track id downloaded this
+    // session — bounded by the library, not by time. Removing entries on completion has a race with
+    // a queued waiter that makes parallel same-track downloads possible again, which is a worse
+    // trade than a fixed few-KB map.
     private val trackMutexes = ConcurrentHashMap<Long, Mutex>()
 
     private val dao get() = AppDatabase.downloadDao
@@ -44,7 +51,9 @@ object DownloadManager {
     private val tokenManager = TokenManager
 
     private val api: SoundCloudApi by lazy { RetrofitClient.create() }
-    private val scope = CoroutineScope(Dispatchers.IO)
+    // Supervised: one failed launch used to cancel the scope's plain Job, and every download after
+    // that silently did nothing for the rest of the session (no error, no queue movement).
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val client: OkHttpClient
         get() = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient()
 
@@ -881,6 +890,10 @@ object DownloadManager {
                 _playlistDownloadProgress.update { it + (batchId to 1f) }
                 delay(500)
                 _storageTrigger.update { it + 1 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // cancelBatch() cancels the batch job; swallowing it here made the batch finish
+                // "normally" with half the tracks missing. Rethrown so cancellation is honoured.
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -949,12 +962,23 @@ object DownloadManager {
                         }
                     }
                 }
-                FileOutputStream(tempImageFile).use { fos ->
-                    downloadFileToStream(track.fullResArtwork, fos) { _ -> }
+                // The artwork is metadata, not the download: a dead artwork URL (or a placeholder the
+                // API filled in — picsum/avatars, the same heuristic the playlist cover uses) used to
+                // abort the whole track even though the audio was already on disk. Best-effort
+                // download, and the tag simply ships without an embedded image when it is missing.
+                val artworkUrl = track.fullResArtwork
+                val isRealArtwork = artworkUrl.isNotBlank() &&
+                    !artworkUrl.contains("picsum") && !artworkUrl.contains("avatars")
+                if (isRealArtwork) {
+                    runCatching {
+                        FileOutputStream(tempImageFile).use { fos ->
+                            downloadFileToStream(artworkUrl, fos) { _ -> }
+                        }
+                    }
+                    if (tempImageFile.exists() && tempImageFile.length() > 0L) {
+                        tempImageFile.copyTo(internalArtFile, overwrite = true)
+                    }
                 }
-
-                if (tempImageFile.exists()) tempImageFile.copyTo(internalArtFile, overwrite = true)
-
                 if (ext == "mp3") {
                     try {
                         val mp3file = Mp3File(tempAudioFile)
@@ -964,8 +988,10 @@ object DownloadManager {
                         id3v2Tag.artist = track.displayArtist.ifBlank { track.user?.username ?: str("unknown_artist") }
                         id3v2Tag.album = subFolderName ?: str("app_name")
                         id3v2Tag.comment = str("download_comment")
-                        val imageBytes = tempImageFile.readBytes()
-                        id3v2Tag.setAlbumImage(imageBytes, "image/jpeg")
+                        if (tempImageFile.exists() && tempImageFile.length() > 0L) {
+                            val imageBytes = tempImageFile.readBytes()
+                            id3v2Tag.setAlbumImage(imageBytes, "image/jpeg")
+                        }
                         mp3file.save(taggedAudioFile.absolutePath)
                     } catch (e: Exception) {
                         tempAudioFile.copyTo(taggedAudioFile, overwrite = true)
@@ -1000,6 +1026,11 @@ object DownloadManager {
 
                 _storageTrigger.update { it + 1 }
                 _libraryUpdated.tryEmit(Unit)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Cancellation must not be swallowed: cancelDownload()/cancelBatch() cancel this
+                // job, and a caught-and-ignored CancellationException makes the coroutine finish
+                // "normally" instead of cancelled — structured concurrency stops seeing it.
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -1099,7 +1130,13 @@ object DownloadManager {
         activeJobs[trackId]?.cancel()
         activeJobs.remove(trackId)
         _downloadProgress.update { it - trackId }
-        try { File(AppDirs.audioCacheDir, "temp_$trackId.mp3").delete() } catch (e: Exception) {}
+        // Both extensions: YouTube/HLS tracks download as temp_<id>.m4a, everything else as .mp3 —
+        // the hardcoded .mp3 below is why cancelled m4a downloads left their temp file behind.
+        try {
+            File(AppDirs.audioCacheDir, "temp_$trackId.mp3").delete()
+            File(AppDirs.audioCacheDir, "temp_$trackId.m4a").delete()
+            File(AppDirs.audioCacheDir, "temp_art_$trackId.jpg").delete()
+        } catch (e: Exception) {}
         _storageTrigger.update { it + 1 }
         _libraryUpdated.tryEmit(Unit)
     }

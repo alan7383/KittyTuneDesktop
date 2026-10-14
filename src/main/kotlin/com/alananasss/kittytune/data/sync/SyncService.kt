@@ -39,6 +39,9 @@ object SyncService {
     /** Where the secret goes. Bearer-style, because that is what it is. */
     const val PAIRING_HEADER = "Authorization"
 
+    /** An honest exchange is a few kilobytes; this is orders of magnitude of headroom, not a target. */
+    private const val MAX_BODY_BYTES = 16L * 1024 * 1024
+
     private const val KEY_SECRET = "pairing_secret"
     private const val KEY_ENABLED = "listener_enabled"
     private const val KEY_PORT = "listener_port"
@@ -153,7 +156,13 @@ object SyncService {
                 return
             }
 
-            val body = exchange.requestBody.readBytes().decodeToString()
+            // Bounded: readBytes() with no cap let a peer (buggy or hostile) push the heap around
+            // just by sending a large body. A real exchange is a few kilobytes; anything past
+            // 16 MB is not one, and it is refused before a single byte is parsed.
+            val body = readBounded(exchange, MAX_BODY_BYTES)?.decodeToString() ?: run {
+                exchange.sendResponseHeaders(413, -1)
+                return
+            }
             val request = runCatching { gson.fromJson(body, SyncExchange::class.java) }.getOrNull()
             if (request == null) {
                 exchange.sendResponseHeaders(400, -1)
@@ -172,6 +181,22 @@ object SyncService {
         } finally {
             exchange.close()
         }
+    }
+
+    /** Reads at most [limit] bytes, or null when the peer sent more than that. */
+    private fun readBounded(exchange: HttpExchange, limit: Long): ByteArray? {
+        val input = exchange.requestBody
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(64 * 1024)
+        var total = 0L
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            total += read
+            if (total > limit) return null
+            out.write(buffer, 0, read)
+        }
+        return out.toByteArray()
     }
 
     /**

@@ -6,8 +6,9 @@ import com.alananasss.kittytune.data.network.GithubAsset
 import com.alananasss.kittytune.data.network.GithubClient
 import com.alananasss.kittytune.data.network.GithubRelease
 import com.alananasss.kittytune.utils.AppUtils
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -31,6 +32,11 @@ enum class UpdateStatus {
  * 3. App restart button (READY_TO_INSTALL -> restartApp)
  */
 object UpdateManager {
+    // One supervised scope instead of three GlobalScope.launch calls: a GlobalScope job that fails
+    // or outlives shutdown is unstructured work the app can neither cancel nor see, and an
+    // exception in one launch must not take the others down with it.
+    private val installScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val _status = MutableStateFlow(UpdateStatus.IDLE)
     val status = _status.asStateFlow()
 
@@ -83,7 +89,7 @@ object UpdateManager {
         downloadedInstallerFile = file
         _status.value = UpdateStatus.INSTALLING
         _isDialogVisible.value = true
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        installScope.launch {
             performBackgroundInstall(file)
         }
     }
@@ -162,7 +168,7 @@ object UpdateManager {
         killOtherKittyTuneProcesses()
         downloadedInstallerFile?.let { file ->
             _status.value = UpdateStatus.INSTALLING
-            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            installScope.launch {
                 performBackgroundInstall(file)
             }
         }
@@ -172,7 +178,7 @@ object UpdateManager {
         val file = authFailedFile ?: downloadedInstallerFile ?: return
         authFailedFile = null
         _status.value = UpdateStatus.WAITING_FOR_AUTH
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        installScope.launch {
             performBackgroundInstall(file)
         }
     }
@@ -194,7 +200,6 @@ object UpdateManager {
             if (now - lastCheck < AUTO_CHECK_COOLDOWN_MS) {
                 return
             }
-            prefs.putLong(KEY_LAST_CHECK, now)
         }
 
         _status.value = UpdateStatus.CHECKING
@@ -211,6 +216,12 @@ object UpdateManager {
                 _isDialogVisible.value = true
             } else {
                 _status.value = if (isManual) UpdateStatus.NO_UPDATE else UpdateStatus.IDLE
+            }
+            // Committed after the release list actually came back: written before the request as
+            // it was, a network failure still consumed the 15-minute window, and start-ups behind
+            // a flaky proxy could skip update checks indefinitely.
+            if (!isManual) {
+                try { prefs.putLong(KEY_LAST_CHECK, System.currentTimeMillis()) } catch (_: Exception) {}
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -308,9 +319,19 @@ object UpdateManager {
                     throw Exception("HTTP Error ${response.code}")
                 }
 
+                // A server or proxy that ignores the Range header answers 200 with the FULL body,
+                // not 206 with the tail. Appending that body to the already-downloaded head built
+                // an installer with every byte twice — corrupted, and it installed as such (the
+                // audit's "reprise update HTTP 200 sur Range = installateur corrompu"). A 200 on a
+                // resume means no resume support: drop the partial file and start over.
+                if (existingLength > 0 && response.code != 206) {
+                    existingLength = 0L
+                    runCatching { file.delete() }
+                }
+
                 val body = response.body
                 val contentLength = body.contentLength()
-                val totalSize = if (response.code == 206 || existingLength > 0) {
+                val totalSize = if (existingLength > 0) {
                     existingLength + (if (contentLength > 0) contentLength else 0L)
                 } else {
                     if (contentLength > 0) contentLength else asset.size
