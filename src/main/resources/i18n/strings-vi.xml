@@ -1993,6 +1993,7 @@
     <string name="player_button_like">Thích</string>
     <string name="player_button_panel">Bảng cài đặt</string>
     <string name="player_button_queue">Hàng đợi</string>
+    <string name="player_button_devices">Thiết bị</string>
     <string name="player_like">Thích</string>
     <string name="player_next">Bài tiếp theo</string>
     <string name="player_play_pause">Phát / tạm dừng</string>
@@ -2312,6 +2313,7 @@
     <string name="player_button_miniplayer_desc">Chuyển sang cửa sổ phát thu nhỏ Picture-in-Picture</string>
     <string name="player_button_panel_desc">Mở bảng bên với chi tiết bài hát, lời nhạc và hiệu ứng</string>
     <string name="player_button_queue_desc">Truy cập trực tiếp vào danh sách phát tiếp theo</string>
+    <string name="player_button_devices_desc">Truy cập trực tiếp vào bảng thiết bị đã kết nối (KittyTune Connect)</string>
     <string name="player_button_shuffle">Phát ngẫu nhiên</string>
     <string name="player_button_shuffle_desc">Bật hoặc tắt trộn bài hát</string>
     <string name="player_button_repeat">Lặp lại</string>

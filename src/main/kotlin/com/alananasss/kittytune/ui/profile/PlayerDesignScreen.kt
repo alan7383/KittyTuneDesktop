@@ -660,6 +660,13 @@ private fun PlayerButtonsSection(
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE in visibleButtons
         ),
         ButtonConfigItem(
+            key = PlayerPreferences.PLAYER_BAR_BUTTON_DEVICES,
+            label = str("player_button_devices"),
+            desc = str("player_button_devices_desc"),
+            mark = rememberVectorPainter(Icons.Rounded.Devices),
+            enabled = PlayerPreferences.PLAYER_BAR_BUTTON_DEVICES in visibleButtons
+        ),
+        ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_SHUFFLE,
             label = str("player_button_shuffle"),
             desc = str("player_button_shuffle_desc"),

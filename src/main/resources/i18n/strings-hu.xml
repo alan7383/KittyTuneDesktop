@@ -1824,6 +1824,7 @@
     <string name="player_button_like">Kedvelés</string>
     <string name="player_button_panel">Beállítások panel</string>
     <string name="player_button_queue">Várólista</string>
+    <string name="player_button_devices">Eszközök</string>
     <string name="track_already_liked">Már a kedveléseid között</string>
     <string name="sc_selection_personalized_tracks">Még több abból, amit szeretsz</string>
     <string name="sc_selection_your_moods">A te hangulataid</string>
@@ -2230,6 +2231,7 @@
     <string name="player_button_miniplayer_desc">Váltás a lebegő Kép a képben mini lejátszó ablakra</string>
     <string name="player_button_panel_desc">Megnyitja az oldalsó panelt a szám részleteivel, szövegével és effektjeivel</string>
     <string name="player_button_queue_desc">Közvetlen hozzáférés a lejátszási sorhoz</string>
+    <string name="player_button_devices_desc">Közvetlen hozzáférés a csatlakoztatott eszközök panelhez (KittyTune Connect)</string>
     <string name="player_button_shuffle">Véletlenszerű lejátszás</string>
     <string name="player_button_shuffle_desc">A számok véletlenszerű keverésének be- vagy kikapcsolása</string>
     <string name="player_button_repeat">Ismétlés</string>

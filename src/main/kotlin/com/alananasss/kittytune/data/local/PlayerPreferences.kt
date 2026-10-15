@@ -301,6 +301,7 @@ class PlayerPreferences {
         private const val KEY_LOCAL_MEDIA_ENABLED = "local_media_enabled"
         private const val KEY_LOCAL_MEDIA_URIS_SET = "local_media_uris_set_v2"
         private const val KEY_PLAYER_BAR_BUTTONS = "player_bar_buttons"
+        private const val KEY_PLAYER_BAR_DEVICES_MIGRATED = "player_bar_devices_migrated"
         private const val KEY_PLAYER_BAR_STYLE = "player_bar_style"
         private const val KEY_TRACK_SOURCE_BADGE_STYLE = "track_source_badge_style"
         const val KEY_FULL_PLAYER_SOURCE_INDICATOR_ENABLED = "full_player_source_indicator_enabled"
@@ -309,6 +310,7 @@ class PlayerPreferences {
         const val PLAYER_BAR_BUTTON_LIKE = "like"
         const val PLAYER_BAR_BUTTON_PANEL = "panel"
         const val PLAYER_BAR_BUTTON_QUEUE = "queue"
+        const val PLAYER_BAR_BUTTON_DEVICES = "devices"
         const val PLAYER_BAR_BUTTON_LYRICS = "lyrics"
         const val PLAYER_BAR_BUTTON_MINIPLAYER = "miniplayer"
         const val PLAYER_BAR_BUTTON_SHUFFLE = "shuffle"
@@ -319,6 +321,7 @@ class PlayerPreferences {
                 PLAYER_BAR_BUTTON_LIKE,
                 PLAYER_BAR_BUTTON_PANEL,
                 PLAYER_BAR_BUTTON_QUEUE,
+                PLAYER_BAR_BUTTON_DEVICES,
                 PLAYER_BAR_BUTTON_LYRICS,
                 PLAYER_BAR_BUTTON_MINIPLAYER,
                 PLAYER_BAR_BUTTON_SHUFFLE,
@@ -1345,25 +1348,31 @@ class PlayerPreferences {
      */
     fun getPlayerBarButtons(): Set<String> {
         val raw = Prefs.getString(KEY_PLAYER_BAR_BUTTONS, null) ?: return PLAYER_BAR_BUTTONS_DEFAULT
-        val saved = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        var saved = raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         val hasNewKeys = saved.any {
             it == PLAYER_BAR_BUTTON_LYRICS || it == PLAYER_BAR_BUTTON_MINIPLAYER ||
                 it == PLAYER_BAR_BUTTON_SHUFFLE || it == PLAYER_BAR_BUTTON_REPEAT
         }
-        return if (!hasNewKeys) {
-            saved + setOf(
+        if (!hasNewKeys) {
+            saved = saved + setOf(
                 PLAYER_BAR_BUTTON_LYRICS,
                 PLAYER_BAR_BUTTON_MINIPLAYER,
                 PLAYER_BAR_BUTTON_SHUFFLE,
                 PLAYER_BAR_BUTTON_REPEAT,
             )
-        } else {
-            saved
         }
+        if (!Prefs.getBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, false)) {
+            saved = saved + PLAYER_BAR_BUTTON_DEVICES
+            Prefs.putBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, true)
+            Prefs.putString(KEY_PLAYER_BAR_BUTTONS, saved.joinToString(","))
+        }
+        return saved
     }
 
-    fun setPlayerBarButtons(buttons: Set<String>) =
+    fun setPlayerBarButtons(buttons: Set<String>) {
+        Prefs.putBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, true)
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
+    }
 
     fun getPlayerBarStyle(): PlayerBarStyle {
         val raw = Prefs.getString(KEY_PLAYER_BAR_STYLE, PlayerBarStyle.DEFAULT.name)
