@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.core
 
 import com.sun.jna.Native
+import com.sun.jna.Pointer
 import com.sun.jna.platform.win32.User32
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
@@ -54,6 +55,44 @@ object ToolWindowStyle {
         if (!isWindows || !window.isDisplayable) return
         runCatching {
             User32.INSTANCE.SetForegroundWindow(WinDef.HWND(Native.getWindowPointer(window)))
+        }
+    }
+
+    /**
+     * Raises a window to the foreground above other topmost windows in the same process.
+     *
+     * `Window.toFront()` / `Window.requestFocus()` through AWT don't reliably raise a regular topmost
+     * window above a topmost *tool* window (the mini player is one), so the settings dialog opened on
+     * screen but took no clicks — it sat behind the mini player's topmost tool window even though both
+     * carried `alwaysOnTop = true` (issue #76). `SetForegroundWindow` is the Win32 call that actually
+     * activates a window and reorders it above other topmost windows in the Z-order.
+     *
+     * `SetForegroundWindow` can be refused when the calling thread doesn't own the foreground. Since the
+     * user just clicked a context-menu item in our process, we hold the foreground privilege, so the call
+     * is allowed. As belt-and-braces, `BringWindowToTop` and a `SetWindowPos(HWND_TOPMOST)` re-assert the
+     * Z-order even if `SetForegroundWindow` is denied.
+     */
+    fun raiseToFront(window: Window) {
+        if (!isWindows || !window.isDisplayable) return
+        val hwnd = runCatching { WinDef.HWND(Native.getWindowPointer(window)) }.getOrNull() ?: return
+        val user32 = User32.INSTANCE
+        val HWND_TOPMOST = WinDef.HWND(Pointer.createConstant(-1))
+        // The primary call: activates the window and brings it above other topmost windows.
+        // SetForegroundWindow can be refused when the calling thread doesn't own the foreground,
+        // but since the user just clicked in our process we hold the privilege.
+        runCatching { user32.SetForegroundWindow(hwnd) }
+        // Fallbacks that reorder the Z-order without needing the foreground privilege.
+        runCatching { user32.BringWindowToTop(hwnd) }
+        // Re-assert WS_EX_TOPMOST so the shell recomputes the topmost group's Z-order; the window
+        // is already topmost from `alwaysOnTop = true`, but the explicit SetWindowPos forces the
+        // recalculation that SetForegroundWindow alone sometimes doesn't trigger.
+        runCatching {
+            user32.SetWindowPos(
+                hwnd,
+                HWND_TOPMOST,
+                0, 0, 0, 0,
+                WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or WinUser.SWP_NOACTIVATE,
+            )
         }
     }
 

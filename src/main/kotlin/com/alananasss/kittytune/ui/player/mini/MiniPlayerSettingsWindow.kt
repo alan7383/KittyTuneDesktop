@@ -26,8 +26,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -69,6 +73,12 @@ private const val EXIT_MS = 150
  *
  * Drawn as the app's own card rather than an OS dialog, so it can open the way the app's dialogs do:
  * fading in while it grows from 92 %, and reversing on close. The title row drags the window.
+ *
+ * On Windows the window is restyled as a tool window (no taskbar button, no Alt+Tab entry) *before* it
+ * is shown, which avoids the hide/show cycle that froze the settings the last time it was tried
+ * (issue #66). Once it is showing, `ToolWindowStyle.raiseToFront` calls `SetForegroundWindow` — the
+ * Win32 call `toFront()`/`requestFocus()` don't translate to — so the dialog lands above the mini
+ * player's topmost tool window and actually takes clicks (issue #76).
  */
 @Composable
 fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? = null) {
@@ -81,6 +91,10 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? =
         size = DpSize(SETTINGS_WIDTH.dp, SETTINGS_HEIGHT.dp),
     )
 
+    // Starts hidden: the tool-window style and transparent background are set before the first map,
+    // so there is no hide/show cycle (which froze the window, issue #66) and no taskbar button flash.
+    var windowReady by remember { mutableStateOf(false) }
+
     // Closing plays the exit first; the window goes once the card has gone.
     LaunchedEffect(shown.currentState, shown.isIdle) {
         if (shown.isIdle && !shown.currentState && !shown.targetState) onClose()
@@ -90,6 +104,7 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? =
     Window(
         onCloseRequest = requestClose,
         state = state,
+        visible = windowReady,
         undecorated = true,
         transparent = true,
         // Above its own mini player: that window is TOPMOST while pinned, so a normal
@@ -106,12 +121,48 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? =
             }
         },
     ) {
-        runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
-        // An ordinary window that takes focus. Turning it into a tool window hid and re-showed it behind the
-        // toolkit's back, and the settings then sat on screen frozen, taking no clicks (issue #66).
+        // Pre-map setup while the window is still hidden (visible = false above): the tool-window style
+        // lands before the first show, so the shell never sees a regular window to put a taskbar button
+        // for, and there is no hide/show cycle to freeze the window (issue #66). The mini player uses
+        // the same pattern for the same reason.
+        DisposableEffect(window) {
+            runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
+            if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
+            }
+            windowReady = true
+            onDispose { }
+        }
+
+        // Once the window is showing, raise it to the foreground above the mini player's topmost tool
+        // window. toFront()/requestFocus() alone don't reliably do this on Windows (issue #76);
+        // raiseToFront calls SetForegroundWindow, the Win32 function that actually activates a window
+        // and reorders it above other topmost windows in the same process. The user just clicked a
+        // context-menu item in our process, so we hold the foreground privilege and the call is allowed.
         LaunchedEffect(window) {
-            window.toFront()
-            window.requestFocus()
+            // Wait for the DisposableEffect above to set windowReady = true and the window to become
+            // showing. Polling is needed because the Window's visible flag flips in a recomposition
+            // that runs after this effect is first scheduled.
+            var attempts = 0
+            while (!window.isShowing && window.isDisplayable && attempts < 120) {
+                kotlinx.coroutines.delay(16)
+                attempts++
+            }
+            if (!window.isShowing) return@LaunchedEffect
+            runCatching {
+                window.toFront()
+                window.requestFocus()
+            }
+            if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
+                // A frame's wait lets the window finish mapping before we ask the shell to raise it.
+                kotlinx.coroutines.delay(30)
+                com.alananasss.kittytune.core.ToolWindowStyle.raiseToFront(window)
+                // SetForegroundWindow can be refused on the first try if the shell still considers the
+                // just-dismissed context menu the foreground. A second pass after the dust settles
+                // usually sticks, since toFront() has already moved focus into our process.
+                kotlinx.coroutines.delay(60)
+                com.alananasss.kittytune.core.ToolWindowStyle.raiseToFront(window)
+            }
         }
 
         KittyTuneTheme {

@@ -674,7 +674,8 @@ tasks.register<Test>("headlessTest") {
             "WindowsNativeDspTest", "DesktopRenderTest", "DesktopDensityTest",
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
-            "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest"
+            "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest",
+            "ToolWindowStyleRaiseToFrontTest"
         ).forEach(::includeTestsMatching)
     }
 }
