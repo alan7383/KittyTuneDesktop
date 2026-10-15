@@ -352,18 +352,26 @@ object LikeRepository {
 
     fun setLikedPlaylists(ids: Set<Long>) {
         val currentLiked = _likedPlaylists.value
-        val preservedLocalIds = try {
-            val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
-            val allLocal = kotlinx.coroutines.runBlocking { dao.getAllPlaylists().first() }
-            allLocal.filter { local ->
-                currentLiked.contains(local.id) && (local.permalinkUrl?.contains("spotify") == true || local.id < 0 || local.isDownloaded)
-            }.map { it.id }.toSet()
-        } catch (e: Exception) {
-            emptySet()
+        // Optimistic update: apply the server's set immediately so the UI reflects the change
+        // without waiting for a DB round-trip. The locally-preserved ids (downloaded / Spotify /
+        // user-created) are merged in asynchronously — they were the source of a runBlocking on
+        // the UI thread that froze playlist toggles (audit issue).
+        _likedPlaylists.value = ids
+        scope.launch {
+            val preservedLocalIds = try {
+                val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+                val allLocal = dao.getAllPlaylists().first()
+                allLocal.filter { local ->
+                    currentLiked.contains(local.id) && (local.permalinkUrl?.contains("spotify") == true || local.id < 0 || local.isDownloaded)
+                }.map { it.id }.toSet()
+            } catch (e: Exception) {
+                emptySet()
+            }
+            // Merge: only add preserved ids that aren't already in the set (avoids clobbering
+            // a concurrent change).
+            _likedPlaylists.update { current -> (current + preservedLocalIds) }
+            scheduleSave()
         }
-
-        _likedPlaylists.value = ids + preservedLocalIds
-        scheduleSave()
     }
 
     fun togglePlaylistLike(playlistId: Long, isLiked: Boolean, permalink: String? = null, urn: String? = null) {
@@ -373,14 +381,10 @@ object LikeRepository {
             DownloadManager.clearDeletedPlaylistId(playlistId)
         } else {
             current.remove(playlistId)
-            val isUserCreated = try {
-                val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
-                val p = kotlinx.coroutines.runBlocking { db.getPlaylist(playlistId) }
-                p?.isUserCreated == true
-            } catch (_: Exception) { false }
-            if (!isUserCreated) {
-                DownloadManager.addDeletedPlaylistId(playlistId)
-            }
+            // Optimistic: mark as deleted now, revert if the DB check reveals it's user-created.
+            // The previous runBlocking here to read db.getPlaylist() froze the UI thread on every
+            // playlist unlike (audit issue).
+            DownloadManager.addDeletedPlaylistId(playlistId)
         }
         _likedPlaylists.value = current
         DownloadManager.notifyLibraryUpdated()
@@ -392,6 +396,11 @@ object LikeRepository {
                 try {
                     val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
                     val p = dao.getPlaylist(playlistId)
+                    if (p?.isUserCreated == true) {
+                        // User-created playlists are not marked as deleted: revert the optimistic
+                        // addDeletedPlaylistId above.
+                        DownloadManager.clearDeletedPlaylistId(playlistId)
+                    }
                     if (p != null && !p.isDownloaded && !p.isUserCreated) {
                         dao.deletePlaylist(playlistId)
                         dao.deletePlaylistRefs(playlistId)
@@ -586,13 +595,17 @@ object LikeRepository {
             DownloadManager.clearDeletedPlaylistId(playlistId)
         } else {
             current.remove(playlistId)
-            val isUserCreated = try {
-                val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
-                val p = kotlinx.coroutines.runBlocking { db.getPlaylist(playlistId) }
-                p?.isUserCreated == true
-            } catch (_: Exception) { false }
-            if (!isUserCreated) {
-                DownloadManager.addDeletedPlaylistId(playlistId)
+            // Optimistic: mark as deleted, revert if the DB check reveals it's user-created.
+            // The previous runBlocking here froze the sync apply path (audit issue).
+            DownloadManager.addDeletedPlaylistId(playlistId)
+            scope.launch {
+                try {
+                    val db = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
+                    val p = db.getPlaylist(playlistId)
+                    if (p?.isUserCreated == true) {
+                        DownloadManager.clearDeletedPlaylistId(playlistId)
+                    }
+                } catch (_: Exception) {}
             }
         }
         _likedPlaylists.value = current
@@ -608,7 +621,8 @@ object LikeRepository {
         // The table goes with the session: a login that did not clear it would meet its likes
         // again on the next launch, from a store nobody had written to since.
         pendingSave?.cancel()
-        runCatching { kotlinx.coroutines.runBlocking { likeDao.clear() } }
+        // Async: the previous runBlocking here blocked the calling thread on a DB transaction.
+        scope.launch { runCatching { likeDao.clear() } }
         prefs.remove(KEY_LIKED_TRACKS)
         prefs.remove(KEY_LIKED_PLAYLISTS)
         prefs.remove(KEY_LOCALLY_UNLIKED_IDS)
@@ -682,9 +696,12 @@ object LikeRepository {
         // One-time migration. The library used to be one JSON string in the preferences map; it
         // moves to the table here and the prefs key goes, because leaving it would keep the
         // several-megabyte string resident in that map for the whole process (RAM, issue #33).
-        // Reading it once on the startup path costs the same parse the old load did.
         val legacyJson = prefs.getString(KEY_LIKED_TRACKS, null)
-        val loaded: List<Track> = if (legacyJson != null) {
+        if (legacyJson != null) {
+            // Migration path: parse the legacy JSON synchronously (it's already in memory, same
+            // cost as the old load), populate the StateFlow immediately so the UI paints, and
+            // write to the DB asynchronously — the previous runBlocking here on likeDao.replaceAll
+            // blocked the startup thread for thousands of inserts.
             val parsed: List<Track> = try {
                 val type: Type = object : TypeToken<List<Track>>() {}.type
                 gson.fromJson(legacyJson, type) ?: emptyList()
@@ -692,12 +709,22 @@ object LikeRepository {
                 emptyList()
             }
             prefs.remove(KEY_LIKED_TRACKS)
-            runCatching { kotlinx.coroutines.runBlocking { likeDao.replaceAll(parsed) } }
-            parsed
+            scope.launch { runCatching { likeDao.replaceAll(parsed) } }
+            populateFromLoaded(parsed)
         } else {
-            kotlinx.coroutines.runBlocking { likeDao.loadAll() }
+            // Normal path: load from the DB asynchronously. The previous runBlocking here on
+            // likeDao.loadAll() blocked the startup thread for the whole library read — the
+            // single biggest startup freeze on large libraries (audit issue). The UI paints an
+            // empty library first, then populates once the DB read completes (typically <50 ms).
+            scope.launch {
+                val loaded = runCatching { likeDao.loadAll() }.getOrDefault(emptyList())
+                populateFromLoaded(loaded)
+            }
         }
+    }
 
+    /** Applies the loaded list to [_likedTracks], normalising likedAt and filtering the blacklist. */
+    private fun populateFromLoaded(loaded: List<Track>) {
         val now = System.currentTimeMillis()
         val maxAllowedTime = now + 86_400_000L
         val migratedList = loaded.mapIndexed { index, track ->

@@ -404,8 +404,39 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     // and malloc-metadata corruption that later faults on the VM thread).
     private val nativeLock = Any()
 
+    // Defence-in-depth: if this processor is GC'd without onReset() being called (an orphaned
+    // AudioEngine — see Player.prebufferTransition), the Cleaner fires and frees the native
+    // handle so the ~0.4 MB of ebur128 + limiter state doesn't leak forever. The cleanable is
+    // replaced each time a new handle is allocated, and explicitly cleaned in destroyNative()
+    // to prevent the cleaner from running on an already-freed handle.
+    private var nativeCleanable: java.lang.ref.Cleaner.Cleanable? = null
+
     companion object {
         private var isLibraryLoaded = false
+
+        /**
+         * Defence-in-depth native handle cleanup, callable from a [java.lang.ref.Cleaner] without
+         * holding a reference to the processor.
+         *
+         * The primary cleanup path is [onReset] → [destroyNative], called from
+         * `AudioEngine.release()` when an engine is properly torn down. But if an engine is
+         * orphaned (e.g. a prebuffer race that loses — see `Player.prebufferTransition`), `onReset`
+         * is never called and the native ebur128 + limiter state (~0.4 MB) leaks forever, because
+         * the `Long` handle is invisible to GC. The Cleaner fires when the processor becomes
+         * phantom-reachable and frees the handle. Same body as the instance [nativeDestroy]; the
+         * C side ignores the receiver, so a static call works.
+         */
+        @JvmStatic
+        private external fun nativeDestroyHandle(handle: Long)
+
+        /**
+         * One shared [java.lang.ref.Cleaner] for all [NormalizationAudioProcessor] instances.
+         * A single daemon thread services all cleanables, so adding more processors doesn't add
+         * more threads. The cleaner action captures only the `Long` handle — never the processor
+         * — so it doesn't prevent the processor from becoming phantom-reachable.
+         */
+        @JvmStatic
+        private val NATIVE_CLEANER: java.lang.ref.Cleaner = java.lang.ref.Cleaner.create()
 
         init {
             loadNativeLibrary()
@@ -520,6 +551,15 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
                     if (lufs != null) {
                         nativeSetTrackLoudness(nativeHandle, lufs, pendingKnownPeakDb)
                     }
+                    // Register a cleanable that frees this handle if the processor is GC'd
+                    // without onReset(). The action captures only the long, not `this`, so it
+                    // doesn't keep the processor alive.
+                    val handleSnapshot = nativeHandle
+                    if (handleSnapshot != 0L) {
+                        nativeCleanable = NATIVE_CLEANER.register(this) {
+                            try { nativeDestroyHandle(handleSnapshot) } catch (_: Throwable) {}
+                        }
+                    }
                 } catch (t: Throwable) {
                     System.err.println("Failed to initialize native DSP: ${t.message}")
                     nativeHandle = 0L
@@ -530,6 +570,11 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
 
     private fun destroyNative() {
         synchronized(nativeLock) {
+            // Cancel the cleanable first: the handle is about to be freed by nativeDestroy below,
+            // and we don't want the Cleaner to also call nativeDestroyHandle on the now-stale
+            // handle (double-free).
+            nativeCleanable?.clean()
+            nativeCleanable = null
             if (nativeHandle != 0L && isLibraryLoaded) {
                 try {
                     nativeDestroy(nativeHandle)

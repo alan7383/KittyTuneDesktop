@@ -176,6 +176,9 @@ class Player {
 
     @Volatile
     private var prebufferedTransition: PrebufferedTransition? = null
+    /** True while prebufferTransition's coroutine is preparing an engine but hasn't stored it yet. */
+    @Volatile
+    private var prebufferInFlight: Boolean = false
     private var crossfadeJob: Job? = null
 
     fun isPrebuffered(trackId: Long): Boolean {
@@ -194,10 +197,27 @@ class Player {
 
     fun prebufferTransition(item: MediaItem, nextTrack: Track, automixPlan: AutomixPlan? = null) {
         if (isCrossfadingOut) return
-        if (isPrebuffered(nextTrack.id)) return
+        // Hold the lock across the check-then-launch so two near-simultaneous calls for different
+        // tracks can't both pass the isPrebuffered check and both create engines. The loser would
+        // otherwise overwrite prebufferedTransition, orphaning the first engine (and its native
+        // DSP handle, which GC can't free — see issue #33 RAM drift).
+        synchronized(this) {
+            if (isCrossfadingOut) return
+            if (isPrebuffered(nextTrack.id)) return
+            // Mark the slot as in-flight so a concurrent prebufferTransition for a different track
+            // doesn't try to start a second engine alongside this one.
+            if (prebufferInFlight) return
+            prebufferInFlight = true
+        }
 
         scope.launch {
             try {
+                // If a previous prebuffer exists for a different track, release it before we even
+                // resolve the new URL. Previously the old engine was just dereferenced and never
+                // stop()+release()'d, leaking ~1.5-2 MB per orphan (native ebur128 + limiter + the
+                // AiDetectionAudioProcessor's 800 KB preallocated buffer + FFmpeg contexts).
+                releasePrebuffered()
+
                 val rawUrl = item.uri?.takeIf {
                     if (it.startsWith("metrofuse-deezer://")) true
                     else if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it)
@@ -226,8 +246,18 @@ class Player {
                 engine.setMediaItem(url, headers, startPos, nextTrack.id)
                 engine.prepare()
 
-                prebufferedTransition = PrebufferedTransition(engine, item, nextTrack.id, automixPlan, url, headers)
+                // Re-check under the lock: if crossfadeToMediaItem adopted or released a prebuffer
+                // while we were preparing, our engine is now stale — release it and bail.
+                synchronized(this) {
+                    prebufferInFlight = false
+                    if (isCrossfadingOut || prebufferedTransition != null) {
+                        runCatching { engine.stop(); engine.release() }
+                        return@launch
+                    }
+                    prebufferedTransition = PrebufferedTransition(engine, item, nextTrack.id, automixPlan, url, headers)
+                }
             } catch (_: Exception) {
+                synchronized(this) { prebufferInFlight = false }
                 // Ignore prebuffering error, fallback to normal load on transition
             }
         }
@@ -369,7 +399,7 @@ class Player {
             val headers = buildHeaders(item.track)
             val track = item.track
             if (track != null) {
-                val cached = com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(track.id)
+                val cached = kotlinx.coroutines.runBlocking { com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(track.id) }
                 if (cached != null) {
                     activeEngine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
                 } else {
@@ -590,6 +620,16 @@ class Player {
                         // The artwork is lit by this, so the glow and the mix are the same event
                         // rather than two things that usually happen together.
                         AutomixManager.setMixProgress(progress)
+
+                        // Re-check ownership right before touching the engines. A second
+                        // crossfadeToMediaItem call may have run between the top-of-loop check
+                        // and here (the delay(100) / delay(50) above suspend). If so, the second
+                        // call has already released oldEngine (or claimed newEngine as its fading
+                        // engine) — calling setVolume on a released engine is a no-op (defensive
+                        // in AudioEngine), but racing setVolume on a newEngine that a second
+                        // crossfade has already claimed as its fadingEngine is audible as a brief
+                        // level jump (issue #76 audio glitch).
+                        if (!isActive || fadingEngine !== oldEngine) break
 
                         newEngine.setVolume(targetVolume * fadeIn)
                         oldEngine.setVolume(targetVolume * fadeOut)

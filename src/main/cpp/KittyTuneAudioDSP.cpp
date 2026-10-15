@@ -443,6 +443,31 @@ Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeDestroy(
     LOGI("DSP destroyed");
 }
 
+// Static companion method used by the java.lang.ref.Cleaner for defence-in-depth cleanup of
+// orphaned processors. Same body as nativeDestroy above; the JVM resolves this symbol for the
+// @JvmStatic external fun declared in the companion object. See NormalizationAudioProcessor.kt
+// for the full rationale.
+JNIEXPORT void JNICALL
+Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeDestroyHandle(
+    JNIEnv* env, jclass clazz, jlong handle) {
+
+    KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
+    if (!s) return;
+
+    if (s->ebur128) {
+        ebur128_destroy(&s->ebur128);
+        s->ebur128 = NULL;
+    }
+
+    destroyLimiter(s);
+    if (s->processBuffer) {
+        free(s->processBuffer);
+        s->processBuffer = NULL;
+    }
+    free(s);
+    LOGI("DSP destroyed (via Cleaner)");
+}
+
 JNIEXPORT void JNICALL
 Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeSetTargetLevel(
     JNIEnv* env, jclass clazz, jlong handle, jfloat targetLUFS) {

@@ -37,6 +37,14 @@ object TokenManager {
 
     val logoutFlow = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
+    /**
+     * A stored scope for the logout DB cleanup. The previous code created an inline
+     * `CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { ... }` with no stored reference —
+     * the job had no parent and couldn't be cancelled or awaited, so a logout immediately followed
+     * by process exit could lose the DB cleanup mid-flight (audit issue).
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val file = File(AppDirs.dataDir, "soundtune_auth.json")
     private val json = Json { prettyPrint = true }
     private val lock = Any()
@@ -171,7 +179,7 @@ object TokenManager {
         com.alananasss.kittytune.data.network.CookieStore.clear()
         logoutFlow.tryEmit(Unit)
 
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        scope.launch {
             try {
                 val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
                 dao.deleteNonDownloadedOnlinePlaylists()

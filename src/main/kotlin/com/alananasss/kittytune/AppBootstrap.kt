@@ -14,6 +14,9 @@ import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.utils.Config
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -26,6 +29,24 @@ object AppBootstrap {
 
     @Volatile
     private var done = false
+
+    /**
+     * A single supervised scope for the bootstrap's long-running coroutines (sync reconcile,
+     * client_id scrape, native memory trim). The previous code created three separate
+     * `CoroutineScope(Dispatchers.X).launch { ... }` with no stored reference — the scopes
+     * were unparented and the launched coroutines had no parent job, making them impossible to
+     * cancel and structurally unstructured. This scope is owned by the singleton, so the
+     * coroutines are properly parented and the whole group can be cancelled if ever needed.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * Set to true when the main window is visible, false when it's hidden/minimised. The native
+     * memory trim loop reads this to skip work while the app is in the tray — paying 15-second
+     * native trim cycles on an idle hidden app is wasted CPU (audit issue).
+     */
+    @Volatile
+    var windowVisible: Boolean = true
 
     @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
     fun init() {
@@ -120,7 +141,7 @@ object AppBootstrap {
             // Anything the log holds that the statistics table is missing goes back in. The marks advance
             // when events are merged, not when their rows land, so a failed or cancelled insert used to lose
             // listens the peer would never send again (issue #33).
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            scope.launch {
                 com.alananasss.kittytune.data.sync.SyncApply.reconcile()
             }
         }
@@ -131,7 +152,7 @@ object AppBootstrap {
 
         // 4b. Anonymous client_id: validate/scrape in background (replaces the ghost
         // WebView interception on Android). Guest mode depends on this.
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+        scope.launch {
             com.alananasss.kittytune.data.ClientIdScraper.ensureClientId()
         }
 
@@ -143,10 +164,14 @@ object AppBootstrap {
             com.alananasss.kittytune.data.theme.End4ThemeManager.startWatching()
         }
 
-        // 7. Periodic native memory cleanup (JavaCPP Pointer + Linux glibc arena trim)
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default).launch {
+        // 7. Periodic native memory cleanup (JavaCPP Pointer + Linux glibc arena trim).
+        // Skipped while the main window is hidden: paying 15-second native trim cycles on an
+        // idle hidden app is wasted CPU (audit issue). The loop checks [windowVisible] each tick
+        // so visibility changes take effect without restarting the loop.
+        scope.launch {
             while (isActive) {
                 kotlinx.coroutines.delay(15_000L)
+                if (!windowVisible) continue
                 com.alananasss.kittytune.utils.NativeMemoryManager.trim()
             }
         }

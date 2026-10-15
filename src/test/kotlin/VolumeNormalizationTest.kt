@@ -299,7 +299,7 @@ class VolumeNormalizationTest {
     @Test
     fun `track loudness repository caches and persists scan results`() {
         TrackLoudnessRepository.saveLoudness(999991L, -13.5f, -0.8f)
-        val cached = TrackLoudnessRepository.getLoudness(999991L)
+        val cached = kotlinx.coroutines.runBlocking { TrackLoudnessRepository.getLoudness(999991L) }
         assertTrue("Loudness must be retrievable", cached != null)
         assertEquals(-13.5f, cached!!.integratedLufs, 0.05f)
         assertEquals(-0.8f, cached.truePeakDb, 0.05f)

@@ -695,6 +695,13 @@ class AudioEngine {
         kotlinx.coroutines.runBlocking {
             try {
                 freshUrl = reResolver.invoke(failedUrl)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Re-throw: the previous `catch (e: Exception)` swallows CancellationException,
+                // which means a cancelled runBlocking job (e.g. release() cancelling the scope)
+                // is caught here, freshUrl stays null, and the decode loop continues spinning
+                // instead of honouring the cancellation. Re-throwing lets the cancellation
+                // propagate out of runBlocking so the decode thread can exit (audit issue).
+                throw e
             } catch (e: Exception) {
                 Logger.e("AudioEngine", "Re-resolve failed: ${e.message}")
             }

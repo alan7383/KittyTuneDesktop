@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit
 object Prefs {
 
     private val file = File(AppDirs.dataDir, "prefs.json")
+    private val backupFile = File(AppDirs.dataDir, "prefs.json.bak")
     // Compact on purpose: the file is rewritten after every change, and pretty-printing it only made each write bigger.
     private val json = Json { prettyPrint = false }
     private val writer = Executors.newSingleThreadScheduledExecutor { r ->
@@ -41,10 +42,32 @@ object Prefs {
     /** Reactive view of the whole pref map — collect + map to observe a single key. */
     val flow: StateFlow<Map<String, JsonElement>> get() = state
 
-    private fun load(): Map<String, JsonElement> = try {
-        if (file.exists()) json.parseToJsonElement(file.readText()).jsonObject else emptyMap()
-    } catch (_: Exception) {
-        emptyMap()
+    /**
+     * Loads the prefs map from `prefs.json`. If the primary file is missing or corrupt (partial
+     * write that didn't finish atomically, disk error, encoding issue), falls back to
+     * `prefs.json.bak` — the previous successful write — before giving up and returning an empty
+     * map. Previously a corrupt `prefs.json` silently lost every preference (theme, volume,
+     * proxy, download location — the lot) with no backup and no log (audit issue).
+     */
+    private fun load(): Map<String, JsonElement> {
+        return try {
+            if (file.exists()) json.parseToJsonElement(file.readText()).jsonObject else emptyMap()
+        } catch (primary: Exception) {
+            // The primary file is corrupt. Try the backup before falling back to empty — losing
+            // all prefs on a single bad write was the silent data-loss bug the audit flagged.
+            try {
+                if (backupFile.exists()) {
+                    println("Prefs: primary prefs.json failed to parse (${primary.message}), falling back to prefs.json.bak")
+                    json.parseToJsonElement(backupFile.readText()).jsonObject
+                } else {
+                    println("Prefs: primary prefs.json failed to parse (${primary.message}) and no backup exists; starting fresh")
+                    emptyMap()
+                }
+            } catch (backup: Exception) {
+                println("Prefs: both prefs.json and prefs.json.bak failed to parse (${backup.message}); starting fresh")
+                emptyMap()
+            }
+        }
     }
 
     @Volatile
@@ -57,6 +80,15 @@ object Prefs {
             val obj = buildJsonObject { state.value.forEach { (k, v) -> put(k, v) } }
             val tmp = File(file.parentFile, "prefs.json.tmp")
             tmp.writeText(json.encodeToString(JsonElement.serializer(), obj))
+            // Back up the previous good file before replacing it. If the replace succeeds, the
+            // backup stays for next time; if it fails, the backup is the recovery path for the
+            // next load(). The previous code had no backup, so a single bad write lost all prefs.
+            if (file.exists()) {
+                runCatching {
+                    @Suppress("DEPRECATION")
+                    file.copyTo(backupFile, overwrite = true)
+                }
+            }
             // The delete-then-rename this replaced had a window with no file at all, and plain
             // renameTo fails on Windows while a reader holds prefs.json open.
             AtomicFiles.replace(tmp, file)
