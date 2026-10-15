@@ -121,6 +121,7 @@ fun PlayerBar(
     onOpenFullPlayer: () -> Unit = {},
     isNowPlayingOpen: Boolean = false,
     isQueueOpen: Boolean = false,
+    isDevicesOpen: Boolean = false,
     modifier: Modifier = Modifier,
     /** Floating only: told where the pill itself is, which the content uses to keep clear of it. */
     onBarPlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)? = null,
@@ -542,9 +543,21 @@ fun PlayerBar(
                     }
                 }
 
-                Tip(str("connect_devices")) {
-                    IconButton(shapes = iconShapes, onClick = onOpenDevices) {
-                        Icon(Icons.Rounded.Devices, contentDescription = str("connect_devices"))
+                AnimatedVisibility(
+                    visible = !isCompact && PlayerPreferences.PLAYER_BAR_BUTTON_DEVICES in visibleButtons,
+                    enter = barButtonEnter,
+                    exit = barButtonExit,
+                ) {
+                    Tip(str("connect_devices")) {
+                        IconButton(shapes = iconShapes, onClick = onOpenDevices) {
+                            Icon(
+                                Icons.Rounded.Devices,
+                                contentDescription = str("connect_devices"),
+                                tint = if (isDevicesOpen) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
                     }
                 }
                 VolumeControl(

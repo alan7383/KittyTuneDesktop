@@ -354,17 +354,23 @@ fun MainScreen(
             playerViewModel.showLyricsSheet = !playerViewModel.showLyricsSheet
         },
         onOpenDevices = {
-            showNowPlayingPanel = true
-            playerPrefs.setRightPanelOpen(true)
-            playerPrefs.setHiddenPanelTabs(playerPrefs.getHiddenPanelTabs() - "devices")
-            nowPlayingTab = NowPlayingTab.DEVICES
+            if (showNowPlayingPanel && nowPlayingTab == NowPlayingTab.DEVICES) {
+                showNowPlayingPanel = false
+                playerPrefs.setRightPanelOpen(false)
+            } else {
+                showNowPlayingPanel = true
+                playerPrefs.setRightPanelOpen(true)
+                playerPrefs.setHiddenPanelTabs(playerPrefs.getHiddenPanelTabs() - "devices")
+                nowPlayingTab = NowPlayingTab.DEVICES
+            }
         },
         // Straight to the big one, which is what he asked for: "I think you can do this when you click
         // on it, the player opens in full." The lyrics button beside it still opens the panel-sized
         // lyrics, which has its own way up here (issue #33).
         onOpenFullPlayer = { playerViewModel.isLyricsFullScreen = true },
-        isNowPlayingOpen = showNowPlayingPanel && nowPlayingTab != NowPlayingTab.QUEUE,
+        isNowPlayingOpen = showNowPlayingPanel && nowPlayingTab != NowPlayingTab.QUEUE && nowPlayingTab != NowPlayingTab.DEVICES,
         isQueueOpen = showNowPlayingPanel && nowPlayingTab == NowPlayingTab.QUEUE,
+        isDevicesOpen = showNowPlayingPanel && nowPlayingTab == NowPlayingTab.DEVICES,
         modifier = barModifier,
         onBarPlaced = if (isBarFloating) { coordinates ->
             if (coordinates.isAttached) {

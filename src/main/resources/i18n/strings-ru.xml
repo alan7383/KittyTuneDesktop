@@ -1824,6 +1824,7 @@
     <string name="player_button_like">Нравится</string>
     <string name="player_button_panel">Панель настроек</string>
     <string name="player_button_queue">Очередь</string>
+    <string name="player_button_devices">Устройства</string>
     <string name="track_already_liked">Уже в ваших лайках</string>
     <string name="sc_selection_personalized_tracks">Ещё то, что вам нравится</string>
     <string name="sc_selection_your_moods">Ваши настроения</string>
@@ -2233,6 +2234,7 @@
     <string name="player_button_miniplayer_desc">Переключение в компактное плавающее окно «Картинка в картинке»</string>
     <string name="player_button_panel_desc">Открывает боковую панель с деталями трека, текстом и эффектами</string>
     <string name="player_button_queue_desc">Прямой доступ к очереди предстоящих треков</string>
+    <string name="player_button_devices_desc">Прямой доступ к панели подключенных устройств (KittyTune Connect)</string>
     <string name="player_button_shuffle">Перемешивание</string>
     <string name="player_button_shuffle_desc">Включение или отключение перемешивания треков</string>
     <string name="player_button_repeat">Повтор</string>

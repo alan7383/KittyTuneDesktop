@@ -1825,6 +1825,7 @@
     <string name="player_button_like">J'aime</string>
     <string name="player_button_panel">Panneau de réglages</string>
     <string name="player_button_queue">File d'attente</string>
+    <string name="player_button_devices">Appareils</string>
     <string name="track_already_liked">Déjà dans vos j'aime</string>
     <string name="sc_selection_personalized_tracks">Encore ce que vous aimez</string>
     <string name="sc_selection_your_moods">Vos ambiances</string>
@@ -2233,6 +2234,7 @@
     <string name="player_button_miniplayer_desc">Basculer vers la fenêtre flottante Picture-in-Picture</string>
     <string name="player_button_panel_desc">Ouvre le volet latéral avec détails, paroles et effets</string>
     <string name="player_button_queue_desc">Accès direct à la liste des morceaux suivants</string>
+    <string name="player_button_devices_desc">Accès rapide au panneau des appareils connectés (KittyTune Connect)</string>
     <string name="player_button_shuffle">Lecture aléatoire</string>
     <string name="player_button_shuffle_desc">Activer ou désactiver le mélange des titres</string>
     <string name="player_button_repeat">Répétition</string>

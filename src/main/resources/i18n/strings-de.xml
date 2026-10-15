@@ -2132,6 +2132,7 @@
     <string name="player_button_like">Gefällt mir</string>
     <string name="player_button_panel">Einstellungsleiste</string>
     <string name="player_button_queue">Warteschlange</string>
+    <string name="player_button_devices">Geräte</string>
     <string name="player_like">Gefällt mir</string>
     <string name="player_next">Nächster Titel</string>
     <string name="player_play_pause">Wiedergabe / Pause</string>
@@ -2451,6 +2452,7 @@
     <string name="player_button_miniplayer_desc">Zum schwebenden Bild-in-Bild-Miniplayer wechseln</string>
     <string name="player_button_panel_desc">Öffnet die Seitenleiste mit Track-Details, Songtexten und Effekten</string>
     <string name="player_button_queue_desc">Direkter Zugriff auf die Warteschlange der nächsten Titel</string>
+    <string name="player_button_devices_desc">Direkter Zugriff auf das Panel für verbundene Geräte (KittyTune Connect)</string>
     <string name="player_button_shuffle">Zufallswiedergabe</string>
     <string name="player_button_shuffle_desc">Zufällige Wiedergabe aktivieren oder deaktivieren</string>
     <string name="player_button_repeat">Wiederholen</string>
