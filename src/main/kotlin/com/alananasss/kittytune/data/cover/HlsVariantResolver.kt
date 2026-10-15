@@ -1,10 +1,10 @@
 package com.alananasss.kittytune.data.cover
 
+import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.utils.Logger
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URI
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -17,7 +17,10 @@ object HlsVariantResolver {
 
     private const val TAG = "HlsVariantResolver"
 
-    private val cache = ConcurrentHashMap<String, String>()
+    // Bounded LRU cache: the previous unbounded ConcurrentHashMap held one master-playlist →
+    // variant-URL mapping per canvas URL ever looked up, growing for the whole session (audit
+    // Phase 2 RAM gain).
+    private val cache = BoundedCache<String, String>(256)
 
     // Shares ProxyManager's pool and dispatcher; only the timeouts are this resolver's own.
     private val httpClient = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()

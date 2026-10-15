@@ -25,8 +25,11 @@ class AiDetectionAudioProcessor(
 ) : BaseAudioProcessor() {
 
     companion object {
-        // Maximum collection buffer: 4.5 seconds @ 44.1/48 kHz stereo 16-bit
-        private const val MAX_BUFFER_BYTES = 800_000
+        // Maximum collection buffer: exactly 4 seconds @ 44.1 kHz stereo 16-bit = 705,600 bytes.
+        // The AudioEngine hardcodes outputSampleRate = 44100, so 48 kHz never occurs. The previous
+        // 800,000 had ~94 KB of unused headroom per engine instance — ×3 engines (active + fading
+        // + prebuffer) = ~280 KB wasted (audit Phase 2 RAM gain).
+        private const val MAX_BUFFER_BYTES = 705_600
 
         // Sampling checkpoints: 0s, 4s, 8s (early transition coverage), then 20s, 40s, 60s (spaced late-onset monitoring)
         val DEFAULT_CHECKPOINTS_4S = doubleArrayOf(0.0, 4.0, 8.0, 20.0, 40.0, 60.0)

@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.audio.automix
 
+import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.data.StreamResolver
 import com.alananasss.kittytune.data.local.AppDatabase
@@ -42,7 +43,11 @@ object AutomixManager {
     private val beatAnalysisJobs = ConcurrentHashMap<String, BeatAnalysisHandle>()
     private val immediateAnalysisMutex = Mutex()
     private val lookaheadAnalysisMutex = Mutex()
-    private val failedSongIds = ConcurrentHashMap<String, Long>()
+    // Bounded LRU: the previous unbounded ConcurrentHashMap grew one entry per failed beat
+    // analysis, for the whole session. Entries older than 45s (FAILED_COOLDOWN_MS) are useless
+    // but were never evicted. Bounded at 200 — the LRU policy keeps the recently-failed tracks
+    // (audit Phase 2 RAM gain).
+    private val failedSongIds = BoundedCache<String, Long>(200)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 

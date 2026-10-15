@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.data
 
+import com.alananasss.kittytune.core.BoundedSet
 import com.alananasss.kittytune.core.NamedPrefs
 import com.alananasss.kittytune.data.spotify.SpotifyRepository
 import com.alananasss.kittytune.domain.Track
@@ -36,8 +37,8 @@ object SpotifyReleaseDateResolver {
         }
     )
 
-    /** Tracks Spotify had no date for; retried on the next launch only. */
-    private val exhausted = ConcurrentHashMap.newKeySet<Long>()
+    /** Tracks Spotify had no date for; retried on the next launch only. Bounded (audit Phase 2). */
+    private val exhausted = BoundedSet<Long>(1000)
     private val inFlight = ConcurrentHashMap<Long, Job>()
     private val semaphore = Semaphore(4)
 

@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.audio.providers.qobuz
 
+import com.alananasss.kittytune.core.BoundedCache
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -87,8 +88,10 @@ object QobuzAudioProvider {
         Thread(runnable, "QobuzAudioRace").apply { isDaemon = true }
     }
 
-    private val trackCache = ConcurrentHashMap<String, MatchedTrack>()
-    private val streamCache = ConcurrentHashMap<String, Resolved>()
+    // Bounded LRU caches: the previous unbounded ConcurrentHashMaps grew one entry per distinct
+    // (trackId, quality) tuple for the entire session. Bounded at 200 each (audit Phase 2 RAM gain).
+    private val trackCache = BoundedCache<String, MatchedTrack>(200)
+    private val streamCache = BoundedCache<String, Resolved>(200)
 
     fun resolverInstanceBases(customInstances: String? = null): List<String> {
         val configured = customInstances.orEmpty()
@@ -146,7 +149,9 @@ object QobuzAudioProvider {
 
     fun invalidate(mediaId: String) {
         val prefix = "$mediaId::"
-        for (key in streamCache.keys) {
+        // snapshot().keys — BoundedCache is LRU-bounded so we can't iterate it directly; copy the
+        // keys out and filter. The snapshot is cheap (invalidate is rare).
+        for (key in streamCache.snapshot().keys) {
             if (key.startsWith(prefix)) {
                 streamCache.remove(key)
             }

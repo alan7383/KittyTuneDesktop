@@ -143,6 +143,11 @@ class Player {
         const val DISCONTINUITY_REASON_SEEK_ADJUSTMENT = 2
 
         const val TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED = 0
+
+        /** How often the prebuffer TTL is checked. */
+        private const val PREBUFFER_TTL_CHECK_MS = 10_000L
+        /** Prebuffered engines older than this are released if not consumed by a crossfade. */
+        private const val PREBUFFER_TTL_MS = 60_000L
     }
 
     private val listeners = mutableListOf<Listener>()
@@ -172,6 +177,8 @@ class Player {
         val plan: AutomixPlan?,
         val url: String,
         val headers: Map<String, String>,
+        /** Wall-clock ms when the prebuffer was stored, for TTL eviction. */
+        val createdAtMs: Long = System.currentTimeMillis(),
     )
 
     @Volatile
@@ -181,8 +188,30 @@ class Player {
     private var prebufferInFlight: Boolean = false
     private var crossfadeJob: Job? = null
 
+    /**
+     * Prebuffered engines that aren't consumed by a crossfade within this TTL are released to avoid
+     * holding ~1.5-2 MB of native DSP + FFmpeg state for a track the user never skipped to. The
+     * prebuffer is re-created on demand if the user does skip later, so the cost of early release
+     * is one re-resolve, not a lost feature (audit Phase 2 RAM gain).
+     */
+    private val prebufferTtlJob: Job = scope.launch {
+        while (isActive) {
+            delay(PREBUFFER_TTL_CHECK_MS)
+            val pb = prebufferedTransition ?: continue
+            if (System.currentTimeMillis() - pb.createdAtMs > PREBUFFER_TTL_MS) {
+                releasePrebuffered()
+            }
+        }
+    }
+
     fun isPrebuffered(trackId: Long): Boolean {
         val pb = prebufferedTransition ?: return false
+        // TTL check: a prebuffer older than PREBUFFER_TTL_MS is stale (the user didn't skip to it)
+        // — release it and report not-prebuffered so the caller re-resolves if needed.
+        if (System.currentTimeMillis() - pb.createdAtMs > PREBUFFER_TTL_MS) {
+            releasePrebuffered()
+            return false
+        }
         return pb.trackId == trackId && pb.engine.state != AudioEngine.State.IDLE
     }
 

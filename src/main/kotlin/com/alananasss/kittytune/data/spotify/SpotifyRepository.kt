@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.data.spotify
 
+import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.data.network.ProxyManager
 import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.Dispatchers
@@ -371,9 +372,12 @@ object SpotifyRepository {
         return avatar
     }
 
-    private val artistAvatarCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    // Bounded LRU caches: the previous unbounded ConcurrentHashMaps accumulated one entry per
+    // artist page opened and per track whose release date was looked up, for the whole session
+    // (audit Phase 2 RAM gain).
+    private val artistAvatarCache = BoundedCache<String, String>(512)
 
-    private val trackReleaseDateCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val trackReleaseDateCache = BoundedCache<String, String>(512)
 
     private val EMBED_RELEASE_DATE =
         Regex("\"releaseDate\"\\s*:\\s*\\{\\s*\"isoString\"\\s*:\\s*\"([^\"]+)\"")

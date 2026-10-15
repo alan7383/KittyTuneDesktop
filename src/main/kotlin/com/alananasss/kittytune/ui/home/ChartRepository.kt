@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.home
 
+import com.alananasss.kittytune.core.BoundedCache
+import com.alananasss.kittytune.core.BoundedSet
 import com.alananasss.kittytune.data.network.SoundCloudApi
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
@@ -120,7 +122,11 @@ private fun writeChartToDisk(key: String, savedAt: Long, tracks: List<Track>) {
     }
 }
 
-private val countryCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Track>>>()
+// Bounded LRU cache: the previous unbounded ConcurrentHashMap held one Pair<Long, List<Track>>
+// per country ever opened, for the whole session — ~50 KB per country with 50-track charts.
+// Bounded at 32 (there are ~80 supported countries; 32 keeps the recently-viewed ones)
+// (audit Phase 2 RAM gain).
+private val countryCache = BoundedCache<String, Pair<Long, List<Track>>>(32)
 
 /** How long a country's chart is kept before it is read again. */
 private const val COUNTRY_CACHE_MS = 6 * 60 * 60 * 1000L
@@ -167,10 +173,14 @@ private fun spotifyCountryAlias(country: ChartCountry): String = when (country) 
 private val spotifyTop50Mutex = kotlinx.coroutines.sync.Mutex()
 
 /** Lower-case country name to the id of Spotify's "Top 50 - <country>", filled in as countries are asked for. */
-private val spotifyTop50 = java.util.concurrent.ConcurrentHashMap<String, String>()
+// Bounded LRU cache: the previous unbounded ConcurrentHashMap grew one entry per country ever
+// asked for, for the whole session (audit Phase 2 RAM gain).
+private val spotifyTop50 = BoundedCache<String, String>(64)
 
 /** Countries searched for already, so one that Spotify has no chart for is not searched for again and again. */
-private val spotifyTop50Searched = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+// Bounded set: the previous unbounded ConcurrentHashMap.newKeySet() grew for the whole session
+// (audit Phase 2 RAM gain).
+private val spotifyTop50Searched = BoundedSet<String>(64)
 
 /**
  * The id of Spotify's own "Top 50 - <country>" for the first of [names] that has one. Each name is looked up in Spotify's

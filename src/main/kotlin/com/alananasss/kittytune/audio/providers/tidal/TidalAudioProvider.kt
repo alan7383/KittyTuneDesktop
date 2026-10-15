@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.audio.providers.tidal
 
+import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.utils.Logger
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -292,10 +293,14 @@ object TidalAudioProvider {
             .callTimeout(25, TimeUnit.SECONDS)
             .build()
 
-    private val trackCache = ConcurrentHashMap<String, CachedTrack>()
-    private val searchCache = ConcurrentHashMap<String, CachedSearch>()
-    private val streamCache = ConcurrentHashMap<String, Resolved>()
-    private val streamFailureCache = ConcurrentHashMap<String, CachedFailure>()
+    // Bounded LRU caches: each provider used to be an unbounded ConcurrentHashMap that grew one
+    // entry per distinct (trackId, quality, proxy) tuple for the entire session. A long fallback-
+    // heavy session accumulated dozens of entries per failed track. Bounded at 200 each — the LRU
+    // policy keeps the entries still being asked about (audit Phase 2 RAM gain).
+    private val trackCache = BoundedCache<String, CachedTrack>(200)
+    private val searchCache = BoundedCache<String, CachedSearch>(200)
+    private val streamCache = BoundedCache<String, Resolved>(200)
+    private val streamFailureCache = BoundedCache<String, CachedFailure>(200)
 
     @Volatile
     private var resolverRateLimitedUntilMs = 0L
@@ -409,12 +414,14 @@ object TidalAudioProvider {
 
     fun invalidate(mediaId: String) {
         val prefix = "$mediaId::"
-        for (key in streamCache.keys) {
+        // snapshot().keys — BoundedCache is LRU-bounded so we can't iterate it directly; copy the
+        // keys out and filter. The snapshot is cheap (invalidate is rare).
+        for (key in streamCache.snapshot().keys) {
             if (key.startsWith(prefix)) {
                 streamCache.remove(key)?.mediaUri?.deleteIfLocalFileUri()
             }
         }
-        for (key in streamFailureCache.keys) {
+        for (key in streamFailureCache.snapshot().keys) {
             if (key.startsWith(prefix)) {
                 streamFailureCache.remove(key)
             }

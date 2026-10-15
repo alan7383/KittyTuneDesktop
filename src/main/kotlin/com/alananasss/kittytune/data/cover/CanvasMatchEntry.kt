@@ -1,6 +1,6 @@
 package com.alananasss.kittytune.data.cover
 
-import java.util.concurrent.ConcurrentHashMap
+import com.alananasss.kittytune.core.BoundedCache
 
 enum class CanvasMatchTier(val baseConfidence: Int) {
     ISRC_EXACT(100),
@@ -24,8 +24,10 @@ data class CanvasMatchEntry(
 
 object CanvasIndex {
 
-    private val byIsrc = ConcurrentHashMap<String, CanvasMatchEntry>()
-    private val bySongArtist = ConcurrentHashMap<String, CanvasMatchEntry>()
+    // Bounded LRU caches: the previous unbounded ConcurrentHashMaps grew one entry per (isrc)
+    // and per (song, artist) tuple ever looked up, for the whole session (audit Phase 2 RAM gain).
+    private val byIsrc = BoundedCache<String, CanvasMatchEntry>(512)
+    private val bySongArtist = BoundedCache<String, CanvasMatchEntry>(512)
 
     fun getByIsrc(isrc: String): CanvasMatchEntry? = byIsrc[isrc]
 

@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.data.cover
 
 import com.alananasss.kittytune.audio.providers.ProviderIsrc
+import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.core.NamedPrefs
 import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.Dispatchers
@@ -45,8 +46,11 @@ object AppleMusicCanvasProvider {
 
     data class AppleMusicCanvas(val animated: String?)
 
-    private val cache = ConcurrentHashMap<String, AppleMusicCanvas>()
-    private val negativeCache = ConcurrentHashMap<String, Long>()
+    // Bounded LRU caches: the previous unbounded ConcurrentHashMaps grew one entry per (isrc,
+    // song, artist, aspect) tuple ever looked up. A session that scrolled many albums with
+    // animated covers accumulated hundreds of entries. Bounded at 256/256 (audit Phase 2 RAM gain).
+    private val cache = BoundedCache<String, AppleMusicCanvas>(256)
+    private val negativeCache = BoundedCache<String, Long>(256)
     private const val NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000L
 
     @Volatile private var cachedToken: String? = null

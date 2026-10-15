@@ -68,7 +68,11 @@ object LyricsCache {
      */
     private const val CURRENT_SCHEMA = 2
 
-    private const val MAX_MEMORY_ENTRIES = 64
+    // 24 entries is enough for upcoming + recently-played; anything older reloads from disk in
+    // <5 ms. The previous 64 was wasteful for word-synced / enhanced lyrics (TTML, QRC) which can
+    // be 50-150 KB per entry — 64 × 150 KB = ~10 MB worst case. 24 × 150 KB = ~3.6 MB (audit
+    // Phase 2 RAM gain).
+    private const val MAX_MEMORY_ENTRIES = 24
     private val FOUND_TTL_MS = 90L * 24 * 60 * 60 * 1000 // 90 days
     private val MISS_TTL_MS = 12L * 60 * 60 * 1000 // 12 hours
 
