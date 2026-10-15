@@ -464,20 +464,56 @@ object KaraokeManager {
         downloadJob = null
         val modelTmp = File(getModelsDir(), "$MODEL_FILE_NAME.tmp")
         runCatching { modelTmp.delete() }
-        _downloadState.value = ModelDownloadState.NotDownloaded
+        val userHome = System.getProperty("user.home") ?: "/home/alan"
+        runCatching { File(userHome, ".cache/demucs-rs/$MODEL_FILE_NAME.tmp").delete() }
+        checkModelStatus()
     }
 
     fun deleteModel() {
         downloadJob?.cancel()
+        downloadJob = null
+        cancelSeparation()
         synchronized(sessionLock) {
             runCatching { cachedSession?.close() }
             cachedSession = null
             cachedSessionModelPath = null
             cachedSessionGpuKey = null
         }
-        val file = getModelFile()
-        runCatching { file.delete() }
-        _downloadState.value = ModelDownloadState.NotDownloaded
+        // 1. Delete all model files from modelsDir
+        val modelsDir = getModelsDir()
+        if (modelsDir.exists()) {
+            modelsDir.listFiles()?.forEach { file ->
+                if (file.name.endsWith(".onnx") || file.name.endsWith(".safetensors") || file.name.endsWith(".tmp")) {
+                    runCatching { file.delete() }
+                }
+            }
+        }
+        // 2. Delete user cache directory for demucs-rs
+        val isWindows = System.getProperty("os.name", "").lowercase().contains("win")
+        val userCache = if (isWindows) {
+            val localAppData = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
+            File(localAppData, "demucs-rs")
+        } else {
+            val userHome = System.getProperty("user.home") ?: "/home/alan"
+            File(userHome, ".cache/demucs-rs")
+        }
+        if (userCache.exists()) {
+            runCatching {
+                userCache.listFiles()?.forEach { it.delete() }
+                userCache.delete()
+            }
+        }
+        // 3. Clean up any leftover demucs_tmp directories in cacheDir
+        val cacheDir = AppDirs.cacheDir
+        if (cacheDir.exists()) {
+            cacheDir.listFiles { _, name -> name.startsWith("demucs_tmp_") }?.forEach { tmpDir ->
+                runCatching {
+                    tmpDir.listFiles()?.forEach { it.delete() }
+                    tmpDir.delete()
+                }
+            }
+        }
+        checkModelStatus()
     }
 
     fun importModelFile(sourceFile: File): Result<Unit> {
@@ -1077,7 +1113,7 @@ object KaraokeManager {
                 var processedWithDemucs = false
 
                 // If user disabled GPU acceleration and we have a native ONNX model, prefer ONNX CPU execution
-                val shouldRunDemucs = nativeBinary != null && (useGpu || onnxFile == null) && (isModelSafetensors || currentModel.length() > 50_000_000L)
+                val shouldRunDemucs = nativeBinary != null && (useGpu || onnxFile == null) && currentModel.exists() && (isModelSafetensors || currentModel.length() > 50_000_000L)
 
                 if (shouldRunDemucs) {
                     val tempInWav = File.createTempFile("kt_in_${trackId}_", ".wav")
@@ -1162,7 +1198,6 @@ object KaraokeManager {
         tempOutputDir.mkdirs()
 
         var process: Process? = null
-        var pacerJob: Job? = null
 
         try {
             val cmd = mutableListOf<String>()
@@ -1215,30 +1250,6 @@ object KaraokeManager {
 
             runCatching { nativeSetProcessIdlePriority(proc.pid()) }
 
-            // Anti-stutter duty-cycle pacer:
-            // High-intensity GPU compute saturates Vulkan queues and starves the desktop compositor (Hyprland/KWin/Mutter).
-            // Combining hardware queue priority (VK_QUEUE_GLOBAL_PRIORITY_LOW_KHR via libkt_vk_priority.so) with
-            // a balanced duty-cycle pacer prevents compositor frame drops across high refresh rates (60Hz to 240Hz).
-            // In GPU mode: 80ms run, 16ms yield (~83% duty cycle, guarantees a full 16.6ms window for 60Hz and 4x 240Hz flips without kernel scheduler churn).
-            // In Low Power / CPU mode: 40ms run, 40ms yield (50% duty cycle, minimal background consumption).
-            val runDurationMs = if (useGpu) 80L else 40L
-            val pauseDurationMs = if (useGpu) 16L else 40L
-
-            pacerJob = scope.launch(Dispatchers.Default) {
-                try {
-                    while (isActive && proc.isAlive) {
-                        delay(runDurationMs)
-                        if (!isActive || !proc.isAlive) break
-                        pauseSubprocess(proc)
-                        delay(pauseDurationMs)
-                        if (!proc.isAlive) break
-                        resumeSubprocess(proc)
-                    }
-                } finally {
-                    resumeSubprocess(proc)
-                }
-            }
-
             val stdoutReader = BufferedReader(InputStreamReader(proc.inputStream))
             val stderrReader = BufferedReader(InputStreamReader(proc.errorStream))
 
@@ -1257,8 +1268,6 @@ object KaraokeManager {
                 var line = stdoutReader.readLine()
                 while (line != null) {
                     if (currentProcessingTrackId != trackId) {
-                        pacerJob.cancel()
-                        resumeSubprocess(proc)
                         proc.destroyForcibly()
                         throw CancellationException("Separation superseded or cancelled")
                     }
@@ -1295,10 +1304,11 @@ object KaraokeManager {
             Logger.i(TAG, "Demucs separation completed successfully for track $trackId")
         } finally {
             activeProcess = null
-            pacerJob?.cancel()
             process?.let {
-                resumeSubprocess(it)
-                runCatching { it.destroyForcibly() }
+                if (it.isAlive) {
+                    resumeSubprocess(it)
+                    runCatching { it.destroyForcibly() }
+                }
             }
             runCatching {
                 tempOutputDir.listFiles()?.forEach { it.delete() }

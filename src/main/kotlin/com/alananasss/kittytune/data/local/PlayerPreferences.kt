@@ -629,9 +629,9 @@ class PlayerPreferences {
         get() = Prefs.getString(KEY_KARAOKE_SELECTED_GPU, com.alananasss.kittytune.audio.ai.GpuDevice.ID_AUTO) ?: com.alananasss.kittytune.audio.ai.GpuDevice.ID_AUTO
         set(value) = Prefs.putString(KEY_KARAOKE_SELECTED_GPU, value)
 
-    /** Auto-separate playing tracks in background when Karaoke is toggled on. Default: true. */
+    /** Auto-separate playing tracks in background when Karaoke is toggled on. Default: false. */
     var karaokeAutoSeparateOnPlay: Boolean
-        get() = Prefs.getBoolean(KEY_KARAOKE_AUTO_SEPARATE, true)
+        get() = Prefs.getBoolean(KEY_KARAOKE_AUTO_SEPARATE, false)
         set(value) = Prefs.putBoolean(KEY_KARAOKE_AUTO_SEPARATE, value)
 
     fun setSyncLikesEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_SYNC_LIKES, enabled)
