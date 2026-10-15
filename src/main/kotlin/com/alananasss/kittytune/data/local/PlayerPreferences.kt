@@ -210,6 +210,12 @@ val DEFAULT_PINNED_AUDIO_FX = listOf(
 class PlayerPreferences {
     private val gson = Gson()
     private val queueFile = File(AppDirs.dataDir, "queue_cache.json")
+    /**
+     * Dedicated store for the playback position. The position is saved every 5 seconds during
+     * playback; writing it to [Prefs] triggered a full re-encode of prefs.json on every tick.
+     * This file holds only KEY_POSITION, so the rewrite is a few bytes (audit Phase 5 IO gain).
+     */
+    private val positionPrefs = com.alananasss.kittytune.core.NamedPrefs("playback_position")
 
     companion object {
         val DEFAULT_PINNED_AUDIO_FX = listOf(
@@ -1702,7 +1708,7 @@ class PlayerPreferences {
             Prefs.putString(KEY_REPEAT_MODE, repeatMode.name)
             Prefs.remove(KEY_TRACK_JSON)
             if (queueFile.exists()) queueFile.delete()
-            Prefs.remove(KEY_POSITION)
+            positionPrefs.remove(KEY_POSITION)
             Prefs.remove(KEY_CONTEXT_JSON)
             return
         }
@@ -1723,14 +1729,19 @@ class PlayerPreferences {
 
         track?.let { Prefs.putString(KEY_TRACK_JSON, gson.toJson(it)) }
         Prefs.putString(KEY_CONTEXT_JSON, gson.toJson(context))
-        if (getSavePositionEnabled()) Prefs.putLong(KEY_POSITION, position) else Prefs.remove(KEY_POSITION)
+        if (getSavePositionEnabled()) positionPrefs.putLong(KEY_POSITION, position) else positionPrefs.remove(KEY_POSITION)
         Prefs.putBoolean(KEY_SHUFFLE_MODE, shuffleEnabled)
         Prefs.putString(KEY_REPEAT_MODE, repeatMode.name)
     }
 
     fun savePosition(position: Long) {
         if (getSavePositionEnabled()) {
-            Prefs.putLong(KEY_POSITION, position)
+            // Written to a dedicated NamedPrefs file, not the main Prefs map. The position is saved
+            // every 5 seconds during playback; writing it to Prefs triggered a full re-encode of
+            // prefs.json (including large blobs like KEY_TRACK_JSON, KEY_CONTEXT_JSON,
+            // cached_user_uploads) on every position tick. The dedicated file holds only this one
+            // key, so the rewrite is a few bytes (audit Phase 5 IO gain).
+            positionPrefs.putLong(KEY_POSITION, position)
         }
     }
 
@@ -1738,7 +1749,7 @@ class PlayerPreferences {
     fun saveDownloadLocation(uriString: String?) = if (uriString != null) Prefs.putString(KEY_DOWNLOAD_DIR, uriString) else Prefs.remove(KEY_DOWNLOAD_DIR)
     fun getDownloadLocation(): String? = Prefs.getString(KEY_DOWNLOAD_DIR, null)
     fun getLastTrack(): Track? { if (!getPersistentQueueEnabled()) return null; val json = Prefs.getString(KEY_TRACK_JSON, null) ?: return null; return try { gson.fromJson(json, Track::class.java) } catch (_: Exception) { null } }
-    fun getLastPosition(): Long = if (getSavePositionEnabled()) Prefs.getLong(KEY_POSITION, 0L) else 0L
+    fun getLastPosition(): Long = if (getSavePositionEnabled()) positionPrefs.getLong(KEY_POSITION, 0L) else 0L
     fun getLastQueue(): List<Track> {
         if (!getPersistentQueueEnabled()) return emptyList()
         if (queueFile.exists()) {

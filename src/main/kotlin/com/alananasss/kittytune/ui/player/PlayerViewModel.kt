@@ -3911,10 +3911,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 cleanTracks.filterIndexed { index, _ -> index != effectiveStartIndex }.shuffled()
             _queue.add(clickedTrack)
             _queue.addAll(rest)
-            playTrackAtIndex(0, addToHistory = (context == null || isHistoryContext), autoPlay = autoPlay)
+            // Always record the track in history when the user explicitly plays it. The previous
+            // gate `(context == null || isHistoryContext)` prevented tracks from being recorded
+            // when played from any context (search, playlist, album) — only the context itself
+            // was recorded (line ~3956), leaving the "Listening History" tab empty. Station/yt_radio
+            // exclusion is already handled inside playTrackAtIndex (line ~4085).
+            playTrackAtIndex(0, addToHistory = true, autoPlay = autoPlay)
         } else {
             _queue.addAll(cleanTracks)
-            playTrackAtIndex(effectiveStartIndex, addToHistory = (context == null || isHistoryContext), autoPlay = autoPlay)
+            playTrackAtIndex(effectiveStartIndex, addToHistory = true, autoPlay = autoPlay)
         }
 
         updateQueueState(); saveStateAsync(saveQueue = true)

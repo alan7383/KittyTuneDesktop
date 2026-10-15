@@ -1,5 +1,6 @@
 package com.alananasss.kittytune
 
+import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.NetworkMonitor
 import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.data.AlbumResolver
@@ -11,6 +12,7 @@ import com.alananasss.kittytune.data.MusicManager
 import com.alananasss.kittytune.data.RecognitionHistoryRepository
 import com.alananasss.kittytune.data.RepostRepository
 import com.alananasss.kittytune.data.SessionManager
+import com.alananasss.kittytune.data.cache.AudioCache
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.utils.Config
@@ -19,6 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * One-shot application bootstrap — the desktop equivalent of the init sequence that
@@ -112,6 +116,46 @@ object AppBootstrap {
         // 1. Core config + persistence.
         Config.init()
         AppDatabase.init()
+
+        // 1c. Cache sweep: drop leftover partial/temp files from a previous run, prune stale
+        //     lyrics JSON, and pull the audio cache back under its byte bound. Each step is
+        //     wrapped in its own runCatching so a failure in one (a locked file, a half-deleted
+        //     dir) does not stop the others — startup is the cheapest moment to do this work,
+        //     since nothing is reading these files yet (issue #5-DB).
+        scope.launch {
+            withContext(Dispatchers.IO) {
+                // .part files: a download (audio cache, demucs remux, etc.) killed mid-write
+                // leaves these behind. They are never servable and only confuse the decoder.
+                runCatching {
+                    AppDirs.audioCacheDir.listFiles { f -> f.isFile && f.extension == "part" }
+                        ?.forEach { runCatching { it.delete() } }
+                }
+                // temp_* / tagged_* scratch files from the recognition + tagger pipelines.
+                runCatching {
+                    AppDirs.audioCacheDir.listFiles { f ->
+                        f.isFile && (f.name.startsWith("temp_") || f.name.startsWith("tagged_"))
+                    }?.forEach { runCatching { it.delete() } }
+                }
+                // demucs_tmp_* directories: the source-separation worker leaves these on crash.
+                runCatching {
+                    AppDirs.cacheDir.listFiles { f -> f.isDirectory && f.name.startsWith("demucs_tmp_") }
+                        ?.forEach { runCatching { it.deleteRecursively() } }
+                }
+                // Lyrics cache: one .json per track ever played. Prune files older than 90 days,
+                // which matches the in-memory found-entry TTL in LyricsCache.
+                runCatching {
+                    val lyricsDir = File(AppDirs.cacheDir, "lyrics")
+                    val cutoff = System.currentTimeMillis() - 90L * 24 * 60 * 60 * 1000
+                    lyricsDir.listFiles { f -> f.isFile && f.extension == "json" }
+                        ?.filter { it.lastModified() < cutoff }
+                        ?.forEach { runCatching { it.delete() } }
+                }
+                // AudioCache already drops .part files in its own init, but only inside the
+                // tracks/ subdir. Run trim() here too so the cache is bounded if it drifted
+                // over the limit while the app was closed.
+                runCatching { AudioCache.trim() }
+            }
+        }
 
         // 1b. Network Proxy (applies system properties and OkHttp hooks)
         com.alananasss.kittytune.data.network.ProxyManager.applyConfiguration()

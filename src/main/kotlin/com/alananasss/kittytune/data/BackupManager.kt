@@ -53,14 +53,11 @@ object BackupManager {
         withContext(Dispatchers.IO) {
             val tracks = dao.getAllTracks().first()
             val playlists = dao.getAllPlaylists().first()
-            val allRefs = mutableListOf<PlaylistTrackCrossRef>()
-            playlists.forEach { playlist ->
-                val tracksInPlaylist = dao.getTracksForPlaylistSync(playlist.id)
-                tracksInPlaylist.forEach { track ->
-                    val ref = dao.getRef(playlist.id, track.id)
-                    if (ref != null) allRefs.add(ref)
-                }
-            }
+            // Single query for all refs — the previous N+1+M pattern called getTracksForPlaylistSync
+            // per playlist (N queries) then getRef per track per playlist (M queries), so a library
+            // with 100 playlists of 50 tracks was 5,100 DB round-trips through the single dispatcher
+            // (audit Phase 5 IO gain).
+            val allRefs = dao.getAllRefs()
 
             val artists = dao.getAllSavedArtists().first()
             val history = dao.getHistory().first()
@@ -97,12 +94,16 @@ object BackupManager {
             val data: FullBackupData = runCatching { gson.fromJson(jsonString, FullBackupData::class.java) }.getOrNull()
                 ?: throw Exception(str("error_backup_read"))
 
-            (data.localTracks ?: emptyList()).forEach { dao.insertTrack(it) }
-            (data.localPlaylists ?: emptyList()).forEach { dao.insertPlaylist(it) }
-            (data.playlistRefs ?: emptyList()).forEach { dao.insertPlaylistTrackRef(it) }
-            (data.savedArtists ?: emptyList()).forEach { dao.insertArtist(it) }
-            (data.history ?: emptyList()).forEach { dao.insertHistory(it) }
-            (data.listeningStats ?: emptyList()).forEach { dao.insertStatsEvent(it.copy(id = 0)) }
+            // Batch inserts: each dao.insertX(list) call uses execBatch (one transaction per
+            // table), replacing the previous per-item inserts that were each their own transaction
+            // (N commits + N invalidations). execBatch is already atomic per-table; a crash between
+            // tables is unlikely (they're fast) and the restore can be re-run (audit Phase 5 IO gain).
+            dao.insertTracks(data.localTracks ?: emptyList())
+            dao.insertPlaylists(data.localPlaylists ?: emptyList())
+            dao.insertPlaylistTrackRefs(data.playlistRefs ?: emptyList())
+            dao.insertArtists(data.savedArtists ?: emptyList())
+            dao.insertHistoryList(data.history ?: emptyList())
+            dao.insertStatsEvents((data.listeningStats ?: emptyList()).map { it.copy(id = 0) })
 
             LikeRepository.replaceAllLikes(data.likedTracks ?: emptyList())
 
