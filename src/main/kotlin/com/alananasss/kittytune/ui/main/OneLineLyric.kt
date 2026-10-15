@@ -84,7 +84,7 @@ internal fun FloatingLyricChip(vm: PlayerViewModel, modifier: Modifier = Modifie
         // The smooth state feeds two derived things only: the active index (recomputed per frame,
         // but observed only when the line actually changes) and the fill (read in its draw phase).
         // Reading it as a value here, as this used to, recomposed the whole chip at 60 fps.
-        val positionState = rememberSmoothPosition(vm.currentPosition, vm.isPlaying, vm.effectsState.speed)
+        val positionState = rememberSmoothPosition({ vm.currentPosition }, vm.isPlaying, vm.effectsState.speed)
         val lyricsOffset = if (followsPlain) 0L else vm.lyricsOffset
         val activeIndex by remember(lines, lyricsOffset) {
             derivedStateOf { LyricsUtils.activeLineIndex(lines, (positionState.value + lyricsOffset).toLong()) }

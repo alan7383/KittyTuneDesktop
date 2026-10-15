@@ -213,7 +213,7 @@ private fun PanelSyncedLyrics(
         // the line's draw phase and in the derived active index — never here, where reading it would
         // recompose the whole panel at the frame rate.
         val smoothPosition = rememberSmoothPosition(
-            positionMs = vm.uiCurrentPosition,
+            positionMs = { vm.uiCurrentPosition },
             isPlaying = vm.uiIsPlaying,
             speed = vm.effectsState.speed,
         )

@@ -393,14 +393,12 @@ import kotlin.math.roundToInt
     
     @Composable
     fun SyncedLyricsView(viewModel: PlayerViewModel) {
-        val currentPosition = viewModel.uiCurrentPosition
-        val adjustedPosition = currentPosition + viewModel.lyricsOffset
         val lyrics = viewModel.lyricsLines
         // Built on the line being sung, not on line one: the placement below runs after the first frame, and
         // that frame — the top of the song, mid-fade — was the jolt at every opening (issue #33, round 5).
         val listState = key(viewModel.uiCurrentTrack?.id) {
             rememberLazyListState(
-                initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lyrics, adjustedPosition).coerceAtLeast(0)
+                initialFirstVisibleItemIndex = LyricsUtils.activeLineIndex(lyrics, viewModel.uiCurrentPosition + viewModel.lyricsOffset).coerceAtLeast(0)
             )
         }
         val fontSize = viewModel.lyricsFontSize
@@ -414,12 +412,15 @@ import kotlin.math.roundToInt
         // Shared with the panel, which needs exactly the same thing for exactly the same reason
         // (issue #33) — see [rememberSmoothPosition] for why the estimate is bounded, and for why
         // the State is handed on rather than read here.
+        //
+        // positionMs is a lambda so this composable doesn't recompose on every position tick (4–5×/sec).
+        // The smooth position is read via State<Float> in the draw phase only (audit Phase 3 CPU gain).
         val smoothDrawPosition = rememberSmoothPosition(
-            positionMs = currentPosition,
+            positionMs = { viewModel.uiCurrentPosition },
             isPlaying = viewModel.uiIsPlaying,
             speed = viewModel.effectsState.speed,
         )
-    
+
         val fadeBrush = remember {
             Brush.verticalGradient(
                 0f to Color.Transparent,
@@ -428,9 +429,13 @@ import kotlin.math.roundToInt
                 1f to Color.Transparent
             )
         }
-    
-        val activeIndex = remember(adjustedPosition, lyrics) {
-            LyricsUtils.activeLineIndex(lyrics, adjustedPosition)
+
+        // Derived: the frame-clock position is recomputed every frame but observed only when the
+        // active line index actually changes. Computing the index from a per-frame value — as the
+        // `remember(adjustedPosition, lyrics)` this replaces did — recomposed the whole lyrics
+        // screen 4–5 times a second for the whole song (audit Phase 3 CPU gain).
+        val activeIndex by remember(lyrics) {
+            derivedStateOf { LyricsUtils.activeLineIndex(lyrics, viewModel.uiCurrentPosition + viewModel.lyricsOffset) }
         }
     
         // Reading along by hand wins for a while; the panel's copy of the lyrics follows the same
@@ -455,7 +460,7 @@ import kotlin.math.roundToInt
                     .fadingEdge(fadeBrush),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                itemsIndexed(lyrics) { index, line ->
+                itemsIndexed(lyrics, key = { _, line -> "${line.startTime}-${line.endTime}" }) { index, line ->
                     val isActive = index == activeIndex
     
                     // Three ways to set the current line apart, asked for with screenshots of another

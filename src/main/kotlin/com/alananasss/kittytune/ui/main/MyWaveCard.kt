@@ -241,6 +241,7 @@ private fun waveModeVisual(mode: WaveMode): Pair<ImageVector, String> = when (mo
  */
 @Composable
 private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifier = Modifier) {
+    val isSeen = com.alananasss.kittytune.core.LocalWindowSeen.current
     val transition = rememberInfiniteTransition(label = "waveDrift")
     val phase by transition.animateFloat(
         initialValue = 0f,
@@ -248,6 +249,10 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
         animationSpec = infiniteRepeatable(tween(WAVE_PERIOD_MS, easing = LinearEasing), RepeatMode.Restart),
         label = "wavePhase",
     )
+    // When the window is hidden, render a static phase (0f) instead of driving the Canvas at 60 fps
+    // for nobody. The wave is decorative — a static wave looks the same as a frozen one (audit
+    // Phase 3 CPU gain).
+    val effectivePhase = if (isSeen) phase else 0f
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -255,7 +260,7 @@ private fun WaveBackground(energy: Float, colors: List<Color>, modifier: Modifie
             val baseline = h * (0.62f + i * 0.1f)
             val amplitude = h * (0.06f + 0.05f * i) * (0.4f + energy)
             val frequency = 1.2f + i * 0.45f
-            val shift = waveShift(phase, i)
+            val shift = waveShift(effectivePhase, i)
             fun crestY(x: Float) = baseline + amplitude * sin((x / w) * frequency * 2 * PI.toFloat() + shift)
             // The crest alone gets the bright line; outlining the filled shape also drew its sides, two white
             // bars down the card's edges.

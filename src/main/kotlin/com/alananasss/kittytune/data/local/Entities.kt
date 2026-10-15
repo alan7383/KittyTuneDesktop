@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.data.local
 
+import androidx.compose.runtime.Immutable
+
 /**
  * Persistence entities — desktop port of the Room entities.
  * Room @Entity/@PrimaryKey annotations dropped; the schema lives in AppDatabase (JDBC).
@@ -48,6 +50,7 @@ data class PlaylistTrackCrossRef(
 )
 
 // table: saved_artists
+@Immutable
 data class LocalArtist(
     val id: Long,
     val username: String,

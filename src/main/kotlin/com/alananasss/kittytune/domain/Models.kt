@@ -1,5 +1,6 @@
     package com.alananasss.kittytune.domain
     
+    import androidx.compose.runtime.Immutable
     import com.alananasss.kittytune.data.network.LongIdAdapter
     import com.google.gson.annotations.JsonAdapter
     import com.google.gson.annotations.SerializedName
@@ -355,6 +356,7 @@
     typealias PublisherMetadata = TrackPublisherMetadata
 
     // track
+    @Immutable
     data class Track(
         val id: Long,
         val title: String?,
@@ -637,6 +639,7 @@
     )
     
     // playlist
+    @Immutable
     data class Playlist(
         @JsonAdapter(LongIdAdapter::class) val id: Long,
         val title: String?,
@@ -727,6 +730,7 @@
     }
     
     // user
+    @Immutable
     data class User(
         val id: Long,
         val username: String?,

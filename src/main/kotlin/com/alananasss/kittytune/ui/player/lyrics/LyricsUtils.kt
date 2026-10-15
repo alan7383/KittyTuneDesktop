@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.ui.player.lyrics
 
+import androidx.compose.runtime.Immutable
 import com.alananasss.kittytune.data.lyrics.parsers.QRCParser
 import com.alananasss.kittytune.data.lyrics.parsers.TTMLParser
 import com.mpatric.mp3agic.Mp3File
@@ -7,6 +8,7 @@ import org.yaml.snakeyaml.Yaml
 import java.io.File
 import java.util.regex.Pattern
 
+@Immutable
 data class LyricWord(
     val text: String,
     val startTime: Long,
@@ -23,6 +25,7 @@ enum class LyricSinger {
     BOTH
 }
 
+@Immutable
 data class LyricLine(
     val text: String,
     val startTime: Long,

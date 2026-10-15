@@ -349,24 +349,46 @@ private const val SOFT_EDGE_EMS = 1.6f
  * The old Float-returning signature forced every caller to read the per-frame value during composition,
  * which recomposed the visible lyric lines and the mini-player at 60 fps for the whole song.
  */
+/**
+ * Interpolated playback position, updated per frame so word-fill and progress move smoothly between
+ * the player's 4–5 Hz position reports.
+ *
+ * Takes a `() -> Long` lambda (not a `Long`) so the caller's composable doesn't recompose on every
+ * position tick. The lambda is read inside the frame loop, where a jump > 200 ms (a seek or a
+ * re-sync report) snaps the smooth position to the reported value, and small deltas are
+ * extrapolated from the last known anchor. This matches the old `LaunchedEffect(positionMs, …)`
+ * restart-on-every-tick behaviour without invalidating the caller's composition.
+ */
 @Composable
 internal fun rememberSmoothPosition(
-    positionMs: Long,
+    positionMs: () -> Long,
     isPlaying: Boolean,
     speed: Float,
 ): State<Float> {
-    val smooth = remember { mutableFloatStateOf(positionMs.toFloat()) }
-    LaunchedEffect(positionMs, isPlaying, speed) {
+    val initial = positionMs()
+    val smooth = remember { mutableFloatStateOf(initial.toFloat()) }
+    LaunchedEffect(isPlaying, speed) {
         if (!isPlaying) {
-            smooth.floatValue = positionMs.toFloat()
+            smooth.floatValue = positionMs().toFloat()
             return@LaunchedEffect
         }
-        val startedAtMs = System.currentTimeMillis()
-        val startedAt = positionMs.toFloat()
+        var startedAtMs = System.currentTimeMillis()
+        var startedAt = positionMs().toFloat()
         while (isActive) {
             withFrameMillis {
-                val elapsed = (System.currentTimeMillis() - startedAtMs).coerceAtMost(MAX_EXTRAPOLATION_MS)
-                smooth.floatValue = startedAt + (elapsed * speed)
+                val now = System.currentTimeMillis()
+                val reported = positionMs().toFloat()
+                val extrapolated = startedAt + ((now - startedAtMs) * speed)
+                // A jump larger than 200 ms is a seek or a fresh report that's drifted from the
+                // extrapolation — snap to it. Otherwise keep the smooth per-frame extrapolation.
+                if (kotlin.math.abs(reported - extrapolated) > 200f) {
+                    startedAt = reported
+                    startedAtMs = now
+                    smooth.floatValue = reported
+                } else {
+                    val elapsed = (now - startedAtMs).coerceAtMost(MAX_EXTRAPOLATION_MS)
+                    smooth.floatValue = startedAt + (elapsed * speed)
+                }
             }
         }
     }
