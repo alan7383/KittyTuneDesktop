@@ -26,13 +26,18 @@ object WindowsThemeManager {
     
     fun startWatching() {
         if (!isWindows || pollingJob != null) return
-        
+
         // Initial load
         reloadColor()
-        
+
         pollingJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive) {
-                reloadColor()
+                // Skip the registry poll while the window is hidden — the accent color can't change
+                // visually for the user while the app is in the tray, and JNA registry reads every
+                // 2 seconds for the entire JVM lifetime was wasted CPU (audit Phase 4 CPU gain).
+                if (com.alananasss.kittytune.AppBootstrap.windowVisible) {
+                    reloadColor()
+                }
                 delay(2000L) // Check every 2 seconds
             }
         }

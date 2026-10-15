@@ -106,9 +106,23 @@ object SessionManager {
         keepAliveJob = scope.launch {
             while (true) {
                 delay(REFRESH_INTERVAL)
+                // Skip the refresh while in guest mode — there's no token to refresh, and the loop
+                // was waking every 20 minutes for nothing. The previous code called
+                // requestSessionRefresh which returned early in guest mode, but the delay still ran.
+                if (tokenManager.isGuestMode()) continue
                 requestSessionRefresh(force = false)
             }
         }
+    }
+
+    /**
+     * Stops the keep-alive loop. Called from [TokenManager.logout] so the loop doesn't keep hitting
+     * the token endpoint every 20 minutes after the user has logged out (audit Phase 4 CPU/network
+     * gain). The loop restarts on the next [start] / login.
+     */
+    fun stop() {
+        keepAliveJob?.cancel()
+        keepAliveJob = null
     }
 
     fun requestSessionRefresh(force: Boolean = false) {

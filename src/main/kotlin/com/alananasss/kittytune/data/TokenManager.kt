@@ -172,6 +172,9 @@ object TokenManager {
         clearTokens()
         values[KEY_IS_GUEST_MODE] = JsonPrimitive(false)
         save()
+        // Stop the session keep-alive loop: it would otherwise keep hitting the token endpoint
+        // every 20 minutes after logout, for a token that no longer exists (audit Phase 4).
+        SessionManager.stop()
         LikeRepository.clear()
         RepostRepository.clear()
         // Whose follows the social proof was about is gone with the session.
