@@ -101,7 +101,14 @@ object SyncScheduler {
 
                 if (movedNetwork || now - lastPassAtMs >= HEARTBEAT_MS) {
                     lastPassAtMs = now
-                    runCatching { syncAll(if (movedNetwork) "network changed" else "heartbeat") }
+                    // Skip the sync exchange while the window is hidden — the user isn't watching the
+                    // library, and a 10-minute heartbeat landing while the app is in the tray wastes
+                    // network probes and DB merges for nobody. A network change still triggers
+                    // immediately (the user may have just walked in the door and will open the app
+                    // right after) (audit Phase 4 CPU/network gain).
+                    if (movedNetwork || com.alananasss.kittytune.AppBootstrap.windowVisible) {
+                        runCatching { syncAll(if (movedNetwork) "network changed" else "heartbeat") }
+                    }
                 }
                 delay(TICK_MS)
             }

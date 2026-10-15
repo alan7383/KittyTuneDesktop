@@ -459,4 +459,19 @@ object Together {
         quickestTrip.clear()
         Prefs.remove(KEY_SAVED)
     }
+
+    /**
+     * Stops the relay: cancels the tick job, disconnects the MQTT client, and closes the relay.
+     * Called when the user has no saved shared playlists and isn't listening along, so the MQTT
+     * client's automatic reconnect doesn't keep hitting a public broker forever (audit Phase 4
+     * network gain).
+     */
+    fun stop() {
+        if (!started) return
+        started = false
+        tickJob?.cancel()
+        tickJob = null
+        scope.launch { relay.close() }
+        player = null
+    }
 }
