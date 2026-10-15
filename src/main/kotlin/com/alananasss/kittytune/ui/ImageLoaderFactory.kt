@@ -6,7 +6,6 @@ import coil3.disk.DiskCache
 import coil3.disk.directory
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import coil3.request.crossfade
 import com.alananasss.kittytune.core.AppDirs
 
 import okio.Path.Companion.toOkioPath
@@ -38,7 +37,11 @@ object ImageLoaderFactory {
                     .maxSizeBytes(256L * 1024 * 1024)
                     .build()
             }
-            .crossfade(true)
+            // No global crossfade: it applied to every AsyncImage in the app, including 56-dp
+            // thumbnails in fast-scrolling grids, where dozens of 150-300 ms fades read as flicker
+            // and waste GPU compositing. Callers that want a crossfade on large artwork (full
+            // player, dialog covers, player bar) should add `.crossfade(true)` per-call.
+            // (audit Phase 3 CPU gain)
             .build()
     }
 }
