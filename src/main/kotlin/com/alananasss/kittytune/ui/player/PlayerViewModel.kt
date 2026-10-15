@@ -5125,7 +5125,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         com.alananasss.kittytune.core.Toaster.show(str("karaoke_processing_cool_toast"))
                     }
                 }
-                checkAndTriggerKaraokeSeparation(track)
+                checkAndTriggerKaraokeSeparation(track, force = true)
             }
         }
     }
@@ -5134,8 +5134,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     fun checkAndTriggerKaraokeSeparation(track: Track, force: Boolean = false, requireVocalStem: Boolean = false) {
         val prefs = PlayerPreferences()
         val isModelReady = com.alananasss.kittytune.audio.ai.karaoke.KaraokeManager.isModelReady()
+        val isVocalEffectActive = effectsState.isVocalRemoverEnabled || effectsState.isVocalBoostEnabled
         val shouldTrigger = isModelReady &&
-            (force || effectsState.isVocalRemoverEnabled || effectsState.isVocalBoostEnabled || prefs.karaokeAutoSeparateOnPlay)
+            (force || isVocalEffectActive || prefs.karaokeAutoSeparateOnPlay)
         val needVocals = requireVocalStem || effectsState.isVocalBoostEnabled
         if (shouldTrigger) {
             if (prefs.karaokeEngineMode != com.alananasss.kittytune.data.local.KaraokeEngineMode.MEL_BAND_ROFORMER) {
@@ -5207,7 +5208,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         com.alananasss.kittytune.core.Toaster.show(str("karaoke_processing_cool_toast"))
                     }
                 }
-                checkAndTriggerKaraokeSeparation(track)
+                checkAndTriggerKaraokeSeparation(track, force = true, requireVocalStem = true)
             }
         }
     }
