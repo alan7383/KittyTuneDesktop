@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.audio.providers.deezer
 
+import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.utils.Logger
 import okhttp3.Cookie
 import okhttp3.CookieJar
@@ -223,10 +224,17 @@ object DeezerAudioProvider {
             .callTimeout(12, TimeUnit.SECONDS)
             .build()
 
-    private val trackCache = ConcurrentHashMap<String, MatchedTrack>()
-    private val streamCache = ConcurrentHashMap<String, Resolved>()
-    private val proxiedClients = ConcurrentHashMap<String, OkHttpClient>()
-    private val accountSessions = ConcurrentHashMap<String, AccountSession>()
+    // Bounded LRU caches: the previous unbounded ConcurrentHashMaps grew one entry per distinct
+    // (trackId, quality) tuple for the entire session, and proxiedClients leaked one OkHttpClient
+    // (~50-100 KB each) per account session ever used. Bounded at 200/200/32 — the LRU policy keeps
+    // the entries still being asked about (audit Phase 2 RAM gain).
+    private val trackCache = BoundedCache<String, MatchedTrack>(200)
+    private val streamCache = BoundedCache<String, Resolved>(200)
+    private val proxiedClients = BoundedCache<String, OkHttpClient>(32)
+    // accountSessions is bounded at 32: each entry is an AccountSession (cookies + tokens) for a
+    // Deezer account ever used. The previous unbounded map leaked sessions for every account cycled
+    // through. The LRU bound keeps the ones still being asked about.
+    private val accountSessions = BoundedCache<String, AccountSession>(32)
     private val resolverPermits = Semaphore(RESOLVER_MAX_IN_FLIGHT, true)
     private val lastResolverRequestAtMs = AtomicLong(0L)
 
@@ -445,7 +453,9 @@ object DeezerAudioProvider {
 
     fun invalidate(mediaId: String) {
         val prefix = "$mediaId::"
-        for (key in streamCache.keys) {
+        // snapshot().keys — BoundedCache is LRU-bounded so we can't iterate it directly; copy the
+        // keys out and filter. The snapshot is cheap (invalidate is rare).
+        for (key in streamCache.snapshot().keys) {
             if (key.startsWith(prefix)) {
                 streamCache.remove(key)
             }
@@ -1142,17 +1152,21 @@ object DeezerAudioProvider {
     ): OkHttpClient {
         val config = proxyConfig(proxyUrl) ?: return baseClient
         val cacheKey = "${System.identityHashCode(baseClient)}::${config.key}"
-        return proxiedClients.getOrPut(cacheKey) {
-            baseClient
-                .newBuilder()
-                .proxy(
-                    Proxy(
-                        Proxy.Type.HTTP,
-                        InetSocketAddress.createUnresolved(config.host, config.port),
-                    ),
-                )
-                .build()
-        }
+        // BoundedCache has no getOrPut — check then set. The LRU bound (32) evicts the least
+        // recently used proxy client if the user cycles through many accounts, which the previous
+        // unbounded ConcurrentHashMap never did (each ~50-100 KB OkHttpClient leaked forever).
+        proxiedClients[cacheKey]?.let { return it }
+        val newClient = baseClient
+            .newBuilder()
+            .proxy(
+                Proxy(
+                    Proxy.Type.HTTP,
+                    InetSocketAddress.createUnresolved(config.host, config.port),
+                ),
+            )
+            .build()
+        proxiedClients[cacheKey] = newClient
+        return newClient
     }
 
     private fun httpClient(

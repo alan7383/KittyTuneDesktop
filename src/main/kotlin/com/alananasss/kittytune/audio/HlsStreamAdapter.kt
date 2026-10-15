@@ -280,6 +280,13 @@ class HlsStreamAdapter(
                     if (read == -1) {
                         currentStream?.close()
                         currentStream = null
+                        // Once we've moved past segment 0, the prefetched opening segment data is
+                        // dead weight (0.5-2 MB). Null it so GC can collect it. A re-open from
+                        // position 0 will re-fetch — one HTTP request, not a user-visible delay
+                        // (audit Phase 2 RAM gain).
+                        if (currentSegmentIndex > 0) {
+                            openingSegmentData = null
+                        }
                     } else {
                         return read
                     }

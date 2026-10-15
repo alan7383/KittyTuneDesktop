@@ -1160,6 +1160,11 @@ object KaraokeManager {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 Logger.d(TAG, "Separation cancelled for track $trackId")
                 runCatching { stemTmp.delete() }
+                // Remove listeners on cancellation: the previous code skipped this, so any
+                // listeners registered for the cancelled track stayed in the ConcurrentHashMap
+                // forever — each a lambda closing over a viewModelScope Job that prevented other
+                // transient state from being GC'd (audit Phase 2 RAM gain).
+                completionListeners.remove(trackId)
                 if (currentProcessingTrackId == trackId) {
                     _separationState.value = SeparationState.Idle
                 }

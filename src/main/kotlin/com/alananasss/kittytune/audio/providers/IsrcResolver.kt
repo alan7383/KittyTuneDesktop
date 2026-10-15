@@ -2,9 +2,9 @@ package com.alananasss.kittytune.audio.providers
 
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProvider
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality
+import com.alananasss.kittytune.core.BoundedCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Resolves a trusted ISRC for a track from Deezer or caller-supplied candidate.
@@ -14,7 +14,9 @@ object IsrcResolver {
     private data class CacheKey(val song: String, val artist: String, val durationSeconds: Int?)
 
     private const val NEGATIVE_RESULT = "\u0000NEGATIVE_RESULT\u0000"
-    private val cache = ConcurrentHashMap<CacheKey, String>()
+    // Bounded LRU cache: the previous unbounded ConcurrentHashMap grew one entry per (song, artist,
+    // duration) tuple ever resolved, for the whole session (audit Phase 2 RAM gain).
+    private val cache = BoundedCache<CacheKey, String>(1000)
 
     suspend fun resolveAndValidate(
         candidateIsrc: String?,

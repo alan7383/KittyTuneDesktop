@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.data
 
+import com.alananasss.kittytune.core.BoundedSet
 import com.alananasss.kittytune.core.NamedPrefs
 import com.alananasss.kittytune.data.local.AppDatabase
 import com.alananasss.kittytune.data.network.RetrofitClient
@@ -40,8 +41,8 @@ object PlaylistCoverResolver {
         }
     )
 
-    /** Playlists we already looked at and found nothing for; retried on next launch only. */
-    private val exhausted = ConcurrentHashMap.newKeySet<Long>()
+    /** Playlists we already looked at and found nothing for; retried on next launch only. Bounded (audit Phase 2). */
+    private val exhausted = BoundedSet<Long>(1000)
     private val inFlight = ConcurrentHashMap<Long, Job>()
     private val semaphore = Semaphore(3)
 

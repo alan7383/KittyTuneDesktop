@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.data.cover
 
+import com.alananasss.kittytune.core.BoundedCache
 import com.alananasss.kittytune.utils.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -25,8 +26,9 @@ object TidalAnimatedCoverProvider {
     private const val BROWSER_USER_AGENT =
         "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Mobile Safari/537.36"
 
-    private val cache = ConcurrentHashMap<String, String>()
-    private val negativeCache = ConcurrentHashMap<String, Long>()
+    // Bounded LRU caches (audit Phase 2 RAM gain).
+    private val cache = BoundedCache<String, String>(256)
+    private val negativeCache = BoundedCache<String, Long>(256)
     private const val NEGATIVE_CACHE_TTL_MS = 5 * 60 * 1000L
 
     // Shares ProxyManager's pool and dispatcher; only the timeouts are this provider's own.
