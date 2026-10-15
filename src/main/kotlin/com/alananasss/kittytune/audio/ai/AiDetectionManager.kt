@@ -896,13 +896,21 @@ object AiDetectionManager {
                                                 audioChannels = 2
                                                 sampleMode = FrameGrabber.SampleMode.FLOAT
                                             }
-                                            altGrabber.start()
-                                            val samples = extractFourSecondsMono(altGrabber)
-                                            altGrabber.stop()
-                                            altGrabber.release()
-                                            if (samples != null) {
-                                                val s = analyzePcmSamples(samples)
-                                                if (s != null) chunkScores.add(s)
+                                            // try/finally around the altGrabber: if extractFourSecondsMono
+                                            // or analyzePcmSamples throws, the previous code skipped
+                                            // altGrabber.stop()/release() (lines 901-902), leaking the
+                                            // FFmpeg AVFormatContext/AVCodecContext (~100-500 KB native
+                                            // each). ×4 ratios per HLS track = up to 4 leaks per track.
+                                            try {
+                                                altGrabber.start()
+                                                val samples = extractFourSecondsMono(altGrabber)
+                                                if (samples != null) {
+                                                    val s = analyzePcmSamples(samples)
+                                                    if (s != null) chunkScores.add(s)
+                                                }
+                                            } finally {
+                                                runCatching { altGrabber.stop() }
+                                                runCatching { altGrabber.release() }
                                             }
                                         }
                                     }
