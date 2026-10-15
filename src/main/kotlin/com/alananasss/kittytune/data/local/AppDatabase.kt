@@ -191,6 +191,18 @@ object AppDatabase {
             )
             st.execute("CREATE INDEX IF NOT EXISTS idx_stats_track ON listening_stats(trackId)")
             st.execute("CREATE INDEX IF NOT EXISTS idx_stats_artist ON listening_stats(artistName)")
+            // Indexes that the original schema shipped without. Each one covers a hot query path
+            // that previously did a full table scan — the cross-ref lookup when a track is removed
+            // from every playlist, the play/recognition-history timestamps when the screens read
+            // newest-first, the local-audio-path existence check the library uses to filter out
+            // non-downloaded rows, and the boolean filters on downloaded_playlists. Added here so
+            // existing installs pick them up on the next launch (issue #5-DB).
+            st.execute("CREATE INDEX IF NOT EXISTS idx_ref_track ON playlist_track_cross_ref(trackId)")
+            st.execute("CREATE INDEX IF NOT EXISTS idx_play_history_ts ON play_history(timestamp DESC)")
+            st.execute("CREATE INDEX IF NOT EXISTS idx_recognition_history_ts ON recognition_history(timestamp DESC)")
+            st.execute("CREATE INDEX IF NOT EXISTS idx_tracks_localpath ON downloaded_tracks(localAudioPath)")
+            st.execute("CREATE INDEX IF NOT EXISTS idx_playlists_downloaded ON downloaded_playlists(isDownloaded)")
+            st.execute("CREATE INDEX IF NOT EXISTS idx_playlists_user ON downloaded_playlists(isUserCreated)")
             // Unique indexes for the blocked-content table (Room parity: one block per
             // track / artist, INSERT OR IGNORE keeps re-blocks idempotent).
             st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_track ON blocked_content(trackId)")

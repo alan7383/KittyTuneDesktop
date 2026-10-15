@@ -150,6 +150,23 @@ class DownloadDao(private val db: AppDatabase) {
         t.id, t.title, t.artist, t.artworkUrl, t.duration, t.localAudioPath, t.localArtworkPath, t.downloadedAt, t.source, t.permalinkUrl,
     )
 
+    /**
+     * One transaction for a whole batch of tracks, e.g. a local-library scan that found
+     * hundreds of files. The per-track loop previously issued one commit per file (each
+     * `exec` its own transaction and its own invalidation), so a 500-file scan was 500
+     * commits and 500 invalidations waking every screen watching the database. `execBatch`
+     * is one commit and one invalidation (issue #5-DB).
+     */
+    suspend fun insertTracks(tracks: List<LocalTrack>) {
+        if (tracks.isEmpty()) return
+        db.execBatch(
+            "INSERT OR IGNORE INTO downloaded_tracks(id,title,artist,artworkUrl,duration,localAudioPath,localArtworkPath,downloadedAt,source,permalinkUrl) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            tracks.map {
+                arrayOf<Any?>(it.id, it.title, it.artist, it.artworkUrl, it.duration, it.localAudioPath, it.localArtworkPath, it.downloadedAt, it.source, it.permalinkUrl)
+            },
+        )
+    }
+
     suspend fun updateTrack(t: LocalTrack) = db.exec(
         "UPDATE downloaded_tracks SET title=?,artist=?,artworkUrl=?,duration=?,localAudioPath=?,localArtworkPath=?,downloadedAt=?,source=?,permalinkUrl=? WHERE id=?",
         t.title, t.artist, t.artworkUrl, t.duration, t.localAudioPath, t.localArtworkPath, t.downloadedAt, t.source, t.permalinkUrl, t.id,
@@ -183,6 +200,15 @@ class DownloadDao(private val db: AppDatabase) {
         p.id, p.title, p.artist, p.artworkUrl, p.trackCount, p.isUserCreated, p.localCoverPath, p.permalinkUrl, p.isAlbum, p.addedAt, if (p.isDownloaded) 1 else 0
     )
 
+    /** Batch-inserts playlists in one transaction (audit Phase 5 — used by BackupManager.restore). */
+    suspend fun insertPlaylists(playlists: List<LocalPlaylist>) {
+        if (playlists.isEmpty()) return
+        db.execBatch(
+            "INSERT OR REPLACE INTO downloaded_playlists(id,title,artist,artworkUrl,trackCount,isUserCreated,localCoverPath,permalinkUrl,isAlbum,addedAt,isDownloaded) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            playlists.map { arrayOf<Any?>(it.id, it.title, it.artist, it.artworkUrl, it.trackCount, it.isUserCreated, it.localCoverPath, it.permalinkUrl, it.isAlbum, it.addedAt, if (it.isDownloaded) 1 else 0) },
+        )
+    }
+
     suspend fun updatePlaylist(p: LocalPlaylist) = db.exec(
         "UPDATE downloaded_playlists SET title=?,artist=?,artworkUrl=?,trackCount=?,isUserCreated=?,localCoverPath=?,permalinkUrl=?,isAlbum=?,addedAt=?,isDownloaded=? WHERE id=?",
         p.title, p.artist, p.artworkUrl, p.trackCount, p.isUserCreated, p.localCoverPath, p.permalinkUrl, p.isAlbum, p.addedAt, if (p.isDownloaded) 1 else 0, p.id
@@ -192,6 +218,19 @@ class DownloadDao(private val db: AppDatabase) {
         "INSERT OR IGNORE INTO playlist_track_cross_ref(playlistId,trackId,addedAt) VALUES(?,?,?)",
         r.playlistId, r.trackId, r.addedAt,
     )
+
+    /** Batch-inserts cross-refs in one transaction (audit Phase 5 — used by BackupManager.restore). */
+    suspend fun insertPlaylistTrackRefs(refs: List<PlaylistTrackCrossRef>) {
+        if (refs.isEmpty()) return
+        db.execBatch(
+            "INSERT OR IGNORE INTO playlist_track_cross_ref(playlistId,trackId,addedAt) VALUES(?,?,?)",
+            refs.map { arrayOf<Any?>(it.playlistId, it.trackId, it.addedAt) },
+        )
+    }
+
+    /** All cross-refs in one query — replaces the N+1+M pattern in BackupManager.createBackup (audit Phase 5). */
+    suspend fun getAllRefs(): List<PlaylistTrackCrossRef> =
+        db.query("SELECT * FROM playlist_track_cross_ref", mapper = ::ref)
 
     suspend fun updatePlaylistTrackRef(r: PlaylistTrackCrossRef) = db.exec(
         "UPDATE playlist_track_cross_ref SET addedAt=? WHERE playlistId=? AND trackId=?",
@@ -307,17 +346,15 @@ class DownloadDao(private val db: AppDatabase) {
 
     suspend fun insertArtists(artists: List<LocalArtist>) {
         if (artists.isEmpty()) return
-        for (i in 0 until artists.size - 1) {
-            val a = artists[i]
-            db.execSilent(
-                "INSERT OR REPLACE INTO saved_artists(id,username,avatarUrl,trackCount,savedAt) VALUES(?,?,?,?,?)",
-                a.id, a.username, a.avatarUrl, a.trackCount, a.savedAt,
-            )
-        }
-        val last = artists.last()
-        db.exec(
+        // One transaction for the whole batch instead of one commit per row — the loop
+        // previously issued N separate execs (N-1 silent + 1 invalidating), each its own
+        // transaction and its own fsync. On a first sync that brought back a saved-artists
+        // list of dozens of rows, that was dozens of commits and dozens of invalidations
+        // waking every screen watching the database. execBatch is one commit, one
+        // invalidation (issue #5-DB).
+        db.execBatch(
             "INSERT OR REPLACE INTO saved_artists(id,username,avatarUrl,trackCount,savedAt) VALUES(?,?,?,?,?)",
-            last.id, last.username, last.avatarUrl, last.trackCount, last.savedAt,
+            artists.map { arrayOf<Any?>(it.id, it.username, it.avatarUrl, it.trackCount, it.savedAt) },
         )
     }
 
@@ -336,9 +373,22 @@ class DownloadDao(private val db: AppDatabase) {
     }
 
     // --- history ---------------------------------------------------------------------------
-    suspend fun insertHistory(item: HistoryItem) = db.exec(
-        "INSERT OR REPLACE INTO play_history(id,numericId,title,subtitle,imageUrl,type,timestamp,isVerified,source,originalUrl) VALUES(?,?,?,?,?,?,?,?,?,?)",
-        item.id, item.numericId, item.title, item.subtitle, item.imageUrl, item.type, item.timestamp, item.isVerified, item.source, item.originalUrl,
+    /**
+     * One insert + the cap that keeps play_history bounded, in one transaction.
+     *
+     * Without the cap the table grew unbounded — every screen that reads newest-first
+     * (getHistory, getHistoryUnlimited) eventually dragged every old row out of disk on
+     * every invalidate. The cap keeps the most recent 500 rows; older history is dropped
+     * the moment row 501 lands. [execTogether] runs both statements as one commit so a
+     * crash between them can't leave the table over the cap, and only one invalidation
+     * fires, so observers recompute once instead of twice (issue #5-DB).
+     */
+    suspend fun insertHistory(item: HistoryItem) = db.execTogether(
+        "INSERT OR REPLACE INTO play_history(id,numericId,title,subtitle,imageUrl,type,timestamp,isVerified,source,originalUrl) VALUES(?,?,?,?,?,?,?,?,?,?)" to
+            arrayOf<Any?>(item.id, item.numericId, item.title, item.subtitle, item.imageUrl, item.type, item.timestamp, item.isVerified, item.source, item.originalUrl),
+        // Cap at 500 rows: keep only the most recent. Without an ORDER BY the cap query would
+        // still scan the whole table; the idx_play_history_ts index makes this an index range.
+        "DELETE FROM play_history WHERE id NOT IN (SELECT id FROM play_history ORDER BY timestamp DESC LIMIT 500)" to emptyArray(),
     )
 
     fun getHistory(): Flow<List<HistoryItem>> = db.observe {
@@ -358,7 +408,19 @@ class DownloadDao(private val db: AppDatabase) {
     suspend fun clearContextsHistory() = db.exec("DELETE FROM play_history WHERE type != 'TRACK'")
 
     suspend fun insertHistoryList(items: List<HistoryItem>) {
-        for (item in items) insertHistory(item)
+        if (items.isEmpty()) return
+        // The loop previously called insertHistory(item) per row, and after the 500-row cap
+        // landed each call was its own transaction that also re-ran the DELETE — N commits,
+        // N cap scans, 2N invalidations. One execBatch is one commit, one invalidation, and
+        // the cap is applied once at the end (issue #5-DB).
+        db.execBatch(
+            "INSERT OR REPLACE INTO play_history(id,numericId,title,subtitle,imageUrl,type,timestamp,isVerified,source,originalUrl) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            items.map {
+                arrayOf<Any?>(it.id, it.numericId, it.title, it.subtitle, it.imageUrl, it.type, it.timestamp, it.isVerified, it.source, it.originalUrl)
+            },
+        )
+        // Trim once for the whole batch: keeps the most recent 500 rows.
+        db.exec("DELETE FROM play_history WHERE id NOT IN (SELECT id FROM play_history ORDER BY timestamp DESC LIMIT 500)")
     }
 
     fun getHistoryUnlimited(): Flow<List<HistoryItem>> = db.observe {

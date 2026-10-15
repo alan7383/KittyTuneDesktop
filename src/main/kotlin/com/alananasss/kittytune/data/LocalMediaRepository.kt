@@ -96,7 +96,10 @@ object LocalMediaRepository {
                 }
 
                 _scanProgress.value = str("pref_local_scan_status_saving")
-                tracksToInsert.forEach { dao.insertTrack(it) }
+                // One batched transaction instead of one commit per file. A scan that found
+                // 500 files previously issued 500 separate INSERTs — 500 transactions, 500
+                // fsyncs, 500 invalidations waking every observer of the tracks table (issue #5-DB).
+                dao.insertTracks(tracksToInsert)
 
                 _scanProgress.value = str("pref_local_scan_status_done")
             } catch (e: Exception) {

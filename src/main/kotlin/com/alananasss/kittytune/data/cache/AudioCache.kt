@@ -117,8 +117,14 @@ object AudioCache {
         }
     }
 
-    /** Drops the least recently played tracks until the cache fits in [maxBytes]. */
-    private fun trim() {
+    /**
+     * Drops the least recently played tracks until the cache fits in [maxBytes].
+     *
+     * Internal so the bootstrap's startup sweep can call it after wiping leftovers — the
+     * cache can have drifted over its bound while the app was closed and a fresh launch is
+     * the cheapest moment to pull it back (issue #5-DB).
+     */
+    internal fun trim() {
         val files = dir.listFiles { f -> f.isFile && f.extension != "part" }?.sortedBy { it.lastModified() } ?: return
         var total = files.sumOf { it.length() }
         for (file in files) {
