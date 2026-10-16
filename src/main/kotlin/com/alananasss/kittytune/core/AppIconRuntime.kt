@@ -29,6 +29,7 @@ object AppIconRuntime {
      *   first pass — which is exactly the launch where the icon matters most.
      */
     fun apply(variantKey: String, window: Window? = null) {
+        if (System.getProperty("os.name").lowercase().contains("mac")) return
         val source = load(variantKey) ?: return
         setDockIcon(source)
         setWindowIcons(source, window)
