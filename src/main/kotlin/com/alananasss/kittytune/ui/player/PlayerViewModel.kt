@@ -1479,6 +1479,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var lastPlayerErrorTrackId: Long? = null
     private var mprisService: com.alananasss.kittytune.data.MprisService? = null
     private var windowsSmtcService: com.alananasss.kittytune.data.WindowsSmtcService? = null
+    private var macNowPlayingService: MacNowPlayingService? = null
 
     companion object {
         const val MY_WAVE_NAV_ID = "my_wave"
@@ -2072,6 +2073,23 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    private fun initMacNowPlayingService() {
+        if (macNowPlayingService == null && System.getProperty("os.name").lowercase().contains("mac")) {
+            try {
+                macNowPlayingService = MacNowPlayingService(
+                    onPlay = { play() },
+                    onPause = { pause() },
+                    onPlayPause = { togglePlayPause() },
+                    onNext = { playNext() },
+                    onPrevious = { smartPrevious() },
+                    onSeek = { seekTo(it) }
+                )
+            } catch (e: Exception) {
+                println("Mac Now Playing service init exception: ${e.message}")
+            }
+        }
+    }
+
     fun updateMprisMedia() {
         initMprisService()
         mprisService?.let { service ->
@@ -2084,6 +2102,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         initWindowsSmtcService()
         windowsSmtcService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
+
+        initMacNowPlayingService()
+        macNowPlayingService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
     }
 
     fun updateDiscordPresence() {
@@ -2129,6 +2150,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         } catch (_: Exception) {
         }
         windowsSmtcService = null
+        macNowPlayingService?.close()
+        macNowPlayingService = null
 
         try {
             MusicManager.player.removeListener(playerListener)

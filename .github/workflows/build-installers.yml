@@ -63,11 +63,13 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Grant execute permission for gradlew and scripts
+        run: |
+          chmod +x gradlew
+          chmod +x scripts/*.sh 2>/dev/null || true
 
-      - name: Build macOS DMG Package
-        run: ./gradlew packageReleaseDmg
+      - name: Build macOS DMG Package with Now Playing
+        run: bash scripts/build-macos-nowplaying.sh --dmg
 
       - name: Get version from tag
         id: get_version
@@ -75,8 +77,13 @@ jobs:
 
       - name: Prepare macOS Binaries
         run: |
-          mkdir dist-mac
-          cp build/compose/binaries/main-release/dmg/*.dmg dist-mac/KittyTune-${{ steps.get_version.outputs.VERSION }}.dmg
+          mkdir -p dist-mac
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          if [ -f "dist-mac/KittyTune-${VERSION}.dmg" ]; then
+            echo "DMG created at dist-mac/KittyTune-${VERSION}.dmg"
+          elif [ -d "build/compose/binaries/main-release/dmg" ]; then
+            cp build/compose/binaries/main-release/dmg/*.dmg "dist-mac/KittyTune-${VERSION}.dmg"
+          fi
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v7

@@ -503,6 +503,16 @@ val compileWindowsSmtcBridge = tasks.register<Exec>("compileWindowsSmtcBridge") 
         "-OutDir", outDir.get().asFile.absolutePath)
 }
 
+val compileMacNowPlayingHelper = tasks.register<Exec>("compileMacNowPlayingHelper") {
+    description = "Builds the native Swift macOS Now Playing helper app."
+    val osName = System.getProperty("os.name").lowercase()
+    enabled = osName.contains("mac")
+    inputs.files("scripts/build-macos-nowplaying.sh", "src/main/swift/KittyTuneNowPlaying.swift",
+        "src/main/resources/icons/kittytune.icns")
+    outputs.file(layout.buildDirectory.file("macos-nowplaying/KittyTune-NowPlaying-Helper.app/Contents/MacOS/KittyTuneNowPlaying"))
+    commandLine("bash", project.file("scripts/build-macos-nowplaying.sh").absolutePath, "--helper-only")
+}
+
 // Exclude non-target native resources so packages don't bundle binaries from other operating systems.
 sourceSets.main {
     val osName = System.getProperty("os.name").lowercase()
@@ -622,6 +632,46 @@ val stripForeignNativesDistributable = tasks.register<StripForeignNativesTask>("
 
 tasks.matching { it.name == "createReleaseDistributable" }.configureEach {
     finalizedBy(stripForeignNativesDistributable)
+}
+
+val embedMacNowPlayingHelper = tasks.register("embedMacNowPlayingHelper") {
+    description = "Embeds the macOS Now Playing helper into the packaged KittyTune.app bundle."
+    val osName = System.getProperty("os.name").lowercase()
+    val isMac = osName.contains("mac")
+    enabled = isMac
+    if (isMac) {
+        dependsOn(compileMacNowPlayingHelper)
+    }
+
+    doLast {
+        if (!isMac) return@doLast
+        val helperApp = layout.buildDirectory.dir("macos-nowplaying/KittyTune-NowPlaying-Helper.app").get().asFile
+        if (!helperApp.exists()) return@doLast
+
+        val baseDir = desktopDistributionDirectory.get().asFile
+        val appDirs = listOf(
+            File(baseDir, "main/app/KittyTune.app"),
+            File(baseDir, "main-release/app/KittyTune.app"),
+            layout.buildDirectory.dir("compose/binaries/main/app/KittyTune.app").get().asFile,
+            layout.buildDirectory.dir("compose/binaries/main-release/app/KittyTune.app").get().asFile
+        ).distinct()
+
+        for (app in appDirs) {
+            if (app.exists()) {
+                val helpersDir = File(app, "Contents/Helpers")
+                helpersDir.mkdirs()
+                val targetHelper = File(helpersDir, "KittyTune-NowPlaying-Helper.app")
+                val proc = ProcessBuilder("ditto", helperApp.absolutePath, targetHelper.absolutePath).start()
+                proc.waitFor()
+            }
+        }
+    }
+}
+
+tasks.matching { it.name in listOf("createDistributable", "createReleaseDistributable") }.configureEach {
+    if (System.getProperty("os.name").lowercase().contains("mac")) {
+        finalizedBy(embedMacNowPlayingHelper)
+    }
 }
 
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask>().configureEach {
