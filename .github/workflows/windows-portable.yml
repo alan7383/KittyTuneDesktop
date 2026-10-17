@@ -5,6 +5,13 @@ on:
   pull_request:
   push:
     branches: ['master']
+    # Docs, website and translations cannot break the Windows build; skip those runs.
+    paths-ignore:
+      - 'docs/**'
+      - 'website/**'
+      - 'images/**'
+      - '**.md'
+      - 'src/main/resources/i18n/**'
 
 permissions:
   contents: read
@@ -19,6 +26,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      # Force the MinGW toolchain for the native DSP DLL. The MSVC (/O2 /MT) build of
+      # KittyTuneAudioDSP + ebur128 crashes headlessTest with STATUS_HEAP_CORRUPTION,
+      # while the exact same sources pass under GCC on Linux/macOS runners. build-native-windows.ps1
+      # prefers g++ when it is on PATH and only falls back to MSVC otherwise.
+      - name: Install MinGW (preferred native compiler)
+        run: choco install mingw --no-progress -y
       - uses: gradle/actions/setup-gradle@v4
       - name: Test and package portable Windows app
         shell: pwsh
