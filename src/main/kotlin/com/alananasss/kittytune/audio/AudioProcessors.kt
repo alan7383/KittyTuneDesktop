@@ -570,16 +570,17 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
 
     private fun destroyNative() {
         synchronized(nativeLock) {
-            // Cancel the cleanable first: the handle is about to be freed by nativeDestroy below,
-            // and we don't want the Cleaner to also call nativeDestroyHandle on the now-stale
-            // handle (double-free).
-            nativeCleanable?.clean()
+            val cleanable = nativeCleanable
             nativeCleanable = null
-            if (nativeHandle != 0L && isLibraryLoaded) {
+            if (cleanable != null) {
+                // clean() unregisters this Cleanable and invokes nativeDestroyHandle(handleSnapshot) exactly once.
+                cleanable.clean()
+                nativeHandle = 0L
+            } else if (nativeHandle != 0L && isLibraryLoaded) {
                 try {
                     nativeDestroy(nativeHandle)
                 } catch (_: Throwable) {}
-                nativeHandle = 0
+                nativeHandle = 0L
             }
         }
     }
