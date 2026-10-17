@@ -5372,6 +5372,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         playerPrefs.setHasSeenEarrapeWarning(seen)
     }
 
+    fun resetAllEffects() {
+        effectsState = AudioEffectsState(
+            speed = effectsState.speed,
+            isPitchEnabled = effectsState.isPitchEnabled,
+            ambientType = effectsState.ambientType
+        )
+        applyEffectsAndSave()
+    }
+
     private fun applyEffectsAndSave() {
         MusicManager.applyEffects(effectsState)
         mprisService?.updateRate(effectsState.speed.toDouble())
