@@ -93,6 +93,7 @@ private const val DROP_HIDDEN_WINDOW_AFTER_MS = 20_000L
 
 @OptIn(androidx.compose.ui.InternalComposeUiApi::class)
 fun main(args: Array<String>) {
+    com.alananasss.kittytune.audio.ai.OnnxHelper.disableNativeTelemetry()
     com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
     // Before anything heavy loads: a second launch only has to wake the first one up.

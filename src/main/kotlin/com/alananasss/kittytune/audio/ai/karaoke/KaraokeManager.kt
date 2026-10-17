@@ -1573,7 +1573,7 @@ object KaraokeManager {
         val selectedGpuId = prefs.karaokeSelectedGpuId
 
         OnnxHelper.ensureNativeLibrariesLoaded()
-        val env = OrtEnvironment.getEnvironment()
+        val env = OnnxHelper.getOrInitEnvironment()
         val session = getOrCreateSession(env, modelFile, useGpu, selectedGpuId)
         val originalPriority = Thread.currentThread().priority
         Thread.currentThread().priority = Thread.MIN_PRIORITY
