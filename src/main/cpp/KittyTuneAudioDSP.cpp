@@ -195,10 +195,18 @@ static KittyTuneDSPState* createDspState(int channels, int sampleRate, int mode,
 
     s->processBufferCapacity = 16384 * channels;
     s->processBuffer = (float*)malloc(s->processBufferCapacity * sizeof(float));
+    if (!s->processBuffer) {
+        LOGE("Failed to allocate DSP process buffer");
+        s->processBufferCapacity = 0;
+        free(s);
+        return NULL;
+    }
 
     s->ebur128 = ebur128_init((unsigned int)channels, (unsigned long)sampleRate, mode);
     if (!s->ebur128) {
         LOGE("Failed to initialize ebur128 (ch=%d, sr=%d)", channels, sampleRate);
+        free(s->processBuffer);
+        s->processBuffer = NULL;
         free(s);
         return NULL;
     }
@@ -228,8 +236,19 @@ static float computeMaxTruePeakDb(KittyTuneDSPState* s) {
 static void processChunk(KittyTuneDSPState* s, short* in, short* out, int numFrames, float forcedGainDb) {
     int totalSamples = numFrames * s->channels;
 
-    if (totalSamples > s->processBufferCapacity) {
-        float* newBuf = (float*)realloc(s->processBuffer, totalSamples * sizeof(float));
+    // Guard against null/negative frame counts coming from the caller: writing a bogus
+    // count into ebur128 corrupts its internal ring buffer and manifests as heap
+    // corruption crashes on Windows (STATUS_HEAP_CORRUPTION in headless tests).
+    if (numFrames <= 0 || totalSamples <= 0) return;
+
+    // Never trust a zeroed capacity with a live buffer pointer (stale state after an
+    // allocation failure would otherwise make realloc(NULL, ...) leak the old buffer).
+    if (!s->processBuffer || s->processBufferCapacity <= 0) {
+        s->processBufferCapacity = totalSamples;
+        s->processBuffer = (float*)malloc((size_t)totalSamples * sizeof(float));
+        if (!s->processBuffer) { s->processBufferCapacity = 0; return; }
+    } else if (totalSamples > s->processBufferCapacity) {
+        float* newBuf = (float*)realloc(s->processBuffer, (size_t)totalSamples * sizeof(float));
         if (!newBuf) return;
         s->processBuffer = newBuf;
         s->processBufferCapacity = totalSamples;
@@ -528,10 +547,24 @@ Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeProcessSho
     KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
     if (!s || !s->ebur128) return;
 
-    short* in = (short*)((char*)env->GetDirectBufferAddress(inputBuffer) + inOffset);
+    short* inBase = (short*)env->GetDirectBufferAddress(inputBuffer);
     short* out = (short*)env->GetDirectBufferAddress(outputBuffer);
-    if (!in || !out) return;
+    if (!inBase || !out) return;
 
+    // Validate the frame count against the actual buffer capacities: a caller passing a
+    // numFrames larger than the direct buffers would read/write past their end and
+    // corrupt the process heap (observed as STATUS_HEAP_CORRUPTION on Windows).
+    jlong inCap = env->GetDirectBufferCapacity(inputBuffer);
+    jlong outCap = env->GetDirectBufferCapacity(outputBuffer);
+    if (inCap == JNI_ERR || outCap == JNI_ERR) return;
+    jlong inBytes = (jlong)numFrames * s->channels * (jlong)sizeof(short);
+    if (numFrames <= 0 || inBytes > (inCap - inOffset) || inBytes > outCap) {
+        LOGE("nativeProcessShort rejected bad frame count: frames=%d ch=%d inCap=%lld outCap=%lld offset=%d",
+             numFrames, s->channels, (long long)inCap, (long long)outCap, inOffset);
+        return;
+    }
+
+    short* in = (short*)((char*)inBase + inOffset);
     processChunk(s, in, out, numFrames, NAN);
 }
 
@@ -593,6 +626,11 @@ Java_com_alananasss_kittytune_data_AudioScannerManager_nativeCreateAnalyzer(
     s->channels = channels;
     s->integratedLoudness = -70.0f;
     s->truePeakLinear = 0.0f;
+    // The scanner path reallocs processBuffer on demand; capacity must start at a
+    // consistent zeroed state (calloc already zeroes it, but be explicit so a future
+    // non-zeroing allocator can't leave a dangling pointer/capacity pair).
+    s->processBuffer = NULL;
+    s->processBufferCapacity = 0;
 
     int mode = EBUR128_MODE_I | EBUR128_MODE_TRUE_PEAK | EBUR128_MODE_HISTOGRAM;
     s->ebur128 = ebur128_init((unsigned int)channels, (unsigned long)sampleRate, mode);
@@ -645,8 +683,13 @@ Java_com_alananasss_kittytune_data_AudioScannerManager_nativeAddFramesShort(
     if (!s || !s->ebur128) return;
 
     int totalSamples = numFrames * s->channels;
-    if (totalSamples > s->processBufferCapacity) {
-        float* newBuf = (float*)realloc(s->processBuffer, totalSamples * sizeof(float));
+    if (numFrames <= 0 || totalSamples <= 0) return;
+    if (!s->processBuffer || s->processBufferCapacity <= 0) {
+        s->processBufferCapacity = totalSamples;
+        s->processBuffer = (float*)malloc((size_t)totalSamples * sizeof(float));
+        if (!s->processBuffer) { s->processBufferCapacity = 0; return; }
+    } else if (totalSamples > s->processBufferCapacity) {
+        float* newBuf = (float*)realloc(s->processBuffer, (size_t)totalSamples * sizeof(float));
         if (!newBuf) return;
         s->processBuffer = newBuf;
         s->processBufferCapacity = totalSamples;

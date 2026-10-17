@@ -745,6 +745,10 @@ tasks.register<Test>("headlessTest") {
     doFirst { listOf("home", "roaming", "local", "tmp").forEach { File(profile, it).mkdirs() } }
     maxHeapSize = "768m"
     maxParallelForks = 1
+    // One JVM per test class: a crash in the native DSP library (e.g. heap corruption
+    // under a different MSVC toolchain) then kills only that class's fork instead of
+    // taking down the whole suite with an unreadable log.
+    forkEvery = 1
     filter {
         listOf("SignedUrlTest", "SidebarNavLayoutTest", "QueuePlayedMarkingTest",
             "PlayerRemainingTimeTest", "PlaylistTotalDurationTest", "SettingsSearchTest",
