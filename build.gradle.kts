@@ -317,15 +317,11 @@ compose.desktop {
             vendor = "KittyTune"
 
             modules(
-                "java.compiler",
-                "java.instrument",
                 "java.management",
                 "java.net.http",
                 "java.sql",
                 "java.naming",
-                "java.scripting",
                 "java.prefs",
-                "jdk.dynalink",
                 // The diagnostic command MBean and the OS memory bean live here. Included in every
                 // build so the diagnostic one differs from a release by launcher flags alone, which
                 // is what makes what it measures worth anything (issue #33).
@@ -334,7 +330,6 @@ compose.desktop {
                 "jdk.jfr",
                 "jdk.unsupported",
                 "jdk.unsupported.desktop",
-                "jdk.security.auth",
                 // Day and month names in any language but English. Without it the trimmed runtime only
                 // knows the root locale, so the listening stats read "Mon Tue" and "October" in Russian
                 // while a run from the full JDK looked fine (issue #66).
@@ -533,6 +528,8 @@ sourceSets.main {
 
     val extension = if (desktopIsWindows) "dll" else if (isMac) "dylib" else "so"
     resources.exclude("native/libkittytune_audio_dsp.$extension")
+    // Demucs CLI binaries (31-34 MB) are downloaded on-demand with the model when Karaoke is enabled.
+    resources.exclude("native/**/demucs*")
     if (desktopIsWindows) {
         resources.exclude("icons/kittytune.icns")
         resources.exclude("native/WindowsSmtcBridge.exe")
@@ -574,14 +571,19 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 abstract class StripForeignNativesTask : DefaultTask() {
-    @get:InputDirectory
-    @get:Optional
+    @get:Internal
     abstract val targetDirectory: DirectoryProperty
+
+    @get:Internal
+    abstract val targetDirectories: ListProperty<Directory>
 
     @TaskAction
     fun execute() {
-        val dir = targetDirectory.orNull?.asFile ?: return
-        if (!dir.exists()) return
+        val singleDir = targetDirectory.orNull?.asFile
+        val multiDirs = targetDirectories.orNull?.map { it.asFile } ?: emptyList()
+        val allDirs = (listOfNotNull(singleDir) + multiDirs).filter { it.exists() }.distinct()
+        if (allDirs.isEmpty()) return
+
         val osName = System.getProperty("os.name").lowercase()
         val osArch = System.getProperty("os.arch").lowercase()
         val isWin = osName.contains("win")
@@ -627,22 +629,50 @@ abstract class StripForeignNativesTask : DefaultTask() {
             }
         }
 
-        dir.walkTopDown().filter { file -> file.isFile && file.name.startsWith("onnxruntime-") && file.name.endsWith(".jar") }.forEach { jar ->
-            stripJar(jar) { name -> !name.startsWith("ai/onnxruntime/native/") || name.startsWith(targetOnnxSubdir) }
-        }
+        for (dir in allDirs) {
+            dir.walkTopDown().filter { file -> file.isFile && file.name.startsWith("onnxruntime-") && file.name.endsWith(".jar") }.forEach { jar ->
+                stripJar(jar) { name -> !name.startsWith("ai/onnxruntime/native/") || name.startsWith(targetOnnxSubdir) }
+            }
 
-        dir.walkTopDown().filter { file -> file.isFile && file.name.startsWith("sqlite-jdbc-") && file.name.endsWith(".jar") }.forEach { jar ->
-            stripJar(jar) { name -> !name.startsWith("org/sqlite/native/") || name.startsWith(targetSqliteSubdir) }
+            dir.walkTopDown().filter { file -> file.isFile && file.name.startsWith("sqlite-jdbc-") && file.name.endsWith(".jar") }.forEach { jar ->
+                stripJar(jar) { name -> !name.startsWith("org/sqlite/native/") || name.startsWith(targetSqliteSubdir) }
+            }
         }
     }
 }
 
+val stripForeignNativesProguard = tasks.register<StripForeignNativesTask>("stripForeignNativesProguard") {
+    description = "Strips foreign native binaries from ProGuard output JARs before packaging."
+    targetDirectory.set(layout.buildDirectory.dir("compose/tmp/main-release/proguard"))
+    dependsOn("proguardReleaseJars")
+}
+
 val stripForeignNativesDistributable = tasks.register<StripForeignNativesTask>("stripForeignNativesDistributable") {
+    description = "Strips foreign native binaries from unpacked release app distributions."
     targetDirectory.set(desktopDistributionDirectory.map { it.dir("main-release/app") })
+}
+
+val stripForeignNativesDistributableMain = tasks.register<StripForeignNativesTask>("stripForeignNativesDistributableMain") {
+    description = "Strips foreign native binaries from unpacked debug app distributions."
+    targetDirectory.set(desktopDistributionDirectory.map { it.dir("main/app") })
+}
+
+tasks.matching { it.name == "proguardReleaseJars" }.configureEach {
+    finalizedBy(stripForeignNativesProguard)
+}
+
+tasks.matching { it.name == "createDistributable" }.configureEach {
+    finalizedBy(stripForeignNativesDistributableMain)
 }
 
 tasks.matching { it.name == "createReleaseDistributable" }.configureEach {
     finalizedBy(stripForeignNativesDistributable)
+}
+
+tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJPackageTask>().configureEach {
+    if (name.startsWith("packageRelease") || name == "createReleaseDistributable") {
+        dependsOn(stripForeignNativesProguard)
+    }
 }
 
 abstract class EmbedMacNowPlayingHelperTask : DefaultTask() {
@@ -708,6 +738,7 @@ tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractProguardT
     if (localJdk21.exists()) {
         javaHome.set(localJdk21.absolutePath)
     }
+    maxHeapSize.set("2048m")
 }
 
 tasks.withType<org.jetbrains.compose.desktop.application.tasks.AbstractJLinkTask>().configureEach {
