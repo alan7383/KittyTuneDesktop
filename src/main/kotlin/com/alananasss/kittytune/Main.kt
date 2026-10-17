@@ -101,6 +101,7 @@ fun main(args: Array<String>) {
     runCatching {
         androidx.compose.ui.platform.registerSkikoComposeImplementation()
     }
+    com.alananasss.kittytune.data.MacSoundCloudOAuth.installUriHandler()
     AppBootstrap.init()
     // Swing's own dialogs (folder pickers, the avatar chooser) in the system's look rather than Java's Metal,
     // which is what made them look cut down next to Windows' own. Compose is unaffected.
