@@ -2607,4 +2607,9 @@
 <string name="connect_devices">Thiết bị</string>
     <string name="sync_playback_title">Hàng đợi và vị trí phát</string>
     <string name="sync_playback_sub">Tiếp tục bài hát và hàng đợi mới nhất khi mở thiết bị khác</string>
+    <string name="login_oauth_declined">Đăng nhập SoundCloud đã bị từ chối. Vui lòng thử lại.</string>
+    <string name="login_oauth_server_error">Không thể khởi động máy chủ đăng nhập cục bộ. Vui lòng thử lại.</string>
+    <string name="login_oauth_timeout">Đã hết thời gian chờ đăng nhập SoundCloud. Vui lòng thử lại.</string>
+    <string name="login_oauth_exchange_error">Không thể hoàn tất đăng nhập SoundCloud. Vui lòng thử lại.</string>
+    <string name="login_oauth_retry">Thử lại</string>
 </resources>

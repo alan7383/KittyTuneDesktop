@@ -2557,4 +2557,9 @@
     <string name="connect_feedback_local_only">Ce fichier local n&apos;est disponible que sur l&apos;appareil source.</string>
     <string name="connect_feedback_track_changed">Le morceau a changé pendant le transfert. Choisissez à nouveau l&apos;appareil.</string>
     <string name="connect_feedback_unable_to_open">Impossible d&apos;ouvrir ce morceau sur l&apos;appareil sélectionné.</string>
+    <string name="login_oauth_declined">La connexion à SoundCloud a été refusée. Réessayez.</string>
+    <string name="login_oauth_server_error">Impossible de démarrer le serveur local de connexion. Réessayez.</string>
+    <string name="login_oauth_timeout">Le délai de connexion à SoundCloud a expiré. Réessayez.</string>
+    <string name="login_oauth_exchange_error">Impossible de terminer la connexion à SoundCloud. Réessayez.</string>
+    <string name="login_oauth_retry">Réessayer</string>
 </resources>

@@ -2746,4 +2746,9 @@
 <string name="connect_devices">Geräte</string>
     <string name="sync_playback_title">Warteschlange und Wiedergabeposition</string>
     <string name="sync_playback_sub">Beim Öffnen eines anderen Geräts den letzten Titel und die Warteschlange fortsetzen</string>
+    <string name="login_oauth_declined">Die SoundCloud-Anmeldung wurde abgelehnt. Bitte erneut versuchen.</string>
+    <string name="login_oauth_server_error">Der lokale Anmeldeserver konnte nicht gestartet werden. Bitte erneut versuchen.</string>
+    <string name="login_oauth_timeout">Die SoundCloud-Anmeldung ist abgelaufen. Bitte erneut versuchen.</string>
+    <string name="login_oauth_exchange_error">Die SoundCloud-Anmeldung konnte nicht abgeschlossen werden. Bitte erneut versuchen.</string>
+    <string name="login_oauth_retry">Erneut versuchen</string>
 </resources>

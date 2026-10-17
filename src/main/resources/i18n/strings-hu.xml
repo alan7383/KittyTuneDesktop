@@ -2525,4 +2525,9 @@
 <string name="connect_devices">Eszközök</string>
     <string name="sync_playback_title">Lejátszási sor és pozíció</string>
     <string name="sync_playback_sub">Az utolsó szám és a lejátszási sor folytatása másik eszköz megnyitásakor</string>
+    <string name="login_oauth_declined">A SoundCloud-bejelentkezést elutasították. Próbálja újra.</string>
+    <string name="login_oauth_server_error">Nem sikerült elindítani a helyi bejelentkezési kiszolgálót. Próbálja újra.</string>
+    <string name="login_oauth_timeout">A SoundCloud-bejelentkezés időtúllépés miatt megszakadt. Próbálja újra.</string>
+    <string name="login_oauth_exchange_error">Nem sikerült befejezni a SoundCloud-bejelentkezést. Próbálja újra.</string>
+    <string name="login_oauth_retry">Újrapróbálkozás</string>
 </resources>
