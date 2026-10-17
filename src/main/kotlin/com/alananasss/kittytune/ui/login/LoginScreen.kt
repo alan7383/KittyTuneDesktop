@@ -27,11 +27,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import com.alananasss.kittytune.core.str
-import com.alananasss.kittytune.data.AuthFlowManager
 import com.alananasss.kittytune.data.GuestDataSummary
 import com.alananasss.kittytune.data.GuestDataTransferManager
 import com.alananasss.kittytune.data.PkceHelper
@@ -47,7 +44,6 @@ import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.utils.Config
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
@@ -57,9 +53,11 @@ import org.json.JSONObject
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.net.URLEncoder
-import java.net.URI
-import com.sun.net.httpserver.HttpServer
-import java.net.InetSocketAddress
+import com.alananasss.kittytune.data.SoundCloudOAuthServer
+import com.alananasss.kittytune.data.MacSoundCloudOAuth
+import androidx.compose.runtime.key
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.awaitCancellation
 
 private const val TAG = "LoginScreen"
 
@@ -86,6 +84,14 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onBackClick: () -> Unit
 ) {
+    var attempt by remember { mutableStateOf(0) }
+    key(attempt) {
+        LoginAttempt(onLoginSuccess, onBackClick, onRetry = { attempt++ })
+    }
+}
+
+@Composable
+private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, onRetry: () -> Unit) {
     val tokenManager = remember { TokenManager }
     val pkceVerifier = remember { PkceHelper.generateVerifier() }
     val pkceChallenge = remember(pkceVerifier) { PkceHelper.generateChallenge(pkceVerifier) }
@@ -104,15 +110,18 @@ fun LoginScreen(
 
     var isLoading by remember { mutableStateOf(false) }
     var lastHandledCode by remember { mutableStateOf<String?>(null) }
-    val authCodeFromIntent by AuthFlowManager.authCode.collectAsState()
+    var authCodeFromIntent by remember { mutableStateOf<String?>(null) }
 
-    var hasLaunchedBrowser by rememberSaveable { mutableStateOf(false) }
+    var hasLaunchedBrowser by remember { mutableStateOf(false) }
     var showTransferDialog by remember { mutableStateOf(false) }
     var isTransferring by remember { mutableStateOf(false) }
     var transferProgress by remember { mutableFloatStateOf(0f) }
     var guestSummary by remember { mutableStateOf<GuestDataSummary?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
+    var loginError by remember { mutableStateOf<String?>(null) }
+    var callbackServer by remember { mutableStateOf<SoundCloudOAuthServer?>(null) }
+    var macRegistration by remember { mutableStateOf<AutoCloseable?>(null) }
     var isProtocolReady by remember { mutableStateOf(false) }
     var serverPort by remember { mutableStateOf<Int?>(null) }
 
@@ -120,133 +129,137 @@ fun LoginScreen(
 
     DisposableEffect(Unit) {
         val server = try {
-            HttpServer.create(InetSocketAddress(0), 0)
+            SoundCloudOAuthServer(authState) { result ->
+                coroutineScope.launch {
+                    if (result.error != null) {
+                        loginError = str("login_oauth_declined")
+                    } else {
+                        authCodeFromIntent = requireNotNull(result.code)
+                    }
+                }
+            }.also {
+                callbackServer = it
+                serverPort = it.port
+            }
         } catch (e: Exception) {
-            println("Could not start local server: ${e.message}")
+            loginError = str("login_oauth_server_error")
             null
         }
-
-        if (server != null) {
-            val port = server.address.port
-            serverPort = port
-
-            server.apply {
-                createContext("/callback") { exchange ->
-                    val url = when (exchange.requestMethod.uppercase()) {
-                        "GET" -> exchange.requestURI.toString()
-                        "POST" -> String(exchange.requestBody.readBytes())
-                        else -> { exchange.sendResponseHeaders(405, -1); return@createContext }
-                    }
-
-                    val code = extractCodeFromUrl(url)
-                    val returnedState = extractStateFromUrl(url)
-                    if (code != null && returnedState == authState) {
-                        AuthFlowManager.setAuthCode(code)
-                    } else if (code != null) {
-                        println("State mismatch! Expected $authState but got $returnedState")
-                    }
-                    val response = "Authentification reussie ! Vous pouvez fermer cette page."
-                    exchange.sendResponseHeaders(200, response.toByteArray(Charsets.UTF_8).size.toLong())
-                    exchange.responseBody.write(response.toByteArray(Charsets.UTF_8))
-                    exchange.responseBody.close()
-                }
-                executor = null
-                start()
-            }
-        }
-
         onDispose {
-            server?.stop(0)
+            macRegistration?.close()
+            server?.close()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        delay(5 * 60 * 1000L)
+        if (!isLoading && !showTransferDialog) loginError = str("login_oauth_timeout")
+    }
+
+    LaunchedEffect(loginError) {
+        if (loginError != null) {
+            macRegistration?.close()
+            callbackServer?.close()
         }
     }
 
     LaunchedEffect(serverPort) {
         if (serverPort != null && !isProtocolReady) {
-            withContext(Dispatchers.IO) {
-                try {
-                    if (os.contains("windows")) {
-                        val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
-                        if (!appDir.exists()) appDir.mkdirs()
+            var registration: AutoCloseable? = null
+            try {
+                withContext(Dispatchers.IO) {
+                    try {
+                        if (os.contains("windows")) {
+                            val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
+                            if (!appDir.exists()) appDir.mkdirs()
 
-                        val vbsFile = java.io.File(appDir, "sc_handler.vbs")
-                        val vbsContent = buildString {
-                            append("If WScript.Arguments.Count > 0 Then\r\n")
-                            append("  url = WScript.Arguments(0)\r\n")
-                            append("  If InStr(url, \"code=\") > 0 Then\r\n")
-                            append("    Set req = CreateObject(\"MSXML2.ServerXMLHTTP.6.0\")\r\n")
-                            append("    req.open \"POST\", \"http://localhost:$serverPort/callback\", False\r\n")
-                            append("    req.setRequestHeader \"Content-Type\", \"text/plain\"\r\n")
-                            append("    req.send url\r\n")
-                            append("  End If\r\n")
-                            append("End If\r\n")
-                        }
-                        vbsFile.writeText(vbsContent)
+                            val vbsFile = java.io.File(appDir, "sc_handler.vbs")
+                            val vbsContent = buildString {
+                                append("If WScript.Arguments.Count > 0 Then\r\n")
+                                append("  url = WScript.Arguments(0)\r\n")
+                                append("  If InStr(url, \"code=\") > 0 Or InStr(url, \"error=\") > 0 Then\r\n")
+                                append("    Set req = CreateObject(\"MSXML2.ServerXMLHTTP.6.0\")\r\n")
+                                append("    req.open \"POST\", \"http://127.0.0.1:$serverPort/callback\", False\r\n")
+                                append("    req.setRequestHeader \"Content-Type\", \"text/plain\"\r\n")
+                                append("    req.send url\r\n")
+                                append("  End If\r\n")
+                                append("End If\r\n")
+                            }
+                            vbsFile.writeText(vbsContent)
                         
-                        if (!vbsFile.exists()) {
-                            throw Exception("VBS file creation failed at ${vbsFile.absolutePath}")
-                        }
+                            if (!vbsFile.exists()) {
+                                throw Exception("VBS file creation failed at ${vbsFile.absolutePath}")
+                            }
 
-                        val handlerCmd = "wscript.exe \"${vbsFile.absolutePath.replace("\\", "\\\\")}\" \"%1\""
+                            val handlerCmd = "wscript.exe \"${vbsFile.absolutePath.replace("\\", "\\\\")}\" \"%1\""
 
-                        val psScript = """
-                            New-Item -Path "HKCU:\\Software\\Classes\\sc" -Force | Out-Null
-                            New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "(default)" -Value "URL:sc Protocol" -Force | Out-Null
-                            New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "URL Protocol" -Value "" -Force | Out-Null
-                            New-Item -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Force | Out-Null
-                            Set-ItemProperty -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Name "(default)" -Value '$handlerCmd' -Force
-                        """.trimIndent()
+                            val psScript = """
+                                New-Item -Path "HKCU:\\Software\\Classes\\sc" -Force | Out-Null
+                                New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "(default)" -Value "URL:sc Protocol" -Force | Out-Null
+                                New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "URL Protocol" -Value "" -Force | Out-Null
+                                New-Item -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Force | Out-Null
+                                Set-ItemProperty -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Name "(default)" -Value '$handlerCmd' -Force
+                            """.trimIndent()
 
-                        val encodedScript = java.util.Base64.getEncoder().encodeToString(psScript.toByteArray(Charsets.UTF_16LE))
-                        val psProc = Runtime.getRuntime().exec(arrayOf(
-                            "powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", encodedScript
-                        ))
-                        psProc.waitFor()
-                        if (psProc.exitValue() != 0) {
-                            val error = String(psProc.errorStream.readBytes())
-                            throw Exception("PowerShell registry update failed: $error")
-                        }
+                            val encodedScript = java.util.Base64.getEncoder().encodeToString(psScript.toByteArray(Charsets.UTF_16LE))
+                            val psProc = Runtime.getRuntime().exec(arrayOf(
+                                "powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", encodedScript
+                            ))
+                            psProc.waitFor()
+                            if (psProc.exitValue() != 0) {
+                                val error = String(psProc.errorStream.readBytes())
+                                throw Exception("PowerShell registry update failed: $error")
+                            }
                         
-                        println("Successfully registered sc:// protocol handler with VBS wrapper")
-                    } else if (os.contains("linux")) {
-                        val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
-                        if (!appDir.exists()) appDir.mkdirs()
+                            println("Successfully registered sc:// protocol handler with VBS wrapper")
+                        } else if (os.contains("mac")) {
+                            registration = MacSoundCloudOAuth.prepare(authState, requireNotNull(serverPort))
+                            macRegistration = registration
+                        } else if (os.contains("linux")) {
+                            val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
+                            if (!appDir.exists()) appDir.mkdirs()
 
-                        val shellFile = java.io.File(appDir, "sc_handler.sh")
-                        shellFile.writeText(buildString {
-                            append("#!/bin/bash\n")
-                            append("# Only forward the OAuth redirect (contains code= param).\n")
-                            append("# SoundCloud's deep-link check sends sc://auth without code=\n")
-                            append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
-                            append("if [[ \"\$1\" == *\"code=\"* ]]; then\n")
-                            append("  curl -s -X POST 'http://localhost:$serverPort/callback' -d \"\$1\"\n")
-                            append("fi\n")
-                        })
-                        shellFile.setExecutable(true)
+                            val shellFile = java.io.File(appDir, "sc_handler.sh")
+                            shellFile.writeText(buildString {
+                                append("#!/bin/bash\n")
+                                append("# Forward success and denial; ignore parameter-free probes.\n")
+                                append("# SoundCloud's deep-link check sends sc://auth without code=\n")
+                                append("# and we intentionally ignore it to avoid a pre-login prompt.\n")
+                                append("if [[ \"\$1\" == *\"code=\"* || \"\$1\" == *\"error=\"* ]]; then\n")
+                                append("  curl -s -X POST 'http://127.0.0.1:$serverPort/callback' -d \"\$1\"\n")
+                                append("fi\n")
+                            })
+                            shellFile.setExecutable(true)
 
-                        val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")
-                        mimeDir.mkdirs()
-                        val targetDesktop = java.io.File(mimeDir, "kittytune-sc.desktop")
-                        targetDesktop.writeText(buildString {
-                            append("[Desktop Entry]\n")
-                            append("Name=KittyTune SC Auth\n")
-                            append("Exec=${shellFile.absolutePath} %u\n")
-                            append("Type=Application\n")
-                            append("NoDisplay=true\n")
-                            append("MimeType=x-scheme-handler/sc;\n")
-                            append("Terminal=false\n")
-                        })
+                            val mimeDir = java.io.File(System.getProperty("user.home"), ".local/share/applications")
+                            mimeDir.mkdirs()
+                            val targetDesktop = java.io.File(mimeDir, "kittytune-sc.desktop")
+                            targetDesktop.writeText(buildString {
+                                append("[Desktop Entry]\n")
+                                append("Name=KittyTune SC Auth\n")
+                                append("Exec=${shellFile.absolutePath} %u\n")
+                                append("Type=Application\n")
+                                append("NoDisplay=true\n")
+                                append("MimeType=x-scheme-handler/sc;\n")
+                                append("Terminal=false\n")
+                            })
 
-                        Runtime.getRuntime().exec(arrayOf("xdg-mime", "default", "kittytune-sc.desktop", "x-scheme-handler/sc")).waitFor()
-                        Runtime.getRuntime().exec(arrayOf("update-desktop-database", mimeDir.absolutePath)).waitFor()
+                            Runtime.getRuntime().exec(arrayOf("xdg-mime", "default", "kittytune-sc.desktop", "x-scheme-handler/sc")).waitFor()
+                            Runtime.getRuntime().exec(arrayOf("update-desktop-database", mimeDir.absolutePath)).waitFor()
                         
-                        println("Successfully registered sc:// protocol handler for Linux")
+                            println("Successfully registered sc:// protocol handler for Linux")
+                        }
+                    } catch (e: Exception) {
+                        println("Failed to register protocol handler: ${e.message}")
+                        loginError = e.message ?: "Could not register the SoundCloud link handler. Please try again."
                     }
-                } catch (e: Exception) {
-                    println("Failed to register protocol handler: ${e.message}")
-                    e.printStackTrace()
-                } finally {
+                }
+                if (loginError == null) {
                     isProtocolReady = true
                 }
+                awaitCancellation()
+            } finally {
+                registration?.close()
             }
         }
     }
@@ -263,6 +276,8 @@ fun LoginScreen(
         if (code != null && code != lastHandledCode) {
             lastHandledCode = code
             isLoading = true
+            macRegistration?.close()
+            callbackServer?.close()
             val wasGuestMode = tokenManager.isGuestMode()
 
             val success = withContext(Dispatchers.IO) {
@@ -275,7 +290,7 @@ fun LoginScreen(
             }
 
             isLoading = false
-            AuthFlowManager.clearAuthCode()
+            authCodeFromIntent = null
 
             if (success) {
                 SessionManager.harvestStoredSession()
@@ -293,7 +308,7 @@ fun LoginScreen(
                     onLoginSuccess()
                 }
             } else {
-                println("Token exchange failed after OAuth callback")
+                loginError = str("login_oauth_exchange_error")
             }
         }
     }
@@ -362,7 +377,10 @@ fun LoginScreen(
                 CircularWavyProgressIndicator()
                 Spacer(modifier = Modifier.height(24.dp))
 
-                if (isLoading) {
+                if (loginError != null) {
+                    Text(requireNotNull(loginError), modifier = Modifier.padding(24.dp))
+                    OutlinedButton(onClick = onRetry) { Text(str("login_oauth_retry")) }
+                } else if (isLoading) {
                     Text(
                         text = str("login_auth_in_progress"),
                         style = MaterialTheme.typography.bodyLarge,
@@ -377,36 +395,12 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedButton(shapes = ButtonDefaults.shapes(),
-onClick = { launchSoundCloudAuth(authUrl) }) {
+onClick = { if (isProtocolReady) launchSoundCloudAuth(authUrl) }) {
                         Text(str("login_reopen_browser"))
                     }
                 }
             }
         }
-    }
-}
-
-private fun extractCodeFromUrl(url: String): String? {
-    try {
-        if (!url.contains("code=")) return null
-        val uri = URI(url.trim())
-        val query = uri.query ?: return url.substringAfter("code=").substringBefore("&")
-        val params = query.split("&").map { it.split("=") }
-        return params.firstOrNull { it.size == 2 && it[0] == "code" }?.get(1)
-    } catch (e: Exception) {
-        return url.substringAfter("code=").substringBefore("&")
-    }
-}
-
-private fun extractStateFromUrl(url: String): String? {
-    try {
-        if (!url.contains("state=")) return null
-        val uri = URI(url.trim())
-        val query = uri.query ?: return url.substringAfter("state=").substringBefore("&")
-        val params = query.split("&").map { it.split("=") }
-        return params.firstOrNull { it.size == 2 && it[0] == "state" }?.get(1)
-    } catch (e: Exception) {
-        return url.substringAfter("state=").substringBefore("&")
     }
 }
 
@@ -486,7 +480,7 @@ private fun exchangeCodeForTokens(
                 val bodyStr = response.body?.string() ?: ""
                 
                 if (!response.isSuccessful) {
-                    println("Token exchange failed at $tokenUrl: ${response.code} - $bodyStr")
+                    println("Token exchange failed at $tokenUrl: ${response.code}")
                     continue
                 }
 
