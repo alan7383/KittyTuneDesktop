@@ -156,6 +156,13 @@ dependencies {
 tasks.withType<Test>().configureEach {
     providers.gradleProperty("uiScale").orNull?.let { systemProperty("sun.java2d.uiScale", it) }
     jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
+    systemProperty("ORT_DISABLE_TELEMETRY", "1")
+    environment("ORT_DISABLE_TELEMETRY", "1")
+}
+
+tasks.withType<JavaExec>().configureEach {
+    systemProperty("ORT_DISABLE_TELEMETRY", "1")
+    environment("ORT_DISABLE_TELEMETRY", "1")
 }
 
 compose.desktop {
@@ -182,6 +189,7 @@ compose.desktop {
         // deny. The day Unsafe actually goes, jnr needs a release either way.
         if (buildJdk >= 24) jvmArgs += "--sun-misc-unsafe-memory-access=allow"
         jvmArgs += "--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED"
+        jvmArgs += "-DORT_DISABLE_TELEMETRY=1"
 
         // Memory, and why an audio app cares about the collector it gets (issue #33).
         //

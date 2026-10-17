@@ -135,6 +135,15 @@ class AiDetectionManagerTest {
         }
     }
 
+
+    @Test
+    fun testAiDetectionManagerInitWithRealModel() {
+        AiDetectionManager.init()
+        println("Model loaded: ${AiDetectionManager.isModelLoaded()}")
+        println("Active acceleration: ${AiDetectionManager.activeAccelerationProvider.value}")
+        assertNotNull(AiDetectionManager.activeAccelerationProvider.value)
+    }
+
     @Test
     fun testCompareTfliteAndOnnx() {
         val tfliteFile = File(tempTestDir, "artifactnet_v94_full.tflite")

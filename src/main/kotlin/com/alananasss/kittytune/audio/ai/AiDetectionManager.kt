@@ -98,6 +98,7 @@ object AiDetectionManager {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val engineLock = Any()
     private val resultLock = Any()
+    private val initLock = Any()
 
     // TFLite engine
     @Volatile private var tfliteModel: FlatBufferModel? = null
@@ -190,35 +191,32 @@ object AiDetectionManager {
      * Initializes the detector according to preferences and warms up GPU discovery.
      */
     fun init() {
-        // Pre-warm GPU detection asynchronously to avoid UI frame drop in settings
-        scope.launch(Dispatchers.IO) {
-            GpuDetector.getDetectedGpus()
-        }
+        synchronized(initLock) {
+            val prefs = PlayerPreferences()
+            val preferredModel = prefs.aiSelectedModel
+            _currentModelFlow.value = preferredModel
 
-        val prefs = PlayerPreferences()
-        val preferredModel = prefs.aiSelectedModel
-        _currentModelFlow.value = preferredModel
-
-        // Update download state statuses for both models
-        for (m in AiModelType.entries) {
-            val stateFlow = downloadStates.getOrPut(m) { MutableStateFlow(ModelDownloadState.NotDownloaded) }
-            if (isModelReady(m)) {
-                stateFlow.value = ModelDownloadState.Ready
-            } else if (stateFlow.value !is ModelDownloadState.Downloading) {
-                stateFlow.value = ModelDownloadState.NotDownloaded
+            // Update download state statuses for both models
+            for (m in AiModelType.entries) {
+                val stateFlow = downloadStates.getOrPut(m) { MutableStateFlow(ModelDownloadState.NotDownloaded) }
+                if (isModelReady(m)) {
+                    stateFlow.value = ModelDownloadState.Ready
+                } else if (stateFlow.value !is ModelDownloadState.Downloading) {
+                    stateFlow.value = ModelDownloadState.NotDownloaded
+                }
             }
+            _downloadState.value = downloadStates[preferredModel]?.value ?: ModelDownloadState.NotDownloaded
+
+            if (isModelLoaded()) return
+
+            if (!isModelReady(preferredModel)) {
+                _downloadState.value = ModelDownloadState.NotDownloaded
+                _activeAccelerationProvider.value = "${preferredModel.runtimeTag} (Not Downloaded)"
+                return
+            }
+
+            initArtifactNet(prefs)
         }
-        _downloadState.value = downloadStates[preferredModel]?.value ?: ModelDownloadState.NotDownloaded
-
-        if (isModelLoaded()) return
-
-        if (!isModelReady(preferredModel)) {
-            _downloadState.value = ModelDownloadState.NotDownloaded
-            _activeAccelerationProvider.value = "${preferredModel.runtimeTag} (Not Downloaded)"
-            return
-        }
-
-        initArtifactNet(prefs)
     }
 
     /**
@@ -290,7 +288,7 @@ object AiDetectionManager {
             if (res != null) {
                 synchronized(engineLock) {
                     closeEngines()
-                    onnxEnv = OrtEnvironment.getEnvironment()
+                    onnxEnv = OnnxHelper.getOrInitEnvironment()
                     onnxSession = res.first
                 }
                 _activeAccelerationProvider.value = res.second
@@ -313,7 +311,7 @@ object AiDetectionManager {
             if (res != null) {
                 synchronized(engineLock) {
                     closeEngines()
-                    onnxEnv = OrtEnvironment.getEnvironment()
+                    onnxEnv = OnnxHelper.getOrInitEnvironment()
                     onnxSession = res.first
                 }
                 _activeAccelerationProvider.value = res.second
@@ -386,7 +384,7 @@ object AiDetectionManager {
         allowCpuFallback: Boolean = true,
     ): Pair<OrtSession, String>? {
         OnnxHelper.ensureNativeLibrariesLoaded()
-        val env = OrtEnvironment.getEnvironment()
+        val env = OnnxHelper.getOrInitEnvironment()
         val useGpu = prefs.aiGpuAccelerationEnabled
         val selectedGpuId = prefs.aiSelectedGpuId
         val targetGpu = GpuDetector.resolveGpu(selectedGpuId)
@@ -1312,7 +1310,7 @@ object AiDetectionManager {
     ): Float = synchronized(engineLock) {
         if (onnxSession != session) return 0f
 
-        val env = OrtEnvironment.getEnvironment()
+        val env = OnnxHelper.getOrInitEnvironment()
         val inputNames = session.inputNames
         val inputName = inputNames.firstOrNull { name ->
             val l = name.lowercase(Locale.ROOT)
