@@ -153,7 +153,11 @@ jobs:
                       zout.writestr(item, zin.read(item.filename))
               os.replace(tmp, f)
           '
-          dpkg-deb -Zxz -b arch_build/pkg "$DEB_FILE"
+          mkdir -p arch_build/pkg/DEBIAN
+          tar -xf control.tar.* -C arch_build/pkg/DEBIAN
+          dpkg-deb --root-owner-group -Zxz -b arch_build/pkg "$DEB_FILE"
+          rm -rf arch_build/pkg/DEBIAN
+          rm -f debian-binary control.tar.* data.tar.*
           
           mkdir -p arch_build/pkg/usr/share/applications
           mkdir -p arch_build/pkg/usr/share/icons/hicolor/256x256/apps
@@ -270,7 +274,11 @@ jobs:
                       zout.writestr(item, zin.read(item.filename))
               os.replace(tmp, f)
           '
-          dpkg-deb -Zxz -b arch_build_arm/pkg "$DEB_FILE"
+          mkdir -p arch_build_arm/pkg/DEBIAN
+          tar -xf control.tar.* -C arch_build_arm/pkg/DEBIAN
+          dpkg-deb --root-owner-group -Zxz -b arch_build_arm/pkg "$DEB_FILE"
+          rm -rf arch_build_arm/pkg/DEBIAN
+          rm -f debian-binary control.tar.* data.tar.*
           
           mkdir -p arch_build_arm/pkg/usr/share/applications
           mkdir -p arch_build_arm/pkg/usr/share/icons/hicolor/256x256/apps
