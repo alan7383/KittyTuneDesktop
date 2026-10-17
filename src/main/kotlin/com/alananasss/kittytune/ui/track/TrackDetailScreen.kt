@@ -208,9 +208,12 @@ fun UserList(
             }
         }
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp), modifier = Modifier.weight(1f)) {
-            itemsIndexed(visibleUsers) { index, user ->
+            itemsIndexed(visibleUsers, key = { _, user -> user.id }) { index, user ->
                 if (index >= visibleUsers.size - 5) {
-                    LaunchedEffect(Unit) { onLoadMore() }
+                    // Keyed on size + loading: a trigger suppressed while a page is already
+                    // loading retries when it finishes instead of stalling (a one-shot
+                    // LaunchedEffect(Unit) never refires once consumed during loading).
+                    LaunchedEffect(visibleUsers.size, isLoadingMore) { onLoadMore() }
                 }
 
                 Row(
@@ -288,7 +291,7 @@ fun PlaylistList(
             }
         }
 
-        if (playlists.isEmpty() && !isLoadingMore) {
+        if (playlists.isEmpty() && !isLoadingMore && !isSortLoading) {
             Box(Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
                 Text(str("detail_no_public_playlist"), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -297,9 +300,10 @@ fun PlaylistList(
                 contentPadding = PaddingValues(bottom = 24.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                itemsIndexed(playlists) { index, playlist ->
+                itemsIndexed(playlists, key = { _, playlist -> playlist.id }) { index, playlist ->
                     if (index >= playlists.size - 5) {
-                        LaunchedEffect(Unit) { onLoadMore() }
+                        // Same retry semantics as UserList: never wedge the scroll.
+                        LaunchedEffect(playlists.size, isLoadingMore) { onLoadMore() }
                     }
 
                     Row(
@@ -373,7 +377,7 @@ fun TrackList(
             }
             itemsIndexed(visibleTracks) { index, track ->
                 if (index >= visibleTracks.size - 5) {
-                    LaunchedEffect(Unit) { onLoadMore() }
+                    LaunchedEffect(visibleTracks.size, isLoadingMore) { onLoadMore() }
                 }
 
                 val progress = downloadProgress[track.id]

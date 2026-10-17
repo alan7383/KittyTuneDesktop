@@ -408,6 +408,16 @@
         @Body request: GraphQlRequest
     ): GraphQlUserProfileResponse
 
+    /**
+     * Most popular playlists a track appears in, ordered server-side (what the official
+     * SoundCloud app shows in "In playlists"). One call replaces dozens of sequential
+     * GET tracks/{id}/playlists pages + client sort. See FeaturedPlaylistsGraphQlRequest.
+     */
+    @POST("https://graph.soundcloud.com/graphql")
+    suspend fun getFeaturedPlaylistsGraphQL(
+        @Body request: FeaturedPlaylistsGraphQlRequest
+    ): FeaturedPlaylistsGraphQlResponse
+
         @GET("users/{userId}")
         suspend fun getUser(@Path("userId") userId: Long): User
     

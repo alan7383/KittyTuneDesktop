@@ -327,6 +327,40 @@
         @SerializedName("user") val user: User?
     )
 
+    // Featured playlists ("Appears in", most popular first) — what the official app shows.
+    // GraphQL: query FeaturedPlaylists($input: FeaturedPlaylistsInput!)
+    //   { featuredPlaylists(input: $input) { urn } }
+    // with variables {"input": {"trackUrn": "soundcloud:tracks:<id>", "filter": "PLAYLIST", "limit": N}}.
+    // The server returns playlist URNs already ordered by popularity, so no client-side
+    // fetching of dozens of /playlists pages + sorting by likes is needed.
+    data class FeaturedPlaylistsGraphQlRequest(
+        @SerializedName("operationName") val operationName: String = "FeaturedPlaylists",
+        @SerializedName("query") val query: String = "query FeaturedPlaylists(\$input: FeaturedPlaylistsInput!) { featuredPlaylists(input: \$input) { urn } }",
+        @SerializedName("variables") val variables: FeaturedPlaylistsVariables
+    )
+
+    data class FeaturedPlaylistsVariables(
+        @SerializedName("input") val input: FeaturedPlaylistsInput
+    )
+
+    data class FeaturedPlaylistsInput(
+        @SerializedName("trackUrn") val trackUrn: String,
+        @SerializedName("filter") val filter: String = "PLAYLIST",
+        @SerializedName("limit") val limit: Int = 100
+    )
+
+    data class FeaturedPlaylistsGraphQlResponse(
+        @SerializedName("data") val data: FeaturedPlaylistsData?
+    )
+
+    data class FeaturedPlaylistsData(
+        @SerializedName("featuredPlaylists") val featuredPlaylists: List<FeaturedPlaylistUrn>?
+    )
+
+    data class FeaturedPlaylistUrn(
+        @SerializedName("urn") val urn: String?
+    )
+
     data class GraphQlUserProfileResponse(
         @SerializedName("data") val data: GraphQlUserProfileData?
     )
@@ -456,7 +490,7 @@
             get() = policy.equals("SNIP", ignoreCase = true) ||
                 monetizationModel.equals("SUB_HIGH_TIER", ignoreCase = true) ||
                 media?.transcodings?.any { it.snipped == true } == true ||
-                (fullDurationMs != null && durationMs != null && fullDurationMs > durationMs)
+                (fullDurationMs != null && durationMs != null && durationMs <= 45_000L && (fullDurationMs - durationMs) > 15_000L)
 
         val effectiveFullDurationMs: Long?
             get() = fullDurationMs?.takeIf { it > 0L } ?: durationMs

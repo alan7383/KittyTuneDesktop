@@ -347,6 +347,7 @@ class PlayerPreferences {
         const val PANEL_TAB_QUEUE = "queue"
         const val PANEL_TAB_LYRICS = "lyrics"
         const val PANEL_TAB_EFFECTS = "effects"
+        const val PANEL_TAB_DEVICES = "devices"
 
         private const val KEY_PANEL_TRACK_STATS_HIDDEN = "now_playing_track_stats_hidden"
 

@@ -10,19 +10,25 @@ import com.alananasss.kittytune.core.Application
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.*
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The page of a track: who liked and reposted it, which playlists it is in, and what is like it.
  *
- * Likers and reposters open by followers, the most followed first, and playlists by likes (round 2 of the tester's
- * list, item 11): a list of everyone who liked a track is read for the names in it that matter. The service hands
- * them out by when, a page at a time, so a few pages are fetched after the first to give "most followed" something
- * to choose from, and the rest as the list is scrolled. Everything loaded is kept in [TrackDetailsCache] and comes
- * back when the page is opened again.
+ * Likers and reposters open by followers, the most followed first, and playlists by popularity
+ * (round 2 of the tester's list, item 11): like the official app, the popular playlists come
+ * from the GraphQL `featuredPlaylists` endpoint, which returns playlist URNs already ordered
+ * server-side in a single call. The full playlists are then hydrated in parallel and shown
+ * progressively as they arrive. The chronological order (toggle off) still pages through
+ * GET tracks/{id}/playlists on scroll. Everything loaded is kept in [TrackDetailsCache] and
+ * comes back when the page is opened again.
  */
 class TrackDetailViewModel(application: Application) : AndroidViewModel(application) {
     private val api = RetrofitClient.create()
@@ -39,7 +45,10 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
     // The same, as the service gave them, for going back to that order.
     private val likersArrived = mutableListOf<User>()
     private val repostersArrived = mutableListOf<User>()
+    // Chronological order of "appears in" (GET tracks/{id}/playlists pages, as arrived).
     private val playlistsArrived = mutableListOf<Playlist>()
+    // Popular order of "appears in" (GraphQL featuredPlaylists, server order — never re-sorted).
+    private val playlistsPopularArrived = mutableListOf<Playlist>()
 
     // pagination cursors (next_href)
     private var likersNextUrl: String? = null
@@ -83,7 +92,7 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
             // clean slate
             likers.clear(); likersArrived.clear(); likersNextUrl = null
             reposters.clear(); repostersArrived.clear(); repostersNextUrl = null
-            inPlaylists.clear(); playlistsArrived.clear(); playlistsNextUrl = null
+            inPlaylists.clear(); playlistsArrived.clear(); playlistsPopularArrived.clear(); playlistsNextUrl = null
             relatedTracks.clear(); relatedNextUrl = null
 
             try {
@@ -122,49 +131,52 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
                 save()
             }
             prefetchUsers()
-            fetchRestOfPlaylists()
+            fetchPopularPlaylists()
         }
     }
 
     // --- the order of the lists ---
 
     private fun showUsers() {
-        likers.clear(); likers.addAll(TrackDetailOrder.users(likersArrived, isUsersSortedByFollowers))
-        reposters.clear(); reposters.addAll(TrackDetailOrder.users(repostersArrived, isUsersSortedByFollowers))
+        val uniqueLikers = likersArrived.distinctBy { it.id }
+        val uniqueReposters = repostersArrived.distinctBy { it.id }
+        likers.clear(); likers.addAll(TrackDetailOrder.users(uniqueLikers, isUsersSortedByFollowers))
+        reposters.clear(); reposters.addAll(TrackDetailOrder.users(uniqueReposters, isUsersSortedByFollowers))
     }
 
     private fun showPlaylists() {
-        inPlaylists.clear(); inPlaylists.addAll(TrackDetailOrder.playlists(playlistsArrived.distinctBy { it.id }, isPlaylistsSortedByLikes))
+        // Popular order is the server's order (featuredPlaylists): never re-sort it, or the
+        // list visibly reshuffles on every hydrated chunk. Chronological stays as arrived.
+        // Likes are only a tie-break-free display value here.
+        inPlaylists.clear()
+        if (isPlaylistsSortedByLikes) {
+            inPlaylists.addAll(playlistsPopularArrived.distinctBy { it.id })
+        } else {
+            inPlaylists.addAll(playlistsArrived.distinctBy { it.id })
+        }
     }
 
     fun toggleUsersSort() {
         isUsersSortedByFollowers = !isUsersSortedByFollowers
-        // When sorting by followers, wait for all pages to load before displaying,
-        // otherwise the user sees a partial list that "refreshes" later.
+        showUsers()
+        save()
         if (isUsersSortedByFollowers) {
             prefetchUsers()
-        } else {
-            showUsers()
-            save()
         }
     }
 
     fun toggleSortPlaylists() {
         isPlaylistsSortedByLikes = !isPlaylistsSortedByLikes
-        // When sorting by likes, wait for all pages to load before displaying,
-        // otherwise the user sees a partial list that "refreshes" later.
-        if (isPlaylistsSortedByLikes) {
-            fetchRestOfPlaylists()
-        } else {
-            showPlaylists()
-            save()
+        showPlaylists()
+        save()
+        if (isPlaylistsSortedByLikes && playlistsPopularArrived.isEmpty() && playlistsFetchJob?.isActive != true) {
+            fetchPopularPlaylists()
         }
     }
 
     /**
-     * A few more pages of those who liked and reposted, once, so "the most followed first" is chosen from more than one
-     * page of who happened to come last. The list is replaced once when they are in rather than as each arrives, so it
-     * does not shuffle under the pointer.
+     * More pages of those who liked and reposted, updating as they arrive, so "the most followed first"
+     * is chosen from a large sample and the list updates live.
      */
     private fun prefetchUsers() {
         prefetchJob?.cancel()
@@ -172,16 +184,37 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
             val id = loadedTrackId
             isUsersSortLoading = true
             try {
-                repeat(PREFETCH_PAGES) {
+                var pagesFetched = 0
+                while (pagesFetched < PREFETCH_PAGES) {
                     val nextLikers = likersNextUrl
-                    if (nextLikers != null) {
-                        val page = api.getLikersNextPage(nextLikers)
-                        likersArrived.addAll(page.collection); likersNextUrl = page.next_href
-                    }
                     val nextReposters = repostersNextUrl
+                    if (nextLikers == null && nextReposters == null) break
+
+                    if (nextLikers != null) {
+                        try {
+                            val page = api.getLikersNextPage(nextLikers)
+                            likersArrived.addAll(page.collection)
+                            likersNextUrl = page.next_href
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            likersNextUrl = null
+                        }
+                    }
                     if (nextReposters != null) {
-                        val page = api.getRepostersNextPage(nextReposters)
-                        repostersArrived.addAll(page.collection); repostersNextUrl = page.next_href
+                        try {
+                            val page = api.getRepostersNextPage(nextReposters)
+                            repostersArrived.addAll(page.collection)
+                            repostersNextUrl = page.next_href
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (_: Exception) {
+                            repostersNextUrl = null
+                        }
+                    }
+                    pagesFetched++
+                    if (id == loadedTrackId) {
+                        showUsers()
                     }
                 }
             } catch (e: CancellationException) {
@@ -190,39 +223,136 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
                 e.printStackTrace()
             } finally {
                 isUsersSortLoading = false
-            }
-            if (id == loadedTrackId) {
-                showUsers()
-                save()
+                if (id == loadedTrackId) {
+                    showUsers()
+                    save()
+                }
             }
         }
     }
 
-    /** The rest of the playlists the track is in, from where the first page stopped, to sort them all by likes. */
-    private fun fetchRestOfPlaylists() {
-        if (!isPlaylistsSortedByLikes || playlistsNextUrl == null) return
+    /**
+     * The most popular playlists the track appears in, the way the official app does it:
+     * one GraphQL `featuredPlaylists` call returns playlist URNs already ordered by
+     * popularity, then the playlists are hydrated in parallel and shown progressively
+     * (chunk by chunk, server order kept) instead of paging sequentially through
+     * GET tracks/{id}/playlists and re-sorting by likes after every page.
+     *
+     * On failure (or an empty answer) falls back to paging the REST endpoint so the tab
+     * never ends up empty for lack of trying.
+     */
+    private fun fetchPopularPlaylists() {
+        if (!isPlaylistsSortedByLikes) return
         playlistsFetchJob?.cancel()
         playlistsFetchJob = viewModelScope.launch {
             val id = loadedTrackId
             isPlaylistsSortLoading = true
-            isPlaylistsLoadingMore = true
+            // Bottom spinner while nothing is shown yet; loadMore is a no-op in popular
+            // mode so this flag cannot wedge the infinite scroll (the old stall bug).
+            isPlaylistsLoadingMore = playlistsPopularArrived.isEmpty()
             try {
-                var next = playlistsNextUrl
-                while (next != null) {
-                    val res = api.getInPlaylistsNextPage(next)
-                    playlistsArrived.addAll(res.collection)
-                    next = res.next_href
-                    playlistsNextUrl = next
+                val req = FeaturedPlaylistsGraphQlRequest(
+                    variables = FeaturedPlaylistsVariables(
+                        input = FeaturedPlaylistsInput(
+                            trackUrn = "soundcloud:tracks:$id",
+                            filter = "PLAYLIST",
+                            limit = POPULAR_LIMIT,
+                        )
+                    )
+                )
+                val urns = api.getFeaturedPlaylistsGraphQL(req)
+                    .data?.featuredPlaylists.orEmpty()
+                    .mapNotNull { it.urn }
+                    .distinct()
+                if (urns.isEmpty()) {
+                    fetchPopularFallbackLocked(id)
+                    return@launch
                 }
-                if (id == loadedTrackId) showPlaylists()
+                val ids = urns.mapNotNull { it.substringAfterLast(":").toLongOrNull() }
+                // Fresh popular list; show progressively, server order preserved.
+                if (id == loadedTrackId && playlistsPopularArrived.isNotEmpty()) {
+                    // Toggled back and forth: keep what we have, top it up silently.
+                } else {
+                    playlistsPopularArrived.clear()
+                }
+                val knownIds = playlistsPopularArrived.map { it.id }.toHashSet()
+                val missing = ids.filter { it !in knownIds }
+                for (chunk in missing.chunked(HYDRATE_CONCURRENCY)) {
+                    ensureActive()
+                    val hydrated = withContext(Dispatchers.IO) {
+                        chunk.map { pid ->
+                            async {
+                                try {
+                                    api.getPlaylist(pid)
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            }
+                        }.awaitAll().filterNotNull()
+                    }
+                    if (id != loadedTrackId) return@launch
+                    playlistsPopularArrived.addAll(hydrated)
+                    showPlaylists()
+                    isPlaylistsLoadingMore = false
+                }
+                // Playlists deleted/private since the GraphQL answer simply never hydrate;
+                // the server order of the ones we got is still the popular order.
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 e.printStackTrace()
+                if (playlistsPopularArrived.isEmpty()) {
+                    fetchPopularFallbackLocked(id)
+                    return@launch
+                }
             } finally {
                 isPlaylistsSortLoading = false
                 isPlaylistsLoadingMore = false
-                save()
+                if (id == loadedTrackId) {
+                    showPlaylists()
+                    save()
+                }
+            }
+        }
+    }
+
+    /**
+     * Fallback when GraphQL is unreachable: page the REST endpoint a few times and keep
+     * the best-effort likes order, so the tab still shows something popularity-ish.
+     * Runs inside the caller's [playlistsFetchJob]. The fetched pages extend the shared
+     * chronological cursor too, so toggling to chronological order keeps paging where
+     * the fallback stopped instead of replaying pages.
+     */
+    private suspend fun fetchPopularFallbackLocked(id: Long) {
+        // Seed with the chronological first page (already loaded) so nothing is lost.
+        for (p in playlistsArrived) {
+            if (playlistsPopularArrived.none { it.id == p.id }) playlistsPopularArrived.add(p)
+        }
+        playlistsPopularArrived.sortByDescending { it.likesCount ?: 0 }
+        if (id == loadedTrackId) {
+            showPlaylists()
+            isPlaylistsLoadingMore = false
+        }
+        var next = playlistsNextUrl
+        var pageCount = 0
+        while (next != null && pageCount < FALLBACK_PAGES) {
+            try {
+                val res = withContext(Dispatchers.IO) { api.getInPlaylistsNextPage(next) }
+                if (id != loadedTrackId) return
+                // Merge into the popular list too, best-effort by likes, so the tab shows
+                // something popularity-ish even without GraphQL.
+                playlistsPopularArrived.addAll(res.collection)
+                playlistsPopularArrived.sortByDescending { it.likesCount ?: 0 }
+                playlistsArrived.addAll(res.collection)
+                next = res.next_href
+                playlistsNextUrl = next
+                pageCount++
+                showPlaylists()
+                isPlaylistsLoadingMore = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                break
             }
         }
     }
@@ -258,6 +388,11 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun loadMorePlaylists() {
+        // Popular mode is fully served by featuredPlaylists (no REST cursor): nothing to page.
+        // (This early return is also what kills the old stall, where the background fetch
+        // held isPlaylistsLoadingMore=true while every tail item had already fired its
+        // one-shot LaunchedEffect(Unit) and would never retry.)
+        if (isPlaylistsSortedByLikes) return
         if (isPlaylistsLoadingMore || playlistsNextUrl == null) return
         viewModelScope.launch {
             isPlaylistsLoadingMore = true
@@ -295,6 +430,7 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
                 likers = likersArrived.toList(),
                 reposters = repostersArrived.toList(),
                 playlists = playlistsArrived.toList(),
+                playlistsPopular = playlistsPopularArrived.toList(),
                 related = relatedTracks.toList(),
                 likersNext = likersNextUrl,
                 repostersNext = repostersNextUrl,
@@ -312,6 +448,7 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
         likersArrived.clear(); likersArrived.addAll(snapshot.likers)
         repostersArrived.clear(); repostersArrived.addAll(snapshot.reposters)
         playlistsArrived.clear(); playlistsArrived.addAll(snapshot.playlists)
+        playlistsPopularArrived.clear(); playlistsPopularArrived.addAll(snapshot.playlistsPopular)
         relatedTracks.clear(); relatedTracks.addAll(snapshot.related)
         likersNextUrl = snapshot.likersNext
         repostersNextUrl = snapshot.repostersNext
@@ -322,12 +459,26 @@ class TrackDetailViewModel(application: Application) : AndroidViewModel(applicat
         showUsers()
         showPlaylists()
         isLoading = false
+        // A cached popular tab stays instant; a cached chronological tab keeps paging.
+        // A popular tab cached before this change (empty popular list) refetches silently.
+        if (isPlaylistsSortedByLikes && playlistsPopularArrived.isEmpty()) {
+            fetchPopularPlaylists()
+        }
     }
 
     private companion object {
         const val PLAYLISTS_PAGE = 50
 
-        /** Pages of likers and reposters fetched after the first, for the sort by followers to choose from. */
-        const val PREFETCH_PAGES = 3
+        /** Pages of likers and reposters fetched when sorting by followers to get a rich sample. */
+        const val PREFETCH_PAGES = 10
+
+        /** Featured playlists asked from GraphQL: one call, server-ordered by popularity. */
+        const val POPULAR_LIMIT = 100
+
+        /** Playlist hydrations in flight at once (GET playlists/{id} each). */
+        const val HYDRATE_CONCURRENCY = 10
+
+        /** REST pages paged as a fallback when GraphQL answers nothing. */
+        const val FALLBACK_PAGES = 6
     }
 }

@@ -342,18 +342,23 @@ object StreamResolver {
             if (scStream != null) {
                 scStream
             } else {
-                val providerFallback = resolveViaProviders(trackToResolve, forDownload)
+                val providerFallback = if (!restricted) resolveViaProviders(trackToResolve, forDownload) else null
                 if (providerFallback != null) {
                     providerFallback
-                } else if (allowYoutube) {
-                    Logger.w("StreamResolver", "All sources failed for '${trackToResolve.title}', trying final YouTube fallback")
-                    val ytUrl = resolveViaNewPipe(trackToResolve)
-                    ytUrl?.let { ResolvedStream(it, source = "youtube") }
-                } else if (restricted) {
-                    Logger.w("StreamResolver", "All alternatives failed for restricted track '${trackToResolve.title}', using 30s preview snippet as last resort")
-                    resolveFromSoundCloudWithDrm(trackToResolve, forDownload, allowSnippet = true)
                 } else {
-                    null
+                    val ytFallback = if (!restricted && allowYoutube) {
+                        Logger.w("StreamResolver", "All sources failed for '${trackToResolve.title}', trying final YouTube fallback")
+                        resolveViaNewPipe(trackToResolve)?.let { ResolvedStream(it, source = "youtube") }
+                    } else null
+
+                    if (ytFallback != null) {
+                        ytFallback
+                    } else if (restricted) {
+                        Logger.w("StreamResolver", "All alternatives failed for restricted track '${trackToResolve.title}', using 30s preview snippet as last resort")
+                        resolveFromSoundCloudWithDrm(trackToResolve, forDownload, allowSnippet = true)
+                    } else {
+                        null
+                    }
                 }
             }
         }
@@ -593,8 +598,12 @@ object StreamResolver {
     private fun resolveViaNewPipe(track: Track): String? {
         return try {
             val cleanTitle = track.title?.replace(Regex("(?i)(\\[.*?\\]|\\(.*?\\))"), "")?.trim() ?: ""
-            val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
-            val query = "$cleanTitle $artistName audio"
+            val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.trim()
+            val query = if (artistName.isNotBlank() && !cleanTitle.contains(artistName, ignoreCase = true)) {
+                "$cleanTitle $artistName"
+            } else {
+                cleanTitle.ifBlank { track.title.orEmpty().trim() }
+            }
 
             val youtubeService = ServiceList.YouTube
             val searchInfo = SearchInfo.getInfo(youtubeService, youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), ""))

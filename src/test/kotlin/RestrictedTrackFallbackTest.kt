@@ -93,6 +93,23 @@ class RestrictedTrackFallbackTest {
     }
 
     @Test
+    fun `normal track with tiny millisecond duration discrepancy is not detected as snipped`() {
+        val track = Track(
+            id = 55L,
+            title = "Tanir, Tyomcha - Da Da Da",
+            artworkUrl = null,
+            durationMs = 198_106L,
+            fullDurationMs = 198_130L,
+            user = null,
+            policy = "MONETIZE",
+            monetizationModel = "BLACKBOX"
+        )
+        assertFalse(track.isSnipped)
+        assertFalse(StreamResolver.isRestricted(track))
+        assertEquals(198_130L, track.effectiveFullDurationMs)
+    }
+
+    @Test
     fun `mpris metadata reflects effective full duration for snipped track`() {
         val track = Track(
             id = 6L,

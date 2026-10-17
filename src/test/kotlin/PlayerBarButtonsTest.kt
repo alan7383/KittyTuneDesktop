@@ -63,4 +63,18 @@ class PlayerBarButtonsTest {
         assertTrue(retrieved.contains(PlayerPreferences.PLAYER_BAR_BUTTON_LIKE))
         assertTrue(retrieved.contains(PlayerPreferences.PLAYER_BAR_BUTTON_QUEUE))
     }
+
+    @Test
+    fun testPanelTabDevicesConstantAndHiding() {
+        assertEquals("devices", PlayerPreferences.PANEL_TAB_DEVICES)
+        val initialHidden = prefs.getHiddenPanelTabs()
+        assertFalse(initialHidden.contains(PlayerPreferences.PANEL_TAB_DEVICES))
+
+        prefs.setHiddenPanelTabs(initialHidden + PlayerPreferences.PANEL_TAB_DEVICES)
+        val updatedHidden = prefs.getHiddenPanelTabs()
+        assertTrue(updatedHidden.contains(PlayerPreferences.PANEL_TAB_DEVICES))
+
+        prefs.setHiddenPanelTabs(updatedHidden - PlayerPreferences.PANEL_TAB_DEVICES)
+        assertFalse(prefs.getHiddenPanelTabs().contains(PlayerPreferences.PANEL_TAB_DEVICES))
+    }
 }

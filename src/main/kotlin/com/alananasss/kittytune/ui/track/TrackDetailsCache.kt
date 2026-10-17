@@ -20,6 +20,7 @@ internal object TrackDetailsCache {
         val likers: List<User>,
         val reposters: List<User>,
         val playlists: List<Playlist>,
+        val playlistsPopular: List<Playlist> = emptyList(),
         val related: List<Track>,
         val likersNext: String?,
         val repostersNext: String?,
