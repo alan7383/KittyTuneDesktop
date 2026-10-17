@@ -1,0 +1,39 @@
+name: macOS SoundCloud OAuth check
+
+on:
+  pull_request:
+    paths:
+      - 'src/main/kotlin/com/alananasss/kittytune/data/*OAuth*'
+      - 'src/main/kotlin/com/alananasss/kittytune/ui/login/LoginScreen.kt'
+      - 'src/main/kotlin/com/alananasss/kittytune/Main.kt'
+      - 'src/test/kotlin/com/alananasss/kittytune/data/*OAuth*'
+      - 'build.gradle.kts'
+      - '.github/workflows/macos-oauth-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  oauth:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Test callbacks and package app
+        run: bash gradlew :test --tests '*SoundCloudOAuthTest' packageDmg --console=plain
+      - name: Check packaged URL scheme
+        run: |
+          APP=build/compose/binaries/main/app/KittyTune.app
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleURLTypes:0:CFBundleURLSchemes:0' "$APP/Contents/Info.plist" | grep -x sc
+          test -x "$APP/Contents/MacOS/KittyTune"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: macos-oauth-test-report
+          path: build/reports/tests/test
