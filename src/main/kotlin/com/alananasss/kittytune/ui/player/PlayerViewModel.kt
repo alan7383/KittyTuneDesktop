@@ -1605,6 +1605,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 SoundCloudTelemetryTracker.onTrackPaused(currentPosition)
             }
             updateDiscordPresence()
+            updateMprisMedia()
         }
 
 
@@ -1641,6 +1642,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
                 if (repeatMode == RepeatMode.ONE) {
                     currentPosition = 0L
+                    mprisService?.updatePosition(0L, emitSeeked = true)
                     MusicManager.player.seekTo(0)
                     MusicManager.player.play()
                 } else {
@@ -4360,14 +4362,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         if (!applyingTogether && com.alananasss.kittytune.data.together.Together.active.value != null) {
             com.alananasss.kittytune.data.together.Together.control(com.alananasss.kittytune.data.together.TogetherMessage.CONTROL_PREVIOUS, currentPosition)
         }
-        // "Previous" always means the track before this one; rewinding first made it take two presses
-        // (issue #66). Only the first track of the queue, with nothing before it, starts over.
+        // If more than 3 seconds have played, rewind to the start of the current track.
+        // Otherwise, skip to the previous track in the queue (or restart if at the beginning).
         val prev = currentQueueIndex - 1
-        if (prev < 0) {
+        if (currentPosition > 3000L || prev < 0) {
             flushListenSession("MANUAL_REPLAY")
             // The same track from the top is a new listen, not a continuation of the old one.
             beginListenSession(currentTrack)
             currentPosition = 0L
+            mprisService?.updatePosition(0L, emitSeeked = true)
             player.seekTo(0)
             if (autoPlay) {
                 player.play()

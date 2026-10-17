@@ -103,7 +103,6 @@ fun SyncSettingsContent() {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ConnectPanel()
         SyncDevicesPage()
         SyncOptionsPage()
         SyncAdvancedPage()
@@ -455,6 +454,11 @@ private fun DeviceRow(
     shape: androidx.compose.ui.graphics.Shape,
     onForget: () -> Unit,
 ) {
+    val livePeer = ConnectManager.peers.collectAsState().value[device.deviceId]
+    val isOnline = livePeer?.connected == true
+    val selectedDevice by ConnectManager.selectedDevice.collectAsState()
+    val isTarget = selectedDevice == device.deviceId
+
     Surface(
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -468,7 +472,7 @@ private fun DeviceRow(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                    .background(if (isTarget) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -476,22 +480,53 @@ private fun DeviceRow(
                     else Icons.Rounded.Computer,
                     null,
                     modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    tint = if (isTarget) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
                 )
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    device.label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                )
-                Text(
-                    if (device.lastSyncedAtMs > 0) str("sync_last_synced", agoLabel(device.lastSyncedAtMs))
-                    else str("sync_state_never_sub"),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        device.label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (isTarget) {
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Text(
+                                str("connect_active"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(if (isOnline) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (isOnline) {
+                            val transport = if (livePeer.transport == "LAN") str("connect_lan") else str("connect_internet")
+                            if (device.lastSyncedAtMs > 0) "$transport • ${str("sync_last_synced", agoLabel(device.lastSyncedAtMs))}"
+                            else transport
+                        } else {
+                            if (device.lastSyncedAtMs > 0) "${str("connect_offline")} • ${str("sync_last_synced", agoLabel(device.lastSyncedAtMs))}"
+                            else str("connect_offline")
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             TextButton(shapes = ButtonDefaults.shapes(), onClick = onForget) { Text(str("sync_forget_device")) }
         }
@@ -512,7 +547,7 @@ private fun DeviceRow(
  * old screen made the reader look for by hand.
  */
 @Composable
-private fun PairDeviceDialog(
+internal fun PairDeviceDialog(
     onDismiss: () -> Unit,
     onPaired: (String) -> Unit,
 ) {

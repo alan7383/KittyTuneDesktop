@@ -1,169 +1,546 @@
 package com.alananasss.kittytune.ui.profile
 
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import com.alananasss.kittytune.data.sync.ConnectManager
-import com.alananasss.kittytune.data.sync.SyncPeers
+import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.core.trackTextInput
+import com.alananasss.kittytune.data.sync.ConnectManager
 import com.alananasss.kittytune.data.sync.ConnectPlatform
+import com.alananasss.kittytune.data.sync.SyncPeers
+import com.alananasss.kittytune.ui.common.pressScale
 
-private fun label(ru: String, en: String) =
-    if (com.alananasss.kittytune.core.Strings.resolvedLanguage == "ru") ru else en
-
-@Composable fun ConnectButton() {
-    var opened by remember { mutableStateOf(false) }
-    IconButton(onClick = { opened = true }) {
-        Icon(Icons.Rounded.Devices, label("Доступные устройства", "Available devices"))
-    }
-    if (opened) Dialog(onDismissRequest = { opened = false }) {
-        Surface(shape = MaterialTheme.shapes.large) {
-            Column(Modifier.widthIn(max = 520.dp).heightIn(max = 650.dp)
-                .verticalScroll(rememberScrollState()).padding(16.dp)) {
-                ConnectPanel()
-                TextButton(onClick = { opened = false }) { Text(label("Закрыть", "Close")) }
-            }
-        }
-    }
-}
-
-@Composable fun ConnectPanel() {
+@Composable
+fun ConnectPanel() {
     val peers by ConnectManager.peers.collectAsState()
     val feedback by ConnectManager.feedback.collectAsState()
     val selected by ConnectManager.selectedDevice.collectAsState()
     val busy by ConnectManager.transferring.collectAsState()
     val independent by ConnectManager.independent.collectAsState()
-    val autoHeadphones by ConnectManager.autoHeadphones.collectAsState()
+
     var url by remember { mutableStateOf(ConnectManager.relayUrl) }
     var error by remember { mutableStateOf("") }
     var localRelay by remember { mutableStateOf(ConnectPlatform.localRelayUrl.isNotBlank()) }
-    var settings by remember { mutableStateOf(false) }
-    var showRelay by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    var showPairDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) { ConnectManager.refresh() }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text(label("Доступные устройства", "Available devices"), Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium)
-            IconButton(onClick = { settings = !settings }) {
-                Icon(Icons.Rounded.Settings, label("Настройки переключения", "Switching settings"))
+
+    if (showPairDialog) {
+        PairDeviceDialog(
+            onDismiss = { showPairDialog = false },
+            onPaired = {
+                showPairDialog = false
+                ConnectManager.refresh()
+            },
+        )
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = str("connect_available_devices"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = str("connect_devices_subtitle"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(
+                onClick = { showSettings = !showSettings },
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = if (showSettings) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+                Icon(
+                    Icons.Rounded.Settings,
+                    contentDescription = str("connect_settings"),
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
-        Text(label("Нажмите на устройство, чтобы перенести музыку и очередь.",
-            "Tap a device to move your music and queue."), style = MaterialTheme.typography.bodySmall)
-        DeviceChoice(label("Это устройство", "This device"),
-            if (independent) label("Играет отдельно", "Independent playback") else label("Локальное воспроизведение", "Local playback"),
-            Icons.Rounded.Speaker, selected == null, !busy) {
-            if (!independent && selected != null) ConnectManager.switchOutput(null)
-        }
-        val known = SyncPeers.all()
-        if (known.isEmpty()) Text(label("Свяжите телефон и компьютер в синхронизации устройств.", "Pair your phone and computer in device sync."),
-            style = MaterialTheme.typography.bodySmall)
-        known.sortedByDescending { peers[it.deviceId]?.connected == true }.forEach { peer ->
-            val live = peers[peer.deviceId]
-            val status = when {
-                independent -> label("Выключите «Играть отдельно» для переключения", "Disable independent playback to switch")
-                live?.connected != true -> label("Не в сети", "Offline")
-                live.transport == "LAN" -> label("Локальная сеть", "Local network")
-                else -> label("Интернет", "Internet")
+
+        // Expandable relay / connection settings
+        AnimatedVisibility(
+            visible = showSettings,
+            enter = fadeIn() + expandVertically(),
+            exit = fadeOut() + shrinkVertically(),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.Cloud,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = str("connect_relay_title"),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    Text(
+                        text = str("connect_relay_desc"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Checkbox(
+                            checked = localRelay,
+                            onCheckedChange = { value ->
+                                localRelay = value
+                                ConnectPlatform.localRelayUrl = if (value) "ws://127.0.0.1:8787" else ""
+                                ConnectManager.relayUrl = ConnectManager.relayUrl
+                            },
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = str("connect_relay_local"),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = {
+                            url = it
+                            error = ""
+                        },
+                        singleLine = true,
+                        label = { Text(str("connect_relay_url")) },
+                        placeholder = { Text(str("connect_relay_url_hint")) },
+                        isError = error.isNotBlank(),
+                        supportingText = if (error.isNotBlank()) {
+                            { Text(error, color = MaterialTheme.colorScheme.error) }
+                        } else null,
+                        modifier = Modifier.fillMaxWidth().trackTextInput(),
+                    )
+
+                    Button(
+                        onClick = {
+                            runCatching { ConnectManager.relayUrl = url }.onFailure {
+                                error = str("connect_relay_url_error")
+                            }
+                        },
+                        modifier = Modifier.align(Alignment.End),
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Text(str("connect_save"))
+                    }
+                }
             }
-            DeviceChoice(peer.label, status,
-                if (peer.platform == "android") Icons.Rounded.PhoneAndroid else Icons.Rounded.Computer,
-                selected == peer.deviceId, !busy && !independent && live?.connected == true) {
-                ConnectManager.switchOutput(peer.deviceId)
+        }
+
+        // Current device (This device / Local playback)
+        DeviceChoiceCard(
+            name = str("connect_this_device"),
+            status = if (independent) str("connect_independent_playback") else str("connect_local_playback"),
+            icon = Icons.Rounded.Speaker,
+            isSelected = selected == null,
+            isEnabled = !busy && (!independent || selected != null),
+            isOnline = true,
+            onClick = {
+                if (!independent && selected != null) ConnectManager.switchOutput(null)
+            },
+        )
+
+        // Paired devices list or Empty State
+        val known = remember(peers) { SyncPeers.all() }
+        if (known.isEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Devices,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = str("connect_no_devices"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        text = str("connect_no_devices_desc"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Button(
+                        onClick = { showPairDialog = true },
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(str("connect_pair_device"))
+                    }
+                }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                known.sortedByDescending { peers[it.deviceId]?.connected == true }.forEach { peer ->
+                    val live = peers[peer.deviceId]
+                    val isOnline = live?.connected == true
+                    val status = when {
+                        independent -> str("connect_disable_independent_hint")
+                        !isOnline -> str("connect_offline")
+                        live.transport == "LAN" -> str("connect_lan")
+                        else -> str("connect_internet")
+                    }
+                    DeviceChoiceCard(
+                        name = peer.label,
+                        status = status,
+                        icon = if (peer.platform == "android") Icons.Rounded.PhoneAndroid else Icons.Rounded.Computer,
+                        isSelected = selected == peer.deviceId,
+                        isEnabled = !busy && !independent && isOnline,
+                        isOnline = isOnline,
+                        onClick = {
+                            ConnectManager.switchOutput(peer.deviceId)
+                        },
+                    )
+                }
+
+                // Add device button below list
+                OutlinedButton(
+                    onClick = { showPairDialog = true },
+                    modifier = Modifier.fillMaxWidth().height(42.dp),
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(str("connect_pair_device"))
+                }
             }
         }
+
+        // Connection error alert
         val connectionError = peers.values.firstOrNull { !it.connected && it.error.isNotBlank() }?.error
-        if (!independent && connectionError != null) Text(
-            if (connectionError.startsWith("HTTP")) label("Сервер недоступен: ", "Server unavailable: ") + connectionError +
-                label(". Проверьте адрес в настройках устройств.", ". Check the address in device settings.")
-            else label("Ошибка соединения: ", "Connection error: ") + connectionError,
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        if (busy) Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            Text(label("Переносим воспроизведение…", "Moving playback…"), style = MaterialTheme.typography.bodySmall)
-        }
-        if (feedback.isNotBlank() && feedback != "✓") Text(friendlyFeedback(feedback), color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodySmall)
-        HorizontalDivider()
-        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(label("Играть отдельно", "Play independently"), style = MaterialTheme.typography.titleSmall)
-                Text(label("Свои трек и очередь. Управление с других устройств выключено.",
-                    "Your own track and queue. Remote controls are off."), style = MaterialTheme.typography.bodySmall)
-            }
-            Switch(checked = independent, enabled = !busy, onCheckedChange = ConnectManager::setIndependent)
-        }
-        if (settings) {
-            if (com.alananasss.kittytune.data.sync.ConnectPlatform.mobile) {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(label("Подхватывать в наушниках", "Continue with headphones"), style = MaterialTheme.typography.titleSmall)
-                        Text(label("Подключение — перенос с ПК. Отключение — пауза.",
-                            "Connect to move playback from PC. Disconnect to pause."), style = MaterialTheme.typography.bodySmall)
-                    }
-                    Switch(checked = autoHeadphones, enabled = !busy && !independent, onCheckedChange = ConnectManager::setAutoHeadphones)
+        if (!independent && connectionError != null) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Rounded.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = if (connectionError.startsWith("HTTP")) {
+                            connectionError
+                        } else {
+                            connectionError
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
                 }
-                Text(label("При открытом приложении. Если оно выгружено — откройте его для подхвата. Bluetooth-колонки тоже могут определяться как наушники.",
-                    "While the app is open. Reopen it after it is stopped to continue. Bluetooth speakers may also be reported as headphones."),
-                    style = MaterialTheme.typography.bodySmall)
             }
-            TextButton(onClick = { showRelay = !showRelay }) { Text(label("Подключение через интернет", "Internet connection")) }
-            if (showRelay) {
-                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Checkbox(checked = localRelay, onCheckedChange = { value ->
-                        localRelay = value
-                        ConnectPlatform.localRelayUrl = if (value) "ws://127.0.0.1:8787" else ""
-                        ConnectManager.relayUrl = ConnectManager.relayUrl
-                    })
-                    Text(label("Сервер запущен на этом компьютере", "Server runs on this computer"), style = MaterialTheme.typography.bodySmall)
+        }
+
+        // Transferring progress
+        if (busy) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Text(
+                        text = str("connect_moving_playback"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
-                OutlinedTextField(value = url, onValueChange = { url = it; error = "" }, singleLine = true,
-                    label = { Text(label("Адрес сервера", "Server address")) }, modifier = Modifier.fillMaxWidth().trackTextInput())
-                Button(onClick = {
-                    runCatching { ConnectManager.relayUrl = url }.onFailure {
-                        error = label("Нужен адрес https:// или wss://", "Use an https:// or wss:// address")
-                    }
-                }) { Text(label("Сохранить", "Save")) }
-                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+            }
+        }
+
+        // Feedback error if any
+        if (feedback.isNotBlank() && feedback != "✓") {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        text = friendlyFeedback(feedback),
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+        // Play independently toggle card (MicroG-style M3 SwitchBar)
+        val cardBg by animateColorAsState(
+            targetValue = if (independent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+            label = "cardBg",
+        )
+        val titleColor by animateColorAsState(
+            targetValue = if (independent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+            label = "titleColor",
+        )
+        val descColor by animateColorAsState(
+            targetValue = if (independent) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+            label = "descColor",
+        )
+
+        val switchInteractionSource = remember { MutableInteractionSource() }
+
+        Surface(
+            onClick = { ConnectManager.setIndependent(!independent) },
+            enabled = !busy,
+            shape = RoundedCornerShape(48.dp),
+            color = cardBg,
+            interactionSource = switchInteractionSource,
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerHoverIcon(if (busy) PointerIcon.Default else PointerIcon.Hand),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = str("connect_play_independently"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = titleColor,
+                    )
+                    Text(
+                        text = str("connect_play_independently_desc"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = descColor,
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                Switch(
+                    checked = independent,
+                    enabled = !busy,
+                    onCheckedChange = null,
+                    interactionSource = switchInteractionSource,
+                    thumbContent = {
+                        Icon(
+                            imageVector = if (independent) Icons.Rounded.Check else Icons.Rounded.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                            tint = if (independent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        )
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.outline,
+                    ),
+                )
             }
         }
     }
 }
 
-@Composable private fun DeviceChoice(name: String, status: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    Surface(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow) {
-        Row(Modifier.padding(12.dp).heightIn(min = 44.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(icon, contentDescription = null, tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-            Column(Modifier.weight(1f)) {
-                Text(name, style = MaterialTheme.typography.titleSmall, maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+@Composable
+private fun DeviceChoiceCard(
+    name: String,
+    status: String,
+    icon: ImageVector,
+    isSelected: Boolean,
+    isEnabled: Boolean,
+    isOnline: Boolean,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+
+    val containerColor = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+        isHovered && isEnabled -> MaterialTheme.colorScheme.surfaceContainerHighest
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+
+    val border = if (isSelected) {
+        BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f))
+    } else null
+
+    Surface(
+        onClick = onClick,
+        enabled = isEnabled,
+        shape = RoundedCornerShape(14.dp),
+        color = containerColor,
+        border = border,
+        interactionSource = interactionSource,
+        modifier = Modifier
+            .fillMaxWidth()
+            .pressScale(interactionSource)
+            .hoverable(interactionSource)
+            .pointerHoverIcon(if (isEnabled) PointerIcon.Hand else PointerIcon.Default),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.surfaceContainerHighest
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp),
+                )
             }
-            if (selected) Icon(Icons.Rounded.CheckCircle, label("Выбрано", "Selected"), tint = MaterialTheme.colorScheme.primary)
+
+            Spacer(Modifier.width(14.dp))
+
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isOnline) Color(0xFF4CAF50)
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = status,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            if (isSelected) {
+                Icon(
+                    Icons.Rounded.CheckCircle,
+                    contentDescription = str("connect_active"),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+            } else if (isEnabled) {
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }
 
 private fun friendlyFeedback(message: String): String = when {
-    message.contains("Timed out") -> label("Устройство не ответило вовремя. Попробуйте ещё раз.", "Device did not respond in time. Try again.")
-    message == "Device is offline" || message == "Source is unavailable" -> label("Устройство не в сети.", "Device is offline.")
-    message == "Automatic transfer cancelled" -> label("Автоматический перенос отменён.", "Automatic transfer cancelled.")
-    message == "Local files are unavailable on another device" -> label("Этот локальный файл есть только на исходном устройстве.", "This local file is only available on the source device.")
-    message == "Track changed; choose the device again" -> label("Трек сменился во время переноса. Выберите устройство ещё раз.", "Track changed during transfer. Choose the device again.")
-    message == "Unable to prepare this track" -> label("Не удалось открыть трек на выбранном устройстве.", "Could not open the track on this device.")
+    message.contains("Timed out") -> str("connect_feedback_timeout")
+    message == "Device is offline" || message == "Source is unavailable" -> str("connect_feedback_offline")
+    message == "Automatic transfer cancelled" -> str("connect_feedback_cancelled")
+    message == "Local files are unavailable on another device" -> str("connect_feedback_local_only")
+    message == "Track changed; choose the device again" -> str("connect_feedback_track_changed")
+    message == "Unable to prepare this track" -> str("connect_feedback_unable_to_open")
     else -> message
 }

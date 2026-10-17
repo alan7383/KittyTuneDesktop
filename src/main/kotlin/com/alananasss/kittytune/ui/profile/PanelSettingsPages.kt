@@ -306,18 +306,21 @@ fun RightPanelSettingsPage() {
         )
     }
 
+    val allTabs = listOf(
+        Triple(PlayerPreferences.PANEL_TAB_TRACK, "detail_track_title", Icons.Rounded.Info),
+        Triple(PlayerPreferences.PANEL_TAB_QUEUE, "player_queue", Icons.Rounded.QueueMusic),
+        Triple(PlayerPreferences.PANEL_TAB_LYRICS, "player_lyrics", Icons.Rounded.Lyrics),
+        Triple(PlayerPreferences.PANEL_TAB_EFFECTS, "player_effects", Icons.Rounded.Tune),
+        Triple(PlayerPreferences.PANEL_TAB_DEVICES, "connect_devices", Icons.Rounded.Devices),
+    )
+
     SettingsGroup(
         title = str("panel_tabs_title"),
-        items = listOf(
-            Triple(PlayerPreferences.PANEL_TAB_TRACK, "detail_track_title", Icons.Rounded.Info),
-            Triple(PlayerPreferences.PANEL_TAB_QUEUE, "player_queue", Icons.Rounded.QueueMusic),
-            Triple(PlayerPreferences.PANEL_TAB_LYRICS, "player_lyrics", Icons.Rounded.Lyrics),
-            Triple(PlayerPreferences.PANEL_TAB_EFFECTS, "player_effects", Icons.Rounded.Tune),
-        ).map { (key, labelKey, icon) ->
+        items = allTabs.map { (key, labelKey, icon) ->
             { shape ->
                 val shown = key !in hiddenTabs
                 // Never the last one: a panel with no tabs has nothing to show and no way back.
-                val isLastShown = shown && hiddenTabs.size == 3
+                val isLastShown = shown && hiddenTabs.size >= allTabs.size - 1
                 SettingsItem(
                     shape = shape,
                     title = str(labelKey),

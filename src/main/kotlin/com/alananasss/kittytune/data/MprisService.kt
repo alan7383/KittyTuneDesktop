@@ -15,6 +15,11 @@ import org.freedesktop.dbus.messages.DBusSignal
 import org.freedesktop.dbus.types.Variant
 import java.awt.EventQueue
 import java.io.Closeable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * MPRIS 2.2 player on `org.mpris.MediaPlayer2.kittytune`.
@@ -91,13 +96,18 @@ class MprisService(
 
     /** Called whenever the track, the playing state or the position baseline changes. */
     fun updateMedia(track: Track?, playing: Boolean, positionMs: Long, durationMs: Long? = null) {
+        val currentMs = currentPositionUs() / 1000L
         currentTrack = track
         isPlaying = playing
         overrideDurationMs = durationMs
         val lengthMs = lengthUs()?.let { it / 1000L }
         val clamped = if (lengthMs != null && lengthMs > 0L) positionMs.coerceIn(0L, lengthMs) else positionMs.coerceAtLeast(0L)
+        val now = System.currentTimeMillis()
+        val movedBackward = clamped < currentMs - 500L
+        val jumpedForward = clamped > currentMs + 1500L
+
         positionAtUpdateMs = clamped
-        lastUpdateTimeMs = System.currentTimeMillis()
+        lastUpdateTimeMs = now
 
         val metadata = buildMetadata(track, overrideDurationMs)
         val trackChanged = !metadataEquals(metadata, announcedMetadata)
@@ -116,6 +126,11 @@ class MprisService(
             changes["PlaybackStatus"] = Variant(status, "s")
         }
         if (changes.isNotEmpty()) sendPlayerPropertiesChanged(changes)
+
+        if (!trackChanged && track != null && (movedBackward || jumpedForward)) {
+            lastSeekedSignalMs = now
+            send(MprisPlayerInterface.Seeked(OBJECT_PATH, clamped * 1000L))
+        }
     }
 
     fun updateVolume(volume: Double) {
@@ -178,7 +193,21 @@ class MprisService(
         }
     }
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    fun updatePlaybackState(playing: Boolean) {
+        if (isPlaying == playing && (if (playing) !stopped else true)) return
+        isPlaying = playing
+        if (playing) stopped = false
+        val status = playbackStatus()
+        if (status != announcedPlaybackStatus) {
+            announcedPlaybackStatus = status
+            sendPlayerPropertiesChanged(mapOf("PlaybackStatus" to Variant(status, "s")))
+        }
+    }
+
     override fun close() {
+        runCatching { serviceScope.cancel() }
         runCatching { connection?.disconnect() }
         connection = null
     }
@@ -194,8 +223,12 @@ class MprisService(
         return if (lengthUs != null && lengthUs > 0L) posUs.coerceIn(0L, lengthUs) else posUs.coerceAtLeast(0L)
     }
 
-    private fun dispatchToMain(action: () -> Unit) {
-        if (EventQueue.isDispatchThread()) action() else EventQueue.invokeLater(action)
+    private fun dispatchAction(action: () -> Unit) {
+        serviceScope.launch {
+            runCatching { action() }.onFailure { e ->
+                println("MPRIS action failed: ${e.message}")
+            }
+        }
     }
 
     private fun lengthUs(): Long? =
@@ -209,7 +242,7 @@ class MprisService(
         lastUpdateTimeMs = now
         lastSeekedSignalMs = now
         send(MprisPlayerInterface.Seeked(OBJECT_PATH, clamped * 1000L))
-        dispatchToMain { onSeek(clamped) }
+        dispatchAction { onSeek(clamped) }
     }
 
     private fun broadcastPlayerProperty(name: String, value: Variant<*>) {
@@ -287,24 +320,71 @@ class MprisService(
         override fun getObjectPath(): String = OBJECT_PATH
         override fun isRemote(): Boolean = false
 
-        override fun Raise() = dispatchToMain(onRaise)
+        override fun Raise() {
+            if (EventQueue.isDispatchThread()) onRaise() else EventQueue.invokeLater(onRaise)
+        }
         override fun Quit() = Unit
 
-        override fun Play() = dispatchToMain(onPlay)
-        override fun Pause() = dispatchToMain(onPause)
-        override fun PlayPause() = dispatchToMain(onPlayPause)
+        override fun Play() {
+            if (currentTrack != null) {
+                val now = System.currentTimeMillis()
+                positionAtUpdateMs = currentPositionUs() / 1000L
+                lastUpdateTimeMs = now
+                stopped = false
+                isPlaying = true
+                val status = "Playing"
+                if (announcedPlaybackStatus != status) {
+                    announcedPlaybackStatus = status
+                    sendPlayerPropertiesChanged(mapOf("PlaybackStatus" to Variant(status, "s")))
+                }
+            }
+            dispatchAction(onPlay)
+        }
+
+        override fun Pause() {
+            if (currentTrack != null) {
+                val now = System.currentTimeMillis()
+                positionAtUpdateMs = currentPositionUs() / 1000L
+                lastUpdateTimeMs = now
+                isPlaying = false
+                val status = "Paused"
+                if (announcedPlaybackStatus != status) {
+                    announcedPlaybackStatus = status
+                    sendPlayerPropertiesChanged(mapOf("PlaybackStatus" to Variant(status, "s")))
+                }
+            }
+            dispatchAction(onPause)
+        }
+
+        override fun PlayPause() {
+            if (currentTrack != null) {
+                val now = System.currentTimeMillis()
+                positionAtUpdateMs = currentPositionUs() / 1000L
+                lastUpdateTimeMs = now
+                val willPlay = stopped || !isPlaying
+                stopped = false
+                isPlaying = willPlay
+                val status = if (willPlay) "Playing" else "Paused"
+                if (announcedPlaybackStatus != status) {
+                    announcedPlaybackStatus = status
+                    sendPlayerPropertiesChanged(mapOf("PlaybackStatus" to Variant(status, "s")))
+                }
+            }
+            dispatchAction(onPlayPause)
+        }
 
         override fun Stop() {
             if (currentTrack == null || stopped) return
             stopped = true
+            isPlaying = false
             announcedPlaybackStatus = "Stopped"
             sendPlayerPropertiesChanged(mapOf("PlaybackStatus" to Variant("Stopped", "s")))
             if (currentPositionUs() != 0L) send(MprisPlayerInterface.Seeked(OBJECT_PATH, 0L))
-            dispatchToMain(onStop)
+            dispatchAction(onStop)
         }
 
-        override fun Next() = dispatchToMain(onNext)
-        override fun Previous() = dispatchToMain(onPrevious)
+        override fun Next() = dispatchAction(onNext)
+        override fun Previous() = dispatchAction(onPrevious)
         override fun OpenUri(Uri: String) = Unit
 
         override fun Seek(Offset: Long) {
@@ -351,25 +431,36 @@ class MprisService(
                         if (clamped == currentVolume) return
                         currentVolume = clamped
                         broadcastPlayerProperty("Volume", Variant(clamped, "d"))
-                        dispatchToMain { onVolume(clamped) }
+                        dispatchAction { onVolume(clamped) }
                     }
                     "Shuffle" -> (raw as? Boolean)?.let { s ->
                         if (s == currentShuffle) return
                         currentShuffle = s
                         broadcastPlayerProperty("Shuffle", Variant(s, "b"))
-                        dispatchToMain { onShuffle(s) }
+                        dispatchAction { onShuffle(s) }
                     }
                     "LoopStatus" -> (raw as? String)?.let { name ->
                         val status = LoopStatus.fromMprisName(name) ?: return
                         if (status == currentLoopStatus) return
                         currentLoopStatus = status
                         broadcastPlayerProperty("LoopStatus", Variant(status.mprisName, "s"))
-                        dispatchToMain { onLoopStatus(status) }
+                        dispatchAction { onLoopStatus(status) }
                     }
                     // Rate 0.0 is defined as Pause by the spec. Other values set playback speed.
                     "Rate" -> (raw as? Double)?.let { r ->
                         if (r == 0.0) {
-                            dispatchToMain(onPause)
+                            if (currentTrack != null) {
+                                val now = System.currentTimeMillis()
+                                positionAtUpdateMs = currentPositionUs() / 1000L
+                                lastUpdateTimeMs = now
+                                isPlaying = false
+                                val status = "Paused"
+                                if (announcedPlaybackStatus != status) {
+                                    announcedPlaybackStatus = status
+                                    sendPlayerPropertiesChanged(mapOf("PlaybackStatus" to Variant(status, "s")))
+                                }
+                            }
+                            dispatchAction(onPause)
                         } else if (r > 0.0) {
                             val clamped = r.coerceIn(0.5, 2.0)
                             if (kotlin.math.abs(clamped - currentRate) >= 1e-4) {
@@ -377,7 +468,7 @@ class MprisService(
                                 lastUpdateTimeMs = System.currentTimeMillis()
                                 currentRate = clamped
                                 broadcastPlayerProperty("Rate", Variant(currentRate, "d"))
-                                onRate?.let { cb -> dispatchToMain { cb(clamped) } }
+                                onRate?.let { cb -> dispatchAction { cb(clamped) } }
                             }
                         }
                     }

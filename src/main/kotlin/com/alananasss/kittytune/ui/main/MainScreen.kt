@@ -360,7 +360,6 @@ fun MainScreen(
             } else {
                 showNowPlayingPanel = true
                 playerPrefs.setRightPanelOpen(true)
-                playerPrefs.setHiddenPanelTabs(playerPrefs.getHiddenPanelTabs() - "devices")
                 nowPlayingTab = NowPlayingTab.DEVICES
             }
         },
@@ -1376,7 +1375,7 @@ enum class NowPlayingTab(val prefKey: String) {
     QUEUE(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_QUEUE),
     LYRICS(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_LYRICS),
     EFFECTS(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_EFFECTS),
-    DEVICES("devices"),
+    DEVICES(com.alananasss.kittytune.data.local.PlayerPreferences.PANEL_TAB_DEVICES),
 }
 
 @Composable

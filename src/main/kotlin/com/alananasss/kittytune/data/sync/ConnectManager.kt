@@ -103,7 +103,12 @@ object ConnectManager {
         if (!value) { automaticJob?.cancel(); selectDevice(null); SyncPlayback.claimLocal() }
         refresh()
     }
-    fun setIndependent(value: Boolean) { suppressAutomatic = true; SyncPlayback.enabled = !value }
+    fun setIndependent(value: Boolean) {
+        suppressAutomatic = true
+        SyncPlayback.enabled = !value
+        _independent.value = value
+        refresh()
+    }
     fun setAutoHeadphones(value: Boolean) {
         ConnectPlatform.autoHeadphones = value; _autoHeadphones.value = value
         automaticJob?.cancel(); suppressAutomatic = false; refresh()

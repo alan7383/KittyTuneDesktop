@@ -129,7 +129,14 @@ fun NowPlayingPanel(
                 NowPlayingTab.entries.filter { it.prefKey !in hiddenTabs }.ifEmpty { NowPlayingTab.entries }
             }
             // The tab we were on can be hidden from the menu below while we are looking at it.
-            LaunchedEffect(tabs) { if (tab !in tabs) onTabChange(tabs.first()) }
+            var previousTabs by remember { mutableStateOf<List<NowPlayingTab>?>(null) }
+            LaunchedEffect(tabs) {
+                val prev = previousTabs
+                previousTabs = tabs
+                if (prev != null && prev != tabs && tab !in tabs) {
+                    onTabChange(tabs.first())
+                }
+            }
 
             // Header: context name + close. Which tabs show is chosen in Appearance > Customize buttons; the gear
             // that also opened that menu here sat right next to the close button (issue #66).
