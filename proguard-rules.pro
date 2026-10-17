@@ -19,7 +19,10 @@
 -keep class !androidx.compose.material.icons.**,androidx.compose.material.** { *; }
 -keep class androidx.compose.material3.** { *; }
 # Allow unused icons in material-icons-extended to be pruned:
--keep class androidx.compose.material.icons.Icons** { *; }
+# Unused icon classes are discarded by dead-code elimination.
+# Only keep the Icons root class and group singletons if referenced.
+-keep class androidx.compose.material.icons.Icons { *; }
+-keep class androidx.compose.material.icons.Icons$* { *; }
 -keep class org.jetbrains.compose.** { *; }
 -keep class org.jetbrains.skiko.** { *; }
 -keep class org.jetbrains.skia.** { *; }

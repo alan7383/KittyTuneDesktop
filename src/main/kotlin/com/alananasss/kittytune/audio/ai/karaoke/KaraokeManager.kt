@@ -43,6 +43,8 @@ import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
+import java.util.zip.ZipFile
 
 /**
  * Manages HTDemucs v4 AI Source Separation and Karaoke mode:
@@ -57,9 +59,9 @@ object KaraokeManager {
     const val MODEL_FILE_NAME = "htdemucs.safetensors"
     const val MODEL_TOTAL_BYTES = 84_000_000L // ~84 MB
 
-    const val DOWNLOAD_URL = "https://huggingface.co/nikhilunni/demucs-rs/resolve/main/htdemucs.safetensors"
+    const val DOWNLOAD_URL = "https://huggingface.co/set-soft/audio_separation/resolve/main/Demucs/htdemucs.safetensors"
     val FALLBACK_URLS = listOf(
-        "https://huggingface.co/nikhilunni/demucs-rs/resolve/main/htdemucs.safetensors",
+        "https://huggingface.co/set-soft/audio_separation/resolve/main/Demucs/htdemucs.safetensors",
     )
 
     sealed class ModelDownloadState {
@@ -275,7 +277,91 @@ object KaraokeManager {
     fun isModelReady(): Boolean {
         if (getOnnxModelFile() != null) return true
         val file = getModelFile()
-        return file.exists() && file.length() > 10_000_000L
+        val hasModel = file.exists() && file.length() > 10_000_000L
+        val hasBinary = getNativeDemucsBinary() != null
+        return hasModel && hasBinary
+    }
+
+    fun getBinaryDownloadUrl(): String? {
+        val os = System.getProperty("os.name", "").lowercase()
+        val isWindows = os.contains("win")
+        val isMac = os.contains("mac")
+        return when {
+            isWindows -> "https://github.com/nikhilunni/demucs-rs/releases/download/v0.3.4/demucs-x86_64-pc-windows-msvc.zip"
+            isMac -> "https://github.com/nikhilunni/demucs-rs/releases/download/v0.3.4/demucs-aarch64-apple-darwin.tar.gz"
+            else -> "https://github.com/nikhilunni/demucs-rs/releases/download/v0.3.4/demucs-x86_64-unknown-linux-gnu.tar.gz"
+        }
+    }
+
+    private fun extractBinaryArchive(archiveFile: File, destFile: File): Boolean {
+        return try {
+            val isWindows = System.getProperty("os.name", "").lowercase().contains("win")
+            if (isWindows) {
+                ZipFile(archiveFile).use { zip ->
+                    val entry = zip.entries().asSequence().firstOrNull { it.name.endsWith("demucs.exe") || it.name == "demucs.exe" }
+                        ?: return false
+                    zip.getInputStream(entry).use { input ->
+                        destFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                }
+            } else {
+                val tarExit = runCatching {
+                    val pb = ProcessBuilder("tar", "-xzf", archiveFile.absolutePath, "-C", destFile.parentFile.absolutePath)
+                    pb.redirectErrorStream(true)
+                    val p = pb.start()
+                    p.waitFor()
+                }.getOrDefault(-1)
+
+                if (tarExit != 0 || !destFile.exists() || destFile.length() < 1_000_000L) {
+                    GZIPInputStream(archiveFile.inputStream().buffered()).use { gzis ->
+                        val header = ByteArray(512)
+                        while (true) {
+                            var offset = 0
+                            while (offset < 512) {
+                                val r = gzis.read(header, offset, 512 - offset)
+                                if (r < 0) break
+                                offset += r
+                            }
+                            if (offset < 512) break
+                            val name = String(header, 0, 100).trim('\u0000', ' ')
+                            if (name.isEmpty()) break
+                            val sizeStr = String(header, 124, 12).trim('\u0000', ' ')
+                            val size = sizeStr.toLongOrNull(8) ?: 0L
+                            if (name.endsWith("demucs") || name == "demucs") {
+                                destFile.outputStream().use { out ->
+                                    var remaining = size
+                                    val buf = ByteArray(8192)
+                                    while (remaining > 0) {
+                                        val toRead = minOf(remaining, buf.size.toLong()).toInt()
+                                        val read = gzis.read(buf, 0, toRead)
+                                        if (read <= 0) break
+                                        out.write(buf, 0, read)
+                                        remaining -= read
+                                    }
+                                }
+                                break
+                            } else {
+                                val pad = (512 - (size % 512)) % 512
+                                val toSkip = size + pad
+                                var skipped = 0L
+                                while (skipped < toSkip) {
+                                    val s = gzis.skip(toSkip - skipped)
+                                    if (s <= 0) break
+                                    skipped += s
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            destFile.setExecutable(true, false)
+            destFile.exists() && destFile.length() > 1_000_000L
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed extracting demucs binary archive: ${e.message}")
+            false
+        }
     }
 
     /**
@@ -379,82 +465,143 @@ object KaraokeManager {
     }
 
     /**
-     * Download Mel-Band RoFormer ONNX model in background with progress.
+     * Download Demucs model weights and CLI binary in background with progress.
      */
     fun startModelDownload() {
         if (_downloadState.value is ModelDownloadState.Downloading || isModelReady()) return
 
         downloadJob?.cancel()
         downloadJob = scope.launch(Dispatchers.IO) {
-            _downloadState.value = ModelDownloadState.Downloading(0f, 0L, MODEL_TOTAL_BYTES)
-
+            val BINARY_APPROX_BYTES = 11_000_000L
+            val needsBinary = getNativeDemucsBinary() == null
             val modelFinal = getModelFile()
-            modelFinal.parentFile?.mkdirs()
-            val modelTmp = File(modelFinal.parentFile ?: getModelsDir(), "$MODEL_FILE_NAME.tmp")
-            val urlsToTry = listOf(DOWNLOAD_URL) + FALLBACK_URLS
+            val needsModel = !modelFinal.exists() || modelFinal.length() < 10_000_000L
 
-            var downloadSuccess = false
-            var lastError: Exception? = null
+            val totalBytesAll = (if (needsBinary) BINARY_APPROX_BYTES else 0L) +
+                                (if (needsModel) MODEL_TOTAL_BYTES else 0L)
+            var currentBytes = 0L
 
-            for (url in urlsToTry) {
-                var totalDownloaded = 0L
-                try {
-                    val client = ProxyManager.getOkHttpClient().newBuilder()
-                        .connectTimeout(30, TimeUnit.SECONDS)
-                        .readTimeout(120, TimeUnit.SECONDS)
-                        .followRedirects(true)
-                        .followSslRedirects(true)
-                        .build()
+            _downloadState.value = ModelDownloadState.Downloading(0f, 0L, totalBytesAll)
 
-                    val request = Request.Builder()
-                        .url(url)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-                        .build()
+            val client = ProxyManager.getOkHttpClient().newBuilder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
 
-                    client.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) {
-                            throw RuntimeException("HTTP ${response.code} downloading RoFormer model")
-                        }
-                        val body = response.body ?: throw RuntimeException("Empty response body")
-                        val totalBytes = body.contentLength().takeIf { it > 0 } ?: MODEL_TOTAL_BYTES
-
-                        FileOutputStream(modelTmp).use { out ->
-                            val buf = ByteArray(32768)
-                            body.byteStream().use { input ->
-                                while (true) {
-                                    val read = input.read(buf)
-                                    if (read <= 0) break
-                                    out.write(buf, 0, read)
-                                    totalDownloaded += read
-                                    val progress = (totalDownloaded.toFloat() / totalBytes).coerceIn(0f, 1f)
-                                    _downloadState.value = ModelDownloadState.Downloading(progress, totalDownloaded, totalBytes)
-                                }
-                            }
-                            out.flush()
-                        }
-                    }
-
-                    if (!modelTmp.exists() || modelTmp.length() < 10_000_000L) {
-                        throw RuntimeException("Downloaded model is incomplete or empty")
-                    }
+            // Step 1: Download native demucs binary if needed
+            if (needsBinary) {
+                val binUrl = getBinaryDownloadUrl()
+                if (binUrl != null) {
+                    val binDir = File(AppDirs.dataDir, "bin")
+                    binDir.mkdirs()
+                    val isWin = System.getProperty("os.name", "").lowercase().contains("win")
+                    val ext = if (isWin) ".zip" else ".tar.gz"
+                    val binArchiveTmp = File(binDir, "demucs_archive$ext")
+                    val binTarget = File(binDir, if (isWin) "demucs.exe" else "demucs")
 
                     try {
-                        Files.move(modelTmp.toPath(), modelFinal.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-                    } catch (_: Exception) {
-                        Files.move(modelTmp.toPath(), modelFinal.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                        val req = Request.Builder()
+                            .url(binUrl)
+                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                            .build()
+                        client.newCall(req).execute().use { resp ->
+                            if (!resp.isSuccessful) throw RuntimeException("HTTP ${resp.code} downloading demucs binary")
+                            val body = resp.body
+                            FileOutputStream(binArchiveTmp).use { out ->
+                                val buf = ByteArray(32768)
+                                body.byteStream().use { input ->
+                                    while (true) {
+                                        val read = input.read(buf)
+                                        if (read <= 0) break
+                                        out.write(buf, 0, read)
+                                        currentBytes += read
+                                        val p = (currentBytes.toFloat() / totalBytesAll).coerceIn(0f, 1f)
+                                        _downloadState.value = ModelDownloadState.Downloading(p, currentBytes, totalBytesAll)
+                                    }
+                                }
+                                out.flush()
+                            }
+                        }
+                        extractBinaryArchive(binArchiveTmp, binTarget)
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "Failed downloading demucs binary: ${e.message}")
+                    } finally {
+                        binArchiveTmp.delete()
                     }
-
-                    downloadSuccess = true
-                    _downloadState.value = ModelDownloadState.Ready
-                    break
-                } catch (e: Exception) {
-                    lastError = e
-                    runCatching { modelTmp.delete() }
                 }
             }
 
-            if (!downloadSuccess) {
-                _downloadState.value = ModelDownloadState.Error(lastError?.message ?: "Download failed")
+            // Step 2: Download model weights if needed
+            if (needsModel) {
+                modelFinal.parentFile?.mkdirs()
+                val modelTmp = File(modelFinal.parentFile ?: getModelsDir(), "$MODEL_FILE_NAME.tmp")
+                val urlsToTry = listOf(DOWNLOAD_URL) + FALLBACK_URLS
+                var modelSuccess = false
+                var lastError: Exception? = null
+
+                val baseBytes = currentBytes
+                for (url in urlsToTry) {
+                    var downloadedThisTry = 0L
+                    try {
+                        val request = Request.Builder()
+                            .url(url)
+                            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                            .build()
+
+                        client.newCall(request).execute().use { response ->
+                            if (!response.isSuccessful) {
+                                throw RuntimeException("HTTP ${response.code} downloading Demucs model")
+                            }
+                            val body = response.body
+                            val modelBytes = body.contentLength().takeIf { it > 0 } ?: MODEL_TOTAL_BYTES
+
+                            FileOutputStream(modelTmp).use { out ->
+                                val buf = ByteArray(32768)
+                                body.byteStream().use { input ->
+                                    while (true) {
+                                        val read = input.read(buf)
+                                        if (read <= 0) break
+                                        out.write(buf, 0, read)
+                                        downloadedThisTry += read
+                                        val overallBytes = baseBytes + downloadedThisTry
+                                        val progress = (overallBytes.toFloat() / totalBytesAll).coerceIn(0f, 1f)
+                                        _downloadState.value = ModelDownloadState.Downloading(progress, overallBytes, totalBytesAll)
+                                    }
+                                }
+                                out.flush()
+                            }
+                        }
+
+                        if (!modelTmp.exists() || modelTmp.length() < 10_000_000L) {
+                            throw RuntimeException("Downloaded model is incomplete or empty")
+                        }
+
+                        try {
+                            Files.move(modelTmp.toPath(), modelFinal.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                        } catch (_: Exception) {
+                            Files.move(modelTmp.toPath(), modelFinal.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                        }
+
+                        modelSuccess = true
+                        break
+                    } catch (e: Exception) {
+                        lastError = e
+                        runCatching { modelTmp.delete() }
+                    }
+                }
+
+                if (!modelSuccess) {
+                    _downloadState.value = ModelDownloadState.Error(lastError?.message ?: "Model download failed")
+                    return@launch
+                }
+            }
+
+            if (isModelReady()) {
+                _downloadState.value = ModelDownloadState.Ready
+            } else {
+                _downloadState.value = ModelDownloadState.Error("Model or binary could not be initialized")
             }
         }
     }
@@ -512,6 +659,12 @@ object KaraokeManager {
                     tmpDir.delete()
                 }
             }
+        }
+        // 4. Clean up downloaded demucs native executable in binDir
+        val binDir = File(AppDirs.dataDir, "bin")
+        if (binDir.exists()) {
+            runCatching { File(binDir, "demucs").delete() }
+            runCatching { File(binDir, "demucs.exe").delete() }
         }
         checkModelStatus()
     }
