@@ -2555,4 +2555,9 @@
     <string name="connect_feedback_local_only">Этот локальный файл есть только на исходном устройстве.</string>
     <string name="connect_feedback_track_changed">Трек сменился во время переноса. Выберите устройство ещё раз.</string>
     <string name="connect_feedback_unable_to_open">Не удалось открыть трек на выбранном устройстве.</string>
+    <string name="login_oauth_declined">Вход в SoundCloud отменён. Попробуйте ещё раз.</string>
+    <string name="login_oauth_server_error">Не удалось запустить локальный сервер входа. Попробуйте ещё раз.</string>
+    <string name="login_oauth_timeout">Время ожидания входа в SoundCloud истекло. Попробуйте ещё раз.</string>
+    <string name="login_oauth_exchange_error">Не удалось завершить вход в SoundCloud. Попробуйте ещё раз.</string>
+    <string name="login_oauth_retry">Попробовать ещё раз</string>
 </resources>

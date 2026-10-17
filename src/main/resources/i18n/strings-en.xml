@@ -2556,4 +2556,9 @@
     <string name="connect_feedback_local_only">This local file is only available on the source device.</string>
     <string name="connect_feedback_track_changed">Track changed during transfer. Choose the device again.</string>
     <string name="connect_feedback_unable_to_open">Could not open the track on this device.</string>
+    <string name="login_oauth_declined">SoundCloud sign-in was declined. Please try again.</string>
+    <string name="login_oauth_server_error">Could not start the local sign-in server. Please try again.</string>
+    <string name="login_oauth_timeout">SoundCloud sign-in timed out. Please try again.</string>
+    <string name="login_oauth_exchange_error">Could not finish SoundCloud sign-in. Please try again.</string>
+    <string name="login_oauth_retry">Try again</string>
 </resources>
