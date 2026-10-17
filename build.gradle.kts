@@ -380,6 +380,16 @@ compose.desktop {
 
             macOS {
                 bundleID = "com.alananasss.kittytune"
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>CFBundleURLTypes</key>
+                        <array><dict>
+                            <key>CFBundleURLName</key><string>SoundCloud OAuth</string>
+                            <key>CFBundleURLSchemes</key><array><string>sc</string></array>
+                            <key>CFBundleTypeRole</key><string>Viewer</string>
+                        </dict></array>
+                    """.trimIndent()
+                }
                 appCategory = "public.app-category.music"
                 // Without this jpackage bundles its own generic Java icon, and the variant
                 // switcher then has nothing recognisable to fall back to.
@@ -744,7 +754,7 @@ tasks.register<Test>("headlessTest") {
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest",
-            "ToolWindowStyleRaiseToFrontTest"
+            "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest"
         ).forEach(::includeTestsMatching)
     }
 }
