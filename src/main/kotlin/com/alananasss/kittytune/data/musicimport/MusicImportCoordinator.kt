@@ -15,7 +15,7 @@ data class MusicTransferRequest(
 /**
  * App-level bridge between the `soundcloud://musicapi/auth` deep link handled by
  * [com.alananasss.kittytune.ui.musicimport.MusicApiAuthLauncher], the import screens
- * and the transfer progress screen. Mirrors AuthFlowManager.
+ * and the transfer progress screen.
  */
 object MusicImportCoordinator {
     private val _pendingAuth = MutableStateFlow<MusicApiAuth?>(null)
