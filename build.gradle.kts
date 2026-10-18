@@ -125,7 +125,7 @@ dependencies {
         implementation("org.bytedeco:tensorflow-lite:$tfliteVersion:$tfliteClassifier")
     }
 
-    val onnxVersion = "1.29.0"
+    val onnxVersion = "1.31.0"
     implementation("com.microsoft.onnxruntime:onnxruntime:$onnxVersion")
 
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
