@@ -660,9 +660,9 @@ fun KaraokeLyricsView(
 private val TOP_START_GAP = 12.dp
 
 /** How stiffly the sung line springs into place; the lines around it are a little softer. */
-private const val LINE_STIFFNESS = 300f
-private const val LINE_STIFFNESS_STEP = 18f
-private const val LINE_STIFFNESS_MIN = 190f
+private const val LINE_STIFFNESS = 120f
+private const val LINE_STIFFNESS_STEP = 20f
+private const val LINE_STIFFNESS_MIN = 20f
 
 /**
  * Where the sung line's top settles, as a [androidx.compose.foundation.lazy.LazyListItemInfo.offset]: the same

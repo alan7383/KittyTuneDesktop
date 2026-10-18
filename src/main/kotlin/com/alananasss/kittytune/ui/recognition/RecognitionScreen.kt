@@ -33,6 +33,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -111,49 +112,6 @@ fun RecognitionScreen(
             )
         }
 
-        FilledTonalIconButton(
-            onClick = {
-                if (isSearching) {
-                    viewModel.cancelRecognition()
-                } else {
-                    onBackClick()
-                }
-            },
-            shapes = IconButtonDefaults.shapes(),
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(8.dp)
-        ) {
-            Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = str("btn_back")
-            )
-        }
-
-        FilledTonalIconButton(
-            shapes = IconButtonDefaults.shapes(),
-            onClick = { onNavigate("recognition_history") },
-
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            ),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(8.dp)
-        ) {
-            Icon(
-                Icons.Rounded.History,
-                contentDescription = str("recognition_history_title")
-            )
-        }
-
         val currentPage = when (val s = state) {
             is RecognitionState.Idle, is RecognitionState.Recording, is RecognitionState.Processing -> RecognitionUiPage.Main
             is RecognitionState.Success -> RecognitionUiPage.Success(s)
@@ -195,6 +153,51 @@ fun RecognitionScreen(
                     )
                 }
             }
+        }
+
+        FilledTonalIconButton(
+            onClick = {
+                if (isSearching) {
+                    viewModel.cancelRecognition()
+                } else {
+                    onBackClick()
+                }
+            },
+            shapes = IconButtonDefaults.shapes(),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(8.dp)
+                .zIndex(2f)
+        ) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = str("btn_back")
+            )
+        }
+
+        FilledTonalIconButton(
+            shapes = IconButtonDefaults.shapes(),
+            onClick = { onNavigate("recognition_history") },
+
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(8.dp)
+                .zIndex(2f)
+        ) {
+            Icon(
+                Icons.Rounded.History,
+                contentDescription = str("recognition_history_title")
+            )
         }
     }
 }
@@ -615,19 +618,25 @@ private fun SuccessView(
     val likedTracks by LikeRepository.likedTracks.collectAsStateWithLifecycle()
     val isLiked = soundcloudTrack?.let { track -> likedTracks.any { it.id == track.id } } == true
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val minScreenHeight = maxHeight
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .widthIn(max = 520.dp)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
         ) {
-            Spacer(modifier = Modifier.statusBarsPadding())
-            Spacer(modifier = Modifier.height(64.dp))
-
-            ElevatedCard(
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .widthIn(max = 520.dp)
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = minScreenHeight)
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 72.dp, bottom = 48.dp)
+            ) {
+                ElevatedCard(
                 shape = RoundedCornerShape(28.dp),
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 18.dp),
                 modifier = Modifier.size(240.dp)
@@ -746,9 +755,9 @@ private fun SuccessView(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
             )
-            Spacer(modifier = Modifier.height(120.dp))
         }
     }
+}
 }
 
 /** The track's plays, likes, reposts and comments on SoundCloud, each a small tile with its icon. */
