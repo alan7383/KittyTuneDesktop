@@ -223,7 +223,7 @@ fun main(args: Array<String>) {
                         com.alananasss.kittytune.ui.tray.TrayMenuState.show(x, y)
                     }
                 )
-                val started = service.start()
+                val started = runCatching { service.start() }.getOrDefault(false)
                 useSniTray = started
                 if (started) activeSniService = service
 

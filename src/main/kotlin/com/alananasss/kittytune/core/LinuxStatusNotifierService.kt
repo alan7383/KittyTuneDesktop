@@ -125,13 +125,13 @@ class LinuxStatusNotifierService(
                 isRegistered = true
                 println("SNI [init] Registered successfully as $busName with DBusMenu")
                 true
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 println("SNI [init] StatusNotifierWatcher not responding: ${e.message}")
                 conn.disconnect()
                 connection = null
                 false
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             println("SNI [init] Failed to start D-Bus service: ${e.message}")
             connection = null
             false

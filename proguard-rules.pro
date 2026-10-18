@@ -27,14 +27,17 @@
 -keep class org.jetbrains.skiko.** { *; }
 -keep class org.jetbrains.skia.** { *; }
 
-# Native bridges & JNI (JavaCPP, FFmpeg, ONNX, TFLite, SQLite, JNA, DBus, JNR)
+# Native bridges & JNI (JavaCPP, FFmpeg, ONNX, TFLite, SQLite, JNA, DBus, JNR, JFFI)
 -keep class org.bytedeco.** { *; }
 -keep class ai.onnxruntime.** { *; }
 -keep class org.sqlite.** { *; }
 -keep class com.sun.jna.** { *; }
 -keep class jnr.** { *; }
+-keep class com.kenai.** { *; }
 -keep class com.github.hypfvieh.** { *; }
 -keep class org.freedesktop.dbus.** { *; }
+-keep class org.slf4j.** { *; }
+-keep class org.eclipse.paho.** { *; }
 
 # Networking, Serialization, Media
 -keep class okhttp3.** { *; }
