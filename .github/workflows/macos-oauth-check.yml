@@ -24,7 +24,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Test callbacks and package app
         run: bash gradlew :test --tests '*SoundCloudOAuthTest' packageDmg --console=plain
       - name: Check packaged URL scheme

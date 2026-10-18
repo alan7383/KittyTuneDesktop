@@ -17,7 +17,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Test and package portable Windows app
         shell: pwsh
         run: ./scripts/build-windows.ps1 -JavaHome $env:JAVA_HOME
