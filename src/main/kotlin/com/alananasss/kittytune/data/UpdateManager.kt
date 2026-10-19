@@ -53,10 +53,7 @@ object UpdateManager {
     var downloadedInstallerFile: File? = null
     private var currentInstallProcess: Process? = null
     private var authFailedFile: File? = null
-    // True when we already launched the Windows PowerShell helper script that will
-    // wait for this process to exit, run the installer, and relaunch KittyTune.
-    // When set, restartApp() just needs to exitProcess(0) — the script handles the rest.
-    private var windowsHelperScriptLaunched = false
+
 
     private const val KEY_LAST_CHECK = "last_check_time"
     private val prefs = NamedPrefs("update_cache")
@@ -420,54 +417,13 @@ object UpdateManager {
 
             val osName = System.getProperty("os.name", "").lowercase()
 
-            // On Windows, the installer (Inno Setup) cannot replace files that are currently in use.
-            // Strategy:
-            //   1. Write a PowerShell helper script that waits for this process to exit,
-            //      then runs the installer silently, then relaunches KittyTune.
-            //   2. Launch the script detached (it blocks on WaitForExit).
-            //   3. Set status to READY_TO_INSTALL — the user chooses when to restart.
-            //   4. When the user clicks "Restart", restartApp() simply calls exitProcess(0)
-            //      and the already-running PS script takes over.
+            // On Windows, running executables and DLLs cannot be overwritten in place.
+            // When download completes, we mark READY_TO_INSTALL so the user can choose when to restart.
+            // When user clicks "Restart to update" (restartApp()), the detached PowerShell helper script
+            // is executed right as the process exits, installing without file lock errors.
             if (osName.contains("win")) {
-                _status.value = UpdateStatus.INSTALLING
-
-                val installerPath = file.absolutePath
-                val isMsi = file.name.endsWith(".msi", ignoreCase = true)
-                val msiLogFilePath = File(System.getProperty("java.io.tmpdir"), "kittytune_msi.log").absolutePath
-
-                val exitCode = try {
-                    if (isMsi) {
-                        val process = ProcessBuilder(
-                            "msiexec.exe",
-                            "/i", installerPath,
-                            "/qn", "/norestart",
-                            "MSIINSTALLPERUSER=1", "ALLUSERS=2",
-                            "MSIRESTARTMANAGERCONTROL=Disable",
-                            "REBOOT=ReallySuppress",
-                            "/l*v", msiLogFilePath
-                        ).start()
-                        currentInstallProcess = process
-                        process.waitFor()
-                    } else {
-                        val process = ProcessBuilder(
-                            installerPath,
-                            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-"
-                        ).start()
-                        currentInstallProcess = process
-                        process.waitFor()
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    -1
-                } finally {
-                    currentInstallProcess = null
-                }
-
-                if (exitCode == 0) {
-                    _status.value = UpdateStatus.READY_TO_INSTALL
-                } else {
-                    _status.value = UpdateStatus.ERROR
-                }
+                downloadedInstallerFile = file
+                _status.value = UpdateStatus.READY_TO_INSTALL
                 return
             }
 
@@ -552,6 +508,99 @@ object UpdateManager {
         }
     }
 
+    internal fun resolveKittyTuneExe(): File? {
+        val jpackagePath = System.getProperty("jpackage.app.path")
+        val possibleExePaths = mutableListOf<File>()
+        jpackagePath?.let { p ->
+            val f = File(p)
+            if (f.isFile) possibleExePaths.add(f)
+            else if (f.isDirectory) File(f, "KittyTune.exe").let { if (it.exists()) possibleExePaths.add(it) }
+        }
+        possibleExePaths.addAll(listOfNotNull(
+            File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
+            File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
+            File(System.getProperty("user.dir") ?: "", "KittyTune.exe"),
+            File(System.getenv("ProgramFiles") ?: "", "KittyTune/KittyTune.exe")
+        ))
+        return possibleExePaths.firstOrNull { it.exists() && it.isFile }
+    }
+
+    internal fun buildWindowsUpdaterScript(
+        targetPid: Long,
+        installerFile: File,
+        kittyExe: File?,
+        logFile: File,
+        msiLogFile: File,
+    ): String {
+        val escapedInstaller = installerFile.absolutePath.replace("'", "''")
+        val escapedTargetExe = (kittyExe?.absolutePath ?: "").replace("'", "''")
+        val escapedLog = logFile.absolutePath.replace("'", "''")
+        val escapedMsiLog = msiLogFile.absolutePath.replace("'", "''")
+        val isMsi = installerFile.name.endsWith(".msi", ignoreCase = true)
+
+        val installCmd = if (isMsi) {
+            """
+            Log "Executing msiexec..."
+            ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'MSIRESTARTMANAGERCONTROL=Disable', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru -WindowStyle Hidden
+            Log "msiexec finished with exit code ${'$'}(${'$'}p.ExitCode)"
+            """.trimIndent()
+        } else {
+            """
+            Log "Executing setup executable..."
+            ${'$'}p = Start-Process -FilePath '$escapedInstaller' -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-') -Wait -PassThru -WindowStyle Hidden
+            Log "Setup finished with exit code ${'$'}(${'$'}p.ExitCode)"
+            """.trimIndent()
+        }
+
+        return """
+            # KittyTune Windows Auto-Updater Script
+            ${'$'}logFile = '$escapedLog'
+            function Log(${'$'}msg) {
+                ${'$'}ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+                "[${'$'}ts] ${'$'}msg" | Out-File -FilePath ${'$'}logFile -Append -Encoding utf8
+            }
+
+            Log "Starting updater for PID $targetPid"
+            ${'$'}targetPid = $targetPid
+            try {
+                ${'$'}proc = Get-Process -Id ${'$'}targetPid -ErrorAction Stop
+                Log "Waiting for process ${'$'}targetPid to exit..."
+                ${'$'}null = ${'$'}proc.WaitForExit(30000)
+            } catch {
+                Log "Process ${'$'}targetPid is not running or already exited."
+            }
+
+            Log "Ensuring all KittyTune processes are stopped..."
+            Get-Process -Name "KittyTune", "kittytune" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+
+            $installCmd
+
+            ${'$'}exePath = '$escapedTargetExe'
+            if (-not (Test-Path -Path ${'$'}exePath)) {
+                ${'$'}candidates = @(
+                    "${'$'}env:LOCALAPPDATA\KittyTune\KittyTune.exe",
+                    "${'$'}env:LOCALAPPDATA\Programs\KittyTune\KittyTune.exe",
+                    "${'$'}env:ProgramFiles\KittyTune\KittyTune.exe"
+                )
+                foreach (${'$'}c in ${'$'}candidates) {
+                    if (Test-Path -Path ${'$'}c) {
+                        ${'$'}exePath = ${'$'}c
+                        break
+                    }
+                }
+            }
+
+            if (Test-Path -Path ${'$'}exePath) {
+                Log "Relaunching KittyTune from ${'$'}exePath"
+                Start-Process -FilePath ${'$'}exePath
+            } else {
+                Log "Could not find KittyTune.exe to relaunch"
+            }
+            Log "Updater script finished."
+        """.trimIndent()
+    }
+
     /** Restart the application after in-app installation. */
     fun restartApp() {
         var launched = false
@@ -559,29 +608,44 @@ object UpdateManager {
             val osName = System.getProperty("os.name", "").lowercase()
             when {
                 osName.contains("win") -> {
-                    val jpackagePath = System.getProperty("jpackage.app.path")
-                    val possibleExePaths = mutableListOf<File>()
-                    jpackagePath?.let { p ->
-                        val f = File(p)
-                        if (f.isFile) possibleExePaths.add(f)
-                        else if (f.isDirectory) File(f, "KittyTune.exe").let { if (it.exists()) possibleExePaths.add(it) }
-                    }
-                    possibleExePaths.addAll(listOfNotNull(
-                        File(System.getenv("LOCALAPPDATA") ?: "", "KittyTune/KittyTune.exe"),
-                        File(System.getenv("LOCALAPPDATA") ?: "", "Programs/KittyTune/KittyTune.exe"),
-                        File(System.getProperty("user.dir"), "KittyTune.exe"),
-                        File(System.getenv("ProgramFiles") ?: "", "KittyTune/KittyTune.exe")
-                    ))
-                    val existingExe = possibleExePaths.firstOrNull { it.exists() && it.isFile }
-                    if (existingExe != null) {
-                        val escapedPath = existingExe.absolutePath.replace("'", "''")
+                    val installer = downloadedInstallerFile
+                    if (installer != null && installer.exists()) {
+                        val currentPid = runCatching { ProcessHandle.current().pid() }.getOrDefault(0L)
+                        val targetExe = resolveKittyTuneExe()
+                        val tmpDir = File(System.getProperty("java.io.tmpdir"), "KittyTuneUpdates")
+                        tmpDir.mkdirs()
+                        val scriptFile = File(tmpDir, "update_install_${System.currentTimeMillis()}.ps1")
+                        val logFile = File(tmpDir, "kittytune_updater.log")
+                        val msiLogFile = File(tmpDir, "kittytune_msi.log")
+                        val scriptContent = buildWindowsUpdaterScript(
+                            targetPid = currentPid,
+                            installerFile = installer,
+                            kittyExe = targetExe,
+                            logFile = logFile,
+                            msiLogFile = msiLogFile
+                        )
+                        scriptFile.writeText(scriptContent, Charsets.UTF_8)
+
                         ProcessBuilder(
                             "powershell.exe",
                             "-NonInteractive",
                             "-WindowStyle", "Hidden",
-                            "-Command", "Start-Sleep -Seconds 1; Start-Process '$escapedPath'"
+                            "-ExecutionPolicy", "Bypass",
+                            "-File", scriptFile.absolutePath
                         ).start()
                         launched = true
+                    } else {
+                        val existingExe = resolveKittyTuneExe()
+                        if (existingExe != null) {
+                            val escapedPath = existingExe.absolutePath.replace("'", "''")
+                            ProcessBuilder(
+                                "powershell.exe",
+                                "-NonInteractive",
+                                "-WindowStyle", "Hidden",
+                                "-Command", "Start-Sleep -Seconds 1; Start-Process -FilePath '$escapedPath'"
+                            ).start()
+                            launched = true
+                        }
                     }
                 }
                 osName.contains("nux") || osName.contains("nix") -> {
@@ -726,6 +790,7 @@ object UpdateManager {
     fun cancelDownload() {
         _downloadProgress.value = 0f
         _downloadSize.value = 0L
+        downloadedInstallerFile = null
         if (releaseInfo != null) {
             _status.value = UpdateStatus.AVAILABLE
         } else {

@@ -344,7 +344,7 @@ fun buildSyncedLyrics(
         if (entry.isInstrumental) return@forEachIndexed
         val cleanText = LyricsUtils.decodeHtmlEntities(entry.text)
         if (cleanText.isBlank() && entry.words.isEmpty()) return@forEachIndexed
-        val cleanTranslation = entry.translation?.let { LyricsUtils.decodeHtmlEntities(it) }
+        val cleanTranslation = entry.translation?.let { LyricsUtils.decodeHtmlEntities(it) }?.takeUnless { LyricsUtils.isDuplicateTranslation(cleanText, it) }
 
         val effectiveSinger = if (isDuetEnabled) {
             entry.singer?.takeIf { it != LyricSinger.DEFAULT }

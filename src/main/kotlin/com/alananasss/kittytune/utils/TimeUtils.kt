@@ -4,7 +4,9 @@ import com.alananasss.kittytune.core.str
 import java.util.Locale
 
 fun makeTimeString(duration: Long): String {
-    val totalSeconds = duration / 1000
+    if (duration <= 0L) return "00:00"
+    val safeDuration = duration.coerceIn(0L, 1000L * 3600 * 99)
+    val totalSeconds = safeDuration / 1000
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60

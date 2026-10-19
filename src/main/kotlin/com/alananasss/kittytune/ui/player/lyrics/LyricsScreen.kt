@@ -611,7 +611,7 @@ import kotlin.math.roundToInt
                         }
 
                         AnimatedVisibility(
-                            visible = viewModel.isLyricsTranslationEnabled && !line.translation.isNullOrBlank(),
+                            visible = viewModel.isLyricsTranslationEnabled && !line.translation.isNullOrBlank() && !LyricsUtils.isDuplicateTranslation(line.text, line.translation),
                             enter = expandVertically() + fadeIn(),
                             exit = shrinkVertically() + fadeOut()
                         ) {

@@ -435,7 +435,7 @@ private fun PanelLyricLine(
         // romanization il faut que ça se fasse direct en updatant l'écran avec anim" — direct in both
         // directions, and animated in both (issue #33).
         val secondary = when {
-            vm.isLyricsTranslationEnabled -> line.translation ?: line.romanization
+            vm.isLyricsTranslationEnabled -> (line.translation?.takeUnless { com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.isDuplicateTranslation(line.text, it) }) ?: line.romanization
             vm.isRomanizationEnabled -> line.romanization
             else -> null
         }

@@ -146,22 +146,29 @@ internal object ManualLyricsSearch {
 
     private suspend fun searchLrcLib(query: String, track: LyricsSearchTrack): List<UnifiedLyricResult> =
         LrcLibClient.api.searchLyrics(query).map { hit ->
-            // The lyricsfile carries word timings when it exists, so it goes first.
-            val raw = hit.lyricsfile?.takeIf { it.isNotBlank() }
-                ?: hit.syncedLyrics?.takeIf { it.isNotBlank() }
-                ?: hit.plainLyrics
+            val parsedFileLines = hit.lyricsfile?.takeIf { it.isNotBlank() }?.let { LyricsUtils.parseLyricsContent(it, track.durationMs) }.orEmpty()
+            val raw = if (parsedFileLines.isNotEmpty()) {
+                hit.lyricsfile
+            } else {
+                hit.syncedLyrics?.takeIf { it.isNotBlank() }
+                    ?: hit.plainLyrics?.takeIf { it.isNotBlank() }
+                    ?: hit.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
+            }
             val (lineSync, wordSync) = raw?.let { timingsOf(it, track.durationMs) } ?: (false to false)
+            val plainPreview = hit.plainLyrics
+                ?: hit.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
+                ?: raw?.takeUnless { LyricsUtils.isYamlContent(it) }
             UnifiedLyricResult(
                 id = hit.id.toString(),
                 name = hit.trackName?.takeIf { it.isNotBlank() } ?: hit.name,
                 artistName = hit.artistName,
                 albumName = hit.albumName,
                 durationSec = hit.duration,
-                hasLineSync = lineSync,
-                hasWordSync = wordSync,
+                hasLineSync = lineSync || parsedFileLines.isNotEmpty(),
+                hasWordSync = wordSync || parsedFileLines.any { it.words.size > 1 },
                 provider = "LRCLIB",
                 rawContent = raw,
-                previewText = cleanPreview(hit.plainLyrics ?: raw),
+                previewText = plainPreview?.let { cleanPreview(it) }.orEmpty(),
             )
         }
 

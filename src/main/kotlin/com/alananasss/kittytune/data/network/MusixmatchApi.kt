@@ -312,7 +312,11 @@ object MusixmatchClient {
                 val translationsRes = api.getTranslations(trackId = trackId, lang = targetLang, token = token)
                 translationsRes.message.body?.translationsList?.forEach { wrapper ->
                     wrapper.translation?.let { t ->
-                        translationMap[t.matchedLine.trim()] = t.description.trim()
+                        val matched = t.matchedLine.trim()
+                        val desc = t.description.trim()
+                        if (desc.isNotBlank() && !com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.isDuplicateTranslation(matched, desc)) {
+                            translationMap[matched] = desc
+                        }
                     }
                 }
             } catch (e: Exception) { }
@@ -320,7 +324,13 @@ object MusixmatchClient {
             val missingLines = uniqueOriginalLines.filter { !translationMap.containsKey(it.trim()) }
             if (missingLines.isNotEmpty()) {
                 val machineTranslations = FreeTranslator.translateMissing(missingLines, targetLang)
-                translationMap.putAll(machineTranslations)
+                machineTranslations.forEach { (orig, trans) ->
+                    val trimmedOrig = orig.trim()
+                    val trimmedTrans = trans.trim()
+                    if (trimmedTrans.isNotBlank() && !com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.isDuplicateTranslation(trimmedOrig, trimmedTrans)) {
+                        translationMap[trimmedOrig] = trimmedTrans
+                    }
+                }
             }
         }
 

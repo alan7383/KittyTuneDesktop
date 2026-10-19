@@ -355,7 +355,7 @@ object LyricsUtils {
             QRCParser.isQrc(trimmed) -> {
                 parseQrc(trimmed, totalDurationMs)
             }
-            trimmed.startsWith("version:") -> {
+            isYamlContent(trimmed) -> {
                 parseLyricsFile(content, totalDurationMs)
             }
             else -> {
@@ -422,6 +422,39 @@ object LyricsUtils {
                 agent = line.agent
             )
         }
+    }
+
+    fun isYamlContent(content: String?): Boolean {
+        if (content.isNullOrBlank()) return false
+        val trimmed = content.trim().removePrefix("---").trim()
+        return trimmed.startsWith("version:") || (trimmed.startsWith("metadata:") && trimmed.contains("lines:"))
+    }
+
+    fun extractPlainLyricsFromYaml(yamlContent: String): String? {
+        val trimmed = yamlContent.trim().removePrefix("---").trim()
+        if (!isYamlContent(trimmed)) return null
+        return try {
+            val yaml = Yaml()
+            val data = yaml.load<Map<String, Any>>(trimmed)
+            (data["plain"] as? String)?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Determines whether [translation] is identical or near-identical to [original].
+     * Filters out duplicate subtitles, identical machine translation echo lines,
+     * and minor punctuation/whitespace variances (e.g. trailing periods or casing).
+     */
+    fun isDuplicateTranslation(original: String?, translation: String?): Boolean {
+        if (original.isNullOrBlank() || translation.isNullOrBlank()) return false
+        val o = original.trim()
+        val t = translation.trim()
+        if (o.equals(t, ignoreCase = true)) return true
+        val normO = o.filter { it.isLetterOrDigit() }.lowercase()
+        val normT = t.filter { it.isLetterOrDigit() }.lowercase()
+        return normO.isNotEmpty() && normO == normT
     }
 
     private fun parseLyricsFile(yamlContent: String, totalDurationMs: Long): List<LyricLine> {

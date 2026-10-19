@@ -998,7 +998,8 @@ class AudioEngine {
                 drainStretcher(outBuf, localLine)
 
                 if (seekRequestMs == -1L) {
-                    positionMs = (grabber?.timestamp ?: 0L) / 1000L
+                    val rawPos = (grabber?.timestamp ?: 0L) / 1000L
+                    positionMs = if (durationMs > 0L) rawPos.coerceIn(0L, durationMs) else rawPos.coerceAtLeast(0L)
                 }
             }
         } catch (t: Throwable) {
