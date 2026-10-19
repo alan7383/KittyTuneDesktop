@@ -39,12 +39,14 @@ object SmartTranslation {
             val result = mutableMapOf<String, String>()
 
             val whole = kinds.filterValues { it == Kind.FOREIGN }.keys.toList()
-            whole.forEach { line -> known[line]?.takeIf { it.isNotBlank() }?.let { result[line] = it } }
+            whole.forEach { line ->
+                known[line]?.takeIf { it.isNotBlank() && !com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.isDuplicateTranslation(line, it) }?.let { result[line] = it }
+            }
             val toTranslate = whole.filter { it !in result }
             if (toTranslate.isNotEmpty()) {
                 FreeTranslator.translateMissing(toTranslate, reader).forEach { (line, translation) ->
                     // A translation that is the line again says nothing, so it is not shown.
-                    if (!translation.trim().equals(line, ignoreCase = true)) result[line] = translation.trim()
+                    if (!com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.isDuplicateTranslation(line, translation)) result[line] = translation.trim()
                 }
             }
 

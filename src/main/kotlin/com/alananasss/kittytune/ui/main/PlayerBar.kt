@@ -629,13 +629,14 @@ private fun PlaybackProgressRow(vm: PlayerViewModel) {
         trackKey = vm.uiCurrentTrack?.id,
     )
     playheadMs = playhead
-    val position = when {
+    val duration = (clip?.lengthMs ?: vm.uiDuration).coerceAtLeast(1L)
+    val rawPosition = when {
         wheelMs != null -> wheelMs
         isScrubbingNow -> scrubPosition.toLong()
         else -> playhead
     }
+    val position = rawPosition.coerceIn(0L, duration)
     drawnMs = position
-    val duration = (clip?.lengthMs ?: vm.uiDuration).coerceAtLeast(1L)
     val mix = com.alananasss.kittytune.ui.player.slider.rememberMixTransition()
     val shownFraction = if (isScrubbingNow) (position.toFloat() / duration).also { mix.noteShown(it) }
     else mix.shownFraction(position.toFloat() / duration, vm.uiCurrentTrack?.id)

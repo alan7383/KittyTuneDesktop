@@ -1086,7 +1086,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     )
                     translationsRes.message.body?.translationsList?.forEach { wrapper ->
                         wrapper.translation?.let { t ->
-                            translationMap[t.matchedLine.trim()] = t.description.trim()
+                            val matched = t.matchedLine.trim()
+                            val desc = t.description.trim()
+                            if (desc.isNotBlank() && !desc.equals(matched, ignoreCase = true)) {
+                                translationMap[matched] = desc
+                            }
                         }
                     }
                 } catch (_: Exception) {
@@ -2487,9 +2491,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     /** Publishes a resolved lookup to the screen. Main thread only. */
     private fun applyLyricsPayload(payload: LyricsPayload) {
+        val sanitizedPlain = payload.plain?.let { plain ->
+            if (com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.isYamlContent(plain)) {
+                com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.extractPlainLyricsFromYaml(plain)
+            } else {
+                plain
+            }
+        }?.takeIf { it.isNotBlank() }
         lyricsLines.clear()
         lyricsLines.addAll(payload.lines)
-        rawPlainLyrics = payload.plain
+        rawPlainLyrics = sanitizedPlain
         currentLyricsSource = payload.provider.takeUnless { payload.isEmpty }
         uiCurrentTrack?.let { refineLyricVoices(it) }
         lyricsMode = if (payload.lines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
@@ -2792,14 +2803,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     (altTitle != null && LyricsMatcher.isAcceptable(altTitle, result.artistName, target))
                 if (!isAcceptable) return@mapNotNull null
 
-                val synced = result.lyricsfile ?: result.syncedLyrics
-                val lines = synced
+                val fileLines = result.lyricsfile
                     ?.takeIf { it.isNotBlank() }
                     ?.let { LyricsUtils.parseLyricsContent(it, trackDurationMs) }
-                    ?: emptyList()
+                    .orEmpty()
+                val synced = result.syncedLyrics
+                val lines = if (fileLines.isEmpty() && !synced.isNullOrBlank()) {
+                    LyricsUtils.parseLyricsContent(synced, trackDurationMs)
+                } else {
+                    fileLines
+                }
+                val plain = result.plainLyrics
+                    ?: result.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
                 LyricsCandidate(
                     lines = lines,
-                    plain = result.plainLyrics,
+                    plain = plain,
                     provider = "LRCLIB",
                     matchScore = LyricsMatcher.score(candTitle, result.artistName, result.duration, target),
                     titleSimilarity = titleSim,
@@ -2907,13 +2925,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         variant: LyricsVariant,
     ): List<LyricLine> {
         if (lines.isEmpty()) return lines
-        val wantsTranslation = variant.translationLang != null && lines.none { it.translation != null }
+        val targetLang = variant.translationLang
+        val wantsTranslation = targetLang != null && lines.none { it.translation != null }
         val wantsRomanization = variant.romanized && lines.none { it.romanization != null }
         if (!wantsTranslation && !wantsRomanization) return lines
 
         val texts = lines.map { it.text }.filter { it.isNotBlank() }.distinct()
-        val translations = if (wantsTranslation) {
-            com.alananasss.kittytune.util.SmartTranslation.forLines(texts, variant.translationLang!!)
+        val translations = if (wantsTranslation && targetLang != null) {
+            com.alananasss.kittytune.util.SmartTranslation.forLines(texts, targetLang)
         } else {
             emptyMap()
         }
@@ -2923,8 +2942,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             emptyMap()
         }
         return lines.map { line ->
+            val rawTrans = line.translation ?: translations[line.text.trim()]
+            val filteredTrans = rawTrans?.takeUnless { LyricsUtils.isDuplicateTranslation(line.text, it) }
             line.copy(
-                translation = line.translation ?: translations[line.text.trim()],
+                translation = filteredTrans,
                 romanization = line.romanization ?: romanizations[line.text.trim()],
             )
         }
@@ -2991,11 +3012,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private suspend fun processLyricsResponse(response: LrcLibResponse?, trackDuration: Long) {
-        val lyricsText = response?.lyricsfile ?: response?.syncedLyrics
+        val fileLines = response?.lyricsfile?.takeIf { it.isNotBlank() }?.let { LyricsUtils.parseLyricsContent(it, trackDuration) }.orEmpty()
+        val synced = response?.syncedLyrics
         val resultLines = when {
             response == null -> emptyList()
-            !lyricsText.isNullOrEmpty() -> LyricsUtils.parseLyricsContent(lyricsText, trackDuration)
-
+            fileLines.isNotEmpty() -> fileLines
+            !synced.isNullOrBlank() -> LyricsUtils.parseLyricsContent(synced, trackDuration)
             else -> emptyList()
         }
 
@@ -3003,7 +3025,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             lyricsLines.clear()
             lyricsLines.addAll(resultLines)
 
-            rawPlainLyrics = response?.plainLyrics ?: if (resultLines.isNotEmpty()) {
+            val plain = response?.plainLyrics
+                ?: response?.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
+            rawPlainLyrics = plain ?: if (resultLines.isNotEmpty()) {
                 resultLines.joinToString("\n") { it.text }
             } else {
                 response?.syncedLyrics
@@ -3156,18 +3180,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             if (result.rawContent != null) {
                 finalLines = LyricsUtils.parseLyricsContent(result.rawContent, duration)
                 if (finalLines.isEmpty()) {
-                    finalPlain = result.rawContent
+                    finalPlain = LyricsUtils.extractPlainLyricsFromYaml(result.rawContent)
+                        ?: if (!LyricsUtils.isYamlContent(result.rawContent)) result.rawContent else null
                 }
             } else {
                 when (result.provider.uppercase()) {
                     "LRCLIB" -> {
                         try {
                             val lrcData = LrcLibClient.api.getLyricsById(result.id.toLong())
-                            val lyricsText = lrcData.lyricsfile ?: lrcData.syncedLyrics
-                            if (!lyricsText.isNullOrEmpty()) {
-                                finalLines = LyricsUtils.parseLyricsContent(lyricsText, duration)
+                            val fileLines = lrcData.lyricsfile?.takeIf { it.isNotBlank() }?.let { LyricsUtils.parseLyricsContent(it, duration) }.orEmpty()
+                            val synced = lrcData.syncedLyrics
+                            val lines = if (fileLines.isEmpty() && !synced.isNullOrBlank()) {
+                                LyricsUtils.parseLyricsContent(synced, duration)
+                            } else {
+                                fileLines
                             }
+                            finalLines = lines
                             finalPlain = lrcData.plainLyrics
+                                ?: lrcData.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
@@ -5722,7 +5752,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                             saveStateAsync(savePositionOnly = true)
                         }
 
-                        val enginePos = MusicManager.player.currentPosition.coerceAtLeast(0L)
+                        val rawEnginePos = MusicManager.player.currentPosition.coerceAtLeast(0L)
+                        val enginePos = if (duration > 0L) rawEnginePos.coerceIn(0L, duration) else rawEnginePos
                         val timeSinceSeek = System.currentTimeMillis() - lastSeekTimestamp
                         if (timeSinceSeek < 800L) {
                             if (kotlin.math.abs(enginePos - seekTargetPosition) < 1500L) {

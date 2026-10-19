@@ -46,6 +46,11 @@ object LyricsCache {
     ) {
         @Suppress("SENSELESS_COMPARISON")
         fun sanitized(): Entry {
+            val cleanPlain = plain?.let { p ->
+                if (com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.isYamlContent(p)) {
+                    com.alananasss.kittytune.ui.player.lyrics.LyricsUtils.extractPlainLyricsFromYaml(p)
+                } else p
+            }?.takeIf { it.isNotBlank() }
             val rawLines: List<LyricLine>? = lines
             val cleanLines = (rawLines ?: emptyList()).map { line ->
                 var updated = line
@@ -57,7 +62,7 @@ object LyricsCache {
                 }
                 updated
             }
-            return copy(lines = cleanLines)
+            return copy(lines = cleanLines, plain = cleanPlain)
         }
     }
 

@@ -605,9 +605,10 @@ internal fun LazyListState.roomForwardPx(): Float {
     val info = layoutInfo
     val last = info.visibleItemsInfo.lastOrNull() ?: return 0f
     if (last.index != info.totalItemsCount - 1) return Float.MAX_VALUE
-    val bottomEdge = info.viewportEndOffset + info.afterContentPadding
-    val keep = (bottomEdge - info.viewportStartOffset) * LAST_LINE_KEEP_FRACTION
-    return (last.offset + last.size - (bottomEdge - keep)).coerceAtLeast(0f)
+    val viewportHeight = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
+    val stopY = viewportHeight * (1f - LAST_LINE_KEEP_FRACTION)
+    val lastBottom = (last.offset + last.size).toFloat()
+    return (lastBottom - stopY).coerceAtLeast(0f)
 }
 
 /** The last line stops this far (of the viewport) above the bottom edge, clear of its fade. */
@@ -616,9 +617,12 @@ private const val LAST_LINE_KEEP_FRACTION = 0.14f
 /** Holds back a drag, a wheel notch or a touch that would scroll past [roomForwardPx]. */
 internal fun Modifier.stopAtLastLine(listState: LazyListState): Modifier = nestedScroll(object : NestedScrollConnection {
     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        if (source != NestedScrollSource.UserInput) return Offset.Zero
         if (available.y >= 0f) return Offset.Zero
-        val over = -available.y - listState.roomForwardPx()
-        return if (over > 0f) Offset(0f, over) else Offset.Zero
+        val room = listState.roomForwardPx()
+        val scrollAmount = -available.y
+        val over = scrollAmount - room
+        return if (over > 0f) Offset(0f, -over) else Offset.Zero
     }
 })
 
