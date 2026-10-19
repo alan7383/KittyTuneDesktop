@@ -84,7 +84,7 @@ class MusicImportSelectionViewModel(application: Application) : AndroidViewModel
                 }
                 if (fetchFailed) break
             } while (next != null)
-            playlists = collected
+            playlists = collected.filter { (it.totalItems ?: 0) > 0 }.distinctBy { it.id }
             isLoading = false
             loadLikedTracksCount()
         }

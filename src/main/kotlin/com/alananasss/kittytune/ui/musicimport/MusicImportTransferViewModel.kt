@@ -51,9 +51,10 @@ class MusicImportTransferViewModel(application: Application) : AndroidViewModel(
             val hasPlaylists = request?.playlistIds?.isNotEmpty() == true
             val playlistsDone = !hasPlaylists || (
                 playlistStatus.isNotEmpty() &&
-                playlistStatus.all { it.isSyncing != true && (it.progressPercent ?: 100) >= 100 }
+                playlistStatus.all { it.isSyncing == false && it.progressPercent != null && it.progressPercent >= 100 }
             )
-            val likesDone = request?.importLikes != true || (!likesSyncing && (likesProgress ?: 100) >= 100)
+            val currentLikes = likesProgress
+            val likesDone = request?.importLikes != true || (!likesSyncing && currentLikes != null && currentLikes >= 100)
             return playlistsDone && likesDone
         }
 
@@ -101,8 +102,14 @@ class MusicImportTransferViewModel(application: Application) : AndroidViewModel(
         if (transfer.playlistIds.isNotEmpty()) {
             when (val result = repository.startPlaylistSync(transfer.userPlatformUuid, transfer.playlistIds)) {
                 is MusicImportResult.Success -> {
-                    playlistStatus = result.data
-                    playlistSuccess = true
+                    if (result.data.isNotEmpty()) {
+                        playlistStatus = result.data
+                        playlistSuccess = true
+                    } else {
+                        phase = TransferPhase.ERROR
+                        error = "Failed to start playlist sync"
+                        hasError = true
+                    }
                 }
                 is MusicImportResult.Error -> {
                     phase = TransferPhase.ERROR
@@ -152,6 +159,7 @@ class MusicImportTransferViewModel(application: Application) : AndroidViewModel(
         phase = TransferPhase.SYNCING
         pollJob?.cancel()
         pollJob = viewModelScope.launch {
+            var idlePollCount = 0
             while (isActive) {
                 delay(POLL_INTERVAL_MS)
                 refreshStatus(transfer)
@@ -159,6 +167,18 @@ class MusicImportTransferViewModel(application: Application) : AndroidViewModel(
                     phase = TransferPhase.DONE
                     DownloadManager.notifyLibraryUpdated()
                     pollJob?.cancel()
+                } else if (phase == TransferPhase.SYNCING) {
+                    val anySyncing = playlistStatus.any { it.isSyncing == true } || likesSyncing
+                    if (!anySyncing) {
+                        idlePollCount++
+                        if (idlePollCount >= 3) {
+                            phase = TransferPhase.ERROR
+                            error = "Import failed or cancelled on SoundCloud"
+                            pollJob?.cancel()
+                        }
+                    } else {
+                        idlePollCount = 0
+                    }
                 }
             }
         }

@@ -184,6 +184,11 @@
             @Query("linked_partitioning") linkedPartitioning: Int = 1
         ): StationLibraryResponse
 
+        @GET
+        suspend fun getStationLibraryNextPage(
+            @Url url: String
+        ): StationLibraryResponse
+
         // --- Search ---
     
         @GET("search/tracks")

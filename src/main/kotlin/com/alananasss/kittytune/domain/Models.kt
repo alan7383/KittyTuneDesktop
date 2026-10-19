@@ -568,7 +568,8 @@
     data class StationLibraryItem(
         @SerializedName("created_at") val createdAt: String?,
         val type: String?,
-        @SerializedName("system_playlist") val systemPlaylist: SystemPlaylist?
+        @SerializedName("system_playlist") val systemPlaylist: SystemPlaylist?,
+        @SerializedName("playlist") val playlist: Playlist? = null
     )
     data class SystemPlaylist(
         val urn: String?,
