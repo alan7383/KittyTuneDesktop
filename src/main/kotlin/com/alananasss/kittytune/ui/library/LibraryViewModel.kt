@@ -22,6 +22,7 @@ import com.alananasss.kittytune.data.local.LocalPlaylist
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Playlist
+import com.alananasss.kittytune.domain.StationLibraryItem
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.User
 import com.alananasss.kittytune.utils.Logger
@@ -888,7 +889,20 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         allCreated
                     }
                     val repostedPlaylistsDeferred = async { api.getMyPlaylistPosts() }
-                    val libraryAllDeferred = async { try { api.getMyLibraryAll(limit = 200) } catch (e: Exception) { null } }
+                    val libraryAllDeferred = async {
+                        val allItems = mutableListOf<StationLibraryItem>()
+                        try {
+                            var resp = api.getMyLibraryAll(limit = 200)
+                            allItems.addAll(resp.collection)
+                            while (!resp.next_href.isNullOrEmpty()) {
+                                resp = api.getStationLibraryNextPage(resp.next_href!!)
+                                allItems.addAll(resp.collection)
+                            }
+                        } catch (e: Exception) {
+                            Logger.e("LibraryVM", "Failed to fetch library/all", e)
+                        }
+                        allItems
+                    }
                     val uploadedTracksDeferred = async {
                         val tracks = mutableListOf<Track>()
                         try {
@@ -1036,26 +1050,71 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
                         }
                     }
 
-                    // Add liked system playlists and stations from library/all
-                    libraryAllResponse?.collection?.forEach { item ->
-                        val sp = item.systemPlaylist ?: return@forEach
-                        val numId = if (sp.numericId != 0L) sp.numericId else (sp.urn?.let { kotlin.math.abs(it.hashCode().toLong()) } ?: 0L)
-                        if (numId != 0L && addedPlaylistIds.add(numId)) {
-                            trulyLikedIds.add(numId)
-                            val stationPermalink = sp.permalinkUrl ?: if (sp.isArtistStation) "https://soundcloud.com/discover/sets/artist-stations:${sp.numericId}" else "https://soundcloud.com/discover/sets/track-stations:${sp.numericId}"
-                            val fakePlaylist = Playlist(
-                                id = numId,
-                                title = sp.title,
-                                artworkUrl = sp.artworkUrl,
-                                calculatedArtworkUrl = sp.calculatedArtworkUrl,
-                                trackCount = sp.tracks?.size,
-                                user = sp.user,
-                                tracks = null,
-                                permalinkUrl = stationPermalink,
-                                urn = sp.urn
-                            )
-                            val date = parseIsoDate(item.createdAt)
-                            newOnlineItems.add(LibraryItem.PlaylistItem(fakePlaylist, date))
+                    // Add liked user playlists, system playlists and stations from library/all
+                    libraryAllResponse.forEach { item ->
+                        val pl = item.playlist
+                        val sp = item.systemPlaylist
+
+                        if (pl != null) {
+                            if (addedPlaylistIds.add(pl.id)) {
+                                val isUserOwned = pl.user?.id == user.id
+                                val date = parseIsoDate(item.createdAt ?: pl.lastModified ?: pl.createdAt)
+
+                                val localCoverFile = java.io.File(com.alananasss.kittytune.core.AppDirs.imageCacheDir, "playlist_cover_${pl.id}.jpg")
+                                val localInDb = try { db.getPlaylist(pl.id) } catch (_: Exception) { null }
+                                val effectiveCover = localInDb?.localCoverPath ?: if (localCoverFile.exists()) localCoverFile.absolutePath else null
+                                val adjustedPlaylist = if (!effectiveCover.isNullOrEmpty()) {
+                                    pl.copy(artworkUrl = effectiveCover)
+                                } else {
+                                    pl
+                                }
+                                newOnlineItems.add(LibraryItem.PlaylistItem(adjustedPlaylist, date))
+
+                                launch(Dispatchers.IO) {
+                                    try {
+                                        val existing = db.getPlaylist(pl.id)
+                                        if (existing == null) {
+                                            db.insertPlaylist(
+                                                LocalPlaylist(
+                                                    id = pl.id,
+                                                    title = pl.title ?: str("untitled_track"),
+                                                    artist = pl.user?.username ?: user.username ?: str("unknown_artist"),
+                                                    artworkUrl = pl.fullResArtwork,
+                                                    localCoverPath = null,
+                                                    trackCount = pl.trackCount ?: pl.tracks?.size ?: 0,
+                                                    isUserCreated = isUserOwned,
+                                                    permalinkUrl = pl.permalinkUrl,
+                                                    isAlbum = pl.isRealAlbum,
+                                                    isDownloaded = false
+                                                )
+                                            )
+                                        } else if (isUserOwned && !existing.isUserCreated) {
+                                            db.updatePlaylist(existing.copy(isUserCreated = true))
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                    }
+                                }
+                            }
+                        } else if (sp != null) {
+                            val numId = if (sp.numericId != 0L) sp.numericId else (sp.urn?.let { kotlin.math.abs(it.hashCode().toLong()) } ?: 0L)
+                            if (numId != 0L && addedPlaylistIds.add(numId)) {
+                                trulyLikedIds.add(numId)
+                                val stationPermalink = sp.permalinkUrl ?: if (sp.isArtistStation) "https://soundcloud.com/discover/sets/artist-stations:${sp.numericId}" else "https://soundcloud.com/discover/sets/track-stations:${sp.numericId}"
+                                val fakePlaylist = Playlist(
+                                    id = numId,
+                                    title = sp.title,
+                                    artworkUrl = sp.artworkUrl,
+                                    calculatedArtworkUrl = sp.calculatedArtworkUrl,
+                                    trackCount = sp.tracks?.size,
+                                    user = sp.user,
+                                    tracks = null,
+                                    permalinkUrl = stationPermalink,
+                                    urn = sp.urn
+                                )
+                                val date = parseIsoDate(item.createdAt)
+                                newOnlineItems.add(LibraryItem.PlaylistItem(fakePlaylist, date))
+                            }
                         }
                     }
 

@@ -74,7 +74,6 @@ class SoundCloudMusicImportRepository(
         return runGraphQl(request) { body ->
             gson.fromJson(body, PlaylistSyncStatusResponse::class.java)
                 ?.data?.startPlaylistSync?.statuses
-                ?: emptyList()
         }
     }
 
@@ -90,7 +89,6 @@ class SoundCloudMusicImportRepository(
         return runGraphQl(request) { body ->
             gson.fromJson(body, LikesSyncStatusResponse::class.java)
                 ?.data?.startLikesSync?.statuses
-                ?: emptyList()
         }
     }
 
@@ -157,14 +155,18 @@ class SoundCloudMusicImportRepository(
         body.deepAsString("data.externalPlaylists.__typename") == "AuthenticationError" ||
             body.deepAsString("data.externalLikedTracks.__typename") == "AuthenticationError" ||
             body.deepAsString("data.likesSyncStatus.__typename") == "AuthenticationError" ||
-            body.deepAsString("data.playlistSyncStatus.__typename") == "AuthenticationError"
+            body.deepAsString("data.playlistSyncStatus.__typename") == "AuthenticationError" ||
+            body.deepAsString("data.startPlaylistSync.__typename") == "AuthenticationError" ||
+            body.deepAsString("data.startLikesSync.__typename") == "AuthenticationError"
 
     private fun isOtherUnionError(body: JsonObject): Boolean {
         val typenames = listOf(
             body.deepAsString("data.externalPlaylists.__typename"),
             body.deepAsString("data.externalLikedTracks.__typename"),
             body.deepAsString("data.likesSyncStatus.__typename"),
-            body.deepAsString("data.playlistSyncStatus.__typename")
+            body.deepAsString("data.playlistSyncStatus.__typename"),
+            body.deepAsString("data.startPlaylistSync.__typename"),
+            body.deepAsString("data.startLikesSync.__typename")
         )
         return typenames.any { it == "ClientError" || it == "TooManyRequestsError" }
     }
@@ -173,13 +175,17 @@ class SoundCloudMusicImportRepository(
         body.deepAsString("data.externalPlaylists.errorMessage") ?:
         body.deepAsString("data.externalLikedTracks.errorMessage") ?:
         body.deepAsString("data.likesSyncStatus.errorMessage") ?:
-        body.deepAsString("data.playlistSyncStatus.errorMessage")
+        body.deepAsString("data.playlistSyncStatus.errorMessage") ?:
+        body.deepAsString("data.startPlaylistSync.errorMessage") ?:
+        body.deepAsString("data.startLikesSync.errorMessage")
 
     private fun extractUnionRetryAfter(body: JsonObject): Long? =
         body.deepAsLong("data.externalPlaylists.retryAfter") ?:
         body.deepAsLong("data.externalLikedTracks.retryAfter") ?:
         body.deepAsLong("data.likesSyncStatus.retryAfter") ?:
-        body.deepAsLong("data.playlistSyncStatus.retryAfter")
+        body.deepAsLong("data.playlistSyncStatus.retryAfter") ?:
+        body.deepAsLong("data.startPlaylistSync.retryAfter") ?:
+        body.deepAsLong("data.startLikesSync.retryAfter")
 
     private fun extractErrorMessage(body: JsonObject): String? =
         body.deepString("errorMessage")
