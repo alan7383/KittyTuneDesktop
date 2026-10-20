@@ -2498,6 +2498,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 plain
             }
         }?.takeIf { it.isNotBlank() }
+            // Last line of defence: never publish an unparsed XML document as plain lyrics.
+            ?.takeUnless { LyricsUtils.looksLikeTtml(it) }
         lyricsLines.clear()
         lyricsLines.addAll(payload.lines)
         rawPlainLyrics = sanitizedPlain
@@ -2572,6 +2574,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         if (raw.isNullOrBlank()) return null
         val trackDurationMs = track.durationMs ?: 0L
         val parsed = LyricsUtils.parseLyricsContent(raw, trackDurationMs)
+        // Embedded TTML that failed to parse must not be shown as raw tags; let the online
+        // providers try instead.
+        if (parsed.isEmpty() && LyricsUtils.looksLikeTtml(raw)) return null
         return LyricsPayload(
             lines = parsed.ifEmpty { listOf(LyricLine(raw, 0, trackDurationMs)) },
             plain = raw.takeIf { parsed.isEmpty() },
@@ -2635,6 +2640,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 )
                 val raw = result.getOrNull()?.takeIf { it.isNotBlank() } ?: continue
                 val parsed = LyricsUtils.parseLyricsContent(raw, trackDurationMs)
+                // A TTML payload that failed to parse is unusable: showing the raw <tt> markup
+                // is worse than letting the next provider answer.
+                if (parsed.isEmpty() && LyricsUtils.looksLikeTtml(raw)) continue
                 val plain = if (parsed.isEmpty()) raw else null
                 val matchScore = LyricsMatcher.score(candTitle, candArtist, (trackDurationMs / 1000.0), target)
                 val titleSim = LyricsMatcher.titleSimilarity(candTitle, target)
@@ -2999,10 +3007,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             withContext(Dispatchers.Main) {
                 lyricsLines.clear()
                 lyricsLines.addAll(resultLines)
-                rawPlainLyrics = if (resultLines.isNotEmpty()) {
-                    resultLines.joinToString("\n") { it.text }
-                } else {
-                    content
+                rawPlainLyrics = when {
+                    resultLines.isNotEmpty() -> resultLines.joinToString("\n") { it.text }
+                    // Unparsed TTML stays hidden rather than dumped as raw XML tags.
+                    LyricsUtils.looksLikeTtml(content) -> null
+                    else -> content
                 }
                 lyricsMode = if (resultLines.isNotEmpty()) LyricsMode.SYNCED else LyricsMode.PLAIN
                 isSearchingLyrics = false
@@ -3027,11 +3036,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
             val plain = response?.plainLyrics
                 ?: response?.lyricsfile?.let { LyricsUtils.extractPlainLyricsFromYaml(it) }
-            rawPlainLyrics = plain ?: if (resultLines.isNotEmpty()) {
+            rawPlainLyrics = (plain ?: if (resultLines.isNotEmpty()) {
                 resultLines.joinToString("\n") { it.text }
             } else {
                 response?.syncedLyrics
-            }
+            })?.takeUnless { LyricsUtils.looksLikeTtml(it) }
 
             lyricsMode = if (resultLines.isNotEmpty()) {
                 LyricsMode.SYNCED
@@ -3181,7 +3190,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 finalLines = LyricsUtils.parseLyricsContent(result.rawContent, duration)
                 if (finalLines.isEmpty()) {
                     finalPlain = LyricsUtils.extractPlainLyricsFromYaml(result.rawContent)
-                        ?: if (!LyricsUtils.isYamlContent(result.rawContent)) result.rawContent else null
+                        ?: result.rawContent.takeUnless {
+                            LyricsUtils.isYamlContent(it) || LyricsUtils.looksLikeTtml(it)
+                        }
                 }
             } else {
                 when (result.provider.uppercase()) {
@@ -3230,7 +3241,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                             ).getOrNull()
                             if (!raw.isNullOrBlank()) {
                                 finalLines = LyricsUtils.parseLyricsContent(raw, duration)
-                                if (finalLines.isEmpty()) finalPlain = raw
+                                if (finalLines.isEmpty() && !LyricsUtils.looksLikeTtml(raw)) finalPlain = raw
                             }
                         }
                     }
