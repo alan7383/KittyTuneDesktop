@@ -2,6 +2,7 @@ package com.alananasss.kittytune.ui.profile
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -15,12 +16,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.InfoPanelHalf
 import com.alananasss.kittytune.data.local.LibraryTileIcons
+import com.alananasss.kittytune.data.local.MiniPlayerContentMode
 import com.alananasss.kittytune.data.local.MiniPlayerStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.local.SidebarNavEntry
@@ -374,14 +377,37 @@ fun RightPanelSettingsPage() {
     )
 }
 
+private fun miniPlayerContentModeOptions(): List<Pair<MiniPlayerContentMode, String>> = listOf(
+    MiniPlayerContentMode.AUTO to str("mini_player_content_auto"),
+    MiniPlayerContentMode.TITLE_AND_ARTIST to str("mini_player_content_title"),
+    MiniPlayerContentMode.LYRICS to str("mini_player_content_lyrics"),
+    MiniPlayerContentMode.BOTH to str("mini_player_content_both"),
+)
+
+private fun miniPlayerContentModeLabel(mode: MiniPlayerContentMode): String =
+    miniPlayerContentModeOptions().first { it.first == mode }.second
+
 /** Interface → Mini player: the same grouped cards as every other settings page. */
 @Composable
 fun MiniPlayerSettingsPage() {
     val prefs = remember { PlayerPreferences() }
     val snapshot by Prefs.flow.collectAsState()
+    var showContentModeDialog by remember { mutableStateOf(false) }
+    val contentMode = remember(snapshot) { prefs.getMiniPlayerContentMode() }
     fun toggle(title: String, subtitle: String, checked: Boolean, set: (Boolean) -> Unit): @Composable (androidx.compose.ui.graphics.Shape) -> Unit = { shape ->
         SettingsItem(shape = shape, title = title, subtitle = subtitle, hasSwitch = true, switchState = checked, onSwitchChange = set)
     }
+
+    if (showContentModeDialog) {
+        ChoiceDialog(
+            title = str("mini_player_content_mode"),
+            options = miniPlayerContentModeOptions(),
+            selected = contentMode,
+            onSelect = { prefs.setMiniPlayerContentMode(it) },
+            onDismiss = { showContentModeDialog = false },
+        )
+    }
+
     val style = remember(snapshot) { prefs.getMiniPlayerStyle() }
     SettingsGroup(
         title = str("mini_player_section_look"),
@@ -396,6 +422,14 @@ fun MiniPlayerSettingsPage() {
     SettingsGroup(
         title = str("mini_player_section_content"),
         items = listOf(
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("mini_player_content_mode"),
+                    subtitle = miniPlayerContentModeLabel(contentMode),
+                    onClick = { showContentModeDialog = true },
+                )
+            },
             toggle(str("mini_player_show_cover"), str("mini_player_show_cover_desc"), remember(snapshot) { prefs.getMiniPlayerShowCover() }) { prefs.setMiniPlayerShowCover(it) },
             toggle(str("mini_player_show_playback_controls"), str("mini_player_show_playback_controls_desc"), remember(snapshot) { prefs.getMiniPlayerShowPlaybackControls() }) { prefs.setMiniPlayerShowPlaybackControls(it) },
             toggle(str("mini_player_show_additional_controls"), str("mini_player_show_additional_controls_desc"), remember(snapshot) { prefs.getMiniPlayerShowAdditionalControls() }) { prefs.setMiniPlayerShowAdditionalControls(it) },
@@ -438,6 +472,18 @@ private fun MiniPlayerSettingsItems(prefs: PlayerPreferences) {
     val hoverEffect = remember(prefsSnapshot) { prefs.getMiniPlayerHoverEffect() }
     val hoverIllumination = remember(prefsSnapshot) { prefs.getMiniPlayerHoverIllumination() }
     val showProgress = remember(prefsSnapshot) { prefs.getMiniPlayerShowProgress() }
+    val contentMode = remember(prefsSnapshot) { prefs.getMiniPlayerContentMode() }
+    var showContentModeDialog by remember { mutableStateOf(false) }
+
+    if (showContentModeDialog) {
+        ChoiceDialog(
+            title = str("mini_player_content_mode"),
+            options = miniPlayerContentModeOptions(),
+            selected = contentMode,
+            onSelect = { prefs.setMiniPlayerContentMode(it) },
+            onDismiss = { showContentModeDialog = false },
+        )
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         MiniPlayerSectionTitle(str("mini_player_section_look"))
@@ -456,6 +502,11 @@ private fun MiniPlayerSettingsItems(prefs: PlayerPreferences) {
         }
 
         MiniPlayerSectionTitle(str("mini_player_section_content"))
+        ChoiceRow(
+            title = str("mini_player_content_mode"),
+            subtitle = miniPlayerContentModeLabel(contentMode),
+            onClick = { showContentModeDialog = true },
+        )
         SwitchRow(str("mini_player_show_cover"), showCover, str("mini_player_show_cover_desc")) {
             prefs.setMiniPlayerShowCover(!showCover)
         }
@@ -487,4 +538,37 @@ private fun MiniPlayerSectionTitle(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 4.dp),
     )
+}
+
+/** A row that opens a single-choice dialog, styled like the switch rows around it. */
+@Composable
+private fun ChoiceRow(title: String, subtitle: String?, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Spacer(Modifier.width(12.dp))
+        Icon(
+            Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+    }
 }

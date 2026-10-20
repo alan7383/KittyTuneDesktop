@@ -1,7 +1,9 @@
+import com.alananasss.kittytune.data.local.MiniPlayerContentMode
 import com.alananasss.kittytune.data.local.MiniPlayerStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.lyrics.LyricWord
 import com.alananasss.kittytune.ui.player.mini.resolveActiveChunk
+import com.alananasss.kittytune.ui.player.mini.resolveMiniPlayerTextPlan
 import com.alananasss.kittytune.ui.player.mini.splitIntoChunks
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -216,6 +218,61 @@ class MiniLyricsPlayerTest {
         } finally {
             prefs.setMiniPlayerStyle(origStyle)
             prefs.setMiniPlayerTransparentBg(origTransparentBg)
+        }
+    }
+
+    @Test
+    fun mini_player_content_mode_decides_lyrics_and_track_info() {
+        // Automatic keeps the old behaviour: lyrics when there are any, otherwise the track info.
+        val autoWithLyrics = resolveMiniPlayerTextPlan(MiniPlayerContentMode.AUTO, hasLyrics = true)
+        assertTrue(autoWithLyrics.showLyrics)
+        assertFalse(autoWithLyrics.showTrackInfo)
+
+        val autoWithoutLyrics = resolveMiniPlayerTextPlan(MiniPlayerContentMode.AUTO, hasLyrics = false)
+        assertFalse(autoWithoutLyrics.showLyrics)
+        assertTrue(autoWithoutLyrics.showTrackInfo)
+
+        // Title and artist always wins over the lyrics.
+        val titleOnly = resolveMiniPlayerTextPlan(MiniPlayerContentMode.TITLE_AND_ARTIST, hasLyrics = true)
+        assertFalse(titleOnly.showLyrics)
+        assertTrue(titleOnly.showTrackInfo)
+
+        // Lyrics only, with the track info as the fallback when no line is available.
+        val lyricsOnly = resolveMiniPlayerTextPlan(MiniPlayerContentMode.LYRICS, hasLyrics = true)
+        assertTrue(lyricsOnly.showLyrics)
+        assertFalse(lyricsOnly.showTrackInfo)
+
+        val lyricsFallback = resolveMiniPlayerTextPlan(MiniPlayerContentMode.LYRICS, hasLyrics = false)
+        assertFalse(lyricsFallback.showLyrics)
+        assertTrue(lyricsFallback.showTrackInfo)
+
+        // Both pieces at once; without lyrics the track info still has to be shown.
+        val both = resolveMiniPlayerTextPlan(MiniPlayerContentMode.BOTH, hasLyrics = true)
+        assertTrue(both.showLyrics)
+        assertTrue(both.showTrackInfo)
+
+        val bothWithoutLyrics = resolveMiniPlayerTextPlan(MiniPlayerContentMode.BOTH, hasLyrics = false)
+        assertFalse(bothWithoutLyrics.showLyrics)
+        assertTrue(bothWithoutLyrics.showTrackInfo)
+    }
+
+    @Test
+    fun mini_player_content_mode_preferences_persistence() {
+        val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
+        val original = prefs.getMiniPlayerContentMode()
+
+        try {
+            assertEquals(
+                MiniPlayerContentMode.AUTO,
+                MiniPlayerContentMode.valueOf(PlayerPreferences.DEFAULT_MINI_PLAYER_CONTENT_MODE),
+            )
+
+            for (mode in MiniPlayerContentMode.entries) {
+                prefs.setMiniPlayerContentMode(mode)
+                assertEquals(mode, prefs.getMiniPlayerContentMode())
+            }
+        } finally {
+            prefs.setMiniPlayerContentMode(original)
         }
     }
 

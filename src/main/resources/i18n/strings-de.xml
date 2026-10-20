@@ -2070,6 +2070,11 @@
     <string name="mini_player_hover_illumination_desc">Den Hintergrund des Mini-Players beim Bewegen der Maus darüber aufhellen</string>
     <string name="mini_player_show_progress">Fortschrittsbalken anzeigen</string>
     <string name="mini_player_show_progress_desc">Eine dünne Wiedergabefortschrittsleiste am unteren Rand anzeigen</string>
+    <string name="mini_player_content_mode">Inhalt des Mini-Players</string>
+    <string name="mini_player_content_auto">Automatisch (Songtext, falls verfügbar)</string>
+    <string name="mini_player_content_title">Titel und Interpret</string>
+    <string name="mini_player_content_lyrics">Nur Songtext</string>
+    <string name="mini_player_content_both">Songtext und Titel</string>
     <string name="mini_player_style">Mini-Player-Stil</string>
     <string name="mini_player_style_elongated">Transparente längliche Leiste</string>
     <string name="mini_player_style_elongated_desc">Minimalistischer einzeiliger Player mit transparentem Hintergrund für Taskleisten und Panels</string>

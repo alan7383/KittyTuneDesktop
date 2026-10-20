@@ -1931,6 +1931,11 @@
     <string name="mini_player_hover_illumination_desc">Làm sáng nền trình phát thu nhỏ khi di chuyển chuột qua nó</string>
     <string name="mini_player_show_progress">Hiện thanh tiến trình</string>
     <string name="mini_player_show_progress_desc">Hiển thị thanh tiến trình phát mỏng ở phía dưới</string>
+    <string name="mini_player_content_mode">Nội dung trình phát thu nhỏ</string>
+    <string name="mini_player_content_auto">Tự động (lời bài hát nếu có)</string>
+    <string name="mini_player_content_title">Tên bài hát và nghệ sĩ</string>
+    <string name="mini_player_content_lyrics">Chỉ lời bài hát</string>
+    <string name="mini_player_content_both">Lời bài hát và tên bài hát</string>
     <string name="mini_player_style">Kiểu trình phát thu nhỏ</string>
     <string name="mini_player_style_elongated">Thanh kéo dài trong suốt</string>
     <string name="mini_player_style_elongated_desc">Trình phát một dòng tối giản với nền trong suốt cho thanh tác vụ và bảng điều khiển</string>
