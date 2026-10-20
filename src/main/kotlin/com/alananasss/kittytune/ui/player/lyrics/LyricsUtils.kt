@@ -172,6 +172,8 @@ object LyricsUtils {
     private val ENHANCED_WORD_PATTERN = Pattern.compile("<(\\d{2}):(\\d{2})\\.(\\d{2,3})>([^<]*)")
 
     private val NUMERIC_ENTITY_REGEX = Regex("&#(x)?([0-9a-fA-F]+);")
+    private val TTML_ROOT_REGEX = Regex("""<(?:[A-Za-z_][\w.-]*:)?tt(?:\s|>)""", RegexOption.IGNORE_CASE)
+    private const val MAX_TTML_DETECTION_CHARS = 4096
 
     private val LRC_TIMESTAMP = Regex("""\[\d{1,3}:\d{2}(?:[.:]\d{1,3})?]""")
     private val ENHANCED_TIMESTAMP = Regex("""<\d{1,3}:\d{2}(?:[.:]\d{1,3})?>""")
@@ -346,20 +348,40 @@ object LyricsUtils {
         return result
     }
 
+    /** True when [content] is TTML (Apple Music, BetterLyrics, YouLyPlus…), not LRC or plain text. */
+    fun looksLikeTtml(content: String): Boolean {
+        val trimmed = content.removePrefix("\uFEFF").trimStart()
+        if (trimmed.isEmpty()) return false
+        if (trimmed.startsWith("<?xml")) return true
+        return TTML_ROOT_REGEX.containsMatchIn(trimmed.take(MAX_TTML_DETECTION_CHARS))
+    }
+
     fun parseLyricsContent(content: String, totalDurationMs: Long): List<LyricLine> {
-        val trimmed = content.trim()
+        // TTML is XML and must be parsed as such, never through the LRC/plain-text path. Decoding
+        // HTML entities first would turn valid XML entities ("R&amp;B", "&lt;3") into bare & / <,
+        // make the document invalid, and let callers fall back to showing the raw <tt> markup.
+        val raw = content.removePrefix("\uFEFF").trim()
         val parsed = when {
-            trimmed.startsWith("<tt") || trimmed.contains("<tt ") || trimmed.contains("<tt:") || trimmed.startsWith("<?xml") -> {
-                parseTtml(trimmed, totalDurationMs)
-            }
-            QRCParser.isQrc(trimmed) -> {
-                parseQrc(trimmed, totalDurationMs)
-            }
-            isYamlContent(trimmed) -> {
-                parseLyricsFile(content, totalDurationMs)
+            looksLikeTtml(raw) -> {
+                parseTtml(raw, totalDurationMs)
             }
             else -> {
-                parseLrc(content, totalDurationMs)
+                // Some feeds HTML-escape the whole TTML document: decode once, then retry as XML.
+                val decoded = decodeHtmlEntities(raw)
+                when {
+                    decoded != raw && looksLikeTtml(decoded) -> {
+                        parseTtml(decoded, totalDurationMs)
+                    }
+                    QRCParser.isQrc(raw) -> {
+                        parseQrc(raw, totalDurationMs)
+                    }
+                    isYamlContent(raw) -> {
+                        parseLyricsFile(content, totalDurationMs)
+                    }
+                    else -> {
+                        parseLrc(content, totalDurationMs)
+                    }
+                }
             }
         }
         val withoutWatermarks = parsed.filterNot { isWatermarkLine(it.text) }
