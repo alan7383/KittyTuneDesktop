@@ -934,6 +934,11 @@
     <string name="mini_player_hover_illumination_desc">A mini lejátszó hátterének kivilágosítása az egér rámutatásakor</string>
     <string name="mini_player_show_progress">Folyamatjelző sáv megjelenítése</string>
     <string name="mini_player_show_progress_desc">Vékony lejátszási folyamatjelző sáv megjelenítése alul</string>
+    <string name="mini_player_content_mode">Mini lejátszó tartalma</string>
+    <string name="mini_player_content_auto">Automatikus (dalszöveg, ha elérhető)</string>
+    <string name="mini_player_content_title">Cím és előadó</string>
+    <string name="mini_player_content_lyrics">Csak dalszöveg</string>
+    <string name="mini_player_content_both">Dalszöveg és cím</string>
     <string name="mini_player_style">Mini lejátszó stílusa</string>
     <string name="mini_player_style_elongated">Átlátszó nyújtott sáv</string>
     <string name="mini_player_style_elongated_desc">Minimalista egysoros lejátszó átlátszó háttérrel a tálcához és panelekhez</string>

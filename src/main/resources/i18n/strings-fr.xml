@@ -934,6 +934,11 @@
     <string name="mini_player_hover_illumination_desc">Illuminer l\'arrière-plan du mini-lecteur au survol de la souris</string>
     <string name="mini_player_show_progress">Afficher la barre de progression</string>
     <string name="mini_player_show_progress_desc">Afficher une fine barre de progression en bas du mini-lecteur</string>
+    <string name="mini_player_content_mode">Contenu du mini-lecteur</string>
+    <string name="mini_player_content_auto">Automatique (paroles si disponibles)</string>
+    <string name="mini_player_content_title">Titre et artiste</string>
+    <string name="mini_player_content_lyrics">Paroles uniquement</string>
+    <string name="mini_player_content_both">Paroles et titre</string>
     <string name="mini_player_style">Style du mini-lecteur</string>
     <string name="mini_player_style_elongated">Barre allongée transparente</string>
     <string name="mini_player_style_elongated_desc">Lecteur minimaliste sur une ligne avec fond transparent pour la barre des tâches ou panneaux</string>

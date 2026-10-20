@@ -934,6 +934,11 @@
     <string name="mini_player_hover_illumination_desc">Подсвечивать фон мини-плеера при наведении курсора мыши</string>
     <string name="mini_player_show_progress">Показывать индикатор выполнения</string>
     <string name="mini_player_show_progress_desc">Отображать тонкую полосу прогресса внизу мини-плеера</string>
+    <string name="mini_player_content_mode">Содержимое мини-плеера</string>
+    <string name="mini_player_content_auto">Автоматически (текст, если доступен)</string>
+    <string name="mini_player_content_title">Название и исполнитель</string>
+    <string name="mini_player_content_lyrics">Только текст</string>
+    <string name="mini_player_content_both">Текст и название</string>
     <string name="mini_player_style">Стиль мини-плеера</string>
     <string name="mini_player_style_elongated">Прозрачный вытянутый плеер</string>
     <string name="mini_player_style_elongated_desc">Минималистичный однострочный плеер с прозрачным фоном для панели задач</string>

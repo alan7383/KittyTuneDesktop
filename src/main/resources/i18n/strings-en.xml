@@ -934,6 +934,11 @@
     <string name="mini_player_hover_illumination_desc">Illuminate the mini-player background when moving the mouse over it</string>
     <string name="mini_player_show_progress">Show progress bar</string>
     <string name="mini_player_show_progress_desc">Display a thin playback progress bar along the bottom</string>
+    <string name="mini_player_content_mode">Mini player content</string>
+    <string name="mini_player_content_auto">Automatic (lyrics when available)</string>
+    <string name="mini_player_content_title">Title and artist</string>
+    <string name="mini_player_content_lyrics">Lyrics only</string>
+    <string name="mini_player_content_both">Lyrics and title</string>
     <string name="mini_player_style">Mini player style</string>
     <string name="mini_player_style_elongated">Transparent elongated bar</string>
     <string name="mini_player_style_elongated_desc">Minimalistic single-line player with transparent background for taskbars and panels</string>

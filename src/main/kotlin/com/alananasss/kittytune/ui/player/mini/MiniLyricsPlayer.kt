@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -117,6 +118,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import coil3.compose.AsyncImage
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.data.local.MiniPlayerContentMode
 import com.alananasss.kittytune.data.local.MiniPlayerStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.common.Tip
@@ -267,6 +269,7 @@ fun MiniLyricsPlayerWindow(
 ) {
     val prefs = remember { PlayerPreferences() }
     val miniPlayerStyle by prefs.miniPlayerStyleFlow().collectAsState(initial = prefs.getMiniPlayerStyle())
+    val contentMode by prefs.miniPlayerContentModeFlow().collectAsState(initial = prefs.getMiniPlayerContentMode())
     val transparentBg by prefs.miniPlayerTransparentBgFlow().collectAsState(initial = prefs.getMiniPlayerTransparentBg())
     val isElongated = miniPlayerStyle == MiniPlayerStyle.ELONGATED
 
@@ -611,6 +614,7 @@ fun MiniLyricsPlayerWindow(
                                 MiniLyricsElongatedContent(
                                     viewModel = viewModel,
                                     windowHeight = windowState.size.height,
+                                    contentMode = contentMode,
                                     showCover = showCover,
                                     showPlayback = showPlayback,
                                     showAdditional = showAdditional,
@@ -623,6 +627,7 @@ fun MiniLyricsPlayerWindow(
                                 MiniLyricsContent(
                                     viewModel = viewModel,
                                     windowHeight = windowState.size.height,
+                                    contentMode = contentMode,
                                     showCover = showCover,
                                     showPlayback = showPlayback,
                                     showAdditional = showAdditional,
@@ -805,6 +810,7 @@ fun MiniLyricsPlayerWindow(
 private fun MiniLyricsContent(
     viewModel: PlayerViewModel,
     windowHeight: Dp = 82.dp,
+    contentMode: MiniPlayerContentMode = MiniPlayerContentMode.AUTO,
     showCover: Boolean = true,
     showPlayback: Boolean = true,
     showAdditional: Boolean = true,
@@ -828,12 +834,21 @@ private fun MiniLyricsContent(
     // active line index actually changes. Computing the index from a per-frame value — as the
     // `remember(adjustedPosition, lyrics)` this replaces did — recomposed the whole mini-player
     // sixty times a second for the whole song.
-    val activeIndex by remember(lyrics, viewModel.lyricsOffset) {
+    val wantsLyrics = contentMode != MiniPlayerContentMode.TITLE_AND_ARTIST
+    val activeIndex by remember(lyrics, viewModel.lyricsOffset, wantsLyrics) {
         derivedStateOf {
-            if (lyrics.isEmpty()) -1 else LyricsUtils.activeLineIndex(lyrics, (smoothPosition.value + viewModel.lyricsOffset).toLong())
+            if (!wantsLyrics || lyrics.isEmpty()) -1 else LyricsUtils.activeLineIndex(lyrics, (smoothPosition.value + viewModel.lyricsOffset).toLong())
         }
     }
     val activeLine = lyrics.getOrNull(activeIndex)
+    val lyricLine = activeLine?.takeIf { it.text.isNotBlank() }
+    val textPlan = remember(contentMode, lyricLine != null) {
+        resolveMiniPlayerTextPlan(contentMode, lyricLine != null)
+    }
+    val trackInfo = track?.let {
+        val artist = it.displayArtist.ifBlank { it.user?.username.orEmpty() }
+        if (artist.isNotBlank()) "${it.title.orEmpty()} • $artist" else it.title.orEmpty()
+    }.orEmpty()
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -900,46 +915,69 @@ private fun MiniLyricsContent(
                 val maxChars = remember(maxWidth) {
                     (maxWidth.value / 9.2f).toInt().coerceIn(18, 90)
                 }
-                if (track != null && activeLine != null && activeLine.text.isNotBlank()) {
-                    MiniLyricDisplay(
-                        line = activeLine,
-                        positionMs = { smoothPosition.value + viewModel.lyricsOffset },
-                        wordSync = viewModel.isWordSyncEnabled,
-                        fillEffect = viewModel.isAppleMusicEffectEnabled,
-                        maxChunkChars = maxChars,
-                        textShadow = textShadow,
-                    )
-                } else if (track != null) {
-                    Column(verticalArrangement = Arrangement.Center) {
-                        Text(
-                            text = track.title ?: "",
-                            style = MaterialTheme.typography.titleMedium.copy(shadow = textShadow),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { str("mini_player_instrumental") },
-                            style = MaterialTheme.typography.bodySmall.copy(shadow = textShadow),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                when {
+                    track == null -> {
+                        Column(verticalArrangement = Arrangement.Center) {
+                            Text(
+                                text = "KittyTune",
+                                style = MaterialTheme.typography.titleMedium.copy(shadow = textShadow),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = str("mini_player_no_track"),
+                                style = MaterialTheme.typography.bodySmall.copy(shadow = textShadow),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    lyricLine != null && textPlan.showLyrics && textPlan.showTrackInfo -> {
+                        Column(verticalArrangement = Arrangement.Center) {
+                            MiniLyricDisplay(
+                                line = lyricLine,
+                                positionMs = { smoothPosition.value + viewModel.lyricsOffset },
+                                wordSync = viewModel.isWordSyncEnabled,
+                                fillEffect = viewModel.isAppleMusicEffectEnabled,
+                                maxChunkChars = maxChars,
+                                textShadow = textShadow,
+                            )
+                            Text(
+                                text = trackInfo,
+                                style = MaterialTheme.typography.bodySmall.copy(shadow = textShadow),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    lyricLine != null && textPlan.showLyrics -> {
+                        MiniLyricDisplay(
+                            line = lyricLine,
+                            positionMs = { smoothPosition.value + viewModel.lyricsOffset },
+                            wordSync = viewModel.isWordSyncEnabled,
+                            fillEffect = viewModel.isAppleMusicEffectEnabled,
+                            maxChunkChars = maxChars,
+                            textShadow = textShadow,
                         )
                     }
-                } else {
-                    Column(verticalArrangement = Arrangement.Center) {
-                        Text(
-                            text = "KittyTune",
-                            style = MaterialTheme.typography.titleMedium.copy(shadow = textShadow),
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = str("mini_player_no_track"),
-                            style = MaterialTheme.typography.bodySmall.copy(shadow = textShadow),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    else -> {
+                        Column(verticalArrangement = Arrangement.Center) {
+                            Text(
+                                text = track.title ?: "",
+                                style = MaterialTheme.typography.titleMedium.copy(shadow = textShadow),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.ifBlank { str("mini_player_instrumental") },
+                                style = MaterialTheme.typography.bodySmall.copy(shadow = textShadow),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -1058,6 +1096,7 @@ private fun MiniLyricsContent(
 private fun MiniLyricsElongatedContent(
     viewModel: PlayerViewModel,
     windowHeight: Dp = 38.dp,
+    contentMode: MiniPlayerContentMode = MiniPlayerContentMode.AUTO,
     showCover: Boolean = true,
     showPlayback: Boolean = true,
     showAdditional: Boolean = true,
@@ -1081,12 +1120,25 @@ private fun MiniLyricsElongatedContent(
     // active line index actually changes. Computing the index from a per-frame value — as the
     // `remember(adjustedPosition, lyrics)` this replaces did — recomposed the whole mini-player
     // sixty times a second for the whole song.
-    val activeIndex by remember(lyrics, viewModel.lyricsOffset) {
+    val wantsLyrics = contentMode != MiniPlayerContentMode.TITLE_AND_ARTIST
+    val activeIndex by remember(lyrics, viewModel.lyricsOffset, wantsLyrics) {
         derivedStateOf {
-            if (lyrics.isEmpty()) -1 else LyricsUtils.activeLineIndex(lyrics, (smoothPosition.value + viewModel.lyricsOffset).toLong())
+            if (!wantsLyrics || lyrics.isEmpty()) -1 else LyricsUtils.activeLineIndex(lyrics, (smoothPosition.value + viewModel.lyricsOffset).toLong())
         }
     }
     val activeLine = lyrics.getOrNull(activeIndex)
+    val lyricLine = activeLine?.takeIf { it.text.isNotBlank() }
+    val textPlan = remember(contentMode, lyricLine != null) {
+        resolveMiniPlayerTextPlan(contentMode, lyricLine != null)
+    }
+    val trackInfo = remember(track?.title, track?.displayArtist, track?.user?.username) {
+        val current = track
+        if (current == null) "" else {
+            val artist = current.displayArtist.ifBlank { current.user?.username.orEmpty() }
+            val title = current.title.orEmpty()
+            if (artist.isNotBlank()) "$title • $artist" else title
+        }
+    }
 
     val interactionSource = remember { MutableInteractionSource() }
     val isHovered by interactionSource.collectIsHoveredAsState()
@@ -1148,47 +1200,76 @@ private fun MiniLyricsElongatedContent(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.CenterStart
             ) {
-                val maxChars = remember(maxWidth) {
-                    (maxWidth.value / 8.5f).toInt().coerceIn(20, 140)
+                val availableWidth = maxWidth
+                val maxChars = remember(availableWidth) {
+                    (availableWidth.value / 8.5f).toInt().coerceIn(20, 140)
                 }
 
-                if (track != null && activeLine != null && activeLine.text.isNotBlank()) {
-                    MiniLyricDisplay(
-                        line = activeLine,
-                        positionMs = { smoothPosition.value + viewModel.lyricsOffset },
-                        wordSync = viewModel.isWordSyncEnabled,
-                        fillEffect = viewModel.isAppleMusicEffectEnabled,
-                        maxChunkChars = maxChars,
-                        textShadow = textShadow,
-                        compact = true,
-                    )
-                } else if (track != null) {
-                    val trackInfo = remember(track.title, track.displayArtist, track.user?.username) {
-                        val artist = track.displayArtist.ifBlank { track.user?.username.orEmpty() }
-                        val title = track.title.orEmpty()
-                        if (artist.isNotBlank()) "$title • $artist" else title
+                when {
+                    track == null -> {
+                        Text(
+                            text = "KittyTune",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                shadow = textShadow,
+                            ),
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    Text(
-                        text = trackInfo,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            shadow = textShadow,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                } else {
-                    Text(
-                        text = "KittyTune",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            shadow = textShadow,
-                        ),
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    lyricLine != null && textPlan.showLyrics && textPlan.showTrackInfo -> {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = trackInfo,
+                                style = MaterialTheme.typography.bodySmall.copy(shadow = textShadow),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = availableWidth * 0.42f)
+                            )
+                            Text(
+                                text = "  ·  ",
+                                style = MaterialTheme.typography.bodySmall.copy(shadow = textShadow),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                maxLines = 1
+                            )
+                            Box(modifier = Modifier.weight(1f)) {
+                                MiniLyricDisplay(
+                                    line = lyricLine,
+                                    positionMs = { smoothPosition.value + viewModel.lyricsOffset },
+                                    wordSync = viewModel.isWordSyncEnabled,
+                                    fillEffect = viewModel.isAppleMusicEffectEnabled,
+                                    maxChunkChars = maxChars,
+                                    textShadow = textShadow,
+                                    compact = true,
+                                )
+                            }
+                        }
+                    }
+                    lyricLine != null && textPlan.showLyrics -> {
+                        MiniLyricDisplay(
+                            line = lyricLine,
+                            positionMs = { smoothPosition.value + viewModel.lyricsOffset },
+                            wordSync = viewModel.isWordSyncEnabled,
+                            fillEffect = viewModel.isAppleMusicEffectEnabled,
+                            maxChunkChars = maxChars,
+                            textShadow = textShadow,
+                            compact = true,
+                        )
+                    }
+                    else -> {
+                        Text(
+                            text = trackInfo,
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                shadow = textShadow,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -1427,6 +1508,32 @@ private fun MiniLyricDisplay(
             }
         }
     }
+}
+
+/** Which pieces of text the mini player shows for the chosen [MiniPlayerContentMode]. */
+internal data class MiniPlayerTextPlan(
+    val showLyrics: Boolean,
+    val showTrackInfo: Boolean,
+)
+
+/**
+ * Decides the mini player's text for a track that has lyrics or not.
+ *
+ * [MiniPlayerContentMode.LYRICS] and [MiniPlayerContentMode.BOTH] fall back to the title and
+ * artist when no lyric line is available, so the player never turns into an empty bar during an
+ * intro, an instrumental track or a track whose lyrics could not be loaded.
+ */
+internal fun resolveMiniPlayerTextPlan(
+    mode: MiniPlayerContentMode,
+    hasLyrics: Boolean,
+): MiniPlayerTextPlan = when (mode) {
+    MiniPlayerContentMode.AUTO ->
+        if (hasLyrics) MiniPlayerTextPlan(true, false) else MiniPlayerTextPlan(false, true)
+    MiniPlayerContentMode.TITLE_AND_ARTIST -> MiniPlayerTextPlan(false, true)
+    MiniPlayerContentMode.LYRICS ->
+        if (hasLyrics) MiniPlayerTextPlan(true, false) else MiniPlayerTextPlan(false, true)
+    MiniPlayerContentMode.BOTH ->
+        MiniPlayerTextPlan(showLyrics = hasLyrics, showTrackInfo = true)
 }
 
 internal data class LyricChunk(

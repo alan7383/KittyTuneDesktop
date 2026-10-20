@@ -22,6 +22,9 @@ import com.alananasss.kittytune.data.lyrics.clients.PaxsenixClient
 enum class AppThemeMode { SYSTEM, LIGHT, DARK }
 enum class StartDestination { HOME, LIBRARY }
 enum class MiniPlayerStyle { STANDARD, ELONGATED }
+
+/** What the mini player shows in its text area. */
+enum class MiniPlayerContentMode { AUTO, TITLE_AND_ARTIST, LYRICS, BOTH }
 enum class LyricsScreenContext { MAIN, FULLSCREEN, SIDEBAR }
 
 /**
@@ -263,6 +266,8 @@ class PlayerPreferences {
         private const val KEY_MINI_PLAYER_HOVER_EFFECT = "mini_player_hover_effect"
         private const val KEY_MINI_PLAYER_HOVER_ILLUMINATION = "mini_player_hover_illumination"
         private const val KEY_MINI_PLAYER_SHOW_PROGRESS = "mini_player_show_progress"
+        private const val KEY_MINI_PLAYER_CONTENT_MODE = "mini_player_content_mode"
+        const val DEFAULT_MINI_PLAYER_CONTENT_MODE = "AUTO"
         private const val KEY_MINI_PLAYER_STYLE = "mini_player_style"
         const val DEFAULT_MINI_PLAYER_STYLE = "STANDARD"
         private const val KEY_MINI_PLAYER_TRANSPARENT_BG = "mini_player_transparent_bg"
@@ -1034,6 +1039,17 @@ class PlayerPreferences {
     fun getMiniPlayerShowProgress(): Boolean = Prefs.getBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, true)
     fun setMiniPlayerShowProgress(show: Boolean) = Prefs.putBoolean(KEY_MINI_PLAYER_SHOW_PROGRESS, show)
     fun miniPlayerShowProgressFlow() = Prefs.booleanFlow(KEY_MINI_PLAYER_SHOW_PROGRESS, true)
+
+    fun getMiniPlayerContentMode(): MiniPlayerContentMode {
+        val name = Prefs.getString(KEY_MINI_PLAYER_CONTENT_MODE, MiniPlayerContentMode.AUTO.name)
+        return try {
+            MiniPlayerContentMode.valueOf(name ?: MiniPlayerContentMode.AUTO.name)
+        } catch (_: Exception) {
+            MiniPlayerContentMode.AUTO
+        }
+    }
+    fun setMiniPlayerContentMode(mode: MiniPlayerContentMode) = Prefs.putString(KEY_MINI_PLAYER_CONTENT_MODE, mode.name)
+    fun miniPlayerContentModeFlow(): Flow<MiniPlayerContentMode> = Prefs.flow.map { getMiniPlayerContentMode() }
 
     fun getMiniPlayerStyle(): MiniPlayerStyle {
         val name = Prefs.getString(KEY_MINI_PLAYER_STYLE, MiniPlayerStyle.STANDARD.name)
