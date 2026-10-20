@@ -72,34 +72,20 @@ object OnnxHelper {
     }
 
     /**
-     * Preloads system-installed native libonnxruntime.so on Linux if present,
-     * ensuring binary compatibility with system C++ runtime and preventing crashes.
+     * Loads the ONNX Runtime native engine bundled in the `onnxruntime` jar and pre-warms its
+     * environment.
+     *
+     * Never preload a distro `libonnxruntime.so` first: the Java JNI library is built against the
+     * exact runtime version shipped in the jar. A system library with the same SONAME but another
+     * version wins the dynamic-linker lookup and makes the JNI fail with errors such as
+     * `version 'VERS_1.31.0' not found` (seen with a distro package providing 1.29.0). Letting the
+     * ORT loader extract and load its own core and JNI libraries keeps the pair in sync.
      */
     fun ensureNativeLibrariesLoaded() {
         if (nativeLoaded) return
         synchronized(lock) {
             if (nativeLoaded) return
             disableNativeTelemetry()
-            val os = System.getProperty("os.name", "").lowercase(Locale.ROOT)
-            if (os.contains("linux") || os.contains("unix")) {
-                val candidatePaths = listOf(
-                    "/usr/lib/libonnxruntime.so",
-                    "/usr/lib64/libonnxruntime.so",
-                    "/usr/local/lib/libonnxruntime.so"
-                )
-                for (path in candidatePaths) {
-                    val file = File(path)
-                    if (file.exists()) {
-                        val result = runCatching {
-                            System.load(file.absolutePath)
-                        }
-                        if (result.isSuccess) {
-                            System.setProperty("onnxruntime.native.onnxruntime.skip", "true")
-                            break
-                        }
-                    }
-                }
-            }
             val nativePath = System.getProperty("onnxruntime.native.path")
             if (!nativePath.isNullOrEmpty() && !File(nativePath, "libonnxruntime4j_jni.so").exists()) {
                 System.clearProperty("onnxruntime.native.path")
