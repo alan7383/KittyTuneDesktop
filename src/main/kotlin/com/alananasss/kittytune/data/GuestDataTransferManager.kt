@@ -2,6 +2,7 @@ package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.data.local.AppDatabase
+import com.alananasss.kittytune.data.local.ExternalPlaylists
 import com.alananasss.kittytune.data.local.LocalPlaylist
 import com.alananasss.kittytune.data.local.PlaylistTrackCrossRef
 import com.alananasss.kittytune.data.network.PlaylistLikeItem
@@ -113,7 +114,7 @@ object GuestDataTransferManager {
 
         if (transferLikedPlaylists && summary.likedPlaylists.isNotEmpty()) {
             val scPlaylists =
-                summary.likedPlaylists.filter { !(it.permalinkUrl?.contains("spotify") == true || it.id > 1000000000000000L) }
+                summary.likedPlaylists.filter { !ExternalPlaylists.isExternalPermalink(it.permalinkUrl) && it.id <= 1000000000000000L }
             val batches = scPlaylists.chunked(25)
             for (batch in batches) {
                 try {

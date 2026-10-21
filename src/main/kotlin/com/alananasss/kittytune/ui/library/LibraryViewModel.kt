@@ -67,7 +67,7 @@ sealed class LibraryItem(open val timestamp: Long, open val key: String, open va
         fun getPlaylistCanonicalKey(playlist: Playlist): String {
             val permalink = playlist.permalinkUrl
             return if (permalink != null && permalink.startsWith("yt_radio:")) {
-                "yt_radio:$permalink"
+                permalink
             } else if (playlist.urn?.startsWith("soundcloud:system-playlists:") == true) {
                 "system_playlist:${playlist.urn}"
             } else {

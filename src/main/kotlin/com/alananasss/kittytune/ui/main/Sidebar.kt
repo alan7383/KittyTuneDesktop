@@ -915,11 +915,12 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                 val pl = item.playlist
                 val permalink = pl.permalinkUrl
                 val isYoutubeShortcut = permalink != null && permalink.startsWith("yt_radio:")
+                val isSpotifyRadioShortcut = permalink != null && permalink.startsWith("spotify_radio:")
                 val isTrackStation = pl.isTrackStation || permalink?.contains("track-stations") == true || pl.urn?.contains("track-stations") == true
                 val isArtistStation = pl.isArtistStation || permalink?.contains("artist-stations") == true || pl.urn?.contains("artist-stations") == true
 
                 val dest = when {
-                    isYoutubeShortcut -> java.net.URLEncoder.encode(permalink, "UTF-8")
+                    isYoutubeShortcut || isSpotifyRadioShortcut -> permalink.orEmpty()
                     isTrackStation -> "station:${pl.numericId}"
                     isArtistStation -> "station_artist:${pl.numericId}"
                     pl.urn?.startsWith("soundcloud:system-playlists:") == true -> "system_playlist:${pl.urn}"
@@ -932,6 +933,8 @@ private fun buildLibraryEntries(libraryViewModel: LibraryViewModel): List<LibEnt
                     title = pl.title ?: "",
                     subtitle = listOfNotNull(
                         when {
+                            isYoutubeShortcut -> str("radio") + " • YouTube"
+                            isSpotifyRadioShortcut -> str("radio") + " • Spotify"
                             isTrackStation || isArtistStation -> str("lib_stations")
                             pl.isRealAlbum -> str("lib_albums")
                             else -> str("lib_playlists")
