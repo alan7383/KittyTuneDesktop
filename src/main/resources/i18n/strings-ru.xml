@@ -2049,6 +2049,7 @@
     <string name="automix_overlap_8bars">8 тактов</string>
     <string name="automix_overlap_auto">Автоматически (4 такта)</string>
     <string name="automix_overlap_custom">Пользовательская длительность</string>
+    <string name="automix_overlap_custom_value">Длительность: %d сек</string>
     <string name="automix_overlap_mode">Длительность перехода</string>
     <string name="automix_start_offset">Смещение начала</string>
     <string name="automix_start_offset_desc">Выберите, с какого момента начинается следующий трек при переходе</string>

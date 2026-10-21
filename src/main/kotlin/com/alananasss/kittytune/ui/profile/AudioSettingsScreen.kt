@@ -441,6 +441,7 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
     val togetherCode by com.alananasss.kittytune.data.together.Together.active.collectAsState()
     val mayChangeAutomix = togetherCode?.let(com.alananasss.kittytune.data.together.Together::isHostOf) ?: true
     var automixOverlapMode by remember { mutableStateOf(prefs.getAutomixOverlapMode()) }
+    var automixOverlapCustomSec by remember { mutableStateOf(prefs.getAutomixOverlapCustomSec()) }
     var automixStartOffsetMode by remember { mutableStateOf(prefs.getAutomixStartOffsetMode()) }
     var automixStartOffsetCustomSec by remember { mutableStateOf(prefs.getAutomixStartOffsetCustomSec()) }
     var automixTempoMatch by remember { mutableStateOf(prefs.getAutomixTempoMatchEnabled()) }
@@ -482,12 +483,14 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
     }
 
     if (showAutomixOverlapDialog) {
+        var tempMode by remember { mutableStateOf(automixOverlapMode) }
+        var tempCustomSec by remember { mutableStateOf(automixOverlapCustomSec) }
         val options = listOf(
-            0 to str(com.alananasss.kittytune.R.string.automix_overlap_auto),
-            1 to str(com.alananasss.kittytune.R.string.automix_overlap_2bars),
-            2 to str(com.alananasss.kittytune.R.string.automix_overlap_4bars),
-            3 to str(com.alananasss.kittytune.R.string.automix_overlap_8bars),
-            4 to str(com.alananasss.kittytune.R.string.automix_overlap_custom)
+            PlayerPreferences.AUTOMIX_OVERLAP_AUTO to str(com.alananasss.kittytune.R.string.automix_overlap_auto),
+            PlayerPreferences.AUTOMIX_OVERLAP_2BARS to str(com.alananasss.kittytune.R.string.automix_overlap_2bars),
+            PlayerPreferences.AUTOMIX_OVERLAP_4BARS to str(com.alananasss.kittytune.R.string.automix_overlap_4bars),
+            PlayerPreferences.AUTOMIX_OVERLAP_8BARS to str(com.alananasss.kittytune.R.string.automix_overlap_8bars),
+            PlayerPreferences.AUTOMIX_OVERLAP_CUSTOM to str(com.alananasss.kittytune.R.string.automix_overlap_custom)
         )
         EscapableAlertDialog(
             onDismissRequest = { showAutomixOverlapDialog = false },
@@ -498,25 +501,50 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable {
-                                    automixOverlapMode = mode
-                                    prefs.setAutomixOverlapMode(mode)
-                                    showAutomixOverlapDialog = false
-                                }
-                                .padding(vertical = 12.dp),
+                                .clickable { tempMode = mode }
+                                .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = automixOverlapMode == mode,
+                                selected = tempMode == mode,
                                 onClick = null
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(label, fontWeight = FontWeight.Normal)
                         }
                     }
+                    if (tempMode == PlayerPreferences.AUTOMIX_OVERLAP_CUSTOM) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = str(com.alananasss.kittytune.R.string.automix_overlap_custom_value).replace("%d", tempCustomSec.toString()),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Slider(
+                            value = tempCustomSec.toFloat(),
+                            onValueChange = { tempCustomSec = it.toInt() },
+                            valueRange = 1f..30f,
+                            steps = 28,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             },
             confirmButton = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
+                    automixOverlapMode = tempMode
+                    automixOverlapCustomSec = tempCustomSec
+                    prefs.setAutomixOverlapMode(tempMode)
+                    prefs.setAutomixOverlapCustomSec(tempCustomSec)
+                    com.alananasss.kittytune.audio.automix.AutomixManager.clearPlan()
+                    showAutomixOverlapDialog = false
+                }) {
+                    Text(str("btn_ok"))
+                }
+            },
+            dismissButton = {
                 TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAutomixOverlapDialog = false }) {
                     Text(str("btn_cancel"))
                 }
@@ -646,10 +674,10 @@ fun AudioTransitionsPage(playerViewModel: PlayerViewModel) {
         Spacer(Modifier.height(16.dp))
 
         val automixOverlapLabel = when (automixOverlapMode) {
-            1 -> str(com.alananasss.kittytune.R.string.automix_overlap_2bars)
-            2 -> str(com.alananasss.kittytune.R.string.automix_overlap_4bars)
-            3 -> str(com.alananasss.kittytune.R.string.automix_overlap_8bars)
-            4 -> str(com.alananasss.kittytune.R.string.automix_overlap_custom)
+            PlayerPreferences.AUTOMIX_OVERLAP_2BARS -> str(com.alananasss.kittytune.R.string.automix_overlap_2bars)
+            PlayerPreferences.AUTOMIX_OVERLAP_4BARS -> str(com.alananasss.kittytune.R.string.automix_overlap_4bars)
+            PlayerPreferences.AUTOMIX_OVERLAP_8BARS -> str(com.alananasss.kittytune.R.string.automix_overlap_8bars)
+            PlayerPreferences.AUTOMIX_OVERLAP_CUSTOM -> "${str(com.alananasss.kittytune.R.string.automix_overlap_custom)} (${automixOverlapCustomSec}s)"
             else -> str(com.alananasss.kittytune.R.string.automix_overlap_auto)
         }
         val automixStartOffsetLabel = when (automixStartOffsetMode) {
