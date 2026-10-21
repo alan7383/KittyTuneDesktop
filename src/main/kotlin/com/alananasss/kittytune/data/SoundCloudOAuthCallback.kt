@@ -19,7 +19,7 @@ internal object SoundCloudOAuthCallback {
         if (uri.rawFragment != null || uri.rawUserInfo != null || uri.port != -1) return null
         if (uri.scheme == null) {
             if (uri.rawAuthority != null || uri.rawPath != "/callback") return null
-        } else if (uri.scheme != "sc" || uri.rawAuthority != "auth" || !uri.rawPath.isNullOrEmpty()) {
+        } else if (uri.scheme != "sc" || uri.rawAuthority != "auth" || (uri.rawPath != null && uri.rawPath != "/" && uri.rawPath.isNotEmpty())) {
             return null
         }
         val params = linkedMapOf<String, String>()

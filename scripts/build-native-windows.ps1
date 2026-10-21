@@ -8,8 +8,14 @@ $outPath = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $outPath | Out-Null
 $outDll = Join-Path $outPath 'libkittytune_audio_dsp.dll'
 $compiler = Get-Command g++.exe -ErrorAction SilentlyContinue
+if (-not $compiler) {
+    $wingetGpp = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin\g++.exe'
+    if (Test-Path -LiteralPath $wingetGpp) {
+        $compiler = [PSCustomObject]@{ Source = $wingetGpp }
+    }
+}
 if ($compiler) {
-    & $compiler.Source -shared -O3 -static-libgcc -static-libstdc++ `
+    & $compiler.Source -shared -O3 -static -static-libgcc -static-libstdc++ `
         "-I$JavaHome/include" "-I$JavaHome/include/win32" "-I$nativeSource/ebur128/queue" `
         "$nativeSource/KittyTuneAudioDSP.cpp" "$nativeSource/ebur128/ebur128.c" -o $outDll
     if ($LASTEXITCODE -ne 0) { throw "Native audio compiler failed: $LASTEXITCODE" }
