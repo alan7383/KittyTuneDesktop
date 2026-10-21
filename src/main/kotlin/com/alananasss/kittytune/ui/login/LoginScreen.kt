@@ -169,13 +169,22 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
                             val appDir = com.alananasss.kittytune.core.AppDirs.dataDir
                             if (!appDir.exists()) appDir.mkdirs()
 
+                            // Write the current port to a side-car file so the VBS always reads
+                            // the live port rather than a value baked in at registration time.
+                            val portFile = java.io.File(appDir, "sc_oauth_port.txt")
+                            portFile.writeText(serverPort.toString())
+
                             val vbsFile = java.io.File(appDir, "sc_handler.vbs")
+                            val portFilePath = portFile.absolutePath
                             val vbsContent = buildString {
                                 append("If WScript.Arguments.Count > 0 Then\r\n")
                                 append("  url = WScript.Arguments(0)\r\n")
                                 append("  If InStr(url, \"code=\") > 0 Or InStr(url, \"error=\") > 0 Then\r\n")
+                                append("    Dim fso, port\r\n")
+                                append("    Set fso = CreateObject(\"Scripting.FileSystemObject\")\r\n")
+                                append("    port = Trim(fso.OpenTextFile(\"$portFilePath\", 1).ReadAll())\r\n")
                                 append("    Set req = CreateObject(\"MSXML2.ServerXMLHTTP.6.0\")\r\n")
-                                append("    req.open \"POST\", \"http://127.0.0.1:$serverPort/callback\", False\r\n")
+                                append("    req.open \"POST\", \"http://127.0.0.1:\" & port & \"/callback\", False\r\n")
                                 append("    req.setRequestHeader \"Content-Type\", \"text/plain\"\r\n")
                                 append("    req.send url\r\n")
                                 append("  End If\r\n")
@@ -187,26 +196,23 @@ private fun LoginAttempt(onLoginSuccess: () -> Unit, onBackClick: () -> Unit, on
                                 throw Exception("VBS file creation failed at ${vbsFile.absolutePath}")
                             }
 
-                            val handlerCmd = "wscript.exe \"${vbsFile.absolutePath.replace("\\", "\\\\")}\" \"%1\""
-
-                            val psScript = """
-                                New-Item -Path "HKCU:\\Software\\Classes\\sc" -Force | Out-Null
-                                New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "(default)" -Value "URL:sc Protocol" -Force | Out-Null
-                                New-ItemProperty -Path "HKCU:\\Software\\Classes\\sc" -Name "URL Protocol" -Value "" -Force | Out-Null
-                                New-Item -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Force | Out-Null
-                                Set-ItemProperty -Path "HKCU:\\Software\\Classes\\sc\\shell\\open\\command" -Name "(default)" -Value '$handlerCmd' -Force
-                            """.trimIndent()
-
-                            val encodedScript = java.util.Base64.getEncoder().encodeToString(psScript.toByteArray(Charsets.UTF_16LE))
-                            val psProc = Runtime.getRuntime().exec(arrayOf(
-                                "powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", encodedScript
-                            ))
-                            psProc.waitFor()
-                            if (psProc.exitValue() != 0) {
-                                val error = String(psProc.errorStream.readBytes())
-                                throw Exception("PowerShell registry update failed: $error")
+                            // Use reg.exe directly to avoid PowerShell backslash-escaping complexity.
+                            // The VBS path needs no escaping since reg.exe receives it as a raw argument.
+                            val handlerCmd = """wscript.exe "${vbsFile.absolutePath}" "%1""""
+                            val regExe = "${System.getenv("SystemRoot") ?: "C:\\Windows"}\\System32\\reg.exe"
+                            fun regAdd(key: String, vararg args: String) {
+                                val cmd = arrayOf(regExe, "add", key, "/f") + args
+                                val proc = Runtime.getRuntime().exec(cmd)
+                                val stderr = proc.errorStream.bufferedReader().readText()
+                                val exit = proc.waitFor()
+                                if (exit != 0) throw Exception("reg add failed (exit $exit): $stderr")
                             }
-                        
+                            regAdd("HKCU\\Software\\Classes\\sc",
+                                "/ve", "/d", "URL:sc Protocol")
+                            regAdd("HKCU\\Software\\Classes\\sc",
+                                "/v", "URL Protocol", "/d", "")
+                            regAdd("HKCU\\Software\\Classes\\sc\\shell\\open\\command",
+                                "/ve", "/d", handlerCmd)
                             println("Successfully registered sc:// protocol handler with VBS wrapper")
                         } else if (os.contains("mac")) {
                             registration = MacSoundCloudOAuth.prepare(authState, requireNotNull(serverPort))

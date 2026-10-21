@@ -54,7 +54,15 @@ if (-not $installedRoot) {
         }
     }
 }
-if (-not $installedRoot) { throw 'Windows 10 SDK not found (no v10.0 InstallationFolder)' }
+if (-not $installedRoot) {
+    $checkedIn = Join-Path $repoRoot 'src\main\resources\native\WindowsSmtcBridge.exe'
+    if (Test-Path -LiteralPath $checkedIn) {
+        Write-Host "Windows SDK not found; using checked-in fallback ($checkedIn -> $outExe)"
+        Copy-Item -LiteralPath $checkedIn -Destination $outExe -Force
+        exit 0
+    }
+    throw 'Windows 10 SDK not found (no v10.0 InstallationFolder)'
+}
 
 $sdkVersion = (Get-ChildItem (Join-Path $installedRoot 'Include') -Directory |
     Where-Object Name -match '^\d+\.\d+\.\d+\.\d+$' |

@@ -207,13 +207,20 @@ object MusicApiAuthLauncher {
 
     private fun registerWindowsHandler(appDir: File) {
         val actualPort = (server?.address as? InetSocketAddress)?.port ?: CALLBACK_PORT
+        val portFile = File(appDir, "soundcloud_oauth_port.txt")
+        portFile.writeText(actualPort.toString())
+
         val vbsFile = File(appDir, "soundcloud_handler.vbs")
+        val portFilePath = portFile.absolutePath
         val vbsContent = buildString {
             append("If WScript.Arguments.Count > 0 Then\r\n")
             append("  url = WScript.Arguments(0)\r\n")
             append("  If InStr(url, \"data64=\") > 0 Then\r\n")
+            append("    Dim fso, port\r\n")
+            append("    Set fso = CreateObject(\"Scripting.FileSystemObject\")\r\n")
+            append("    port = Trim(fso.OpenTextFile(\"$portFilePath\", 1).ReadAll())\r\n")
             append("    Set req = CreateObject(\"MSXML2.ServerXMLHTTP.6.0\")\r\n")
-            append("    req.open \"POST\", \"http://127.0.0.1:$actualPort/callback\", False\r\n")
+            append("    req.open \"POST\", \"http://127.0.0.1:\" & port & \"/callback\", False\r\n")
             append("    req.setRequestHeader \"Content-Type\", \"text/plain\"\r\n")
             append("    req.send url\r\n")
             append("  End If\r\n")
@@ -221,23 +228,16 @@ object MusicApiAuthLauncher {
         }
         vbsFile.writeText(vbsContent)
 
-        val handlerCmd = "wscript.exe \"${vbsFile.absolutePath.replace("\\", "\\\\")}\" \"%1\""
-
-        val psScript = """
-            New-Item -Path "HKCU:\\Software\\Classes\\soundcloud" -Force | Out-Null
-            New-ItemProperty -Path "HKCU:\\Software\\Classes\\soundcloud" -Name "(default)" -Value "URL:soundcloud Protocol" -Force | Out-Null
-            New-ItemProperty -Path "HKCU:\\Software\\Classes\\soundcloud" -Name "URL Protocol" -Value "" -Force | Out-Null
-            New-Item -Path "HKCU:\\Software\\Classes\\soundcloud\\shell\\open\\command" -Force | Out-Null
-            Set-ItemProperty -Path "HKCU:\\Software\\Classes\\soundcloud\\shell\\open\\command" -Name "(default)" -Value '$handlerCmd' -Force
-        """.trimIndent()
-
-        val encodedScript = java.util.Base64.getEncoder().encodeToString(psScript.toByteArray(Charsets.UTF_16LE))
-        val psProc = Runtime.getRuntime().exec(
-            arrayOf(
-                "powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", encodedScript
-            )
-        )
-        psProc.waitFor()
+        val handlerCmd = """wscript.exe "${vbsFile.absolutePath}" "%1""""
+        val regExe = "${System.getenv("SystemRoot") ?: "C:\\Windows"}\\System32\\reg.exe"
+        fun regAdd(key: String, vararg args: String) {
+            val cmd = arrayOf(regExe, "add", key, "/f") + args
+            val proc = Runtime.getRuntime().exec(cmd)
+            proc.waitFor()
+        }
+        regAdd("HKCU\\Software\\Classes\\soundcloud", "/ve", "/d", "URL:soundcloud Protocol")
+        regAdd("HKCU\\Software\\Classes\\soundcloud", "/v", "URL Protocol", "/d", "")
+        regAdd("HKCU\\Software\\Classes\\soundcloud\\shell\\open\\command", "/ve", "/d", handlerCmd)
         println("$TAG: registered soundcloud:// protocol handler for Windows")
     }
 
