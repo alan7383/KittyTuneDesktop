@@ -656,11 +656,12 @@ fun LibraryScreen(
                         is LibraryItem.PlaylistItem -> {
                             val permalink = item.playlist.permalinkUrl
                             val isYoutubeShortcut = permalink != null && permalink.startsWith("yt_radio:")
+                            val isSpotifyRadioShortcut = permalink != null && permalink.startsWith("spotify_radio:")
                             val isTrackStation = item.playlist.isTrackStation || permalink?.contains("track-stations") == true || item.playlist.urn?.contains("track-stations") == true
                             val isArtistStation = item.playlist.isArtistStation || permalink?.contains("artist-stations") == true || item.playlist.urn?.contains("artist-stations") == true
  
-                            val navId = if (isYoutubeShortcut) {
-                                java.net.URLEncoder.encode(permalink, "UTF-8")
+                            val navId = if (isYoutubeShortcut || isSpotifyRadioShortcut) {
+                                permalink.orEmpty()
                             } else if (isTrackStation) {
                                 "station:${item.playlist.numericId}"
                             } else if (isArtistStation) {

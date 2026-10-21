@@ -82,6 +82,7 @@ import com.alananasss.kittytune.data.AlbumResolver
 import com.alananasss.kittytune.data.DownloadManager
 import com.alananasss.kittytune.data.LikeRepository
 import com.alananasss.kittytune.data.local.AppDatabase
+import com.alananasss.kittytune.data.local.ExternalPlaylists
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
@@ -362,6 +363,7 @@ fun PlaylistDetailScreen(
     // header line offers the picker instead of silently opening the first one.
     var playlistArtists by remember { mutableStateOf<List<com.alananasss.kittytune.data.spotify.SpotifyArtistRef>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var hasSavedRadio by remember(playlistId) { mutableStateOf(false) }
     var defaultIcon by remember { mutableStateOf<ImageVector?>(null) }
 
     val downloadProgress by DownloadManager.downloadProgress.collectAsState()
@@ -400,8 +402,24 @@ fun PlaylistDetailScreen(
     val stationIdFromUrn = cleanIdStr.substringAfterLast(":").toLongOrNull()
     val currentIdLong = stationIdFromUrn ?: cleanIdStr.toLongOrNull() ?: 0L
 
-    val stableId = remember(playlistId, cleanIdStr, currentIdLong) {
+    val isSpotifyRadioRoute = playlistId.startsWith("spotify_radio:") || playlistId.startsWith("station_spotify:")
+    val radioRoutePermalink = remember(playlistId, isSpotifyRadioRoute) {
+        when {
+            playlistId.startsWith("yt_radio:") -> playlistId
+            isSpotifyRadioRoute -> {
+                val seed = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(playlistId)
+                seed.takeIf { it.isNotBlank() }?.let { "spotify_radio:$it" }
+            }
+            else -> null
+        }
+    }
+
+    // Kept for likes saved by older builds, which hashed the raw route.
+    val legacyStableId = remember(playlistId, cleanIdStr, currentIdLong) {
         if (currentIdLong != 0L) currentIdLong else cleanIdStr.hashCode().toLong()
+    }
+    val stableId = remember(playlistId, radioRoutePermalink, legacyStableId) {
+        ExternalPlaylists.radioStableId(radioRoutePermalink) ?: legacyStableId
     }
 
     val playlistInDb by DownloadManager.isPlaylistInLibraryFlow(stableId).collectAsState(initial = null)
@@ -608,6 +626,36 @@ fun PlaylistDetailScreen(
 
     LaunchedEffect(playlistId, refreshTrigger) {
         if (playlistId.startsWith("yt_radio:")) {
+            // A liked radio is a snapshot. Reopen it instead of re-resolving
+            // the seed remotely, which used to come back empty after a while.
+            val db = AppDatabase.downloadDao
+            val saved = if (stableId != 0L) db.getPlaylist(stableId) else null
+            val savedTracks = if (saved != null) db.getTracksForPlaylistSync(stableId) else emptyList()
+            if (saved != null && savedTracks.isNotEmpty()) {
+                hasSavedRadio = true
+                playlistTitle = saved.title
+                playlistCover = saved.localCoverPath ?: saved.artworkUrl
+                playlistUser = User(0, saved.artist, null)
+                playlistPermalinkUrl = saved.permalinkUrl ?: playlistId
+                defaultIcon = Icons.Rounded.Radio
+                val addedAtMap = db.getAddedAtForPlaylist(stableId)
+                tracks.clear()
+                tracks.addAll(savedTracks.map { local ->
+                    Track(
+                        id = local.id,
+                        title = local.title,
+                        artworkUrl = local.localArtworkPath.ifEmpty { local.artworkUrl },
+                        durationMs = local.duration,
+                        user = User(0, local.artist, null),
+                        likedAt = addedAtMap[local.id]?.takeIf { it > 0 },
+                        source = local.source ?: "youtube",
+                        permalinkUrl = local.permalinkUrl,
+                    )
+                })
+                isLoading = false
+                return@LaunchedEffect
+            }
+
             val encodedUrl = playlistId.removePrefix("yt_radio:")
             val url = URLDecoder.decode(encodedUrl, "UTF-8")
             youtubeRadioViewModel.loadInitial(url)
@@ -678,6 +726,31 @@ fun PlaylistDetailScreen(
                             newTracks.addAll(pl.tracks.map { it.toTrack() })
                         }
                     } else if (isSpotifyRadio) {
+                        // Prefer the snapshot saved when the radio was liked.
+                        val saved = if (stableId != 0L) db.getPlaylist(stableId) else null
+                        val savedTracks = if (saved != null) db.getTracksForPlaylistSync(stableId) else emptyList()
+                        if (saved != null && savedTracks.isNotEmpty()) {
+                            isAlbum = false
+                            hasSavedRadio = true
+                            playlistTitle = saved.title
+                            playlistCover = saved.localCoverPath ?: saved.artworkUrl
+                            defaultIcon = Icons.Rounded.Radio
+                            playlistUser = User(0, saved.artist, null)
+                            playlistPermalinkUrl = saved.permalinkUrl ?: radioRoutePermalink
+                            val addedAtMap = db.getAddedAtForPlaylist(stableId)
+                            newTracks.addAll(savedTracks.map { local ->
+                                Track(
+                                    id = local.id,
+                                    title = local.title,
+                                    artworkUrl = local.localArtworkPath.ifEmpty { local.artworkUrl },
+                                    durationMs = local.duration,
+                                    user = User(0, local.artist, null),
+                                    likedAt = addedAtMap[local.id]?.takeIf { it > 0 },
+                                    source = local.source ?: "spotify",
+                                    permalinkUrl = local.permalinkUrl,
+                                )
+                            })
+                        } else {
                         val isArtistStationSeed = playlistId.startsWith("station_artist:") || playlistId.startsWith("spotify:artist:") || playlistId.startsWith("spotify_artist:")
                         var radioPlaylist = com.alananasss.kittytune.data.spotify.SpotifyRepository.getRadio(cleanIdStr, isArtist = isArtistStationSeed)
                         if (radioPlaylist == null) {
@@ -735,6 +808,7 @@ fun PlaylistDetailScreen(
                                     newTracks.addAll(artist.topTracks.map { it.toTrack() })
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -988,12 +1062,25 @@ fun PlaylistDetailScreen(
 
                 else -> {
                     val isOffline = !NetworkUtils.isInternetAvailable()
-                    val forceLocal = isOffline || isDownloadedView || currentIdLong < 0
-                    val localPlaylist = if (stableId != 0L && forceLocal) db.getPlaylist(stableId) else null
+                    // A radio is a self-contained snapshot, and so is any
+                    // provider list saved in the library. On a route (liked
+                    // radio) load it when it has tracks; legacy rows are opened
+                    // numerically and must always load locally so they never
+                    // fall through to SoundCloud's playlist endpoint.
+                    val localExternalRow = if (stableId != 0L) db.getPlaylist(stableId)?.takeIf { local ->
+                        radioRoutePermalink != null || ExternalPlaylists.isExternalPermalink(local.permalinkUrl)
+                    } else null
+                    val localExternalTracks = if (localExternalRow != null) db.getTracksForPlaylistSync(stableId) else emptyList()
+                    val forceLocal = isOffline || isDownloadedView || currentIdLong < 0 ||
+                        (localExternalRow != null && (localExternalTracks.isNotEmpty() || radioRoutePermalink == null))
+                    val localPlaylist = if (stableId != 0L && forceLocal) localExternalRow ?: db.getPlaylist(stableId) else null
                     if (localPlaylist != null) {
                         playlistTitle = localPlaylist.title
                         playlistCover = localPlaylist.localCoverPath ?: localPlaylist.artworkUrl
                         playlistUser = User(0, localPlaylist.artist, null)
+                        if (radioRoutePermalink != null || ExternalPlaylists.isRadioPermalink(localExternalRow?.permalinkUrl)) {
+                            defaultIcon = Icons.Rounded.Radio
+                        }
                         isUserCreated = localPlaylist.isUserCreated || currentIdLong < 0
                         isLocalPlaylist = isDownloadedView || currentIdLong < 0
                         playlistPermalinkUrl = localPlaylist.permalinkUrl
@@ -1140,7 +1227,7 @@ fun PlaylistDetailScreen(
         }
     }
 
-    if (playlistId.startsWith("yt_radio:")) {
+    if (playlistId.startsWith("yt_radio:") && !hasSavedRadio) {
         playlistTitle = youtubeRadioViewModel.playlistTitle
         playlistCover = youtubeRadioViewModel.playlistCover
         playlistUser = youtubeRadioViewModel.playlistUser
@@ -1490,6 +1577,7 @@ fun PlaylistDetailScreen(
                                 }
                             }
                             isYoutubeRadio -> str("radio") + " • YouTube"
+                            isSpotifyRadioRoute -> str("radio") + " • Spotify"
                             isLoading && playlistId != "likes" -> "..."
                             else -> {
                                 val count = tracksToDisplay.size
@@ -1536,12 +1624,14 @@ fun PlaylistDetailScreen(
                                 playlistId != "likes" && playlistId != "downloads" && playlistId != "local_files"
 
                             if (playlistId != "downloads" && playlistId != "likes" && playlistId != "local_files" && !isUserCreated) {
-                                val isPlaylistLiked = likedPlaylistsRepo.contains(stableId)
+                                val isPlaylistLiked = likedPlaylistsRepo.contains(stableId) ||
+                                    (legacyStableId != stableId && likedPlaylistsRepo.contains(legacyStableId))
                                 FilledTonalIconButton(
                                     shapes = IconButtonDefaults.shapes(),
                                     modifier = Modifier.size(44.dp),
                                     onClick = {
                                         if (!isPlaylistLiked) {
+                                            val savedPermalink = radioRoutePermalink ?: playlistPermalinkUrl
                                             val targetPlaylist = Playlist(
                                                 id = stableId,
                                                 title = playlistTitle,
@@ -1551,22 +1641,32 @@ fun PlaylistDetailScreen(
                                                 user = playlistUser ?: User(0, playlistUser?.username ?: "", null),
                                                 tracks = tracksToDisplay.toList(),
                                                 isAlbum = isAlbum,
-                                                permalinkUrl = playlistPermalinkUrl ?: shareUrl,
+                                                permalinkUrl = savedPermalink ?: shareUrl,
                                                 urn = playlistUrn
                                             )
                                             DownloadManager.importPlaylistToLibrary(
                                                 playlist = targetPlaylist,
                                                 tracks = tracksToDisplay.toList(),
-                                                syncToCloud = !(playlistId.startsWith("spotify") || playlistId.startsWith("station_spotify") || playlistUrn?.startsWith("spotify:") == true || playlistPermalinkUrl?.contains("spotify") == true),
+                                                syncToCloud = radioRoutePermalink == null &&
+                                                    !ExternalPlaylists.isExternalPermalink(savedPermalink ?: shareUrl) &&
+                                                    !(playlistId.startsWith("spotify") || playlistId.startsWith("station_spotify") || playlistUrn?.startsWith("spotify:") == true || playlistPermalinkUrl?.contains("spotify") == true),
                                                 likePlaylist = true
                                             )
                                         } else {
                                             LikeRepository.togglePlaylistLike(
                                                 stableId,
                                                 false,
-                                                playlistPermalinkUrl,
+                                                radioRoutePermalink ?: playlistPermalinkUrl,
                                                 playlistUrn
                                             )
+                                            if (legacyStableId != stableId) {
+                                                LikeRepository.togglePlaylistLike(
+                                                    legacyStableId,
+                                                    false,
+                                                    playlistPermalinkUrl,
+                                                    playlistUrn
+                                                )
+                                            }
                                         }
                                     },
                                 ) {

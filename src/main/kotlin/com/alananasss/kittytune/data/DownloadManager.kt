@@ -220,9 +220,9 @@ object DownloadManager {
                 val allPlaylists = dao.getAllPlaylists().first()
                 val currentLiked = LikeRepository.likedPlaylists.value
                 allPlaylists.forEach { localPlaylist ->
-                    val isSpotify = localPlaylist.permalinkUrl?.contains("spotify") == true
+                    val isExternal = ExternalPlaylists.isExternalPermalink(localPlaylist.permalinkUrl)
                     val isLiked = currentLiked.contains(localPlaylist.id)
-                    if (!localPlaylist.isUserCreated && localPlaylist.id > 0 && !isSpotify && !isLiked) {
+                    if (!localPlaylist.isUserCreated && localPlaylist.id > 0 && !isExternal && !isLiked) {
                         val tracks = dao.getTracksForPlaylistSync(localPlaylist.id)
                         val hasDownloadedTracks = tracks.any { it.localAudioPath.isNotEmpty() }
                         if (!hasDownloadedTracks) {
@@ -514,40 +514,46 @@ object DownloadManager {
         likePlaylist: Boolean = true
     ) {
         scope.launch {
-            if (likePlaylist && playlist.id != 0L) {
+            // A radio is saved under its seed route, not under a transient
+            // remote playlist id. This is what lets the library reopen the
+            // exact snapshot the detail page liked.
+            val libraryId = ExternalPlaylists.libraryIdFor(playlist.permalinkUrl, playlist.id)
+            val targetPlaylist = if (libraryId != playlist.id) playlist.copy(id = libraryId) else playlist
+
+            if (likePlaylist && targetPlaylist.id != 0L) {
                 LikeRepository.togglePlaylistLike(
-                    playlistId = playlist.id,
+                    playlistId = targetPlaylist.id,
                     isLiked = true,
-                    permalink = playlist.permalinkUrl,
-                    urn = playlist.urn
+                    permalink = targetPlaylist.permalinkUrl,
+                    urn = targetPlaylist.urn
                 )
             }
 
-            val existing = dao.getPlaylist(playlist.id)
-            val isUserCreatedFinal = playlist.id < 0 || (existing?.isUserCreated == true)
-            val localCover = existing?.localCoverPath ?: (if (playlist.id < 0) playlist.calculatedArtworkUrl ?: playlist.artworkUrl else null)
+            val existing = dao.getPlaylist(targetPlaylist.id)
+            val isUserCreatedFinal = targetPlaylist.id < 0 || (existing?.isUserCreated == true)
+            val localCover = existing?.localCoverPath ?: (if (targetPlaylist.id < 0) targetPlaylist.calculatedArtworkUrl ?: targetPlaylist.artworkUrl else null)
             val isDownloadedFinal = isDownloaded ?: (existing?.isDownloaded ?: false)
             val baseTime = System.currentTimeMillis()
 
             val firstTrackArt = tracks.firstOrNull { it.fullResArtwork.isNotBlank() && !it.fullResArtwork.contains("picsum") && !it.fullResArtwork.contains("avatars") }?.fullResArtwork ?: ""
-            val rawArt = if (!playlist.artworkUrl.isNullOrEmpty() && !playlist.artworkUrl.contains("avatars")) {
-                playlist.artworkUrl.replace("large", "t500x500")
-            } else if (!playlist.calculatedArtworkUrl.isNullOrEmpty() && !playlist.calculatedArtworkUrl.contains("avatars")) {
-                playlist.calculatedArtworkUrl.replace("large", "t500x500")
+            val rawArt = if (!targetPlaylist.artworkUrl.isNullOrEmpty() && !targetPlaylist.artworkUrl.contains("avatars")) {
+                targetPlaylist.artworkUrl.replace("large", "t500x500")
+            } else if (!targetPlaylist.calculatedArtworkUrl.isNullOrEmpty() && !targetPlaylist.calculatedArtworkUrl.contains("avatars")) {
+                targetPlaylist.calculatedArtworkUrl.replace("large", "t500x500")
             } else {
                 firstTrackArt
             }
 
             val localPlaylist = LocalPlaylist(
-                id = playlist.id,
-                title = playlist.title ?: str("untitled_track"),
-                artist = playlist.user?.username ?: str("unknown_artist"),
+                id = targetPlaylist.id,
+                title = targetPlaylist.title ?: str("untitled_track"),
+                artist = targetPlaylist.user?.username ?: str("unknown_artist"),
                 artworkUrl = rawArt,
                 localCoverPath = localCover,
                 trackCount = tracks.size,
                 isUserCreated = isUserCreatedFinal,
-                permalinkUrl = playlist.permalinkUrl,
-                isAlbum = playlist.isRealAlbum,
+                permalinkUrl = targetPlaylist.permalinkUrl,
+                isAlbum = targetPlaylist.isRealAlbum,
                 addedAt = existing?.addedAt ?: baseTime,
                 isDownloaded = isDownloadedFinal
             )
@@ -569,7 +575,7 @@ object DownloadManager {
                     )
                     dao.insertTrack(localTrack)
                 }
-                dao.insertPlaylistTrackRef(PlaylistTrackCrossRef(playlist.id, track.id, baseTime + index))
+                dao.insertPlaylistTrackRef(PlaylistTrackCrossRef(targetPlaylist.id, track.id, baseTime + index))
             }
             _libraryUpdated.tryEmit(Unit)
         }
@@ -578,8 +584,11 @@ object DownloadManager {
     fun deletePlaylist(playlistId: Long, syncToCloud: Boolean = true, forceUserCreated: Boolean? = null, forcePermalink: String? = null) {
         scope.launch {
             val playlistToDelete = dao.getPlaylist(playlistId)
+            val externalPermalink = forcePermalink ?: playlistToDelete?.permalinkUrl
 
-            if (syncToCloud && playlistId > 0 && !tokenManager.isGuestMode()) {
+            // Radios and provider lists only exist in the local library; they
+            // must never be unliked/deleted on SoundCloud.
+            if (syncToCloud && playlistId > 0 && !ExternalPlaylists.isExternalPermalink(externalPermalink) && !tokenManager.isGuestMode()) {
                 val token = tokenManager.getAccessToken()
                 if (!token.isNullOrEmpty()) {
                     try {

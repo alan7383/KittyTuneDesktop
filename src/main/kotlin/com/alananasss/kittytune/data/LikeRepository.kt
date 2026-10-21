@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.core.NamedPrefs
+import com.alananasss.kittytune.data.local.ExternalPlaylists
 import com.alananasss.kittytune.data.network.PlaylistLikeItem
 import com.alananasss.kittytune.data.network.PlaylistLikeRequest
 import com.alananasss.kittytune.data.network.RetrofitClient
@@ -362,7 +363,7 @@ object LikeRepository {
                 val dao = com.alananasss.kittytune.data.local.AppDatabase.downloadDao
                 val allLocal = dao.getAllPlaylists().first()
                 allLocal.filter { local ->
-                    currentLiked.contains(local.id) && (local.permalinkUrl?.contains("spotify") == true || local.id < 0 || local.isDownloaded)
+                    currentLiked.contains(local.id) && (ExternalPlaylists.isExternalPermalink(local.permalinkUrl) || local.id < 0 || local.isDownloaded)
                 }.map { it.id }.toSet()
             } catch (e: Exception) {
                 emptySet()
@@ -412,10 +413,10 @@ object LikeRepository {
             }
 
             val safePermalink = permalink ?: ""
-            val isSpotify = safePermalink.contains("spotify.com") || safePermalink.contains("spotify:")
-                    || urn?.startsWith("spotify:") == true || (urn != null && urn.contains("spotify"))
-                    || playlistId == 0L
-            if (isSpotify) {
+            val isExternal = ExternalPlaylists.isExternalPermalink(safePermalink) ||
+                urn?.startsWith("spotify:") == true || (urn != null && urn.contains("spotify")) ||
+                playlistId == 0L
+            if (isExternal) {
                 return@launch
             }
 
