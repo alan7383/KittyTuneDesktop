@@ -2086,6 +2086,7 @@
     <string name="automix_overlap_4bars">4 bars</string>
     <string name="automix_overlap_8bars">8 bars</string>
     <string name="automix_overlap_custom">Custom duration</string>
+    <string name="automix_overlap_custom_value">Duration: %d seconds</string>
     <string name="automix_start_offset">Start Offset</string>
     <string name="automix_start_offset_desc">Choose where the incoming track begins playback during transition</string>
     <string name="automix_start_offset_auto">Automatic (Smart intro skip)</string>

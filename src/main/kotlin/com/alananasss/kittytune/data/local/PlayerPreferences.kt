@@ -492,7 +492,13 @@ class PlayerPreferences {
         private const val KEY_AUTOMIX_HARMONIC_MIX = "automix_harmonic_mix"
         private const val KEY_AUTOMIX_DYNAMIC_MIX_POINTS = "automix_dynamic_mix_points"
         private const val KEY_AUTOMIX_BASS_DUCKING = "automix_bass_ducking"
+        const val AUTOMIX_OVERLAP_AUTO = 0
+        const val AUTOMIX_OVERLAP_2BARS = 1
+        const val AUTOMIX_OVERLAP_4BARS = 2
+        const val AUTOMIX_OVERLAP_8BARS = 3
+        const val AUTOMIX_OVERLAP_CUSTOM = 4
         private const val KEY_AUTOMIX_OVERLAP_MODE = "automix_overlap_mode"
+        private const val KEY_AUTOMIX_OVERLAP_CUSTOM_SEC = "automix_overlap_custom_sec"
         const val AUTOMIX_START_OFFSET_AUTO = 0
         const val AUTOMIX_START_OFFSET_BEGINNING = 1
         const val AUTOMIX_START_OFFSET_CUSTOM = 2
@@ -686,8 +692,11 @@ class PlayerPreferences {
     fun getAutomixBassDuckingEnabled(): Boolean = Prefs.getBoolean(KEY_AUTOMIX_BASS_DUCKING, true)
     fun setAutomixBassDuckingEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTOMIX_BASS_DUCKING, enabled)
 
-    fun getAutomixOverlapMode(): Int = Prefs.getInt(KEY_AUTOMIX_OVERLAP_MODE, 0)
+    fun getAutomixOverlapMode(): Int = Prefs.getInt(KEY_AUTOMIX_OVERLAP_MODE, AUTOMIX_OVERLAP_AUTO)
     fun setAutomixOverlapMode(mode: Int) = Prefs.putInt(KEY_AUTOMIX_OVERLAP_MODE, mode)
+
+    fun getAutomixOverlapCustomSec(): Int = Prefs.getInt(KEY_AUTOMIX_OVERLAP_CUSTOM_SEC, 8)
+    fun setAutomixOverlapCustomSec(seconds: Int) = Prefs.putInt(KEY_AUTOMIX_OVERLAP_CUSTOM_SEC, seconds.coerceIn(1, 30))
 
     fun getAutomixStartOffsetMode(): Int = Prefs.getInt(KEY_AUTOMIX_START_OFFSET_MODE, AUTOMIX_START_OFFSET_AUTO)
     fun setAutomixStartOffsetMode(mode: Int) = Prefs.putInt(KEY_AUTOMIX_START_OFFSET_MODE, mode)

@@ -1296,6 +1296,7 @@
     <string name="automix_overlap_4bars">4 Takte</string>
     <string name="automix_overlap_8bars">8 Takte</string>
     <string name="automix_overlap_custom">Eigene Dauer</string>
+    <string name="automix_overlap_custom_value">Dauer: %d Sekunden</string>
     <string name="automix_start_offset">Start-Offset</string>
     <string name="automix_start_offset_desc">Wähle, an welcher Stelle der nächste Titel während des Übergangs beginnt</string>
     <string name="automix_start_offset_auto">Automatisch (intelligenter Intro-Skip)</string>

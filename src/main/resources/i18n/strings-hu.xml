@@ -2047,6 +2047,7 @@
     <string name="automix_overlap_8bars">8 ütem</string>
     <string name="automix_overlap_auto">Automatikus (4 ütem)</string>
     <string name="automix_overlap_custom">Egyéni időtartam</string>
+    <string name="automix_overlap_custom_value">Időtartam: %d másodperc</string>
     <string name="automix_overlap_mode">Átmenet hossza</string>
     <string name="automix_start_offset">Kezdési eltolás</string>
     <string name="automix_start_offset_desc">Válaszd ki, hol kezdődjön a következő szám lejátszása az átmenet során</string>

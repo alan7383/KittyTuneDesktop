@@ -26,6 +26,7 @@ object R {
         const val automix_overlap_4bars = "automix_overlap_4bars"
         const val automix_overlap_8bars = "automix_overlap_8bars"
         const val automix_overlap_custom = "automix_overlap_custom"
+        const val automix_overlap_custom_value = "automix_overlap_custom_value"
         const val automix_start_offset = "automix_start_offset"
         const val automix_start_offset_desc = "automix_start_offset_desc"
         const val automix_start_offset_auto = "automix_start_offset_auto"

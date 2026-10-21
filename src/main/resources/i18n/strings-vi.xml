@@ -1175,6 +1175,7 @@
     <string name="automix_overlap_4bars">4 khuông nhạc</string>
     <string name="automix_overlap_8bars">8 khuông nhạc</string>
     <string name="automix_overlap_custom">Thời lượng tùy chỉnh</string>
+    <string name="automix_overlap_custom_value">Thời lượng: %d giây</string>
     <string name="automix_start_offset">Độ lệch bắt đầu</string>
     <string name="automix_start_offset_desc">Chọn vị trí bắt đầu phát bài hát tiếp theo trong quá trình chuyển tiếp</string>
     <string name="automix_start_offset_auto">Tự động (bỏ qua intro thông minh)</string>
