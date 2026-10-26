@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
@@ -41,8 +42,14 @@ object ArtworkPalette {
     fun load(url: String): BufferedImage? = try {
         val input: ImageInputStream? = if (url.startsWith("http")) {
             val req = Request.Builder().url(url).build()
-            httpClient.newCall(req).execute().use { response ->
-                response.body?.byteStream()?.let { ImageIO.createImageInputStream(it) }
+            // Read the bytes while the response is open. Creating the ImageInputStream from the
+            // response's stream and then closing the response (the old code did exactly that)
+            // left every artwork undecodable, so the dynamic theme silently kept its old seed.
+            val bytes = httpClient.newCall(req).execute().use { response ->
+                if (response.isSuccessful) response.body?.bytes() else null
+            }
+            bytes?.takeIf { it.isNotEmpty() }?.let {
+                ImageIO.createImageInputStream(ByteArrayInputStream(it))
             }
         } else {
             File(url).takeIf { it.isFile }?.let { ImageIO.createImageInputStream(it) }
