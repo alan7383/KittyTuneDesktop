@@ -37,7 +37,7 @@
         }
     
         fun isRpcRunning(): Boolean {
-            return discordWebSocket.isWebSocketConnected()
+            return discordWebSocket.isSocketConnectedToAccount()
         }
     
     suspend fun setActivity(
