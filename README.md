@@ -10,7 +10,7 @@
   <a href="https://discord.gg/thyHQH9jV9"><img src="https://img.shields.io/badge/Discord-gray?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 <p align="center">
-  <a href="https://alan7383.github.io/kittytune-website/download" title="Download KittyTune"><img src=".github/assets/download-kittytune.svg" alt="Download KittyTune" width="240"/></a>
+  <a href="https://alan7383.github.io/kittytune-website/download" title="Download KittyTune"><img src=".github/assets/download-kittytune.svg" alt="Download KittyTune" width="460"/></a>
 </p>
 
 <p align="center">
