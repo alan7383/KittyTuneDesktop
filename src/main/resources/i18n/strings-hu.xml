@@ -2642,4 +2642,16 @@
     <string name="icon_name_shiro_kt_logo">KT Logó</string>
     <string name="icon_name_shiro_cozy_nap">Kényelmes dallam</string>
     <string name="icon_name_shiro_cool_cat">Menő cica</string>
+    <string name="theme_preset_accents_title">Válogatott előbeállítások</string>
+    <string name="theme_preset_accents_subtitle">Harmonikus használatra kész színek</string>
+    <string name="color_palette_system_dynamic">Dinamikus rendszer</string>
+    <string name="color_hex_copied">Hex kód másolva</string>
+    <string name="color_hint_muted">Visszafogott</string>
+    <string name="color_hint_balanced">Kiegyensúlyozott</string>
+    <string name="color_hint_vivid">Élénk</string>
+    <string name="color_hint_dark">Sötét</string>
+    <string name="color_hint_default">Alapértelmezett</string>
+    <string name="color_hint_bright">Világos</string>
+    <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
+    <string name="color_spec_2021_label">SPEC 2021 (Örökölt)</string>
 </resources>

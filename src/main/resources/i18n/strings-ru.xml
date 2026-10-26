@@ -2643,4 +2643,16 @@
     <string name="icon_name_shiro_kt_logo">Логотип KT</string>
     <string name="icon_name_shiro_cozy_nap">Уютный кот</string>
     <string name="icon_name_shiro_cool_cat">Крутой кот</string>
+    <string name="theme_preset_accents_title">Готовые пресеты</string>
+    <string name="theme_preset_accents_subtitle">Гармоничные готовые цветовые схемы</string>
+    <string name="color_palette_system_dynamic">Системная динамическая</string>
+    <string name="color_hex_copied">Hex-код скопирован</string>
+    <string name="color_hint_muted">Приглушённый</string>
+    <string name="color_hint_balanced">Сбалансированный</string>
+    <string name="color_hint_vivid">Яркий</string>
+    <string name="color_hint_dark">Тёмный</string>
+    <string name="color_hint_default">По умолчанию</string>
+    <string name="color_hint_bright">Светлый</string>
+    <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
+    <string name="color_spec_2021_label">SPEC 2021 (Устаревший)</string>
 </resources>

@@ -2724,4 +2724,16 @@
     <string name="icon_name_shiro_kt_logo">Logo KT</string>
     <string name="icon_name_shiro_cozy_nap">Giai điệu ấm cúng</string>
     <string name="icon_name_shiro_cool_cat">Mèo sành điệu</string>
+    <string name="theme_preset_accents_title">Mẫu tuyển chọn</string>
+    <string name="theme_preset_accents_subtitle">Màu sắc hài hòa sẵn sàng sử dụng</string>
+    <string name="color_palette_system_dynamic">Động theo hệ thống</string>
+    <string name="color_hex_copied">Đã sao chép mã hex</string>
+    <string name="color_hint_muted">Dịu</string>
+    <string name="color_hint_balanced">Cân bằng</string>
+    <string name="color_hint_vivid">Rực rỡ</string>
+    <string name="color_hint_dark">Tối</string>
+    <string name="color_hint_default">Mặc định</string>
+    <string name="color_hint_bright">Sáng</string>
+    <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
+    <string name="color_spec_2021_label">SPEC 2021 (Cũ)</string>
 </resources>
