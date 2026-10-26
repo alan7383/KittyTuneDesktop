@@ -3,11 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/alan7383/KittyTuneDesktop/blob/master/LICENSE"><img src="https://img.shields.io/badge/License-gray?style=for-the-badge&logo=github" alt="License"></a>
-  <a href="https://github.com/alan7383/KittyTuneDesktop/releases"><img src="https://img.shields.io/github/v/tag/alan7383/KittyTuneDesktop?style=for-the-badge&label=Release&color=gray&logo=github" alt="Release"></a>
-  <a href="https://github.com/alan7383/KittyTuneDesktop/stargazers"><img src="https://img.shields.io/github/stars/alan7383/KittyTuneDesktop?style=for-the-badge&label=Stars&color=gray&logo=github" alt="Stars"></a>
-  <a href="https://ko-fi.com/alan7383"><img src="https://img.shields.io/badge/Ko--fi-gray?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
-  <a href="https://discord.gg/thyHQH9jV9"><img src="https://img.shields.io/badge/Discord-gray?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <img src=".github/assets/badges.svg" alt="Android | Kotlin | Material Design | Jetpack Compose" width="100%"/>
 </p>
 <p align="center">
   <a href="https://alan7383.github.io/kittytune-website/download" title="Download KittyTune"><img src=".github/assets/download-kittytune.svg" alt="Download KittyTune" width="460"/></a>
