@@ -121,7 +121,7 @@ fun AiDetectionBadge(
     modifier: Modifier = Modifier,
 ) {
     val prefs = remember { PlayerPreferences() }
-    val showBadge = prefs.aiShowBadge
+    val showBadge = prefs.aiShowBadge && AiDetectionManager.isModelReady()
     if (!showBadge) {
         return
     }

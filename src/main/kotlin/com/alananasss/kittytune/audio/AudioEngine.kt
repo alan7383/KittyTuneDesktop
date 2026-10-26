@@ -225,7 +225,7 @@ class AudioEngine {
         }
 
         val prefs = com.alananasss.kittytune.data.local.PlayerPreferences()
-        if (prefs.aiShowBadge || prefs.aiAutoSkip) {
+        if (com.alananasss.kittytune.audio.ai.AiDetectionManager.isModelReady() && (prefs.aiShowBadge || prefs.aiAutoSkip)) {
             com.alananasss.kittytune.audio.ai.AiDetectionManager.analyzeTrackUpfront(
                 urlOrPath = url,
                 headers = headers,
