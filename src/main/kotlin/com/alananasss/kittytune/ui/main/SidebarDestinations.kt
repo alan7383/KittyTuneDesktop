@@ -3,6 +3,7 @@ package com.alananasss.kittytune.ui.main
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.DynamicFeed
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WatchLater
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.DynamicFeed
+import androidx.compose.material.icons.outlined.Equalizer
 import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
@@ -48,5 +50,6 @@ internal object SidebarDestinations {
         Destination(PlayerPreferences.SIDEBAR_NAV_STATS, "listening_stats", "listening_stats_title", Icons.Filled.Leaderboard, Icons.Outlined.Leaderboard),
         Destination(PlayerPreferences.SIDEBAR_NAV_HISTORY, "history", "history_title", Icons.Filled.WatchLater, Icons.Outlined.WatchLater),
         Destination(PlayerPreferences.SIDEBAR_NAV_SETTINGS, "settings", "profile_menu_settings", Icons.Filled.Settings, Icons.Outlined.Settings),
+        Destination(PlayerPreferences.SIDEBAR_NAV_EQUALIZER, "equalizer", "equalizer_title", Icons.Filled.Equalizer, Icons.Outlined.Equalizer),
 ).associateBy { it.key }
 }
