@@ -158,11 +158,17 @@ tasks.withType<Test>().configureEach {
     jvmArgs("--add-opens=java.desktop/sun.awt.X11=ALL-UNNAMED")
     systemProperty("ORT_DISABLE_TELEMETRY", "1")
     environment("ORT_DISABLE_TELEMETRY", "1")
+    providers.environmentVariable("DISPLAY").orNull?.let { environment("DISPLAY", it) }
+    providers.environmentVariable("XAUTHORITY").orNull?.let { environment("XAUTHORITY", it) }
+    providers.environmentVariable("WAYLAND_DISPLAY").orNull?.let { environment("WAYLAND_DISPLAY", it) }
 }
 
 tasks.withType<JavaExec>().configureEach {
     systemProperty("ORT_DISABLE_TELEMETRY", "1")
     environment("ORT_DISABLE_TELEMETRY", "1")
+    providers.environmentVariable("DISPLAY").orNull?.let { environment("DISPLAY", it) }
+    providers.environmentVariable("XAUTHORITY").orNull?.let { environment("XAUTHORITY", it) }
+    providers.environmentVariable("WAYLAND_DISPLAY").orNull?.let { environment("WAYLAND_DISPLAY", it) }
 }
 
 compose.desktop {
