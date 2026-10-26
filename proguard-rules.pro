@@ -54,3 +54,8 @@
 -keep class org.schabi.newpipe.extractor.** { *; }
 
 -dontwarn **
+
+# ZXing QR: QRCodeWriter resolves ErrorCorrectionLevel through Enum.valueOf at runtime.
+# Shrinking the enum made that call throw "ErrorCorrectionLevel is not an enum class",
+# which the UI turned into the blank white QR plate in release builds.
+-keep class com.google.zxing.** { *; }
