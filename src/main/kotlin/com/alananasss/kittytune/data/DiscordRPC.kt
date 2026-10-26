@@ -18,15 +18,21 @@ class DiscordRPC(
         track: Track,
         contextName: String?,
         isPlaying: Boolean,
-        position: Long
+        position: Long,
+        durationOverride: Long = 0L,
     ) {
-        val duration = track.durationMs ?: 0L
+        val duration = if (durationOverride > 0L) {
+            durationOverride
+        } else {
+            track.effectiveFullDurationMs ?: track.durationMs ?: 0L
+        }
 
         val startTime: Long?
         val endTime: Long?
 
         if (isPlaying && duration > 0) {
-            startTime = System.currentTimeMillis() - position
+            val clampedPosition = position.coerceIn(0L, duration)
+            startTime = System.currentTimeMillis() - clampedPosition
             endTime = startTime + duration
         } else {
             startTime = null

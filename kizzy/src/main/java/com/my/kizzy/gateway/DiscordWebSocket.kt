@@ -59,10 +59,21 @@
         private var heartbeatInterval = 0L
         private var resumeGatewayUrl: String? = null
         private var heartbeatJob: Job? = null
+        private var connectJob: Job? = null
         private var connected = false
-        private var client: HttpClient = HttpClient {
-            install(WebSockets)
+        private var client: HttpClient? = null
+
+        private fun getClient(): HttpClient {
+            var c = client
+            if (c == null) {
+                c = HttpClient {
+                    install(WebSockets)
+                }
+                client = c
+            }
+            return c
         }
+
         private val json = Json {
             ignoreUnknownKeys = true
             encodeDefaults = true
@@ -78,11 +89,13 @@
             get() = supervisorJob + Dispatchers.Default
     
         suspend fun connect() {
-            launch {
+            if (isSocketConnectedToAccount()) return
+            if (connectJob?.isActive == true) return
+            connectJob = launch {
                 try {
                     Logger.getLogger("Kizzy").log(INFO, "Gateway: Connect called")
                     val url = resumeGatewayUrl ?: gatewayUrl
-                    websocket = client.webSocketSession(url)
+                    websocket = getClient().webSocketSession(url)
     
                     // start receiving messages
                     websocket!!.incoming.receiveAsFlow()
@@ -108,12 +121,16 @@
             heartbeatJob?.cancel()
             connected = false
             val close = websocket?.closeReason?.await()
-            Logger.getLogger("Kizzy").log(INFO, "Gateway: Closed with code: ${close?.code}, reason: ${close?.message},  can_reconnect: ${close?.code?.toInt() == 4000}")
-            if (close?.code?.toInt() == 4000) {
-                delay(200.milliseconds)
+            val code = close?.code?.toInt()
+            Logger.getLogger("Kizzy").log(INFO, "Gateway: Closed with code: $code, reason: ${close?.message}")
+            // Codes that cannot reconnect (authentication failure, invalid shards, etc.)
+            val isFatal = code in listOf(4004, 4010, 4011, 4012, 4013, 4014)
+            if (!isFatal) {
+                delay(1000.milliseconds)
                 connect()
-            } else
+            } else {
                 close()
+            }
         }
     
         private suspend fun onMessage(payload: Payload) {
@@ -217,7 +234,7 @@
             }
         }
     
-        private fun isSocketConnectedToAccount(): Boolean {
+        fun isSocketConnectedToAccount(): Boolean {
             return connected && websocket?.isActive == true
         }
     
@@ -241,6 +258,8 @@
         fun close() {
             heartbeatJob?.cancel()
             heartbeatJob = null
+            connectJob?.cancel()
+            connectJob = null
             // Cancel only the launched children (connect receive loop, heartbeat), not the scope
             // itself. Cancelling the scope via this.cancel() would make the scope unusable for a
             // future reconnect, and with the previous buggy getter it didn't even do that.
@@ -256,16 +275,21 @@
             }
             // Release the ktor HttpClient (connection pool + threads). Previously leaked forever —
             // every closeRPC() left one HttpClient open.
-            runCatching { client.close() }
+            runCatching { client?.close() }
+            client = null
             websocket = null
         }
 
         suspend fun sendActivity(presence: Presence) {
+            if (!isSocketConnectedToAccount()) {
+                connect()
+            }
             // Wait for the gateway to reach READY, but with a timeout: the previous unbounded
             // `while (!isSocketConnectedToAccount()) delay(10ms)` could spin forever if connect()
             // silently failed to dispatch READY, suspending the caller indefinitely.
             val ready = withTimeoutOrNull(ACTIVITY_READY_TIMEOUT_MS) {
-                while (!isSocketConnectedToAccount()) delay(10.milliseconds)
+                while (!isSocketConnectedToAccount()) delay(50.milliseconds)
+                true
             }
             if (ready == null) {
                 Logger.getLogger("Kizzy").log(Level.WARNING, "Gateway: sendActivity timed out waiting for READY, dropping presence update")
