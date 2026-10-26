@@ -72,11 +72,11 @@ object UpdateManager {
         val file = installerFile
             // Check update temp dir for valid update file
             ?: updateDir.listFiles()
-                ?.filter { f -> f.name.startsWith("update_") && validExts.any { f.name.endsWith(it, ignoreCase = true) } }
+                ?.filter { f -> (f.name.startsWith("update_") || f.name.startsWith("KittyTune", ignoreCase = true) || f.name.startsWith("kitty-tune", ignoreCase = true)) && validExts.any { f.name.endsWith(it, ignoreCase = true) } }
                 ?.maxByOrNull { it.lastModified() }
             // Check cache dir for valid update file
             ?: AppDirs.cacheDir.listFiles()
-                ?.filter { f -> f.name.startsWith("update_") && validExts.any { f.name.endsWith(it, ignoreCase = true) } }
+                ?.filter { f -> (f.name.startsWith("update_") || f.name.startsWith("KittyTune", ignoreCase = true) || f.name.startsWith("kitty-tune", ignoreCase = true)) && validExts.any { f.name.endsWith(it, ignoreCase = true) } }
                 ?.maxByOrNull { it.lastModified() }
             // Check Downloads folder for valid KittyTune installer
             ?: downloadsDir.listFiles()
@@ -213,6 +213,11 @@ object UpdateManager {
                 _isDialogVisible.value = true
             } else {
                 _status.value = if (isManual) UpdateStatus.NO_UPDATE else UpdateStatus.IDLE
+                if (isManual) {
+                    com.alananasss.kittytune.core.Toaster.show(
+                        com.alananasss.kittytune.core.str("update_no_update_toast")
+                    )
+                }
             }
             // Committed after the release list actually came back: written before the request as
             // it was, a network failure still consumed the 15-minute window, and start-ups behind
@@ -223,6 +228,11 @@ object UpdateManager {
         } catch (e: Exception) {
             e.printStackTrace()
             _status.value = if (isManual) UpdateStatus.ERROR else UpdateStatus.IDLE
+            if (isManual) {
+                com.alananasss.kittytune.core.Toaster.show(
+                    com.alananasss.kittytune.core.str("update_check_error_toast")
+                )
+            }
         }
     }
 
@@ -282,7 +292,9 @@ object UpdateManager {
         withContext(Dispatchers.IO) {
             try {
                 val updateDir = File(System.getProperty("java.io.tmpdir"), "KittyTuneUpdates").apply { mkdirs() }
-                var file = File(updateDir, "update_${asset.name}")
+                // Use the exact asset name. Windows Installer (MSI) validates the package name against
+                // its registered database during repair/upgrades; an 'update_' prefix causes Error 1316/1603.
+                var file = File(updateDir, asset.name)
 
                 var existingLength = 0L
                 if (isResuming && file.exists()) {
@@ -292,7 +304,7 @@ object UpdateManager {
                     if (file.exists()) {
                         val deleted = runCatching { file.delete() }.getOrDefault(false)
                         if (!deleted) {
-                            file = File(updateDir, "update_${System.currentTimeMillis()}_${asset.name}")
+                            file = File(updateDir, "${System.currentTimeMillis()}_${asset.name}")
                         }
                     }
                 }
@@ -361,7 +373,7 @@ object UpdateManager {
                         }
                     }
                 } catch (e: java.io.FileNotFoundException) {
-                    val fallbackFile = File(File(System.getProperty("java.io.tmpdir"), "KittyTuneUpdates"), "update_${System.currentTimeMillis()}_${asset.name}")
+                    val fallbackFile = File(File(System.getProperty("java.io.tmpdir"), "KittyTuneUpdates"), "${System.currentTimeMillis()}_${asset.name}")
                     body.byteStream().use { input ->
                         FileOutputStream(fallbackFile, false).use { output ->
                             val buffer = ByteArray(8 * 1024)
@@ -541,14 +553,45 @@ object UpdateManager {
         val installCmd = if (isMsi) {
             """
             Log "Executing msiexec..."
-            ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'MSIRESTARTMANAGERCONTROL=Disable', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru -WindowStyle Hidden
-            Log "msiexec finished with exit code ${'$'}(${'$'}p.ExitCode)"
+            ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru -WindowStyle Hidden
+            Log "msiexec silent install finished with exit code ${'$'}(${'$'}p.ExitCode)"
+
+            # Fallback 1: If exit code 1638 (same version already installed), retry with REINSTALL=ALL
+            if (${'$'}p.ExitCode -eq 1638) {
+                Log "Detected exit code 1638 (same version). Retrying silent reinstall..."
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru -WindowStyle Hidden
+                Log "msiexec silent reinstall finished with exit code ${'$'}(${'$'}p.ExitCode)"
+            }
+
+            # Fallback 2: If silent install failed (e.g. 1603 due to UAC elevation required), retry with basic UI (/qb)
+            if (${'$'}p.ExitCode -ne 0) {
+                Log "Silent install failed (${'$'}(${'$'}p.ExitCode)). Retrying with basic UI (/qb)..."
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru
+                Log "msiexec basic UI install finished with exit code ${'$'}(${'$'}p.ExitCode)"
+                if (${'$'}p.ExitCode -eq 1638) {
+                    Log "Retrying basic UI install with REINSTALL=ALL..."
+                    ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru
+                    Log "msiexec basic UI reinstall finished with exit code ${'$'}(${'$'}p.ExitCode)"
+                }
+            }
+
+            # Fallback 3: Full interactive wizard if basic UI still failed
+            if (${'$'}p.ExitCode -ne 0) {
+                Log "Basic UI install failed (${'$'}(${'$'}p.ExitCode)). Retrying with interactive installer..."
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/norestart', '/l*v', '$escapedMsiLog') -Wait -PassThru
+                Log "msiexec interactive install finished with exit code ${'$'}(${'$'}p.ExitCode)"
+            }
             """.trimIndent()
         } else {
             """
             Log "Executing setup executable..."
             ${'$'}p = Start-Process -FilePath '$escapedInstaller' -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-') -Wait -PassThru -WindowStyle Hidden
             Log "Setup finished with exit code ${'$'}(${'$'}p.ExitCode)"
+            if (${'$'}p.ExitCode -ne 0) {
+                Log "Silent setup failed (${'$'}(${'$'}p.ExitCode)). Retrying with interactive installer..."
+                ${'$'}p = Start-Process -FilePath '$escapedInstaller' -Wait -PassThru
+                Log "Interactive setup finished with exit code ${'$'}(${'$'}p.ExitCode)"
+            }
             """.trimIndent()
         }
 
@@ -571,8 +614,14 @@ object UpdateManager {
             }
 
             Log "Ensuring all KittyTune processes are stopped..."
-            Get-Process -Name "KittyTune", "kittytune" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-            Start-Sleep -Seconds 1
+            ${'$'}procs = Get-Process -Name "KittyTune", "kittytune", "WindowsSmtcBridge" -ErrorAction SilentlyContinue
+            if (${'$'}procs) {
+                ${'$'}procs | Stop-Process -Force -ErrorAction SilentlyContinue
+                ${'$'}procs | ForEach-Object {
+                    try { ${'$'}null = ${'$'}_.WaitForExit(10000) } catch {}
+                }
+            }
+            Start-Sleep -Seconds 2
 
             $installCmd
 
@@ -581,7 +630,8 @@ object UpdateManager {
                 ${'$'}candidates = @(
                     "${'$'}env:LOCALAPPDATA\KittyTune\KittyTune.exe",
                     "${'$'}env:LOCALAPPDATA\Programs\KittyTune\KittyTune.exe",
-                    "${'$'}env:ProgramFiles\KittyTune\KittyTune.exe"
+                    "${'$'}env:ProgramFiles\KittyTune\KittyTune.exe",
+                    "${'$'}{env:ProgramFiles(x86)}\KittyTune\KittyTune.exe"
                 )
                 foreach (${'$'}c in ${'$'}candidates) {
                     if (Test-Path -Path ${'$'}c) {
@@ -774,13 +824,15 @@ object UpdateManager {
             val updateDir = File(System.getProperty("java.io.tmpdir"), "KittyTuneUpdates")
             if (updateDir.exists()) {
                 updateDir.listFiles()?.forEach { f ->
-                    if (f.name.startsWith("update_") && f.isFile) {
-                        runCatching { f.delete() }
+                    if (f.isFile && (f.name.endsWith(".msi", ignoreCase = true) || f.name.endsWith(".exe", ignoreCase = true) || f.name.startsWith("update_"))) {
+                        if (!f.name.endsWith(".log", ignoreCase = true) && !f.name.endsWith(".ps1", ignoreCase = true)) {
+                            runCatching { f.delete() }
+                        }
                     }
                 }
             }
             AppDirs.cacheDir.listFiles()?.forEach { f ->
-                if (f.name.startsWith("update_") && f.isFile) {
+                if (f.isFile && (f.name.endsWith(".msi", ignoreCase = true) || f.name.startsWith("update_"))) {
                     runCatching { f.delete() }
                 }
             }
