@@ -184,6 +184,31 @@ fun MainScreen(
         }
     }
 
+    // The home view model answers a pasted link with either a destination or a
+    // track. The desktop has no navigation bus of its own, so those answers are
+    // handed to the player, which owns the route protocol (same wiring the
+    // Android app does through HomeScreen).
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        homeViewModel.navigateTo.collect { route ->
+            playerViewModel.navigateToPlaylistId = desktopHomeDestination(route)
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        homeViewModel.playTrack.collect { track ->
+            playerViewModel.playPlaylist(listOf(track), 0)
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(playerViewModel.showEqualizerScreen) {
+        if (playerViewModel.showEqualizerScreen) {
+            playerViewModel.showEqualizerScreen = false
+            if (navController.currentDestination?.route != "equalizer") {
+                navController.navigate("equalizer")
+            }
+        }
+    }
+
     var showShortcutsDialog by remember { mutableStateOf(false) }
 
     // Sync the user's SoundCloud followings into the local DB at app startup.
@@ -212,6 +237,17 @@ fun MainScreen(
                 val isAlt = event.isAltPressed
                 val isMeta = event.isMetaPressed
                 val noModifiers = !isShift && !isCtrl && !isAlt && !isMeta
+
+                if (noModifiers && event.key == Key.Escape) {
+                    if (playerViewModel.showEqualizerScreen) {
+                        playerViewModel.showEqualizerScreen = false
+                        return@collect
+                    }
+                    if (navController.currentDestination?.route == "equalizer") {
+                        navController.popBackStack()
+                        return@collect
+                    }
+                }
 
                 val now = System.currentTimeMillis()
 
@@ -818,6 +854,12 @@ fun MainScreen(
                                 onBackClick = { navController.popBackStack() }
                             )
                         }
+                        composable("equalizer") {
+                            com.alananasss.kittytune.ui.player.EqualizerScreen(
+                                viewModel = playerViewModel,
+                                onBack = null
+                            )
+                        }
                         // Settings sub-pages are now handled within SettingsScreen's Split Pane layout
                         composable("playlist_detail/{playlistId}") { backStackEntry ->
                             val id = backStackEntry.arguments?.let { args ->
@@ -1362,6 +1404,7 @@ fun MainScreen(
             onDismiss = { com.alananasss.kittytune.data.UpdateManager.hideDialog() }
         )
     }
+
 }
 
 /**
@@ -1387,6 +1430,17 @@ fun PlaceholderScreen(name: String) {
             modifier = Modifier.padding(24.dp)
         )
     }
+}
+
+/**
+ * Translates a destination the home view model asked for into the player's route
+ * protocol. Provider urns (`deezer:album:123`, `qobuz:playlist:7`) travel as they
+ * are; a route that already names a screen keeps only its id.
+ */
+private fun desktopHomeDestination(route: String): String = when {
+    route.startsWith("playlist_detail/") -> route.removePrefix("playlist_detail/")
+    route.startsWith("profile/") -> "profile:${route.removePrefix("profile/")}"
+    else -> route
 }
 
 private fun isSameRoute(navController: androidx.navigation.NavController, targetRoute: String): Boolean {
