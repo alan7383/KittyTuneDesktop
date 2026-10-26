@@ -306,6 +306,7 @@ fun SettingsItem(
 fun SettingsScaffold(
     title: String,
     onBackClick: (() -> Unit)? = null,
+    subtitle: String? = null,
     scrollState: androidx.compose.foundation.ScrollState? = null,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit
@@ -324,7 +325,20 @@ fun SettingsScaffold(
 
     val topBarContent = @Composable {
         LargeTopAppBar(
-            title = { Text(title, fontWeight = FontWeight.Bold, maxLines = 1) },
+            title = {
+                Column {
+                    Text(title, fontWeight = FontWeight.Bold, maxLines = 1)
+                    if (!subtitle.isNullOrBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1
+                        )
+                    }
+                }
+            },
             navigationIcon = {
                 if (onBackClick != null) {
                     IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBackClick) {

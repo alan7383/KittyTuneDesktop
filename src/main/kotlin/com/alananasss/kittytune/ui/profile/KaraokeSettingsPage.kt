@@ -237,6 +237,8 @@ fun KaraokeSettingsPage(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
+                            KaraokeQuickStart(playerViewModel = playerViewModel)
+
                             // 1. Unified KaraokeModelCard (modeled on AiModelCard)
                             KaraokeModelCard(
                                 engineMode = engineMode,
@@ -1434,6 +1436,72 @@ private fun KaraokeModelCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+
+/**
+ * A visible "what to do next" card. The karaoke feature used to live behind three tabs and a
+ * model download, so a listener could open it and never discover how to use it on a song.
+ */
+@Composable
+private fun KaraokeQuickStart(playerViewModel: PlayerViewModel) {
+    val track = playerViewModel.currentTrack
+    val modelReady = KaraokeManager.isModelReady()
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = str("karaoke_settings_sub"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Text(
+                text = if (track == null) {
+                    str("karaoke_no_track_playing_notice")
+                } else {
+                    "${str("karaoke_isolate_now")}: ${track.title}"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Button(
+                onClick = {
+                    if (track != null && modelReady) {
+                        playerViewModel.checkAndTriggerKaraokeSeparation(
+                            track = track,
+                            force = true,
+                            requireVocalStem = true,
+                        )
+                    }
+                },
+                enabled = track != null && modelReady,
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                Icon(Icons.Rounded.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(str("karaoke_isolate_now"))
+            }
+            if (!modelReady) {
+                Text(
+                    text = str("karaoke_model_required_notice"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
