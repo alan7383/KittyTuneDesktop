@@ -8,6 +8,7 @@ import com.alananasss.kittytune.data.SessionManager
 import com.alananasss.kittytune.data.TokenManager
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.ui.player.EqualizerState
 import com.alananasss.kittytune.utils.SignedUrl
 import com.alananasss.kittytune.audio.automix.AutomixManager
 import com.alananasss.kittytune.audio.automix.AutomixPlan
@@ -159,15 +160,36 @@ class Player {
     var onCompletion: (() -> Unit)? = null
     var onError: ((Throwable) -> Unit)? = null
 
+    @Volatile
     var activeEngine = AudioEngine()
+
+    @Volatile
     private var fadingEngine: AudioEngine? = null
-    
+
+    /**
+     * Identifies the transition that currently owns [activeEngine] and [fadingEngine].
+     *
+     * A crossfade prepares its incoming engine in a coroutine, and a listener can skip again
+     * while that is still running. Cancelling the old job is not enough: cancellation is only
+     * observed at a suspension point, so the superseded job could still reach its `prepare()`
+     * or `play()` afterwards and leave a third engine decoding alongside the new track. Every
+     * transition bumps this id, and a job may only touch the engines while its id is current.
+     */
+    @Volatile
+    private var transitionId = 0L
+
     @Volatile var isCrossfadingOut = false
     var lastEffectsState: AudioEffectsState? = null
+        private set
+    var lastEqualizerState: EqualizerState? = null
         private set
 
     fun reapplyEffects() {
         lastEffectsState?.let { applyEffects(it) }
+    }
+
+    fun reapplyEqualizer() {
+        lastEqualizerState?.let { applyEqualizer(it) }
     }
 
     data class PrebufferedTransition(
@@ -216,12 +238,12 @@ class Player {
     }
 
     fun releasePrebuffered() {
-        val pb = prebufferedTransition ?: return
-        prebufferedTransition = null
-        try {
-            pb.engine.stop()
-            pb.engine.release()
-        } catch (_: Exception) {}
+        // Taking the reference and clearing the slot must be one step: a crossfade adopting the
+        // prebuffer at the same instant would otherwise have its engine stopped from under it.
+        val pb = synchronized(this) {
+            prebufferedTransition.also { prebufferedTransition = null }
+        } ?: return
+        stopAndRelease(pb.engine)
     }
 
     fun prebufferTransition(item: MediaItem, nextTrack: Track, automixPlan: AutomixPlan? = null) {
@@ -265,6 +287,7 @@ class Player {
 
                 val engine = AudioEngine()
                 lastEffectsState?.let { engine.applyEffects(it) }
+                lastEqualizerState?.let { engine.applyEqualizer(it) }
 
                 if (automixPlan != null && (automixPlan.tempoRatio != 1f || automixPlan.pitchRatio != 1f)) {
                     engine.setStretcherRatio(automixPlan.tempoRatio, automixPlan.pitchRatio)
@@ -392,6 +415,32 @@ class Player {
         eng.onReResolveUrl = null
     }
 
+    /** Starts a transition and returns its id. See [transitionId]. */
+    private fun beginTransition(): Long = synchronized(this) { ++transitionId }
+
+    /** Invalidates the transition in flight without starting another one. */
+    private fun invalidateTransition(): Long = synchronized(this) { ++transitionId }
+
+    private fun isCurrentTransition(id: Long): Boolean = transitionId == id
+
+    /** Releases an engine that no longer belongs to the active/fading pair. */
+    private fun releaseIfOrphaned(engine: AudioEngine?) {
+        if (engine == null) return
+        val orphan = synchronized(this) {
+            engine !== activeEngine && engine !== fadingEngine
+        }
+        if (orphan) stopAndRelease(engine)
+    }
+
+    private fun stopAndRelease(engine: AudioEngine?) {
+        if (engine == null) return
+        try {
+            engine.stop()
+            engine.release()
+        } catch (_: Exception) {
+        }
+    }
+
     fun addListener(l: Listener) { if (!listeners.contains(l)) listeners.add(l) }
     fun removeListener(l: Listener) { listeners.remove(l) }
 
@@ -400,15 +449,25 @@ class Player {
     }
 
     fun setMediaItem(item: MediaItem, startPositionMs: Long = 0L) {
-        releasePrebuffered()
+        // A direct load supersedes any crossfade. Invalidating first waits for a transition that
+        // is currently inside its engine-setup section, so it cannot start playing after us.
+        invalidateTransition()
         crossfadeJob?.cancel()
-        isCrossfadingOut = false
-        fadingEngine?.stop()
-        fadingEngine?.release()
-        fadingEngine = null
-        items.clear()
-        items.add(item)
-        currentIndex = 0
+        releasePrebuffered()
+        val previousFade = synchronized(this) {
+            isCrossfadingOut = false
+            AutomixManager.setIsAutomixing(false)
+            AutomixManager.clearPlan()
+            AutomixManager.setMixProgress(0f)
+            fadingEngine.also { fadingEngine = null }
+        }
+        stopAndRelease(previousFade)
+
+        synchronized(this) {
+            items.clear()
+            items.add(item)
+            currentIndex = 0
+        }
 
         val uriStr = item.uri
         val isDirectUrl = uriStr != null && (
@@ -454,61 +513,77 @@ class Player {
         crossfadeDurationMs: Long,
         automixPlan: AutomixPlan? = null
     ) {
-        items.clear()
-        items.add(item)
-        currentIndex = 0
-        
-        crossfadeJob?.cancel()
-        resolveJob?.cancel()
-        
-        fadingEngine?.stop()
-        fadingEngine?.release()
-        fadingEngine = null
+        val transition: Long
+        lateinit var oldEngine: AudioEngine
+        lateinit var newEngine: AudioEngine
+        var effectivePlan: AutomixPlan? = null
+        var isAdopted = false
+        var pre: PrebufferedTransition? = null
+        val enginesToRelease = mutableListOf<AudioEngine>()
 
-        val oldEngine = activeEngine
-        unbindEngine(oldEngine)
+        // Swap the state under the same monitor the transition setup uses. A superseded job can
+        // then either finish its setup before us (and we replace it) or see that its id is stale
+        // and never touch an engine at all; it can no longer start playback behind our back.
+        synchronized(this) {
+            transition = ++transitionId
+            crossfadeJob?.cancel()
+            resolveJob?.cancel()
 
-        val targetTrackId = item.track?.id
-        val isAdopted = prebufferedTransition != null && prebufferedTransition?.trackId == targetTrackId
-        val pre = if (isAdopted) prebufferedTransition else null
-        if (!isAdopted) {
-            // Skip during crossfade: the prebuffered engine was warmed up for a
-            // different track. Dropping the reference alone keeps its decoder, line
-            // and DSP state alive until GC (which never frees the native DSP handle) —
-            // stop+release it explicitly instead (issue #33 RAM drift).
-            prebufferedTransition?.let { pb ->
-                try {
-                    pb.engine.stop()
-                    pb.engine.release()
-                } catch (_: Exception) {}
+            items.clear()
+            items.add(item)
+            currentIndex = 0
+
+            // The previous fade is over the moment another transition begins.
+            fadingEngine?.let { enginesToRelease.add(it) }
+            fadingEngine = null
+
+            oldEngine = activeEngine
+            unbindEngine(oldEngine)
+
+            val targetTrackId = item.track?.id
+            pre = prebufferedTransition?.takeIf { it.trackId == targetTrackId }
+            isAdopted = pre != null
+            if (!isAdopted) {
+                // Skip during crossfade: the prebuffered engine was warmed up for a
+                // different track. Dropping the reference alone keeps its decoder, line
+                // and DSP state alive until GC (which never frees the native DSP handle) —
+                // stop+release it explicitly instead (issue #33 RAM drift).
+                prebufferedTransition?.let { enginesToRelease.add(it.engine) }
+            }
+            prebufferedTransition = null
+
+            newEngine = pre?.engine ?: AudioEngine()
+            effectivePlan = pre?.plan ?: automixPlan
+
+            bindEngine(newEngine)
+            activeEngine = newEngine
+            fadingEngine = oldEngine
+            isCrossfadingOut = true
+
+            // A superseded fade leaves these flags behind if only the old job is allowed to clear
+            // them. The transition that replaces it owns the state now, so reset the mix here.
+            AutomixManager.setMixProgress(0f)
+            AutomixManager.setMixBeatsLeft(null)
+            AutomixManager.setIsAutomixing(effectivePlan != null)
+            if (effectivePlan == null) AutomixManager.clearPlan()
+
+            if (!isAdopted) {
+                lastEffectsState?.let { newEngine.applyEffects(it) }
+                lastEqualizerState?.let { newEngine.applyEqualizer(it) }
+                if (effectivePlan != null && (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f)) {
+                    newEngine.setStretcherRatio(effectivePlan.tempoRatio, effectivePlan.pitchRatio)
+                }
             }
         }
-        prebufferedTransition = null
 
-        val newEngine = pre?.engine ?: AudioEngine()
-        val effectivePlan = pre?.plan ?: automixPlan
-
-        bindEngine(newEngine)
-        activeEngine = newEngine
-        fadingEngine = oldEngine
-        isCrossfadingOut = true
-
-        if (effectivePlan != null) {
-            AutomixManager.setIsAutomixing(true)
-        }
-
-        if (!isAdopted) {
-            lastEffectsState?.let { newEngine.applyEffects(it) }
-            if (effectivePlan != null && (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f)) {
-                newEngine.setStretcherRatio(effectivePlan.tempoRatio, effectivePlan.pitchRatio)
-            }
-        }
+        enginesToRelease.forEach(::stopAndRelease)
 
         listeners.forEach { it.onMediaItemTransition(currentMediaItem, MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED) }
 
-        val actualStartPos = if (isAdopted) (effectivePlan?.incomingStartMs ?: startPositionMs) else (effectivePlan?.incomingStartMs ?: startPositionMs)
+        val actualStartPos = effectivePlan?.incomingStartMs ?: startPositionMs
 
         startCrossfade(
+            transitionId = transition,
             newEngine = newEngine,
             oldEngine = oldEngine,
             item = item,
@@ -522,6 +597,7 @@ class Player {
     }
 
     private fun startCrossfade(
+        transitionId: Long,
         newEngine: AudioEngine,
         oldEngine: AudioEngine,
         item: MediaItem,
@@ -532,188 +608,253 @@ class Player {
         preUrl: String?,
         preHeaders: Map<String, String>?
     ) {
-        crossfadeJob = scope.launch {
-            try {
-                if (!isAdopted) {
-                    val rawUrl = item.uri?.takeIf {
-                        if (it.startsWith("metrofuse-deezer://")) true
-                        else if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it)
-                        else if (it.startsWith("file:")) runCatching { java.io.File(java.net.URI(it)).exists() }.getOrDefault(false)
-                        else java.io.File(it).exists()
-                    } ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
+        synchronized(this) {
+            // Do not let a superseded transition replace the job handle of the one that
+            // actually owns the engines: cancelling it later must cancel the live fade.
+            if (!isCurrentTransition(transitionId)) return
+            crossfadeJob = scope.launch {
+                try {
+                    if (!isAdopted) {
+                        val rawUrl = item.uri?.takeIf {
+                            if (it.startsWith("metrofuse-deezer://")) true
+                            else if (SignedUrl.isNetworkUrl(it)) !SignedUrl.isExpired(it)
+                            else if (it.startsWith("file:")) runCatching { java.io.File(java.net.URI(it)).exists() }.getOrDefault(false)
+                            else java.io.File(it).exists()
+                        } ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
 
-                    if (rawUrl == null) {
-                        oldEngine.stop()
-                        oldEngine.release()
-                        fadingEngine = null
-                        isCrossfadingOut = false
-                        listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
-                        return@launch
-                    }
-                    val url = if (rawUrl.startsWith("metrofuse-deezer://")) {
-                        com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProxy.getPlayableUrlFromDeezerUri(rawUrl)
-                    } else {
-                        rawUrl
-                    }
-                    val headers = buildHeaders(item.track)
+                        // The listener may have skipped while we were resolving. Do not stop or
+                        // start anything for a transition the player has already replaced.
+                        if (!isActive || !isCurrentTransition(transitionId)) return@launch
 
-                    val track = item.track
-                    if (track != null) {
-                        val cached = com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(track.id)
-                        if (cached != null) {
-                            newEngine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
+                        if (rawUrl == null) {
+                            synchronized(this@Player) {
+                                if (!isCurrentTransition(transitionId)) return@launch
+                                if (fadingEngine === oldEngine) fadingEngine = null
+                                oldEngine.stop()
+                                oldEngine.release()
+                                isCrossfadingOut = false
+                            }
+                            listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
+                            return@launch
+                        }
+                        val url = if (rawUrl.startsWith("metrofuse-deezer://")) {
+                            com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProxy.getPlayableUrlFromDeezerUri(rawUrl)
                         } else {
-                            newEngine.clearTrackLoudness()
-                            com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
-                                if (currentMediaItem?.track?.id == track.id) {
-                                    newEngine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                            rawUrl
+                        }
+                        val headers = buildHeaders(item.track)
+                        val track = item.track
+
+                        // Resolve the loudness before taking the transition lock: this is a database
+                        // read, and holding the lock across it would stall the next skip.
+                        val cachedLoudness = track?.let {
+                            com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(it.id)
+                        }
+
+                        synchronized(this@Player) {
+                            if (!isActive || !isCurrentTransition(transitionId)) return@launch
+                            // Defensive: only the transition that still owns this pair may use it.
+                            if (activeEngine !== newEngine || fadingEngine !== oldEngine) return@launch
+
+                            if (track != null) {
+                                if (cachedLoudness != null) {
+                                    newEngine.setTrackLoudness(cachedLoudness.integratedLufs, cachedLoudness.truePeakDb)
+                                } else {
+                                    newEngine.clearTrackLoudness()
+                                    com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
+                                        if (isCurrentTransition(transitionId) && currentMediaItem?.track?.id == track.id) {
+                                            newEngine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                                        }
+                                    }
+                                }
+                            } else {
+                                newEngine.clearTrackLoudness()
+                            }
+
+                            newEngine.setMediaItem(url, headers, startPositionMs, track?.id)
+                            newEngine.prepare()
+                        }
+                    }
+
+                    val targetVolume = volumeAmplitude
+                    synchronized(this@Player) {
+                        if (!isActive || !isCurrentTransition(transitionId)) return@launch
+                        if (activeEngine !== newEngine || fadingEngine !== oldEngine) return@launch
+                        newEngine.setVolume(0f)
+                        newEngine.setTrackGainDb(trackGainDb)
+
+                        if (playWhenReady) newEngine.play()
+                    }
+
+                    if (!isAdopted) {
+                        var waitCount = 0
+                        while (newEngine.state == AudioEngine.State.BUFFERING &&
+                            waitCount < 50 && isActive && isCurrentTransition(transitionId)
+                        ) {
+                            delay(100)
+                            waitCount++
+                        }
+                    }
+
+                    if (!isActive || !isCurrentTransition(transitionId) || fadingEngine !== oldEngine) return@launch
+
+                    val transitionDuration = effectivePlan?.overlapMs ?: crossfadeDurationMs
+                    var remainingMs = oldEngine.durationMs - oldEngine.positionMs
+                    if (remainingMs < 0) remainingMs = 0
+
+                    val actualCrossfadeMs = if (effectivePlan != null) {
+                        if (oldEngine.isPlaying) {
+                            if (remainingMs > 0 && remainingMs < transitionDuration) remainingMs.coerceAtLeast(1000L)
+                            else transitionDuration
+                        } else 0L
+                    } else if (oldEngine.isPlaying && remainingMs > 0 && remainingMs < transitionDuration) {
+                        remainingMs
+                    } else if (!oldEngine.isPlaying || remainingMs == 0L) {
+                        0L
+                    } else {
+                        transitionDuration
+                    }
+
+                    val bassDuckingEnabled = PlayerPreferences().getAutomixBassDuckingEnabled()
+
+                    if (actualCrossfadeMs <= 0L) {
+                        synchronized(this@Player) {
+                            if (!isCurrentTransition(transitionId)) return@launch
+                            newEngine.setVolume(targetVolume)
+                            if (fadingEngine === oldEngine) fadingEngine = null
+                            oldEngine.stop()
+                            oldEngine.release()
+                        }
+                        AutomixManager.setMixProgress(0f)
+                    } else {
+                        val steps = (actualCrossfadeMs / 15L).toInt().coerceIn(50, 800)
+                        val delayMs = (actualCrossfadeMs / steps).coerceAtLeast(5L)
+
+                        for (i in 0..steps) {
+                            if (!isActive || !isCurrentTransition(transitionId)) break
+                            if (fadingEngine !== oldEngine) break
+
+                            var bufferWait = 0
+                            while (!newEngine.isPlaying && isActive && isCurrentTransition(transitionId) &&
+                                newEngine.state == AudioEngine.State.BUFFERING && bufferWait < 50
+                            ) {
+                                delay(100)
+                                bufferWait++
+                            }
+                            // Paused mid-fade: hold the fade where it is, so it resumes rather than having finished
+                            // in silence.
+                            var pauseWait = 0
+                            while (!playWhenReady && isActive && isCurrentTransition(transitionId) && pauseWait < 600) {
+                                delay(50)
+                                pauseWait++
+                            }
+
+                            if (!isActive || !isCurrentTransition(transitionId) || fadingEngine !== oldEngine) break
+
+                            if (oldEngine.state == AudioEngine.State.ENDED || oldEngine.state == AudioEngine.State.IDLE) {
+                                newEngine.setVolume(targetVolume)
+                                break
+                            }
+
+                            val progress = i.toFloat() / steps
+                            val fadeOut = equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
+                            val fadeIn = equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
+
+                            // The artwork is lit by this, so the glow and the mix are the same event
+                            // rather than two things that usually happen together.
+                            AutomixManager.setMixProgress(progress)
+
+                            // Re-check ownership right before touching the engines. A second
+                            // crossfadeToMediaItem call may have run between the top-of-loop check
+                            // and here (the delay(100) / delay(50) above suspend). If so, the second
+                            // call has already released oldEngine (or claimed newEngine as its fading
+                            // engine) — calling setVolume on a released engine is a no-op (defensive
+                            // in AudioEngine), but racing setVolume on a newEngine that a second
+                            // crossfade has already claimed as its fadingEngine is audible as a brief
+                            // level jump (issue #76 audio glitch).
+                            if (!isActive || !isCurrentTransition(transitionId) || fadingEngine !== oldEngine) break
+
+                            newEngine.setVolume(targetVolume * fadeIn)
+                            oldEngine.setVolume(targetVolume * fadeOut)
+
+                            if (effectivePlan != null && bassDuckingEnabled) {
+                                oldEngine.setDuckMix(equalPowerIn(0.45f, 1f, progress))
+                                newEngine.setDuckMix(1f - equalPowerIn(0f, 0.55f, progress))
+                            }
+
+                            delay(delayMs)
+                        }
+                    }
+                } finally {
+                    val ownedNow = synchronized(this@Player) {
+                        if (!isCurrentTransition(transitionId)) {
+                            false
+                        } else {
+                            // The incoming engine is still ours: give it the full gain and retire the
+                            // outgoing one. Doing this under the transition lock keeps a skip that
+                            // lands at this exact moment from seeing half-cleared state.
+                            if (fadingEngine === oldEngine) {
+                                newEngine.setVolume(volumeAmplitude)
+                                fadingEngine = null
+                            }
+                            oldEngine.resetDuckMix()
+                            newEngine.resetDuckMix()
+                            try {
+                                oldEngine.setVolume(0f)
+                                oldEngine.stop()
+                                oldEngine.release()
+                            } catch (_: Exception) {
+                            }
+
+                            if (effectivePlan != null) {
+                                AutomixManager.setIsAutomixing(false)
+                                AutomixManager.clearPlan()
+
+                                if (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f) {
+                                    // Back to the track's own tempo and key, in steps too small to hear. Ten jumps of a
+                                    // fifth of a second each made the start of a mixed-in track warble, as if it were
+                                    // playing at a lower quality for its first seconds (issue #66).
+                                    scope.launch {
+                                        val startTempo = effectivePlan.tempoRatio
+                                        val startPitch = effectivePlan.pitchRatio
+                                        for (step in 1..STRETCH_RAMP_STEPS) {
+                                            delay(STRETCH_RAMP_STEP_MS)
+                                            if (!isActive || !isCurrentTransition(transitionId)) break
+                                            val frac = FastOutSlowInEasing.transform(step.toFloat() / STRETCH_RAMP_STEPS)
+                                            val curTempo = startTempo + frac * (1f - startTempo)
+                                            val curPitch = startPitch + frac * (1f - startPitch)
+                                            newEngine.setStretcherRatio(curTempo, curPitch)
+                                        }
+                                        if (isCurrentTransition(transitionId)) newEngine.setStretcherRatio(1f, 1f)
+                                    }
                                 }
                             }
+                            // Every exit from the loop above lands here, including a fade cut short or a track
+                            // that ended underneath it. Leaving the artwork lit for a mix that is over would be
+                            // worse than never lighting it.
+                            isCrossfadingOut = false
+                            AutomixManager.setMixProgress(0f)
+                            true
                         }
-                    } else {
-                        newEngine.clearTrackLoudness()
                     }
 
-                    newEngine.setMediaItem(url, headers, startPositionMs, track?.id)
-                    newEngine.prepare()
-                }
-
-                val targetVolume = volumeAmplitude
-                newEngine.setVolume(0f)
-                newEngine.setTrackGainDb(trackGainDb)
-
-                if (playWhenReady) newEngine.play()
-
-                if (!isAdopted) {
-                    var waitCount = 0
-                    while (newEngine.state == AudioEngine.State.BUFFERING && waitCount < 50 && isActive) {
-                        delay(100)
-                        waitCount++
-                    }
-                }
-
-                val transitionDuration = effectivePlan?.overlapMs ?: crossfadeDurationMs
-                var remainingMs = oldEngine.durationMs - oldEngine.positionMs
-                if (remainingMs < 0) remainingMs = 0
-
-                val actualCrossfadeMs = if (effectivePlan != null) {
-                    if (oldEngine.isPlaying) {
-                        if (remainingMs > 0 && remainingMs < transitionDuration) remainingMs.coerceAtLeast(1000L)
-                        else transitionDuration
-                    } else 0L
-                } else if (oldEngine.isPlaying && remainingMs > 0 && remainingMs < transitionDuration) {
-                    remainingMs
-                } else if (!oldEngine.isPlaying || remainingMs == 0L) {
-                    0L
-                } else {
-                    transitionDuration
-                }
-
-                val bassDuckingEnabled = PlayerPreferences().getAutomixBassDuckingEnabled()
-
-                if (actualCrossfadeMs <= 0L) {
-                    newEngine.setVolume(targetVolume)
-                    oldEngine.stop()
-                    oldEngine.release()
-                    AutomixManager.setMixProgress(0f)
-                } else {
-                    val steps = (actualCrossfadeMs / 15L).toInt().coerceIn(50, 800)
-                    val delayMs = (actualCrossfadeMs / steps).coerceAtLeast(5L)
-
-                    for (i in 0..steps) {
-                        if (fadingEngine != oldEngine) break
-                        if (!isActive) break
-
-                        var bufferWait = 0
-                        while (!newEngine.isPlaying && isActive && newEngine.state == AudioEngine.State.BUFFERING && bufferWait < 50) {
-                            delay(100)
-                            bufferWait++
-                        }
-                        // Paused mid-fade: hold the fade where it is, so it resumes rather than having finished
-                        // in silence.
-                        var pauseWait = 0
-                        while (!playWhenReady && isActive && pauseWait < 600) {
-                            delay(50)
-                            pauseWait++
-                        }
-
-                        if (oldEngine.state == AudioEngine.State.ENDED || oldEngine.state == AudioEngine.State.IDLE) {
-                            newEngine.setVolume(targetVolume)
-                            break
-                        }
-
-                        val progress = i.toFloat() / steps
-                        val fadeOut = equalPowerOut(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
-                        val fadeIn = equalPowerIn(CROSSFADE_SPAN_START, CROSSFADE_SPAN_END, progress)
-
-                        // The artwork is lit by this, so the glow and the mix are the same event
-                        // rather than two things that usually happen together.
-                        AutomixManager.setMixProgress(progress)
-
-                        // Re-check ownership right before touching the engines. A second
-                        // crossfadeToMediaItem call may have run between the top-of-loop check
-                        // and here (the delay(100) / delay(50) above suspend). If so, the second
-                        // call has already released oldEngine (or claimed newEngine as its fading
-                        // engine) — calling setVolume on a released engine is a no-op (defensive
-                        // in AudioEngine), but racing setVolume on a newEngine that a second
-                        // crossfade has already claimed as its fadingEngine is audible as a brief
-                        // level jump (issue #76 audio glitch).
-                        if (!isActive || fadingEngine !== oldEngine) break
-
-                        newEngine.setVolume(targetVolume * fadeIn)
-                        oldEngine.setVolume(targetVolume * fadeOut)
-
-                        if (effectivePlan != null && bassDuckingEnabled) {
-                            oldEngine.setDuckMix(equalPowerIn(0.45f, 1f, progress))
-                            newEngine.setDuckMix(1f - equalPowerIn(0f, 0.55f, progress))
-                        }
-
-                        delay(delayMs)
-                    }
-                }
-            } finally {
-                isCrossfadingOut = false
-                try {
-                    if (fadingEngine == oldEngine) {
-                        newEngine.setVolume(volumeAmplitude)
-                        oldEngine.setVolume(0f)
-                        oldEngine.stop()
-                        oldEngine.release()
-                        fadingEngine = null
-                    }
-                } catch (_: Exception) {}
-
-                oldEngine.resetDuckMix()
-                newEngine.resetDuckMix()
-
-                if (effectivePlan != null) {
-                    AutomixManager.setIsAutomixing(false)
-                    AutomixManager.clearPlan()
-
-                    if (effectivePlan.tempoRatio != 1f || effectivePlan.pitchRatio != 1f) {
-                        // Back to the track's own tempo and key, in steps too small to hear. Ten jumps of a
-                        // fifth of a second each made the start of a mixed-in track warble, as if it were
-                        // playing at a lower quality for its first seconds (issue #66).
-                        scope.launch {
-                            val startTempo = effectivePlan.tempoRatio
-                            val startPitch = effectivePlan.pitchRatio
-                            for (step in 1..STRETCH_RAMP_STEPS) {
-                                delay(STRETCH_RAMP_STEP_MS)
-                                if (!isActive) break
-                                val frac = FastOutSlowInEasing.transform(step.toFloat() / STRETCH_RAMP_STEPS)
-                                val curTempo = startTempo + frac * (1f - startTempo)
-                                val curPitch = startPitch + frac * (1f - startPitch)
-                                newEngine.setStretcherRatio(curTempo, curPitch)
+                    if (!ownedNow) {
+                        // A newer transition owns the active/fading pair now, or this transition was cancelled.
+                        // Since this transition's coroutine is exiting, oldEngine has no coroutine fading it out
+                        // anymore. If it is still fadingEngine or not active, stop and release it so it cannot
+                        // decode in the background at full volume (issue #95).
+                        val toRelease = mutableListOf<AudioEngine>()
+                        synchronized(this@Player) {
+                            if (fadingEngine === oldEngine) {
+                                fadingEngine = null
+                                isCrossfadingOut = false
                             }
-                            newEngine.setStretcherRatio(1f, 1f)
+                            if (activeEngine !== oldEngine) toRelease.add(oldEngine)
+                            if (activeEngine !== newEngine) toRelease.add(newEngine)
                         }
+                        toRelease.forEach(::stopAndRelease)
                     }
                 }
-                isCrossfadingOut = false
-                // Every exit from the loop above lands here, including a fade cut short or a track
-                // that ended underneath it. Leaving the artwork lit for a mix that is over would be
-                // worse than never lighting it.
-                AutomixManager.setMixProgress(0f)
             }
         }
     }
@@ -726,23 +867,56 @@ class Player {
 
     fun play() { playWhenReady = true }
     fun pause() { playWhenReady = false }
+
+    /**
+     * Aborts any crossfade in flight, stopping and releasing the outgoing deck immediately,
+     * resetting mix progress, and restoring full volume to [activeEngine].
+     */
+    fun cancelCrossfade() {
+        val enginesToRelease = mutableListOf<AudioEngine>()
+        synchronized(this) {
+            invalidateTransition()
+            crossfadeJob?.cancel()
+            crossfadeJob = null
+            resolveJob?.cancel()
+            resolveJob = null
+            releasePrebuffered()
+            isCrossfadingOut = false
+            AutomixManager.setMixProgress(0f)
+            AutomixManager.setIsAutomixing(false)
+            AutomixManager.clearPlan()
+            activeEngine.setVolume(volumeAmplitude)
+            fadingEngine?.let { enginesToRelease.add(it) }
+            fadingEngine = null
+        }
+        enginesToRelease.forEach(::stopAndRelease)
+    }
+
     fun stop() {
+        // Invalidate first: a transition inside its setup section is allowed to finish before
+        // this returns, and its stale finally cannot mistake itself for the current owner.
+        invalidateTransition()
         crossfadeJob?.cancel()
         resolveJob?.cancel()
         releasePrebuffered()
-        isCrossfadingOut = false
-        fadingEngine?.stop()
-        fadingEngine?.release()
-        fadingEngine = null
+        val previousFade = synchronized(this) {
+            isCrossfadingOut = false
+            fadingEngine.also { fadingEngine = null }
+        }
+        stopAndRelease(previousFade)
         activeEngine.stop()
     }
+
     fun release() {
+        invalidateTransition()
         crossfadeJob?.cancel()
         resolveJob?.cancel()
         releasePrebuffered()
-        isCrossfadingOut = false
-        fadingEngine?.release()
-        fadingEngine = null
+        val previousFade = synchronized(this) {
+            isCrossfadingOut = false
+            fadingEngine.also { fadingEngine = null }
+        }
+        stopAndRelease(previousFade)
         activeEngine.release()
     }
 
@@ -762,7 +936,18 @@ class Player {
 
     private fun loadCurrent(startPositionMs: Long, isCrossfade: Boolean, crossfadeDurationMs: Long) {
         val item = currentMediaItem ?: return
+        val transition = beginTransition()
+        crossfadeJob?.cancel()
         resolveJob?.cancel()
+
+        // A direct load to an index is not a mix: retire any outgoing fade immediately rather
+        // than leaving both tracks audible until the new URL has resolved.
+        val previousFade = synchronized(this) {
+            isCrossfadingOut = false
+            fadingEngine.also { fadingEngine = null }
+        }
+        stopAndRelease(previousFade)
+
         resolveJob = scope.launch {
             val rawUrl = item.uri?.takeIf {
                 if (it.startsWith("metrofuse-deezer://")) true
@@ -771,11 +956,15 @@ class Player {
                 else java.io.File(it).exists()
             }
                 ?: item.track?.let { withContext(Dispatchers.IO) { StreamResolver.resolveStream(it) } }
+            if (!isActive || !isCurrentTransition(transition)) return@launch
             if (rawUrl == null) {
-                activeEngine.stop()
-                fadingEngine?.stop()
-                fadingEngine?.release()
-                fadingEngine = null
+                synchronized(this@Player) {
+                    if (!isCurrentTransition(transition)) return@launch
+                    activeEngine.stop()
+                    fadingEngine?.stop()
+                    fadingEngine?.release()
+                    fadingEngine = null
+                }
                 listeners.forEach { it.onPlaybackStateChanged(STATE_ENDED) }
                 return@launch
             }
@@ -785,38 +974,49 @@ class Player {
                 rawUrl
             }
             val headers = buildHeaders(item.track)
-            
+
             val track = item.track
-            if (track != null) {
-                val cached = com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(track.id)
-                if (cached != null) {
-                    activeEngine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
-                } else {
-                    activeEngine.clearTrackLoudness()
-                    com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
-                        if (currentMediaItem?.track?.id == track.id) {
-                            activeEngine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+            // Leave the database read outside the transition lock so a quick skip never waits
+            // behind it; the ownership check happens again below, before anything is touched.
+            val cached = track?.let {
+                com.alananasss.kittytune.data.TrackLoudnessRepository.getLoudness(it.id)
+            }
+            if (!isActive || !isCurrentTransition(transition)) return@launch
+
+            synchronized(this@Player) {
+                if (!isCurrentTransition(transition)) return@launch
+                val engine = activeEngine
+
+                if (track != null) {
+                    if (cached != null) {
+                        engine.setTrackLoudness(cached.integratedLufs, cached.truePeakDb)
+                    } else {
+                        engine.clearTrackLoudness()
+                        com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
+                            if (isCurrentTransition(transition) && currentMediaItem?.track?.id == track.id) {
+                                engine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                            }
                         }
                     }
+                } else {
+                    engine.clearTrackLoudness()
                 }
-            } else {
-                activeEngine.clearTrackLoudness()
-            }
 
-            fadingEngine?.stop()
-            fadingEngine?.release()
-            fadingEngine = null
-            
-            activeEngine.setVolume(volumeAmplitude)
-            activeEngine.setTrackGainDb(trackGainDb)
-            if (activeEngine.currentUrl != url) {
-                activeEngine.setMediaItem(url, headers, startPositionMs, currentMediaItem?.track?.id)
-                activeEngine.prepare()
-                if (playWhenReady) activeEngine.play()
-            } else {
-                if (activeEngine.state == AudioEngine.State.IDLE) {
-                    activeEngine.prepare()
-                    if (playWhenReady) activeEngine.play()
+                fadingEngine?.stop()
+                fadingEngine?.release()
+                fadingEngine = null
+
+                engine.setVolume(volumeAmplitude)
+                engine.setTrackGainDb(trackGainDb)
+                if (engine.currentUrl != url) {
+                    engine.setMediaItem(url, headers, startPositionMs, currentMediaItem?.track?.id)
+                    engine.prepare()
+                    if (playWhenReady) engine.play()
+                } else {
+                    if (engine.state == AudioEngine.State.IDLE) {
+                        engine.prepare()
+                        if (playWhenReady) engine.play()
+                    }
                 }
             }
         }
@@ -836,6 +1036,12 @@ class Player {
         lastEffectsState = state
         activeEngine.applyEffects(state)
         fadingEngine?.applyEffects(state)
+    }
+
+    fun applyEqualizer(state: EqualizerState) {
+        lastEqualizerState = state
+        activeEngine.applyEqualizer(state)
+        fadingEngine?.applyEqualizer(state)
     }
 
     fun onKaraokeStemReady(trackId: Long) {

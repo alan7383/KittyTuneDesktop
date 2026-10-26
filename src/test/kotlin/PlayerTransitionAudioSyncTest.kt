@@ -106,4 +106,34 @@ class PlayerTransitionAudioSyncTest {
 
         player.release()
     }
+
+    @Test
+    fun testCancelCrossfadeSilencesAndReleasesFadingEngineImmediately() {
+        val player = Player()
+        val item1 = MediaItem.Builder().setMediaId("1").setUri("https://example.com/1.mp3").build()
+        val item2 = MediaItem.Builder().setMediaId("2").setUri("https://example.com/2.mp3").build()
+
+        player.setMediaItem(item1)
+        player.crossfadeToMediaItem(item2, 0L, 5000L)
+        assertTrue("isCrossfadingOut must be true during active crossfade", player.isCrossfadingOut)
+
+        // Cancel crossfade must synchronously tear down fading deck and clear flag
+        player.cancelCrossfade()
+        assertFalse("isCrossfadingOut must be reset after cancelCrossfade()", player.isCrossfadingOut)
+        assertEquals(player.volume, player.activeEngine.getVolume(), 0.01f)
+
+        player.release()
+    }
+
+    @Test
+    fun testRapidCrossfadeRequestsDoNotLeaveDanglingEngines() {
+        val player = Player()
+        for (i in 1..10) {
+            val item = MediaItem.Builder().setMediaId(i.toString()).setUri("https://example.com/$i.mp3").build()
+            player.crossfadeToMediaItem(item, 0L, 3000L)
+        }
+        player.cancelCrossfade()
+        assertFalse(player.isCrossfadingOut)
+        player.release()
+    }
 }
