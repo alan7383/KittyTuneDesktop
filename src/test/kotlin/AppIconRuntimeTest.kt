@@ -73,4 +73,28 @@ class AppIconRuntimeTest {
         val blackPainter = AppIconRuntime.loadTrayPainter("black")
         assertNotNull(blackPainter, "Black variant tray icon should load successfully")
     }
+
+    @Test
+    fun appIconVariants_orderingAndCommunityParity() {
+        assertEquals(14, AppIconVariants.COLORED.size)
+        assertEquals(48, AppIconVariants.COUNTRIES.size)
+        assertEquals(62, AppIconVariants.OFFICIAL.size)
+        assertEquals(8, AppIconVariants.COMMUNITY.size)
+        assertEquals(70, AppIconVariants.ALL.size)
+
+        // Colored must be first, followed by countries in OFFICIAL
+        assertEquals(AppIconVariants.COLORED + AppIconVariants.COUNTRIES, AppIconVariants.OFFICIAL)
+
+        // All community variants must have author "shiro" and isCommunity = true
+        for (v in AppIconVariants.COMMUNITY) {
+            assertTrue(v.isCommunity, "${v.key} should have isCommunity = true")
+            assertEquals("shiro", v.author, "${v.key} should have author 'shiro'")
+            assertTrue(AppIconVariants.hasResource(v.key), "${v.key} should have resource file")
+            assertNotNull(AppIconRuntime.loadTrayPainter(v.key), "${v.key} tray icon painter should load")
+        }
+
+        // Check that available community list contains all 8
+        assertEquals(8, AppIconVariants.AVAILABLE_COMMUNITY.size)
+        assertEquals(62, AppIconVariants.AVAILABLE_OFFICIAL.size)
+    }
 }
