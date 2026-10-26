@@ -255,14 +255,37 @@ fun PlayerBar(
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     val deviceLabel = vm.playbackDeviceLabel
-                                    if (deviceLabel != null) Text(
-                                        text = deviceLabel,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false),
-                                    ) else ArtistLinkText(
+                                    if (deviceLabel != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .clickable { onOpenDevices() }
+                                                .padding(end = 6.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.Devices,
+                                                null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Spacer(Modifier.width(3.dp))
+                                            Text(
+                                                text = deviceLabel,
+                                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                                color = MaterialTheme.colorScheme.primary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                text = "·",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                    ArtistLinkText(
                                         track = track,
                                         onArtistClick = { vm.navigateToTrackArtist(it) },
                                         text = track.displayArtist.ifBlank { track.user?.username.orEmpty() },
@@ -553,7 +576,7 @@ fun PlayerBar(
                             Icon(
                                 Icons.Rounded.Devices,
                                 contentDescription = str("connect_devices"),
-                                tint = if (isDevicesOpen) MaterialTheme.colorScheme.primary
+                                tint = if (isDevicesOpen || vm.isRemotePlayback) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp),
                             )

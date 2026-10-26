@@ -386,12 +386,15 @@ fun PlaylistDetailScreen(
         .replace("deezer:album:", "")
         .replace("deezer:playlist:", "")
         .replace("deezer:artist:", "")
+        .replace("deezer_radio:", "")
         .replace("tidal:album:", "")
         .replace("tidal:playlist:", "")
         .replace("tidal:artist:", "")
+        .replace("tidal_radio:", "")
         .replace("qobuz:album:", "")
         .replace("qobuz:playlist:", "")
         .replace("qobuz:artist:", "")
+        .replace("qobuz_radio:", "")
         .replace("station:", "")
         .replace("liked_by:", "")
         .replace("local_playlist:", "")
@@ -406,6 +409,9 @@ fun PlaylistDetailScreen(
     val radioRoutePermalink = remember(playlistId, isSpotifyRadioRoute) {
         when {
             playlistId.startsWith("yt_radio:") -> playlistId
+            playlistId.startsWith("tidal_radio:") -> playlistId
+            playlistId.startsWith("deezer_radio:") -> playlistId
+            playlistId.startsWith("qobuz_radio:") -> playlistId
             isSpotifyRadioRoute -> {
                 val seed = com.alananasss.kittytune.data.spotify.SpotifyRepository.extractId(playlistId)
                 seed.takeIf { it.isNotBlank() }?.let { "spotify_radio:$it" }
@@ -860,6 +866,9 @@ fun PlaylistDetailScreen(
                     val isTidalAlbum = playlistId.startsWith("tidal:album:")
                     val isTidalPlaylist = playlistId.startsWith("tidal:playlist:")
                     val isTidalArtist = playlistId.startsWith("tidal:artist:")
+                    val isTidalRadio = playlistId.startsWith("tidal_radio:")
+                    val isDeezerRadio = playlistId.startsWith("deezer_radio:")
+                    val isQobuzRadio = playlistId.startsWith("qobuz_radio:")
 
                     if (isTidalAlbum) {
                         val pl = com.alananasss.kittytune.data.tidal.TidalSearchRepository.getAlbum(cleanIdStr)
@@ -895,6 +904,69 @@ fun PlaylistDetailScreen(
                             playlistPermalinkUrl = pl.permalinkUrl
                             playlistUrn = pl.urn
                             newTracks.addAll(pl.tracks ?: emptyList())
+                        }
+                    } else if (isTidalRadio) {
+                        // TIDAL builds a radio around the seed itself: the seed, then
+                        // the tracks it considers close. The route keeps the seed id
+                        // so the same radio can be reopened from the library.
+                        val radioTracks = com.alananasss.kittytune.data.tidal.TidalSearchRepository.getRadio(cleanIdStr)
+                        // TIDAL refuses to build a radio for some tracks; showing the
+                        // track itself beats an empty screen.
+                        val radio = radioTracks.ifEmpty {
+                            listOfNotNull(com.alananasss.kittytune.data.tidal.TidalSearchRepository.getTrack(cleanIdStr))
+                        }
+                        if (radio.isNotEmpty()) {
+                            val seed = radio.first()
+                            isAlbum = false
+                            playlistTitle = str("tidal_radio_title", seed.title ?: "")
+                            playlistCover = seed.artworkUrl
+                            defaultIcon = Icons.Rounded.Radio
+                            playlistUser = User(
+                                id = kotlin.math.abs("TIDAL".hashCode().toLong()),
+                                username = "TIDAL",
+                                avatarUrl = seed.artworkUrl
+                            )
+                            playlistPermalinkUrl = "https://tidal.com/browse/track/$cleanIdStr"
+                            playlistUrn = "tidal_radio:$cleanIdStr"
+                            newTracks.addAll(radio)
+                        }
+                    } else if (isDeezerRadio) {
+                        // Deezer's own artist radio: a station around the artist,
+                        // not just their greatest hits.
+                        val radioTracks = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.getRadio(cleanIdStr)
+                        if (radioTracks.isNotEmpty()) {
+                            val seed = radioTracks.first()
+                            isAlbum = false
+                            playlistTitle = str("deezer_radio_title", seed.user?.username ?: "Deezer")
+                            playlistCover = seed.artworkUrl
+                            defaultIcon = Icons.Rounded.Radio
+                            playlistUser = User(
+                                id = seed.user?.id ?: 0L,
+                                username = seed.user?.username ?: "Deezer",
+                                avatarUrl = seed.user?.avatarUrl
+                            )
+                            playlistPermalinkUrl = "https://www.deezer.com/artist/$cleanIdStr"
+                            playlistUrn = "deezer_radio:$cleanIdStr"
+                            newTracks.addAll(radioTracks)
+                        }
+                    } else if (isQobuzRadio) {
+                        // A Qobuz station around the seed: the album it belongs to,
+                        // the artist, and the artists Qobuz lists as similar.
+                        val radioTracks = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getRadio(cleanIdStr)
+                        if (radioTracks.isNotEmpty()) {
+                            val seed = radioTracks.first()
+                            isAlbum = false
+                            playlistTitle = str("qobuz_radio_title", seed.title ?: "")
+                            playlistCover = seed.artworkUrl
+                            defaultIcon = Icons.Rounded.Radio
+                            playlistUser = User(
+                                id = seed.user?.id ?: 0L,
+                                username = seed.user?.username ?: "Qobuz",
+                                avatarUrl = seed.user?.avatarUrl
+                            )
+                            playlistPermalinkUrl = "https://open.qobuz.com/track/$cleanIdStr"
+                            playlistUrn = "qobuz_radio:$cleanIdStr"
+                            newTracks.addAll(radioTracks)
                         }
                     }
                 }
