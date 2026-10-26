@@ -2863,4 +2863,16 @@
     <string name="icon_name_shiro_kt_logo">KT Logo</string>
     <string name="icon_name_shiro_cozy_nap">Gemütliche Katze</string>
     <string name="icon_name_shiro_cool_cat">Coole Katze</string>
+    <string name="theme_preset_accents_title">Kuratierte Vorlagen</string>
+    <string name="theme_preset_accents_subtitle">Harmonische, gebrauchsfertige Farbwerte</string>
+    <string name="color_palette_system_dynamic">System Dynamisch</string>
+    <string name="color_hex_copied">Hex-Code kopiert</string>
+    <string name="color_hint_muted">Gedämpft</string>
+    <string name="color_hint_balanced">Ausgewogen</string>
+    <string name="color_hint_vivid">Lebendig</string>
+    <string name="color_hint_dark">Dunkel</string>
+    <string name="color_hint_default">Standard</string>
+    <string name="color_hint_bright">Hell</string>
+    <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
+    <string name="color_spec_2021_label">SPEC 2021 (Legacy)</string>
 </resources>

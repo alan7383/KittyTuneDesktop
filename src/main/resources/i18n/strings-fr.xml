@@ -2645,4 +2645,16 @@
     <string name="icon_name_shiro_kt_logo">Logo KT</string>
     <string name="icon_name_shiro_cozy_nap">Sieste cozy</string>
     <string name="icon_name_shiro_cool_cat">Chat stylé</string>
+    <string name="theme_preset_accents_title">Nuances recommandées</string>
+    <string name="theme_preset_accents_subtitle">Sélections coordonnées prêtes à l'emploi</string>
+    <string name="color_palette_system_dynamic">Dynamique Système</string>
+    <string name="color_hex_copied">Code hex copié</string>
+    <string name="color_hint_muted">Atténué</string>
+    <string name="color_hint_balanced">Équilibré</string>
+    <string name="color_hint_vivid">Vif</string>
+    <string name="color_hint_dark">Sombre</string>
+    <string name="color_hint_default">Défaut</string>
+    <string name="color_hint_bright">Lumineux</string>
+    <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
+    <string name="color_spec_2021_label">SPEC 2021 (Héritée)</string>
 </resources>

@@ -2644,4 +2644,16 @@
     <string name="icon_name_shiro_kt_logo">KT Logo</string>
     <string name="icon_name_shiro_cozy_nap">Cozy Tune</string>
     <string name="icon_name_shiro_cool_cat">Cool Cat</string>
+    <string name="theme_preset_accents_title">Curated Presets</string>
+    <string name="theme_preset_accents_subtitle">Harmonious ready-to-use color seeds</string>
+    <string name="color_palette_system_dynamic">System Dynamic</string>
+    <string name="color_hex_copied">Hex code copied</string>
+    <string name="color_hint_muted">Muted</string>
+    <string name="color_hint_balanced">Balanced</string>
+    <string name="color_hint_vivid">Vivid</string>
+    <string name="color_hint_dark">Dark</string>
+    <string name="color_hint_default">Default</string>
+    <string name="color_hint_bright">Bright</string>
+    <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
+    <string name="color_spec_2021_label">SPEC 2021 (Legacy)</string>
 </resources>
