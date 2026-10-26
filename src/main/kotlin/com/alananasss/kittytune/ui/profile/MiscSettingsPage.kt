@@ -5,6 +5,7 @@ import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.Translate
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.runtime.*
 import androidx.navigation.NavController
 import com.alananasss.kittytune.core.Strings
@@ -33,6 +34,7 @@ fun MiscGeneralPage() {
     var appLanguage by remember { mutableStateOf(prefs.getAppLanguage()) }
     var startDestination by remember { mutableStateOf(prefs.getStartDestination()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
+    var verifiedFilterEnabled by remember { mutableStateOf(prefs.getVerifiedFilterEnabled()) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showStartDialog by remember { mutableStateOf(false) }
 
@@ -110,6 +112,21 @@ fun MiscGeneralPage() {
                         prefs.setAutoUpdateEnabled(it)
                     },
                     highlightKey = "pref_auto_update",
+                )
+            },
+            { shape ->
+                SettingsItem(
+                    shape = shape,
+                    title = str("pref_verified_filter"),
+                    subtitle = str("pref_verified_filter_sub"),
+                    icon = Icons.Rounded.Verified,
+                    hasSwitch = true,
+                    switchState = verifiedFilterEnabled,
+                    onSwitchChange = {
+                        verifiedFilterEnabled = it
+                        prefs.setVerifiedFilterEnabled(it)
+                    },
+                    highlightKey = "pref_verified_filter",
                 )
             },
         ),

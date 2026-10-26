@@ -14,6 +14,10 @@ import com.alananasss.kittytune.data.LikeRepository
 import com.alananasss.kittytune.data.RecentSearchRepository
 import com.alananasss.kittytune.data.SearchCategory
 import com.alananasss.kittytune.data.TokenManager
+import com.alananasss.kittytune.data.search.ProviderLinks
+import com.alananasss.kittytune.data.search.TrackVerification
+import com.alananasss.kittytune.data.search.TrackVerifier
+import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.local.HistoryItem
 import com.alananasss.kittytune.data.network.RetrofitClient
 import com.alananasss.kittytune.domain.Playlist
@@ -103,6 +107,7 @@ import com.alananasss.kittytune.utils.Logger
     class HomeViewModel(application: Application) : AndroidViewModel(application) {
         private val api = RetrofitClient.create()
         private val prefs = com.alananasss.kittytune.core.NamedPrefs("home_cache")
+        private val playerPrefs = PlayerPreferences()
         private val gson = Gson()
         private val tokenManager = TokenManager
     
@@ -125,6 +130,24 @@ import com.alananasss.kittytune.utils.Logger
         var activeFilter by mutableStateOf(SearchFilter.ALL)
         var isSearchLoading by mutableStateOf(false)
         var activeSearchSource by mutableStateOf(SearchSource.SOUNDCLOUD)
+
+        /**
+         * Master switch for the Verified filter, set in Settings. Off by default: comparing against
+         * four catalogues is extra network work, so it stays out of search unless enabled.
+         */
+        var verifiedFilterEnabled by mutableStateOf(playerPrefs.getVerifiedFilterEnabled())
+            private set
+
+        /** Whether the current search is applying the Verified filter. */
+        var verifiedOnly by mutableStateOf(verifiedFilterEnabled)
+            private set
+
+        /** Source-scoped identity of the rows the verifier could fully confirm. */
+        var verifiedTrackKeys by mutableStateOf<Set<String>>(emptySet())
+            private set
+
+        var trackVerificationStatus by mutableStateOf(TrackVerification.Status.IDLE)
+            private set
 
         /**
          * "All": every source the reader has switched on is asked at once, and the results come back grouped by source
@@ -408,6 +431,23 @@ import com.alananasss.kittytune.utils.Logger
         }
 
         init {
+            viewModelScope.launch {
+                playerPrefs.verifiedFilterEnabledFlow().collect { enabled ->
+                    val changed = verifiedFilterEnabled != enabled
+                    verifiedFilterEnabled = enabled
+                    if (!enabled) {
+                        verifiedOnly = false
+                        verifiedTrackKeys = emptySet()
+                        trackVerificationStatus = TrackVerification.Status.IDLE
+                    } else if (changed) {
+                        verifiedOnly = true
+                    }
+                    if (changed && searchQuery.isNotBlank()) {
+                        searchJob?.cancel()
+                        searchJob = viewModelScope.launch { performSearch(searchQuery) }
+                    }
+                }
+            }
             loadFromCache()
             if (isOfflineMode) {
                 isLoading = false
@@ -443,6 +483,7 @@ import com.alananasss.kittytune.utils.Logger
             val isSpotifyUrl = trimmed.contains("open.spotify.com") || trimmed.contains("spotify.link") ||
                     trimmed.startsWith("spotify:") || trimmed.startsWith("spotify_") || trimmed.startsWith("station_spotify:")
             val isYoutubeUrl = trimmed.contains("youtube.com") || trimmed.contains("youtu.be") || trimmed.startsWith("yt_radio:")
+            val isProviderUrl = ProviderLinks.looksLikeProviderUrl(trimmed)
 
             if (isSoundCloudUrl) {
                 handleSoundCloudUrl(trimmed)
@@ -450,6 +491,8 @@ import com.alananasss.kittytune.utils.Logger
                 handleSpotifyUrl(trimmed)
             } else if (isYoutubeUrl) {
                 handleYoutubeUrl(trimmed)
+            } else if (isProviderUrl) {
+                handleProviderUrl(trimmed)
             } else {
                 if (trimmed.isBlank()) {
                     clearSearchResults()
@@ -567,6 +610,58 @@ import com.alananasss.kittytune.utils.Logger
             }
         }
 
+        /**
+         * Pasted Qobuz/Tidal/Deezer links point at an exact object. Resolve the id
+         * instead of sending the URL through text search, which is what made a
+         * pasted link return an arbitrary page of songs.
+         *
+         * When the link cannot be resolved the search stays empty on purpose: a
+         * provider link is not a title, so searching for its text would only
+         * produce something unrelated.
+         */
+        private fun handleProviderUrl(url: String) {
+            isSearchLoading = true
+            clearSearchResults()
+            viewModelScope.launch {
+                try {
+                    var processedUrl = url
+                    var link = ProviderLinks.parse(processedUrl)
+                    if (link == null && ProviderLinks.isShortLink(processedUrl)) {
+                        processedUrl = unshortenUrl(processedUrl)
+                        link = ProviderLinks.parse(processedUrl)
+                    }
+                    if (link == null) return@launch
+
+                    when (link.kind) {
+                        ProviderLinks.Kind.TRACK -> {
+                            val track = withContext(Dispatchers.IO) {
+                                when (link.provider) {
+                                    ProviderLinks.Provider.DEEZER ->
+                                        com.alananasss.kittytune.data.deezer.DeezerSearchRepository.getTrack(link.id)
+                                    ProviderLinks.Provider.TIDAL ->
+                                        com.alananasss.kittytune.data.tidal.TidalSearchRepository.getTrack(link.id)
+                                    ProviderLinks.Provider.QOBUZ ->
+                                        com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getTrack(link.id)
+                                }
+                            }
+                            if (track != null) {
+                                _playTrack.emit(track)
+                                clearSearch()
+                            }
+                        }
+                        else -> {
+                            _navigateTo.emit(link.urn)
+                            clearSearch()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    isSearchLoading = false
+                }
+            }
+        }
+
         private fun handleSpotifyUrl(url: String) {
             isSearchLoading = true
             clearSearchResults()
@@ -644,9 +739,36 @@ import com.alananasss.kittytune.utils.Logger
         }
     
         var searchTrigger by mutableStateOf(0)
-        fun activateSearch() { isSearching = true; searchTrigger++ }
-        fun clearSearch() { searchQuery = ""; isSearching = false; clearSearchResults() }
+        fun activateSearch() {
+            isSearching = true
+            verifiedOnly = verifiedFilterEnabled
+            searchTrigger++
+        }
+        fun clearSearch() {
+            searchQuery = ""
+            isSearching = false
+            verifiedOnly = verifiedFilterEnabled
+            clearSearchResults()
+        }
         fun onFilterChanged(filter: SearchFilter) { activeFilter = filter; if (searchQuery.isNotBlank()) { searchJob?.cancel(); searchJob = viewModelScope.launch { performSearch(searchQuery) } } }
+
+        /** Whether [track] may show the verified badge in the current result list. */
+        fun isVerifiedMatch(track: Track): Boolean =
+            verifiedFilterEnabled && verifiedOnly && TrackVerification.keyOf(track) in verifiedTrackKeys
+
+        /** Toggles the Verified filter for the current search; the feature must be enabled in Settings. */
+        fun onVerifiedFilterChanged(enabled: Boolean) {
+            if (!verifiedFilterEnabled || verifiedOnly == enabled) return
+            verifiedOnly = enabled
+            if (!enabled) {
+                verifiedTrackKeys = emptySet()
+                trackVerificationStatus = TrackVerification.Status.IDLE
+            }
+            if (searchQuery.isNotBlank()) {
+                searchJob?.cancel()
+                searchJob = viewModelScope.launch { performSearch(searchQuery) }
+            }
+        }
     
         fun onSearchSourceChanged(source: SearchSource) {
             if (activeSearchSource == source && !searchAllPlatforms) return
@@ -666,6 +788,8 @@ import com.alananasss.kittytune.utils.Logger
             searchResultsTidalTracks.clear(); searchResultsTidalAlbums.clear(); searchResultsTidalPlaylists.clear(); searchResultsTidalArtists.clear()
             searchResultsQobuzTracks.clear(); searchResultsQobuzAlbums.clear(); searchResultsQobuzPlaylists.clear(); searchResultsQobuzArtists.clear()
             searchResultsApple.clear()
+            verifiedTrackKeys = emptySet()
+            trackVerificationStatus = TrackVerification.Status.IDLE
             yandexNotice = null
             searchCorrectedQuery = null
             tracksNextUrl = null; artistsNextUrl = null; playlistsNextUrl = null
@@ -676,6 +800,8 @@ import com.alananasss.kittytune.utils.Logger
             // The field searches as you type, so this is the first moment a query becomes a search
             // rather than a prefix. Recording it here is what keeps "lo" out of the history.
             recordSearch(query)
+            verifiedFilterEnabled = playerPrefs.getVerifiedFilterEnabled()
+            if (!verifiedFilterEnabled) verifiedOnly = false
             try {
                 if (searchAllPlatforms) {
                     coroutineScope {
@@ -689,10 +815,110 @@ import com.alananasss.kittytune.utils.Logger
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-            } finally {
-                isSearchLoading = false
             }
+            try {
+                applyTrackVerification(query)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e.printStackTrace()
+                if (verifiedOnly) trackVerificationStatus = TrackVerification.Status.UNAVAILABLE
+            }
+            isSearchLoading = false
             warmTopResults(query)
+        }
+
+        private fun currentTrackResults(source: SearchSource): MutableList<Track>? = when (source) {
+            SearchSource.SOUNDCLOUD -> searchResultsTracks
+            SearchSource.YOUTUBE -> searchResultsYoutube
+            SearchSource.YOUTUBE_MUSIC -> searchResultsYoutubeMusic
+            SearchSource.SPOTIFY -> searchResultsSpotify
+            SearchSource.DEEZER -> searchResultsDeezerTracks
+            SearchSource.TIDAL -> searchResultsTidalTracks
+            SearchSource.QOBUZ -> searchResultsQobuzTracks
+            SearchSource.APPLE_MUSIC, SearchSource.YANDEX_MUSIC -> null
+        }
+
+        private fun excludedPlatform(source: SearchSource): String? = when (source) {
+            SearchSource.SPOTIFY -> "spotify"
+            SearchSource.DEEZER -> "deezer"
+            SearchSource.TIDAL -> "tidal"
+            SearchSource.QOBUZ -> "qobuz"
+            else -> null
+        }
+
+        private fun trackSectionVisible(): Boolean =
+            activeFilter == SearchFilter.ALL ||
+                activeFilter == SearchFilter.TRACKS ||
+                activeSearchSource == SearchSource.YOUTUBE ||
+                activeSearchSource == SearchSource.YOUTUBE_MUSIC
+
+        /**
+         * Replaces the current track list(s) with the verified ranking. When nothing can be
+         * compared, the lists are left alone and the UI explains that verification was unavailable.
+         */
+        private suspend fun applyTrackVerification(query: String) {
+            if (!verifiedFilterEnabled || !verifiedOnly) {
+                verifiedTrackKeys = emptySet()
+                trackVerificationStatus = TrackVerification.Status.IDLE
+                return
+            }
+
+            if (searchAllPlatforms) {
+                val lists = listOf(
+                    searchResultsTracks,
+                    searchResultsYoutube,
+                    searchResultsYoutubeMusic,
+                    searchResultsSpotify,
+                    searchResultsDeezerTracks,
+                    searchResultsTidalTracks,
+                    searchResultsQobuzTracks,
+                )
+                val keys = linkedSetOf<String>()
+                var anyReference = false
+                var anyVisible = false
+                var anyVerified = false
+                for (list in lists) {
+                    if (list.isEmpty()) continue
+                    val outcome = TrackVerifier.verify(query, list.toList(), excludedPlatform = null)
+                    list.clear()
+                    list.addAll(outcome.tracks)
+                    keys += outcome.verifiedKeys
+                    anyReference = anyReference || outcome.referencesAvailable
+                    anyVisible = anyVisible || outcome.tracks.isNotEmpty()
+                    anyVerified = anyVerified || outcome.verifiedKeys.isNotEmpty()
+                }
+                verifiedTrackKeys = keys
+                trackVerificationStatus = when {
+                    !anyReference -> TrackVerification.Status.UNAVAILABLE
+                    anyVerified -> TrackVerification.Status.VERIFIED
+                    !anyVisible -> TrackVerification.Status.NO_MATCHES
+                    else -> TrackVerification.Status.INCONCLUSIVE
+                }
+                return
+            }
+
+            if (!trackSectionVisible()) {
+                verifiedTrackKeys = emptySet()
+                trackVerificationStatus = TrackVerification.Status.IDLE
+                return
+            }
+            val list = currentTrackResults(activeSearchSource)
+            if (list == null || list.isEmpty()) {
+                verifiedTrackKeys = emptySet()
+                trackVerificationStatus = TrackVerification.Status.IDLE
+                return
+            }
+
+            val outcome = TrackVerifier.verify(
+                query = query,
+                tracks = list.toList(),
+                excludedPlatform = excludedPlatform(activeSearchSource),
+            )
+            list.clear()
+            list.addAll(outcome.tracks)
+            verifiedTrackKeys = outcome.verifiedKeys
+            trackVerificationStatus = outcome.status
         }
 
         private suspend fun performOneSource(source: SearchSource, query: String) {
@@ -1106,6 +1332,7 @@ import com.alananasss.kittytune.utils.Logger
                             }
                         }
                     }
+                    if (verifiedFilterEnabled && verifiedOnly) applyTrackVerification(searchQuery)
                 } catch (e: Exception) { e.printStackTrace() } finally { isSearchLoadingMore = false }
             }
         }

@@ -3,7 +3,9 @@ package com.alananasss.kittytune.data.local
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.Prefs
 import com.alananasss.kittytune.domain.Track
+import com.alananasss.kittytune.data.audio.SavedEqProfile
 import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.ui.player.EqualizerState
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.ui.player.RepeatMode
 import com.google.gson.Gson
@@ -239,6 +241,9 @@ class PlayerPreferences {
         private const val KEY_TRACK_JSON = "last_track_json"
         private const val KEY_POSITION = "last_position"
         private const val KEY_EFFECTS = "audio_effects"
+        private const val KEY_EQUALIZER_STATE = "equalizer_state_v2"
+        private const val KEY_EQ_AUTO_APPLY = "auto_eq_auto_apply"
+        private const val KEY_SAVED_EQ_PROFILES = "saved_eq_profiles_v1"
         private const val KEY_CONTEXT_JSON = "last_context_json"
         private const val KEY_SHUFFLE_MODE = "shuffle_mode_enabled"
         private const val KEY_REPEAT_MODE = "repeat_mode_state"
@@ -461,6 +466,7 @@ class PlayerPreferences {
         private const val KEY_APP_LANGUAGE = "app_language_code"
         private const val KEY_PRECISE_SPEED = "precise_speed_enabled"
         private const val KEY_AUTO_UPDATE = "auto_update_enabled"
+        private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
@@ -543,6 +549,7 @@ class PlayerPreferences {
         const val KEY_DISABLED_AUDIO_PROVIDERS = "disabled_audio_providers"
         const val KEY_QOBUZ_COUNTRY = "qobuz_country"
         const val KEY_QOBUZ_CUSTOM_INSTANCES = "qobuz_custom_instances"
+        const val KEY_QOBUZ_USER_AUTH_TOKEN = "qobuz_user_auth_token"
         const val KEY_QOBUZ_QUALITY = "qobuz_quality"
         const val KEY_TIDAL_RESOLVER_ENDPOINTS = "tidal_resolver_endpoints"
         const val KEY_TIDAL_AUDIO_QUALITY = "tidal_audio_quality"
@@ -761,6 +768,10 @@ class PlayerPreferences {
     fun setDownloadDrmStreamsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DOWNLOAD_DRM_STREAMS, enabled)
     fun getAutoUpdateEnabled(): Boolean = Prefs.getBoolean(KEY_AUTO_UPDATE, true)
     fun setAutoUpdateEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_AUTO_UPDATE, enabled)
+
+    fun getVerifiedFilterEnabled(): Boolean = Prefs.getBoolean(KEY_VERIFIED_FILTER_ENABLED, false)
+    fun setVerifiedFilterEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_VERIFIED_FILTER_ENABLED, enabled)
+    fun verifiedFilterEnabledFlow(): Flow<Boolean> = Prefs.booleanFlow(KEY_VERIFIED_FILTER_ENABLED, false)
 
     fun getPreciseSpeedEnabled(): Boolean = Prefs.getBoolean(KEY_PRECISE_SPEED, false)
     fun setPreciseSpeedEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_PRECISE_SPEED, enabled)
@@ -1812,6 +1823,54 @@ class PlayerPreferences {
         } catch (_: Exception) { AudioEffectsState() } 
     }
 
+    fun saveEqualizerState(state: EqualizerState) = Prefs.putString(KEY_EQUALIZER_STATE, gson.toJson(state))
+
+    fun getEqualizerState(): EqualizerState {
+        val json = Prefs.getString(KEY_EQUALIZER_STATE, null) ?: return EqualizerState()
+        return try {
+            val state = gson.fromJson(json, EqualizerState::class.java)
+            state.copy(
+                bandGainsDb = List(16) { index -> state.bandGainsDb.getOrElse(index) { 0f } },
+                selectedPreset = state.selectedPreset.ifBlank { "Flat" },
+            )
+        } catch (_: Exception) {
+            EqualizerState()
+        }
+    }
+
+    /** Whether a saved AutoEq profile is reopened when its headphone reconnects. */
+    fun getAutoEqAutoApply(): Boolean = Prefs.getBoolean(KEY_EQ_AUTO_APPLY, false)
+    fun setAutoEqAutoApply(enabled: Boolean) = Prefs.putBoolean(KEY_EQ_AUTO_APPLY, enabled)
+
+    fun getSavedEqProfileForDevice(deviceKey: String): SavedEqProfile? {
+        if (deviceKey.isBlank()) return null
+        return readSavedEqProfiles()[deviceKey]
+    }
+
+    fun saveEqProfileForDevice(profile: SavedEqProfile) {
+        if (profile.deviceKey.isBlank()) return
+        val profiles = readSavedEqProfiles().toMutableMap()
+        profiles[profile.deviceKey] = profile
+        Prefs.putString(KEY_SAVED_EQ_PROFILES, gson.toJson(profiles))
+    }
+
+    fun clearSavedEqProfileForDevice(deviceKey: String) {
+        if (deviceKey.isBlank()) return
+        val profiles = readSavedEqProfiles().toMutableMap()
+        profiles.remove(deviceKey)
+        Prefs.putString(KEY_SAVED_EQ_PROFILES, gson.toJson(profiles))
+    }
+
+    private fun readSavedEqProfiles(): Map<String, SavedEqProfile> {
+        val raw = Prefs.getString(KEY_SAVED_EQ_PROFILES, null) ?: return emptyMap()
+        return try {
+            val type = object : TypeToken<Map<String, SavedEqProfile>>() {}.type
+            gson.fromJson<Map<String, SavedEqProfile>>(raw, type) ?: emptyMap()
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
     fun getPinnedAudioFx(): List<String> {
         val json = Prefs.getString(KEY_PINNED_AUDIO_FX, null) ?: return DEFAULT_PINNED_AUDIO_FX
         return try {
@@ -1978,6 +2037,11 @@ class PlayerPreferences {
 
     fun getQobuzCustomInstances(): String = Prefs.getString(KEY_QOBUZ_CUSTOM_INSTANCES, com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.DEFAULT_INSTANCE) ?: com.alananasss.kittytune.audio.providers.qobuz.QobuzAudioProvider.DEFAULT_INSTANCE
     fun setQobuzCustomInstances(instances: String) = Prefs.putString(KEY_QOBUZ_CUSTOM_INSTANCES, instances.trim())
+
+    fun getQobuzUserAuthToken(): String? = Prefs.getString(KEY_QOBUZ_USER_AUTH_TOKEN, null)?.takeIf { it.isNotBlank() }
+    fun setQobuzUserAuthToken(token: String?) {
+        if (token.isNullOrBlank()) Prefs.remove(KEY_QOBUZ_USER_AUTH_TOKEN) else Prefs.putString(KEY_QOBUZ_USER_AUTH_TOKEN, token.trim())
+    }
 
     fun getQobuzQuality(): Int = Prefs.getInt(KEY_QOBUZ_QUALITY, 27)
     fun setQobuzQuality(quality: Int) = Prefs.putInt(KEY_QOBUZ_QUALITY, quality)
