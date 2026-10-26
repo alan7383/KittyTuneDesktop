@@ -90,6 +90,7 @@ object SyncService {
         deviceId = SyncLog.deviceId,
         deviceName = SyncLog.deviceName,
         platform = PLATFORM,
+        addresses = rankedCandidateAddresses(),
     )
 
     /**
@@ -104,8 +105,12 @@ object SyncService {
     /** @return the pairing details in [code], or null when it is not one of ours. */
     fun parsePairingCode(code: String): PairingPayload? = runCatching {
         val json = String(Base64.getUrlDecoder().decode(code.trim()))
-        gson.fromJson(json, PairingPayload::class.java)
-            ?.takeIf { it.host.isNotBlank() && it.secret.isNotBlank() && it.port in 1..65535 }
+        gson.fromJson(json, PairingPayload::class.java)?.let { payload ->
+            val host = payload.host.ifBlank { payload.addresses.firstOrNull().orEmpty() }
+            if (host.isNotBlank() && payload.secret.isNotBlank() && payload.port in 1..65535) {
+                if (payload.host.isBlank()) payload.copy(host = host) else payload
+            } else null
+        }
     }.getOrNull()
 
     @Synchronized
@@ -261,6 +266,63 @@ object SyncService {
         return diff == 0
     }
 
+    private data class ScoredAddress(val score: Int, val address: String)
+
+    /**
+     * All IPv4 addresses on this machine, ranked by likelihood of being the real LAN interface.
+     *
+     * Virtual/container interfaces (docker, veth, virbr, tun, tap, wg, etc.) are heavily penalised
+     * so that real Wi-Fi and Ethernet LAN interfaces (192.168.x.x, 10.x.x.x, etc.) are placed first.
+     */
+    fun rankedCandidateAddresses(): List<String> = runCatching {
+        val candidates = mutableListOf<ScoredAddress>()
+        val interfaces = java.net.NetworkInterface.getNetworkInterfaces() ?: return emptyList()
+
+        for (ni in interfaces.asSequence()) {
+            if (!ni.isUp || ni.isLoopback) continue
+            val name = ni.name.lowercase()
+            val display = ni.displayName.lowercase()
+
+            val isVirtual = ni.isVirtual ||
+                name.contains("docker") || name.startsWith("veth") ||
+                name.contains("virbr") || name.contains("lxc") ||
+                name.contains("cni") || name.contains("flannel") ||
+                name.contains("calico") || name.contains("tailscale") ||
+                name.startsWith("tun") || name.startsWith("tap") ||
+                name.startsWith("wg") || name.contains("hamachi") ||
+                name.contains("zerotier") || name.contains("vmnet") ||
+                name.contains("vbox") || name.contains("dummy") ||
+                display.contains("docker") || display.contains("virtual") ||
+                display.contains("wsl") || display.contains("hyper-v")
+
+            val isPhysicalLan = name.startsWith("wl") || name.startsWith("wi") ||
+                name.startsWith("en") || name.startsWith("eth") || name.startsWith("lan")
+
+            for (addr in ni.inetAddresses.asSequence()) {
+                if (addr !is java.net.Inet4Address || addr.isLoopbackAddress || addr.isLinkLocalAddress || addr.isAnyLocalAddress) {
+                    continue
+                }
+                val ip = addr.hostAddress ?: continue
+                val score = when {
+                    isVirtual -> 10
+                    isPhysicalLan && ip.startsWith("192.168.") -> 100
+                    isPhysicalLan && ip.startsWith("10.") -> 90
+                    isPhysicalLan && ip.matches(Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")) -> 70
+                    isPhysicalLan -> 60
+                    ip.startsWith("192.168.") -> 50
+                    ip.startsWith("10.") -> 40
+                    ip.matches(Regex("^172\\.(1[6-9]|2[0-9]|3[0-1])\\..*")) -> 30
+                    else -> 20
+                }
+                candidates.add(ScoredAddress(score, ip))
+            }
+        }
+
+        candidates.sortedByDescending { it.score }
+            .map { it.address }
+            .distinct()
+    }.getOrDefault(emptyList())
+
     /**
      * This machine's address on the local network, for the pairing code.
      *
@@ -268,15 +330,7 @@ object SyncService {
      * and loopback is only the last resort — which at least fails visibly rather than silently
      * handing out an address that cannot work.
      */
-    fun localAddress(): String = runCatching {
-        java.net.NetworkInterface.getNetworkInterfaces().asSequence()
-            .filter { it.isUp && !it.isLoopback }
-            .flatMap { it.inetAddresses.asSequence() }
-            .filterIsInstance<java.net.Inet4Address>()
-            .firstOrNull { !it.isLoopbackAddress }
-            ?.hostAddress
-            ?: "127.0.0.1"
-    }.getOrDefault("127.0.0.1")
+    fun localAddress(): String = rankedCandidateAddresses().firstOrNull() ?: "127.0.0.1"
 }
 
 /**
@@ -293,6 +347,7 @@ data class PairingPayload(
     val deviceName: String,
     /** "desktop" or "android", for a screen that wants to draw the right icon. Absent in old codes. */
     val platform: String = "",
+    val addresses: List<String> = emptyList(),
 )
 
 /**
