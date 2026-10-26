@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -127,7 +128,8 @@ fun SettingsItem(
     sliderRange: ClosedFloatingPointRange<Float> = 0f..1f,
     onSliderChange: ((Float) -> Unit)? = null,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
-    highlightKey: String? = null
+    highlightKey: String? = null,
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -167,14 +169,16 @@ fun SettingsItem(
     }
 
     val onToggleOrClick = {
-        if (hasSwitch && onSwitchChange != null) {
-            if (onClick != null) {
-                onClick()
+        if (enabled) {
+            if (hasSwitch && onSwitchChange != null) {
+                if (onClick != null) {
+                    onClick()
+                } else {
+                    onSwitchChange(!switchState)
+                }
             } else {
-                onSwitchChange(!switchState)
+                onClick?.invoke()
             }
-        } else {
-            onClick?.invoke()
         }
     }
 
@@ -182,7 +186,7 @@ fun SettingsItem(
     // branching at the draw site, so both kinds take one path through it instead of two.
     val rowMark = icon?.let { androidx.compose.ui.graphics.vector.rememberVectorPainter(it) } ?: mark
 
-    val isClickable = onClick != null || hasSwitch
+    val isClickable = (onClick != null || hasSwitch) && enabled
     val cardColors = CardDefaults.cardColors(
         containerColor = animatedContainerColor,
         disabledContainerColor = animatedContainerColor,
@@ -258,8 +262,9 @@ fun SettingsItem(
                 // Without a handler the switch still shows the state, it just cannot be changed here.
                 SettingsSwitch(
                     checked = switchState,
-                    onCheckedChange = onSwitchChange,
+                    onCheckedChange = if (enabled) onSwitchChange else null,
                     interactionSource = interactionSource,
+                    enabled = enabled,
                 )
             } else if (trailingContent != null) {
                 trailingContent()
@@ -268,7 +273,7 @@ fun SettingsItem(
                     imageVector = Icons.AutoMirrored.Rounded.ArrowForwardIos,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 0.5f else 0.2f)
                 )
             }
         }
@@ -282,6 +287,7 @@ fun SettingsItem(
             shape = shape,
             modifier = Modifier
                 .fillMaxWidth()
+                .alpha(if (enabled) 1f else 0.42f)
                 .bringIntoViewRequester(bringIntoViewRequester)
                 .onGloballyPositioned { itemCoordinates = it },
             interactionSource = interactionSource
@@ -294,6 +300,7 @@ fun SettingsItem(
             shape = shape,
             modifier = Modifier
                 .fillMaxWidth()
+                .alpha(if (enabled) 1f else 0.42f)
                 .bringIntoViewRequester(bringIntoViewRequester)
                 .onGloballyPositioned { itemCoordinates = it },
         ) {
@@ -390,7 +397,8 @@ fun SplitSettingsItem(
     switchState: Boolean,
     onSwitchChange: (Boolean) -> Unit,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
-    highlightKey: String? = null
+    highlightKey: String? = null,
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
 
@@ -430,11 +438,13 @@ fun SplitSettingsItem(
     }
 
     Card(
-        onClick = onClick,
+        onClick = { if (enabled) onClick() },
+        enabled = enabled,
         colors = CardDefaults.cardColors(containerColor = animatedContainerColor),
         shape = shape,
         modifier = Modifier
             .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.42f)
             .bringIntoViewRequester(bringIntoViewRequester)
             .onGloballyPositioned { itemCoordinates = it }
     ) {
@@ -509,7 +519,8 @@ fun SplitSettingsItem(
             ) {
                 Switch(
                     checked = switchState,
-                    onCheckedChange = onSwitchChange,
+                    onCheckedChange = if (enabled) onSwitchChange else null,
+                    enabled = enabled,
                     thumbContent = {
                         if (switchState) {
                             Icon(

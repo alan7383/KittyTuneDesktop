@@ -132,6 +132,7 @@ fun ContentFilterSettingsPage() {
 
     val currentModel by AiDetectionManager.currentModelFlow.collectAsState()
     val modelDownloadState by AiDetectionManager.downloadState.collectAsState()
+    val isModelReady = modelDownloadState is AiDetectionManager.ModelDownloadState.Ready
     val activeAcceleration by AiDetectionManager.activeAccelerationProvider.collectAsState()
 
     var aiAutoSkip by remember { mutableStateOf(prefs.aiAutoSkip) }
@@ -141,6 +142,19 @@ fun ContentFilterSettingsPage() {
     var aiShowBadge by remember { mutableStateOf(prefs.aiShowBadge) }
     var aiShowHumanBadge by remember { mutableStateOf(prefs.aiShowHumanBadge) }
     var aiWindow by remember { mutableStateOf(prefs.aiDetectionWindow) }
+
+    LaunchedEffect(isModelReady) {
+        if (!isModelReady) {
+            aiAutoSkip = false
+            prefs.aiAutoSkip = false
+            aiAutoBlock = false
+            prefs.aiAutoBlock = false
+            aiShowBadge = false
+            prefs.aiShowBadge = false
+            aiShowHumanBadge = false
+            prefs.aiShowHumanBadge = false
+        }
+    }
 
     var gpuAccelerationEnabled by remember { mutableStateOf(prefs.aiGpuAccelerationEnabled) }
     var selectedGpuId by remember { mutableStateOf(prefs.aiSelectedGpuId) }
@@ -462,6 +476,9 @@ fun ContentFilterSettingsPage() {
                             if (pendingEnableFeature == "block") {
                                 aiAutoBlock = true
                                 prefs.aiAutoBlock = true
+                            } else if (pendingEnableFeature == "badge") {
+                                aiShowBadge = true
+                                prefs.aiShowBadge = true
                             } else {
                                 aiAutoSkip = true
                                 prefs.aiAutoSkip = true
@@ -542,6 +559,10 @@ fun ContentFilterSettingsPage() {
                         prefs.aiAutoSkip = false
                         aiAutoBlock = false
                         prefs.aiAutoBlock = false
+                        aiShowBadge = false
+                        prefs.aiShowBadge = false
+                        aiShowHumanBadge = false
+                        prefs.aiShowHumanBadge = false
                         showDeleteModelDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -1077,14 +1098,15 @@ fun ContentFilterSettingsPage() {
                                     title = str("block_ai_window_title"),
                                     subtitle = str(aiWindow.titleKey),
                                     icon = Icons.Rounded.Speed,
-                                    onClick = { showAiWindowDialog = true },
+                                    onClick = if (isModelReady) { { showAiWindowDialog = true } } else null,
                                     highlightKey = "ai_detection_window",
+                                    enabled = isModelReady,
                                 )
 
                                 // Block 3: Badges group
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     val badgeBottomRadius by animateDpAsState(
-                                        targetValue = if (aiShowBadge) 4.dp else 24.dp,
+                                        targetValue = if (aiShowBadge && isModelReady) 4.dp else 24.dp,
                                         label = "BadgeCornerAnim",
                                     )
 
@@ -1099,16 +1121,19 @@ fun ContentFilterSettingsPage() {
                                         subtitle = str("pref_ai_show_badge_sub"),
                                         icon = Icons.Rounded.SmartToy,
                                         hasSwitch = true,
-                                        switchState = aiShowBadge,
-                                        onSwitchChange = {
-                                            aiShowBadge = it
-                                            prefs.aiShowBadge = it
+                                        switchState = aiShowBadge && isModelReady,
+                                        enabled = isModelReady,
+                                        onSwitchChange = { enabled ->
+                                            if (isModelReady) {
+                                                aiShowBadge = enabled
+                                                prefs.aiShowBadge = enabled
+                                            }
                                         },
                                         highlightKey = "ai_show_badge",
                                     )
 
                                     AnimatedVisibility(
-                                        visible = aiShowBadge,
+                                        visible = aiShowBadge && isModelReady,
                                         enter = expandVertically() + fadeIn(),
                                         exit = shrinkVertically() + fadeOut(),
                                     ) {
@@ -1123,10 +1148,13 @@ fun ContentFilterSettingsPage() {
                                             subtitle = str("pref_ai_show_human_badge_sub"),
                                             icon = Icons.Rounded.VerifiedUser,
                                             hasSwitch = true,
-                                            switchState = aiShowHumanBadge,
-                                            onSwitchChange = {
-                                                aiShowHumanBadge = it
-                                                prefs.aiShowHumanBadge = it
+                                            switchState = aiShowHumanBadge && isModelReady,
+                                            enabled = isModelReady,
+                                            onSwitchChange = { enabled ->
+                                                if (isModelReady) {
+                                                    aiShowHumanBadge = enabled
+                                                    prefs.aiShowHumanBadge = enabled
+                                                }
                                             },
                                             highlightKey = "ai_show_human_badge",
                                         )
