@@ -129,6 +129,7 @@ import com.alananasss.kittytune.domain.Comment
 import com.alananasss.kittytune.ui.player.CommentSort
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.data.local.RadioEligibility
 import com.alananasss.kittytune.ui.player.RepeatMode
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
@@ -589,9 +590,9 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     })
                 }
             }
-            if (!isLocalFile) {
+            if (!isLocalFile && RadioEligibility.canStartRadio(track)) {
                 add(MenuOptionItem("track_radio", Icons.Rounded.Radio, str("menu_track_radio")) {
-                    if (track.source == "youtube") viewModel.startYoutubeRadio(track) else viewModel.startRadioFromTrack(track)
+                    if (RadioEligibility.radioKind(track) == RadioEligibility.Kind.YOUTUBE) viewModel.startYoutubeRadio(track) else viewModel.startRadioFromTrack(track)
                 })
                 add(MenuOptionItem("share", Icons.Outlined.Share, str("btn_share")) { viewModel.shareTrack(track) })
             }

@@ -18,7 +18,10 @@ object ExternalPlaylists {
         val value = permalinkUrl?.trim().orEmpty()
         return value.startsWith("yt_radio:", ignoreCase = true) ||
             value.startsWith("spotify_radio:", ignoreCase = true) ||
-            value.startsWith("station_spotify:", ignoreCase = true)
+            value.startsWith("station_spotify:", ignoreCase = true) ||
+            value.startsWith("tidal_radio:", ignoreCase = true) ||
+            value.startsWith("deezer_radio:", ignoreCase = true) ||
+            value.startsWith("qobuz_radio:", ignoreCase = true)
     }
 
     fun isExternalPermalink(permalinkUrl: String?): Boolean {
@@ -53,9 +56,36 @@ object ExternalPlaylists {
             return url.takeIf { it.isNotBlank() }?.let { abs(it.hashCode().toLong()) }
         }
 
+        if (route.startsWith("tidal_radio:", ignoreCase = true)) {
+            val seed = route.substringAfter(':').trim()
+            return seed.takeIf { it.isNotBlank() }?.let { tidalRadioStableId(it) }
+        }
+
+        if (route.startsWith("deezer_radio:", ignoreCase = true)) {
+            val seed = route.substringAfter(':').trim()
+            return seed.takeIf { it.isNotBlank() }?.let { deezerRadioStableId(it) }
+        }
+
+        if (route.startsWith("qobuz_radio:", ignoreCase = true)) {
+            val seed = route.substringAfter(':').trim()
+            return seed.takeIf { it.isNotBlank() }?.let { qobuzRadioStableId(it) }
+        }
+
         val seed = SpotifyRepository.extractId(route)
         return seed.takeIf { it.isNotBlank() }?.let { spotifyStableId(it) }
     }
+
+    /** The library id of a TIDAL radio, derived from the track it is built around. */
+    fun tidalRadioStableId(id: String): Long =
+        abs(("tidal_radio:${id.trim()}").hashCode().toLong())
+
+    /** The library id of a Deezer radio, derived from the artist it is built around. */
+    fun deezerRadioStableId(id: String): Long =
+        abs(("deezer_radio:${id.trim()}").hashCode().toLong())
+
+    /** The library id of a Qobuz radio, derived from the track it is built around. */
+    fun qobuzRadioStableId(id: String): Long =
+        abs(("qobuz_radio:${id.trim()}").hashCode().toLong())
 
     /** Numeric id to use when saving a list, based on what identifies it remotely. */
     fun libraryIdFor(permalinkUrl: String?, fallbackId: Long): Long =

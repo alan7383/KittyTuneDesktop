@@ -1,6 +1,7 @@
 package com.alananasss.kittytune.data.tidal
 
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.data.search.ProviderSearchRanker
 import com.alananasss.kittytune.domain.Playlist
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.domain.TrackPublisherMetadata
@@ -27,9 +28,11 @@ data class TidalSearchResult(
 
 object TidalSearchRepository {
     private const val API_BASE = "https://api.tidal.com/v1"
+    private const val WEB_API_BASE = "https://tidal.com/v1"
     private const val AUTH_URL = "https://auth.tidal.com/v1/oauth2/token"
     private const val CLIENT_ID = "txNoH4kkV41MfH25"
     private const val CLIENT_SECRET = "dQjy0MinCEvxi1O4UmxvxWnDjt4cgHBPw8ll6nYBk98="
+    private const val WEB_PUBLIC_TOKEN = "49YxDN9a2aFV6RTG"
 
     // Shares ProxyManager's pool and dispatcher; only the timeouts are this repository's own.
     private val client = com.alananasss.kittytune.data.network.ProxyManager.getOkHttpClient().newBuilder()
@@ -103,11 +106,54 @@ object TidalSearchRepository {
         val artists = root.optJSONObject("artists")?.optJSONArray("items")?.mapObjects { it.toTidalArtist() } ?: emptyList()
 
         TidalSearchResult(
-            tracks = tracks,
+            tracks = ProviderSearchRanker.rankTracks(query, tracks),
             albums = albums,
             playlists = playlists,
             artists = artists
         )
+    }
+
+    /** Resolves one exact Tidal track from a pasted link. */
+    suspend fun getTrack(trackId: String, countryCode: String = "US"): Track? = withContext(Dispatchers.IO) {
+        val cleanId = trackId.removePrefix("tidal:track:").trim()
+        if (cleanId.isBlank()) return@withContext null
+
+        val query = "countryCode=$countryCode&deviceType=BROWSER"
+        val webJson = fetchJsonWithPublicToken("$WEB_API_BASE/tracks/$cleanId?$query")
+        val json = webJson ?: getAccessToken()?.let { token ->
+            fetchJson("$API_BASE/tracks/$cleanId?$query", token)
+        }
+        json?.toTidalTrack()
+    }
+
+    /**
+     * The track radio TIDAL builds around a seed: the seed itself, then the
+     * tracks TIDAL considers close to it. This is the endpoint the official
+     * player uses, and it answers with the public web token, so a radio works
+     * without a listener login.
+     */
+    suspend fun getRadio(trackId: String, countryCode: String = "US", limit: Int = 50): List<Track> = withContext(Dispatchers.IO) {
+        val cleanId = trackId.removePrefix("tidal:track:").trim()
+        if (cleanId.isBlank()) return@withContext emptyList()
+
+        val query = "countryCode=$countryCode&deviceType=BROWSER&limit=$limit"
+        val json = fetchJsonWithPublicToken("$API_BASE/tracks/$cleanId/radio?$query")
+            ?: getAccessToken()?.let { fetchJson("$API_BASE/tracks/$cleanId/radio?$query", it) }
+        val items = json?.optJSONArray("items") ?: return@withContext emptyList()
+        items.mapObjects { it.toTidalTrack() }
+    }
+
+    /**
+     * The TIDAL id of a catalogue track, whichever way the app knows it: the
+     * permalink the catalogue mapping writes, or the id at the end of the share
+     * link.
+     */
+    fun extractTrackId(track: Track): String? {
+        track.permalink?.removePrefix("tidal:track:")?.trim()
+            ?.takeIf { it.isNotBlank() && it != "null" && it.all(Char::isDigit) }
+            ?.let { return it }
+        val candidate = track.permalinkUrl?.substringAfterLast('/')?.substringBefore('?')?.trim().orEmpty()
+        return candidate.takeIf { it.isNotBlank() && it.all(Char::isDigit) }
     }
 
     suspend fun getAlbum(albumId: String, countryCode: String = "US"): Playlist? = withContext(Dispatchers.IO) {
@@ -396,6 +442,21 @@ object TidalSearchRepository {
                 if (!response.isSuccessful) return@use null
                 val body = response.body.string()
                 JSONObject(body)
+            }
+        }.getOrNull()
+    }
+
+    private fun fetchJsonWithPublicToken(url: String): JSONObject? {
+        return runCatching {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-tidal-token", WEB_PUBLIC_TOKEN)
+                .header("Accept", "application/json")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                JSONObject(response.body.string())
             }
         }.getOrNull()
     }

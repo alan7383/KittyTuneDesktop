@@ -67,6 +67,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.TextButton
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
+import com.alananasss.kittytune.data.search.TrackVerification
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.material.icons.rounded.BarChart
@@ -165,6 +168,10 @@ import com.alananasss.kittytune.core.Strings
 import com.alananasss.kittytune.ui.player.PlayerViewModel
 import java.util.Calendar
 
+/** Carries the verified row identities down to [SearchTrackRow] without threading them through every list composable. */
+private val LocalVerifiedTrackKeys = compositionLocalOf<Set<String>> { emptySet() }
+private val LocalVerifiedFilterOn = compositionLocalOf { false }
+
 /**
  * Home feed: greeting, recently-played quick tiles (2x3 grid like the reference)
  * and the SoundCloud personalized section carousels from HomeViewModel.
@@ -194,7 +201,12 @@ fun HomeContent(
         label = "homeMode",
     ) { shown ->
         when (shown) {
-            HomeMode.SEARCH -> SearchResults(vm, playerViewModel, navController)
+            HomeMode.SEARCH -> CompositionLocalProvider(
+                LocalVerifiedTrackKeys provides vm.verifiedTrackKeys,
+                LocalVerifiedFilterOn provides (vm.verifiedFilterEnabled && vm.verifiedOnly),
+            ) {
+                SearchResults(vm, playerViewModel, navController)
+            }
             HomeMode.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularWavyProgressIndicator()
             }
@@ -515,6 +527,49 @@ private fun SearchSourceButton(vm: HomeViewModel) {
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
+private fun VerifiedFilterButton(vm: HomeViewModel) {
+    val statusDescription = when {
+        !vm.verifiedOnly -> null
+        vm.trackVerificationStatus == TrackVerification.Status.VERIFIED && vm.verifiedTrackKeys.isNotEmpty() ->
+            str("search_verified_count", vm.verifiedTrackKeys.size)
+        vm.trackVerificationStatus == TrackVerification.Status.NO_MATCHES ->
+            str("search_verified_no_matches")
+        vm.trackVerificationStatus == TrackVerification.Status.UNAVAILABLE ->
+            str("search_verified_unavailable")
+        vm.trackVerificationStatus == TrackVerification.Status.INCONCLUSIVE ->
+            str("search_verified_inconclusive")
+        else -> null
+    }
+    com.alananasss.kittytune.ui.common.Tip(
+        statusDescription ?: str("pref_verified_filter")
+    ) {
+        IconButton(
+            onClick = { vm.onVerifiedFilterChanged(!vm.verifiedOnly) },
+            shapes = IconButtonDefaults.shapes(),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = if (vm.verifiedOnly) {
+                    MaterialTheme.colorScheme.secondaryContainer
+                } else {
+                    Color.Transparent
+                },
+                contentColor = if (vm.verifiedOnly) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                },
+            ),
+            modifier = Modifier.size(32.dp),
+        ) {
+            Icon(
+                Icons.Rounded.Verified,
+                contentDescription = str("pref_verified_filter"),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+@Composable
 private fun SearchResults(
     vm: HomeViewModel,
     playerViewModel: PlayerViewModel,
@@ -568,6 +623,16 @@ private fun SearchResults(
             // slide in and out beside it.
             SearchSourceButton(vm)
 
+            if (vm.verifiedFilterEnabled &&
+                (vm.activeFilter == SearchFilter.ALL ||
+                    vm.activeFilter == SearchFilter.TRACKS ||
+                    vm.activeSearchSource == SearchSource.YOUTUBE ||
+                    vm.activeSearchSource == SearchSource.YOUTUBE_MUSIC)
+            ) {
+                Spacer(Modifier.width(12.dp))
+                VerifiedFilterButton(vm)
+            }
+
             val hasFilters = vm.activeSearchSource in listOf(
                 SearchSource.SOUNDCLOUD, SearchSource.SPOTIFY, SearchSource.DEEZER, SearchSource.TIDAL, SearchSource.QOBUZ,
             )
@@ -613,6 +678,23 @@ private fun SearchResults(
                     )
                 }
             }
+        }
+
+        val verifiedStatusText = when {
+            !vm.verifiedFilterEnabled || !vm.verifiedOnly -> null
+            vm.trackVerificationStatus == TrackVerification.Status.NO_MATCHES ->
+                str("search_verified_no_matches")
+            vm.trackVerificationStatus == TrackVerification.Status.UNAVAILABLE ->
+                str("search_verified_unavailable")
+            else -> null
+        }
+        if (verifiedStatusText != null) {
+            Text(
+                text = verifiedStatusText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp),
+            )
         }
 
         // ── Loading bar ──
@@ -1872,6 +1954,8 @@ private fun SectionHeader(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel, onOpened: () -> Unit = {}) {
+    val isVerifiedMatch = LocalVerifiedFilterOn.current &&
+        TrackVerification.keyOf(track) in LocalVerifiedTrackKeys.current
     val durationMs = track.durationMs ?: 0L
     val minutes = durationMs / 60000
     val seconds = (durationMs % 60000) / 1000
@@ -1922,7 +2006,15 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel, onOpe
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f, fill = false)
                 )
-                if (track.user?.verified == true) {
+                if (isVerifiedMatch) {
+                    Spacer(Modifier.width(3.dp))
+                    Icon(
+                        Icons.Rounded.Verified,
+                        str("search_verified_track"),
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(12.dp),
+                    )
+                } else if (track.user?.verified == true) {
                     Spacer(Modifier.width(3.dp))
                     Icon(Icons.Rounded.Verified, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                 }
