@@ -137,8 +137,11 @@ class Issue93BugfixesTest {
         assertTrue(script.contains("\$targetPid = 12345"))
         assertTrue(script.contains("WaitForExit(30000)"))
         assertTrue(script.contains("Stop-Process -Force"))
+        assertTrue(script.contains("WindowsSmtcBridge"))
         val escapedInstaller = installer.absolutePath.replace("'", "''")
         assertTrue(script.contains("-ArgumentList @('/i', '$escapedInstaller'"))
+        assertTrue(script.contains("REINSTALL=ALL"))
+        assertTrue(script.contains("'/qb'"))
         assertTrue(script.contains("Start-Process -FilePath \$exePath"))
         assertFalse("Must not pass literal nested double quotes to Start-Process", script.contains("`\"`\""))
     }
