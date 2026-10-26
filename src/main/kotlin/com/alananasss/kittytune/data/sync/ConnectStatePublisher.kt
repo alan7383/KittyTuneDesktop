@@ -22,7 +22,11 @@ internal class ConnectStatePublisher {
         val queueChanged = old != null && old.queue !== state.queue && old.queue != state.queue
         val changed = old == null || old.currentIndex != state.currentIndex ||
             old.isPlaying != state.isPlaying || old.shuffleEnabled != state.shuffleEnabled ||
-            old.repeatMode != state.repeatMode || old.volume != state.volume || version != lastQueue ||
+            old.repeatMode != state.repeatMode || old.volume != state.volume || old.isLiked != state.isLiked ||
+            old.isYourMixActive != state.isYourMixActive || old.speed != state.speed ||
+            old.sleepTimerEndOfTrack != state.sleepTimerEndOfTrack ||
+            (old.sleepTimerRemainingMs == null) != (state.sleepTimerRemainingMs == null) ||
+            version != lastQueue ||
             queueChanged || kotlin.math.abs(state.positionMs - (projected ?: 0L)) > 1_000L
         // A paused renderer has no timeline drift; its socket already supplies keepalive.
         if (!force && !changed && (!state.isPlaying || elapsedMs < 60_000L)) return null
