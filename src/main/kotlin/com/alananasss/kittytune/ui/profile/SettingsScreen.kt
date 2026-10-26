@@ -488,6 +488,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
     var youtubeFallback by remember { mutableStateOf(prefs.getYouTubeFallbackEnabled()) }
     var localMedia by remember { mutableStateOf(prefs.getLocalMediaEnabled()) }
     var autoUpdate by remember { mutableStateOf(prefs.getAutoUpdateEnabled()) }
+    var verifiedFilterEnabled by remember { mutableStateOf(prefs.getVerifiedFilterEnabled()) }
     var discordRpc by remember { mutableStateOf(prefs.getDiscordRpcEnabled()) }
     var aiAutoSkip by remember { mutableStateOf(prefs.aiAutoSkip) }
     var aiAutoBlock by remember { mutableStateOf(prefs.aiAutoBlock) }
@@ -757,6 +758,15 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         SettingsSearchItem(str("settings_cat_audio"), null, SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO), Icons.Rounded.GraphicEq, keywords = listOf("audio", "sound", "son", "звук")),
         SettingsSearchItem(str("settings_cat_playback"), str("settings_audio_playback_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_PLAYBACK)), Icons.Rounded.PlayArrow, keywords = listOf("playback", "autoplay", "queue", "воспроизведение")),
         SettingsSearchItem(str("settings_audio_quality_title"), str("settings_audio_quality_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_QUALITY)), Icons.Rounded.GraphicEq, keywords = listOf("quality", "sound", "output", "bitrate", "high", "flac", "качество")),
+        SettingsSearchItem(
+            title = str("equalizer_title"),
+            subtitle = str("equalizer_subtitle"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_QUALITY)),
+            icon = Icons.Rounded.Equalizer,
+            keywords = listOf("equalizer", "eq", "autoeq", "auto eq", "headphones", "bluetooth", "bass", "treble", "égaliseur", "эквалайзер"),
+            highlightKey = "equalizer",
+        ),
         SettingsSearchItem(str("settings_audio_transitions_title"), str("settings_audio_transitions_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_TRANSITIONS)), Icons.Rounded.AutoAwesome, keywords = listOf("transitions", "crossfade", "automix", "dj", "mix")),
         SettingsSearchItem(str("karaoke_settings_title"), str("karaoke_settings_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_KARAOKE)), Icons.Rounded.Mic, keywords = listOf("karaoke", "vocal remover", "roformer", "stems", "voix", "instrumental")),
         SettingsSearchItem(str("sleep_timer_title"), str("settings_audio_sleep_sub"), SettingsCategory.AUDIO, SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_SLEEP_TIMER)), Icons.Rounded.Timer, keywords = listOf("timer", "sleep", "fade", "таймер сна")),
@@ -977,6 +987,24 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
                 prefs.setAutoUpdateEnabled(it)
             },
             highlightKey = "pref_auto_update",
+        ),
+        SettingsSearchItem(
+            title = str("pref_verified_filter"),
+            subtitle = str("pref_verified_filter_sub"),
+            category = SettingsCategory.MISC,
+            place = SettingsPlace(SettingsCategory.MISC, listOf(SettingsSubPage.MISC_GENERAL)),
+            icon = Icons.Rounded.Verified,
+            keywords = listOf(
+                "verified", "verification", "reupload", "official", "cover", "search",
+                "vérifié", "officiel", "проверено", "официальный",
+            ),
+            hasSwitch = true,
+            switchState = verifiedFilterEnabled,
+            onSwitchChange = {
+                verifiedFilterEnabled = it
+                prefs.setVerifiedFilterEnabled(it)
+            },
+            highlightKey = "pref_verified_filter",
         ),
         SettingsSearchItem(
             title = str("pref_discord_title"),

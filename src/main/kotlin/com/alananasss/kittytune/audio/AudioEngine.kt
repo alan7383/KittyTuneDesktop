@@ -2,6 +2,7 @@ package com.alananasss.kittytune.audio
 
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.ui.player.EqualizerState
 import com.alananasss.kittytune.utils.Logger
 import com.alananasss.kittytune.utils.SignedUrl
 import kotlinx.coroutines.CoroutineScope
@@ -62,6 +63,7 @@ class AudioEngine {
     private val outputChannels = 2
 
     private val fx = FxAudioProcessor()
+    private val equalizer = EqualizerAudioProcessor()
     private val reverb = ReverbAudioProcessor()
     private val eightD = EightDAudioProcessor()
     private val earrape = EarrapeAudioProcessor()
@@ -105,7 +107,7 @@ class AudioEngine {
     private val chain: List<AudioProcessor> = listOf(
         aiDetection,
         automixDuck,
-        fx, reverb, eightD, earrape, normalization, mono,
+        fx, equalizer, reverb, eightD, earrape, normalization, mono,
         vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
         superWide, vinylLoFi, phaser, megaphone, robotVocoder, chorus,
         underwater, tranceGate, pingPongDelay, chiptune, shimmerReverb,
@@ -144,6 +146,15 @@ class AudioEngine {
     @Volatile
     private var stopFlag = false
 
+    /**
+     * Terminal state, set by [release]. A released engine must never produce sound again: the
+     * player may have already moved on to a newer engine, and a late coroutine (a superseded
+     * crossfade, a cancelled load) reaching [setMediaItem]/[prepare]/[play] afterwards used to
+     * revive it as an invisible third stream playing over the selected track (issue #95).
+     */
+    @Volatile
+    private var released = false
+
     @Volatile
     private var activeWorkerId = 0L
 
@@ -180,6 +191,7 @@ class AudioEngine {
         startPositionMs: Long = 0L,
         trackId: Long? = null,
     ) {
+        if (released) return
         stopInternal()
         // New track: restart AI collection from zero and drop the previous verdict,
         // mirroring the Android MusicManager resetForNewTrack + resetResult pair.
@@ -269,6 +281,7 @@ class AudioEngine {
 
     @Synchronized
     fun prepare() {
+        if (released) return
         val url = currentUrl ?: return
         stopFlag = false
         val newWorkerId = ++activeWorkerId
@@ -333,6 +346,7 @@ class AudioEngine {
     }
 
     fun play() {
+        if (released) return
         warmUpJob?.cancel()
         warmUpJob = null
         val pausedFor = if (paused && pausedTimestamp > 0L) System.currentTimeMillis() - pausedTimestamp else 0L
@@ -412,6 +426,7 @@ class AudioEngine {
     }
 
     fun seekTo(ms: Long) {
+        if (released) return
         val coerced = ms.coerceAtLeast(0)
         seekRequestMs = coerced
         positionMs = coerced
@@ -421,12 +436,14 @@ class AudioEngine {
     }
 
     fun setVolume(v: Float) {
+        if (released) return
         volume = if (v <= 0.001f) 0f else v.coerceIn(0f, 1f)
         applyLineVolume()
     }
 
     /** @param db the current track's trim, clamped to [TRACK_GAIN_MIN_DB]..[TRACK_GAIN_MAX_DB]. */
     fun setTrackGainDb(db: Float) {
+        if (released) return
         trackGainDb = db.coerceIn(TRACK_GAIN_MIN_DB, TRACK_GAIN_MAX_DB)
         applyLineVolume()
     }
@@ -458,6 +475,8 @@ class AudioEngine {
     }
 
     fun release() {
+        if (released) return
+        released = true
         stop()
         aiDetection.resetForNewTrack()
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
@@ -610,6 +629,14 @@ class AudioEngine {
         stretcher.setParameters(state.speed, pitch)
 
         limiter.setCeiling(peakLimiterCeilingFor(state))
+    }
+
+    fun applyEqualizer(state: EqualizerState) {
+        equalizer.setParameters(
+            enabled = state.isEnabled,
+            preampDb = state.preampDb,
+            gainsDb = state.bandGainsDb.toFloatArray(),
+        )
     }
 
     fun setDuckMix(fraction: Float) {

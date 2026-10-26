@@ -20,8 +20,13 @@ import com.alananasss.kittytune.data.*
 import com.alananasss.kittytune.data.sync.*
 import com.alananasss.kittytune.data.local.LocalPlaylist
 import com.alananasss.kittytune.data.local.LyricsAlignment
+import com.alananasss.kittytune.data.local.RadioEligibility
 import com.alananasss.kittytune.data.local.LyricsDisplayStyle
 import com.alananasss.kittytune.data.local.PlayerPreferences
+import com.alananasss.kittytune.data.audio.AutoEqProfileData
+import com.alananasss.kittytune.data.audio.ConnectedHeadphone
+import com.alananasss.kittytune.data.audio.HeadphoneDetector
+import com.alananasss.kittytune.data.audio.SavedEqProfile
 import com.alananasss.kittytune.data.network.LrcLibClient
 import com.alananasss.kittytune.data.ListeningStatsRepository
 import com.alananasss.kittytune.data.network.LrcLibResponse
@@ -116,17 +121,21 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     val uiClipWindow get() = clipWindow.takeUnless { isRemotePlayback }
     val uiCurrentAnimatedCoverUrl get() = currentAnimatedCoverUrl.takeUnless { isRemotePlayback }
     val uiCurrentStreamSource get() = if (isRemotePlayback) uiCurrentTrack?.source.orEmpty() else currentStreamSource
-    val uiIsYourMixActive: Boolean get() = !isRemotePlayback && isYourMixActive
+    val uiIsYourMixActive: Boolean get() = if (isRemotePlayback) remotePeer?.snapshot?.isYourMixActive == true else isYourMixActive
     val uiCurrentContext get() = currentContext.takeUnless { isRemotePlayback }
     val playbackDeviceLabel: String?
         get() = remoteDeviceId?.let { id ->
             val peer = remotePeer
             val name = peer?.name ?: com.alananasss.kittytune.data.sync.SyncPeers.find(id)?.label.orEmpty()
             val ru = com.alananasss.kittytune.core.Strings.resolvedLanguage == "ru"
-            if (peer?.connected == true) (if (ru) "Играет на " else "Playing on ") + name
-            else name + if (ru) " · Не в сети" else " · Offline"
+            val fr = com.alananasss.kittytune.core.Strings.resolvedLanguage == "fr"
+            if (peer?.connected == true) {
+                if (fr) "Écoute sur $name" else if (ru) "Играет на $name" else "Playing on $name"
+            } else {
+                name + if (fr) " · Hors ligne" else if (ru) " · Не в сети" else " · Offline"
+            }
         }
-    val uiIsLiked: Boolean get() = if (isRemotePlayback) remoteTrackLiked else isLiked
+    val uiIsLiked: Boolean get() = if (isRemotePlayback) remotePeer?.snapshot?.isLiked ?: remoteTrackLiked else isLiked
     val uiCurrentTrack: Track?
         get() = if (isRemotePlayback) remotePeer?.snapshot?.let { it.queue.getOrNull(it.currentIndex) } else currentTrack
     val uiIsPlaying: Boolean
@@ -168,7 +177,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 remoteDeviceId = id
                 remotePeer = peer
                 val displayedTrack = uiCurrentTrack
-                remoteTrackLiked = displayedTrack?.let { LikeRepository.isTrackLiked(it.id) } == true
+                val remoteLiked = peer?.snapshot?.isLiked
+                remoteTrackLiked = remoteLiked ?: (displayedTrack?.let { LikeRepository.isTrackLiked(it.id) } == true)
+                if (remoteLiked != null && displayedTrack != null) {
+                    val localLiked = LikeRepository.isTrackLiked(displayedTrack.id)
+                    if (remoteLiked != localLiked) {
+                        if (remoteLiked) LikeRepository.addLike(displayedTrack) else LikeRepository.removeLike(displayedTrack.id)
+                    }
+                }
+                val remoteSpeed = peer?.snapshot?.speed
+                if (remoteSpeed != null && isRemotePlayback && effectsState.speed != remoteSpeed) {
+                    effectsState = effectsState.copy(speed = remoteSpeed)
+                }
                 if (displayedTrack != null && displayedTrack.id != previousTrackId) loadLyrics(displayedTrack)
                 remotePosition = peer?.position() ?: 0L
                 remoteTicker?.cancel()
@@ -292,6 +312,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
 
     var effectsState by mutableStateOf(playerPrefs.getLastEffects())
+    var equalizerState by mutableStateOf(playerPrefs.getEqualizerState())
+        private set
+    var connectedHeadphone by mutableStateOf<ConnectedHeadphone?>(null)
+        private set
+    var autoEqAutoApplyEnabled by mutableStateOf(playerPrefs.getAutoEqAutoApply())
+        private set
+    private var lastAutoEqDeviceKey: String? = null
     var isPreciseSpeedEnabled by mutableStateOf(playerPrefs.getPreciseSpeedEnabled())
     var isQueuePreserveUpcomingEnabled by mutableStateOf(playerPrefs.getQueuePreserveUpcomingOnJump())
     var fullPlayerBgStyle by mutableStateOf(playerPrefs.getFullPlayerBgStyle())
@@ -1113,6 +1140,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     var showLyricsSheet by mutableStateOf(false)
+    var showEqualizerScreen by mutableStateOf(false)
     var lyricsLines = mutableStateListOf<LyricLine>()
     var isLyricsLoading by mutableStateOf(false)
     var isSearchingLyrics by mutableStateOf(false)
@@ -1455,7 +1483,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var sleepTimerRemainingMs by mutableLongStateOf(0L)
     var sleepTimerEndOfTrack by mutableStateOf(false)
     var showSleepTimerDialog by mutableStateOf(false)
-    val isSleepTimerActive: Boolean get() = sleepTimerRemainingMs > 0L || sleepTimerEndOfTrack
+    val isSleepTimerActive: Boolean
+        get() = if (isRemotePlayback) {
+            (remotePeer?.snapshot?.sleepTimerRemainingMs ?: 0L) > 0L || remotePeer?.snapshot?.sleepTimerEndOfTrack == true
+        } else {
+            sleepTimerRemainingMs > 0L || sleepTimerEndOfTrack
+        }
     private var sleepTimerJob: Job? = null
     /** Level to put back when a sleep-timer fade ends. Null means no fade is running. */
     private var preFadeVolume: Float? = null
@@ -1659,6 +1692,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         override fun onPlayerError(error: Throwable) {
             println("Player error: ${error.message}")
+            MusicManager.cancelCrossfade()
 
             currentTrack?.let { StreamResolver.evictStream(it.id) }
 
@@ -1814,6 +1848,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             if (trackActuallyChanged || reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
                 currentTrack?.let { checkAndTriggerKaraokeSeparation(it) }
             }
+
+            updateMprisMedia()
         }
     }
 
@@ -1822,6 +1858,28 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         playerInitialized = true
         MusicManager.player.addListener(playerListener)
         MusicManager.applyEffects(effectsState)
+        MusicManager.applyEqualizer(equalizerState)
+        HeadphoneDetector.start()
+        viewModelScope.launch {
+            HeadphoneDetector.device.collect { headphone ->
+                val previous = connectedHeadphone
+                connectedHeadphone = headphone
+                maybeRestoreAutoEq(headphone)
+                // Follow the system default across a jack or Bluetooth switch. Without this the
+                // already-open SourceDataLine keeps playing into the old device; reopening it is
+                // the only portable way to move the stream on Windows, macOS and PulseAudio.
+                val changed = previous?.key != headphone?.key ||
+                    previous?.isBluetooth != headphone?.isBluetooth
+                if (changed && playerPrefs.getAudioDevice().isEmpty() && playerInitialized &&
+                    (isPlaying || previous != null)
+                ) {
+                    viewModelScope.launch {
+                        delay(500)
+                        runCatching { MusicManager.hotSwapDevice() }
+                    }
+                }
+            }
+        }
         applyRepeatMode()
         fetchUserProfile()
         observeArtworkColors()
@@ -2022,6 +2080,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun closeDiscordRpc() {
+        discordJob?.cancel()
+        discordJob = null
         try {
             discordRpc?.closeRPC()
         } catch (_: Exception) {
@@ -2111,10 +2171,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
         initMacNowPlayingService()
         macNowPlayingService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
+
+        updateDiscordPresence()
     }
 
     fun updateDiscordPresence() {
-        updateMprisMedia()
         val track = currentTrack
         val token = playerPrefs.getDiscordToken()
         val enabled = playerPrefs.getDiscordRpcEnabled()
@@ -2124,11 +2185,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             val contextText = currentContext?.displayText
             val playing = isPlaying
             val pos = currentPosition
+            val effectiveDuration = duration.takeIf { it > 0L } ?: track.effectiveFullDurationMs ?: track.durationMs ?: 0L
             discordJob?.cancel()
             discordJob = viewModelScope.launch(Dispatchers.IO) {
-                delay(300.milliseconds)
+                delay(500.milliseconds)
                 try {
-                    discordRpc?.updatePresence(track, contextText, playing, pos)
+                    discordRpc?.updatePresence(track, contextText, playing, pos, effectiveDuration)
                 } catch (e: Exception) {
                     if (e !is kotlinx.coroutines.CancellationException) {
                         e.printStackTrace()
@@ -3910,15 +3972,56 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun startRadioFromTrack(track: Track) {
         showMenuSheet = false
-        if (isSpotifyTrack(track)) {
-            // Spotify seeds have no SoundCloud station; use the catalog radio.
-            val spotifyId = getSpotifyTrackId(track)
-            if (!spotifyId.isNullOrBlank()) {
-                navigateToPlaylistId = "spotify_radio:$spotifyId"
-                return
+        when (RadioEligibility.radioKind(track)) {
+            RadioEligibility.Kind.SPOTIFY -> {
+                // Spotify seeds have no SoundCloud station; use the catalog radio.
+                val spotifyId = getSpotifyTrackId(track)
+                if (!spotifyId.isNullOrBlank()) {
+                    navigateToPlaylistId = "spotify_radio:$spotifyId"
+                }
             }
+            RadioEligibility.Kind.TIDAL -> {
+                val tidalId = com.alananasss.kittytune.data.tidal.TidalSearchRepository.extractTrackId(track)
+                if (!tidalId.isNullOrBlank()) {
+                    navigateToPlaylistId = "tidal_radio:$tidalId"
+                }
+            }
+            RadioEligibility.Kind.DEEZER -> {
+                val artistId = deezerArtistId(track)
+                if (!artistId.isNullOrBlank()) {
+                    navigateToPlaylistId = "deezer_radio:$artistId"
+                }
+            }
+            RadioEligibility.Kind.QOBUZ -> {
+                val trackId = qobuzTrackId(track)
+                if (!trackId.isNullOrBlank()) {
+                    navigateToPlaylistId = "qobuz_radio:$trackId"
+                }
+            }
+            RadioEligibility.Kind.YOUTUBE -> startYoutubeRadio(track)
+            RadioEligibility.Kind.SOUND_CLOUD -> {
+                navigateToPlaylistId = "station:${track.id}"
+            }
+            RadioEligibility.Kind.NONE -> return
         }
-        navigateToPlaylistId = "station:${track.id}"
+    }
+
+    /** The Deezer artist a track belongs to: the radio is built around them. */
+    private fun deezerArtistId(track: Track): String? {
+        track.user?.urn?.removePrefix("deezer:artist:")?.trim()
+            ?.takeIf { it.isNotBlank() && it != "null" }
+            ?.let { return it }
+        val id = track.user?.id ?: 0L
+        return if (id > 0L) id.toString() else null
+    }
+
+    /** The Qobuz id of a track, from its permalink or its share link. */
+    private fun qobuzTrackId(track: Track): String? {
+        track.permalink?.removePrefix("qobuz:track:")?.trim()
+            ?.takeIf { it.isNotBlank() && it != "null" }
+            ?.let { return it }
+        val candidate = track.permalinkUrl?.substringAfterLast('/')?.substringBefore('?')?.trim().orEmpty()
+        return candidate.takeIf { it.isNotBlank() }
     }
 
     fun startYoutubeRadio(track: Track) {
@@ -4063,6 +4166,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     private fun playTrackAtIndex(index: Int, addToHistory: Boolean = true, isCrossfade: Boolean = false, autoPlay: Boolean = true) {
         if (index < 0 || index >= _queue.size) {
+            MusicManager.cancelCrossfade()
             currentContext = null; return
         }
         val candidate = _queue[index]
@@ -4076,9 +4180,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         currentQueueIndex = index
         val trackToPlay = _queue[index]
 
-        if (!isCrossfade) {
+        val canCrossfade = isCrossfade && MusicManager.isPrebuffered(trackToPlay.id)
+        if (!canCrossfade) {
+            MusicManager.cancelCrossfade()
             MusicManager.stop()
             isPlaying = false
+        } else {
+            MusicManager.cancelCrossfade()
         }
 
         isLoading = true; duration = trackToPlay.effectiveFullDurationMs ?: trackToPlay.durationMs ?: 0L; currentPosition = 0L
@@ -4203,23 +4311,34 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 playTrackAtIndex(0, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
             } else {
                 val autoPlayEnabled = playerPrefs.getAutoplayEnabled()
-                val isSpotify = isSpotifyTrack(currentTrack)
-                val isYoutube = currentTrack?.source == "youtube"
+                val radioKind = RadioEligibility.radioKind(currentTrack)
+                val isYoutube = radioKind == RadioEligibility.Kind.YOUTUBE
 
-                if (autoPlayEnabled || isYoutube) {
+                if ((autoPlayEnabled || isYoutube) && radioKind != RadioEligibility.Kind.NONE) {
                     viewModelScope.launch {
                         val youtubeFallback = playerPrefs.getYouTubeFallbackEnabled()
 
-                        when {
-                            isSpotify -> fetchAndQueueSpotifyRadio()
-                            isYoutube || (currentTrack?.source == "soundcloud" && youtubeFallback) -> fetchAndPlayYoutubeRadio()
-                            else -> fetchAndQueueRadio()
+                        when (radioKind) {
+                            RadioEligibility.Kind.SPOTIFY -> fetchAndQueueSpotifyRadio()
+                            RadioEligibility.Kind.TIDAL -> fetchAndQueueTidalRadio()
+                            RadioEligibility.Kind.DEEZER -> fetchAndQueueDeezerRadio()
+                            RadioEligibility.Kind.QOBUZ -> fetchAndQueueQobuzRadio()
+                            RadioEligibility.Kind.YOUTUBE -> fetchAndPlayYoutubeRadio()
+                            RadioEligibility.Kind.SOUND_CLOUD -> {
+                                if (currentTrack?.source == "soundcloud" && youtubeFallback) {
+                                    fetchAndPlayYoutubeRadio()
+                                } else {
+                                    fetchAndQueueRadio()
+                                }
+                            }
+                            RadioEligibility.Kind.NONE -> Unit
                         }
 
                         val newNextIndex = currentQueueIndex + 1
                         if (newNextIndex < _queue.size) {
                             playTrackAtIndex(newNextIndex, addToHistory = false, isCrossfade = isCrossfade, autoPlay = autoPlay)
                         } else {
+                            MusicManager.cancelCrossfade()
                             MusicManager.player.pause()
                             MusicManager.player.seekTo(0)
                             currentPosition = 0L
@@ -4228,6 +4347,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                         }
                     }
                 } else {
+                    MusicManager.cancelCrossfade()
                     MusicManager.player.pause()
                     MusicManager.player.seekTo(0)
                     currentPosition = 0L
@@ -4312,6 +4432,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     private suspend fun fetchAndQueueRadio() {
         val lastTrack = currentTrack ?: return
+        if (!RadioEligibility.canStartRadio(lastTrack)) return
         isAutoplayRadioLoading = true
         try {
             val station = api.getTrackStation(lastTrack.id)
@@ -4398,6 +4519,129 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    /**
+     * End-of-queue autoplay for TIDAL catalogue tracks: ask TIDAL for the radio
+     * around the seed, append its tracks (skipping the seed itself) and register
+     * the station context so it lands in history like the other radios.
+     */
+    private suspend fun fetchAndQueueTidalRadio() {
+        val lastTrack = currentTrack ?: return
+        val tidalId = com.alananasss.kittytune.data.tidal.TidalSearchRepository.extractTrackId(lastTrack) ?: return
+        isAutoplayRadioLoading = true
+        try {
+            val radioTracks = com.alananasss.kittytune.data.tidal.TidalSearchRepository.getRadio(tidalId)
+
+            val tracksToAdd = radioTracks
+                .filter { it.id != lastTrack.id }
+                .distinctBy { it.id }
+                .filter { track -> _queue.none { it.id == track.id } }
+                .filter { !com.alananasss.kittytune.data.BlockManager.isBlocked(it) }
+
+            if (tracksToAdd.isNotEmpty()) {
+                _queue.addAll(tracksToAdd)
+                _originalQueue.addAll(tracksToAdd)
+                updateQueueState()
+            }
+            if (currentContext == null) {
+                val ctx = PlaybackContext(
+                    displayText = str("context_station", lastTrack.title ?: ""),
+                    navigationId = "tidal_radio:$tidalId",
+                    imageUrl = lastTrack.fullResArtwork,
+                    artistName = lastTrack.user?.username,
+                    isVerified = false
+                )
+                currentContext = ctx
+                MusicManager.updateContext(ctx)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isAutoplayRadioLoading = false
+        }
+    }
+
+    /**
+     * End-of-queue autoplay for Deezer catalogue tracks: ask Deezer for the
+     * artist radio around the seed and append its tracks, so the queue keeps
+     * playing music of the same kind instead of stopping dead.
+     */
+    private suspend fun fetchAndQueueDeezerRadio() {
+        val lastTrack = currentTrack ?: return
+        val artistId = deezerArtistId(lastTrack) ?: return
+        isAutoplayRadioLoading = true
+        try {
+            val radioTracks = com.alananasss.kittytune.data.deezer.DeezerSearchRepository.getRadio(artistId)
+
+            val tracksToAdd = radioTracks
+                .filter { it.id != lastTrack.id }
+                .distinctBy { it.id }
+                .filter { track -> _queue.none { it.id == track.id } }
+                .filter { !com.alananasss.kittytune.data.BlockManager.isBlocked(it) }
+
+            if (tracksToAdd.isNotEmpty()) {
+                _queue.addAll(tracksToAdd)
+                _originalQueue.addAll(tracksToAdd)
+                updateQueueState()
+            }
+            if (currentContext == null) {
+                val ctx = PlaybackContext(
+                    displayText = str("context_station", lastTrack.title ?: ""),
+                    navigationId = "deezer_radio:$artistId",
+                    imageUrl = lastTrack.fullResArtwork,
+                    artistName = lastTrack.user?.username,
+                    isVerified = false
+                )
+                currentContext = ctx
+                MusicManager.updateContext(ctx)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isAutoplayRadioLoading = false
+        }
+    }
+
+    /**
+     * End-of-queue autoplay for Qobuz catalogue tracks: build a station around
+     * the seed from Qobuz's own catalogue (the album it belongs to, the artist,
+     * and the artists Qobuz lists as similar) and append it to the queue.
+     */
+    private suspend fun fetchAndQueueQobuzRadio() {
+        val lastTrack = currentTrack ?: return
+        val trackId = qobuzTrackId(lastTrack) ?: return
+        isAutoplayRadioLoading = true
+        try {
+            val radioTracks = com.alananasss.kittytune.data.qobuz.QobuzSearchRepository.getRadio(trackId)
+
+            val tracksToAdd = radioTracks
+                .filter { it.id != lastTrack.id }
+                .distinctBy { it.id }
+                .filter { track -> _queue.none { it.id == track.id } }
+                .filter { !com.alananasss.kittytune.data.BlockManager.isBlocked(it) }
+
+            if (tracksToAdd.isNotEmpty()) {
+                _queue.addAll(tracksToAdd)
+                _originalQueue.addAll(tracksToAdd)
+                updateQueueState()
+            }
+            if (currentContext == null) {
+                val ctx = PlaybackContext(
+                    displayText = str("context_station", lastTrack.title ?: ""),
+                    navigationId = "qobuz_radio:$trackId",
+                    imageUrl = lastTrack.fullResArtwork,
+                    artistName = lastTrack.user?.username,
+                    isVerified = false
+                )
+                currentContext = ctx
+                MusicManager.updateContext(ctx)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isAutoplayRadioLoading = false
+        }
+    }
+
     fun smartPrevious(isCrossfade: Boolean = playerPrefs.getCrossfadeEnabled(), autoPlay: Boolean = true) {
         if (routeRemote("previous")) return
         if (!applyingTogether && com.alananasss.kittytune.data.together.Together.active.value != null) {
@@ -4407,6 +4651,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         // Otherwise, skip to the previous track in the queue (or restart if at the beginning).
         val prev = currentQueueIndex - 1
         if (currentPosition > 3000L || prev < 0) {
+            MusicManager.cancelCrossfade()
             flushListenSession("MANUAL_REPLAY")
             // The same track from the top is a new listen, not a continuation of the old one.
             beginListenSession(currentTrack)
@@ -4716,7 +4961,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun toggleLike() {
-        if (isRemotePlayback) { uiCurrentTrack?.let { toggleTrackLike(it) }; return }
+        if (routeRemote("like", if (uiIsLiked) 0L else 1L)) {
+            val t = uiCurrentTrack
+            if (t != null) {
+                remoteTrackLiked = !uiIsLiked
+                if (!uiIsLiked) LikeRepository.addLike(t) else LikeRepository.removeLike(t.id)
+            }
+            return
+        }
         val t = currentTrack ?: return
         isLiked = !isLiked
 
@@ -4726,6 +4978,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         } else {
             LikeRepository.removeLike(t.id)
         }
+        ConnectManager.publish(connectSnapshot())
     }
 
     val isYourMixActive: Boolean
@@ -5014,6 +5267,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun dislikeCurrentTrackInMix() {
+        if (routeRemote("dislike")) return
         val track = currentTrack ?: return
         if (isMyWaveActive) com.alananasss.kittytune.data.wave.WaveFeedback.onDisliked(track)
         playerPrefs.addMixDislikedTrack(track.id)
@@ -5108,9 +5362,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun setCustomSpeed(speed: Float) {
+        if (routeRemote("speed", (speed * 100f).toLong())) {
+            effectsState = effectsState.copy(speed = speed)
+            return
+        }
         val factor = if (isPreciseSpeedEnabled) 20f else 10f;
         val r = (speed * factor).roundToInt() / factor; effectsState =
             effectsState.copy(speed = r); applyEffectsAndSave()
+        ConnectManager.publish(connectSnapshot())
     }
 
     fun togglePitchEnabled(e: Boolean) {
@@ -5383,11 +5642,70 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var pinnedAudioFx by mutableStateOf(playerPrefs.getPinnedAudioFx())
         private set
 
+    fun disableEffects(fxIds: Collection<String>) {
+        if (fxIds.isEmpty()) return
+        var state = effectsState
+        var changed = false
+        for (fxId in fxIds) {
+            val updated = when (fxId) {
+                "bass_boost" -> if (state.isBassBoostEnabled) state.copy(isBassBoostEnabled = false) else null
+                "sub_octaver" -> if (state.isSubOctaverEnabled) state.copy(isSubOctaverEnabled = false) else null
+                "tape_saturation" -> if (state.isTapeSaturationEnabled) state.copy(isTapeSaturationEnabled = false) else null
+                "vocal_boost" -> if (state.isVocalBoostEnabled) state.copy(isVocalBoostEnabled = false) else null
+                "vocal_remover" -> if (state.isVocalRemoverEnabled) state.copy(isVocalRemoverEnabled = false) else null
+                "normalization" -> if (state.isNormalizationEnabled) state.copy(isNormalizationEnabled = false) else null
+                "earrape" -> if (state.isEarrapeEnabled) state.copy(isEarrapeEnabled = false) else null
+                "eight_d" -> if (state.is8DEnabled) state.copy(is8DEnabled = false) else null
+                "super_wide" -> if (state.isSuperWideEnabled) state.copy(isSuperWideEnabled = false) else null
+                "chorus" -> if (state.isChorusEnabled) state.copy(isChorusEnabled = false) else null
+                "flanger" -> if (state.isFlangerEnabled) state.copy(isFlangerEnabled = false) else null
+                "phaser" -> if (state.isPhaserEnabled) state.copy(isPhaserEnabled = false) else null
+                "ping_pong" -> if (state.isPingPongDelayEnabled) state.copy(isPingPongDelayEnabled = false) else null
+                "reverse_echo" -> if (state.isReverseEchoEnabled) state.copy(isReverseEchoEnabled = false) else null
+                "reverb" -> if (state.isReverbEnabled) state.copy(isReverbEnabled = false) else null
+                "shimmer_reverb" -> if (state.isShimmerReverbEnabled) state.copy(isShimmerReverbEnabled = false) else null
+                "stadium" -> if (state.isStadiumEnabled) state.copy(isStadiumEnabled = false) else null
+                "rotary_speaker" -> if (state.isRotarySpeakerEnabled) state.copy(isRotarySpeakerEnabled = false) else null
+                "asmr_vocal" -> if (state.isAsmrVocalEnabled) state.copy(isAsmrVocalEnabled = false) else null
+                "mono" -> if (state.isMonoEnabled) state.copy(isMonoEnabled = false) else null
+                "rain" -> if (state.isRainEnabled) state.copy(isRainEnabled = false) else null
+                "underwater" -> if (state.isUnderwaterEnabled) state.copy(isUnderwaterEnabled = false) else null
+                "empty_mall" -> if (state.isEmptyMallEnabled) state.copy(isEmptyMallEnabled = false) else null
+                "party_next_door" -> if (state.isPartyNextDoorEnabled) state.copy(isPartyNextDoorEnabled = false) else null
+                "night_drive" -> if (state.isNightDriveEnabled) state.copy(isNightDriveEnabled = false) else null
+                "muffled" -> if (state.isMuffledEnabled) state.copy(isMuffledEnabled = false) else null
+                "cassette_walkman" -> if (state.isWalkmanEnabled) state.copy(isWalkmanEnabled = false) else null
+                "vinyl_lofi" -> if (state.isVinylLoFiEnabled) state.copy(isVinylLoFiEnabled = false) else null
+                "gramophone" -> if (state.isGramophoneEnabled) state.copy(isGramophoneEnabled = false) else null
+                "vintage_mp3" -> if (state.isVintageMp3Enabled) state.copy(isVintageMp3Enabled = false) else null
+                "chiptune" -> if (state.isChiptuneEnabled) state.copy(isChiptuneEnabled = false) else null
+                "megaphone" -> if (state.isMegaphoneEnabled) state.copy(isMegaphoneEnabled = false) else null
+                "robot_vocoder" -> if (state.isRobotVocoderEnabled) state.copy(isRobotVocoderEnabled = false) else null
+                "trance_gate" -> if (state.isTranceGateEnabled) state.copy(isTranceGateEnabled = false) else null
+                else -> null
+            }
+            if (updated != null) {
+                state = updated
+                changed = true
+            }
+        }
+        if (changed) {
+            effectsState = state
+            applyEffectsAndSave()
+            ConnectManager.publish(connectSnapshot())
+        }
+    }
+
+    fun disableEffect(fxId: String) {
+        disableEffects(listOf(fxId))
+    }
+
     fun togglePinAudioFx(fxId: String): Boolean {
         val current = pinnedAudioFx.toMutableList()
         val isPinned = current.contains(fxId)
         if (isPinned) {
             current.remove(fxId)
+            disableEffect(fxId)
         } else {
             current.add(fxId)
         }
@@ -5397,13 +5715,18 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun updatePinnedAudioFx(fxIds: List<String>) {
+        val removed = pinnedAudioFx.filterNot { fxIds.contains(it) }
+        disableEffects(removed)
         pinnedAudioFx = fxIds
         playerPrefs.setPinnedAudioFx(fxIds)
     }
 
     fun resetPinnedAudioFx() {
-        pinnedAudioFx = PlayerPreferences.DEFAULT_PINNED_AUDIO_FX
-        playerPrefs.setPinnedAudioFx(PlayerPreferences.DEFAULT_PINNED_AUDIO_FX)
+        val defaults = PlayerPreferences.DEFAULT_PINNED_AUDIO_FX
+        val removed = pinnedAudioFx.filterNot { defaults.contains(it) }
+        disableEffects(removed)
+        pinnedAudioFx = defaults
+        playerPrefs.setPinnedAudioFx(defaults)
     }
 
     fun isAudioFxPinned(fxId: String): Boolean = pinnedAudioFx.contains(fxId)
@@ -5430,6 +5753,145 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 effectsState
             )
         }
+    }
+
+    private var equalizerSaveJob: Job? = null
+
+    private fun applyEqualizerAndSave() {
+        MusicManager.applyEqualizer(equalizerState)
+        val snapshot = equalizerState
+        equalizerSaveJob?.cancel()
+        equalizerSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            // Dragging a band produces one state per pixel; only the resting value needs to reach disk.
+            delay(250)
+            playerPrefs.saveEqualizerState(snapshot)
+        }
+    }
+
+    fun toggleEqualizer() {
+        equalizerState = equalizerState.copy(isEnabled = !equalizerState.isEnabled)
+        applyEqualizerAndSave()
+    }
+
+    fun setEqualizerBand(bandIndex: Int, gainDb: Float) {
+        val currentGains = equalizerState.bandGainsDb.toMutableList()
+        if (bandIndex !in currentGains.indices) return
+        currentGains[bandIndex] = gainDb.coerceIn(-12f, 12f)
+        equalizerState = equalizerState.copy(
+            bandGainsDb = currentGains,
+            selectedPreset = "Custom",
+            autoProfileId = null,
+            autoProfileName = null,
+            autoProfileSource = null,
+            autoProfileDeviceKey = null,
+            autoProfileDeviceName = null,
+        )
+        applyEqualizerAndSave()
+    }
+
+    fun setEqualizerPreamp(preampDb: Float) {
+        equalizerState = equalizerState.copy(preampDb = preampDb.coerceIn(-12f, 12f))
+        applyEqualizerAndSave()
+    }
+
+    fun applyEqualizerPreset(preset: EqualizerPreset) {
+        equalizerState = equalizerState.copy(
+            bandGainsDb = preset.bandGainsDb,
+            preampDb = preset.preampDb,
+            selectedPreset = preset.name,
+            autoProfileId = null,
+            autoProfileName = null,
+            autoProfileSource = null,
+            autoProfileDeviceKey = null,
+            autoProfileDeviceName = null,
+        )
+        applyEqualizerAndSave()
+    }
+
+    fun resetEqualizer() = applyEqualizerPreset(EqualizerPresets.Flat)
+
+    fun applyAutoEqProfile(data: AutoEqProfileData, device: ConnectedHeadphone?) {
+        equalizerState = equalizerState.copy(
+            isEnabled = true,
+            bandGainsDb = data.gainsDb,
+            preampDb = data.preampDb,
+            selectedPreset = data.profile.name,
+            autoProfileId = data.profile.id,
+            autoProfileName = data.profile.name,
+            autoProfileSource = data.profile.attribution,
+            autoProfileDeviceKey = device?.key,
+            autoProfileDeviceName = device?.name,
+        )
+        applyEqualizerAndSave()
+        if (device != null) {
+            playerPrefs.saveEqProfileForDevice(
+                SavedEqProfile(
+                    profileId = data.profile.id,
+                    profileName = data.profile.name,
+                    source = data.profile.attribution,
+                    deviceKey = device.key,
+                    deviceName = device.name,
+                    gainsDb = data.gainsDb,
+                    preampDb = data.preampDb,
+                )
+            )
+            lastAutoEqDeviceKey = device.key
+        }
+    }
+
+    fun removeAutoEqProfile(deviceKey: String? = null) {
+        val key = deviceKey ?: equalizerState.autoProfileDeviceKey
+        if (!key.isNullOrBlank()) playerPrefs.clearSavedEqProfileForDevice(key)
+        applyEqualizerPreset(EqualizerPresets.Flat)
+    }
+
+    fun setAutoEqAutoApply(enabled: Boolean) {
+        autoEqAutoApplyEnabled = enabled
+        playerPrefs.setAutoEqAutoApply(enabled)
+        if (enabled) {
+            lastAutoEqDeviceKey = null
+            maybeRestoreAutoEq(connectedHeadphone)
+        }
+    }
+
+    fun refreshConnectedHeadphone() {
+        viewModelScope.launch {
+            val device = HeadphoneDetector.refresh()
+            connectedHeadphone = device
+            maybeRestoreAutoEq(device)
+        }
+    }
+
+    /**
+     * Reopens the AutoEq profile remembered for this pair. It is deliberately keyed by the model
+     * name, so the same profile follows the headset from a 3.5 mm jack to USB or Bluetooth.
+     */
+    private fun maybeRestoreAutoEq(device: ConnectedHeadphone?) {
+        if (device == null) {
+            lastAutoEqDeviceKey = null
+            return
+        }
+        if (device.key == lastAutoEqDeviceKey) return
+        lastAutoEqDeviceKey = device.key
+        if (!autoEqAutoApplyEnabled) return
+        val saved = playerPrefs.getSavedEqProfileForDevice(device.key) ?: return
+        if (equalizerState.isEnabled &&
+            equalizerState.autoProfileId == saved.profileId &&
+            equalizerState.autoProfileDeviceKey == device.key
+        ) return
+        equalizerState = equalizerState.copy(
+            isEnabled = true,
+            bandGainsDb = saved.gainsDb,
+            preampDb = saved.preampDb,
+            selectedPreset = saved.profileName,
+            autoProfileId = saved.profileId,
+            autoProfileName = saved.profileName,
+            autoProfileSource = saved.source,
+            autoProfileDeviceKey = device.key,
+            autoProfileDeviceName = device.name,
+        )
+        applyEqualizerAndSave()
+        viewModelScope.launch { _uiEvent.emit(str("equalizer_auto_restored", saved.profileName)) }
     }
 
     fun showTrackOptions(track: Track, playlistContextId: Long? = null, fromPlayer: Boolean = false) {
@@ -5495,17 +5957,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun toggleTrackLike(track: Track) {
-        if (!isRemotePlayback && track.id == currentTrack?.id) {
+        if (isRemotePlayback && track.id == uiCurrentTrack?.id) {
             toggleLike()
+            return
+        }
+        val isCurrentlyLiked = LikeRepository.isTrackLiked(track.id)
+        if (isCurrentlyLiked) {
+            LikeRepository.removeLike(track.id)
         } else {
-            val isCurrentlyLiked = LikeRepository.isTrackLiked(track.id)
-            if (isCurrentlyLiked) {
-                LikeRepository.removeLike(track.id)
-            } else {
-                LikeRepository.addLike(track)
-            }
-            if (track.id == uiCurrentTrack?.id) remoteTrackLiked = !isCurrentlyLiked
-            if (track.id == currentTrack?.id) isLiked = !isCurrentlyLiked
+            LikeRepository.addLike(track)
+        }
+        if (track.id == uiCurrentTrack?.id) remoteTrackLiked = !isCurrentlyLiked
+        if (track.id == currentTrack?.id) {
+            isLiked = !isCurrentlyLiked
+            ConnectManager.publish(connectSnapshot())
         }
     }
 
@@ -5560,8 +6025,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     /** Captured on the UI thread; a live controller never overwrites the local player. */
     private fun connectSnapshot(): PlaybackSnapshot? {
         val window = connectQueueWindow.capture(queueState, currentQueueIndex) ?: return null
-        return PlaybackSnapshot(SyncLog.deviceId, System.currentTimeMillis(), window.queue,
-            window.index, currentPosition.coerceAtLeast(0L), isPlaying, shuffleEnabled, repeatMode.name, volume = volume)
+        return PlaybackSnapshot(
+            SyncLog.deviceId, System.currentTimeMillis(), window.queue,
+            window.index, currentPosition.coerceAtLeast(0L), isPlaying, shuffleEnabled, repeatMode.name,
+            volume = volume, isLiked = isLiked, isYourMixActive = isYourMixActive,
+            speed = effectsState.speed,
+            sleepTimerRemainingMs = sleepTimerRemainingMs.takeIf { isSleepTimerActive && !sleepTimerEndOfTrack },
+            sleepTimerEndOfTrack = sleepTimerEndOfTrack.takeIf { isSleepTimerActive }
+        )
     }
 
     private suspend fun handleConnectCommand(command: ConnectMessage) {
@@ -5583,6 +6054,37 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 val target = when (command.value) { 0L -> RepeatMode.NONE; 1L -> RepeatMode.ALL; 2L -> RepeatMode.ONE; else -> error("Invalid repeat mode") }
                 repeatMode = target
                 applyRepeatMode()
+            }
+            "like" -> {
+                val shouldLike = command.value == 1L
+                val t = currentTrack ?: uiCurrentTrack
+                if (t != null && isLiked != shouldLike) {
+                    isLiked = shouldLike
+                    if (shouldLike) {
+                        LikeRepository.addLike(t)
+                        if (isMyWaveActive) com.alananasss.kittytune.data.wave.WaveFeedback.onLiked(t)
+                    } else {
+                        LikeRepository.removeLike(t.id)
+                    }
+                    ConnectManager.publish(connectSnapshot())
+                }
+            }
+            "dislike" -> {
+                dislikeCurrentTrackInMix()
+                ConnectManager.publish(connectSnapshot())
+            }
+            "speed" -> {
+                val s = (command.value / 100f).coerceIn(0.25f, 3.0f)
+                setCustomSpeed(s)
+                ConnectManager.publish(connectSnapshot())
+            }
+            "sleep_timer" -> {
+                when (command.value) {
+                    0L -> cancelSleepTimer()
+                    -1L -> startSleepTimerEndOfTrack()
+                    else -> if (command.value > 0L) startSleepTimer(command.value)
+                }
+                ConnectManager.publish(connectSnapshot())
             }
             "queue", "remove" -> {
                 val state = connectSnapshot() ?: error("Queue is empty")
@@ -5661,8 +6163,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 val playing = isPlaying
                 val shuffle = shuffleEnabled
                 val repeat = repeatMode.name
+                val liked = isLiked
+                val mix = isYourMixActive
+                val spd = effectsState.speed
+                val timerMs = sleepTimerRemainingMs.takeIf { isSleepTimerActive && !sleepTimerEndOfTrack }
+                val timerEnd = sleepTimerEndOfTrack.takeIf { isSleepTimerActive }
                 viewModelScope.launch(Dispatchers.IO) {
-                    SyncPlayback.publish(q, index, position, playing, shuffle, repeat)
+                    SyncPlayback.publish(q, index, position, playing, shuffle, repeat, liked, mix, spd, timerMs, timerEnd)
                 }
             }
         }
@@ -5930,6 +6437,10 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     // â”€â”€â”€ Sleep Timer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     fun startSleepTimer(durationMs: Long) {
+        if (routeRemote("sleep_timer", durationMs)) {
+            showSleepTimerDialog = false
+            return
+        }
         cancelSleepTimer()
 
         val isFadeEnabled = playerPrefs.getSleepTimerFadeEnabled()
@@ -5946,6 +6457,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         showSleepTimerDialog = false
         showSleepTimerIslandNotification(isStarted = true, durationText = formatRemaining(durationMs))
         emitUiEvent(str("sleep_timer_started"))
+        ConnectManager.publish(connectSnapshot())
 
         sleepTimerJob = viewModelScope.launch(Dispatchers.Main) {
             while (isActive) {
@@ -5992,15 +6504,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun startSleepTimerEndOfTrack() {
+        if (routeRemote("sleep_timer", -1L)) {
+            showSleepTimerDialog = false
+            return
+        }
         cancelSleepTimer()
         sleepTimerRemainingMs = 0L
         sleepTimerEndOfTrack = true
         showSleepTimerDialog = false
         showSleepTimerIslandNotification(isStarted = true, durationText = str("sleep_timer_end_of_track"))
         emitUiEvent(str("sleep_timer_started"))
+        ConnectManager.publish(connectSnapshot())
     }
 
     fun cancelSleepTimer() {
+        if (routeRemote("sleep_timer", 0L)) {
+            showSleepTimerDialog = false
+            return
+        }
         sleepTimerJob?.cancel()
         sleepTimerJob = null
         // Only if a fade actually lowered the volume. This used to compare against a field that
@@ -6010,9 +6531,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         preFadeVolume = null
         sleepTimerRemainingMs = 0L
         sleepTimerEndOfTrack = false
+        ConnectManager.publish(connectSnapshot())
     }
 
     fun formatSleepTimerRemaining(): String {
+        if (isRemotePlayback) {
+            if (remotePeer?.snapshot?.sleepTimerEndOfTrack == true) return str("sleep_timer_end_of_track")
+            val ms = remotePeer?.snapshot?.sleepTimerRemainingMs ?: 0L
+            return formatRemaining(ms)
+        }
         if (sleepTimerEndOfTrack) return str("sleep_timer_end_of_track")
         return formatRemaining(sleepTimerRemainingMs)
     }
@@ -6381,6 +6908,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 .build()
             viewModelScope.launch(Dispatchers.Main) {
                 try {
+                    // A skip may have replaced this load while it was resolving. The newer
+                    // selection owns the player now; starting this one would play two tracks.
+                    if (currentQueueIndex != index || currentTrack?.id != trackToPlay.id) return@launch
                     isLoading = false
                     isPlaying = true
                     currentPosition = MusicManager.player.currentPosition.coerceAtLeast(0L)
@@ -6470,6 +7000,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
             if (resolvedUrl == null) {
                 withContext(Dispatchers.Main) {
+                    MusicManager.cancelCrossfade()
                     MusicManager.stop()
                     if (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
                         isLoading = true
@@ -6497,6 +7028,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
             withContext(Dispatchers.Main) {
                 try {
+                    // The resolution above can outlive a quick skip. Never let a stale result
+                    // overwrite the track that is selected now.
+                    if (currentQueueIndex != index || currentTrack?.id != trackToPlay.id) {
+                        MusicManager.cancelCrossfade()
+                        return@withContext
+                    }
                     currentStreamSource = finalStreamSource
                     queueChunkingJob?.cancel()
 
@@ -6520,6 +7057,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     preloadNextTrack(index + 1)
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    MusicManager.cancelCrossfade()
+                    MusicManager.stop()
                     isLoading = false
                     isPlaying = false
                 }

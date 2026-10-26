@@ -3,6 +3,7 @@ package com.alananasss.kittytune.data
 import com.alananasss.kittytune.audio.AudioEngine
 import com.alananasss.kittytune.domain.Track
 import com.alananasss.kittytune.ui.player.AudioEffectsState
+import com.alananasss.kittytune.ui.player.EqualizerState
 import com.alananasss.kittytune.ui.player.PlaybackContext
 import com.alananasss.kittytune.utils.Config
 import kotlinx.coroutines.CoroutineScope
@@ -184,6 +185,7 @@ object MusicManager {
     fun setTrackGainDb(db: Float) { player.trackGainDb = db }
     fun getVolume(): Float = player.volume
     fun stop() = player.stop()
+    fun cancelCrossfade() = player.cancelCrossfade()
 
     val isCrossfadingOut: Boolean get() = player.isCrossfadingOut
 
@@ -213,6 +215,10 @@ object MusicManager {
         rainPlayer?.setAmbientType(state.ambientType)
         rainPlayer?.setEnabled(state.isRainEnabled)
         rainPlayer?.setVolume(state.rainVolume)
+    }
+
+    fun applyEqualizer(state: EqualizerState) {
+        player.applyEqualizer(state)
     }
 
     fun onKaraokeStemReady(trackId: Long) {

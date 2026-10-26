@@ -389,7 +389,7 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
         SettingsGroupTitle(str("settings_audio_quality_title"))
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SettingsItem(
-                shape = getSettingsShape(4, 0),
+                shape = getSettingsShape(5, 0),
                 title = str("pref_audio_device_title"),
                 subtitle = if (currentDevice.isEmpty()) {
                     systemDefaultSinkDesc ?: str("pref_audio_device_default")
@@ -400,13 +400,13 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                 onClick = { showDeviceDialog = true }
             )
             SettingsItem(
-                shape = getSettingsShape(4, 1),
+                shape = getSettingsShape(5, 1),
                 title = str("pref_quality"),
                 subtitle = if (audioQuality == "HIGH") str("quality_high") else str("quality_low"),
                 onClick = { showQualityDialog = true }
             )
             SettingsItem(
-                shape = getSettingsShape(4, 2),
+                shape = getSettingsShape(5, 2),
                 title = str("pref_audio_mono"),
                 subtitle = str("pref_audio_mono_sub"),
                 hasSwitch = true,
@@ -415,7 +415,20 @@ fun AudioQualityPage(playerViewModel: PlayerViewModel) {
                 highlightKey = "pref_audio_mono"
             )
             SplitSettingsItem(
-                shape = getSettingsShape(4, 3),
+                shape = getSettingsShape(5, 3),
+                title = str("equalizer_title"),
+                subtitle = if (playerViewModel.equalizerState.isEnabled) {
+                    playerViewModel.equalizerState.selectedPreset
+                } else {
+                    str("equalizer_subtitle")
+                },
+                onClick = { playerViewModel.showEqualizerScreen = true },
+                switchState = playerViewModel.equalizerState.isEnabled,
+                onSwitchChange = { playerViewModel.toggleEqualizer() },
+                highlightKey = "equalizer"
+            )
+            SplitSettingsItem(
+                shape = getSettingsShape(5, 4),
                 title = str("pref_norm_title"),
                 subtitle = str("pref_norm_sub"),
                 onClick = { showNormDialog = true },
