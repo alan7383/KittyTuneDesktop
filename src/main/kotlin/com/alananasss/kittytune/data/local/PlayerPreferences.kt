@@ -409,7 +409,8 @@ class PlayerPreferences {
         const val SIDEBAR_NAV_HISTORY = "history"
         const val SIDEBAR_NAV_SETTINGS = "settings"
         const val SIDEBAR_NAV_SEARCH = "search"
-        val SIDEBAR_NAV_EXTRAS = listOf(SIDEBAR_NAV_SEARCH, SIDEBAR_NAV_STATS, SIDEBAR_NAV_HISTORY, SIDEBAR_NAV_SETTINGS)
+        const val SIDEBAR_NAV_EQUALIZER = "equalizer"
+        val SIDEBAR_NAV_EXTRAS = listOf(SIDEBAR_NAV_SEARCH, SIDEBAR_NAV_STATS, SIDEBAR_NAV_HISTORY, SIDEBAR_NAV_SETTINGS, SIDEBAR_NAV_EQUALIZER)
 
         private const val KEY_SIDEBAR_NAV_LAYOUT = "sidebar_nav_layout"
 
