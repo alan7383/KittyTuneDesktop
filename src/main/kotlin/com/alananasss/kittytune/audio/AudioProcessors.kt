@@ -229,17 +229,32 @@ class FxAudioProcessor : BaseAudioProcessor() {
 
 class ReverbAudioProcessor : BaseAudioProcessor() {
     private var enabled = false
-    private var buffer: ShortArray = ShortArray(0)
-    private var cursor = 0
-
     private val delayMs = 150
+    private var buffer: ShortArray = ShortArray((44100 * (delayMs / 1000.0) * 2).toInt())
+    private var cursor = 0
     private var decay = 0.5f
+
+    private fun ensureBuffer() {
+        val rate = if (inputAudioFormat.sampleRate > 0) inputAudioFormat.sampleRate else 44100
+        val channels = if (inputAudioFormat.channelCount > 0) inputAudioFormat.channelCount else 2
+        val requiredSize = (rate * (delayMs / 1000.0) * channels).toInt().coerceAtLeast(1)
+        if (buffer.size != requiredSize) {
+            buffer = ShortArray(requiredSize)
+            cursor = 0
+        }
+    }
 
     fun setEnabled(enabled: Boolean) {
         if (this.enabled != enabled) {
             this.enabled = enabled
-
-            if (!enabled) buffer = ShortArray(0)
+            if (enabled) {
+                ensureBuffer()
+            } else {
+                cursor = 0
+                if (buffer.isNotEmpty()) {
+                    buffer.fill(0)
+                }
+            }
         }
     }
 
@@ -248,10 +263,7 @@ class ReverbAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun onConfigure(inputAudioFormat: AudioFormat): AudioFormat {
-
-        val bufferSize = (inputAudioFormat.sampleRate * (delayMs / 1000.0) * inputAudioFormat.channelCount).toInt()
-        buffer = ShortArray(bufferSize)
-        cursor = 0
+        ensureBuffer()
         return inputAudioFormat
     }
 
@@ -262,11 +274,18 @@ class ReverbAudioProcessor : BaseAudioProcessor() {
         }
     }
 
+    override fun onReset() {
+        cursor = 0
+        if (buffer.isNotEmpty()) {
+            buffer.fill(0)
+        }
+    }
+
     override fun queueInput(inputBuffer: ByteBuffer) {
         val remaining = inputBuffer.remaining()
         if (remaining == 0) return
 
-        if (!enabled) {
+        if (!enabled || buffer.isEmpty()) {
             val outputBuffer = replaceOutputBuffer(remaining)
             outputBuffer.put(inputBuffer)
             outputBuffer.flip()
