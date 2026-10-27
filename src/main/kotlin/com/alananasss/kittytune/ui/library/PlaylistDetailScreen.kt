@@ -2259,13 +2259,20 @@ fun TrackListItem(
             }
             Spacer(Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title ?: str("untitled_track"),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = titleWeight,
-                    color = titleColor
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = track.title ?: str("untitled_track"),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = titleWeight,
+                        color = titleColor,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (track.isGoPlus) {
+                        Spacer(Modifier.width(6.dp))
+                        com.alananasss.kittytune.ui.common.GoPlusBadge(compact = true)
+                    }
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isDownloaded && !isDownloading) {
                         Icon(Icons.Rounded.DownloadDone, str("btn_downloaded"), modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary)
@@ -2504,14 +2511,21 @@ fun TrackTableItem(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(
-                        text = track.title ?: str("untitled_track"),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontWeight = titleWeight,
-                        color = titleColor,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = track.title ?: str("untitled_track"),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = titleWeight,
+                            color = titleColor,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (track.isGoPlus) {
+                            Spacer(Modifier.width(6.dp))
+                            com.alananasss.kittytune.ui.common.GoPlusBadge(compact = true)
+                        }
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (isDownloaded && !isDownloading) {
                             Icon(Icons.Rounded.DownloadDone, str("btn_downloaded"), modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)
@@ -2836,6 +2850,10 @@ fun TrackCompactItem(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f, fill = false)
                     )
+                    if (track.isGoPlus) {
+                        Spacer(Modifier.width(6.dp))
+                        com.alananasss.kittytune.ui.common.GoPlusBadge(compact = true)
+                    }
                     if (isDownloaded && !isDownloading) {
                         Spacer(Modifier.width(6.dp))
                         Icon(Icons.Rounded.DownloadDone, str("btn_downloaded"), modifier = Modifier.size(12.dp), tint = MaterialTheme.colorScheme.primary)

@@ -492,6 +492,13 @@
                 media?.transcodings?.any { it.snipped == true } == true ||
                 (fullDurationMs != null && durationMs != null && durationMs <= 45_000L && (fullDurationMs - durationMs) > 15_000L)
 
+        val isGoPlus: Boolean
+            get() = (source == null || source == "soundcloud") &&
+                (monetizationModel.equals("SUB_HIGH_TIER", ignoreCase = true) ||
+                 policy.equals("SNIP", ignoreCase = true) ||
+                 isSnipped ||
+                 media?.transcodings?.any { it.snipped == true } == true)
+
         val effectiveFullDurationMs: Long?
             get() = fullDurationMs?.takeIf { it > 0L } ?: durationMs
 

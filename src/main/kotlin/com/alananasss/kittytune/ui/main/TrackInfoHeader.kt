@@ -124,13 +124,20 @@ private fun TitleAndArtist(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text = track.title ?: "",
-            style = if (isLarge) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = track.title ?: "",
+                style = if (isLarge) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (track.isGoPlus) {
+                Spacer(Modifier.width(6.dp))
+                com.alananasss.kittytune.ui.common.GoPlusBadge()
+            }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             // navigateToTrackArtist routes both sources, and opens the picker when several artists are credited.
             ArtistLinkText(

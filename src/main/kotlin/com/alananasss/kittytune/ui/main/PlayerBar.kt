@@ -245,13 +245,20 @@ fun PlayerBar(
                                 modifier = Modifier.weight(1f, fill = false).widthIn(max = titleMaxWidth),
                                 verticalArrangement = Arrangement.Center,
                             ) {
-                                Text(
-                                    text = track.title.orEmpty(),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = track.title.orEmpty(),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false),
+                                    )
+                                    if (track.isGoPlus) {
+                                        Spacer(Modifier.width(5.dp))
+                                        com.alananasss.kittytune.ui.common.GoPlusBadge(compact = true)
+                                    }
+                                }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     val deviceLabel = vm.playbackDeviceLabel
