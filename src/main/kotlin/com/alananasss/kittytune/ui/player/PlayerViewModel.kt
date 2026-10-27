@@ -2027,6 +2027,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 if (_queue.isEmpty()) {
                     MusicManager.player.stop()
                     currentTrack = null
+                    currentStreamSource = null
                     isPlaying = false
                 } else if (wasCurrentTrack) {
                     val targetIdx = currentQueueIndex.coerceIn(0, _queue.size - 1)
@@ -4199,6 +4200,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         loadTrimFor(trackToPlay.id)
         hasPushedRecentlyPlayed = false
         currentTrack = trackToPlay; MusicManager.currentTrack = trackToPlay
+        currentStreamSource = trackToPlay.source
 
         playRobustly(index, autoPlay = autoPlay, isCrossfade = isCrossfade)
         refillWaveIfLow()
@@ -6900,6 +6902,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         if (index !in _queue.indices) return
 
         val trackToPlay = _queue[index]
+        currentStreamSource = trackToPlay.source
 
         if (isCrossfade && MusicManager.isPrebuffered(trackToPlay.id)) {
             val emptyItem = com.alananasss.kittytune.media.MediaItem.Builder()
@@ -7002,6 +7005,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 withContext(Dispatchers.Main) {
                     MusicManager.cancelCrossfade()
                     MusicManager.stop()
+                    currentStreamSource = trackToPlay.source
                     if (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
                         isLoading = true
                         isPlaying = false

@@ -183,13 +183,47 @@ object StreamResolver {
     fun cachedStreamUrl(trackId: Long): String? =
         streamCache[trackId]?.takeIf { it.isUsable() }?.stream?.url
 
-    fun init() {}
+    fun init() {
+        ensureNewPipeClientVersion()
+    }
 
     init {
         try {
             NewPipe.init(ExtractorDownloader)
+            ensureNewPipeClientVersion()
         } catch (e: Exception) {
             e.printStackTrace()
+        }
+    }
+
+    /**
+     * NewPipeExtractor v0.26.2+ attempts to dynamically extract the YouTube WEB client version
+     * by fetching sw.js. YouTube changed sw.js and results page HTML, which causes
+     * extractClientVersionFromHtmlSearchResultsPage() to throw an unhandled
+     * ParsingException("Could not get ytInitialData").
+     *
+     * Priming clientVersion and clientVersionExtracted via reflection ensures NewPipe skips
+     * scraping sw.js/results page and directly uses the valid InnerTube API for stream extraction.
+     */
+    fun ensureNewPipeClientVersion(force: Boolean = false) {
+        try {
+            val helperClass = org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper::class.java
+            val cvField = helperClass.getDeclaredField("clientVersion")
+            cvField.isAccessible = true
+            if (force || cvField.get(null) == null) {
+                cvField.set(null, "2.20260120.01.00")
+            }
+            val cveField = helperClass.getDeclaredField("clientVersionExtracted")
+            cveField.isAccessible = true
+            cveField.set(null, true)
+
+            val ytmField = helperClass.getDeclaredField("youtubeMusicClientVersion")
+            ytmField.isAccessible = true
+            if (force || ytmField.get(null) == null) {
+                ytmField.set(null, "1.20260121.03.00")
+            }
+        } catch (e: Exception) {
+            Logger.w("StreamResolver", "Failed to prime YoutubeParsingHelper clientVersion: ${e.message}")
         }
     }
 
@@ -512,7 +546,7 @@ object StreamResolver {
                         val ytUrl = resolveViaNewPipe(track)
                         if (ytUrl != null) {
                             Logger.i("StreamResolver", "Using YouTube stream for '${track.title}'")
-                            return ResolvedStream(ytUrl, source = "youtube")
+                            return ResolvedStream(ytUrl, source = "youtube_music")
                         }
                     }
                     AudioProviderOrderItem.SOUNDCLOUD -> {
@@ -596,7 +630,8 @@ object StreamResolver {
     private const val DURATION_TOLERANCE_SEC = 12L
 
     private fun resolveViaNewPipe(track: Track): String? {
-        return try {
+        ensureNewPipeClientVersion()
+        fun extract(): String? {
             val cleanTitle = track.title?.replace(Regex("(?i)(\\[.*?\\]|\\(.*?\\))"), "")?.trim() ?: ""
             val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.trim()
             val query = if (artistName.isNotBlank() && !cleanTitle.contains(artistName, ignoreCase = true)) {
@@ -673,18 +708,29 @@ object StreamResolver {
                 .filter { it.url != null }
                 .minByOrNull { it.getResolution()?.replace("p", "")?.toIntOrNull() ?: Int.MAX_VALUE }
 
-            bestVideoStream?.url
+            return bestVideoStream?.url
+        }
+
+        return try {
+            extract()
         } catch (e: Exception) {
-            e.printStackTrace()
-            null
+            Logger.w("StreamResolver", "[YouTube] First extraction attempt failed for '${track.title}': ${e.message}, retrying with re-primed client version...")
+            try {
+                ensureNewPipeClientVersion(force = true)
+                extract()
+            } catch (retryE: Exception) {
+                Logger.e("StreamResolver", "[YouTube] Failed to extract stream for '${track.title}': ${retryE.message}")
+                null
+            }
         }
     }
 
     private fun resolveFromYoutubeDirect(track: Track): String? {
         val url = track.permalinkUrl ?: return null
-        return try {
+        ensureNewPipeClientVersion()
+        fun extract(targetUrl: String): String? {
             val service = ServiceList.YouTube
-            val extractor = service.getStreamExtractor(url)
+            val extractor = service.getStreamExtractor(targetUrl)
             extractor.fetchPage()
             val best = extractor.audioStreams
                 .filter { it.deliveryMethod == org.schabi.newpipe.extractor.stream.DeliveryMethod.PROGRESSIVE_HTTP && it.url != null }
@@ -697,10 +743,19 @@ object StreamResolver {
             val muxed = extractor.videoStreams
                 .filter { it.url != null }
                 .minByOrNull { it.getResolution()?.replace("p", "")?.toIntOrNull() ?: Int.MAX_VALUE }
-            muxed?.url
+            return muxed?.url
+        }
+        return try {
+            extract(url)
         } catch (e: Exception) {
-            e.printStackTrace()
-            null
+            Logger.w("StreamResolver", "[YouTube] First extraction attempt failed for $url: ${e.message}, retrying with re-primed client version...")
+            try {
+                ensureNewPipeClientVersion(force = true)
+                extract(url)
+            } catch (retryE: Exception) {
+                Logger.e("StreamResolver", "[YouTube] Failed to extract stream from $url: ${retryE.message}")
+                null
+            }
         }
     }
 
