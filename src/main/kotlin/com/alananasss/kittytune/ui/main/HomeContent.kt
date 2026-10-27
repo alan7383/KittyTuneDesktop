@@ -1991,13 +1991,20 @@ private fun SearchTrackRow(track: Track, playerViewModel: PlayerViewModel, onOpe
         )
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = track.title ?: "",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = track.title ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (track.isGoPlus) {
+                    Spacer(Modifier.width(6.dp))
+                    com.alananasss.kittytune.ui.common.GoPlusBadge(compact = true)
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ArtistLinkText(
                     track = track,
