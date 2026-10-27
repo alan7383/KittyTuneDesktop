@@ -94,6 +94,7 @@ import com.alananasss.kittytune.ui.common.ScrollableLazyColumn as LazyColumn
  */
 private sealed interface QueueListItem {
     data class PastHeader(val count: Int, val isExpanded: Boolean) : QueueListItem
+    data class UpNextHeader(val count: Int) : QueueListItem
     data class TrackItem(val queueIndex: Int, val track: Track) : QueueListItem
 }
 
@@ -121,16 +122,20 @@ internal fun QueueList(vm: PlayerViewModel) {
     var pastExpandedByUser by remember { mutableStateOf<Boolean?>(null) }
     val isPastExpanded = pastExpandedByUser ?: (pastCount <= PAST_COLLAPSE_THRESHOLD)
 
-    val listItems = remember(queue, currentIndex, played, isPastExpanded) {
+    val upNextCount = (queue.size - currentIndex - 1).coerceAtLeast(0)
+
+    val listItems = remember(queue, currentIndex, played, isPastExpanded, upNextCount) {
         buildList {
             for (index in queue.indices) {
                 if (index == firstPast) add(QueueListItem.PastHeader(count = pastCount, isExpanded = isPastExpanded))
+                if (currentIndex >= 0 && index == currentIndex + 1 && upNextCount > 0) {
+                    add(QueueListItem.UpNextHeader(count = upNextCount))
+                }
                 val isPast = index in pastIndices
                 if (!isPast || isPastExpanded) add(QueueListItem.TrackItem(queueIndex = index, track = queue[index]))
             }
         }
     }
-    val upNextCount = (queue.size - currentIndex - 1).coerceAtLeast(0)
 
     val reorderableState = rememberReorderableLazyListState(
         lazyListState = listState,
@@ -170,6 +175,7 @@ internal fun QueueList(vm: PlayerViewModel) {
             key = { item ->
                 when (item) {
                     is QueueListItem.PastHeader -> "queue_header_past"
+                    is QueueListItem.UpNextHeader -> "queue_header_up_next"
                     is QueueListItem.TrackItem -> keys[item.queueIndex]
                 }
             }
@@ -182,23 +188,21 @@ internal fun QueueList(vm: PlayerViewModel) {
                     isExpanded = item.isExpanded,
                     onToggle = { pastExpandedByUser = !item.isExpanded },
                 )
+                is QueueListItem.UpNextHeader -> QueueSectionRule(
+                    label = str("queue_up_next"),
+                    count = item.count
+                )
                 is QueueListItem.TrackItem -> {
                     val index = item.queueIndex
                     ReorderableItem(state = reorderableState, key = keys[index]) { isDragging ->
-                        Column {
-                            // Named where the treatment changes, so the upcoming tracks read as a section.
-                            if (currentIndex >= 0 && index == currentIndex + 1) {
-                                QueueSectionRule(str("queue_up_next"), count = upNextCount)
-                            }
-                            QueueRow(
-                                vm = vm,
-                                track = item.track,
-                                index = index,
-                                isCurrent = index == currentIndex,
-                                isPast = index in pastIndices,
-                                isDragging = isDragging,
-                            )
-                        }
+                        QueueRow(
+                            vm = vm,
+                            track = item.track,
+                            index = index,
+                            isCurrent = index == currentIndex,
+                            isPast = index in pastIndices,
+                            isDragging = isDragging,
+                        )
                     }
                 }
             }
