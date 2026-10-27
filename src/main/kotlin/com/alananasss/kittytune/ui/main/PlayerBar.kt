@@ -254,10 +254,6 @@ fun PlayerBar(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f, fill = false),
                                     )
-                                    if (track.isGoPlus) {
-                                        Spacer(Modifier.width(5.dp))
-                                        com.alananasss.kittytune.ui.common.GoPlusBadge(compact = true)
-                                    }
                                 }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {

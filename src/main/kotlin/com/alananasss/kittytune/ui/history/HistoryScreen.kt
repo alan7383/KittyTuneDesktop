@@ -609,6 +609,10 @@ fun HistoryTrackRow(
                         )
                     }
 
+                    if (track.isGoPlus) {
+                        com.alananasss.kittytune.ui.common.GoPlusBadge(compact = true)
+                    }
+
                     Text(
                         text = "• $timeStr",
                         style = MaterialTheme.typography.labelSmall,
