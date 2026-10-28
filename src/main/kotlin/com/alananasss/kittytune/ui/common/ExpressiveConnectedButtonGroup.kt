@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
@@ -29,11 +30,10 @@ fun <T> ExpressiveConnectedButtonGroup(
     modifier: Modifier = Modifier,
     fillMaxWidth: Boolean = false,
     contentPadding: PaddingValues? = null,
-    // Optional Android-parity styling (recognition screen). Null = library defaults (current look).
-    checkedContainerColor: Color? = null,
-    uncheckedContainerColor: Color? = null,
-    checkedContentColor: Color? = null,
-    uncheckedContentColor: Color? = null,
+    checkedContainerColor: Color = MaterialTheme.colorScheme.primary,
+    uncheckedContainerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
+    checkedContentColor: Color = MaterialTheme.colorScheme.onPrimary,
+    uncheckedContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     border: BorderStroke? = null,
     iconSpacing: Dp = 4.dp,
     labelProvider: @Composable (T) -> Unit,
@@ -51,23 +51,17 @@ fun <T> ExpressiveConnectedButtonGroup(
         options.forEachIndexed { index, option ->
             val buttonModifier = if (fillMaxWidth) Modifier.weight(1f) else Modifier
             val isChecked = selectedOption != null && selectedOption == option
-            // State-driven container/content so the checked segment wears the accent fill,
-            // exactly like Android. All null → plain library defaults (previous behavior).
-            val defaults = ToggleButtonDefaults.colors()
             ToggleButton(
                 checked = isChecked,
                 onCheckedChange = { onOptionSelected(option) },
                 modifier = buttonModifier,
-                // Was accepted and then only used to decide the row's width, so every caller that passed it
-                // to squeeze a long label into a narrow segment got the default 24 dp either side anyway and
-                // watched the label wrap mid-word. It reaches the button now.
                 contentPadding = contentPadding ?: ButtonDefaults.ContentPadding,
                 border = border,
-                colors = defaults.copy(
-                    containerColor = if (isChecked) checkedContainerColor ?: defaults.checkedContainerColor else uncheckedContainerColor ?: defaults.containerColor,
-                    contentColor = if (isChecked) checkedContentColor ?: defaults.checkedContentColor else uncheckedContentColor ?: defaults.contentColor,
-                    checkedContainerColor = checkedContainerColor ?: defaults.checkedContainerColor,
-                    checkedContentColor = checkedContentColor ?: defaults.checkedContentColor
+                colors = ToggleButtonDefaults.colors(
+                    containerColor = uncheckedContainerColor,
+                    contentColor = uncheckedContentColor,
+                    checkedContainerColor = checkedContainerColor,
+                    checkedContentColor = checkedContentColor,
                 ),
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
