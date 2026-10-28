@@ -7,16 +7,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -88,8 +93,14 @@ fun ListeningStatsScreen(
         StatsHeader(
             report = report,
             period = viewModel.period,
+            periodOffset = viewModel.periodOffset,
+            canGoBack = viewModel.canGoBack,
+            canGoForward = viewModel.canGoForward,
             style = style,
             onSelect = viewModel::selectPeriod,
+            onPrevious = viewModel::previousPeriod,
+            onNext = viewModel::nextPeriod,
+            onReset = viewModel::resetToCurrentPeriod,
             onStyle = {
                 style = it
                 Prefs.putString(KEY_STATS_STYLE, it.name)
@@ -104,7 +115,25 @@ fun ListeningStatsScreen(
             // listen that finished while the screen was open gave it a new key, and the whole page was built
             // again under the pointer, hover lost and charts growing in from zero (issue #66).
             contentKey = { it?.let { (r, s) -> r.window.startMs to s } },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(viewModel.period, viewModel.canGoBack, viewModel.canGoForward) {
+                    if (viewModel.period == ReportPeriod.ALL_TIME) return@pointerInput
+                    var totalDrag = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { totalDrag = 0f },
+                        onHorizontalDrag = { _, dragAmount ->
+                            totalDrag += dragAmount
+                        },
+                        onDragEnd = {
+                            if (totalDrag > 80f && viewModel.canGoBack) {
+                                viewModel.previousPeriod()
+                            } else if (totalDrag < -80f && viewModel.canGoForward) {
+                                viewModel.nextPeriod()
+                            }
+                        }
+                    )
+                },
             label = "statsBody",
         ) { shown ->
             val (shownReport, shownStyle) = shown ?: (null to style)
@@ -125,8 +154,14 @@ fun ListeningStatsScreen(
 private fun StatsHeader(
     report: ListeningReport?,
     period: ReportPeriod,
+    periodOffset: Int,
+    canGoBack: Boolean,
+    canGoForward: Boolean,
     style: StatsStyle,
     onSelect: (ReportPeriod) -> Unit,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onReset: () -> Unit,
     onStyle: (StatsStyle) -> Unit,
     onPrivacy: () -> Unit,
 ) {
@@ -209,6 +244,86 @@ private fun StatsHeader(
                 )
             },
         )
+
+        if (period != ReportPeriod.ALL_TIME) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .widthIn(max = 560.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                FilledTonalIconButton(
+                    onClick = onPrevious,
+                    enabled = canGoBack,
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+                    ),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = str("listening_stats_previous_period"),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .then(if (periodOffset != 0) Modifier.clickable { onReset() } else Modifier)
+                        .padding(vertical = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    val headline = if (report != null) periodHeadline(period, periodOffset, report) else ""
+                    val subtitle = if (report != null && periodOffset != 0) spanLabel(period, report) else null
+                    Text(
+                        text = headline,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    if (subtitle != null) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
+                FilledTonalIconButton(
+                    onClick = onNext,
+                    enabled = canGoForward,
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.25f)
+                    ),
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowForward,
+                        contentDescription = str("listening_stats_next_period"),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
     }
     }
 }
@@ -340,11 +455,42 @@ internal fun spanLabel(period: ReportPeriod, report: ListeningReport): String {
     val start = Instant.ofEpochMilli(report.window.startMs).atZone(zone).toLocalDate()
     val end = Instant.ofEpochMilli(report.window.endMs).atZone(zone).toLocalDate().minusDays(1)
     val loc = statsLocale()
+    val currentYear = java.time.LocalDate.now(zone).year
     return when (period) {
-        ReportPeriod.WEEK -> "${start.dayOfMonth} ${start.month.getDisplayName(TextStyle.SHORT, loc)} – ${end.dayOfMonth} ${end.month.getDisplayName(TextStyle.SHORT, loc)}"
+        ReportPeriod.WEEK -> {
+            val startStr = "${start.dayOfMonth} ${start.month.getDisplayName(TextStyle.SHORT, loc)}"
+            val endStr = "${end.dayOfMonth} ${end.month.getDisplayName(TextStyle.SHORT, loc)}"
+            if (end.year != currentYear) {
+                "$startStr – $endStr ${end.year}"
+            } else {
+                "$startStr – $endStr"
+            }
+        }
         ReportPeriod.MONTH -> "${start.month.getDisplayName(TextStyle.FULL_STANDALONE, loc).replaceFirstChar { it.titlecase(loc) }} ${start.year}"
         ReportPeriod.YEAR -> start.year.toString()
         ReportPeriod.ALL_TIME -> str("listening_stats_since", "${start.month.getDisplayName(TextStyle.FULL_STANDALONE, loc)} ${start.year}")
+    }
+}
+
+@Composable
+internal fun periodHeadline(period: ReportPeriod, offset: Int, report: ListeningReport): String {
+    if (period == ReportPeriod.ALL_TIME) {
+        return str("listening_stats_period_all")
+    }
+    return when (offset) {
+        0 -> when (period) {
+            ReportPeriod.WEEK -> str("listening_stats_period_week_current")
+            ReportPeriod.MONTH -> str("listening_stats_period_month_current")
+            ReportPeriod.YEAR -> str("listening_stats_period_year_current")
+            ReportPeriod.ALL_TIME -> str("listening_stats_period_all")
+        }
+        -1 -> when (period) {
+            ReportPeriod.WEEK -> str("listening_stats_period_week_last")
+            ReportPeriod.MONTH -> str("listening_stats_period_month_last")
+            ReportPeriod.YEAR -> str("listening_stats_period_year_last")
+            ReportPeriod.ALL_TIME -> str("listening_stats_period_all")
+        }
+        else -> spanLabel(period, report)
     }
 }
 

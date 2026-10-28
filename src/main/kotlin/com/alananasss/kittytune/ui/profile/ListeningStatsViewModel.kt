@@ -28,6 +28,12 @@ class ListeningStatsViewModel : ViewModel() {
 
     var period by mutableStateOf(ReportPeriod.WEEK)
         private set
+    var periodOffset by mutableStateOf(0)
+        private set
+    var canGoBack by mutableStateOf(false)
+        private set
+    var canGoForward by mutableStateOf(false)
+        private set
     var report by mutableStateOf<ListeningReport?>(null)
         private set
     var isLoading by mutableStateOf(true)
@@ -37,6 +43,7 @@ class ListeningStatsViewModel : ViewModel() {
     var events by mutableStateOf<List<ListeningStatsEvent>>(emptyList())
         private set
 
+    private var oldestEventMs: Long? = null
     private var loadJob: Job? = null
 
     init {
@@ -48,20 +55,43 @@ class ListeningStatsViewModel : ViewModel() {
     }
 
     fun selectPeriod(value: ReportPeriod) {
-        if (value == period) return
+        if (value == period && periodOffset == 0) return
         period = value
+        periodOffset = 0
+        load()
+    }
+
+    fun previousPeriod() {
+        if (period == ReportPeriod.ALL_TIME || !canGoBack) return
+        periodOffset--
+        load()
+    }
+
+    fun nextPeriod() {
+        if (period == ReportPeriod.ALL_TIME || !canGoForward) return
+        periodOffset++
+        load()
+    }
+
+    fun resetToCurrentPeriod() {
+        if (periodOffset == 0) return
+        periodOffset = 0
         load()
     }
 
     private fun load() {
         val selected = period
+        val offset = periodOffset
         loadJob?.cancel()
         isLoading = report == null || report?.window == null
         loadJob = viewModelScope.launch {
             val zone = ZoneId.systemDefault()
             val now = System.currentTimeMillis()
-            val firstEventMs = ListeningStatsRepository.getSnapshot(0L).firstAtMs
-            val window = ListeningReports.windowFor(selected, now, zone, firstEventMs)
+            if (oldestEventMs == null) {
+                oldestEventMs = ListeningStatsRepository.getSnapshot(0L).firstAtMs
+            }
+            val firstEventMs = oldestEventMs
+            val window = ListeningReports.windowFor(selected, now, zone, firstEventMs, offset)
             val previous = ListeningReports.previousWindow(selected, window, zone)
             val rows = ListeningStatsRepository.getEvents(previous?.startMs ?: window.startMs)
             val built = withContext(Dispatchers.Default) {
@@ -73,6 +103,8 @@ class ListeningStatsViewModel : ViewModel() {
             events = rows.filter { it.timestamp >= window.startMs && it.timestamp < window.endMs }
                 .sortedByDescending { it.timestamp }
             report = built
+            canGoForward = selected != ReportPeriod.ALL_TIME && offset < 0
+            canGoBack = selected != ReportPeriod.ALL_TIME && (firstEventMs == null || window.endMs > firstEventMs || offset > -52)
             isLoading = false
         }
     }
