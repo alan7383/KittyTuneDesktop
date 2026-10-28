@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +20,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -115,25 +113,7 @@ fun ListeningStatsScreen(
             // listen that finished while the screen was open gave it a new key, and the whole page was built
             // again under the pointer, hover lost and charts growing in from zero (issue #66).
             contentKey = { it?.let { (r, s) -> r.window.startMs to s } },
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(viewModel.period, viewModel.canGoBack, viewModel.canGoForward) {
-                    if (viewModel.period == ReportPeriod.ALL_TIME) return@pointerInput
-                    var totalDrag = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { totalDrag = 0f },
-                        onHorizontalDrag = { _, dragAmount ->
-                            totalDrag += dragAmount
-                        },
-                        onDragEnd = {
-                            if (totalDrag > 80f && viewModel.canGoBack) {
-                                viewModel.previousPeriod()
-                            } else if (totalDrag < -80f && viewModel.canGoForward) {
-                                viewModel.nextPeriod()
-                            }
-                        }
-                    )
-                },
+            modifier = Modifier.fillMaxSize(),
             label = "statsBody",
         ) { shown ->
             val (shownReport, shownStyle) = shown ?: (null to style)
