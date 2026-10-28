@@ -93,12 +93,12 @@ data class ListeningReport(
 object ListeningReports {
 
     /** The calendar span [period] covers at [nowMs]; "all time" starts at [firstEventMs]. */
-    fun windowFor(period: ReportPeriod, nowMs: Long, zone: ZoneId, firstEventMs: Long? = null): ReportWindow {
+    fun windowFor(period: ReportPeriod, nowMs: Long, zone: ZoneId, firstEventMs: Long? = null, offset: Int = 0): ReportWindow {
         val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
         val start = when (period) {
-            ReportPeriod.WEEK -> today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-            ReportPeriod.MONTH -> today.withDayOfMonth(1)
-            ReportPeriod.YEAR -> today.withDayOfYear(1)
+            ReportPeriod.WEEK -> today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(offset.toLong())
+            ReportPeriod.MONTH -> today.withDayOfMonth(1).plusMonths(offset.toLong())
+            ReportPeriod.YEAR -> today.withDayOfYear(1).plusYears(offset.toLong())
             ReportPeriod.ALL_TIME -> firstEventMs?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalDate().withDayOfMonth(1) } ?: today.withDayOfMonth(1)
         }
         val end = when (period) {
