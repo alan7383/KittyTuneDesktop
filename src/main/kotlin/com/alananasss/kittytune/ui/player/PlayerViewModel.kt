@@ -139,7 +139,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     val uiCurrentTrack: Track?
         get() = if (isRemotePlayback) remotePeer?.snapshot?.let { it.queue.getOrNull(it.currentIndex) } else currentTrack
     val uiIsPlaying: Boolean
-        get() = if (isRemotePlayback) remotePeer?.connected == true && remotePeer?.snapshot?.isPlaying == true else isPlaying
+        get() = if (isRemotePlayback) remotePeer?.connected == true && remotePeer?.snapshot?.isPlaying == true else (isPlaying || (isLoading && playWhenReady))
     val uiDuration: Long
         get() = if (isRemotePlayback) uiCurrentTrack?.durationMs ?: 0L else duration
     val uiCurrentPosition: Long
@@ -246,6 +246,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var currentStreamSource by mutableStateOf<String?>(initialTrack?.source)
     var isPlaying by mutableStateOf(false)
     var isLoading by mutableStateOf(false)
+    var playWhenReady by mutableStateOf(true)
     var duration by mutableLongStateOf(initialTrack?.effectiveFullDurationMs ?: initialTrack?.durationMs ?: 0L)
     var currentPosition by mutableLongStateOf(
         if (playerPrefs.getPersistentQueueEnabled() && playerPrefs.getSavePositionEnabled()) playerPrefs.getLastPosition() else 0L
@@ -1627,7 +1628,16 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private val playerListener = object : Player.Listener {
+        override fun onPlayWhenReadyChanged(playWhenReadyState: Boolean, reason: Int) {
+            if (MusicManager.isLoadingTrack) return
+            playWhenReady = playWhenReadyState
+            MusicManager.playWhenReadyRequested = playWhenReadyState
+        }
+
         override fun onIsPlayingChanged(isPlayingState: Boolean) {
+            if (MusicManager.isLoadingTrack && !isPlayingState) {
+                return
+            }
             isPlaying = isPlayingState
             saveStateAsync(saveQueue = false)
             // The gap while paused is not listening, and the position after a resume is the new
@@ -1636,8 +1646,13 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             if (isPlayingState) {
                 consecutivePlayerErrors = 0
                 lastPlayerErrorTrackId = null
-                startProgressUpdate()
-                SoundCloudTelemetryTracker.onTrackResumed(currentPosition)
+                if (MusicManager.playWhenReadyRequested) {
+                    playWhenReady = true
+                    startProgressUpdate()
+                    SoundCloudTelemetryTracker.onTrackResumed(currentPosition)
+                } else {
+                    try { player.pause() } catch (_: Exception) {}
+                }
             } else {
                 SoundCloudTelemetryTracker.onTrackPaused(currentPosition)
             }
@@ -1860,6 +1875,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         MusicManager.applyEffects(effectsState)
         MusicManager.applyEqualizer(equalizerState)
         HeadphoneDetector.start()
+        viewModelScope.launch {
+            MusicManager.playWhenReadyRequestedFlow.collect { req ->
+                playWhenReady = req
+            }
+        }
         viewModelScope.launch {
             HeadphoneDetector.device.collect { headphone ->
                 val previous = connectedHeadphone
@@ -4190,6 +4210,9 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             MusicManager.cancelCrossfade()
         }
 
+        playWhenReady = autoPlay
+        MusicManager.playWhenReadyRequested = autoPlay
+        MusicManager.isLoadingTrack = true
         isLoading = true; duration = trackToPlay.effectiveFullDurationMs ?: trackToPlay.durationMs ?: 0L; currentPosition = 0L
         beginListenSession(trackToPlay)
         // Alongside the session rather than anywhere else, so "played" means the same to the queue as
@@ -4690,12 +4713,12 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun play() {
         if (routeRemote("play")) return
-        if (!isPlaying) togglePlayPause()
+        if (!uiIsPlaying) togglePlayPause()
     }
 
     fun pause() {
         if (routeRemote("pause")) return
-        if (isPlaying) togglePlayPause()
+        if (isPlaying || playWhenReady || MusicManager.playWhenReadyRequested) togglePlayPause()
     }
 
     /** Plays files handed over by the OS, adding them to the local library on the way. */
@@ -4895,10 +4918,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 currentPosition,
             )
         }
-        if (player.isPlaying) {
-            player.pause()
+        if (player.isPlaying || playWhenReady || MusicManager.playWhenReadyRequested) {
+            playWhenReady = false
+            MusicManager.playWhenReadyRequested = false
+            try {
+                player.playWhenReady = false
+                player.pause()
+            } catch (_: Exception) {}
             saveStateAsync(savePositionOnly = true)
         } else {
+            playWhenReady = true
+            MusicManager.playWhenReadyRequested = true
+            try {
+                player.playWhenReady = true
+            } catch (_: Exception) {}
             if (player.currentMediaItem == null && currentTrack != null) {
                 pendingSeekPosition = currentPosition
                 playPlaylist(
@@ -6914,20 +6947,36 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     // A skip may have replaced this load while it was resolving. The newer
                     // selection owns the player now; starting this one would play two tracks.
                     if (currentQueueIndex != index || currentTrack?.id != trackToPlay.id) return@launch
-                    isLoading = false
-                    isPlaying = true
-                    currentPosition = MusicManager.player.currentPosition.coerceAtLeast(0L)
-                    if (MusicManager.player.duration > 0) duration = MusicManager.player.duration
-                    startProgressUpdate()
-                    val crossfadeDurationMs = playerPrefs.getCrossfadeDuration() * 1000L
-                    val automixPlan = if (playerPrefs.getAutomixEnabled()) com.alananasss.kittytune.audio.automix.AutomixManager.currentAutomixPlan else null
-                    MusicManager.crossfadeToMediaItem(emptyItem, startPosition, crossfadeDurationMs, automixPlan)
-                    MusicManager.applyEffects(effectsState)
-                    preloadNextTrack(index + 1)
+                    val shouldPlay = autoPlay && MusicManager.playWhenReadyRequested && playWhenReady
+                    if (shouldPlay) {
+                        isLoading = false
+                        isPlaying = true
+                        currentPosition = MusicManager.player.currentPosition.coerceAtLeast(0L)
+                        if (MusicManager.player.duration > 0) duration = MusicManager.player.duration
+                        startProgressUpdate()
+                        val crossfadeDurationMs = playerPrefs.getCrossfadeDuration() * 1000L
+                        val automixPlan = if (playerPrefs.getAutomixEnabled()) com.alananasss.kittytune.audio.automix.AutomixManager.currentAutomixPlan else null
+                        MusicManager.crossfadeToMediaItem(emptyItem, startPosition, crossfadeDurationMs, automixPlan)
+                        MusicManager.applyEffects(effectsState)
+                        preloadNextTrack(index + 1)
+                    } else {
+                        MusicManager.cancelCrossfade()
+                        MusicManager.player.playWhenReady = false
+                        MusicManager.player.setMediaItem(emptyItem, startPosition)
+                        MusicManager.player.prepare()
+                        MusicManager.player.pause()
+                        isLoading = false
+                        isPlaying = false
+                        currentPosition = startPosition
+                        progressUpdateJob?.cancel()
+                    }
+                    MusicManager.isLoadingTrack = false
                 } catch (e: Exception) {
                     e.printStackTrace()
+                    MusicManager.cancelCrossfade()
                     isLoading = false
                     isPlaying = false
+                    MusicManager.isLoadingTrack = false
                 }
             }
             return
@@ -7006,6 +7055,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     MusicManager.cancelCrossfade()
                     MusicManager.stop()
                     currentStreamSource = trackToPlay.source
+                    MusicManager.isLoadingTrack = false
                     if (!com.alananasss.kittytune.utils.NetworkUtils.isInternetAvailable()) {
                         isLoading = true
                         isPlaying = false
@@ -7041,21 +7091,27 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     currentStreamSource = finalStreamSource
                     queueChunkingJob?.cancel()
 
+                    val shouldPlay = autoPlay && MusicManager.playWhenReadyRequested && playWhenReady
+                    MusicManager.player.playWhenReady = shouldPlay
                     val crossfadeDurationMs = playerPrefs.getCrossfadeDuration() * 1000L
                     val automixPlan = if (playerPrefs.getAutomixEnabled()) com.alananasss.kittytune.audio.automix.AutomixManager.currentAutomixPlan else null
-                    if (isCrossfade && (automixPlan != null || crossfadeDurationMs > 0) && MusicManager.player.isPlaying && startPosition == 0L) {
+                    if (shouldPlay && isCrossfade && (automixPlan != null || crossfadeDurationMs > 0) && MusicManager.player.isPlaying && startPosition == 0L) {
                         MusicManager.crossfadeToMediaItem(newMediaItem, startPosition, crossfadeDurationMs, automixPlan)
+                        startProgressUpdate()
                     } else {
+                        if (isCrossfade) MusicManager.cancelCrossfade()
                         MusicManager.player.setMediaItem(newMediaItem, startPosition)
                         MusicManager.player.prepare()
-                        if (autoPlay) {
-                            MusicManager.player.playWhenReady = true
+                        if (shouldPlay) {
+                            MusicManager.player.play()
+                        } else {
+                            MusicManager.player.pause()
+                            progressUpdateJob?.cancel()
                         }
                     }
-
-                    if (autoPlay) {
-                        MusicManager.player.play()
-                    }
+                    isLoading = false
+                    isPlaying = shouldPlay
+                    MusicManager.isLoadingTrack = false
 
                     MusicManager.applyEffects(effectsState)
                     preloadNextTrack(index + 1)
@@ -7065,6 +7121,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                     MusicManager.stop()
                     isLoading = false
                     isPlaying = false
+                    MusicManager.isLoadingTrack = false
                 }
             }
         }
