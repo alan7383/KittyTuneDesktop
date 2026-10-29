@@ -86,6 +86,26 @@ object MusicManager {
 
     @Volatile private var initialized = false
 
+    val isLoadingTrackFlow = MutableStateFlow(false)
+    var isLoadingTrack: Boolean
+        get() = isLoadingTrackFlow.value
+        set(value) {
+            isLoadingTrackFlow.value = value
+        }
+
+    val playWhenReadyRequestedFlow = MutableStateFlow(true)
+    var playWhenReadyRequested: Boolean
+        get() = playWhenReadyRequestedFlow.value
+        set(value) {
+            playWhenReadyRequestedFlow.value = value
+            if (!value) {
+                try {
+                    player.playWhenReady = false
+                    player.pause()
+                } catch (_: Exception) {}
+            }
+        }
+
     // --- observable playback state (the ViewModel mirrors these into Compose state) ------
     val isPlaying: Boolean get() = player.isPlaying
     val positionMs: Long get() = player.currentPosition

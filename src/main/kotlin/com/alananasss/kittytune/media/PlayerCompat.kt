@@ -117,6 +117,7 @@ class Player {
 
     interface Listener {
         fun onIsPlayingChanged(isPlaying: Boolean) {}
+        fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {}
         fun onPlaybackStateChanged(playbackState: Int) {}
         fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {}
         fun onPositionDiscontinuity(oldPosition: PositionInfo, newPosition: PositionInfo, reason: Int) {}
@@ -327,6 +328,7 @@ class Player {
                 activeEngine.pause()
                 fadingEngine?.pause()
             }
+            listeners.forEach { it.onPlayWhenReadyChanged(value, 1) }
         }
 
     var repeatMode: Int = REPEAT_MODE_OFF

@@ -446,11 +446,27 @@ fun PlayerBar(
                             ) { vm.togglePlayPause() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            if (vm.uiIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
-                        )
+                        if (vm.uiIsLoading && vm.uiIsPlaying) {
+                            Box(contentAlignment = Alignment.Center) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                                Icon(
+                                    Icons.Rounded.Pause,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        } else {
+                            Icon(
+                                if (vm.uiIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
                     }
 
                     Spacer(Modifier.width(transportGap))
