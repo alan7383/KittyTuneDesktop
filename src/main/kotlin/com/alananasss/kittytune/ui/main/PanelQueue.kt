@@ -35,9 +35,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ClearAll
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -238,6 +239,12 @@ private fun QueueToolbar(vm: PlayerViewModel, upNextCount: Int) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        PanelToolButton(
+            icon = Icons.Rounded.History,
+            label = str("queue_history"),
+            onClick = { vm.showQueueHistoryDialog = true },
+        )
+        Spacer(Modifier.width(6.dp))
         PanelToolButton(
             icon = Icons.Rounded.Shuffle,
             label = str("btn_shuffle"),

@@ -1381,6 +1381,13 @@ fun MainScreen(
 
     AiDetectionOverlays(playerViewModel, navController)
 
+    if (playerViewModel.showQueueHistoryDialog) {
+        com.alananasss.kittytune.ui.player.QueueHistoryDialog(
+            viewModel = playerViewModel,
+            onDismiss = { playerViewModel.showQueueHistoryDialog = false }
+        )
+    }
+
     if (showShortcutsDialog) {
         KeyboardShortcutsDialog(onDismiss = { showShortcutsDialog = false })
     }

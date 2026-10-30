@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DragHandle
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.RepeatOne
@@ -102,6 +103,13 @@ fun ExpandedQueueScreen(
                     }
                 },
                 actions = {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { viewModel.showQueueHistoryDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Rounded.History,
+                            contentDescription = str("queue_history")
+                        )
+                    }
+
                     val shuffleColor = if (viewModel.uiShuffleEnabled)
                         MaterialTheme.colorScheme.primary
                     else
