@@ -10,6 +10,18 @@ import java.nio.channels.FileLock
 import java.nio.charset.StandardCharsets
 import kotlin.concurrent.thread
 
+private interface WinUser32Bridge : com.sun.jna.win32.StdCallLibrary {
+    fun AllowSetForegroundWindow(dwProcessId: Int): Boolean
+
+    companion object {
+        val INSTANCE: WinUser32Bridge? by lazy {
+            runCatching {
+                com.sun.jna.Native.load("user32", WinUser32Bridge::class.java) as WinUser32Bridge
+            }.getOrNull()
+        }
+    }
+}
+
 /**
  * One KittyTune per user.
  *
@@ -67,6 +79,12 @@ object SingleInstance {
         val message = lines.joinToString(separator = "\n", postfix = "\n")
         val port = runCatching { portFile.readText().trim().toInt() }.getOrNull() ?: return false
         return runCatching {
+            // On Windows, grant the target process permission to become the foreground window (ASFW_ANY = -1)
+            if (System.getProperty("os.name")?.lowercase()?.contains("win") == true) {
+                runCatching {
+                    WinUser32Bridge.INSTANCE?.AllowSetForegroundWindow(-1)
+                }
+            }
             Socket().use { socket ->
                 socket.connect(InetSocketAddress(InetAddress.getLoopbackAddress(), port), CONNECT_TIMEOUT_MS)
                 socket.getOutputStream().write(message.toByteArray(StandardCharsets.UTF_8))
