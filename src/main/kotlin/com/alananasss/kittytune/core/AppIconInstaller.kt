@@ -51,10 +51,14 @@ object AppIconInstaller {
         }
     }
 
-    private fun variantPng(variantKey: String): ByteArray? =
-        Thread.currentThread().contextClassLoader
-            ?.getResourceAsStream(AppIconVariants.resourcePath(variantKey))
+    private fun variantPng(variantKey: String): ByteArray? {
+        val res = AppIconVariants.resourcePath(variantKey)
+        return (Thread.currentThread().contextClassLoader ?: AppIconInstaller::class.java.classLoader)
+            ?.getResourceAsStream(res)
             ?.use { it.readBytes() }
+            ?: AppIconInstaller::class.java.getResourceAsStream("/" + res.removePrefix("/"))
+                ?.use { it.readBytes() }
+    }
 
     // ------------------------------------------------------------------ linux
 

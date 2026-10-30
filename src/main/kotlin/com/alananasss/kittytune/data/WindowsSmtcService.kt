@@ -120,6 +120,22 @@ class WindowsSmtcService(
         out.println(message)
     }
 
+    fun restart() {
+        runCatching { writer?.println("QUIT") }
+        runCatching { writer?.flush() }
+        runCatching { writer?.close() }
+        runCatching {
+            if (process?.waitFor(1500, java.util.concurrent.TimeUnit.MILLISECONDS) != true) {
+                process?.destroyForcibly()
+                process?.waitFor(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            }
+        }
+        process = null
+        writer = null
+        lastSentUpdate = null
+        start()
+    }
+
     override fun close() {
         runCatching { writer?.println("QUIT") }
         runCatching { writer?.close() }

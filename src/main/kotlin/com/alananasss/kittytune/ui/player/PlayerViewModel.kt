@@ -48,6 +48,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.drop
 import com.alananasss.kittytune.data.cover.AnimatedCoverResolver
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfoItem
@@ -1938,6 +1939,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         startTrimWatcher()
         com.alananasss.kittytune.data.together.Together.start(this)
 
+        if (System.getProperty("os.name").lowercase().contains("win")) {
+            viewModelScope.launch {
+                playerPrefs.appIconVariantFlow().drop(1).collectLatest {
+                    delay(2500)
+                    restartWindowsSmtc()
+                }
+            }
+        }
+
         // The listen in progress when the app exits used to be lost outright — the single most common
         // way for a track to end, and the one nobody was recording (issue #33). The hook runs on a
         // normal exit and on a termination signal; it writes synchronously because the process is on
@@ -2187,6 +2197,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 println("Windows SMTC service init exception: ${e.message}")
             }
         }
+    }
+
+    fun restartWindowsSmtc() {
+        windowsSmtcService?.restart()
+        windowsSmtcService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
     }
 
     private fun initMacNowPlayingService() {
