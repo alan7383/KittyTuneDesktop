@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -107,6 +108,28 @@ fun AiDetectionOverlays(viewModel: PlayerViewModel, navController: NavController
                 onUndo = { viewModel.undoAiSkip() },
                 onClose = { viewModel.hideAiSkipUndoBar() },
                 durationMillis = 6000L,
+                modifier = Modifier.widthIn(min = 380.dp, max = 640.dp),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = viewModel.showQueueArchivedUndoBar,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+            ) + fadeIn(animationSpec = tween(durationMillis = 300)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+            ) + fadeOut(animationSpec = tween(durationMillis = 250)),
+            modifier = Modifier.zIndex(21f),
+        ) {
+            com.alananasss.kittytune.ui.player.pixel.DismissUndoBar(
+                text = str("queue_archived_message"),
+                leadingIcon = Icons.Rounded.History,
+                onUndo = { viewModel.undoQueueArchived() },
+                onClose = { viewModel.hideQueueArchivedUndoBar() },
+                durationMillis = 4500L,
                 modifier = Modifier.widthIn(min = 380.dp, max = 640.dp),
             )
         }

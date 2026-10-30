@@ -48,6 +48,7 @@ object AppDatabase {
     val recentSearchDao: RecentSearchDao by lazy { RecentSearchDao(this) }
     val blockedContentDao: BlockedContentDao by lazy { BlockedContentDao(this) }
     val likeDao: LikeDao by lazy { LikeDao(this) }
+    val queueHistoryDao: QueueHistoryDao by lazy { QueueHistoryDao(this) }
 
     fun init() {
         Class.forName("org.sqlite.JDBC")
@@ -144,6 +145,12 @@ object AppDatabase {
             """CREATE TABLE IF NOT EXISTS liked_tracks (
                 trackId INTEGER PRIMARY KEY NOT NULL, likedAt INTEGER NOT NULL,
                 trackJson TEXT NOT NULL)""",
+            """CREATE TABLE IF NOT EXISTS queue_history (
+                id TEXT PRIMARY KEY NOT NULL, title TEXT NOT NULL,
+                trackCount INTEGER NOT NULL, tracksJson TEXT NOT NULL,
+                currentIndex INTEGER NOT NULL, currentPositionMs INTEGER NOT NULL,
+                contextJson TEXT, firstTrackArtworkUrl TEXT, firstTrackTitle TEXT,
+                firstTrackArtist TEXT, savedAt INTEGER NOT NULL)""",
         )
         conn.createStatement().use { st ->
             ddl.forEach { st.execute(it) }
@@ -207,6 +214,7 @@ object AppDatabase {
             // track / artist, INSERT OR IGNORE keeps re-blocks idempotent).
             st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_track ON blocked_content(trackId)")
             st.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_artist ON blocked_content(artistId)")
+            st.execute("CREATE INDEX IF NOT EXISTS idx_queue_history_ts ON queue_history(savedAt DESC)")
             // What makes applying a synced listen twice impossible rather than merely unlikely. SQLite
             // treats NULLs as distinct in a unique index, so the rows from before sync existed — all of
             // which have no id — do not collide with each other (issue #33).
