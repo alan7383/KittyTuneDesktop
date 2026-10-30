@@ -1,4 +1,4 @@
-package com.alananasss.kittytune.data
+﻿package com.alananasss.kittytune.data
 
 import com.alananasss.kittytune.audio.AudioEngine
 import com.alananasss.kittytune.domain.Track
@@ -93,7 +93,7 @@ object MusicManager {
             isLoadingTrackFlow.value = value
         }
 
-    val playWhenReadyRequestedFlow = MutableStateFlow(true)
+    val playWhenReadyRequestedFlow = MutableStateFlow(false)
     var playWhenReadyRequested: Boolean
         get() = playWhenReadyRequestedFlow.value
         set(value) {

@@ -1,4 +1,4 @@
-import kotlinx.coroutines.flow.MutableStateFlow
+﻿import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,5 +89,48 @@ class PauseWhileLoadingTest {
         onPlayWhenReadyChanged(playWhenReadyState = false, isAudioFocusLoss = true)
         assertFalse("Audio focus loss while loading must pause playback intent", playWhenReady)
         assertFalse("Audio focus loss while loading must pause playWhenReadyRequested", playWhenReadyRequested)
+    }
+
+    @Test
+    fun testSingleClickToPlayWhenPausedOrIdle() {
+        var isPlaying = false
+        var isLoading = false
+        var playWhenReady = false
+        var playWhenReadyRequested = false
+        var enginePlayCalls = 0
+        var enginePauseCalls = 0
+
+        fun uiIsPlaying(): Boolean = isPlaying || (isLoading && playWhenReady)
+
+        fun togglePlayPause() {
+            if (uiIsPlaying()) {
+                playWhenReady = false
+                playWhenReadyRequested = false
+                enginePauseCalls++
+            } else {
+                playWhenReady = true
+                playWhenReadyRequested = true
+                enginePlayCalls++
+            }
+        }
+
+        // Initially paused/idle: uiIsPlaying must be false
+        assertFalse(uiIsPlaying())
+
+        // 1st click MUST trigger play immediately (no double-click needed!)
+        togglePlayPause()
+        assertTrue("Single click when paused must activate playWhenReady", playWhenReady)
+        assertTrue("Single click when paused must activate playWhenReadyRequested", playWhenReadyRequested)
+        org.junit.Assert.assertEquals(1, enginePlayCalls)
+        org.junit.Assert.assertEquals(0, enginePauseCalls)
+
+        // 2nd click MUST trigger pause
+        isLoading = true // e.g. now loading track with playWhenReady
+        assertTrue(uiIsPlaying())
+        togglePlayPause()
+        assertFalse("Second click while loading must pause", playWhenReady)
+        assertFalse("Second click while loading must pause requested", playWhenReadyRequested)
+        org.junit.Assert.assertEquals(1, enginePlayCalls)
+        org.junit.Assert.assertEquals(1, enginePauseCalls)
     }
 }

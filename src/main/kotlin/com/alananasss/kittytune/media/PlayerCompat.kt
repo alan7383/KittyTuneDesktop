@@ -1,4 +1,4 @@
-package com.alananasss.kittytune.media
+﻿package com.alananasss.kittytune.media
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import com.alananasss.kittytune.audio.AudioEngine
@@ -318,7 +318,7 @@ class Player {
 
     var playWhenReady: Boolean = false
         set(value) {
-            if (field == value) return
+            val changed = field != value
             field = value
             // The outgoing track of a crossfade too: left alone it went on fading out after a pause, which
             // sounded like the pause had not worked, and the next press — meant as a second pause — resumed.
@@ -329,7 +329,7 @@ class Player {
                 activeEngine.pause()
                 fadingEngine?.pause()
             }
-            listeners.forEach { it.onPlayWhenReadyChanged(value, 1) }
+            if (changed) { listeners.forEach { it.onPlayWhenReadyChanged(value, 1) } }
         }
 
     var repeatMode: Int = REPEAT_MODE_OFF
@@ -868,8 +868,16 @@ class Player {
 
     fun prepare() { activeEngine.prepare() }
 
-    fun play() { playWhenReady = true }
-    fun pause() { playWhenReady = false }
+        fun play() {
+        playWhenReady = true
+        activeEngine.play()
+        fadingEngine?.play()
+    }
+    fun pause() {
+        playWhenReady = false
+        activeEngine.pause()
+        fadingEngine?.pause()
+    }
 
     /**
      * Aborts any crossfade in flight, stopping and releasing the outgoing deck immediately,

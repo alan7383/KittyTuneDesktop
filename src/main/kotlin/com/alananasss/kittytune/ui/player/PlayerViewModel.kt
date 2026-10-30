@@ -1,4 +1,4 @@
-package com.alananasss.kittytune.ui.player
+﻿package com.alananasss.kittytune.ui.player
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.History
@@ -247,7 +247,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     var currentStreamSource by mutableStateOf<String?>(initialTrack?.source)
     var isPlaying by mutableStateOf(false)
     var isLoading by mutableStateOf(false)
-    var playWhenReady by mutableStateOf(true)
+    var playWhenReady by mutableStateOf(false)
     var duration by mutableLongStateOf(initialTrack?.effectiveFullDurationMs ?: initialTrack?.durationMs ?: 0L)
     var currentPosition by mutableLongStateOf(
         if (playerPrefs.getPersistentQueueEnabled() && playerPrefs.getSavePositionEnabled()) playerPrefs.getLastPosition() else 0L
@@ -4843,7 +4843,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
 
     fun pause() {
         if (routeRemote("pause")) return
-        if (isPlaying || playWhenReady || MusicManager.playWhenReadyRequested) togglePlayPause()
+        if (uiIsPlaying) togglePlayPause()
     }
 
     /** Plays files handed over by the OS, adding them to the local library on the way. */
@@ -5043,7 +5043,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
                 currentPosition,
             )
         }
-        if (player.isPlaying || playWhenReady || MusicManager.playWhenReadyRequested) {
+        if (uiIsPlaying) {
             playWhenReady = false
             MusicManager.playWhenReadyRequested = false
             try {
