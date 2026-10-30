@@ -3454,7 +3454,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
             } else {
                 var isContextLocal = false
                 if (menuContextPlaylistId != null) {
-                    if (menuContextPlaylistId == -2L || menuContextPlaylistId!! < 0) {
+                    if (menuContextPlaylistId == -2L) {
                         isContextLocal = true
                     }
                 } else if (target.id == currentTrack?.id) {
