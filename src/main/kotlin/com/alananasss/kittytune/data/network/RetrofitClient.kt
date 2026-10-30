@@ -57,17 +57,17 @@ object RetrofitClient {
             }
 
             val deviceId = Config.getOrCreateSoundCloudDeviceId()
-            val buildVersion = "2025.12.10-release"
-            // Android Build.VERSION.RELEASE / MODEL are unavailable on desktop â€”
+            val buildVersion = "2026.10.08-release"
+            // Android Build.VERSION.RELEASE / MODEL are unavailable on desktop —
             // use stable values matching a generic device (the API only reads the UA loosely).
-            val customUserAgent = "SoundCloud/$buildVersion (Android 10; Android)"
+            val customUserAgent = "SoundCloud/$buildVersion (Android 14; Pixel 8)"
 
             val requestBuilder = originalRequest.newBuilder()
                 .url(newUrl)
                 .header("User-Agent", customUserAgent)
                 .header("Accept", "application/json")
                 .header("Accept-Language", com.alananasss.kittytune.core.Strings.getAcceptLanguage())
-                .header("App-Version", "330120")
+                .header("App-Version", "376070")
                 .header("UDID", deviceId)
 
             if (!token.isNullOrEmpty()) {
