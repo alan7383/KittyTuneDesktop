@@ -871,23 +871,49 @@ object StreamResolver {
     ): List<com.alananasss.kittytune.domain.Transcoding> {
         val candidates = mutableListOf<com.alananasss.kittytune.domain.Transcoding>()
 
-        transcodings.find { it.format?.protocol == "progressive" }?.let { candidates.add(it) }
-
-        if (qualityPref != "HIGH") {
-            transcodings.find { it.format?.protocol == "hls" && it.format.mimeType?.contains("mpeg") == true }?.let { candidates.add(it) }
-        }
-        transcodings.find { it.format?.protocol == "hls" }?.let {
-            if (!candidates.contains(it)) candidates.add(it)
+        if (qualityPref == "LOW") {
+            for (preset in listOf("opus_64k", "aac_64k", "aac_96k")) {
+                transcodings.filter { it.preset == preset && it.format?.protocol == "hls" }.forEach {
+                    if (it !in candidates) candidates.add(it)
+                }
+            }
+            transcodings.filter { it.format?.protocol == "hls" && it.format.mimeType?.contains("mpeg") == true }.forEach {
+                if (it !in candidates) candidates.add(it)
+            }
+            transcodings.filter { it.format?.protocol == "hls" }.forEach {
+                if (it !in candidates) candidates.add(it)
+            }
+            transcodings.filter { it.format?.protocol == "progressive" }.forEach {
+                if (it !in candidates) candidates.add(it)
+            }
+        } else {
+            transcodings.filter { it.format?.protocol == "progressive" }.forEach {
+                if (it !in candidates) candidates.add(it)
+            }
+            for (preset in listOf("aac_160k", "aac_96k", "opus_64k", "abr_sq")) {
+                transcodings.filter { it.preset == preset && it.format?.protocol == "hls" }.forEach {
+                    if (it !in candidates) candidates.add(it)
+                }
+            }
+            transcodings.filter { it.format?.protocol == "hls" }.forEach {
+                if (it !in candidates) candidates.add(it)
+            }
         }
 
         if (allowDrm) {
-            val cencPresets = listOf("aac_160k", "aac_96k", "abr_sq")
+            val cencPresets = if (qualityPref == "LOW") listOf("aac_96k", "aac_160k", "abr_sq") else listOf("aac_160k", "aac_96k", "abr_sq")
             for (preset in cencPresets) {
-                transcodings.find { it.preset == preset && it.format?.protocol == "ctr-encrypted-hls" }?.let { candidates.add(it) }
-                transcodings.find { it.preset == preset && it.format?.protocol == "cbc-encrypted-hls" }?.let { candidates.add(it) }
+                transcodings.filter { it.preset == preset && it.format?.protocol == "ctr-encrypted-hls" }.forEach {
+                    if (it !in candidates) candidates.add(it)
+                }
+            }
+            for (preset in cencPresets) {
+                transcodings.filter { it.preset == preset && it.format?.protocol == "cbc-encrypted-hls" }.forEach {
+                    if (it !in candidates) candidates.add(it)
+                }
             }
             transcodings.filter { it.format?.protocol?.contains("encrypted") == true }.forEach {
-                if (!candidates.contains(it)) candidates.add(it)
+                if (it !in candidates) candidates.add(it)
             }
         }
 

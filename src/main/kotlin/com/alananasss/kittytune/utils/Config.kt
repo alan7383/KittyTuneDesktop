@@ -18,9 +18,14 @@ import java.io.File
 object Config {
     private const val KEY_CLIENT_ID = "dynamic_client_id"
 
-    const val FALLBACK_ID = "7K3no7iJj8d02d20Z26Z26Z26Z26Z26"
-    const val OFFICIAL_CLIENT_ID = "QOFuKCOeAXIph267vzqj3B1wb65cZVAQ"
-    const val OFFICIAL_CLIENT_SECRET = "EhBDsGIj9EbuBbRf0QkhH9Fq9BX3yN4B"
+    // Official client ID and secret extracted from SoundCloud Android (2026.10.08)
+    const val OFFICIAL_CLIENT_ID = "SSdQ80vM8nLPhbDBylHl2JFK6ElhBr9B"
+    const val OFFICIAL_CLIENT_SECRET = "hfRHykhbMuLT7PnpTv0hPXsKS0NM5pX1"
+
+    // Previous client ID kept as fallback
+    const val EXPIRING_CLIENT_ID = "QOFuKCOeAXIph267vzqj3B1wb65cZVAQ"
+    const val EXPIRING_CLIENT_SECRET = "EhBDsGIj9EbuBbRf0QkhH9Fq9BX3yN4B"
+    const val FALLBACK_ID = OFFICIAL_CLIENT_ID
 
     val OFFICIAL_CLIENT_SIGNATURE: String by lazy {
         calculateSignature(OFFICIAL_CLIENT_ID, OFFICIAL_CLIENT_SECRET)
@@ -30,9 +35,9 @@ object Config {
         return try {
             val concat = "$clientId:$clientSecret".toByteArray(Charsets.UTF_8)
             val digest = java.security.MessageDigest.getInstance("SHA-256").digest(concat)
-            Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
+            Base64.getUrlEncoder().withoutPadding().encodeToString(digest).trim()
         } catch (e: Exception) {
-            "ztQ_RKaMCPavrjcXvMT6t0STPQ0vU2cY4YKGVeLU6Iw"
+            "cg5kjFy0kprA70IQrfihSM2yTEZiI774yeG1CW4uyTA"
         }
     }
 
