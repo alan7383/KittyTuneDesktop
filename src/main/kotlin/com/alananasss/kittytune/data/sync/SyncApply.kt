@@ -119,6 +119,7 @@ object SyncApply {
             furthestPositionMs = payload.furthestPositionMs,
             // What makes this insert idempotent at the database level rather than at ours.
             syncEventId = event.id,
+            genre = payload.genre,
         )
     }
 }

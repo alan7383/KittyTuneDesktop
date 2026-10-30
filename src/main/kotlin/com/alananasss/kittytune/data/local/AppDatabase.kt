@@ -185,6 +185,9 @@ object AppDatabase {
             for (column in listOf(
                 "furthestPositionMs INTEGER NOT NULL DEFAULT 0",
                 "syncEventId TEXT",
+                // The track's genre, for the listening recaps' "most listened genres" slide. Nullable
+                // because older rows do not have one and because sources without genres leave it blank.
+                "genre TEXT",
             )) {
                 try {
                     st.execute("ALTER TABLE listening_stats ADD COLUMN $column")

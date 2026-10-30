@@ -67,6 +67,8 @@ fun ListeningStatsScreen(
     onBackClick: () -> Unit,
     onTrackClick: (trackId: Long) -> Unit,
     onArtistClick: (ReportArtist) -> Unit,
+    onOpenRecap: (String) -> Unit = {},
+    onOpenRecaps: () -> Unit = {},
 ) {
     // Built through an explicit initializer: the default factory route throws on desktop (issue #33).
     val viewModel: ListeningStatsViewModel = viewModel { ListeningStatsViewModel() }
@@ -117,14 +119,21 @@ fun ListeningStatsScreen(
             label = "statsBody",
         ) { shown ->
             val (shownReport, shownStyle) = shown ?: (null to style)
+            val recaps: @Composable () -> Unit = {
+                com.alananasss.kittytune.ui.profile.recap.RecapCarouselSection(
+                    onOpenRecap = onOpenRecap,
+                    onSeeAll = onOpenRecaps,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
             when {
                 shownReport == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     ContainedLoadingIndicator()
                 }
                 !shownReport.hasData -> EmptyStats()
-                shownStyle == StatsStyle.OVERVIEW -> OverviewStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick)
-                shownStyle == StatsStyle.COMPACT -> CompactStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick)
-                else -> StoryStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick)
+                shownStyle == StatsStyle.OVERVIEW -> OverviewStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick, header = recaps)
+                shownStyle == StatsStyle.COMPACT -> CompactStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick, header = recaps)
+                else -> StoryStats(shownReport, viewModel.period, { openList = it }, onTrackClick, onArtistClick, header = recaps)
             }
         }
     }

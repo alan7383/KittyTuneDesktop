@@ -108,6 +108,7 @@ object ListeningStatsRepository {
                 listenDurationMs = listenDurationMs,
                 trackDurationMs = track.durationMs ?: 0L,
                 furthestPositionMs = furthestPositionMs,
+                genre = track.genre?.trim()?.takeIf { it.isNotEmpty() },
             )
 
             // The log first, so the row can carry the event's id and be immune to being applied twice.
@@ -134,6 +135,7 @@ object ListeningStatsRepository {
                     timestamp = timestamp,
                     furthestPositionMs = payload.furthestPositionMs,
                     syncEventId = eventId,
+                    genre = payload.genre,
                 )
             )
             onStatsChanged()
@@ -170,11 +172,49 @@ object ListeningStatsRepository {
         memo("topArtistsIn:$since:$until:$limit") { dao.getTopArtistsBetween(since, until, limit) }
 
     suspend fun getTotalListenTime(since: Long): Long = getSnapshot(since).totalListenMs
+    /** Listening time inside a closed range, for comparing a span against the one before it. */
+    suspend fun getTotalListenTime(since: Long, until: Long): Long =
+        memo("totalBetween:$since:$until") { dao.getTotalListenTimeBetween(since, until) }
+    /** Rows between [since] and [until], newest first, capped at [limit]. */
+    suspend fun getRecentEventsBetween(since: Long, until: Long, limit: Int): List<com.alananasss.kittytune.data.local.ListeningStatsEvent> =
+        dao.getRecentEventsBetween(since, until, limit)
     suspend fun getTotalEvents(since: Long): Int = getSnapshot(since).rows
     suspend fun getUniqueTracks(since: Long): Int = getSnapshot(since).uniqueTracks
     suspend fun getUniqueArtists(since: Long): Int = getSnapshot(since).uniqueArtists
     suspend fun getEventCount(type: String, since: Long): Int = dao.getEventCountByType(type, since)
     suspend fun getEvents(since: Long): List<ListeningStatsEvent> = dao.getEventsAfter(since)
+
+    /** Artists heard before [before], lower-cased and split, for the recaps' "new this period" counts. */
+    suspend fun getArtistNamesBefore(before: Long): Set<String> = memo("artistsBefore:$before") {
+        dao.getArtistNamesBefore(before)
+            .flatMap { raw -> com.alananasss.kittytune.data.local.DownloadDao.splitArtistNames(raw).ifEmpty { listOf(raw) } }
+            .mapTo(HashSet()) { it.lowercase() }
+    }
+
+    /** Track ids heard before [before]. */
+    suspend fun getTrackIdsBefore(before: Long): Set<Long> = memo("tracksBefore:$before") {
+        dao.getTrackIdsBefore(before).toHashSet()
+    }
+
+    /** When the first listen was recorded, or null with none. */
+    suspend fun getOldestEventAt(): Long? = memo("oldest") { dao.getOldestEventTimestamp() }
+
+    /**
+     * Fills in the genre of listens recorded before genres were kept.
+     *
+     * Only the tracks a recap is about are asked for, through [fetch] (track id → genre), so opening
+     * a recap costs one request rather than one per listen. Tracks the service has no genre for are
+     * simply left as they were.
+     */
+    suspend fun backfillGenres(trackIds: Collection<Long>, fetch: suspend (List<Long>) -> Map<Long, String>): Boolean {
+        if (trackIds.isEmpty()) return false
+        val found = runCatching { fetch(trackIds.distinct()) }.getOrDefault(emptyMap())
+            .filterValues { it.isNotBlank() }
+        if (found.isEmpty()) return false
+        found.forEach { (id, genre) -> dao.setGenreForTrack(id, genre.trim()) }
+        onStatsChanged()
+        return true
+    }
 
     fun clearStats() {
         scope.launch {

@@ -821,6 +821,36 @@ fun MainScreen(
                                         playerViewModel.resolveAndNavigateToArtist(artist.name, artist.artistId)
                                     }
                                 },
+                                onOpenRecap = { id -> navController.navigate("recap/$id") },
+                                onOpenRecaps = { navController.navigate("recaps") },
+                            )
+                        }
+                        composable("recaps") {
+                            com.alananasss.kittytune.ui.profile.recap.RecapsScreen(
+                                onBackClick = { navController.popBackStack() },
+                                onOpenRecap = { id -> navController.navigate("recap/$id") },
+                            )
+                        }
+                        composable(
+                            route = "recap/{id}",
+                            arguments = listOf(androidx.navigation.navArgument("id") { type = androidx.navigation.NavType.StringType }),
+                        ) { backStackEntry ->
+                            val recapId = backStackEntry.arguments?.let { args ->
+                                runCatching { args.read { getString("id") } }.getOrNull()
+                            }.orEmpty()
+                            com.alananasss.kittytune.ui.profile.recap.RecapStoryScreen(
+                                recapId = recapId,
+                                onClose = { navController.popBackStack() },
+                                onTrackClick = { track -> playerViewModel.navigateToTrackDetails(track.trackId) },
+                                onArtistClick = { artist ->
+                                    navController.popBackStack()
+                                    val permalink = artist.permalink
+                                    if (artist.source == "spotify" && !permalink.isNullOrBlank()) {
+                                        playerViewModel.navigateToSpotifyArtist(permalink.removePrefix("spotify:artist:"))
+                                    } else {
+                                        playerViewModel.resolveAndNavigateToArtist(artist.name, artist.artistId)
+                                    }
+                                },
                             )
                         }
                         composable("sync_settings") {
