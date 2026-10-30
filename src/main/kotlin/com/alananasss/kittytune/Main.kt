@@ -192,11 +192,15 @@ fun main(args: Array<String>) {
 
         var useSniTray by remember { mutableStateOf(isLinux) }
 
+        androidx.compose.runtime.DisposableEffect(appIconVariant) {
+            runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
+            onDispose { }
+        }
+
         if (isLinux) {
             var activeSniService by remember { mutableStateOf<com.alananasss.kittytune.core.LinuxStatusNotifierService?>(null) }
 
             androidx.compose.runtime.DisposableEffect(appIconVariant) {
-                runCatching { com.alananasss.kittytune.core.AppIconInstaller.apply(appIconVariant) }
                 val iconBaseName = if (appIconVariant == "og") "kittytune" else "kittytune-$appIconVariant"
                 val service = com.alananasss.kittytune.core.LinuxStatusNotifierService(
                     iconName = iconBaseName,

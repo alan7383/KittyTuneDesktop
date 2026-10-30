@@ -27,6 +27,7 @@ class LinuxAppIdHelperTest {
 
     @Test
     fun testAppIconInstallerApply() {
+        org.junit.Assume.assumeTrue(System.getProperty("os.name").lowercase().contains("linux"))
         AppIconInstaller.apply("sunset")
         Thread.sleep(1500) // apply runs in daemon thread
 
@@ -46,6 +47,7 @@ class LinuxAppIdHelperTest {
 
     @Test
     fun testWindowClassName() {
+        org.junit.Assume.assumeTrue(System.getProperty("os.name").lowercase().contains("linux"))
         LinuxAppIdHelper.apply()
         val frame = javax.swing.JFrame("KittyTune Hyprland Test")
         frame.size = java.awt.Dimension(300, 200)

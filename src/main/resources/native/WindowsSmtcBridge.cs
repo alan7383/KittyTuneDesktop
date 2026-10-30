@@ -255,8 +255,7 @@ namespace KittyTuneSmtc {
                 "KittyTune.lnk",
                 "Kitty Tune.lnk",
                 Path.Combine("KittyTune", "KittyTune.lnk"),
-                Path.Combine("Kitty Tune", "Kitty Tune.lnk"),
-                Path.Combine("Unknown", "KittyTune.lnk")
+                Path.Combine("Kitty Tune", "Kitty Tune.lnk")
             };
             var paths = new string[menuDirs.Length * relativePaths.Length];
             int i = 0;
