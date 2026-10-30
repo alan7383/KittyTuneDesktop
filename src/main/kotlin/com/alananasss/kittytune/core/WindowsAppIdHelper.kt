@@ -184,6 +184,12 @@ object WindowsAppIdHelper {
                         return false;
                     }
                 }
+
+                public static void RefreshShell() {
+                    try {
+                        SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero);
+                    } catch {}
+                }
             }
 "@
             Add-Type -TypeDefinition ${d}code
@@ -194,7 +200,18 @@ object WindowsAppIdHelper {
                 if (-not ${d}p) { continue }
                 [NativeShortcutPatcher]::Patch(${d}p, ${d}appId, ${d}ico)
             }
-            [NativeShortcutPatcher]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
+            try {
+                if (-not [string]::IsNullOrEmpty(${d}ico)) {
+                    ${d}wsh = New-Object -ComObject WScript.Shell
+                    foreach (${d}p in ${d}lines) {
+                        if (-not ${d}p) { continue }
+                        ${d}sl = ${d}wsh.CreateShortcut(${d}p)
+                        ${d}sl.IconLocation = "${d}ico,0"
+                        ${d}sl.Save()
+                    }
+                }
+            } catch {}
+            [NativeShortcutPatcher]::RefreshShell()
         """.trimIndent()
 
         runCatching {
