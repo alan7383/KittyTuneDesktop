@@ -644,7 +644,7 @@ private fun MenuSheetContent(viewModel: PlayerViewModel) {
                     )
                 }
             }
-            if (viewModel.menuContextPlaylistId != null && (viewModel.menuContextPlaylistId!! < 0 || viewModel.menuContextPlaylistId == -2L)) {
+            if (viewModel.menuContextPlaylistId != null) {
                 add(MenuOptionItem("remove_from_playlist", Icons.Outlined.Delete, str("menu_remove")) { viewModel.removeFromContextPlaylist(viewModel.menuContextPlaylistId!!, track) })
             }
             if (viewModel.isMenuContextFromPlayer) {
