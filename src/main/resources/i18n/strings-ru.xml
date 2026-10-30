@@ -1317,6 +1317,8 @@
     <string name="queue_history_delete">Удалить</string>
     <string name="queue_history_count_one">1 сохраненная очередь</string>
     <string name="queue_history_count">%1$d сохраненных очередей</string>
+    <string name="pref_queue_auto_archive">Сохранять историю очередей</string>
+    <string name="pref_queue_auto_archive_sub">Автоматически сохранять предыдущую очередь при запуске новой</string>
     <string name="radio">Радио</string>
     <string name="recognition_history_title">История</string>
     <string name="recognition_listen_on_kittytune">Слушать на KittyTune</string>

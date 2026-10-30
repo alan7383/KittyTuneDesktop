@@ -2234,6 +2234,8 @@
     <string name="queue_history_delete">Löschen</string>
     <string name="queue_history_count_one">1 gespeicherte Warteschlange</string>
     <string name="queue_history_count">%1$d gespeicherte Warteschlangen</string>
+    <string name="pref_queue_auto_archive">Warteschlangen-Verlauf archivieren</string>
+    <string name="pref_queue_auto_archive_sub">Frühere Warteschlangen automatisch speichern, wenn eine neue gestartet wird</string>
     <string name="recognition_default_source">Audioquelle</string>
     <string name="sc_selection_buzzing">Angesagte Künstler</string>
     <string name="sc_selection_curated">Ausgewählt von SoundCloud</string>

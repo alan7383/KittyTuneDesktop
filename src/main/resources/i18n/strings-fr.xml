@@ -1318,6 +1318,8 @@
     <string name="queue_history_delete">Supprimer</string>
     <string name="queue_history_count_one">1 file enregistrée</string>
     <string name="queue_history_count">%1$d files enregistrées</string>
+    <string name="pref_queue_auto_archive">Conserver l\'historique des files</string>
+    <string name="pref_queue_auto_archive_sub">Sauvegarder automatiquement l\'ancienne file d\'attente lors du lancement d\'une nouvelle</string>
     <string name="radio">Radio</string>
     <string name="recognition_history_title">Historique</string>
     <string name="recognition_listen_on_kittytune">Écouter sur KittyTune</string>
