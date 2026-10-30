@@ -865,6 +865,7 @@
     <string name="lang_hungarian">Magyar</string>
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
+    <string name="lang_turkish">Türkçe</string>
     <!-- TYPOGRAPHY -->
     <string name="dialog_font_settings_title">Cài đặt phông chữ</string>
     <string name="dialog_font_weight">Độ dày (wght): %1$d</string>
@@ -2736,4 +2737,27 @@
     <string name="color_hint_bright">Sáng</string>
     <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
     <string name="color_spec_2021_label">SPEC 2021 (Cũ)</string>
+    <string name="listening_stats_next_period">Kỳ tiếp theo</string>
+    <string name="listening_stats_period_month_current">Tháng này</string>
+    <string name="listening_stats_period_month_last">Tháng trước</string>
+    <string name="listening_stats_period_week_current">Tuần này</string>
+    <string name="listening_stats_period_week_last">Tuần trước</string>
+    <string name="listening_stats_period_year_current">Năm nay</string>
+    <string name="listening_stats_period_year_last">Năm ngoái</string>
+    <string name="listening_stats_previous_period">Kỳ trước</string>
+    <string name="pref_queue_auto_archive">Lưu lại lịch sử danh sách chờ</string>
+    <string name="pref_queue_auto_archive_sub">Tự động lưu các danh sách chờ trước đó khi bắt đầu danh sách mới</string>
+    <string name="queue_archived_message">Đã lưu danh sách chờ trước đó</string>
+    <string name="queue_history">Lịch sử danh sách chờ</string>
+    <string name="queue_history_clear_msg">Bạn có chắc chắn muốn xóa tất cả danh sách chờ đã lưu?</string>
+    <string name="queue_history_clear_title">Xóa lịch sử danh sách chờ</string>
+    <string name="queue_history_count">%1$d danh sách chờ đã lưu</string>
+    <string name="queue_history_count_one">1 danh sách chờ đã lưu</string>
+    <string name="queue_history_delete">Xóa</string>
+    <string name="queue_history_empty">Chưa có danh sách phát được lưu</string>
+    <string name="queue_history_empty_desc">Các danh sách chờ trước đó sẽ tự động được lưu tại đây khi bắt đầu danh sách mới.</string>
+    <string name="queue_history_restore">Khôi phục danh sách chờ</string>
+    <string name="queue_history_restored">Đã khôi phục danh sách chờ</string>
+    <string name="queue_history_snapshot">Lưu danh sách chờ hiện tại</string>
+    <string name="queue_history_snapshot_desc">Lưu các bài hát hiện tại vào lịch sử danh sách chờ</string>
 </resources>

@@ -757,6 +757,7 @@
     <string name="lang_hungarian">Magyar</string>
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
+    <string name="lang_turkish">Türkçe</string>
     <string name="lib_albums">Albumok</string>
     <string name="lib_artists">Előadók</string>
     <string name="lib_collapse_tooltip">Könyvtár összecsukása</string>
@@ -2654,4 +2655,27 @@
     <string name="color_hint_bright">Világos</string>
     <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
     <string name="color_spec_2021_label">SPEC 2021 (Örökölt)</string>
+    <string name="listening_stats_next_period">Következő időszak</string>
+    <string name="listening_stats_period_month_current">Ebben a hónapban</string>
+    <string name="listening_stats_period_month_last">Múlt hónapban</string>
+    <string name="listening_stats_period_week_current">Ezen a héten</string>
+    <string name="listening_stats_period_week_last">Múlt héten</string>
+    <string name="listening_stats_period_year_current">Idén</string>
+    <string name="listening_stats_period_year_last">Tavaly</string>
+    <string name="listening_stats_previous_period">Előző időszak</string>
+    <string name="pref_queue_auto_archive">Várólista előzményeinek megőrzése</string>
+    <string name="pref_queue_auto_archive_sub">Korábbi várólisták automatikus mentése új indításakor</string>
+    <string name="queue_archived_message">Korábbi várólista elmentve</string>
+    <string name="queue_history">Várólista előzményei</string>
+    <string name="queue_history_clear_msg">Biztosan törölni szeretnéd az összes mentett várólistát?</string>
+    <string name="queue_history_clear_title">Várólista-előzmények törlése</string>
+    <string name="queue_history_count">%1$d mentett várólista</string>
+    <string name="queue_history_count_one">1 mentett várólista</string>
+    <string name="queue_history_delete">Törlés</string>
+    <string name="queue_history_empty">Nincsenek mentett várólisták</string>
+    <string name="queue_history_empty_desc">A korábbi várólisták automatikusan ide mentődnek, amikor új kezdődik.</string>
+    <string name="queue_history_restore">Várólista visszaállítása</string>
+    <string name="queue_history_restored">Várólista visszaállítva</string>
+    <string name="queue_history_snapshot">Aktuális várólista mentése</string>
+    <string name="queue_history_snapshot_desc">Aktuális számok mentése a várólista-előzményekbe</string>
 </resources>
