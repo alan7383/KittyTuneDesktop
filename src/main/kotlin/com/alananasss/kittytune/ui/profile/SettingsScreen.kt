@@ -880,6 +880,18 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
             highlightKey = "pref_queue_preserve_upcoming",
         ),
         SettingsSearchItem(
+            title = str("pref_queue_auto_archive"),
+            subtitle = str("pref_queue_auto_archive_sub"),
+            category = SettingsCategory.AUDIO,
+            place = SettingsPlace(SettingsCategory.AUDIO, listOf(SettingsSubPage.AUDIO_PLAYBACK)),
+            icon = Icons.Rounded.History,
+            keywords = listOf("queue", "history", "archive", "historique", "sauvegarde", "file"),
+            hasSwitch = true,
+            switchState = playerViewModel.isQueueAutoArchiveEnabled,
+            onSwitchChange = { playerViewModel.toggleQueueAutoArchive(it) },
+            highlightKey = "pref_queue_auto_archive",
+        ),
+        SettingsSearchItem(
             title = str("pref_save_position"),
             subtitle = str("pref_save_position_sub"),
             category = SettingsCategory.AUDIO,

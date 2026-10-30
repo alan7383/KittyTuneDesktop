@@ -106,13 +106,17 @@ fun QueueHistoryDialog(
                     onClick = {
                         QueueHistoryRepository.clearAll()
                         showClearConfirmDialog = false
-                    }
+                    },
+                    shapes = ButtonDefaults.shapes()
                 ) {
                     Text(str("queue_history_delete"), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showClearConfirmDialog = false }) {
+                TextButton(
+                    onClick = { showClearConfirmDialog = false },
+                    shapes = ButtonDefaults.shapes()
+                ) {
                     Text(str("btn_cancel"))
                 }
             }
@@ -176,6 +180,7 @@ fun QueueHistoryDialog(
                     if (summaries.isNotEmpty()) {
                         IconButton(
                             onClick = { showClearConfirmDialog = true },
+                            shapes = IconButtonDefaults.shapes(),
                             modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
                         ) {
                             Icon(
@@ -188,6 +193,7 @@ fun QueueHistoryDialog(
 
                     IconButton(
                         onClick = onDismiss,
+                        shapes = IconButtonDefaults.shapes(),
                         modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
                     ) {
                         Icon(
@@ -247,7 +253,7 @@ fun QueueHistoryDialog(
                                     viewModel.saveCurrentQueueToHistory()
                                     snapshotSavedRecently = true
                                 },
-                                shape = RoundedCornerShape(10.dp),
+                                shapes = ButtonDefaults.shapes(),
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                 modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
                             ) {
@@ -442,7 +448,7 @@ private fun QueueHistoryCard(
                 FilledTonalIconButton(
                     onClick = onRestore,
                     modifier = Modifier.size(36.dp).pointerHoverIcon(PointerIcon.Hand),
-                    shape = CircleShape
+                    shapes = IconButtonDefaults.shapes()
                 ) {
                     Icon(
                         imageVector = Icons.Rounded.PlayArrow,
@@ -454,6 +460,7 @@ private fun QueueHistoryCard(
 
                 IconButton(
                     onClick = onToggleExpand,
+                    shapes = IconButtonDefaults.shapes(),
                     modifier = Modifier.size(36.dp).pointerHoverIcon(PointerIcon.Hand)
                 ) {
                     Icon(
@@ -466,6 +473,7 @@ private fun QueueHistoryCard(
 
                 IconButton(
                     onClick = onDelete,
+                    shapes = IconButtonDefaults.shapes(),
                     modifier = Modifier.size(36.dp).pointerHoverIcon(PointerIcon.Hand)
                 ) {
                     Icon(
@@ -567,7 +575,7 @@ private fun QueueHistoryCard(
                             Button(
                                 onClick = onRestore,
                                 modifier = Modifier.weight(1f).pointerHoverIcon(PointerIcon.Hand),
-                                shape = RoundedCornerShape(10.dp),
+                                shapes = ButtonDefaults.shapes(),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 )
@@ -583,7 +591,7 @@ private fun QueueHistoryCard(
 
                             OutlinedButton(
                                 onClick = onDelete,
-                                shape = RoundedCornerShape(10.dp),
+                                shapes = ButtonDefaults.shapes(),
                                 modifier = Modifier.pointerHoverIcon(PointerIcon.Hand)
                             ) {
                                 Icon(

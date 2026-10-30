@@ -322,6 +322,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private var lastAutoEqDeviceKey: String? = null
     var isPreciseSpeedEnabled by mutableStateOf(playerPrefs.getPreciseSpeedEnabled())
     var isQueuePreserveUpcomingEnabled by mutableStateOf(playerPrefs.getQueuePreserveUpcomingOnJump())
+    var isQueueAutoArchiveEnabled by mutableStateOf(playerPrefs.getQueueAutoArchiveEnabled())
     var fullPlayerBgStyle by mutableStateOf(playerPrefs.getFullPlayerBgStyle())
         private set
     var fullPlayerLayout by mutableStateOf(playerPrefs.getFullPlayerLayout())
@@ -4203,6 +4204,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private fun archiveQueueIfNeeded(incomingTracks: List<Track>) {
+        if (!playerPrefs.getQueueAutoArchiveEnabled()) return
         val currentTracks = if (_queue.isNotEmpty()) _queue.toList() else _originalQueue.toList()
         if (currentTracks.isNotEmpty() && !areTrackListsEquivalent(currentTracks, incomingTracks)) {
             if (currentTracks.size >= 2 || currentContext != null) {
@@ -5434,6 +5436,11 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     fun toggleQueuePreserveUpcoming(enabled: Boolean) {
         isQueuePreserveUpcomingEnabled = enabled
         playerPrefs.setQueuePreserveUpcomingOnJump(enabled)
+    }
+
+    fun toggleQueueAutoArchive(enabled: Boolean) {
+        isQueueAutoArchiveEnabled = enabled
+        playerPrefs.setQueueAutoArchiveEnabled(enabled)
     }
 
     fun updateFullPlayerBgStyle(style: com.alananasss.kittytune.data.local.FullPlayerBgStyle) {
