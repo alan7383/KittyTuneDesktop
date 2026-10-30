@@ -333,11 +333,6 @@ object AppIconInstaller {
             val icoFile = File(iconDir, "app_icon_$variantKey.ico")
             icoFile.writeBytes(IconEncoders.ico(source))
 
-            // Drop the ICOs for other variants so the directory does not grow without bound.
-            iconDir.listFiles { f ->
-                f.isFile && f.name.startsWith("app_icon") && f.name != icoFile.name
-            }?.forEach { runCatching { it.delete() } }
-
             val links = findWindowsShortcuts()
             if (links.isNotEmpty()) WindowsAppIdHelper.patchShortcuts(links, appId = WindowsAppIdHelper.APP_ID, icoPath = icoFile.canonicalPath)
 
@@ -403,6 +398,9 @@ object AppIconInstaller {
     private const val WINDOWS_EXE = "KittyTune.exe"
 
     private fun mentionsOurLauncher(lnk: File): Boolean {
+        if (lnk.name.contains("KittyTune", ignoreCase = true) || lnk.name.contains("Kitty Tune", ignoreCase = true)) {
+            return true
+        }
         val bytes = runCatching {
             if (lnk.length() > 512 * 1024) return false
             lnk.readBytes()

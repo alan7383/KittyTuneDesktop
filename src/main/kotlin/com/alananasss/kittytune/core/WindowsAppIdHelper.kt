@@ -134,6 +134,9 @@ object WindowsAppIdHelper {
                 [DllImport("ole32.dll")]
                 public static extern int PropVariantClear(ref PROPVARIANTAppIdHelper pvar);
 
+                [DllImport("shell32.dll")]
+                public static extern void SHChangeNotify(int wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
                 static readonly Guid AppIdGuid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");
 
                 public static bool Patch(string path, string appId, string iconPath) {
@@ -144,6 +147,19 @@ object WindowsAppIdHelper {
 
                         if (!string.IsNullOrEmpty(iconPath)) {
                             link.SetIconLocation(iconPath, 0);
+                        } else {
+                            var curIcon = new StringBuilder(1024);
+                            int curIdx;
+                            link.GetIconLocation(curIcon, curIcon.Capacity, out curIdx);
+                            string cur = curIcon.ToString();
+                            if (!string.IsNullOrEmpty(cur) && !System.IO.File.Exists(cur)) {
+                                var targetPath = new StringBuilder(1024);
+                                link.GetPath(targetPath, targetPath.Capacity, IntPtr.Zero, 0);
+                                string target = targetPath.ToString();
+                                if (!string.IsNullOrEmpty(target) && System.IO.File.Exists(target)) {
+                                    link.SetIconLocation(target, 0);
+                                }
+                            }
                         }
 
                         if (!string.IsNullOrEmpty(appId)) {
@@ -178,6 +194,7 @@ object WindowsAppIdHelper {
                 if (-not ${d}p) { continue }
                 [NativeShortcutPatcher]::Patch(${d}p, ${d}appId, ${d}ico)
             }
+            [NativeShortcutPatcher]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
         """.trimIndent()
 
         runCatching {
