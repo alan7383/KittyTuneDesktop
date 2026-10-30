@@ -1942,7 +1942,6 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         if (System.getProperty("os.name").lowercase().contains("win")) {
             viewModelScope.launch {
                 playerPrefs.appIconVariantFlow().drop(1).collectLatest {
-                    delay(2500)
                     restartWindowsSmtc()
                 }
             }

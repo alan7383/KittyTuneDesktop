@@ -352,7 +352,7 @@ object AppIconInstaller {
      * in-memory copy in StartMenuExperienceHost, which only lets go when it restarts — that is
      * safe (Windows brings it back on demand, and open windows and the taskbar are untouched).
      */
-    private fun notifyWindowsShell() {
+    internal fun notifyWindowsShell() {
         runCatching {
             val shell = com.sun.jna.Native.load(
                 "shell32", WindowsShellNotifier::class.java,
@@ -365,7 +365,10 @@ object AppIconInstaller {
             listOf("ie4uinit.exe", "-ClearIconCache"),
             listOf("taskkill", "/f", "/im", "StartMenuExperienceHost.exe")
         ).forEach { cmd ->
-            runCatching { ProcessBuilder(cmd).start() }
+            runCatching {
+                val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
+                p.waitFor(2000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            }
         }
     }
 

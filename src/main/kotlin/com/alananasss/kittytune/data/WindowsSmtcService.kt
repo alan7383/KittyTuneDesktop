@@ -36,9 +36,6 @@ class WindowsSmtcService(
 
     init {
         if (System.getProperty("os.name").lowercase().contains("win")) {
-            runCatching {
-                com.alananasss.kittytune.core.WindowsAppIdHelper.apply(APP_USER_MODEL_ID)
-            }
             runCatching { start() }.onFailure { e ->
                 println("Windows SMTC unavailable: ${e.message}")
                 close()
