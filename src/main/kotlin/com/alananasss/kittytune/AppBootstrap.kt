@@ -66,7 +66,6 @@ object AppBootstrap {
         System.setProperty("org.bytedeco.javacpp.maxphysicalbytes", "0")
 
         com.alananasss.kittytune.audio.ai.OnnxHelper.ensureNativeLibrariesLoaded()
-        com.alananasss.kittytune.core.WindowsAppIdHelper.apply()
         com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
 
         runCatching {

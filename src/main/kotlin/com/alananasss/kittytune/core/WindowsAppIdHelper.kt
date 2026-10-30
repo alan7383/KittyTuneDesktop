@@ -29,14 +29,9 @@ object WindowsAppIdHelper {
         if (applied) return
         applied = true
 
-        // 1. Process-level AppUserModelID MUST be set before creating any window / UI
-        runCatching {
-            com.sun.jna.platform.win32.Shell32.INSTANCE.SetCurrentProcessExplicitAppUserModelID(
-                com.sun.jna.WString(appId)
-            )
-        }.onFailure {
-            println("[WindowsAppIdHelper] SetCurrentProcessExplicitAppUserModelID failed: ${it.message}")
-        }
+        // Process-level AppUserModelID is deliberately NOT set on the JVM process so that
+        // the Windows Taskbar dynamically updates button icons via standard WM_SETICON messages.
+        // SMTC media controls are handled independently by WindowsSmtcBridge.exe with its own AUMID.
 
         // 2. Ensure shortcuts on Taskbar, Start Menu, Desktop have System.AppUserModel.ID set
         thread(isDaemon = true, name = "WindowsAppIdHelper-ShortcutSync") {
@@ -65,21 +60,23 @@ object WindowsAppIdHelper {
         if (links.isEmpty()) return
         val tempDir = File(System.getProperty("java.io.tmpdir"), "kittytune_appids")
         tempDir.mkdirs()
-        val listFile = File(tempDir, "shortcuts_${System.currentTimeMillis()}.txt")
+        val uid = "${System.currentTimeMillis()}_${Thread.currentThread().id}"
+        val listFile = File(tempDir, "shortcuts_$uid.txt")
+        val appIdFile = File(tempDir, "appid_$uid.txt")
+        val icoFile = File(tempDir, "ico_$uid.txt")
+        val bom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
         runCatching {
-            listFile.writeText(links.joinToString("\n") { it.canonicalPath }, Charsets.UTF_8)
+            listFile.writeBytes(bom + links.joinToString("\r\n") { it.canonicalPath }.toByteArray(Charsets.UTF_8))
+            appIdFile.writeBytes(bom + appId.toByteArray(Charsets.UTF_8))
+            icoFile.writeBytes(bom + icoPath.orEmpty().toByteArray(Charsets.UTF_8))
         }.onFailure { return }
 
-        val ownExe = System.getProperty("jpackage.app-path")?.takeIf {
-            it.endsWith(".exe", ignoreCase = true)
-        }.orEmpty()
-
-        fun quote(s: String) = "'" + s.replace("'", "''") + "'"
         val d = "${'$'}"
         val script = """
             ${d}ErrorActionPreference = 'SilentlyContinue'
             ${d}code = @"
             using System;
+            using System.IO;
             using System.Text;
             using System.Runtime.InteropServices;
             using System.Runtime.InteropServices.ComTypes;
@@ -139,6 +136,15 @@ object WindowsAppIdHelper {
 
                 static readonly Guid AppIdGuid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3");
 
+                // Read file content as UTF-8 and strip BOM if present (avoids PowerShell Get-Content BOM issues)
+                public static string ReadUtf8NoBom(string path) {
+                    if (!File.Exists(path)) return "";
+                    var bytes = File.ReadAllBytes(path);
+                    int start = 0;
+                    if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) start = 3;
+                    return Encoding.UTF8.GetString(bytes, start, bytes.Length - start).Trim();
+                }
+
                 public static bool Patch(string path, string appId, string iconPath) {
                     try {
                         var link = (IShellLinkWAppIdHelper)new ShellLinkCoClassAppIdHelper();
@@ -152,11 +158,11 @@ object WindowsAppIdHelper {
                             int curIdx;
                             link.GetIconLocation(curIcon, curIcon.Capacity, out curIdx);
                             string cur = curIcon.ToString();
-                            if (!string.IsNullOrEmpty(cur) && !System.IO.File.Exists(cur)) {
+                            if (!string.IsNullOrEmpty(cur) && !File.Exists(cur)) {
                                 var targetPath = new StringBuilder(1024);
                                 link.GetPath(targetPath, targetPath.Capacity, IntPtr.Zero, 0);
                                 string target = targetPath.ToString();
-                                if (!string.IsNullOrEmpty(target) && System.IO.File.Exists(target)) {
+                                if (!string.IsNullOrEmpty(target) && File.Exists(target)) {
                                     link.SetIconLocation(target, 0);
                                 }
                             }
@@ -176,7 +182,11 @@ object WindowsAppIdHelper {
                             }
                         }
 
-                        file.Save(null, true);
+                        try {
+                            file.Save(path, true);
+                        } catch {
+                            // fallback already attempted — ignore
+                        }
                         Marshal.ReleaseComObject(file);
                         Marshal.ReleaseComObject(link);
                         return true;
@@ -193,35 +203,40 @@ object WindowsAppIdHelper {
             }
 "@
             Add-Type -TypeDefinition ${d}code
-            ${d}appId = ${quote(appId)}
-            ${d}ico = ${quote(icoPath.orEmpty())}
-            ${d}lines = Get-Content -LiteralPath ${quote(listFile.canonicalPath)} -Encoding UTF8
+            ${d}scriptDir = Split-Path -Parent ${d}MyInvocation.MyCommand.Path
+            ${d}appIdPath = Join-Path ${d}scriptDir '${appIdFile.name}'
+            ${d}icoPath = Join-Path ${d}scriptDir '${icoFile.name}'
+            ${d}listPath = Join-Path ${d}scriptDir '${listFile.name}'
+            # Use C# ReadUtf8NoBom to avoid PowerShell BOM/ANSI issues with Unicode paths
+            ${d}appId = [NativeShortcutPatcher]::ReadUtf8NoBom(${d}appIdPath)
+            ${d}ico = [NativeShortcutPatcher]::ReadUtf8NoBom(${d}icoPath)
+            ${d}lines = [NativeShortcutPatcher]::ReadUtf8NoBom(${d}listPath) -split "`r`n|`n"
             foreach (${d}p in ${d}lines) {
                 if (-not ${d}p) { continue }
                 [NativeShortcutPatcher]::Patch(${d}p, ${d}appId, ${d}ico)
+                try {
+                    [System.IO.File]::SetLastWriteTime(${d}p, [System.DateTime]::Now)
+                } catch {}
             }
-            try {
-                if (-not [string]::IsNullOrEmpty(${d}ico)) {
-                    ${d}wsh = New-Object -ComObject WScript.Shell
-                    foreach (${d}p in ${d}lines) {
-                        if (-not ${d}p) { continue }
-                        ${d}sl = ${d}wsh.CreateShortcut(${d}p)
-                        ${d}sl.IconLocation = "${d}ico,0"
-                        ${d}sl.Save()
-                    }
-                }
-            } catch {}
             [NativeShortcutPatcher]::RefreshShell()
         """.trimIndent()
 
-        runCatching {
+        val scriptFile = File(tempDir, "patch_$uid.ps1")
+        try {
+            scriptFile.writeBytes(bom + script.toByteArray(Charsets.UTF_8))
             val process = ProcessBuilder(
-                "powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden",
-                "-Command", script
+                "powershell", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                "-WindowStyle", "Hidden",
+                "-File", scriptFile.canonicalPath
             ).apply { redirectErrorStream(true) }.start()
             process.waitFor()
+        } catch (_: Throwable) {
+        } finally {
+            runCatching { scriptFile.delete() }
+            runCatching { listFile.delete() }
+            runCatching { appIdFile.delete() }
+            runCatching { icoFile.delete() }
         }
-        runCatching { listFile.delete() }
     }
 
     private fun findShortcutFiles(): List<File> {
@@ -263,11 +278,21 @@ object WindowsAppIdHelper {
             if (file.length() > 512 * 1024) return false
             file.readBytes()
         }.getOrNull() ?: return false
-        val needle = WINDOWS_EXE.toByteArray(Charsets.US_ASCII)
-        return bytes.indices.any { i ->
-            i + needle.size <= bytes.size && needle.indices.all { j ->
-                bytes[i + j].toInt().toChar().equals(needle[j].toInt().toChar(), ignoreCase = true)
+        val ascii = WINDOWS_EXE.toByteArray(Charsets.US_ASCII)
+        val utf16 = WINDOWS_EXE.toByteArray(Charsets.UTF_16LE)
+        return contains(bytes, ascii) || contains(bytes, utf16)
+    }
+
+    private fun contains(haystack: ByteArray, needle: ByteArray): Boolean {
+        if (needle.isEmpty() || haystack.size < needle.size) return false
+        outer@ for (i in 0..haystack.size - needle.size) {
+            for (j in needle.indices) {
+                val a = haystack[i + j].toInt().let { if (it in 65..90) it + 32 else it }
+                val b = needle[j].toInt().let { if (it in 65..90) it + 32 else it }
+                if (a != b) continue@outer
             }
+            return true
         }
+        return false
     }
 }
