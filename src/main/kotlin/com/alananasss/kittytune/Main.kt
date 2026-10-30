@@ -97,6 +97,7 @@ fun main(args: Array<String>) {
     // Arguments are files the OS asked us to open ("Open with", a double-click on an associated file).
     if (!com.alananasss.kittytune.core.SingleInstance.acquire(args.toList())) return
     com.alananasss.kittytune.audio.ai.OnnxHelper.disableNativeTelemetry()
+    com.alananasss.kittytune.core.WindowsAppIdHelper.apply()
     com.alananasss.kittytune.core.LinuxAppIdHelper.apply()
     System.setProperty("sun.java2d.wm.className", "kitty-tune")
     runCatching {

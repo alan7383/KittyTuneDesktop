@@ -136,16 +136,18 @@ namespace KittyTuneSmtc {
 
             // By expected name first, then anything in the Start Menu that actually launches us —
             // the user may have renamed or localised the shortcut.
+            bool foundAny = false;
             foreach (string path in NamedShortcuts(menuDirs)) {
-                if (File.Exists(path) && PatchShortcut(path, launcher)) return;
+                if (File.Exists(path) && PatchShortcut(path, launcher)) foundAny = true;
             }
             foreach (string path in AllStartMenuShortcuts(menuDirs)) {
-                if (PatchShortcut(path, launcher)) return;
+                if (PatchShortcut(path, launcher)) foundAny = true;
             }
 
-            if (launcher == null) return;
+            if (foundAny || launcher == null) return;
             string created = Path.Combine(menuDirs[0], "KittyTune.lnk");
             Directory.CreateDirectory(menuDirs[0]);
+            if (File.Exists(created)) try { File.Delete(created); } catch { }
             var fresh = (IShellLinkW)new ShellLinkCoClass();
             fresh.SetPath(launcher);
             fresh.SetDescription("KittyTune");
@@ -161,7 +163,7 @@ namespace KittyTuneSmtc {
             try {
                 var link = (IShellLinkW)new ShellLinkCoClass();
                 var file = (IPersistFile)link;
-                file.Load(path, 0 /* STGM_READ */);
+                file.Load(path, 2 /* STGM_READWRITE */);
                 string target = ReadShortcutTarget(link);
                 // A same-named .lnk belonging to something else is left alone.
                 if (target.IndexOf("KittyTune", StringComparison.OrdinalIgnoreCase) < 0) return false;
@@ -177,7 +179,7 @@ namespace KittyTuneSmtc {
                     link.SetIconLocation(launcher, 0);
                 }
                 SetAppUserModelId(link);
-                file.Save(path, false);
+                file.Save(null, true);
                 return true;
             } catch (Exception) {
                 return false;
@@ -188,7 +190,7 @@ namespace KittyTuneSmtc {
             try {
                 var store = (IPropertyStore)link;
                 var key = new PROPERTYKEY {
-                    fmtid = new Guid(0x9F4C2855, 0x9F79, 0x4B39, 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE4, 0xD4, 0x36),
+                    fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
                     pid = 5
                 };
                 var value = default(PropVariant);
@@ -220,7 +222,7 @@ namespace KittyTuneSmtc {
         static void SetAppUserModelId(IShellLinkW link) {
             var store = (IPropertyStore)link;
             var key = new PROPERTYKEY {
-                fmtid = new Guid(0x9F4C2855, 0x9F79, 0x4B39, 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE4, 0xD4, 0x36),
+                fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),
                 pid = 5
             };
             IntPtr s = Marshal.StringToCoTaskMemUni(AppUserModelId);
@@ -238,9 +240,13 @@ namespace KittyTuneSmtc {
 
         static string[] StartMenuDirs() {
             var relative = Path.Combine("Microsoft", "Windows", "Start Menu", "Programs");
+            var taskbarRel = Path.Combine("Microsoft", "Internet Explorer", "Quick Launch", "User Pinned", "TaskBar");
             return new[] {
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), relative),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), relative)
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), relative),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), taskbarRel),
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
             };
         }
 
@@ -249,7 +255,8 @@ namespace KittyTuneSmtc {
                 "KittyTune.lnk",
                 "Kitty Tune.lnk",
                 Path.Combine("KittyTune", "KittyTune.lnk"),
-                Path.Combine("Kitty Tune", "Kitty Tune.lnk")
+                Path.Combine("Kitty Tune", "Kitty Tune.lnk"),
+                Path.Combine("Unknown", "KittyTune.lnk")
             };
             var paths = new string[menuDirs.Length * relativePaths.Length];
             int i = 0;
