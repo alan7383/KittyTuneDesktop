@@ -339,7 +339,7 @@ object AppIconInstaller {
             }?.forEach { runCatching { it.delete() } }
 
             val links = findWindowsShortcuts()
-            if (links.isNotEmpty()) updateShortcutIcons(links, icoFile)
+            if (links.isNotEmpty()) WindowsAppIdHelper.patchShortcuts(links, appId = WindowsAppIdHelper.APP_ID, icoPath = icoFile.canonicalPath)
 
             notifyWindowsShell()
         } catch (e: Throwable) {
@@ -402,65 +402,6 @@ object AppIconInstaller {
     /** The launcher jpackage produces from `packageName = "KittyTune"`. */
     private const val WINDOWS_EXE = "KittyTune.exe"
 
-    /**
-     * Points each of our .lnk files' IconLocation at [icoFile].
-     *
-     * Shortcuts are matched on their TARGET, not their name: a shortcut the user renamed still
-     * gets caught, and — the reason a name match is not good enough — an unrelated app whose
-     * name happens to contain "kitty" does not. KiTTY and the kitty terminal both exist, and
-     * rewriting their icons would be a nasty thing to do.
-     *
-     * The shortcut list is handed over in a file rather than interpolated into the command, so
-     * neither an apostrophe in a user name nor a hundred shortcuts can break the invocation.
-     */
-    private fun updateShortcutIcons(links: List<File>, icoFile: File) {
-        val listFile = File(icoFile.parentFile, "shortcuts.txt")
-        runCatching {
-            listFile.writeText(links.joinToString("\n") { it.canonicalPath }, Charsets.UTF_8)
-        }.onFailure { return }
-
-        val ownExe = System.getProperty("jpackage.app-path")?.takeIf {
-            it.endsWith(".exe", ignoreCase = true)
-        }.orEmpty()
-
-        fun quote(s: String) = "'" + s.replace("'", "''") + "'"
-        val d = "${'$'}"
-        val script = """
-            ${d}ErrorActionPreference = 'SilentlyContinue'
-            ${d}ws = New-Object -ComObject WScript.Shell
-            ${d}exe = ${quote(ownExe)}
-            ${d}ico = ${quote(icoFile.canonicalPath)}
-            foreach (${d}p in (Get-Content -LiteralPath ${quote(listFile.canonicalPath)} -Encoding UTF8)) {
-                if (-not ${d}p) { continue }
-                try {
-                    ${d}l = ${d}ws.CreateShortcut(${d}p)
-                    ${d}t = ${d}l.TargetPath
-                    if (-not ${d}t) { continue }
-                    ${d}hit = ${d}false
-                    if (${d}exe -and (${d}t -ieq ${d}exe)) { ${d}hit = ${d}true }
-                    elseif ([System.IO.Path]::GetFileName(${d}t) -ieq '$WINDOWS_EXE') { ${d}hit = ${d}true }
-                    if (${d}hit) {
-                        ${d}l.IconLocation = ${d}ico + ',0'
-                        ${d}l.Save()
-                    }
-                } catch {}
-            }
-        """.trimIndent()
-
-        runCatching {
-            ProcessBuilder(
-                "powershell", "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden",
-                "-Command", script
-            ).apply { redirectErrorStream(true) }.start().waitFor()
-        }.onFailure { println("[AppIconInstaller] PowerShell shortcut update failed: ${it.message}") }
-        runCatching { listFile.delete() }
-    }
-
-    /**
-     * Cheap pre-filter so the PowerShell pass only opens a handful of shortcuts instead of
-     * every .lnk in the Start Menu: a .lnk embeds its target path, so the launcher name shows
-     * up in the raw bytes as ASCII, UTF-16 or both.
-     */
     private fun mentionsOurLauncher(lnk: File): Boolean {
         val bytes = runCatching {
             if (lnk.length() > 512 * 1024) return false

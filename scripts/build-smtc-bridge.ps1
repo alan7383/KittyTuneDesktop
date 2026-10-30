@@ -3,8 +3,8 @@
 # binary that slowly rots. Run on windows-latest in GitHub Actions, or locally from a Developer
 # Command Prompt.
 #
-# The WinRT metadata (Windows.winmd) and its .NET projection come from the Windows SDK, whose
-# location this script discovers by version, newest first.
+# The WinRT metadata (Windows.winmd) and its .NET projection come from the Windows SDK, or directly
+# from the Windows system WinMetadata directory.
 
 param(
     [string]$OutDir = ""
@@ -54,49 +54,55 @@ if (-not $installedRoot) {
         }
     }
 }
-if (-not $installedRoot) {
-    $checkedIn = Join-Path $repoRoot 'src\main\resources\native\WindowsSmtcBridge.exe'
-    if (Test-Path -LiteralPath $checkedIn) {
-        Write-Host "Windows SDK not found; using checked-in fallback ($checkedIn -> $outExe)"
-        Copy-Item -LiteralPath $checkedIn -Destination $outExe -Force
-        exit 0
-    }
-    throw 'Windows 10 SDK not found (no v10.0 InstallationFolder)'
-}
 
-$sdkVersion = (Get-ChildItem (Join-Path $installedRoot 'Include') -Directory |
-    Where-Object Name -match '^\d+\.\d+\.\d+\.\d+$' |
-    Sort-Object { try { [version]$_.Name } catch { [version]'0.0.0.0' } } -Descending |
-    Select-Object -First 1).Name
-if (-not $sdkVersion) { throw 'Windows SDK include dir not found' }
+$winmdRefs = @()
+if ($installedRoot) {
+    $sdkVersion = (Get-ChildItem (Join-Path $installedRoot 'Include') -Directory |
+        Where-Object Name -match '^\d+\.\d+\.\d+\.\d+$' |
+        Sort-Object { try { [version]$_.Name } catch { [version]'0.0.0.0' } } -Descending |
+        Select-Object -First 1).Name
 
-# In Windows SDK 10/11, Windows.winmd is located under UnionMetadata
-$winmdCandidates = @(
-    (Join-Path $installedRoot "UnionMetadata\$sdkVersion\Windows.winmd"),
-    (Join-Path $installedRoot "UnionMetadata\$sdkVersion\Facade\Windows.winmd"),
-    (Join-Path $installedRoot "UnionMetadata\Windows.winmd")
-)
-$winmd = $null
-foreach ($cand in $winmdCandidates) {
-    if (Test-Path $cand) {
-        $winmd = $cand
-        break
+    if ($sdkVersion) {
+        $winmdCandidates = @(
+            (Join-Path $installedRoot "UnionMetadata\$sdkVersion\Windows.winmd"),
+            (Join-Path $installedRoot "UnionMetadata\$sdkVersion\Facade\Windows.winmd"),
+            (Join-Path $installedRoot "UnionMetadata\Windows.winmd")
+        )
+        foreach ($cand in $winmdCandidates) {
+            if (Test-Path $cand) {
+                $winmdRefs += $cand
+                break
+            }
+        }
     }
 }
-if (-not $winmd -and (Test-Path (Join-Path $installedRoot 'UnionMetadata'))) {
-    $found = Get-ChildItem (Join-Path $installedRoot 'UnionMetadata') -Filter 'Windows.winmd' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($found) { $winmd = $found.FullName }
-}
-if (-not $winmd) {
+
+if ($winmdRefs.Count -eq 0) {
     $sysWinmd = Join-Path $env:windir 'System32\WinMetadata\Windows.winmd'
-    if (Test-Path $sysWinmd) { $winmd = $sysWinmd }
+    if (Test-Path $sysWinmd) {
+        $winmdRefs += $sysWinmd
+    } else {
+        # Windows 11 split WinMetadata
+        $modular = @(
+            (Join-Path $env:windir 'System32\WinMetadata\Windows.Foundation.winmd'),
+            (Join-Path $env:windir 'System32\WinMetadata\Windows.Media.winmd'),
+            (Join-Path $env:windir 'System32\WinMetadata\Windows.Storage.winmd')
+        )
+        $allExist = $true
+        foreach ($m in $modular) {
+            if (-not (Test-Path $m)) { $allExist = $false; break }
+        }
+        if ($allExist) {
+            $winmdRefs += $modular
+        }
+    }
 }
-if (-not $winmd) { throw "Windows.winmd not found in SDK ($installedRoot) or System32" }
 
 $projCandidates = @(
     (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime\v4.0_4.0.0.0__b77a5c561934e089\System.Runtime.WindowsRuntime.dll'),
+    (Join-Path $env:windir 'Microsoft.NET\Framework64\v4.0.30319\System.Runtime.WindowsRuntime.dll'),
+    (Join-Path $env:windir 'Microsoft.NET\Framework\v4.0.30319\System.Runtime.WindowsRuntime.dll'),
     "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.WindowsRuntime.dll",
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5.1\System.Runtime.WindowsRuntime.dll",
     "$env:ProgramFiles\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.WindowsRuntime.dll"
 )
 $projection = $null
@@ -106,24 +112,12 @@ foreach ($cand in $projCandidates) {
         break
     }
 }
-if (-not $projection) {
-    $found = Get-ChildItem (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime') -Filter 'System.Runtime.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($found) { $projection = $found.FullName }
-}
-if (-not $projection) {
-    $refDir = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework"
-    if (Test-Path $refDir) {
-        $found = Get-ChildItem $refDir -Filter 'System.Runtime.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($found) { $projection = $found.FullName }
-    }
-}
-if (-not $projection) { throw "System.Runtime.WindowsRuntime.dll not found in GAC or Reference Assemblies" }
 
 $interopCandidates = @(
     (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.InteropServices.WindowsRuntime\v4.0_4.0.0.0__b03f5f7f11d50a3a\System.Runtime.InteropServices.WindowsRuntime.dll'),
+    (Join-Path $env:windir 'Microsoft.NET\Framework64\v4.0.30319\System.Runtime.InteropServices.WindowsRuntime.dll'),
+    (Join-Path $env:windir 'Microsoft.NET\Framework\v4.0.30319\System.Runtime.InteropServices.WindowsRuntime.dll'),
     "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.InteropServices.WindowsRuntime.dll",
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5.1\System.Runtime.InteropServices.WindowsRuntime.dll",
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\Facades\System.Runtime.InteropServices.WindowsRuntime.dll",
     "$env:ProgramFiles\Reference Assemblies\Microsoft\Framework\.NETCore\v4.5\System.Runtime.InteropServices.WindowsRuntime.dll"
 )
 $interop = $null
@@ -133,28 +127,44 @@ foreach ($cand in $interopCandidates) {
         break
     }
 }
-if (-not $interop) {
-    $found = Get-ChildItem (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime.InteropServices.WindowsRuntime') -Filter 'System.Runtime.InteropServices.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($found) { $interop = $found.FullName }
-}
-if (-not $interop) {
-    $refDir = "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework"
-    if (Test-Path $refDir) {
-        $found = Get-ChildItem $refDir -Filter 'System.Runtime.InteropServices.WindowsRuntime.dll' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($found) { $interop = $found.FullName }
+
+$runtimeCandidates = @(
+    (Join-Path $env:windir 'Microsoft.NET\assembly\GAC_MSIL\System.Runtime\v4.0_4.0.0.0__b03f5f7f11d50a3a\System.Runtime.dll'),
+    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.5\Facades\System.Runtime.dll"
+)
+$runtimeRef = $null
+foreach ($cand in $runtimeCandidates) {
+    if (Test-Path $cand) {
+        $runtimeRef = $cand
+        break
     }
 }
-if (-not $interop) { $interop = "System.Runtime.InteropServices.WindowsRuntime.dll" }
 
-Write-Host "Using Windows.winmd: $winmd"
-Write-Host "Using System.Runtime.WindowsRuntime: $projection"
-Write-Host "Using System.Runtime.InteropServices.WindowsRuntime: $interop"
+$checkedIn = Join-Path $repoRoot 'src\main\resources\native\WindowsSmtcBridge.exe'
 
-Write-Host "Compiling WindowsSmtcBridge.cs (SDK $sdkVersion)"
-& $csc /nologo /target:winexe /platform:anycpu32bitpreferred `
-    /win32icon:$icon /out:$outExe `
-    /r:$winmd /r:$projection /r:$interop /r:System.Runtime.dll $source
-if ($LASTEXITCODE -ne 0) { throw "csc failed with exit code $LASTEXITCODE" }
-if (-not (Test-Path $outExe)) { throw "csc reported success but $outExe is missing" }
+if ($winmdRefs.Count -gt 0 -and $projection -and $interop) {
+    Write-Host "Compiling WindowsSmtcBridge.cs with csc..."
+    $argList = @('/nologo', '/target:winexe', '/platform:anycpu32bitpreferred', "/win32icon:$icon", "/out:$outExe")
+    foreach ($w in $winmdRefs) { $argList += "/r:$w" }
+    $argList += "/r:$projection"
+    $argList += "/r:$interop"
+    if ($runtimeRef) { $argList += "/r:$runtimeRef" } else { $argList += "/r:System.Runtime.dll" }
+    $argList += $source
 
-Write-Host "Built $outExe"
+    & $csc @argList
+    if ($LASTEXITCODE -eq 0 -and (Test-Path $outExe)) {
+        Write-Host "Successfully built $outExe"
+        exit 0
+    }
+    Write-Warning "csc compilation failed, checking fallback..."
+}
+
+if (Test-Path -LiteralPath $checkedIn) {
+    if ((Resolve-Path -LiteralPath $checkedIn).Path -ne (Resolve-Path -LiteralPath $outExe -ErrorAction SilentlyContinue).Path) {
+        Write-Host "Using checked-in fallback ($checkedIn -> $outExe)"
+        Copy-Item -LiteralPath $checkedIn -Destination $outExe -Force
+        exit 0
+    }
+}
+
+throw "Could not compile WindowsSmtcBridge.cs and no fallback available."

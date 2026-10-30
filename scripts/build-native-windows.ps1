@@ -7,6 +7,8 @@ $nativeSource = Join-Path (Split-Path -Parent $PSScriptRoot) 'src\main\cpp'
 $outPath = [IO.Path]::GetFullPath($OutputDirectory)
 New-Item -ItemType Directory -Force -Path $outPath | Out-Null
 $outDll = Join-Path $outPath 'libkittytune_audio_dsp.dll'
+$fallback = Join-Path (Split-Path -Parent $PSScriptRoot) 'src\main\resources\native\libkittytune_audio_dsp.dll'
+
 $compiler = Get-Command g++.exe -ErrorAction SilentlyContinue
 if (-not $compiler) {
     $wingetGpp = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin\g++.exe'
@@ -24,9 +26,23 @@ if ($compiler) {
 
 # Use the installed MSVC toolchain when MinGW is unavailable. No global PATH changes.
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-if (-not (Test-Path -LiteralPath $vswhere)) { throw 'Install Visual Studio C++ Build Tools or put MinGW g++ on PATH.' }
+if (-not (Test-Path -LiteralPath $vswhere)) {
+    if (Test-Path -LiteralPath $fallback) {
+        Write-Host "C++ compiler not found, using precompiled libkittytune_audio_dsp.dll"
+        Copy-Item -LiteralPath $fallback -Destination $outDll -Force
+        exit 0
+    }
+    throw 'Install Visual Studio C++ Build Tools or put MinGW g++ on PATH.'
+}
 $visualStudio = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-if (-not $visualStudio) { throw 'Visual Studio C++ Build Tools not found.' }
+if (-not $visualStudio) {
+    if (Test-Path -LiteralPath $fallback) {
+        Write-Host "C++ compiler not found, using precompiled libkittytune_audio_dsp.dll"
+        Copy-Item -LiteralPath $fallback -Destination $outDll -Force
+        exit 0
+    }
+    throw 'Visual Studio C++ Build Tools not found.'
+}
 $vcvars = Join-Path $visualStudio 'VC\Auxiliary\Build\vcvars64.bat'
 $environmentLines = & $env:ComSpec /d /c "call `"$vcvars`" >nul && set"
 if ($LASTEXITCODE -ne 0) { throw 'Unable to initialize the C++ compiler environment.' }

@@ -370,6 +370,7 @@ compose.desktop {
                 }
                 shortcut = true
                 menu = true
+                menuGroup = "KittyTune"
                 dirChooser = true
                 perUserInstall = true
                 upgradeUuid = "6f8d30e5-7971-4a7b-a19c-49fb1e5b1234"
