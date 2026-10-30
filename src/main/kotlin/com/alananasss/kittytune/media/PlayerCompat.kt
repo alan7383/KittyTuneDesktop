@@ -318,6 +318,7 @@ class Player {
 
     var playWhenReady: Boolean = false
         set(value) {
+            if (field == value) return
             field = value
             // The outgoing track of a crossfade too: left alone it went on fading out after a pause, which
             // sounded like the pause had not worked, and the next press — meant as a second pause — resumed.

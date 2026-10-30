@@ -1658,6 +1658,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private val playerListener = object : Player.Listener {
         override fun onPlayWhenReadyChanged(playWhenReadyState: Boolean, reason: Int) {
             if (MusicManager.isLoadingTrack) return
+            if (playWhenReady == playWhenReadyState && MusicManager.playWhenReadyRequested == playWhenReadyState) return
             playWhenReady = playWhenReadyState
             MusicManager.playWhenReadyRequested = playWhenReadyState
         }

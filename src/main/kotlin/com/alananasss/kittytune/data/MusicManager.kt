@@ -97,11 +97,14 @@ object MusicManager {
     var playWhenReadyRequested: Boolean
         get() = playWhenReadyRequestedFlow.value
         set(value) {
+            if (playWhenReadyRequestedFlow.value == value) return
             playWhenReadyRequestedFlow.value = value
             if (!value) {
                 try {
-                    player.playWhenReady = false
-                    player.pause()
+                    if (player.playWhenReady) {
+                        player.playWhenReady = false
+                        player.pause()
+                    }
                 } catch (_: Exception) {}
             }
         }
