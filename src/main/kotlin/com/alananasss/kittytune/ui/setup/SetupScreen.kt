@@ -488,6 +488,7 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                                             AppLanguage.HUNGARIAN -> "Magyar"
                                             AppLanguage.RUSSIAN -> "Русский"
                                             AppLanguage.VIETNAMESE -> "Tiếng Việt"
+                                            AppLanguage.TURKISH -> "Türkçe"
                                         }
                                         Text(langText)
                                     }
@@ -506,6 +507,7 @@ fun SetupScreen(onSetupComplete: () -> Unit) {
                                                         AppLanguage.HUNGARIAN -> "Magyar"
                                                         AppLanguage.RUSSIAN -> "Русский"
                                                         AppLanguage.VIETNAMESE -> "Tiếng Việt"
+                                            AppLanguage.TURKISH -> "Türkçe"
                                                     }
                                                     Text(text)
                                                 },

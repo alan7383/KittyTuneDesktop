@@ -757,6 +757,7 @@
     <string name="lang_hungarian">Magyar</string>
     <string name="lang_russian">Русский</string>
     <string name="lang_vietnamese">Tiếng Việt</string>
+    <string name="lang_turkish">Türkçe</string>
     <string name="lib_albums">Альбомы</string>
     <string name="lib_artists">Исполнители</string>
     <string name="lib_collapse_tooltip">Свернуть библиотеку</string>
@@ -2670,4 +2671,12 @@
     <string name="color_hint_bright">Светлый</string>
     <string name="color_spec_2025_label">SPEC 2025 (M3)</string>
     <string name="color_spec_2021_label">SPEC 2021 (Устаревший)</string>
+    <string name="listening_stats_next_period">Следующий период</string>
+    <string name="listening_stats_period_month_current">В этом месяце</string>
+    <string name="listening_stats_period_month_last">В прошлом месяце</string>
+    <string name="listening_stats_period_week_current">На этой неделе</string>
+    <string name="listening_stats_period_week_last">На прошлой неделе</string>
+    <string name="listening_stats_period_year_current">В этом году</string>
+    <string name="listening_stats_period_year_last">В прошлом году</string>
+    <string name="listening_stats_previous_period">Предыдущий период</string>
 </resources>

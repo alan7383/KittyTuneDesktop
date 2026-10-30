@@ -13,7 +13,7 @@ import org.w3c.dom.Element
 
 class LocalizationParityTest {
 
-    private val languages = listOf("en", "fr", "de", "hu", "ru", "vi")
+    private val languages = listOf("en", "fr", "de", "hu", "ru", "vi", "tr")
 
     private fun loadKeys(lang: String): Map<String, String> {
         val file = File("src/main/resources/i18n/strings-$lang.xml")
