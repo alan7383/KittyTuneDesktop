@@ -39,6 +39,7 @@ internal fun StoryStats(
     onOpen: (StatsList) -> Unit,
     onTrackClick: (Long) -> Unit,
     onArtistClick: (ReportArtist) -> Unit,
+    header: (@Composable () -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     LazyColumn(
@@ -47,6 +48,7 @@ internal fun StoryStats(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        if (header != null) item(key = "recaps") { header() }
         item {
             StoryCard(Brush.linearGradient(listOf(scheme.primaryContainer, scheme.tertiaryContainer)), scheme.onPrimaryContainer, index = 0) {
                 Text(str("stats_story_you_listened"), style = MaterialTheme.typography.titleMedium)

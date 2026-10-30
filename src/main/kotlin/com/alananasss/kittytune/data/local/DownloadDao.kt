@@ -100,6 +100,7 @@ class DownloadDao(private val db: AppDatabase) {
         timestamp = rs.getLong("timestamp"),
         furthestPositionMs = rs.getLong("furthestPositionMs"),
         syncEventId = rs.getString("syncEventId"),
+        genre = rs.getString("genre"),
     )
 
     private fun trackTrim(rs: ResultSet) = TrackTrimRow(
@@ -465,8 +466,20 @@ class DownloadDao(private val db: AppDatabase) {
     private fun statsRow(e: ListeningStatsEvent): Array<out Any?> = arrayOf<Any?>(
         e.trackId, e.trackTitle, e.artistName, e.artistId, e.artistPermalink, e.artistAvatarUrl,
         e.artworkUrl, e.source, e.eventType, e.listenDurationMs, e.trackDurationMs, e.timestamp,
-        e.furthestPositionMs, e.syncEventId,
+        e.furthestPositionMs, e.syncEventId, e.genre,
     )
+
+    /** Fills in a track's genre on the rows that lack one; rows that already have one keep it. */
+    suspend fun setGenreForTrack(trackId: Long, genre: String) =
+        db.exec("UPDATE listening_stats SET genre = ? WHERE trackId = ? AND genre IS NULL", genre, trackId)
+
+    /** Artist names heard before [before], for the recaps' "new this period" counts. */
+    suspend fun getArtistNamesBefore(before: Long): List<String> =
+        db.query("SELECT DISTINCT artistName FROM listening_stats WHERE timestamp < ?", before) { it.getString(1) }
+
+    /** Track ids heard before [before]. */
+    suspend fun getTrackIdsBefore(before: Long): List<Long> =
+        db.query("SELECT DISTINCT trackId FROM listening_stats WHERE timestamp < ?", before) { it.getLong(1) }
 
     /**
      * Every number the statistics header shows, in one query (issue #33).
@@ -538,6 +551,21 @@ class DownloadDao(private val db: AppDatabase) {
 
     suspend fun getEventsAfter(since: Long): List<ListeningStatsEvent> =
         db.query("SELECT * FROM listening_stats WHERE timestamp >= ? ORDER BY timestamp DESC", since, mapper = ::statsEvent)
+
+    /** Rows between [since] (inclusive) and [until] (exclusive), newest first, capped at [limit]. */
+    suspend fun getRecentEventsBetween(since: Long, until: Long, limit: Int): List<ListeningStatsEvent> =
+        db.query(
+            "SELECT * FROM listening_stats WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?",
+            since, until, limit, mapper = ::statsEvent,
+        )
+
+    /** Listening time inside a closed range, for comparing a span against the one before it. */
+    suspend fun getTotalListenTimeBetween(since: Long, until: Long): Long =
+        db.scalarLong("SELECT COALESCE(SUM(listenDurationMs), 0) FROM listening_stats WHERE timestamp >= ? AND timestamp < ?", since, until)
+
+    /** The oldest listen's timestamp, or null when the table is empty. */
+    suspend fun getOldestEventTimestamp(): Long? =
+        db.query("SELECT MIN(timestamp) AS t FROM listening_stats", mapper = { it.getLong("t").let { v -> if (it.wasNull()) null else v } }).firstOrNull()
 
     suspend fun getTopTracksAfter(since: Long, limit: Int = 10): List<TopTrackResult> = db.query(
         "SELECT trackId, trackTitle, artistName, MAX(artworkUrl) as artworkUrl, MAX(source) as source, COUNT(*) as playCount, SUM(listenDurationMs) as totalListenMs FROM listening_stats WHERE timestamp >= ? AND $playRule GROUP BY trackId ORDER BY totalListenMs DESC LIMIT ?",
@@ -746,8 +774,8 @@ class DownloadDao(private val db: AppDatabase) {
         const val INSERT_STATS_EVENT =
             "INSERT OR IGNORE INTO listening_stats(trackId,trackTitle,artistName,artistId," +
                 "artistPermalink,artistAvatarUrl,artworkUrl,source,eventType,listenDurationMs," +
-                "trackDurationMs,timestamp,furthestPositionMs,syncEventId) " +
-                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                "trackDurationMs,timestamp,furthestPositionMs,syncEventId,genre) " +
+                "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
     }
 }
 

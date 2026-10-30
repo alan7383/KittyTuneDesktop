@@ -53,6 +53,7 @@ internal fun OverviewStats(
     onOpen: (StatsList) -> Unit,
     onTrackClick: (Long) -> Unit,
     onArtistClick: (ReportArtist) -> Unit,
+    header: (@Composable () -> Unit)? = null,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 760.dp
@@ -61,6 +62,7 @@ internal fun OverviewStats(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            if (header != null) item(key = "recaps") { header() }
             item { SummaryCard(report, period, onOpen) }
             item {
                 MorphingGrid(columns = if (isWide) 2 else 1, spacing = 16.dp, weights = listOf(1.6f, 1f)) {
