@@ -9,7 +9,15 @@ object MainWindowRaiser {
     @Volatile
     var handler: (() -> Unit)? = null
 
+    @Volatile
+    var pendingShow: Boolean = false
+
     fun raise() {
-        handler?.invoke()
+        val h = handler
+        if (h != null) {
+            h.invoke()
+        } else {
+            pendingShow = true
+        }
     }
 }

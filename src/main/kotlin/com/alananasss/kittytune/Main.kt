@@ -147,8 +147,13 @@ fun main(args: Array<String>) {
             }
         }
 
+        val osName = remember { System.getProperty("os.name").lowercase() }
+        val isLinux = remember { osName.contains("linux") || osName.contains("nix") }
+        val isWindowsHost = remember { osName.contains("win") }
+
         fun showMainWindow() {
             isWindowVisible = true
+            isWindowComposed = true
             val win = java.awt.Window.getWindows().firstOrNull { it is androidx.compose.ui.awt.ComposeWindow }
                 ?: java.awt.Window.getWindows().firstOrNull { it.isVisible }
             win?.let { w ->
@@ -159,6 +164,14 @@ fun main(args: Array<String>) {
                     }
                     w.toFront()
                     w.requestFocus()
+                    if (isWindowsHost) {
+                        val hwnd = com.alananasss.kittytune.data.theme.WindowsFullScreen.handleOf(w)
+                        if (hwnd != null) {
+                            com.sun.jna.platform.win32.User32.INSTANCE.ShowWindow(hwnd, com.sun.jna.platform.win32.WinUser.SW_RESTORE)
+                            com.sun.jna.platform.win32.User32.INSTANCE.SetForegroundWindow(hwnd)
+                            com.sun.jna.platform.win32.User32.INSTANCE.BringWindowToTop(hwnd)
+                        }
+                    }
                 }
             }
         }
@@ -182,12 +195,12 @@ fun main(args: Array<String>) {
 
         androidx.compose.runtime.DisposableEffect(Unit) {
             com.alananasss.kittytune.core.MainWindowRaiser.handler = { showMainWindow() }
+            if (com.alananasss.kittytune.core.MainWindowRaiser.pendingShow) {
+                com.alananasss.kittytune.core.MainWindowRaiser.pendingShow = false
+                showMainWindow()
+            }
             onDispose { com.alananasss.kittytune.core.MainWindowRaiser.handler = null }
         }
-
-        val osName = remember { System.getProperty("os.name").lowercase() }
-        val isLinux = remember { osName.contains("linux") || osName.contains("nix") }
-        val isWindowsHost = remember { osName.contains("win") }
 
         var useSniTray by remember { mutableStateOf(isLinux) }
 
@@ -540,6 +553,20 @@ fun main(args: Array<String>) {
                 minOf(960, currentScreenBounds?.width ?: 960),
                 minOf(600, currentScreenBounds?.height ?: 600)
             )
+
+            LaunchedEffect(Unit) {
+                if (isWindowsHost) {
+                    javax.swing.SwingUtilities.invokeLater {
+                        runCatching {
+                            val hwnd = com.alananasss.kittytune.data.theme.WindowsFullScreen.handleOf(window)
+                            if (hwnd != null) {
+                                com.sun.jna.platform.win32.User32.INSTANCE.SetForegroundWindow(hwnd)
+                                com.sun.jna.platform.win32.User32.INSTANCE.BringWindowToTop(hwnd)
+                            }
+                        }
+                    }
+                }
+            }
 
             // Leaving full screen, said to the toolkit as well as to Compose.
             //
