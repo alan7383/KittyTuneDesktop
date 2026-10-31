@@ -1791,6 +1791,8 @@
     <string name="about_role_translation_hu_desc">Bản dịch tiếng Hungary đầy đủ trên Crowdin</string>
     <string name="about_role_translation_qa">Dịch thuật &amp; QA</string>
     <string name="about_role_translation_qa_desc">Dịch thuật, kiểm thử &amp; đề xuất cải tiến</string>
+    <string name="about_role_qa">QA &amp; Đóng góp ý kiến</string>
+    <string name="about_role_qa_desc">Kiểm thử ứng dụng, phản hồi giao diện máy tính bảng &amp; đề xuất</string>
     <string name="about_role_translation_ru">Bản dịch tiếng Nga</string>
     <string name="about_role_translation_ru_desc">Bản địa hóa tiếng Nga hoàn chỉnh trên Crowdin</string>
     <string name="about_role_translation_vi">Bản dịch tiếng Việt</string>

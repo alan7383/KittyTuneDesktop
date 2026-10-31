@@ -1131,6 +1131,8 @@
     <string name="about_role_translation_vi_desc">Vietnamesische Lokalisierung &amp; Beiträge</string>
     <string name="about_role_translation_qa">Übersetzungen &amp; QA</string>
     <string name="about_role_translation_qa_desc">Übersetzungen, Tests &amp; Vorschläge</string>
+    <string name="about_role_qa">QA &amp; Feedback</string>
+    <string name="about_role_qa_desc">App-Tests, Tablet-Feedback &amp; Vorschläge</string>
 
     <string name="update_available_title">Update verfügbar</string>
     <string name="update_btn_download">Herunterladen &amp; installieren</string>

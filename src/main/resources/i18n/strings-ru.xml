@@ -42,6 +42,8 @@
     <string name="about_role_translation_hu_desc">Полная венгерская локализация на Crowdin</string>
     <string name="about_role_translation_qa">Переводы и QA</string>
     <string name="about_role_translation_qa_desc">Переводы, тестирование и предложения</string>
+    <string name="about_role_qa">Тестирование и отзывы</string>
+    <string name="about_role_qa_desc">Тестирование приложения, отзывы для планшетов и предложения</string>
     <string name="about_role_community_contrib">Код &amp; Сообщество</string>
     <string name="about_role_community_contrib_desc">Вклад, отзывы и предложения</string>
     <string name="about_website_group">KittyTune везде</string>
