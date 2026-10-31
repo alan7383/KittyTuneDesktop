@@ -195,6 +195,9 @@ class HlsStreamAdapter(
     val liveUrl: String
         @Synchronized get() = livePlaylistUrl
 
+    val hasInitSegment: Boolean
+        @Synchronized get() = initSegmentUrl != null
+
     @Synchronized
     private fun segmentCount(): Int = segments.size
 

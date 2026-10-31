@@ -24,6 +24,8 @@ import java.io.FileOutputStream
 object AudioCache {
     private const val KEY_ENABLED = "audio_cache_enabled"
     private const val KEY_MAX_MB = "audio_cache_max_mb"
+    internal const val KEY_REMUX_VERSION = "audio_cache_remux_version"
+    internal const val CURRENT_REMUX_VERSION = 2
     const val DEFAULT_MAX_MB = 1024
 
     val dir: File get() = File(AppDirs.audioCacheDir, "tracks").apply { mkdirs() }
@@ -32,15 +34,38 @@ object AudioCache {
     /** Bounded and dropping: a burst of skips should not queue up hours of downloading. */
     private val queue = Channel<Track>(capacity = 8, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
 
+    @Volatile
+    private var migrated = false
+
     init {
         // Crash leftovers: a download killed mid-store leaves its .part behind, and trim()
         // ignores those by design. Nothing can be in flight this early, so drop them all.
         scope.launch {
+            ensureMigrated()
             dir.listFiles { f -> f.isFile && f.extension == "part" }
                 ?.forEach { runCatching { it.delete() } }
         }
         scope.launch {
             for (track in queue) runCatching { store(track) }.onFailure { Logger.w("AudioCache", "Could not cache ${track.id}: ${it.message}") }
+        }
+    }
+
+    /**
+     * Evicts legacy .m4a cache files written before v2, when DownloadManager.remuxHls
+     * decoded and re-encoded HLS streams at FFmpegFrameRecorder's default 64 kbps (32 kbps/ch).
+     */
+    @Synchronized
+    internal fun ensureMigrated(targetDir: File = dir) {
+        if (migrated && targetDir == dir) return
+        if (Prefs.getInt(KEY_REMUX_VERSION, 0) < CURRENT_REMUX_VERSION) {
+            targetDir.listFiles { f -> f.isFile && f.extension.equals("m4a", ignoreCase = true) }
+                ?.forEach { runCatching { it.delete() } }
+            if (targetDir == dir) {
+                Prefs.putInt(KEY_REMUX_VERSION, CURRENT_REMUX_VERSION)
+            }
+        }
+        if (targetDir == dir) {
+            migrated = true
         }
     }
 
@@ -60,6 +85,7 @@ object AudioCache {
     /** The cached file for [trackId], marked as just used; null when it is not cached or caching is off. */
     fun lookup(trackId: Long): File? {
         if (!isEnabled) return null
+        ensureMigrated()
         val file = dir.listFiles { f -> f.nameWithoutExtension == trackId.toString() && isCompleteCacheFile(f) }
             ?.firstOrNull() ?: return null
         file.setLastModified(System.currentTimeMillis())

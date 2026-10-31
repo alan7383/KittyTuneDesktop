@@ -807,21 +807,33 @@ object StreamResolver {
             val protocol = candidate.format?.protocol ?: continue
             val apiUrl = candidate.url ?: continue
 
-            val urlWithParams = if (apiUrl.contains("?")) "$apiUrl&client_id=${Config.CLIENT_ID}" else "$apiUrl?client_id=${Config.CLIENT_ID}"
+            val isMobileApi = apiUrl.contains("api-mobile.soundcloud.com")
+            fun urlWithClientId(cid: String): String =
+                if (apiUrl.contains("?")) "$apiUrl&client_id=$cid" else "$apiUrl?client_id=$cid"
+
+            val primaryClientId = if (isMobileApi || !mutableToken.isNullOrEmpty()) {
+                Config.OFFICIAL_CLIENT_ID
+            } else {
+                Config.CLIENT_ID
+            }
 
             try {
-                var response = client.newCall(buildStreamInfoRequest(urlWithParams, mutableToken)).execute()
+                var response = client.newCall(buildStreamInfoRequest(urlWithClientId(primaryClientId), mutableToken)).execute()
 
                 if (!response.isSuccessful && isAuthFailure(response.code)) {
                     val refreshedToken = SessionManager.awaitFreshAccessToken(staleToken = mutableToken, force = true)
                     if (!refreshedToken.isNullOrEmpty() && refreshedToken != mutableToken) {
                         response.close()
                         mutableToken = refreshedToken
-                        response = client.newCall(buildStreamInfoRequest(urlWithParams, mutableToken)).execute()
+                        response = client.newCall(buildStreamInfoRequest(urlWithClientId(Config.OFFICIAL_CLIENT_ID), mutableToken)).execute()
                     } else if (!mutableToken.isNullOrEmpty()) {
                         response.close()
                         mutableToken = null
-                        response = client.newCall(buildStreamInfoRequest(urlWithParams, mutableToken)).execute()
+                        response = client.newCall(buildStreamInfoRequest(urlWithClientId(Config.CLIENT_ID), null)).execute()
+                    }
+                    if (!response.isSuccessful && isAuthFailure(response.code) && Config.CLIENT_ID != Config.OFFICIAL_CLIENT_ID) {
+                        response.close()
+                        response = client.newCall(buildStreamInfoRequest(urlWithClientId(Config.OFFICIAL_CLIENT_ID), null)).execute()
                     }
                 }
 
@@ -863,56 +875,66 @@ object StreamResolver {
 
     private fun tokenManagerShouldRefresh(): Boolean = TokenManager.shouldRefreshAccessToken()
 
-    private fun buildTranscodingCandidates(
+    internal fun buildTranscodingCandidates(
         transcodings: List<com.alananasss.kittytune.domain.Transcoding>,
         qualityPref: String,
         forDownload: Boolean,
         allowDrm: Boolean
     ): List<com.alananasss.kittytune.domain.Transcoding> {
         val candidates = mutableListOf<com.alananasss.kittytune.domain.Transcoding>()
+        val playable = transcodings.filter { it.snipped != true }.ifEmpty { transcodings }
 
         if (qualityPref == "LOW") {
             for (preset in listOf("opus_64k", "aac_64k", "aac_96k")) {
-                transcodings.filter { it.preset == preset && it.format?.protocol == "hls" }.forEach {
+                playable.filter { it.preset == preset && it.format?.protocol == "hls" }.forEach {
                     if (it !in candidates) candidates.add(it)
                 }
             }
-            transcodings.filter { it.format?.protocol == "hls" && it.format.mimeType?.contains("mpeg") == true }.forEach {
+            playable.filter { it.format?.protocol == "hls" && it.format.mimeType?.contains("mpeg") == true }.forEach {
                 if (it !in candidates) candidates.add(it)
             }
-            transcodings.filter { it.format?.protocol == "hls" }.forEach {
+            playable.filter { it.format?.protocol == "hls" }.forEach {
                 if (it !in candidates) candidates.add(it)
             }
-            transcodings.filter { it.format?.protocol == "progressive" }.forEach {
+            playable.filter { it.format?.protocol == "progressive" }.forEach {
                 if (it !in candidates) candidates.add(it)
             }
         } else {
-            transcodings.filter { it.format?.protocol == "progressive" }.forEach {
-                if (it !in candidates) candidates.add(it)
-            }
-            for (preset in listOf("aac_160k", "aac_96k", "opus_64k", "abr_sq")) {
-                transcodings.filter { it.preset == preset && it.format?.protocol == "hls" }.forEach {
+            // Prefer HQ AAC HLS (256k / 160k "HQ Free") first, then 128k MP3 progressive/HLS, then lower HLS tiers.
+            for (preset in listOf("aac_256k", "aac_160k")) {
+                playable.filter { it.preset == preset && it.format?.protocol == "hls" }.forEach {
                     if (it !in candidates) candidates.add(it)
                 }
             }
-            transcodings.filter { it.format?.protocol == "hls" }.forEach {
+            playable.filter { it.format?.protocol == "progressive" }.forEach {
+                if (it !in candidates) candidates.add(it)
+            }
+            playable.filter { it.format?.protocol == "hls" && it.format.mimeType?.contains("mpeg") == true }.forEach {
+                if (it !in candidates) candidates.add(it)
+            }
+            for (preset in listOf("aac_96k", "opus_64k", "abr_sq")) {
+                playable.filter { it.preset == preset && it.format?.protocol == "hls" }.forEach {
+                    if (it !in candidates) candidates.add(it)
+                }
+            }
+            playable.filter { it.format?.protocol == "hls" }.forEach {
                 if (it !in candidates) candidates.add(it)
             }
         }
 
         if (allowDrm) {
-            val cencPresets = if (qualityPref == "LOW") listOf("aac_96k", "aac_160k", "abr_sq") else listOf("aac_160k", "aac_96k", "abr_sq")
+            val cencPresets = if (qualityPref == "LOW") listOf("aac_96k", "aac_160k", "abr_sq") else listOf("aac_256k", "aac_160k", "aac_96k", "abr_sq")
             for (preset in cencPresets) {
-                transcodings.filter { it.preset == preset && it.format?.protocol == "ctr-encrypted-hls" }.forEach {
+                playable.filter { it.preset == preset && it.format?.protocol == "ctr-encrypted-hls" }.forEach {
                     if (it !in candidates) candidates.add(it)
                 }
             }
             for (preset in cencPresets) {
-                transcodings.filter { it.preset == preset && it.format?.protocol == "cbc-encrypted-hls" }.forEach {
+                playable.filter { it.preset == preset && it.format?.protocol == "cbc-encrypted-hls" }.forEach {
                     if (it !in candidates) candidates.add(it)
                 }
             }
-            transcodings.filter { it.format?.protocol?.contains("encrypted") == true }.forEach {
+            playable.filter { it.format?.protocol?.contains("encrypted") == true }.forEach {
                 if (it !in candidates) candidates.add(it)
             }
         }

@@ -1053,21 +1053,71 @@ object DownloadManager {
 
     /** Remux a plain HLS stream to a local m4a container with FFmpeg (stream copy, no re-encode). */
     internal fun remuxHls(m3u8Url: String, outFile: File, onProgress: (Int) -> Unit) {
-        // `use` on both: their contexts are native, and an exception mid-copy must not strand them.
-        org.bytedeco.javacv.FFmpegFrameGrabber(m3u8Url).use { grabber ->
-            grabber.start()
-            org.bytedeco.javacv.FFmpegFrameRecorder(outFile.absolutePath, grabber.audioChannels).use { recorder ->
-                recorder.format = "mp4"
-                recorder.sampleRate = grabber.sampleRate
-                recorder.audioChannels = grabber.audioChannels
-                recorder.audioCodec = org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_AAC
-                recorder.start()
-                val total = grabber.lengthInTime.coerceAtLeast(1)
-                var frame = grabber.grabSamples()
-                while (frame != null) {
-                    recorder.recordSamples(frame.sampleRate, frame.audioChannels, *frame.samples)
-                    onProgress(((grabber.timestamp * 100) / total).toInt().coerceIn(0, 100))
-                    frame = grabber.grabSamples()
+        val headerBlob = buildString {
+            append("User-Agent: ${com.alananasss.kittytune.utils.Config.USER_AGENT}\r\n")
+            append("Origin: https://soundcloud.com\r\n")
+            append("Referer: https://soundcloud.com/\r\n")
+        }
+
+        fun configureGrabber(grabber: org.bytedeco.javacv.FFmpegFrameGrabber) {
+            if (m3u8Url.startsWith("http://") || m3u8Url.startsWith("https://")) {
+                grabber.setOption("headers", headerBlob)
+                grabber.setOption("reconnect", "1")
+                grabber.setOption("reconnect_streamed", "1")
+                grabber.setOption("reconnect_on_network_error", "1")
+            }
+        }
+
+        // Primary path: true lossless stream copy (packets copied as-is without decoding or re-encoding).
+        // Calling grabSamples() + recordSamples() without setting audioBitrate previously decoded the
+        // 160 kbps AAC stream and re-encoded it at FFmpegFrameRecorder's default 64 kbps (32 kbps/ch).
+        val streamCopied = runCatching {
+            org.bytedeco.javacv.FFmpegFrameGrabber(m3u8Url).use { grabber ->
+                configureGrabber(grabber)
+                grabber.start()
+                org.bytedeco.javacv.FFmpegFrameRecorder(outFile.absolutePath, grabber.audioChannels).use { recorder ->
+                    recorder.format = "mp4"
+                    recorder.sampleRate = grabber.sampleRate
+                    recorder.audioChannels = grabber.audioChannels
+                    recorder.audioCodec = grabber.audioCodec
+                    recorder.start(grabber.formatContext)
+                    val total = grabber.lengthInTime.coerceAtLeast(1)
+                    var copiedPackets = 0
+                    var pkt = grabber.grabPacket()
+                    while (pkt != null) {
+                        if (pkt.size() > 0) {
+                            recorder.recordPacket(pkt)
+                            copiedPackets++
+                            onProgress(((grabber.timestamp * 100) / total).toInt().coerceIn(0, 100))
+                        }
+                        pkt = grabber.grabPacket()
+                    }
+                    copiedPackets > 0
+                }
+            }
+        }.getOrDefault(false)
+
+        if (!streamCopied || !outFile.exists() || outFile.length() == 0L) {
+            outFile.delete()
+            // Fallback when stream copy into MP4 is rejected: transcode at high bitrate (never 64 kbps default).
+            org.bytedeco.javacv.FFmpegFrameGrabber(m3u8Url).use { grabber ->
+                configureGrabber(grabber)
+                grabber.start()
+                val targetBitrate = grabber.audioBitrate.takeIf { it >= 160_000 } ?: 256_000
+                org.bytedeco.javacv.FFmpegFrameRecorder(outFile.absolutePath, grabber.audioChannels).use { recorder ->
+                    recorder.format = "mp4"
+                    recorder.sampleRate = grabber.sampleRate
+                    recorder.audioChannels = grabber.audioChannels
+                    recorder.audioCodec = org.bytedeco.ffmpeg.global.avcodec.AV_CODEC_ID_AAC
+                    recorder.audioBitrate = targetBitrate
+                    recorder.start()
+                    val total = grabber.lengthInTime.coerceAtLeast(1)
+                    var frame = grabber.grabSamples()
+                    while (frame != null) {
+                        recorder.recordSamples(frame.sampleRate, frame.audioChannels, *frame.samples)
+                        onProgress(((grabber.timestamp * 100) / total).toInt().coerceIn(0, 100))
+                        frame = grabber.grabSamples()
+                    }
                 }
             }
         }
