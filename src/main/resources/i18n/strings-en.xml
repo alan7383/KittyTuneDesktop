@@ -42,6 +42,8 @@
     <string name="about_role_translation_hu_desc">Full Hungarian localization on Crowdin</string>
     <string name="about_role_translation_qa">Translations &amp; QA</string>
     <string name="about_role_translation_qa_desc">Translations, testing &amp; suggestions</string>
+    <string name="about_role_qa">QA &amp; Feedback</string>
+    <string name="about_role_qa_desc">App testing, tablet feedback &amp; suggestions</string>
     <string name="about_role_community_contrib">Code &amp; Community</string>
     <string name="about_role_community_contrib_desc">Contributions, feedback &amp; suggestions</string>
     <string name="about_website_group">KittyTune everywhere</string>
