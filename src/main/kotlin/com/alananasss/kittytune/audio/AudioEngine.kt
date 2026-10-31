@@ -675,7 +675,9 @@ class AudioEngine {
             // the end first, so a track only started once all of it had been downloaded, the longer the slower
             // (issue #66).
             return FFmpegFrameGrabber(adapter.getInputStream(startPositionMs), 0).apply {
-                format = "mp4" // Fragments are ISOBMFF (mp4)
+                if (adapter.hasInitSegment) {
+                    format = "mp4" // Fragments with #EXT-X-MAP are ISOBMFF (fMP4)
+                }
                 setOption("probesize", "32768") // 32KB is enough for MOOV atom + some audio
                 setOption("analyzeduration", "0")
                 sampleRate = outputSampleRate
