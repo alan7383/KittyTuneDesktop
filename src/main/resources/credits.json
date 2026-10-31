@@ -23,24 +23,39 @@
     {
       "github": "imsawiq",
       "role": "about_role_community_contrib",
-      "badge": "Contributor",
+      "badge": "Core Desktop",
       "category": "dev",
       "order": 2
+    },
+    {
+      "github": "VeXEveryOne",
+      "name": "VeX (VeXEveryOne)",
+      "role": "about_role_community_contrib",
+      "badge": "Connect & Sync",
+      "category": "dev",
+      "order": 3
     },
     {
       "github": "jason-fastner007",
       "name": "Jason-Marshall Fastner (jason-fastner007)",
       "role": "about_role_community_contrib",
-      "badge": "🇩🇪 Deutsch",
+      "badge": "Dev • 🇩🇪 Deutsch",
       "category": "dev",
-      "order": 3
+      "order": 4
+    },
+    {
+      "github": "sneoww98",
+      "role": "about_role_community_contrib",
+      "badge": "Contributor",
+      "category": "dev",
+      "order": 5
     },
     {
       "github": "wynriu",
       "role": "about_role_translation_vi",
       "badge": "🇻🇳 Tiếng Việt",
       "category": "translation",
-      "order": 4
+      "order": 6
     },
     {
       "name": "Егор Белоусов (kivoyoso)",
@@ -49,42 +64,43 @@
       "role": "about_role_translation_ru",
       "badge": "🇷🇺 Русский",
       "category": "translation",
-      "order": 5
+      "order": 7
+    },
+    {
+      "name": "mattdotcat",
+      "url": "https://t.me/b37246",
+      "badge": "🇭🇺 Magyar",
+      "role": "about_role_translation_hu",
+      "category": "translation",
+      "order": 8
     },
     {
       "github": "meowsite",
       "role": "about_role_translation_qa",
       "badge": "🌐 QA & Feedback",
       "category": "community",
-      "order": 6
+      "order": 9
     },
     {
       "github": "dyr00l",
       "role": "about_role_community_contrib",
       "badge": "QA & Feedback",
       "category": "community",
-      "order": 7
-    },
-    {
-      "github": "sneoww98",
-      "role": "about_role_community_contrib",
-      "badge": "Contributor",
-      "category": "community",
-      "order": 8
+      "order": 10
     },
     {
       "github": "quntqunt",
       "role": "about_role_community_contrib",
       "badge": "Contributor",
       "category": "community",
-      "order": 9
+      "order": 11
     },
     {
       "github": "tankist939-afk",
       "role": "about_role_community_contrib",
       "badge": "Contributor",
       "category": "community",
-      "order": 10
+      "order": 12
     }
   ]
 }

@@ -38,6 +38,8 @@
     <string name="about_role_translation_vi_desc">Вьетнамская локализация и вклад</string>
     <string name="about_role_translation_de">Немецкий перевод</string>
     <string name="about_role_translation_de_desc">Немецкая локализация и адаптации UI</string>
+    <string name="about_role_translation_hu">Венгерский перевод</string>
+    <string name="about_role_translation_hu_desc">Полная венгерская локализация на Crowdin</string>
     <string name="about_role_translation_qa">Переводы и QA</string>
     <string name="about_role_translation_qa_desc">Переводы, тестирование и предложения</string>
     <string name="about_role_community_contrib">Код &amp; Сообщество</string>
