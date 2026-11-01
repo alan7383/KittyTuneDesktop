@@ -71,9 +71,9 @@ dependencies {
 
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-gson:3.0.0")
-    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("org.java-websocket:Java-WebSocket:1.6.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:5.5.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:5.5.1")
 
     val ktorVersion = "3.6.0"
     implementation("io.ktor:ktor-client-core:$ktorVersion")
