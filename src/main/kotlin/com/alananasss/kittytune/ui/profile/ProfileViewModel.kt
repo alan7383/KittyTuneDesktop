@@ -78,6 +78,54 @@
         val userComments = mutableStateListOf<Comment>()
         private var commentsNextUrl: String? = null
         var isCommentsLoadingMore by mutableStateOf(false)
+
+        private var likesNextUrl: String? = null
+        var isLikesLoadingMore by mutableStateOf(false)
+            private set
+
+        fun hasMoreLikes(): Boolean = likesNextUrl != null
+
+        fun loadMoreLikes() {
+            val next = likesNextUrl ?: return
+            if (isLikesLoadingMore) return
+            viewModelScope.launch {
+                isLikesLoadingMore = true
+                try {
+                    val urlToFetch = next.replace("limit=50", "limit=200")
+                    val page = api.getTrackLikesNextPage(urlToFetch)
+                    val newTracks = page.collection.mapNotNull(::likedTrackOf)
+                    likedTracks.addAll(newTracks)
+                    likesNextUrl = page.next_href?.replace("limit=50", "limit=200")
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    isLikesLoadingMore = false
+                }
+            }
+        }
+
+        private var tracksNextUrl: String? = null
+        var isTracksLoadingMore by mutableStateOf(false)
+            private set
+
+        fun hasMoreTracks(): Boolean = tracksNextUrl != null
+
+        fun loadMoreTracks() {
+            val next = tracksNextUrl ?: return
+            if (isTracksLoadingMore) return
+            viewModelScope.launch {
+                isTracksLoadingMore = true
+                try {
+                    val page = api.getUserTracksNextPage(next)
+                    allTracks.addAll(page.collection.filterNotNull())
+                    tracksNextUrl = page.next_href
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    isTracksLoadingMore = false
+                }
+            }
+        }
     
         var artistStationId: Long? = null
 
@@ -218,6 +266,8 @@
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
+            } finally {
+                tracksNextUrl = nextUrl
             }
         }
 
@@ -235,12 +285,16 @@
             var pageCount = 0
             try {
                 while (nextUrl != null && pageCount < maxPages) {
-                    val page = api.getTrackLikesNextPage(nextUrl)
+                    val urlToFetch = nextUrl.replace("limit=50", "limit=200")
+                    val page = api.getTrackLikesNextPage(urlToFetch)
                     likedTracks.addAll(page.collection.mapNotNull(::likedTrackOf))
-                    nextUrl = page.next_href
+                    nextUrl = page.next_href?.replace("limit=50", "limit=200")
                     pageCount++
                 }
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            } finally {
+                likesNextUrl = nextUrl
+            }
         }
 
         // mapNotNull callers: an entry can arrive with no track when the like points at something deleted,
@@ -472,6 +526,8 @@
             val comments: List<Comment>,
             val commentsNext: String?,
             val stationId: Long?,
+            val likesNext: String?,
+            val tracksNext: String?,
         )
 
         private fun saveSnapshot(userId: Long) {
@@ -480,7 +536,7 @@
             snapshots[userId] = ProfileSnapshot(
                 System.currentTimeMillis(), u, isCurrentUser, popularTracks.toList(), allTracks.toList(), repostedTracks.toList(),
                 albums.toList(), playlists.toList(), likedTracks.toList(), similarArtists.toList(), userComments.toList(),
-                commentsNextUrl, artistStationId,
+                commentsNextUrl, artistStationId, likesNextUrl, tracksNextUrl,
             )
         }
 
@@ -500,6 +556,8 @@
             popularReleases.clear(); singles.clear(); compilations.clear(); appearsOn.clear(); discoveredOn.clear()
             commentsNextUrl = k.commentsNext
             artistStationId = k.stationId
+            likesNextUrl = k.likesNext
+            tracksNextUrl = k.tracksNext
             isLoading = false
         }
 
@@ -532,7 +590,7 @@
                     // in front of the reader: details, then the mixes, then popular, and the latest tracks and
                     // albums seconds later, behind six pages of the track list.
                     coroutineScope {
-                        val meDef = async { runCatching { api.getMe().id }.getOrNull() }
+                        val meDef = async { runCatching { api.getMe() }.getOrNull() }
                         val userDef = async { fetchUser(userId) }
                         val popDef = async { try { api.getUserTopTracks(userId).collection.filterNotNull() } catch (_: Exception) { emptyList() } }
                         val tracksDef = async { fetchUserTracksFirstPage(userId) }
@@ -552,9 +610,15 @@
                         val likesDef = async { fetchUserLikesFirstPage(userId) }
                         val stationDef = async { runCatching { api.getArtistStation(userId) }.getOrNull() }
 
-                        if (meDef.await() == userId) isCurrentUser = true
+                        val me = meDef.await()
+                        if (me?.id == userId) isCurrentUser = true
 
-                        val freshUser = userDef.await()
+                        val userFetched = userDef.await()
+                        val freshUser = if (isCurrentUser && me != null) {
+                            if (userFetched != null && me.likesCount == 0 && userFetched.likesCount > 0) userFetched else me
+                        } else {
+                            userFetched
+                        }
                         if (freshUser == null) {
                             coroutineContext[kotlinx.coroutines.Job]?.let { job -> job.children.forEach { it.cancel() } }
                             loadUnknownProfile(userId, forceReload)
@@ -564,10 +628,12 @@
                         val station = stationDef.await()
                         val popular = popDef.await()
                         val (firstTracks, moreTracksUrl) = tracksDef.await()
+                        tracksNextUrl = moreTracksUrl
                         val reposts = repostsDef.await()
                         val fetchedAlbums = albumsDef.await()
                         val fetchedPlaylists = playDef.await()
                         val (firstLikes, moreLikesUrl) = likesDef.await()
+                        likesNextUrl = moreLikesUrl
                         val commentsRes = commentsResponseDef.await()
 
                         // One frame: no suspension between these, so the page appears whole.
@@ -852,10 +918,11 @@
                     try { api.getUser(userId) } catch (_: Exception) { null }
                 }
 
-                // Take REST result immediately; if GraphQL finishes first and is non-null, prefer it.
+                // REST API has publicFavoritesCount and playlistCount (which GraphQL query omits).
+                // Prefer REST result, fall back to GraphQL if REST fails.
                 val restUser = restDef.await()
                 val graphUser = if (graphQlDef.isCompleted) graphQlDef.await() else null
-                graphUser ?: restUser
+                restUser ?: graphUser
             }
         }
     

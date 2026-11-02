@@ -1,5 +1,7 @@
 package com.alananasss.kittytune.ui.pet
 
+import com.alananasss.kittytune.core.trackTextInput
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -985,7 +987,7 @@ private fun NameField(value: String, onValueChange: (String) -> Unit, modifier: 
                 Icon(Icons.Rounded.Casino, contentDescription = str("pet_ob_name_random"))
             }
         },
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().trackTextInput()
     )
 }
 
