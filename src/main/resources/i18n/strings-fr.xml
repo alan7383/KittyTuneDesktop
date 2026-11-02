@@ -1479,6 +1479,10 @@
     <string name="update_auth_failed_desc">L\'authentification a été annulée ou a échoué. Veuillez réessayer.</string>
     <string name="update_auth_failed_title">Échec de l\'authentification</string>
     <string name="update_available_title">Mise à jour disponible</string>
+    <string name="update_nixos_notice_title">Système NixOS / Nix détecté</string>
+    <string name="update_nixos_notice_desc">Les mises à jour sont gérées de façon déclarative sous Nix. Exécutez la commande ci-dessous pour mettre à jour votre installation :</string>
+    <string name="update_btn_view_release">Voir la release</string>
+    <string name="btn_copy">Copier</string>
     <string name="update_btn_close_instances">Fermer les instances</string>
     <string name="update_btn_dont_remind">Ne plus me le rappeler</string>
     <string name="update_btn_download">Télécharger &amp; Installer</string>

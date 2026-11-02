@@ -178,6 +178,7 @@ pre-built binaries for linux, windows, and macos are available on the [**release
 | :--- | :--- | :--- |
 | **Arch Linux** | [AUR (`kitty-tune-bin`)](https://aur.archlinux.org/packages/kitty-tune-bin) | `yay -S kitty-tune-bin` |
 | **Arch Linux** | Pacman package | `sudo pacman -U kitty-tune-*.pkg.tar.zst` |
+| **NixOS / Nix** | Flake / Package | `nix run github:alan7383/KittyTuneDesktop` |
 | **Debian / Ubuntu / Mint** | Debian package (`.deb`) | `sudo apt install ./kitty-tune_*_amd64.deb` |
 | **Fedora / RHEL / openSUSE** | RPM package (`.rpm`) | `sudo dnf install ./kitty-tune-*.rpm` |
 | **Universal Linux** | Standalone AppImage | `chmod +x KittyTune-*.AppImage && ./KittyTune-*.AppImage` |
@@ -212,6 +213,77 @@ download the latest `.pkg.tar.zst` archive directly from [**releases**](https://
 ```bash
 sudo pacman -U kitty-tune-*.pkg.tar.zst
 ```
+
+---
+
+#### **nixos / nix**
+
+KittyTune Desktop provides first-class support for **NixOS** and systems running the **Nix** package manager with a built-in Flake, package derivation, and NixOS module.
+
+##### **run directly without installing**
+```bash
+nix run github:alan7383/KittyTuneDesktop
+```
+
+##### **temporary shell**
+```bash
+nix shell github:alan7383/KittyTuneDesktop
+```
+
+##### **declarative nixos configuration (flake)**
+Add KittyTune Desktop to your `flake.nix` inputs:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    kittytune.url = "github:alan7383/KittyTuneDesktop";
+  };
+
+  outputs = { self, nixpkgs, kittytune, ... }: {
+    nixosConfigurations.myhostname = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        # Option 1: Using the provided NixOS module (Recommended)
+        kittytune.nixosModules.default
+        {
+          programs.kittytune.enable = true;
+        }
+
+        # Option 2: Directly adding to environment.systemPackages
+        # ({ pkgs, ... }: {
+        #   environment.systemPackages = [
+        #     kittytune.packages.${pkgs.system}.default
+        #   ];
+        # })
+      ];
+    };
+  };
+}
+```
+
+##### **home-manager**
+```nix
+{ inputs, pkgs, ... }: {
+  home.packages = [
+    inputs.kittytune.packages.${pkgs.system}.default
+  ];
+}
+```
+
+##### **non-flake (legacy nix)**
+```bash
+nix-build
+./result/bin/kitty-tune
+```
+
+##### **development shell**
+To develop or build KittyTune locally on NixOS:
+```bash
+nix develop
+./gradlew run
+```
+
 
 ---
 
