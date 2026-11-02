@@ -17,6 +17,9 @@ on:
       - '.github/workflows/nix-check.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check-nix:
     name: Test Nix Build & Flake on Linux
@@ -25,12 +28,36 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
         with:
           extra_nix_config: |
             experimental-features = nix-command flakes
+
+      - name: Generate & Lock flake.lock
+        run: |
+          nix flake lock
+          echo "=== Content of flake.lock ==="
+          cat flake.lock
+
+      - name: Commit flake.lock if missing
+        run: |
+          if [ -n "$(git status --porcelain flake.lock)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add flake.lock
+            git commit -m "chore(nix): add flake.lock"
+            git push origin ${{ github.ref_name }} || echo "Push failed or not permitted, artifact is preserved."
+          fi
+
+      - name: Upload flake.lock as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake-lock
+          path: flake.lock
 
       - name: Check Flake Syntax & Outputs
         run: nix flake check
