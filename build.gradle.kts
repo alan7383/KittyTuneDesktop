@@ -347,7 +347,9 @@ compose.desktop {
                 // Day and month names in any language but English. Without it the trimmed runtime only
                 // knows the root locale, so the listening stats read "Mon Tue" and "October" in Russian
                 // while a run from the full JDK looked fine (issue #66).
-                "jdk.localedata"
+                "jdk.localedata",
+                // Required by dbus-java on Linux for Unix socket UID authentication (com.sun.security.auth.module.UnixSystem)
+                "jdk.security.auth"
             )
 
             // "Open with KittyTune" and the music entry in the OS's default-apps settings. Neither
