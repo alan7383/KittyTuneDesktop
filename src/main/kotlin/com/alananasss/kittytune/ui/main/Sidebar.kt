@@ -175,12 +175,19 @@ fun Sidebar(
                     key(destination.key) {
                         val isSearchRow = destination.key == PlayerPreferences.SIDEBAR_NAV_SEARCH
                         val isHomeRow = destination.key == PlayerPreferences.SIDEBAR_NAV_HOME
+                        val isPetRow = destination.key == PlayerPreferences.SIDEBAR_NAV_PET
+                        val isSettingsRow = destination.key == PlayerPreferences.SIDEBAR_NAV_SETTINGS
+                        val onPetPage = com.alananasss.kittytune.ui.profile.SettingsNavigation.current.pages.firstOrNull() ==
+                            com.alananasss.kittytune.ui.profile.SettingsSubPage.PET
                         val searching = homeViewModel?.isSearching == true
                         SidebarNavItem(
                             label = str(destination.labelKey),
                             selected = currentRoute == destination.route && when {
                                 isSearchRow -> searching
                                 isHomeRow -> !searching
+                                // both live on the settings route: the pet row owns its page
+                                isPetRow -> onPetPage
+                                isSettingsRow -> !onPetPage
                                 else -> true
                             },
                             iconSelected = destination.iconSelected,
@@ -191,6 +198,12 @@ fun Sidebar(
                             when {
                                 isSearchRow -> homeViewModel?.activateSearch()
                                 isHomeRow -> homeViewModel?.clearSearch()
+                                isPetRow -> com.alananasss.kittytune.ui.profile.SettingsNavigation.go(
+                                    com.alananasss.kittytune.ui.profile.SettingsPlace(
+                                        com.alananasss.kittytune.ui.profile.SettingsCategory.INTERFACE,
+                                        listOf(com.alananasss.kittytune.ui.profile.SettingsSubPage.PET),
+                                    )
+                                )
                             }
                             if (currentRoute != destination.route) {
                                 navController.navigate(destination.route) { launchSingleTop = true }

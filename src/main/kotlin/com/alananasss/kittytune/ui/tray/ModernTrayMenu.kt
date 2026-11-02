@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
@@ -102,6 +103,8 @@ fun ModernTrayMenuHost(
     isMiniPlayerVisible: Boolean,
     onShowWindow: () -> Unit,
     onToggleMiniPlayer: () -> Unit,
+    isPetVisible: Boolean = false,
+    onTogglePet: () -> Unit = {},
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
@@ -112,7 +115,7 @@ fun ModernTrayMenuHost(
     FloatingMenuWindow(
         anchorXDp = TrayMenuState.x,
         anchorYDp = TrayMenuState.y,
-        contentHeight = FLOATING_MENU_PADDING + HEADER_HEIGHT + FLOATING_MENU_DIVIDER + FLOATING_MENU_ITEM_HEIGHT * 3,
+        contentHeight = FLOATING_MENU_PADDING + HEADER_HEIGHT + FLOATING_MENU_DIVIDER + FLOATING_MENU_ITEM_HEIGHT * 4,
         onDismiss = { TrayMenuState.hide() },
     ) {
         NowPlayingHeader(
@@ -139,6 +142,14 @@ fun ModernTrayMenuHost(
             onClick = {
                 TrayMenuState.hide()
                 onToggleMiniPlayer()
+            },
+        )
+        FloatingMenuItem(
+            icon = Icons.Rounded.Pets,
+            text = if (isPetVisible) str("pet_desk_hide") else str("pet_desk_tray_show"),
+            onClick = {
+                TrayMenuState.hide()
+                onTogglePet()
             },
         )
         FloatingMenuItem(

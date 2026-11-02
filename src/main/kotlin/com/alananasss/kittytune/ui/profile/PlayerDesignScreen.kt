@@ -646,6 +646,13 @@ private fun PlayerButtonsSection(
             enabled = PlayerPreferences.PLAYER_BAR_BUTTON_MINIPLAYER in visibleButtons
         ),
         ButtonConfigItem(
+            key = PlayerPreferences.PLAYER_BAR_BUTTON_PET,
+            label = str("pet_settings_title"),
+            desc = str("pet_desk_bar_button_desc"),
+            mark = rememberVectorPainter(Icons.Rounded.Pets),
+            enabled = PlayerPreferences.PLAYER_BAR_BUTTON_PET in visibleButtons
+        ),
+        ButtonConfigItem(
             key = PlayerPreferences.PLAYER_BAR_BUTTON_PANEL,
             label = str("player_button_panel"),
             desc = str("player_button_panel_desc"),

@@ -172,6 +172,10 @@ object AppBootstrap {
         DownloadManager.init()
         AlbumResolver.init()
 
+        // The Kitty pet follows playback from the start (it gets hungry, sad, sleepy on its own),
+        // whether or not its window is shown.
+        com.alananasss.kittytune.ui.pet.PetState.start()
+
         // The sync listener. It opens a port on the local network, so it stays off until there is a
         // reason for it — which is a device having been paired. Pairing turns it on; an install that
         // has never paired never opens anything (issue #33).

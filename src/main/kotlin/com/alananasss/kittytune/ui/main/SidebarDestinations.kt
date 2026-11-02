@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.WatchLater
@@ -20,6 +21,7 @@ import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Leaderboard
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Pets
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WatchLater
@@ -47,6 +49,8 @@ internal object SidebarDestinations {
         Destination(PlayerPreferences.SIDEBAR_NAV_EXPLORE, "genres", "explorer_title", Icons.Filled.Explore, Icons.Outlined.Explore),
         Destination(PlayerPreferences.SIDEBAR_NAV_RECOGNITION, "recognition", "pref_bottom_menu_fab_recognition", Icons.Filled.Mic, Icons.Outlined.Mic),
         Destination(PlayerPreferences.SIDEBAR_NAV_SYNC, "sync_settings", "sync_title", Icons.Filled.Devices, Icons.Outlined.Devices),
+        // opens the settings on the pet's own page (see Sidebar)
+        Destination(PlayerPreferences.SIDEBAR_NAV_PET, "settings", "pet_settings_title", Icons.Filled.Pets, Icons.Outlined.Pets),
         Destination(PlayerPreferences.SIDEBAR_NAV_STATS, "listening_stats", "listening_stats_title", Icons.Filled.Leaderboard, Icons.Outlined.Leaderboard),
         Destination(PlayerPreferences.SIDEBAR_NAV_HISTORY, "history", "history_title", Icons.Filled.WatchLater, Icons.Outlined.WatchLater),
         Destination(PlayerPreferences.SIDEBAR_NAV_SETTINGS, "settings", "profile_menu_settings", Icons.Filled.Settings, Icons.Outlined.Settings),

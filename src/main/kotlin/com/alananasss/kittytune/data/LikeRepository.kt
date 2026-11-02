@@ -51,6 +51,11 @@ object LikeRepository {
     private val _likedTracks = MutableStateFlow<List<Track>>(emptyList())
     val likedTracks = _likedTracks.asStateFlow()
 
+    /** True once the library has been read from disk (an empty list before that means "unknown", not "none"). */
+    @Volatile
+    var isReady = false
+        private set
+
     private val _likedPlaylists = MutableStateFlow<Set<Long>>(emptySet())
     val likedPlaylists = _likedPlaylists.asStateFlow()
 
@@ -739,6 +744,7 @@ object LikeRepository {
 
         val blacklist = getBlacklist()
         _likedTracks.value = migratedList.filter { !blacklist.contains(it.id) }
+        isReady = true
 
         val savedPlaylistIds = getStringSet(KEY_LIKED_PLAYLISTS).mapNotNull { it.toLongOrNull() }.toSet()
         _likedPlaylists.value = savedPlaylistIds

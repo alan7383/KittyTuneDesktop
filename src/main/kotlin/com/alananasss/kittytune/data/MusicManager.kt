@@ -39,6 +39,9 @@ object MusicManager {
 
     var currentTrack: Track? = null
 
+    /** Real-time beat tracking of what plays (the kitty pet dances on it). */
+    val liveBeat: com.alananasss.kittytune.audio.beat.LiveBeatTracker get() = player.liveBeat
+
     // --- DRM token cache (kept for API compatibility; playback via CEF is a later TODO) ---
     /** One short token per track, bounded so it does not accumulate for a whole session (issue #33). */
     private val drmTokenCache = com.alananasss.kittytune.core.BoundedCache<Long, String>(200)

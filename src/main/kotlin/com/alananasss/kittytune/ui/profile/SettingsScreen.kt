@@ -119,7 +119,9 @@ fun SettingsScreen(
                     isScrollable = searchQuery.isNotBlank() || (
                         shown.category != SettingsCategory.CREDITS &&
                         shown.subPage != SettingsSubPage.MISC_CONTENT_FILTER &&
-                        shown.subPage != SettingsSubPage.AUDIO_KARAOKE
+                        shown.subPage != SettingsSubPage.AUDIO_KARAOKE &&
+                        // the pet page scrolls its own list, and its setup / photo / editor fill the pane
+                        shown.subPage != SettingsSubPage.PET
                     ),
                 ) {
                     if (searchQuery.isNotBlank()) {
@@ -172,6 +174,7 @@ internal enum class SettingsSubPage(val titleKey: String, val subtitleKey: Strin
     RIGHT_PANEL("settings_page_right_panel", "settings_page_right_panel_sub", Icons.Rounded.ViewQuilt),
     LYRICS("pref_lyrics_title", "settings_page_lyrics_sub", Icons.Rounded.Lyrics),
     MINI_PLAYER("mini_player_settings_title", "settings_page_mini_player_sub", Icons.Rounded.PictureInPicture),
+    PET("pet_settings_title", "pet_desk_settings_sub", Icons.Rounded.Pets),
     CUSTOM_THEME("pref_custom_theme"),
     LYRICS_FULLSCREEN("lyrics_mode_fullscreen"),
     LYRICS_CENTRAL("lyrics_mode_central"),
@@ -217,6 +220,7 @@ private val interfacePages = listOf(
     SettingsSubPage.RIGHT_PANEL,
     SettingsSubPage.LYRICS,
     SettingsSubPage.MINI_PLAYER,
+    SettingsSubPage.PET,
 )
 
 private val audioPages = listOf(
@@ -302,6 +306,7 @@ private fun SettingsPageContent(
         SettingsSubPage.LEFT_PANEL -> LeftPanelSettingsPage()
         SettingsSubPage.RIGHT_PANEL -> RightPanelSettingsPage()
         SettingsSubPage.MINI_PLAYER -> MiniPlayerSettingsPage()
+        SettingsSubPage.PET -> com.alananasss.kittytune.ui.pet.PetSettingsScreen(onBackClick = { SettingsNavigation.up() })
         SettingsSubPage.LYRICS -> LyricsSettingsScreen(
             playerViewModel = playerViewModel,
             page = LyricsSettingsPage.OVERVIEW,
@@ -511,6 +516,7 @@ private fun getSearchableSettings(playerViewModel: PlayerViewModel): List<Settin
         SettingsSearchItem(str("lyrics_mode_central"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS, SettingsSubPage.LYRICS_CENTRAL)), Icons.Rounded.VerticalAlignCenter, keywords = listOf("central", "lyrics", "centre", "центральный")),
         SettingsSearchItem(str("lyrics_mode_sidebar"), null, SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.LYRICS, SettingsSubPage.LYRICS_SIDEBAR)), Icons.Rounded.ViewSidebar, keywords = listOf("sidebar lyrics", "боковой текст")),
         SettingsSearchItem(str("mini_player_settings_title"), str("settings_page_mini_player_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.MINI_PLAYER)), Icons.Rounded.PictureInPicture, keywords = listOf("mini player", "pip", "always on top", "lyrics", "title", "artist", "paroles", "titre", "artiste", "songtext", "dalszöveg", "текст", "мини плеер")),
+        SettingsSearchItem(str("pet_settings_title"), str("pet_desk_settings_sub"), SettingsCategory.INTERFACE, SettingsPlace(SettingsCategory.INTERFACE, listOf(SettingsSubPage.PET)), Icons.Rounded.Pets, keywords = listOf("pet", "cat", "kitty", "tamagotchi", "chat", "chaton", "katze", "macska", "кот", "kedi", "mèo", "ivy", "widget")),
 
         // INTERFACE - Direct Options
         SettingsSearchItem(
