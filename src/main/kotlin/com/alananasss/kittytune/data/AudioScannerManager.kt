@@ -37,7 +37,28 @@ object AudioScannerManager {
         return scanSource(url, headers)
     }
 
-    private fun scanSource(source: String, headers: Map<String, String> = emptyMap()): TrackLoudnessInfo? {
+    /**
+     * A quick estimate from three ten-second windows a fifth, half and three quarters of the way into
+     * the track, reached by seeking — what SoundCloud Desktop measures before a track plays. A few
+     * hundred kilobytes and a second or two of decoding instead of the whole stream, and close enough
+     * to the full figure to set the gain from the first sample. Short tracks are read from the start.
+     */
+    fun scanStreamWindows(url: String, headers: Map<String, String>, durationMs: Long?): TrackLoudnessInfo? {
+        val duration = durationMs?.takeIf { it > 0L } ?: return scanSource(url, headers)
+        if (duration < 60_000L) return scanSource(url, headers, listOf(0L until minOf(duration, 30_000L) * 1000L))
+        val windows = floatArrayOf(0.2f, 0.5f, 0.75f).map { at ->
+            val startUs = (duration * at).toLong() * 1000L
+            startUs until startUs + 10_000_000L
+        }
+        return scanSource(url, headers, windows)
+    }
+
+    /** [windows], in microseconds, limits the scan to those stretches; null reads the whole source. */
+    private fun scanSource(
+        source: String,
+        headers: Map<String, String> = emptyMap(),
+        windows: List<LongRange>? = null,
+    ): TrackLoudnessInfo? {
         var grabber: FFmpegFrameGrabber? = null
         var analyzer: Long = 0L
         try {
@@ -63,35 +84,43 @@ object AudioScannerManager {
 
             var floatBuf = FloatArray(8192)
 
-            while (true) {
-                val frame: Frame = grabber.grabSamples() ?: break
-                val buffers = frame.samples ?: continue
-                if (buffers.isEmpty()) continue
+            // One pass over the whole source, or one per window, each starting with a seek.
+            val stretches = windows ?: listOf(LongRange.EMPTY)
+            for (window in stretches) {
+                if (windows != null) {
+                    try { grabber.timestamp = window.first } catch (_: Throwable) { continue }
+                }
+                while (true) {
+                    val frame: Frame = grabber.grabSamples() ?: break
+                    if (windows != null && grabber.timestamp > window.last) break
+                    val buffers = frame.samples ?: continue
+                    if (buffers.isEmpty()) continue
 
-                val first = buffers[0]
-                val planar = buffers.size == channels && channels > 1
-                val len = first.remaining()
-                val required = if (planar) len * channels else len
-                if (required <= 0) continue
-                if (floatBuf.size < required) floatBuf = FloatArray(required)
+                    val first = buffers[0]
+                    val planar = buffers.size == channels && channels > 1
+                    val len = first.remaining()
+                    val required = if (planar) len * channels else len
+                    if (required <= 0) continue
+                    if (floatBuf.size < required) floatBuf = FloatArray(required)
 
-                if (!planar && first is FloatBuffer) {
-                    val pos = first.position()
-                    first.get(floatBuf, 0, len)
-                    first.position(pos)
-                    val numFrames = len / channels
-                    if (numFrames > 0) {
-                        nativeAddFramesFloat(analyzer, floatBuf, numFrames)
-                    }
-                } else if (planar) {
-                    for (ch in 0 until channels) {
-                        val b = buffers[ch] as? FloatBuffer ?: continue
-                        val bPos = b.position()
-                        for (i in 0 until len) {
-                            floatBuf[i * channels + ch] = b.get(bPos + i)
+                    if (!planar && first is FloatBuffer) {
+                        val pos = first.position()
+                        first.get(floatBuf, 0, len)
+                        first.position(pos)
+                        val numFrames = len / channels
+                        if (numFrames > 0) {
+                            nativeAddFramesFloat(analyzer, floatBuf, numFrames)
                         }
+                    } else if (planar) {
+                        for (ch in 0 until channels) {
+                            val b = buffers[ch] as? FloatBuffer ?: continue
+                            val bPos = b.position()
+                            for (i in 0 until len) {
+                                floatBuf[i * channels + ch] = b.get(bPos + i)
+                            }
+                        }
+                        nativeAddFramesFloat(analyzer, floatBuf, len)
                     }
-                    nativeAddFramesFloat(analyzer, floatBuf, len)
                 }
             }
 

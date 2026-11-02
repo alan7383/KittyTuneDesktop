@@ -28,8 +28,12 @@ static const float kLimiterAttackMs = 5.0f;
 static const float kLimiterReleaseMs = 100.0f;
 
 // Dedicated time constants for loudness normalization
-static const float kNormAttackMs = 350.0f;   // 350ms smooth attenuation
-static const float kNormReleaseMs = 3000.0f; // 3000ms pump-free release
+static const float kNormAttackMs = 250.0f;          // coming down: a loud start is tamed almost at once
+static const float kNormFastAttackMs = 50.0f;       // coming down far (a drop after a quiet intro): at once
+static const float kNormFastAttackRatio = 0.708f;   // "far": the gain must fall by more than 3 dB
+static const float kNormReleaseMs = 4000.0f;        // going up while a track is still being learnt
+static const float kNormSettledReleaseMs = 10000.0f; // going up once it is: quiet passages stay quiet
+static const float kNormLearnSeconds = 20.0f;
 
 typedef struct {
     ebur128_state* ebur128;
@@ -42,7 +46,9 @@ typedef struct {
 
     // Normalization gain smoothing coefficients
     float normAttackCoeff;
+    float normFastAttackCoeff;
     float normReleaseCoeff;
+    float normSettledReleaseCoeff;
 
     // Limiter state
     float* delayBuffer;
@@ -102,6 +108,8 @@ static void initLimiter(KittyTuneDSPState* s) {
     float normReleaseTime = kNormReleaseMs / 1000.0f;
     s->normAttackCoeff = expf(-1.0f / ((float)s->sampleRate * normAttackTime));
     s->normReleaseCoeff = expf(-1.0f / ((float)s->sampleRate * normReleaseTime));
+    s->normFastAttackCoeff = expf(-1.0f / ((float)s->sampleRate * (kNormFastAttackMs / 1000.0f)));
+    s->normSettledReleaseCoeff = expf(-1.0f / ((float)s->sampleRate * (kNormSettledReleaseMs / 1000.0f)));
 
     float envRelease = 0.02f; // 20ms release for envelope
     s->envReleaseCoeff = expf(-1.0f / ((float)s->sampleRate * envRelease));
@@ -116,8 +124,16 @@ static void destroyLimiter(KittyTuneDSPState* s) {
 }
 
 static void smoothGain(KittyTuneDSPState* s) {
-    float gainCoeff = (s->targetGainLinear < s->currentGainLinear)
-        ? s->normAttackCoeff : s->normReleaseCoeff;
+    int settled = !s->hasKnownTrackLoudness
+        && s->framesProcessedSinceReset >= (long long)(s->sampleRate * kNormLearnSeconds);
+    float gainCoeff;
+    // The fast fall is for the live estimate meeting a drop; a known loudness that arrives late
+    // glides at the normal pace, so the correction is never heard as a jump.
+    if (!s->hasKnownTrackLoudness && s->targetGainLinear < s->currentGainLinear * kNormFastAttackRatio) {
+        gainCoeff = s->normFastAttackCoeff;
+    }
+    else if (s->targetGainLinear < s->currentGainLinear) gainCoeff = s->normAttackCoeff;
+    else gainCoeff = settled ? s->normSettledReleaseCoeff : s->normReleaseCoeff;
     s->currentGainLinear = gainCoeff * s->currentGainLinear
         + (1.0f - gainCoeff) * s->targetGainLinear;
 }
@@ -312,6 +328,16 @@ static void processChunk(KittyTuneDSPState* s, short* in, short* out, int numFra
             float maxGainForHeadroom = -1.0f - maxTpDb;
             if (gainDb > maxGainForHeadroom) gainDb = maxGainForHeadroom;
         }
+        // Safety net: something heard far louder than the figure on file says (an estimate gone
+        // wrong) is followed down, as if the track were unknown.
+        float heard = -70.0f;
+        if (s->integratedLoudness > -60.0f) heard = s->integratedLoudness;
+        if (currentShortTermLufs > -60.0f && currentShortTermLufs - 1.0f > heard) heard = currentShortTermLufs - 1.0f;
+        if (currentMomentaryLufs > -60.0f && currentMomentaryLufs - 4.0f > heard) heard = currentMomentaryLufs - 4.0f;
+        if (heard > -60.0f) {
+            float heardGainDb = s->targetLUFS - heard;
+            if (heardGainDb < gainDb - 2.0f) gainDb = heardGainDb;
+        }
     } else {
         float effectiveLufs = -70.0f;
         size_t momentaryWindowFrames = (size_t)(s->sampleRate * 0.4);
@@ -322,16 +348,15 @@ static void processChunk(KittyTuneDSPState* s, short* in, short* out, int numFra
         } else if (s->framesProcessedSinceReset < (long long)shortTermWindowFrames) {
             effectiveLufs = (currentShortTermLufs > -60.0f) ? currentShortTermLufs : currentMomentaryLufs;
         } else {
-            if (s->integratedLoudness > -60.0f) {
-                if (s->shortTermLoudness > s->integratedLoudness) {
-                    effectiveLufs = s->shortTermLoudness;
-                } else {
-                    effectiveLufs = s->integratedLoudness;
-                }
-            } else if (s->shortTermLoudness > -60.0f) {
-                effectiveLufs = s->shortTermLoudness;
-            } else {
-                effectiveLufs = currentMomentaryLufs;
+            // The track average alone lags far behind a quiet intro turning into the drop: the
+            // louder of it, the last few seconds and (with more margin) the last instant decides
+            // how far down to go, so the drop is tamed in well under a second.
+            if (s->integratedLoudness > -60.0f) effectiveLufs = s->integratedLoudness;
+            if (s->shortTermLoudness > -60.0f && s->shortTermLoudness - 1.0f > effectiveLufs) {
+                effectiveLufs = s->shortTermLoudness - 1.0f;
+            }
+            if (currentMomentaryLufs > -60.0f && currentMomentaryLufs - 4.0f > effectiveLufs) {
+                effectiveLufs = currentMomentaryLufs - 4.0f;
             }
         }
 
@@ -528,6 +553,28 @@ Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeSetTrackLo
     KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
     if (!s) return;
     resetDspState(s, trackLufs, maxPeakDb);
+}
+
+/**
+ * A track's loudness arriving while it already plays (its scan finished late). Unlike
+ * nativeSetTrackLoudness, nothing is reset: the gain glides to the track's level over the usual
+ * attack and release instead of jumping mid-song.
+ */
+JNIEXPORT void JNICALL
+Java_com_alananasss_kittytune_audio_NormalizationAudioProcessor_nativeUpdateTrackLoudness(
+    JNIEnv* env, jclass clazz, jlong handle, jfloat trackLufs, jfloat maxPeakDb) {
+
+    KittyTuneDSPState* s = (KittyTuneDSPState*)(intptr_t)handle;
+    if (!s) return;
+    if (!(trackLufs > -60.0f && trackLufs < 0.0f)) return;
+    if (s->framesProcessedSinceReset == 0) {
+        // Nothing heard yet: the track can simply start at its level.
+        resetDspState(s, trackLufs, maxPeakDb);
+        return;
+    }
+    s->hasKnownTrackLoudness = 1;
+    s->knownTrackLufs = trackLufs;
+    s->knownTrackPeakDb = maxPeakDb;
 }
 
 JNIEXPORT void JNICALL
