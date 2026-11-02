@@ -127,10 +127,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install packaging tools (rpm, fakeroot, zstd)
+      - name: Install packaging tools (rpm, fakeroot, zstd, file)
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot zstd binutils
+          sudo apt-get install -y rpm fakeroot zstd binutils file
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -145,12 +145,17 @@ jobs:
       - name: Debug Icon
         run: ls -la src/main/resources/icons/ || true
 
-      - name: Build Debian, RPM & AppImage Packages
-        run: ./gradlew packageReleaseDeb packageReleaseRpm packageReleaseAppImage || ./gradlew packageReleaseDeb packageReleaseRpm
+      - name: Build Debian & RPM Packages
+        run: ./gradlew packageReleaseDeb packageReleaseRpm
 
-      - name: Get version from tag
+      - name: Get version from tag or build file
         id: get_version
-        run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=$(grep -m 1 '^version = ' build.gradle.kts | cut -d '"' -f 2)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Arch Linux x64 Package (.pkg.tar.zst)
         run: |
@@ -226,12 +231,40 @@ jobs:
           tar -cf - .PKGINFO * | zstd -19 -T0 -q - -o ../../kitty-tune-${VERSION}-1-x86_64.pkg.tar.zst
           cd ../..
 
+      - name: Create Linux x64 AppImage Package (.AppImage)
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          mkdir -p appdir/usr/bin
+          cp -r arch_build/pkg/* appdir/
+
+          cat << 'EOF' > appdir/AppRun
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+export PATH="${HERE}/usr/bin:${HERE}/opt/kitty-tune/bin:${PATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/opt/kitty-tune/lib:${LD_LIBRARY_PATH}"
+exec "${HERE}/opt/kitty-tune/bin/KittyTune" "$@"
+EOF
+          chmod +x appdir/AppRun
+
+          cp appdir/usr/share/applications/kitty-tune.desktop appdir/kitty-tune.desktop
+          sed -i 's|^Exec=.*|Exec=KittyTune %U|' appdir/kitty-tune.desktop
+          cp appdir/usr/share/icons/hicolor/256x256/apps/kittytune.png appdir/kittytune.png
+          cp appdir/usr/share/icons/hicolor/256x256/apps/kittytune.png appdir/KittyTune.png
+          cp appdir/usr/share/icons/hicolor/256x256/apps/kittytune.png appdir/.DirIcon
+          ln -sf ../../opt/kitty-tune/bin/KittyTune appdir/usr/bin/KittyTune
+
+          wget -q -O appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool.AppImage
+          ./appimagetool.AppImage --appimage-extract
+          ARCH=x86_64 ./squashfs-root/AppRun -n appdir "KittyTune-${VERSION}-x86_64.AppImage"
+          rm -rf squashfs-root appimagetool.AppImage appdir
+
       - name: Prepare Linux x64 Distribution Binaries
         run: |
           mkdir -p dist-linux-x64
           find build -name "*.deb" -exec cp {} dist-linux-x64/ \;
           find build -name "*.rpm" -exec cp {} dist-linux-x64/ \;
-          find build -name "*.AppImage" -exec cp {} dist-linux-x64/ \;
+          cp KittyTune-*-x86_64.AppImage dist-linux-x64/ 2>/dev/null || true
           cp kitty-tune-*-x86_64.pkg.tar.zst dist-linux-x64/ 2>/dev/null || true
 
       - name: Upload Linux x64 Packages
@@ -241,7 +274,7 @@ jobs:
           path: dist-linux-x64/*
 
   build-linux-arm64:
-    name: Build Linux ARM64 Packages (.deb, .rpm, .pkg.tar.zst)
+    name: Build Linux ARM64 Packages (.deb, .rpm, .pkg.tar.zst, .AppImage)
     if: github.event_name != 'workflow_dispatch' || !inputs.macos_only
     runs-on: ubuntu-24.04-arm
 
@@ -249,10 +282,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install packaging tools (rpm, fakeroot, zstd)
+      - name: Install packaging tools (rpm, fakeroot, zstd, file)
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm fakeroot zstd binutils
+          sudo apt-get install -y rpm fakeroot zstd binutils file
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -270,9 +303,14 @@ jobs:
       - name: Build Debian & RPM Packages
         run: ./gradlew packageReleaseDeb packageReleaseRpm
 
-      - name: Get version from tag
+      - name: Get version from tag or build file
         id: get_version
-        run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=$(grep -m 1 '^version = ' build.gradle.kts | cut -d '"' -f 2)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create Arch Linux ARM64 Package (.pkg.tar.zst)
         run: |
@@ -348,11 +386,40 @@ jobs:
           tar -cf - .PKGINFO * | zstd -19 -T0 -q - -o ../../kitty-tune-${VERSION}-1-aarch64.pkg.tar.zst
           cd ../..
 
+      - name: Create Linux ARM64 AppImage Package (.AppImage)
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          mkdir -p appdir_arm/usr/bin
+          cp -r arch_build_arm/pkg/* appdir_arm/
+
+          cat << 'EOF' > appdir_arm/AppRun
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "$0")")"
+export PATH="${HERE}/usr/bin:${HERE}/opt/kitty-tune/bin:${PATH}"
+export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/opt/kitty-tune/lib:${LD_LIBRARY_PATH}"
+exec "${HERE}/opt/kitty-tune/bin/KittyTune" "$@"
+EOF
+          chmod +x appdir_arm/AppRun
+
+          cp appdir_arm/usr/share/applications/kitty-tune.desktop appdir_arm/kitty-tune.desktop
+          sed -i 's|^Exec=.*|Exec=KittyTune %U|' appdir_arm/kitty-tune.desktop
+          cp appdir_arm/usr/share/icons/hicolor/256x256/apps/kittytune.png appdir_arm/kittytune.png
+          cp appdir_arm/usr/share/icons/hicolor/256x256/apps/kittytune.png appdir_arm/KittyTune.png
+          cp appdir_arm/usr/share/icons/hicolor/256x256/apps/kittytune.png appdir_arm/.DirIcon
+          ln -sf ../../opt/kitty-tune/bin/KittyTune appdir_arm/usr/bin/KittyTune
+
+          wget -q -O appimagetool.AppImage https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-aarch64.AppImage
+          chmod +x appimagetool.AppImage
+          ./appimagetool.AppImage --appimage-extract
+          ARCH=aarch64 ./squashfs-root/AppRun -n appdir_arm "KittyTune-${VERSION}-aarch64.AppImage"
+          rm -rf squashfs-root appimagetool.AppImage appdir_arm
+
       - name: Prepare Linux ARM64 Distribution Binaries
         run: |
           mkdir -p dist-linux-arm64
           find build -name "*.deb" -exec cp {} dist-linux-arm64/ \;
           find build -name "*.rpm" -exec cp {} dist-linux-arm64/ \;
+          cp KittyTune-*-aarch64.AppImage dist-linux-arm64/ 2>/dev/null || true
           cp kitty-tune-*-aarch64.pkg.tar.zst dist-linux-arm64/ 2>/dev/null || true
 
       - name: Upload Linux ARM64 Packages
