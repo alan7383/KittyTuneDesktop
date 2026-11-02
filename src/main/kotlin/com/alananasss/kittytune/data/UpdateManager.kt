@@ -64,6 +64,20 @@ object UpdateManager {
         com.alananasss.kittytune.data.local.PlayerPreferences().setAutoUpdateEnabled(enabled)
     }
 
+    /**
+     * Checks if KittyTune is running inside a Nix / NixOS environment.
+     * On NixOS or when installed via Nix, binaries are stored in the immutable /nix/store
+     * and updates must be performed declaratively (e.g. `nix flake update`),
+     * so background pacman/dpkg/rpm invocations are skipped.
+     */
+    fun isRunningOnNix(): Boolean {
+        val javaHome = System.getProperty("java.home", "")
+        val appPath = System.getProperty("jpackage.app.path", "")
+        val inNixStore = javaHome.contains("/nix/store") || appPath.contains("/nix/store")
+        val hasNixOs = File("/etc/NIXOS").exists() || File("/run/current-system/nixos-version").exists()
+        return inNixStore || hasNixOs
+    }
+
     fun testLocalInstall(installerFile: File? = null) {
         val downloadsDir = File(System.getProperty("user.home"), "Downloads")
         val updateDir = File(System.getProperty("java.io.tmpdir"), "KittyTuneUpdates")
@@ -282,6 +296,12 @@ object UpdateManager {
     }
 
     suspend fun downloadUpdate() {
+        if (isRunningOnNix()) {
+            val url = releaseInfo?.releaseUrl ?: "https://github.com/alan7383/KittyTuneDesktop/releases"
+            com.alananasss.kittytune.core.openUrl(url)
+            return
+        }
+
         val asset = findMatchingAsset()
 
         if (asset == null) {

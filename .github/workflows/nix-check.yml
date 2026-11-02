@@ -1,0 +1,52 @@
+name: Nix Flake Build & Check
+
+on:
+  push:
+    paths:
+      - 'flake.nix'
+      - 'default.nix'
+      - 'shell.nix'
+      - 'nix/**'
+      - '.github/workflows/nix-check.yml'
+  pull_request:
+    paths:
+      - 'flake.nix'
+      - 'default.nix'
+      - 'shell.nix'
+      - 'nix/**'
+      - '.github/workflows/nix-check.yml'
+  workflow_dispatch:
+
+jobs:
+  check-nix:
+    name: Test Nix Build & Flake on Linux
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Check Flake Syntax & Outputs
+        run: nix flake check
+
+      - name: Build KittyTune Package via Flake
+        run: nix build .#default --print-build-logs
+
+      - name: Validate Output Derivation
+        run: |
+          echo "=== Built binaries in result/bin ==="
+          ls -la result/bin
+          echo "=== Desktop and icon files ==="
+          ls -la result/share/applications || true
+          ls -la result/share/icons/hicolor/256x256/apps || true
+          echo "=== Testing executable wrapper ==="
+          file result/bin/kitty-tune
+          test -x result/bin/kitty-tune
+          test -x result/bin/KittyTune
+          echo "Nix package built successfully and executable is verified!"

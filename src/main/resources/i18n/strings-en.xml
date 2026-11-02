@@ -1479,6 +1479,10 @@
     <string name="update_auth_failed_desc">The authentication was cancelled or failed. Please try again.</string>
     <string name="update_auth_failed_title">Authentication failed</string>
     <string name="update_available_title">Update Available</string>
+    <string name="update_nixos_notice_title">NixOS / Nix system detected</string>
+    <string name="update_nixos_notice_desc">Updates are managed declaratively on Nix. Run the command below to update your installation:</string>
+    <string name="update_btn_view_release">View Release</string>
+    <string name="btn_copy">Copy</string>
     <string name="update_btn_close_instances">Close instances</string>
     <string name="update_btn_dont_remind">Don\'t remind me again</string>
     <string name="update_btn_download">Download &amp; Install</string>

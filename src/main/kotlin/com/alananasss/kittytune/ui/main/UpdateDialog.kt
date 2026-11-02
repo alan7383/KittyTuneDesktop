@@ -175,6 +175,75 @@ fun UpdateDialog(
                     Spacer(Modifier.height(16.dp))
                 }
 
+                if (UpdateManager.isRunningOnNix() && status == UpdateStatus.AVAILABLE) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Outlined.NewReleases,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = str("update_nixos_notice_title"),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = str("update_nixos_notice_desc"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "nix flake update",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    TextButton(
+                                        onClick = {
+                                            java.awt.Toolkit.getDefaultToolkit().systemClipboard.setContents(
+                                                java.awt.datatransfer.StringSelection("nix flake update"),
+                                                null
+                                            )
+                                            com.alananasss.kittytune.core.Toaster.show(str("copied_to_clipboard"))
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        shapes = ButtonDefaults.shapes()
+                                    ) {
+                                        Text(
+                                            text = str("btn_copy"),
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
                 // Release info / notes
                 Column(
                     modifier = Modifier
@@ -256,17 +325,35 @@ fun UpdateDialog(
                                 Text(str("btn_cancel"))
                             }
                             Spacer(Modifier.width(12.dp))
-                            FilledTonalButton(
-                                onClick = { scope.launch { UpdateManager.downloadUpdate() } },
-                                shapes = ButtonDefaults.shapes()
-                            ) {
-                                Icon(Icons.Outlined.InstallMobile, contentDescription = null, modifier = Modifier.size(20.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = str("update_btn_download"),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            if (UpdateManager.isRunningOnNix()) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        val url = release?.releaseUrl ?: "https://github.com/alan7383/KittyTuneDesktop/releases"
+                                        com.alananasss.kittytune.core.openUrl(url)
+                                    },
+                                    shapes = ButtonDefaults.shapes()
+                                ) {
+                                    Icon(Icons.Outlined.NewReleases, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = str("update_btn_view_release"),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            } else {
+                                FilledTonalButton(
+                                    onClick = { scope.launch { UpdateManager.downloadUpdate() } },
+                                    shapes = ButtonDefaults.shapes()
+                                ) {
+                                    Icon(Icons.Outlined.InstallMobile, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = str("update_btn_download"),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         }
                         UpdateStatus.DOWNLOADING -> {

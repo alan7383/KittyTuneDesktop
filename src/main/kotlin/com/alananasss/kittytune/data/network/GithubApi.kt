@@ -12,12 +12,18 @@ data class GithubRelease(
     @SerializedName("tag_name") val tagName: String? = null,
     @SerializedName("name") val name: String? = null,
     @SerializedName("body") val body: String? = null,
+    @SerializedName("html_url") val htmlUrl: String? = null,
     @SerializedName("assets") val assets: List<GithubAsset>? = null
 ) {
     val versionName: String
         get() = tagName?.takeIf { it.isNotBlank() }
             ?: name?.takeIf { it.isNotBlank() }
             ?: ""
+
+    val releaseUrl: String
+        get() = htmlUrl?.takeIf { it.isNotBlank() }
+            ?: tagName?.let { "https://github.com/alan7383/KittyTuneDesktop/releases/tag/$it" }
+            ?: "https://github.com/alan7383/KittyTuneDesktop/releases"
 }
 
 data class GithubAsset(
