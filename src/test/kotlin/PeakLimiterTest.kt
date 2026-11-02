@@ -54,17 +54,60 @@ class PeakLimiterTest {
     }
 
     @Test
-    fun `overshoot above full scale is brought under the ceiling`() {
+    fun `sustained overshoot is ridden down and lands inside full scale`() {
         val frames = 20_000
-        val work = tone(frames, 1.2f)
+        val work = tone(frames, 1.5f)
         val limiter = PeakLimiter(SAMPLE_RATE, CHANNELS)
 
         limiter.process(work, work.size)
 
         // Skip the first look-ahead window: it is the ramp the delay line is still filling.
         val peak = maxAbs(work, fromFrame = LOOK * 4)
-        assertTrue("peak $peak should sit at the ceiling", peak <= PeakLimiter.CEILING_TRANSPARENT + 1e-3f)
-        assertTrue("peak $peak should not be crushed far below it", peak > PeakLimiter.CEILING_TRANSPARENT - 0.05f)
+        assertTrue("peak $peak must fit in full scale", peak <= 1f)
+        assertTrue("peak $peak should not be crushed far below it", peak > 0.95f)
+    }
+
+    /**
+     * The audible regression this protects against: at -0.5 dBFS the limiter rode gain on every
+     * kick of a hot master and pumped the whole mix. A small overshoot must now cost nothing but
+     * the rounding of its own top: no gain change on the samples around it.
+     */
+    @Test
+    fun `a small overshoot is rounded off without touching its neighbours`() {
+        val frames = 20_000
+        val input = tone(frames, 0.5f)
+        // One inter-sample peak at +1 dBFS, as an AAC decoder leaves them on a loud kick.
+        val spike = 10_000
+        input[spike * CHANNELS] = 1.1f
+        input[spike * CHANNELS + 1] = 1.1f
+        val work = input.copyOf()
+        val limiter = PeakLimiter(SAMPLE_RATE, CHANNELS)
+
+        limiter.process(work, work.size)
+
+        for (f in LOOK until frames) {
+            val src = f - LOOK
+            val expected = if (src == spike) PeakLimiter.softKnee(1.1f) else input[src * CHANNELS]
+            assertEquals("frame $f", expected, work[f * CHANNELS], 0f)
+        }
+        val top = work[(spike + LOOK) * CHANNELS]
+        assertTrue("the spike $top must be inside full scale", top < 1f && top > 0.95f)
+    }
+
+    @Test
+    fun `the soft knee is the identity below it and never passes full scale`() {
+        assertEquals(0.5f, PeakLimiter.softKnee(0.5f), 0f)
+        assertEquals(-PeakLimiter.SOFT_KNEE, PeakLimiter.softKnee(-PeakLimiter.SOFT_KNEE), 0f)
+        var last = PeakLimiter.SOFT_KNEE
+        var x = PeakLimiter.SOFT_KNEE + 0.01f
+        while (x < 4f) {
+            val y = PeakLimiter.softKnee(x)
+            assertTrue("monotonic at $x", y >= last)
+            assertTrue("inside full scale at $x", y <= 1f)
+            assertEquals(-y, PeakLimiter.softKnee(-x), 0f)
+            last = y
+            x += 0.01f
+        }
     }
 
     @Test

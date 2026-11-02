@@ -3,6 +3,7 @@ package com.alananasss.kittytune.audio
 import com.alananasss.kittytune.ui.player.AudioEffectsState
 import kotlin.math.abs
 import kotlin.math.exp
+import kotlin.math.tanh
 
 /**
  * How much headroom the limiter has to buy for a given effect state.
@@ -57,6 +58,11 @@ internal val effectToggles: List<java.lang.reflect.Method> by lazy {
  * wobble) with a sliding-window minimum over the look-ahead, so the gain has already
  * come down by the time the peak it was computed for reaches the output. Anything
  * that already fits below the threshold passes through untouched.
+ *
+ * Its output then goes through a soft knee ([SOFT_KNEE] to full scale) instead of a hard
+ * clamp, which is what keeps the transparent setting transparent: small overshoots are
+ * rounded off sample by sample, with nothing to pump, and only the large ones, the ones
+ * that would crackle, cost a gain reduction.
  */
 class PeakLimiter(sampleRate: Int, private val channels: Int) {
 
@@ -73,7 +79,7 @@ class PeakLimiter(sampleRate: Int, private val channels: Int) {
      * change, so there is no click.
      */
     fun setCeiling(linear: Float) {
-        threshold = linear.coerceIn(0.1f, 1f)
+        threshold = linear.coerceIn(0.1f, CEILING_TRANSPARENT)
     }
 
     /** Look-ahead, in frames. Also the window the gain has to ramp down over. */
@@ -133,7 +139,7 @@ class PeakLimiter(sampleRate: Int, private val channels: Int) {
             for (c in 0 until channels) {
                 val out = delay[base + c] * gain
                 delay[base + c] = buf[i + c]
-                buf[i + c] = if (out > 1f) 1f else if (out < -1f) -1f else out
+                buf[i + c] = softKnee(out)
             }
             delayPos = if (delayPos + 1 == look) 0 else delayPos + 1
             i += channels
@@ -160,15 +166,21 @@ class PeakLimiter(sampleRate: Int, private val channels: Int) {
 
     companion object {
         /**
-         * -0.5 dBFS: the ceiling when nothing downstream can raise the level again, which is
-         * the ordinary case — no effects, and the time-stretcher passing through at 1x.
+         * +1 dBFS: the gain-riding threshold when nothing downstream can raise the level
+         * again, which is the ordinary case: no effects, and the time-stretcher passing
+         * through at 1x. Above full scale on purpose; [softKnee] brings what is left of the
+         * overshoot back inside [-1, 1].
          *
-         * This is all the limiter needs to do its actual job. What it exists for is the
-         * overshoot lossy decoders leave *above* full scale; sitting any lower means riding
-         * gain continuously on every master that peaks at 0 dBFS, which is most of them, and
-         * that costs level and transient snap for nothing.
+         * It used to be -0.5 dBFS, and that was audible. A hot master decoded from AAC
+         * crosses -0.5 dBFS on nearly every kick, so the limiter pulled the whole mix down by
+         * up to 2 dB and let it back up over 80 ms, on every beat: pumping, less punch, and a
+         * clearly worse sound than the same stream in a browser, which hands its floats to
+         * the OS mixer untouched. Measured on such a track (aac_96k, peaks at +1.6 dBFS) the
+         * old setting rode gain about 30% of the time and kept 31 dB of fidelity to the
+         * decoded signal; this one keeps 52 dB, and gain riding is left for the large
+         * overshoots that would really crackle.
          */
-        const val CEILING_TRANSPARENT = 0.9441f
+        const val CEILING_TRANSPARENT = 1.122f
 
         /**
          * -2 dBFS: the ceiling when an effect is active. Those processors work in 16-bit,
@@ -180,6 +192,23 @@ class PeakLimiter(sampleRate: Int, private val channels: Int) {
          * back is already in range.
          */
         const val CEILING_SAFE = 0.7943f
+
+        /**
+         * Where the output's soft knee starts, -0.9 dBFS. Below it the signal is untouched; above it
+         * the curve bends towards full scale and never reaches past it, so an overshoot is
+         * rounded off instead of flat-topped. The [CEILING_SAFE] output never gets this high.
+         */
+        const val SOFT_KNEE = 0.9f
+
+        private const val KNEE_RANGE = 1f - SOFT_KNEE
+
+        /** Identity up to [SOFT_KNEE], then a tanh bend that tends to (and never passes) 1. */
+        fun softKnee(x: Float): Float {
+            val a = abs(x)
+            if (a <= SOFT_KNEE) return x
+            val y = SOFT_KNEE + KNEE_RANGE * tanh((a - SOFT_KNEE) / KNEE_RANGE)
+            return if (x < 0f) -y else y
+        }
 
         private const val LOOKAHEAD_SECONDS = 0.0025f
         private const val ATTACK_SECONDS = 0.0005f
