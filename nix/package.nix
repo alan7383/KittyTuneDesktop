@@ -5,6 +5,8 @@
 , autoPatchelfHook
 , makeWrapper
 , alsa-lib
+, alsa-plugins
+, libpulseaudio
 , gtk3
 , glib
 , cairo
@@ -43,6 +45,8 @@ let
   runtimeLibs = [
     stdenv.cc.cc.lib
     alsa-lib
+    alsa-plugins
+    libpulseaudio
     gtk3
     glib
     cairo
@@ -132,11 +136,25 @@ Keywords=music;player;soundcloud;streaming;lyrics;lossless;karaoke;
 StartupWMClass=KittyTune
 EOF
 
-    # Create binary wrapper with full dynamic library paths (Skiko, ALSA, GTK, X11, Wayland)
+    # Default ALSA configuration fallback for environments without physical ALSA soundcards (e.g. WSL2 / WSLg)
+    mkdir -p "$out/etc"
+    cat << 'EOF' > "$out/etc/asound.conf"
+pcm.!default {
+    type pulse
+}
+ctl.!default {
+    type pulse
+}
+EOF
+
+    # Create binary wrapper with full dynamic library paths (Skiko, ALSA, GTK, X11, Wayland, PulseAudio)
     mkdir -p "$out/bin"
     makeWrapper "$out/opt/kitty-tune/bin/KittyTune" "$out/bin/kitty-tune" \
       --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath runtimeLibs}" \
       --prefix XDG_DATA_DIRS : "${gtk3}/share/gsettings-schemas/${gtk3.name}:$XDG_DATA_DIRS" \
+      --prefix ALSA_PLUGIN_DIR : "${alsa-plugins}/lib/alsa-lib" \
+      --run 'if [ -e /mnt/wslg/PulseServer ] && [ -z "$PULSE_SERVER" ]; then export PULSE_SERVER=unix:/mnt/wslg/PulseServer; fi' \
+      --run 'if [ ! -f /etc/asound.conf ] && [ ! -f ~/.asoundrc ] && [ -f "'$out'/etc/asound.conf" ]; then export ALSA_CONFIG_PATH="'$out'/etc/asound.conf"; fi' \
       --set-default ORT_DISABLE_TELEMETRY "1"
 
     # Alias KittyTune (capitalized) to kitty-tune
