@@ -16,7 +16,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -66,9 +65,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -77,8 +85,15 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
+import com.alananasss.kittytune.core.BackHandler
+import com.alananasss.kittytune.core.GlobalShortcutDispatcher
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -100,6 +115,9 @@ import java.awt.datatransfer.Transferable
 import java.io.File
 import javax.imageio.ImageIO
 
+/** The keys the story takes over from the player while it is open. */
+private val STORY_KEYS = setOf(Key.Spacebar, Key.DirectionLeft, Key.DirectionRight)
+
 /** How long a slide stays before the story moves on by itself. */
 private const val SLIDE_MS = 7_000
 
@@ -119,22 +137,13 @@ fun RecapStoryScreen(
     LaunchedEffect(recapId) { viewModel.load(recapId) }
     val recap = viewModel.recap
 
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    // Esc goes through the app's back stack, like every other screen.
+    BackHandler(onBack = onClose)
 
     Box(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
-            .focusRequester(focus)
-            .focusable()
-            .onPreviewKeyEvent { ev ->
-                if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (ev.key) {
-                    Key.Escape -> { onClose(); true }
-                    else -> false
-                }
-            }
     ) {
         when {
             recap != null -> Story(recap, onClose, onTrackClick, onArtistClick)
@@ -183,30 +192,42 @@ private fun Story(
         if (index < slides.lastIndex) index++
     }
 
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
+    // Space and the arrows are window-wide player shortcuts (play/pause, seek ±5 s), taken before any
+    // screen sees the key — so a key handler here never ran, and Space started the music. While the
+    // story is open it takes them first, as the sleep screen does; Shift+arrows still change track.
+    val onKey by rememberUpdatedState<(Key) -> Unit> { key ->
+        when (key) {
+            Key.DirectionLeft -> go(index - 1)
+            Key.DirectionRight -> go(index + 1)
+            Key.Spacebar -> paused = !paused
+            else -> Unit
+        }
+    }
+    DisposableEffect(Unit) {
+        val previous = GlobalShortcutDispatcher.interceptor
+        GlobalShortcutDispatcher.interceptor = { event ->
+            val plain = !event.isShiftPressed && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed
+            if (plain && event.key in STORY_KEYS) {
+                if (event.type == KeyEventType.KeyDown) onKey(event.key)
+                true
+            } else {
+                previous?.invoke(event) ?: false
+            }
+        }
+        onDispose { GlobalShortcutDispatcher.interceptor = previous }
+    }
 
     val palette = slide.palette(scheme, recap)
     val container by animateColorAsState(palette.container, tween(500), label = "slideContainer")
     val content by animateColorAsState(palette.onContainer, tween(500), label = "slideContent")
     val accent by animateColorAsState(palette.accent, tween(500), label = "slideAccent")
+    val onAccent by animateColorAsState(palette.onAccent, tween(500), label = "slideOnAccent")
 
     Box(
         Modifier
             .fillMaxSize()
+            .clipToBounds()
             .background(container)
-            .focusRequester(focus)
-            .focusable()
-            .onPreviewKeyEvent { ev ->
-                if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (ev.key) {
-                    Key.DirectionLeft -> { go(index - 1); true }
-                    Key.DirectionRight -> { go(index + 1); true }
-                    Key.Spacebar -> { paused = !paused; true }
-                    Key.Escape -> { onClose(); true }
-                    else -> false
-                }
-            }
             .pointerInput(slides.size) {
                 awaitPointerEventScope {
                     while (true) {
@@ -222,7 +243,7 @@ private fun Story(
     ) {
         MorphingBackdrop(slide.polygon(recap), accent.copy(alpha = 0.18f))
 
-        CompositionLocalProvider(LocalContentColor provides content) {
+        CompositionLocalProvider(LocalContentColor provides content, LocalRecapOnAccent provides onAccent) {
             Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp)) {
                 StoryTopBar(recap, slides.size, index, { progress.value }, paused, { paused = !paused }, onClose)
                 AnimatedContent(
@@ -260,6 +281,7 @@ private fun Story(
                 }
                 if (isLast) {
                     StoryActions(
+                        container = container,
                         onShare = {
                             scope.launch {
                                 val bitmap = runCatching { shareLayer.toImageBitmap() }.getOrNull()
@@ -328,7 +350,7 @@ private fun StoryTopBar(
 }
 
 @Composable
-private fun StoryActions(onShare: () -> Unit, onReplay: () -> Unit) {
+private fun StoryActions(container: Color, onShare: () -> Unit, onReplay: () -> Unit) {
     val content = LocalContentColor.current
     Row(
         Modifier.fillMaxWidth().padding(top = 16.dp),
@@ -346,7 +368,7 @@ private fun StoryActions(onShare: () -> Unit, onReplay: () -> Unit) {
         Button(
             onClick = onShare,
             shapes = ButtonDefaults.shapes(),
-            colors = ButtonDefaults.buttonColors(containerColor = content, contentColor = MaterialTheme.colorScheme.surface),
+            colors = ButtonDefaults.buttonColors(containerColor = content, contentColor = container),
         ) {
             Icon(Icons.Rounded.Share, contentDescription = null)
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
@@ -355,7 +377,14 @@ private fun StoryActions(onShare: () -> Unit, onReplay: () -> Unit) {
     }
 }
 
-/** A big expressive shape drifting behind the slides, morphing into the next shape as the story moves on. */
+/**
+ * A big expressive shape behind the slides, turning slowly and morphing into the next slide's shape.
+ *
+ * Drawn as a path rather than clipped through `toShape()`, so the morph is a real one — the shape used
+ * to jump from one to the other in a frame. The progress runs on an easing that never passes 1: a
+ * bouncy spring overshot it, and a [Morph] read beyond its end extrapolates into a distorted blob.
+ * It is sized from the frame's shorter side and kept whole inside it, turning included.
+ */
 @Composable
 private fun MorphingBackdrop(target: RoundedPolygon, color: Color) {
     var from by remember { mutableStateOf(target) }
@@ -363,26 +392,46 @@ private fun MorphingBackdrop(target: RoundedPolygon, color: Color) {
     val morphProgress = remember { Animatable(1f) }
     LaunchedEffect(target) {
         if (target == to) return@LaunchedEffect
-        from = to
+        // Interrupted halfway (slides flicked quickly): start from whichever end it is closer to,
+        // rather than snapping back to the old shape.
+        from = if (morphProgress.value >= 0.5f) to else from
         to = target
         morphProgress.snapTo(0f)
-        morphProgress.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessVeryLow))
+        morphProgress.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
     }
-    val polygon = if (morphProgress.value >= 1f) to else from
-    val rotation = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        while (true) rotation.animateTo(rotation.value + 360f, tween(40_000, easing = LinearEasing))
-    }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val side = maxWidth * 1.15f
-        Box(
-            Modifier
-                .size(side)
-                .offset(x = maxWidth - side * 0.62f, y = maxHeight * 0.18f)
-                .graphicsLayer { rotationZ = rotation.value }
-                .clip(polygon.toShape())
-                .background(color)
-        )
+    val morph = remember(from, to) { Morph(from, to) }
+    val spin = rememberInfiniteTransition(label = "backdropSpin")
+    val angle by spin.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(40_000, easing = LinearEasing)),
+        label = "backdropAngle",
+    )
+    val path = remember { Path() }
+    Canvas(Modifier.fillMaxSize()) {
+        // Whole at every angle: a shape turning about its centre stays inside a circle of radius
+        // ~0.71 × its side, so a side of 0.7 × the frame's short edge, centred that far in from the
+        // right, never reaches an edge.
+        val side = minOf(size.width, size.height) * 0.7f
+        val left = size.width - side * 1.25f
+        val top = (size.height - side) / 2f
+        path.reset()
+        var first = true
+        morph.forEachCubic(morphProgress.value.coerceIn(0f, 1f)) { c ->
+            if (first) {
+                path.moveTo(c.anchor0X, c.anchor0Y)
+                first = false
+            }
+            path.cubicTo(c.control0X, c.control0Y, c.control1X, c.control1Y, c.anchor1X, c.anchor1Y)
+        }
+        path.close()
+        translate(left, top) {
+            rotate(angle, pivot = Offset(side / 2f, side / 2f)) {
+                scale(side, side, pivot = Offset.Zero) {
+                    drawPath(path, color)
+                }
+            }
+        }
     }
 }
 

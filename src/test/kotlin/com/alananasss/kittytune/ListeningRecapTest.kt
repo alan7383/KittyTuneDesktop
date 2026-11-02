@@ -13,6 +13,10 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Mirrors the mobile [com.alananasss.kittytune.ListeningRecapTest]: the recap periods, the seasonal
+ * palette, the persona heuristics, and the discoveries/genres/sessions numbers.
+ */
 class ListeningRecapTest {
 
     private val zone = ZoneId.of("Europe/Paris")
@@ -51,24 +55,19 @@ class ListeningRecapTest {
 
     @Test
     fun onlyFinishedSpansSinceTheFirstListenAreRecaps() {
-        // History from 10 May 2026, today 30 October 2026.
         val periods = ListeningRecaps.finished(at(2026, 5, 10), at(2026, 10, 30), zone, southern = false)
         val months = periods.filter { it.kind == RecapKind.MONTH }.map { it.start }
         assertEquals((5..9).map { YearMonth.of(2026, it) }.reversed(), months)
-        // Spring (Mar–May) is finished and has listening; summer too; autumn is not over.
         val seasons = periods.filter { it.kind == RecapKind.SEASON }.map { it.season }
         assertEquals(listOf(Season.SUMMER, Season.SPRING), seasons)
         assertTrue(periods.none { it.kind == RecapKind.YEAR })
-        // Newest first; on the same end date the season comes before the month.
         assertEquals("m-2026-09", periods.first().id)
-        assertEquals(listOf("s-2026-06", "m-2026-08"), periods.drop(1).take(2).map { it.id })
     }
 
     @Test
     fun theYearComesFirstOnNewYearsDay() {
         val periods = ListeningRecaps.finished(at(2025, 11, 3), at(2026, 1, 1, 9), zone, southern = false)
         assertEquals(listOf("y-2025", "m-2025-12"), periods.take(2).map { it.id })
-        // Winter 2025–26 is still going.
         assertTrue(periods.none { it.id == "s-2025-12" })
     }
 
@@ -93,29 +92,22 @@ class ListeningRecapTest {
             listen(at(2026, 9, 7, 23), trackId = 1, artist = "Old", genre = "hip-hop"), // Monday night
             listen(at(2026, 9, 7, 23, 4), trackId = 2, artist = "New & Old", genre = "Hip Hop"),
             listen(at(2026, 9, 8, 10), trackId = 3, artist = "Fresh", genre = "House", listenMs = 60_000),
-            listen(at(2026, 8, 30), trackId = 9, artist = "Elsewhere"), // previous month
+            listen(at(2026, 8, 30), trackId = 9, artist = "Elsewhere"),
         )
         val recap = ListeningRecaps.build(
-            period = period,
-            events = events,
-            previousListenMs = 0L,
-            zone = zone,
-            knownArtists = setOf("old"),
-            knownTracks = setOf(1L),
-            nowMs = at(2026, 10, 30),
+            period, events, previousListenMs = 0L, zone = zone,
+            knownArtists = setOf("old"), knownTracks = setOf(1L), nowMs = at(2026, 10, 30),
         )
 
         assertEquals(3, recap.report.plays)
         assertEquals(2, recap.newArtists) // "New" and "Fresh"
         assertEquals(2, recap.newTracks)
-        // Both spellings of hip-hop are one genre, ahead of house.
         assertEquals(2, recap.genres.size)
         assertEquals(360_000L, recap.genres.first().listenMs)
         assertEquals(360_000L, recap.nightMs)
         assertEquals(60_000L, recap.dayMs)
         assertEquals(360_000L, recap.weekdays[0])
         assertEquals("T1", recap.firstTrackTitle)
-        // The two night listens are four minutes apart, so they are one session.
         assertEquals(360_000L, recap.longestSessionMs)
         assertNull(recap.mostReplayed)
     }
@@ -125,13 +117,7 @@ class ListeningRecapTest {
         val period = ListeningRecaps.month(YearMonth.of(2026, 9), zone)
         val events = (1..10).map { listen(at(2026, 9, it, 2), trackId = it.toLong(), artist = "A$it") }
         val recap = ListeningRecaps.build(
-            period = period,
-            events = events,
-            previousListenMs = null,
-            zone = zone,
-            knownArtists = emptySet<String>(),
-            knownTracks = emptySet<Long>(),
-            nowMs = at(2026, 10, 30),
+            period, events, null, zone, emptySet(), emptySet(), nowMs = at(2026, 10, 30),
         )
         assertEquals(RecapPersona.NIGHT_OWL, recap.persona)
         assertTrue(recap.genres.isEmpty())

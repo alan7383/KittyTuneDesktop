@@ -28,7 +28,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.alananasss.kittytune.ui.common.ScrollableLazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -133,8 +139,10 @@ fun RecapCarouselSection(
             return@Column
         }
 
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
+        val rowState = rememberLazyListState()
+        ScrollableLazyRow(
+            state = rowState,
+            modifier = Modifier.fillMaxWidth().mouseDragScroll(rowState),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(end = 8.dp),
         ) {
@@ -152,6 +160,23 @@ fun RecapCarouselSection(
 }
 
 private val RECAP_CARD_HEIGHT = 240.dp
+
+/**
+ * Click and drag to move a row sideways with the mouse, and let go to fling it.
+ *
+ * The row already scrolls with Shift + wheel and the edge arrows, but on a desktop the first thing
+ * people try is to grab it. A drag that starts on a card does not open it: once the pointer has moved
+ * past the touch slop, the drag consumes the gesture and the card's click is cancelled.
+ */
+@Composable
+private fun Modifier.mouseDragScroll(state: LazyListState): Modifier {
+    val fling = ScrollableDefaults.flingBehavior()
+    return draggable(
+        orientation = Orientation.Horizontal,
+        state = rememberDraggableState { delta -> state.dispatchRawDelta(-delta) },
+        onDragStopped = { velocity -> state.scroll { with(fling) { performFling(-velocity) } } },
+    )
+}
 
 @Composable
 private fun CarouselRecapCard(summary: RecapSummary, modifier: Modifier, onClick: () -> Unit) {
@@ -393,7 +418,13 @@ fun RecapsScreen(onBackClick: () -> Unit, onOpenRecap: (String) -> Unit) {
                 item(span = { GridItemSpan(maxLineSpan) }, key = "upcoming") {
                     Column {
                         SectionTitle(str("recaps_upcoming_title"))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        val upcomingState = rememberLazyListState()
+                        ScrollableLazyRow(
+                            state = upcomingState,
+                            modifier = Modifier.fillMaxWidth().mouseDragScroll(upcomingState),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            showsArrows = false,
+                        ) {
                             items(viewModel.upcoming, key = { it.id }) { period ->
                                 UpcomingCard(period, Modifier.width(360.dp))
                             }

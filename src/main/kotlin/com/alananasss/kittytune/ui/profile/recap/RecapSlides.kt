@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,16 +99,16 @@ internal fun slidesFor(recap: ListeningRecap): List<RecapSlide> {
 /** A different colour role per slide, so moving through the story is moving through the palette. */
 internal fun RecapSlide.palette(scheme: ColorScheme, recap: ListeningRecap): RecapPalette = when (this) {
     RecapSlide.INTRO, RecapSlide.SUMMARY -> recap.period.palette(scheme)
-    RecapSlide.TIME -> RecapPalette(scheme.primaryContainer, scheme.onPrimaryContainer, scheme.primary)
-    RecapSlide.FIRST, RecapSlide.WEEK -> RecapPalette(scheme.surfaceContainerHighest, scheme.onSurface, scheme.primary)
+    RecapSlide.TIME -> RecapPalette(scheme.primaryContainer, scheme.onPrimaryContainer, scheme.primary, scheme.onPrimary)
+    RecapSlide.FIRST, RecapSlide.WEEK -> RecapPalette(scheme.surfaceContainerHighest, scheme.onSurface, scheme.primary, scheme.onPrimary)
     RecapSlide.TOP_ARTIST, RecapSlide.GENRES, RecapSlide.HABITS ->
-        RecapPalette(scheme.secondaryContainer, scheme.onSecondaryContainer, scheme.secondary)
-    RecapSlide.TOP_ARTISTS, RecapSlide.TOP_TRACKS -> RecapPalette(scheme.surfaceContainerHigh, scheme.onSurface, scheme.tertiary)
-    RecapSlide.TOP_TRACK -> RecapPalette(scheme.tertiaryContainer, scheme.onTertiaryContainer, scheme.tertiary)
-    RecapSlide.REPLAY, RecapSlide.PERSONA -> RecapPalette(scheme.primary, scheme.onPrimary, scheme.primaryContainer)
-    RecapSlide.DISCOVERIES -> RecapPalette(scheme.tertiary, scheme.onTertiary, scheme.tertiaryContainer)
-    RecapSlide.DAY_NIGHT -> if (recap.nightShare > 0.5f) RecapPalette(scheme.inverseSurface, scheme.inverseOnSurface, scheme.inversePrimary)
-    else RecapPalette(scheme.tertiaryContainer, scheme.onTertiaryContainer, scheme.tertiary)
+        RecapPalette(scheme.secondaryContainer, scheme.onSecondaryContainer, scheme.secondary, scheme.onSecondary)
+    RecapSlide.TOP_ARTISTS, RecapSlide.TOP_TRACKS -> RecapPalette(scheme.surfaceContainerHigh, scheme.onSurface, scheme.tertiary, scheme.onTertiary)
+    RecapSlide.TOP_TRACK -> RecapPalette(scheme.tertiaryContainer, scheme.onTertiaryContainer, scheme.tertiary, scheme.onTertiary)
+    RecapSlide.REPLAY, RecapSlide.PERSONA -> RecapPalette(scheme.primary, scheme.onPrimary, scheme.primaryContainer, scheme.onPrimaryContainer)
+    RecapSlide.DISCOVERIES -> RecapPalette(scheme.tertiary, scheme.onTertiary, scheme.tertiaryContainer, scheme.onTertiaryContainer)
+    RecapSlide.DAY_NIGHT -> if (recap.nightShare > 0.5f) RecapPalette(scheme.inverseSurface, scheme.inverseOnSurface, scheme.inversePrimary, scheme.inverseSurface)
+    else RecapPalette(scheme.tertiaryContainer, scheme.onTertiaryContainer, scheme.tertiary, scheme.onTertiary)
 }
 
 internal fun RecapSlide.polygon(recap: ListeningRecap): RoundedPolygon = when (this) {
@@ -216,11 +217,12 @@ private fun ShapedPicture(
 
 @Composable
 private fun Picture(url: String?, modifier: Modifier = Modifier, placeholder: ImageVector = Icons.Rounded.PlayArrow) {
-    Box(modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest), contentAlignment = Alignment.Center) {
-        if (url.isNullOrBlank()) {
-            Icon(placeholder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
-        } else {
-            AsyncImage(model = url, contentDescription = null, modifier = Modifier.fillMaxSize())
+    // The icon stays underneath: it shows while the cover loads and when it never does. The tint is
+    // taken from the slide, because the container can be the very colour some slides are drawn on.
+    Box(modifier.background(LocalContentColor.current.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+        Icon(placeholder, contentDescription = null, tint = LocalContentColor.current.copy(alpha = 0.6f))
+        if (!url.isNullOrBlank()) {
+            AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
     }
 }
@@ -259,7 +261,7 @@ private fun RankRow(
             Modifier.size(if (big) 40.dp else 32.dp).clip(MaterialShapes.Cookie9Sided.toShape()).background(if (big) accent else LocalContentColor.current.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(rank.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = if (big) MaterialTheme.colorScheme.surface else LocalContentColor.current)
+            Text(rank.toString(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Black, color = if (big) LocalRecapOnAccent.current else LocalContentColor.current)
         }
         Spacer(Modifier.width(12.dp))
         Picture(imageUrl, Modifier.size(if (big) 64.dp else 52.dp).clip(pictureShape), placeholder)
@@ -315,7 +317,7 @@ private fun IntroSlide(recap: ListeningRecap, accent: Color) {
         Rise(0) {
             Box(contentAlignment = Alignment.Center) {
                 SpinningShape(recap.period.polygon(), accent, Modifier.size(240.dp), periodMs = 14_000)
-                Icon(recap.period.icon(), contentDescription = null, tint = MaterialTheme.colorScheme.surface, modifier = Modifier.size(96.dp))
+                Icon(recap.period.icon(), contentDescription = null, tint = LocalRecapOnAccent.current, modifier = Modifier.size(96.dp))
             }
         }
         Spacer(Modifier.height(28.dp))
@@ -324,7 +326,7 @@ private fun IntroSlide(recap: ListeningRecap, accent: Color) {
         Spacer(Modifier.height(12.dp))
         Rise(3) { Text(str("recap_intro_body", recap.report.plays, recap.report.uniqueArtists), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center) }
         Spacer(Modifier.height(20.dp))
-        Rise(4) { Text(str("recap_tap_hint"), style = MaterialTheme.typography.labelLarge, color = LocalContentColor.current.copy(alpha = 0.6f)) }
+        Rise(4) { Text(str("recap_tap_hint"), style = MaterialTheme.typography.labelLarge, color = LocalContentColor.current.copy(alpha = 0.78f)) }
     }
 }
 
@@ -451,8 +453,8 @@ private fun DayNightSlide(recap: ListeningRecap, accent: Color) {
         Spacer(Modifier.height(8.dp))
         Rise(2) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                DayNightBadge(Icons.Rounded.WbSunny, MaterialShapes.Sunny, str("recap_day"), percent(1f - night), if (!isNight) accent else LocalContentColor.current.copy(alpha = 0.2f), Modifier.weight(1f))
-                DayNightBadge(Icons.Rounded.Bedtime, MaterialShapes.Cookie6Sided, str("recap_night"), percent(night), if (isNight) accent else LocalContentColor.current.copy(alpha = 0.2f), Modifier.weight(1f))
+                DayNightBadge(Icons.Rounded.WbSunny, MaterialShapes.Sunny, str("recap_day"), percent(1f - night), if (!isNight) accent else LocalContentColor.current.copy(alpha = 0.2f), Modifier.weight(1f), active = !isNight)
+                DayNightBadge(Icons.Rounded.Bedtime, MaterialShapes.Cookie6Sided, str("recap_night"), percent(night), if (isNight) accent else LocalContentColor.current.copy(alpha = 0.2f), Modifier.weight(1f), active = isNight)
             }
         }
         recap.report.peakHour?.let { h -> Rise(3) { Body(str("recap_peak_hour", hourLabel(h))) } }
@@ -467,10 +469,10 @@ private fun DayNightSlide(recap: ListeningRecap, accent: Color) {
 }
 
 @Composable
-private fun DayNightBadge(icon: ImageVector, polygon: RoundedPolygon, label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+private fun DayNightBadge(icon: ImageVector, polygon: RoundedPolygon, label: String, value: String, color: Color, modifier: Modifier = Modifier, active: Boolean = false) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.size(104.dp).clip(polygon.toShape()).background(color), contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(44.dp))
+            Icon(icon, contentDescription = null, tint = if (active) LocalRecapOnAccent.current else LocalContentColor.current, modifier = Modifier.size(44.dp))
         }
         Spacer(Modifier.height(8.dp))
         Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black)
@@ -575,7 +577,7 @@ private fun PersonaSlide(recap: ListeningRecap, accent: Color) {
         Rise(1) {
             Box(contentAlignment = Alignment.Center) {
                 SpinningShape(persona.polygon(), accent, Modifier.size(240.dp), periodMs = 16_000)
-                Icon(persona.icon(), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(96.dp))
+                Icon(persona.icon(), contentDescription = null, tint = LocalRecapOnAccent.current, modifier = Modifier.size(96.dp))
             }
         }
         Spacer(Modifier.height(24.dp))

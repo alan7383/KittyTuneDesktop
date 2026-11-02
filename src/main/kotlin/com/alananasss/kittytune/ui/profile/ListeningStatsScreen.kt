@@ -69,6 +69,7 @@ fun ListeningStatsScreen(
     onArtistClick: (ReportArtist) -> Unit,
     onOpenRecap: (String) -> Unit = {},
     onOpenRecaps: () -> Unit = {},
+    onOpenPassport: () -> Unit = {},
 ) {
     // Built through an explicit initializer: the default factory route throws on desktop (issue #33).
     val viewModel: ListeningStatsViewModel = viewModel { ListeningStatsViewModel() }
@@ -120,11 +121,16 @@ fun ListeningStatsScreen(
         ) { shown ->
             val (shownReport, shownStyle) = shown ?: (null to style)
             val recaps: @Composable () -> Unit = {
-                com.alananasss.kittytune.ui.profile.recap.RecapCarouselSection(
-                    onOpenRecap = onOpenRecap,
-                    onSeeAll = onOpenRecaps,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    com.alananasss.kittytune.ui.profile.passport.MusicPassportButton(
+                        onClick = onOpenPassport,
+                    )
+                    com.alananasss.kittytune.ui.profile.recap.RecapCarouselSection(
+                        onOpenRecap = onOpenRecap,
+                        onSeeAll = onOpenRecaps,
+                        modifier = Modifier.padding(bottom = 4.dp),
+                    )
+                }
             }
             when {
                 shownReport == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

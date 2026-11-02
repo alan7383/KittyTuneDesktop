@@ -765,6 +765,7 @@ fun MainScreen(
                                                 }
                                             }
                                             id.startsWith("spotify_artist:") -> navController.navigate("profile/${id.removePrefix("spotify_artist:")}")
+                                            id == "music_passport" -> navController.navigate("music_passport")
                                             id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                             id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
                                             id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
@@ -833,6 +834,13 @@ fun MainScreen(
                         }
                         composable(
                             route = "recap/{id}",
+                                onOpenPassport = { navController.navigate("music_passport") },
+                            )
+                        }
+                        composable("music_passport") {
+                            com.alananasss.kittytune.ui.profile.passport.MusicPassportScreen(
+                                onBackClick = { navController.popBackStack() },
+                                currentUser = playerViewModel.currentUser,
                             arguments = listOf(androidx.navigation.navArgument("id") { type = androidx.navigation.NavType.StringType }),
                         ) { backStackEntry ->
                             val recapId = backStackEntry.arguments?.let { args ->
@@ -943,6 +951,7 @@ fun MainScreen(
                                             }
                                         }
                                         id.startsWith("spotify_artist:") -> navController.navigate("profile/${id.removePrefix("spotify_artist:")}")
+                                        id == "music_passport" -> navController.navigate("music_passport")
                                         id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                         id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
                                         id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
@@ -1367,6 +1376,7 @@ fun MainScreen(
             // several times a second for the sake of a debug overlay that is usually hidden.
             currentPositionMs = { playerViewModel.uiCurrentPosition },
             modifier = Modifier.padding(bottom = 100.dp, end = 20.dp)
+    com.alananasss.kittytune.ui.profile.passport.PassportViewerOverlay()
         )
     }
 
