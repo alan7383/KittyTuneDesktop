@@ -4,11 +4,18 @@ on:
   push:
     tags:
       - 'v*'
+  # Run by hand: builds the installers as downloadable artifacts, never a release.
   workflow_dispatch:
+    inputs:
+      macos_only:
+        description: 'Build only the macOS DMGs (arm64 + Intel)'
+        type: boolean
+        default: true
 
 jobs:
   build-windows:
     name: Build Windows Installer (.msi, Portable .zip)
+    if: github.event_name != 'workflow_dispatch' || !inputs.macos_only
     runs-on: windows-latest
 
     steps:
@@ -86,7 +93,13 @@ jobs:
 
       - name: Get version from tag
         id: get_version
-        run: echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')" >> $GITHUB_OUTPUT
+          else
+            # manual run: the DMG is named after the version in build.gradle.kts
+            echo "VERSION=$(grep -m 1 '^version = ' build.gradle.kts | cut -d '"' -f 2)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Prepare macOS Binaries
         run: |
@@ -107,6 +120,7 @@ jobs:
 
   build-linux-x64:
     name: Build Linux x64 Packages (.deb, .rpm, .pkg.tar.zst, .AppImage)
+    if: github.event_name != 'workflow_dispatch' || !inputs.macos_only
     runs-on: ubuntu-24.04
 
     steps:
@@ -228,6 +242,7 @@ jobs:
 
   build-linux-arm64:
     name: Build Linux ARM64 Packages (.deb, .rpm, .pkg.tar.zst)
+    if: github.event_name != 'workflow_dispatch' || !inputs.macos_only
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -348,6 +363,8 @@ jobs:
 
   release:
     name: Publish Universal GitHub Release
+    # only for a pushed tag: a manual run just leaves its installers as artifacts
+    if: startsWith(github.ref, 'refs/tags/')
     needs: [build-windows, build-macos, build-linux-x64, build-linux-arm64]
     runs-on: ubuntu-24.04
     permissions:
