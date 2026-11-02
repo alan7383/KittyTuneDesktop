@@ -1052,6 +1052,10 @@ fun ModernProfileHeader(
                         Text(str("history_title"), fontWeight = FontWeight.SemiBold)
                     }
                 }
+                Spacer(Modifier.height(10.dp))
+                com.alananasss.kittytune.ui.profile.passport.MusicPassportButton(
+                    onClick = { onNavigate("music_passport") },
+                )
                 Spacer(Modifier.height(16.dp))
                 // What the listener has, as numbers to open: it was a page of buttons with nothing about the person.
                 OwnProfileStats(
