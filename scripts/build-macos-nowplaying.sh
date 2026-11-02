@@ -30,7 +30,8 @@ cat > "$HELPER/Contents/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 
-swiftc -O -framework AppKit -framework MediaPlayer "$SWIFT" \
+# Built for macOS 12+ on whichever architecture this Mac is (one DMG per architecture).
+swiftc -O -target "$(uname -m)-apple-macos${MACOSX_DEPLOYMENT_TARGET:-12.0}" -framework AppKit -framework MediaPlayer "$SWIFT" \
   -o "$HELPER/Contents/MacOS/KittyTuneNowPlaying"
 chmod 755 "$HELPER/Contents/MacOS/KittyTuneNowPlaying"
 plutil -lint "$HELPER/Contents/Info.plist"

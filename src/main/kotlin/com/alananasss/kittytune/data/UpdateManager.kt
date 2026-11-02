@@ -247,7 +247,10 @@ object UpdateManager {
                 assets.find { it.name.endsWith(".msi", ignoreCase = true) }
             }
             osName.contains("mac") -> {
-                assets.find { it.name.endsWith(".dmg", ignoreCase = true) }
+                // one DMG per architecture (an Apple Silicon build does not open on an Intel Mac)
+                val dmgs = assets.filter { it.name.endsWith(".dmg", ignoreCase = true) }
+                dmgs.find { it.name.contains(if (isArm) "-arm64" else "-x64", ignoreCase = true) }
+                    ?: dmgs.firstOrNull { !it.name.contains("-arm64", ignoreCase = true) && !it.name.contains("-x64", ignoreCase = true) }
             }
             osName.contains("nux") || osName.contains("nix") -> {
                 val archName = if (isArm) "aarch64" else "x86_64"

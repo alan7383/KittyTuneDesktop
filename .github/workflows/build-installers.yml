@@ -49,8 +49,21 @@ jobs:
           path: dist-win/*
 
   build-macos:
-    name: Build macOS Installer (.dmg)
-    runs-on: macos-latest
+    # One DMG per architecture: the bundled JDK and native libraries are those of the build machine,
+    # so an Apple Silicon build does not open on an Intel Mac ("not supported on this Mac").
+    name: Build macOS Installer (.dmg, ${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-latest
+          - arch: x64
+            runner: macos-15-intel
+    env:
+      # Native helpers (Swift, the DSP) target macOS 12+, not the runner's own version
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
 
     steps:
       - name: Checkout repository
@@ -84,11 +97,12 @@ jobs:
           elif [ -d "build/compose/binaries/main-release/dmg" ]; then
             cp build/compose/binaries/main-release/dmg/*.dmg "dist-mac/KittyTune-${VERSION}.dmg"
           fi
+          mv "dist-mac/KittyTune-${VERSION}.dmg" "dist-mac/KittyTune-${VERSION}-${{ matrix.arch }}.dmg"
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: KittyTune-macOS
+          name: KittyTune-macOS-${{ matrix.arch }}
           path: dist-mac/*
 
   build-linux-x64:
@@ -354,7 +368,8 @@ jobs:
       - name: Download macOS Artifacts
         uses: actions/download-artifact@v7
         with:
-          name: KittyTune-macOS
+          pattern: KittyTune-macOS-*
+          merge-multiple: true
           path: ./release-files
 
       - name: Download Linux x64 Artifacts
