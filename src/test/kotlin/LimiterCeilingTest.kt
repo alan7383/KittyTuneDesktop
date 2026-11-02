@@ -75,8 +75,10 @@ class LimiterCeilingTest {
     }
 
     @Test
-    fun `the transparent ceiling is the higher of the two and both are below full scale`() {
+    fun `the transparent ceiling is the higher of the two and only the safe one is below full scale`() {
         assertTrue(PeakLimiter.CEILING_TRANSPARENT > PeakLimiter.CEILING_SAFE)
-        assertTrue(PeakLimiter.CEILING_TRANSPARENT < 1f)
+        // Above full scale on purpose: small overshoots go to the soft knee, not to gain riding.
+        assertTrue(PeakLimiter.CEILING_TRANSPARENT > 1f)
+        assertTrue(PeakLimiter.CEILING_SAFE < PeakLimiter.SOFT_KNEE)
     }
 }
