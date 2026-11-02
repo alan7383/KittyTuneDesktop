@@ -237,13 +237,13 @@ jobs:
           mkdir -p appdir/usr/bin
           cp -r arch_build/pkg/* appdir/
 
-          cat << 'EOF' > appdir/AppRun
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-export PATH="${HERE}/usr/bin:${HERE}/opt/kitty-tune/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/opt/kitty-tune/lib:${LD_LIBRARY_PATH}"
-exec "${HERE}/opt/kitty-tune/bin/KittyTune" "$@"
-EOF
+          cat << 'EOF' | sed 's/^[[:space:]]*//' > appdir/AppRun
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export PATH="${HERE}/usr/bin:${HERE}/opt/kitty-tune/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/opt/kitty-tune/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/opt/kitty-tune/bin/KittyTune" "$@"
+          EOF
           chmod +x appdir/AppRun
 
           cp appdir/usr/share/applications/kitty-tune.desktop appdir/kitty-tune.desktop
@@ -392,13 +392,13 @@ EOF
           mkdir -p appdir_arm/usr/bin
           cp -r arch_build_arm/pkg/* appdir_arm/
 
-          cat << 'EOF' > appdir_arm/AppRun
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-export PATH="${HERE}/usr/bin:${HERE}/opt/kitty-tune/bin:${PATH}"
-export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/opt/kitty-tune/lib:${LD_LIBRARY_PATH}"
-exec "${HERE}/opt/kitty-tune/bin/KittyTune" "$@"
-EOF
+          cat << 'EOF' | sed 's/^[[:space:]]*//' > appdir_arm/AppRun
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export PATH="${HERE}/usr/bin:${HERE}/opt/kitty-tune/bin:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib:${HERE}/opt/kitty-tune/lib:${LD_LIBRARY_PATH}"
+          exec "${HERE}/opt/kitty-tune/bin/KittyTune" "$@"
+          EOF
           chmod +x appdir_arm/AppRun
 
           cp appdir_arm/usr/share/applications/kitty-tune.desktop appdir_arm/kitty-tune.desktop
