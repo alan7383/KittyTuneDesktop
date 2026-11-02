@@ -478,6 +478,11 @@ class AudioEngine {
         if (released) return
         released = true
         stop()
+    /** For a loudness learnt while the track already plays: glides rather than resets. */
+    fun updateTrackLoudness(lufs: Float, truePeakDb: Float = 0f) {
+        normalization.updateTrackLoudness(lufs, truePeakDb)
+    }
+
         aiDetection.resetForNewTrack()
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         // Terminal: this engine is being discarded. stopInternal() only flush()es the

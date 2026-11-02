@@ -538,6 +538,22 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
         }
     }
 
+    /**
+     * The track's loudness arriving while it already plays: the gain glides to it instead of the
+     * reset [setTrackLoudness] does at a track's start, which would jump mid-song.
+     */
+    fun updateTrackLoudness(trackLufs: Float, maxPeakDb: Float = 0f) {
+        synchronized(nativeLock) {
+            pendingKnownLufs = trackLufs
+            pendingKnownPeakDb = maxPeakDb
+            if (nativeHandle != 0L && isLibraryLoaded) {
+                try {
+                    nativeUpdateTrackLoudness(nativeHandle, trackLufs, maxPeakDb)
+                } catch (_: Throwable) {}
+            }
+        }
+    }
+
     fun clearTrackLoudness() {
         synchronized(nativeLock) {
             pendingKnownLufs = null
@@ -713,6 +729,7 @@ class NormalizationAudioProcessor : BaseAudioProcessor() {
     private external fun nativeDestroy(handle: Long)
     private external fun nativeSetTargetLevel(handle: Long, targetLUFS: Float)
     private external fun nativeSetTrackLoudness(handle: Long, trackLufs: Float, maxPeakDb: Float)
+    private external fun nativeUpdateTrackLoudness(handle: Long, trackLufs: Float, maxPeakDb: Float)
     private external fun nativeClearTrackLoudness(handle: Long)
     private external fun nativeProcessShort(
         handle: Long,

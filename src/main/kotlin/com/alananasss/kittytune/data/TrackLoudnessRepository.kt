@@ -60,7 +60,9 @@ object TrackLoudnessRepository {
 
         val job = scope.launch {
             try {
-                val scanned = AudioScannerManager.scanStream(url, headers)
+                // Three seeked windows rather than the whole stream: known in a second or two, so
+                // the gain is right early in the track instead of a minute in.
+                val scanned = AudioScannerManager.scanStreamWindows(url, headers, track.effectiveFullDurationMs)
                 if (scanned != null) {
                     saveLoudness(track.id, scanned.integratedLufs, scanned.truePeakDb)
                     withContext(Dispatchers.Main) {
@@ -73,6 +75,77 @@ object TrackLoudnessRepository {
             }
         }
         activeScans[track.id] = job
+    }
+
+    // ── Upcoming tracks ─────────────────────────────────────────────────────────────────────────
+
+    private const val LOOKAHEAD = 3
+    private const val MAX_ATTEMPTS = 2
+
+    private val prefetchLock = Any()
+    private var prefetchPlan: List<Track> = emptyList()
+    private var prefetchWorker: Job? = null
+    private var prefetchInFlight: Long? = null
+    /** Tracks that could not be measured this session, so a dead stream is not retried forever. */
+    private val prefetchAttempts = HashMap<Long, Int>()
+
+    /**
+     * Measures the tracks coming up in the queue while the current one plays, so each starts at its
+     * own level instead of learning it on air.
+     *
+     * A small queue worker: the next [LOOKAHEAD] of [upcoming], one at a time and in play order,
+     * skipping any already in the cache or the database. A queue edit only replaces what is still to
+     * do; the track being measured is finished if it is still coming up and dropped if it is not.
+     * Each is a three-window estimate; a track played to its end stores its full measurement over it.
+     */
+    fun prefetch(upcoming: List<Track>) {
+        synchronized(prefetchLock) {
+            prefetchPlan = upcoming.distinctBy { it.id }.take(LOOKAHEAD)
+            val inFlight = prefetchInFlight
+            if (inFlight != null && prefetchPlan.none { it.id == inFlight }) {
+                prefetchWorker?.cancel()
+                prefetchWorker = null
+                prefetchInFlight = null
+            }
+            if (prefetchWorker?.isActive == true) return
+            prefetchWorker = scope.launch { drainPrefetch() }
+        }
+    }
+
+    private suspend fun drainPrefetch() {
+        val self = kotlin.coroutines.coroutineContext[Job]
+        while (self?.isActive == true) {
+            val candidates = synchronized(prefetchLock) {
+                prefetchPlan.filter { (prefetchAttempts[it.id] ?: 0) < MAX_ATTEMPTS && !activeScans.containsKey(it.id) }
+            }
+            // The database check is a suspend read, so it runs outside the lock.
+            val track = candidates.firstOrNull { getLoudness(it.id) == null } ?: break
+            val stillPlanned = synchronized(prefetchLock) {
+                prefetchPlan.any { it.id == track.id }.also { if (it) prefetchInFlight = track.id }
+            }
+            if (!stillPlanned) continue
+            val ok = runCatching { measureUpcoming(track) }.getOrDefault(false)
+            synchronized(prefetchLock) {
+                prefetchInFlight = null
+                if (!ok && self?.isActive == true) prefetchAttempts[track.id] = (prefetchAttempts[track.id] ?: 0) + 1
+            }
+        }
+        synchronized(prefetchLock) { if (prefetchWorker == self) prefetchWorker = null }
+    }
+
+    private suspend fun measureUpcoming(track: Track): Boolean {
+        val url = StreamResolver.resolveStream(track) ?: return false
+        val headers = mutableMapOf("User-Agent" to "SoundCloud/2025.12.10-release (Android 10; Android)")
+        if (track.source != "youtube" && track.source != "youtube_music") {
+            headers["Origin"] = "https://soundcloud.com"
+            headers["Referer"] = "https://soundcloud.com/"
+        }
+        val scanned = AudioScannerManager.scanStreamWindows(url, headers, track.effectiveFullDurationMs) ?: return false
+        // The track may have started, and been measured on air, while this ran.
+        if (cache[track.id] != null) return true
+        saveLoudness(track.id, scanned.integratedLufs, scanned.truePeakDb)
+        println("[TrackLoudness] Estimated ${track.title}: ${"%.1f".format(scanned.integratedLufs)} LUFS")
+        return true
     }
 
     /**

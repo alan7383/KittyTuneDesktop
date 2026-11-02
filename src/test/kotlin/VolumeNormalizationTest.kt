@@ -304,4 +304,103 @@ class VolumeNormalizationTest {
         assertEquals(-13.5f, cached!!.integratedLufs, 0.05f)
         assertEquals(-0.8f, cached.truePeakDb, 0.05f)
     }
+
+    @Test
+    fun `quiet intro turning into a loud drop is tamed within a second`() {
+        // Six seconds of a quiet intro, then the drop at a hot master's level: the old live mode
+        // followed the track average and took around ten seconds to come back down.
+        val proc = createProcessor(NormalizationLevel.NORMAL)
+        val introChunks = (sampleRate * 6.0 / chunkSize).toInt()
+        repeat(introChunks) {
+            proc.queueInput(generateTone(chunkSize, 0.03f))
+            proc.getOutput()
+        }
+        val dropChunks = (sampleRate * 8.0 / chunkSize).toInt()
+        val rms = (0 until dropChunks).map {
+            proc.queueInput(generateTone(chunkSize, 0.6f))
+            measureRmsDb(proc.getOutput())
+        }
+        val settled = rms.last()
+        val oneSecond = (sampleRate * 1.0 / chunkSize).toInt()
+        val excessAfterOneSecond = rms.drop(oneSecond).maxOrNull()!! - settled
+        println("Drop Test: settled RMS = ${settled}dB, worst excess after 1 s = ${excessAfterOneSecond}dB")
+        assertTrue("One second into the drop it must be within 2 dB of its settled level (was $excessAfterOneSecond)", excessAfterOneSecond <= 2.0f)
+    }
+
+    @Test
+    fun `loudness learnt mid-track glides instead of jumping`() {
+        val proc = createProcessor(NormalizationLevel.NORMAL)
+        val warmChunks = (sampleRate * 4.0 / chunkSize).toInt()
+        repeat(warmChunks) {
+            proc.queueInput(generateTone(chunkSize, 0.3f))
+            proc.getOutput()
+        }
+        val before = proc.getCurrentGainDb()
+        // The scan finishes while the track plays and says it is much louder than it sounded so far.
+        proc.updateTrackLoudness(-6f, -0.5f)
+        val gains = (0 until (sampleRate * 3.0 / chunkSize).toInt()).map {
+            proc.queueInput(generateTone(chunkSize, 0.3f))
+            proc.getOutput()
+            proc.getCurrentGainDb()
+        }
+        val steps = (listOf(before) + gains).zipWithNext { a, b -> abs(b - a) }
+        val target = -14f - (-6f)
+        println("Glide Test: before = ${before}dB, after 3 s = ${gains.last()}dB, largest step = ${steps.maxOrNull()}dB")
+        assertTrue("No single buffer may jump more than 1.5 dB (largest ${steps.maxOrNull()})", steps.maxOrNull()!! <= 1.5f)
+        assertEquals("It must still arrive at the track's gain", target, gains.last(), 1.0f)
+    }
+
+    @Test
+    fun `a known loudness that is far too low is overruled by what is heard`() {
+        // The figure on file says -20 LUFS; the track actually plays near -6.7. Trusting the figure
+        // would hold the gain near 0 dB for the whole song.
+        val proc = createProcessor(NormalizationLevel.NORMAL)
+        proc.setTrackLoudness(-20f, -0.5f)
+        val gains = (0 until (sampleRate * 3.0 / chunkSize).toInt()).map {
+            proc.queueInput(generateTone(chunkSize, 0.5f))
+            proc.getOutput()
+            proc.getCurrentGainDb()
+        }
+        println("Safety Net Test: gain after 3 s = ${gains.last()}dB")
+        assertTrue("What is heard must pull the gain down to the track's real level (was ${gains.last()})", gains.last() < -5.5f)
+    }
+
+    @Test
+    fun `windowed scan estimates a track like a full scan`() {
+        // Two minutes whose level changes section by section, so the estimate cannot get lucky.
+        val file = File.createTempFile("kt_windowed_scan", ".wav")
+        try {
+            val amplitudes = floatArrayOf(0.05f, 0.4f, 0.25f, 0.5f, 0.15f, 0.45f)
+            writeWav(file, 120, amplitudes)
+            val full = AudioScannerManager.scanStream(file.absolutePath)
+            val windowed = AudioScannerManager.scanStreamWindows(file.absolutePath, emptyMap(), 120_000L)
+            println("Windowed Scan Test: full = ${full?.integratedLufs} LUFS, windowed = ${windowed?.integratedLufs} LUFS")
+            assertTrue("Both scans must succeed", full != null && windowed != null)
+            assertEquals("The three windows must land close to the whole track", full!!.integratedLufs, windowed!!.integratedLufs, 2.0f)
+        } finally {
+            file.delete()
+        }
+    }
+
+    /** A 16-bit stereo WAV of [seconds], a 440 Hz tone whose level steps through [amplitudes]. */
+    private fun writeWav(file: File, seconds: Int, amplitudes: FloatArray) {
+        val frames = sampleRate * seconds
+        val data = ByteBuffer.allocate(frames * channels * 2).order(ByteOrder.LITTLE_ENDIAN)
+        val section = frames / amplitudes.size
+        for (f in 0 until frames) {
+            val amplitude = amplitudes[(f / section).coerceAtMost(amplitudes.size - 1)]
+            val v = (amplitude * sin(2.0 * Math.PI * 440.0 * f / sampleRate) * 32767.0).toInt().toShort()
+            data.putShort(v)
+            data.putShort(v)
+        }
+        val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+        header.put("RIFF".toByteArray()).putInt(36 + data.capacity()).put("WAVE".toByteArray())
+        header.put("fmt ".toByteArray()).putInt(16).putShort(1).putShort(channels.toShort())
+        header.putInt(sampleRate).putInt(sampleRate * channels * 2).putShort((channels * 2).toShort()).putShort(16)
+        header.put("data".toByteArray()).putInt(data.capacity())
+        file.outputStream().use {
+            it.write(header.array())
+            it.write(data.array())
+        }
+    }
 }

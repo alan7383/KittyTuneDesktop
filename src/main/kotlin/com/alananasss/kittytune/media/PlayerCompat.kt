@@ -666,7 +666,7 @@ class Player {
                                     newEngine.clearTrackLoudness()
                                     com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
                                         if (isCurrentTransition(transitionId) && currentMediaItem?.track?.id == track.id) {
-                                            newEngine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                                            newEngine.updateTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
                                         }
                                     }
                                 }
@@ -1005,7 +1005,7 @@ class Player {
                         engine.clearTrackLoudness()
                         com.alananasss.kittytune.data.TrackLoudnessRepository.scanTrackAsync(track, url, headers) { scanned ->
                             if (isCurrentTransition(transition) && currentMediaItem?.track?.id == track.id) {
-                                engine.setTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
+                                engine.updateTrackLoudness(scanned.integratedLufs, scanned.truePeakDb)
                             }
                         }
                     }

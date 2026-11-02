@@ -7260,6 +7260,20 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
     private fun preloadNextTrack(nextIndex: Int) {
         prefetchWarmJob?.cancel()
 
+        // Measure the coming tracks' loudness now, so normalization has each one's gain the moment
+        // it starts instead of learning it on air.
+        if (effectsState.isNormalizationEnabled) {
+            val upcoming = (0 until 3).mapNotNull { offset ->
+                val index = nextIndex + offset
+                when {
+                    index < _queue.size -> _queue[index]
+                    repeatMode == RepeatMode.ALL && _queue.isNotEmpty() -> _queue[index % _queue.size]
+                    else -> null
+                }
+            }
+            com.alananasss.kittytune.data.TrackLoudnessRepository.prefetch(upcoming)
+        }
+
         val targetIndex = if (nextIndex >= _queue.size) {
             if (repeatMode == RepeatMode.ALL && _queue.isNotEmpty()) 0 else return
         } else nextIndex
