@@ -661,9 +661,9 @@ fun ProfileScreen(
                 // at the foot, not five reposted songs of other people between their music and the artists like them.
                 if (isArtistPage) {
                     val entries = listOfNotNull(
-                        profileViewModel.allTracks.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.MusicNote, str("profile_tab_tracks"), it, "tracks") },
-                        profileViewModel.playlists.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.QueueMusic, str("artist_more_playlists"), it, "playlists") },
-                        profileViewModel.likedTracks.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.FavoriteBorder, str("profile_tab_likes"), it, "likes") },
+                        (if (user.trackCount > 0) user.trackCount else profileViewModel.allTracks.size).takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.MusicNote, str("profile_tab_tracks"), it, "tracks") },
+                        (if (user.playlistCount > 0) user.playlistCount else profileViewModel.playlists.size).takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.QueueMusic, str("artist_more_playlists"), it, "playlists") },
+                        (if (user.likesCount > 0) user.likesCount else profileViewModel.likedTracks.size).takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.FavoriteBorder, str("profile_tab_likes"), it, "likes") },
                         profileViewModel.repostedTracks.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.Rounded.Repeat, str("profile_tab_reposts"), it, "reposts") },
                         profileViewModel.userComments.size.takeIf { it > 0 }?.let { ArtistMoreEntry(Icons.AutoMirrored.Rounded.Comment, str("profile_tab_comments"), it, "comments") },
                     )
@@ -1060,8 +1060,8 @@ fun ModernProfileHeader(
                 // What the listener has, as numbers to open: it was a page of buttons with nothing about the person.
                 OwnProfileStats(
                     tracks = user.trackCount,
-                    likes = profileViewModel.likedTracks.size,
-                    playlists = profileViewModel.playlists.size,
+                    likes = if (user.likesCount > 0) user.likesCount else profileViewModel.likedTracks.size,
+                    playlists = if (user.playlistCount > 0) user.playlistCount else profileViewModel.playlists.size,
                     reposts = profileViewModel.repostedTracks.size,
                     onOpen = { section -> onNavigate("profile_collection:${user.id}:$section") },
                 )
@@ -1329,6 +1329,9 @@ internal fun FullListScreen(
     initialSort: ArtistOrder.TrackSort? = null,
     /** The songs shown as popular on the page, which the "now" order starts with. */
     cardOrder: List<Track> = emptyList(),
+    hasMore: Boolean = false,
+    isLoadingMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var sort by remember { mutableStateOf(initialSort ?: sorts.firstOrNull()) }
@@ -1359,6 +1362,11 @@ internal fun FullListScreen(
         topBar = {
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = str("btn_back"))
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
             )
         },
@@ -1447,6 +1455,12 @@ internal fun FullListScreen(
                 }
 
                 itemsIndexed(filteredTracks) { index, track ->
+                    if (hasMore && !isLoadingMore && index >= filteredTracks.size - 5) {
+                        LaunchedEffect(filteredTracks.size, isLoadingMore) {
+                            onLoadMore()
+                        }
+                    }
+
                     val progress = downloadProgress[track.id]
                     val isDownloading = progress != null
                     val isDownloaded by produceState(false, track.id, downloadProgress) {
@@ -1474,6 +1488,17 @@ internal fun FullListScreen(
                         onAlbumClick = { albumId -> playerViewModel.navigateToPlaylistId = albumId },
                         onArtistClick = { playerViewModel.navigateToTrackArtist(it) }
                     )
+                }
+
+                if (isLoadingMore) {
+                    item(key = "full_list_loading_more") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularWavyProgressIndicator(modifier = Modifier.size(28.dp))
+                        }
+                    }
                 }
             } else {
                 item(key = "empty_tracks") {
@@ -2093,7 +2118,7 @@ fun ProfileCollectionScreen(
     onBackClick: () -> Unit,
     playerViewModel: PlayerViewModel
 ) {
-    val profileViewModel: ProfileViewModel = viewModel(key = "profile_coll_$userId") { ProfileViewModel(AppInstance.application) }
+    val profileViewModel: ProfileViewModel = viewModel(key = "profile_$userId") { ProfileViewModel(AppInstance.application) }
 
     LaunchedEffect(userId) {
         userId.toLongOrNull()?.let { id ->
@@ -2183,7 +2208,7 @@ fun ProfileCollectionScreen(
                     "latest" -> str("artist_new_releases") to profileViewModel.allTracks.toList()
                     "tracks" -> str("profile_tab_tracks") to profileViewModel.allTracks.toList()
                     "reposts" -> str("profile_tab_reposts") to profileViewModel.repostedTracks.toList()
-                    "likes" -> str("profile_tab_likes", user?.username ?: "") to profileViewModel.likedTracks.toList()
+                    "likes" -> str("profile_likes_by_user", user?.username ?: "") to profileViewModel.likedTracks.toList()
                     else -> "" to emptyList<Track>()
                 }
                 FullListScreen(
@@ -2206,6 +2231,22 @@ fun ProfileCollectionScreen(
                         else -> null
                     },
                     cardOrder = if (section == "popular") profileViewModel.popularTracks.toList() else emptyList(),
+                    hasMore = when (section) {
+                        "likes" -> profileViewModel.hasMoreLikes()
+                        "tracks" -> profileViewModel.hasMoreTracks()
+                        else -> false
+                    },
+                    isLoadingMore = when (section) {
+                        "likes" -> profileViewModel.isLikesLoadingMore
+                        "tracks" -> profileViewModel.isTracksLoadingMore
+                        else -> false
+                    },
+                    onLoadMore = {
+                        when (section) {
+                            "likes" -> profileViewModel.loadMoreLikes()
+                            "tracks" -> profileViewModel.loadMoreTracks()
+                        }
+                    },
                 )
             }
         }
