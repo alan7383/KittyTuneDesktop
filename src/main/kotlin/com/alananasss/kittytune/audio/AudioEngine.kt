@@ -796,12 +796,27 @@ class AudioEngine {
                 newG = createGrabber(currentUrlToTry, headers, resumePosMs)
                 newG.startUnlocked()
                 val isHls = currentUrlToTry.contains(".m3u8")
-                if (!isHls && resumePosMs > 0) {
+                val resumeTargetTs = if (resumePosMs > 0) resumePosMs * 1000L else 0L
+                if (!isHls && resumeTargetTs > 0) {
                     try {
-                        newG.timestamp = resumePosMs * 1000L
+                        newG.timestamp = resumeTargetTs
                     } catch (_: Exception) {}
                 }
-                val f = try { newG.grabSamples() } catch (_: Exception) { null }
+                var f = try { newG.grabSamples() } catch (_: Exception) { null }
+                if (resumeTargetTs > 0 && f != null) {
+                    var droppedCount = 0
+                    var lastTs = Long.MIN_VALUE
+                    while (f != null && !stopFlag) {
+                        val ts = newG.timestamp
+                        if (ts >= resumeTargetTs - 25_000L || (lastTs != Long.MIN_VALUE && ts <= lastTs)) {
+                            break
+                        }
+                        lastTs = ts
+                        f = try { newG.grabSamples() } catch (_: Exception) { null }
+                        droppedCount++
+                        if (droppedCount > 1500) break
+                    }
+                }
                 if (f != null) {
                     val samples = f.samples
                     if (samples != null) {
@@ -955,31 +970,35 @@ class AudioEngine {
                     }
 
                     if (seekOk && grabber != null) {
-                        if (isHls) {
-                            // On HLS, createGrabber(seek) already positioned at the requested segment.
-                            val samples = seekFrame?.samples
-                            if (samples != null) {
-                                pushFrame(samples, seekFrame!!.audioChannels)
+                        var f = seekFrame
+                        var droppedCount = 0
+                        var lastTs = Long.MIN_VALUE
+                        while (f != null && !stopFlag && activeWorkerId == workerId) {
+                            val ts = grabber.timestamp
+                            // Accept frame if timestamp is within ~1 audio frame (25ms) of target or past it,
+                            // or if timestamps stop advancing (e.g. malformed stream without PTS)
+                            if (ts >= targetTimestamp - 25_000L || (lastTs != Long.MIN_VALUE && ts <= lastTs)) {
+                                val samples = f.samples
+                                if (samples != null) {
+                                    pushFrame(samples, f.audioChannels)
+                                }
+                                break
                             }
-                        } else {
-                            var f = seekFrame
-                            var droppedCount = 0
-                            while (f != null && !stopFlag && activeWorkerId == workerId) {
-                                val ts = grabber.timestamp
-                                if (ts >= targetTimestamp - 50_000L) {
-                                    val samples = f.samples
-                                    if (samples != null) {
-                                        pushFrame(samples, f.audioChannels)
-                                    }
-                                    break
+                            lastTs = ts
+                            f = try {
+                                grabber.grabSamples()
+                            } catch (_: Exception) {
+                                null
+                            }
+                            droppedCount++
+                            // 1500 frames corresponds to ~35-40s of audio, ensuring we safely prune
+                            // even large HLS segments while preventing infinite loop on broken streams
+                            if (droppedCount > 1500) {
+                                val samples = f?.samples
+                                if (samples != null) {
+                                    pushFrame(samples, f.audioChannels)
                                 }
-                                f = try {
-                                    grabber.grabSamples()
-                                } catch (_: Exception) {
-                                    null
-                                }
-                                droppedCount++
-                                if (droppedCount > 150) break
+                                break
                             }
                         }
                     }
