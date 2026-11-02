@@ -327,6 +327,9 @@ class PlayerPreferences {
         const val PLAYER_BAR_BUTTON_MINIPLAYER = "miniplayer"
         const val PLAYER_BAR_BUTTON_SHUFFLE = "shuffle"
         const val PLAYER_BAR_BUTTON_REPEAT = "repeat"
+        /** Shows / hides the Kitty pet's floating window. */
+        const val PLAYER_BAR_BUTTON_PET = "pet"
+        private const val KEY_PLAYER_BAR_PET_MIGRATED = "player_bar_pet_migrated"
 
         val PLAYER_BAR_BUTTONS_DEFAULT =
             setOf(
@@ -338,6 +341,7 @@ class PlayerPreferences {
                 PLAYER_BAR_BUTTON_MINIPLAYER,
                 PLAYER_BAR_BUTTON_SHUFFLE,
                 PLAYER_BAR_BUTTON_REPEAT,
+                PLAYER_BAR_BUTTON_PET,
             )
 
         const val SEEK_WHEEL_SECONDS_MIN = 1f
@@ -401,9 +405,12 @@ class PlayerPreferences {
 
         const val SIDEBAR_NAV_HOME = "home"
 
+        /** The Kitty pet's settings page. Shown by default, like sync: it needs to be found once. */
+        const val SIDEBAR_NAV_PET = "pet"
+
         /** The rows shown by default. Home can be switched off too, as long as one row stays on. */
         val SIDEBAR_NAV_ITEMS = listOf(
-            SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC,
+            SIDEBAR_NAV_HOME, SIDEBAR_NAV_FEED, SIDEBAR_NAV_EXPLORE, SIDEBAR_NAV_RECOGNITION, SIDEBAR_NAV_SYNC, SIDEBAR_NAV_PET,
         )
 
         // Optional destinations the sidebar can carry; off until someone switches them on.
@@ -1403,6 +1410,12 @@ class PlayerPreferences {
                 PLAYER_BAR_BUTTON_REPEAT,
             )
         }
+        // the Kitty pet button arrived later: shown once to everyone, removable like the rest
+        if (!Prefs.getBoolean(KEY_PLAYER_BAR_PET_MIGRATED, false)) {
+            saved = saved + PLAYER_BAR_BUTTON_PET
+            Prefs.putBoolean(KEY_PLAYER_BAR_PET_MIGRATED, true)
+            Prefs.putString(KEY_PLAYER_BAR_BUTTONS, saved.joinToString(","))
+        }
         if (!Prefs.getBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, false)) {
             saved = saved + PLAYER_BAR_BUTTON_DEVICES
             Prefs.putBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, true)
@@ -1413,6 +1426,7 @@ class PlayerPreferences {
 
     fun setPlayerBarButtons(buttons: Set<String>) {
         Prefs.putBoolean(KEY_PLAYER_BAR_DEVICES_MIGRATED, true)
+        Prefs.putBoolean(KEY_PLAYER_BAR_PET_MIGRATED, true)
         Prefs.putString(KEY_PLAYER_BAR_BUTTONS, buttons.joinToString(","))
     }
 

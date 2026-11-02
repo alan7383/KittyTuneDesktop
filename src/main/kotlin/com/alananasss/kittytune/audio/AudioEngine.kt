@@ -104,8 +104,17 @@ class AudioEngine {
      */
     val aiDetection = com.alananasss.kittytune.audio.ai.AiDetectionAudioProcessor()
 
+    /**
+     * Real-time tempo and beat grid of this engine's track: the Kitty pet dances on it. Fed by a
+     * pass-through tap right after the AI one, on the clean decoded signal, and anchored in media
+     * time on every start and seek ([LiveBeatTracker.onFlush]).
+     */
+    val liveBeat = com.alananasss.kittytune.audio.beat.LiveBeatTracker()
+    private val liveBeatTap = com.alananasss.kittytune.audio.beat.LiveBeatAudioProcessor(liveBeat)
+
     private val chain: List<AudioProcessor> = listOf(
         aiDetection,
+        liveBeatTap,
         automixDuck,
         fx, equalizer, reverb, eightD, earrape, normalization, mono,
         vintageMp3, vocalRemover, vocalBoost, flanger, partyNextDoor,
@@ -206,6 +215,7 @@ class AudioEngine {
         currentHeaders = headers
         positionMs = startPositionMs
         durationMs = 0L
+        liveBeat.onFlush(startPositionMs.toDouble())
         seekRequestMs = if (startPositionMs > 0) startPositionMs else -1L
         if (startPositionMs > 0) {
             aiDetection.notifySeek(startPositionMs)
@@ -450,8 +460,27 @@ class AudioEngine {
 
     fun getVolume(): Float = volume
 
+    /**
+     * The media position being heard right now: [positionMs] is where decoding is, and the output
+     * line (plus the time-stretcher) still holds what plays next. Used to put the pet's dance steps
+     * on the beats the listener hears rather than on the ones being decoded.
+     */
+    fun audiblePositionMs(): Long {
+        val l = line ?: return positionMs
+        val bytesPerSecond = outputSampleRate * outputChannels * 2
+        val queuedBytes = runCatching { (l.bufferSize - l.available()).coerceAtLeast(0) }.getOrDefault(0)
+        val queuedSamples = queuedBytes / 2 + runCatching { stretcher.available() }.getOrDefault(0)
+        val queuedMs = queuedSamples * 1000L / (bytesPerSecond / 2)
+        return (positionMs - queuedMs).coerceAtLeast(0L)
+    }
+
     fun setTrackLoudness(lufs: Float, truePeakDb: Float = 0f) {
         normalization.setTrackLoudness(lufs, truePeakDb)
+    }
+
+    /** For a loudness learnt while the track already plays: glides rather than resets. */
+    fun updateTrackLoudness(lufs: Float, truePeakDb: Float = 0f) {
+        normalization.updateTrackLoudness(lufs, truePeakDb)
     }
 
     fun clearTrackLoudness() {
@@ -478,11 +507,6 @@ class AudioEngine {
         if (released) return
         released = true
         stop()
-    /** For a loudness learnt while the track already plays: glides rather than resets. */
-    fun updateTrackLoudness(lufs: Float, truePeakDb: Float = 0f) {
-        normalization.updateTrackLoudness(lufs, truePeakDb)
-    }
-
         aiDetection.resetForNewTrack()
         com.alananasss.kittytune.audio.ai.AiDetectionManager.resetResult()
         // Terminal: this engine is being discarded. stopInternal() only flush()es the
@@ -967,6 +991,7 @@ class AudioEngine {
                     stretcher.flush()
                     limiter.flush()
                     chain.forEach { it.flush() }
+                    liveBeat.onFlush(seek.toDouble())
                     localLine?.flush()
 
                     if (warmUpRequested) {

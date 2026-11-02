@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.ThumbDown
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
+import androidx.compose.material.icons.rounded.Pets
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.automirrored.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Tune
@@ -544,6 +545,28 @@ fun PlayerBar(
                                 imageVector = Icons.Rounded.PictureInPictureAlt,
                                 contentDescription = str("mini_player_title"),
                                 tint = if (vm.isMiniPlayerVisible) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+                // The Kitty pet's floating window, on and off in one click (lit while it is shown).
+                AnimatedVisibility(
+                    visible = !isVeryCompact && PlayerPreferences.PLAYER_BAR_BUTTON_PET in visibleButtons,
+                    enter = barButtonEnter,
+                    exit = barButtonExit,
+                ) {
+                    val petShown = com.alananasss.kittytune.ui.pet.PetWindowState.visible
+                    Tip(str(if (petShown) "pet_desk_hide" else "pet_desk_tray_show")) {
+                        IconButton(
+                            shapes = iconShapes,
+                            onClick = { com.alananasss.kittytune.ui.pet.PetWindowState.toggle() },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Pets,
+                                contentDescription = str("pet_settings_title"),
+                                tint = if (petShown) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp),
                             )

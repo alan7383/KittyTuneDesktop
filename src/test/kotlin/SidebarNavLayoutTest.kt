@@ -13,7 +13,8 @@ class SidebarNavLayoutTest {
 
         assertEquals(PlayerPreferences.SIDEBAR_NAV_ITEMS + PlayerPreferences.SIDEBAR_NAV_EXTRAS, layout.map { it.key })
         assertEquals(
-            listOf(true, true, false, true, true) + List(PlayerPreferences.SIDEBAR_NAV_EXTRAS.size) { false },
+            // home, feed, explore (hidden by the old set), recognition, sync, kitty pet
+            listOf(true, true, false, true, true, true) + List(PlayerPreferences.SIDEBAR_NAV_EXTRAS.size) { false },
             layout.map { it.isVisible },
         )
     }

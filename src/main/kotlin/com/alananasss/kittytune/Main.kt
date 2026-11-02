@@ -52,6 +52,8 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
     val isLoggedIn = !tokenManager.getAccessToken().isNullOrEmpty()
     val isGuestMode = tokenManager.isGuestMode()
 
+    // decided at launch: someone finishing the setup right now is a fresh install, not an updater
+    val setupCompletedAtLaunch = remember { PlayerPreferences().getHasCompletedSetup() && (isLoggedIn || isGuestMode) }
     var appState by remember {
         val hasCompletedSetup = PlayerPreferences().getHasCompletedSetup()
         val initialState = if (isLoggedIn || isGuestMode) {
@@ -84,7 +86,11 @@ fun AppRouter(playerViewModel: PlayerViewModel? = null) {
         AppState.SETUP -> SetupScreen(
             onSetupComplete = { appState = AppState.MAIN }
         )
-        AppState.MAIN -> if (playerViewModel != null) MainScreen(playerViewModel = playerViewModel) else MainScreen()
+        AppState.MAIN -> {
+            if (playerViewModel != null) MainScreen(playerViewModel = playerViewModel) else MainScreen()
+            // One-time "new: kitty pet" announcement for people who updated (not fresh installs).
+            com.alananasss.kittytune.ui.pet.PetAnnouncementHost(setupCompletedAtLaunch = setupCompletedAtLaunch, playerViewModel = playerViewModel)
+        }
     }
 }
 
@@ -693,6 +699,19 @@ fun main(args: Array<String>) {
             )
         }
 
+        // The Kitty pet: the Android home-screen widget as a floating window, always on top.
+        if (com.alananasss.kittytune.ui.pet.PetWindowState.visible) {
+            com.alananasss.kittytune.ui.pet.PetDesktopWindow(
+                isAppFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen,
+                onOpenMainWindow = { showMainWindow() },
+                onOpenSettings = {
+                    showMainWindow()
+                    playerViewModel.navigateToPlaylistId = "pet_settings"
+                },
+                onPlayPause = { playerViewModel.togglePlayPause() },
+            )
+        }
+
         // Custom tray context menu — transparent, rounded, themed; lives outside the main window
         // so it can open next to the tray icon on any OS.
         com.alananasss.kittytune.ui.tray.ModernTrayMenuHost(
@@ -707,6 +726,8 @@ fun main(args: Array<String>) {
             isMiniPlayerVisible = playerViewModel.isMiniPlayerVisible,
             onShowWindow = { showMainWindow() },
             onToggleMiniPlayer = { playerViewModel.toggleMiniPlayer() },
+            isPetVisible = com.alananasss.kittytune.ui.pet.PetWindowState.visible,
+            onTogglePet = { com.alananasss.kittytune.ui.pet.PetWindowState.toggle() },
             onPlayPause = { playerViewModel.togglePlayPause() },
             onNext = { playerViewModel.playNext() },
             onPrevious = { playerViewModel.smartPrevious() },

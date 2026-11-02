@@ -148,7 +148,17 @@ fun MainScreen(
     // translate into NavHost routes.
     androidx.compose.runtime.LaunchedEffect(playerViewModel.navigateToPlaylistId) {
         playerViewModel.navigateToPlaylistId?.let { destinationId ->
+            // the Kitty pet window's "settings": settings, opened on the pet's page
+            if (destinationId == "pet_settings") {
+                com.alananasss.kittytune.ui.profile.SettingsNavigation.go(
+                    com.alananasss.kittytune.ui.profile.SettingsPlace(
+                        com.alananasss.kittytune.ui.profile.SettingsCategory.INTERFACE,
+                        listOf(com.alananasss.kittytune.ui.profile.SettingsSubPage.PET),
+                    )
+                )
+            }
             val targetRoute = when {
+                destinationId == "pet_settings" -> "settings"
                 destinationId == "history" -> "history"
                 destinationId == "home" -> "home"
                 destinationId == "charts" -> "charts"
@@ -755,6 +765,7 @@ fun MainScreen(
                                             id == "history" -> navController.navigate("history")
                                             id == "recognition_history" -> navController.navigate("recognition_history")
                                             id == "listening_stats" -> navController.navigate("listening_stats")
+                                            id == "music_passport" -> navController.navigate("music_passport")
                                             id == "settings" -> navController.navigate("settings")
                                             id.startsWith("profile:") -> {
                                                 val target = id.removePrefix("profile:")
@@ -765,7 +776,6 @@ fun MainScreen(
                                                 }
                                             }
                                             id.startsWith("spotify_artist:") -> navController.navigate("profile/${id.removePrefix("spotify_artist:")}")
-                                            id == "music_passport" -> navController.navigate("music_passport")
                                             id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                             id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
                                             id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
@@ -824,6 +834,13 @@ fun MainScreen(
                                 },
                                 onOpenRecap = { id -> navController.navigate("recap/$id") },
                                 onOpenRecaps = { navController.navigate("recaps") },
+                                onOpenPassport = { navController.navigate("music_passport") },
+                            )
+                        }
+                        composable("music_passport") {
+                            com.alananasss.kittytune.ui.profile.passport.MusicPassportScreen(
+                                onBackClick = { navController.popBackStack() },
+                                currentUser = playerViewModel.currentUser,
                             )
                         }
                         composable("recaps") {
@@ -834,13 +851,6 @@ fun MainScreen(
                         }
                         composable(
                             route = "recap/{id}",
-                                onOpenPassport = { navController.navigate("music_passport") },
-                            )
-                        }
-                        composable("music_passport") {
-                            com.alananasss.kittytune.ui.profile.passport.MusicPassportScreen(
-                                onBackClick = { navController.popBackStack() },
-                                currentUser = playerViewModel.currentUser,
                             arguments = listOf(androidx.navigation.navArgument("id") { type = androidx.navigation.NavType.StringType }),
                         ) { backStackEntry ->
                             val recapId = backStackEntry.arguments?.let { args ->
@@ -941,6 +951,7 @@ fun MainScreen(
                                         id == "history" -> navController.navigate("history")
                                         id == "recognition_history" -> navController.navigate("recognition_history")
                                         id == "listening_stats" -> navController.navigate("listening_stats")
+                                        id == "music_passport" -> navController.navigate("music_passport")
                                         id == "settings" -> navController.navigate("settings")
                                         id.startsWith("profile:") -> {
                                             val target = id.removePrefix("profile:")
@@ -951,7 +962,6 @@ fun MainScreen(
                                             }
                                         }
                                         id.startsWith("spotify_artist:") -> navController.navigate("profile/${id.removePrefix("spotify_artist:")}")
-                                        id == "music_passport" -> navController.navigate("music_passport")
                                         id.startsWith("followers:") -> navController.navigate("followers/${id.removePrefix("followers:")}")
                                         id.startsWith("followings:") -> navController.navigate("followings/${id.removePrefix("followings:")}")
                                         id.startsWith("profile_collection:") -> navController.navigate("profile_collection/${id.removePrefix("profile_collection:").replace(':', '/')}")
@@ -1366,6 +1376,7 @@ fun MainScreen(
     com.alananasss.kittytune.ui.library.LikeAllPromptHost()
 
     CoverViewerOverlay()
+    com.alananasss.kittytune.ui.profile.passport.PassportViewerOverlay()
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -1376,7 +1387,6 @@ fun MainScreen(
             // several times a second for the sake of a debug overlay that is usually hidden.
             currentPositionMs = { playerViewModel.uiCurrentPosition },
             modifier = Modifier.padding(bottom = 100.dp, end = 20.dp)
-    com.alananasss.kittytune.ui.profile.passport.PassportViewerOverlay()
         )
     }
 
