@@ -532,6 +532,26 @@ class NativeWidevineCdm private constructor(
             while (end < buffer.size && buffer[end] != 0.toByte()) end++
             return String(buffer, 0, end, Charsets.UTF_8)
         }
+
+        /**
+         * Writes a license exchange blob to disk when `KITTYTUNE_DRM_DUMP` names a directory.
+         *
+         * The license request carries what the CDM says it is — platform, architecture, version and
+         * the device certificate — and a server refusing one platform but not another is only
+         * visible by comparing those bytes. Off unless asked for: they are not bytes to leave lying
+         * around.
+         */
+        internal fun dump(name: String, bytes: ByteArray) {
+            val directory = System.getenv("KITTYTUNE_DRM_DUMP")?.trim().orEmpty()
+            if (directory.isEmpty()) return
+            runCatching {
+                val dir = File(directory)
+                dir.mkdirs()
+                val file = File(dir, name)
+                file.writeBytes(bytes)
+                Logger.d(TAG, "wrote ${bytes.size} B to ${file.absolutePath}")
+            }
+        }
     }
 }
 
@@ -552,10 +572,11 @@ internal class NativeWidevineSession(
         val err = ByteArray(512)
         val ok = native.ktwv_license_request(handle, pssh, pssh.size, out, outLen, err, err.size)
         if (ok == 0) throw DrmLicenseException(NativeWidevineCdm.cString(err))
-        takeAndFree(out, outLen)
+        takeAndFree(out, outLen).also { NativeWidevineCdm.dump("license-request.bin", it) }
     }
 
     override fun provideLicense(license: ByteArray): List<ContentKey> = synchronized(lock) {
+        NativeWidevineCdm.dump("license-response.bin", license)
         val err = ByteArray(512)
         val ok = native.ktwv_provide_license(handle, license, license.size, err, err.size)
         if (ok == 0) throw DrmLicenseException(NativeWidevineCdm.cString(err))
