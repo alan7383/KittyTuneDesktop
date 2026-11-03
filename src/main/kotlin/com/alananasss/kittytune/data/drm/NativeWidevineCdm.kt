@@ -9,13 +9,14 @@ import com.sun.jna.ptr.PointerByReference
 import java.io.File
 
 /**
- * Drives the Widevine CDM already installed on the machine (the `.so` a browser downloaded) through
- * its public CDM API, and nothing else.
+ * Drives the Widevine CDM already installed on the machine (the library a browser downloaded —
+ * `libwidevinecdm.so`, `libwidevinecdm.dylib` or `widevinecdm.dll`) through its public CDM API, and
+ * nothing else.
  *
  * This is what makes SoundCloud's `ctr-encrypted-hls` playable on a JVM desktop at all: the CDM signs
  * the license request, holds the content key and decrypts the samples, exactly as it does inside a
  * browser. The key never crosses into Kotlin. On Android the same job is done by `MediaDrm`, which
- * the OS provides; here the only CDM on a Linux desktop is the browser's.
+ * the OS provides; here the only CDM on a desktop is the browser's.
  */
 class NativeWidevineCdm private constructor(
     private val native: WidevineBridge,
@@ -34,7 +35,7 @@ class NativeWidevineCdm private constructor(
         runCatching { native.ktwv_destroy(handle) }
     }
 
-    /** Raw C API exposed by `libkittytune_widevine.so`. */
+    /** Raw C API exposed by the native bridge (`libkittytune_widevine.so`, `.dylib` or `.dll`). */
     internal interface WidevineBridge : Library {
         fun ktwv_create(cdmPath: String, err: ByteArray, errLen: Int): Pointer?
         fun ktwv_destroy(handle: Pointer)
@@ -79,7 +80,11 @@ class NativeWidevineCdm private constructor(
 
     companion object {
         private const val TAG = "NativeWidevineCdm"
-        private const val LIB_NAME = "libkittytune_widevine.so"
+
+        /** The bridge `compileNativeWidevine` builds for each platform, named the way JNA loads it. */
+        private const val BRIDGE_SO = "libkittytune_widevine.so"
+        private const val BRIDGE_DYLIB = "libkittytune_widevine.dylib"
+        private const val BRIDGE_DLL = "libkittytune_widevine.dll"
 
         /** The CDM a browser leaves behind, named per platform. */
         private val CDM_FILE_NAMES = setOf("libwidevinecdm.so", "libwidevinecdm.dylib", "widevinecdm.dll")
@@ -216,13 +221,7 @@ class NativeWidevineCdm private constructor(
 
         private fun loadBridge(): WidevineBridge? {
             loaded?.let { return it }
-            val os = System.getProperty("os.name").lowercase()
-            if (os.contains("win")) return null // the bridge is POSIX-only for now
-            val fileName = if (os.contains("mac") || os.contains("darwin")) {
-                "libkittytune_widevine.dylib"
-            } else {
-                LIB_NAME
-            }
+            val fileName = bridgeFileName()
 
             val stream = NativeWidevineCdm::class.java.getResourceAsStream("/native/$fileName")
                 ?: return null
@@ -241,6 +240,16 @@ class NativeWidevineCdm private constructor(
                 bridgeFailure = e.message ?: e::class.simpleName
                 Logger.e(TAG, "could not load the native bridge: ${e.message}")
                 null
+            }
+        }
+
+        /** The bridge library this platform's build produced, under the name JNA has to load. */
+        private fun bridgeFileName(): String {
+            val os = System.getProperty("os.name").lowercase()
+            return when {
+                os.contains("win") -> BRIDGE_DLL
+                os.contains("mac") || os.contains("darwin") -> BRIDGE_DYLIB
+                else -> BRIDGE_SO
             }
         }
 
@@ -295,7 +304,7 @@ class NativeWidevineCdm private constructor(
                 Logger.d(
                     TAG,
                     "no CDM under the ${roots.size} known locations; set " +
-                        "KITTYTUNE_WIDEVINE_CDM=/path/to/libwidevinecdm.so or run the full scan"
+                        "KITTYTUNE_WIDEVINE_CDM=<path to the CDM library> or run the full scan"
                 )
             }
             return found
@@ -374,6 +383,13 @@ class NativeWidevineCdm private constructor(
                 "C:/Program Files/Google/Chrome",
                 "C:/Program Files (x86)/Google/Chrome",
                 "C:/Program Files (x86)/Microsoft/Edge",
+                // Edge keeps its CDM in a versioned EdgeCore folder, and WebView2 keeps another copy;
+                // neither sits under the "Edge/Application" directory the naive guess points at.
+                "C:/Program Files (x86)/Microsoft/EdgeCore",
+                "C:/Program Files/Microsoft/EdgeCore",
+                "C:/Program Files (x86)/Microsoft/EdgeWebView",
+                "C:/Program Files/Microsoft/EdgeWebView",
+                localAppData?.let { "$it/Microsoft/EdgeWebView" },
                 // macOS: browser profiles live in Application Support.
                 "$home/Library/Application Support/Google/Chrome",
                 "$home/Library/Application Support/Microsoft Edge",

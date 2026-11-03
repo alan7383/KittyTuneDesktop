@@ -534,13 +534,15 @@ val compileNativeWidevine = tasks.register<Exec>("compileNativeWidevine") {
     }
 
     if (osName.contains("win")) {
-        // Expects MinGW g++ on PATH; the CDM is loaded with LoadLibrary either way.
+        // Expects MinGW g++ on PATH; the CDM is loaded with LoadLibrary either way. `-static` also
+        // pulls in winpthread: the bridge starts its own timer thread, and without it the DLL would
+        // need libwinpthread-1.dll next to it, which the portable app does not ship.
         commandLine(
             "g++", "-shared", "-O2", "-std=c++17",
             "-I${cppDir.absolutePath}",
             File(cppDir, "WidevineBridge.cpp").absolutePath,
             "-o", outFile.absolutePath,
-            "-static-libgcc", "-static-libstdc++"
+            "-static"
         )
     } else if (osName.contains("mac") || osName.contains("darwin")) {
         commandLine(

@@ -60,7 +60,7 @@ Où il se trouve selon la plateforme :
 | Android (KittyTune) | `MediaDrm`, fourni par l'OS |
 | Windows (app UWP SoundCloud) | PlayReady, fourni par l'OS |
 | Le `.exe` SoundCloud-Desktop | un CDM sur **leurs serveurs** (`scnative.dev` renvoie la clé) |
-| **JVM sous Linux** | personne — d'où le pont vers le CDM du navigateur |
+| **JVM desktop (Linux, macOS, Windows)** | personne — d'où le pont vers le CDM du navigateur |
 
 Vérifié sur l'AppImage : **aucun CDM dedans**. Pas de `.wvd`, aucun symbole `decrypt::Engine`, et
 aucun des 205 `.so` embarqués n'expose l'API CDM. Le commentaire du code amont est explicite : « le
@@ -142,8 +142,14 @@ décode en `aac (LC) 44100 Hz stéréo, 160 kb/s`.
   ignorés) et trouve donc un navigateur qu'on n'a pas listé, un profil d'un autre utilisateur ou un
   Chromium dans un conteneur. `CdmDiscoveryTest` vérifie le cas Opera GX avec une arborescence
   temporaire, sans avoir besoin d'Opera installé.
-- **Pont POSIX uniquement** (Linux/macOS) : c'est le `dlopen` du CDM qui est visé. Windows a déjà
-  PlayReady, un portage serait un autre chemin.
+- **Pont natif sur les trois OS** : `dlopen` sur Linux/macOS, `LoadLibrary` sur Windows. Le pont se
+  compile en `libkittytune_widevine.so` / `.dylib` / `.dll` et le CDM Windows est le
+  `widevinecdm.dll` qu'Edge (dossier `EdgeCore\<version>\WidevineCdm` ou WebView2) ou Chrome
+  laissent sur la machine. Le `.dll` est lié statiquement (`-static`) pour ne pas dépendre de
+  `libwinpthread-1.dll`, que l'app portable n'embarque pas.
+  État mesuré sous Windows : le pont charge le CDM d'Edge comme celui de Firefox et produit une
+  requête de licence valide ; l'échange de licence SoundCloud, lui, a répondu `HTTP 403` depuis ce
+  réseau (reproduit hors application, avec les deux CDM), donc la fin de chaîne reste à confirmer.
 
 ---
 
