@@ -527,6 +527,26 @@ private fun MiniPlayerSettingsItems(prefs: PlayerPreferences) {
         SwitchRow(str("mini_player_hover_effect"), hoverEffect, str("mini_player_hover_effect_desc")) {
             prefs.setMiniPlayerHoverEffect(!hoverEffect)
         }
+
+        // Windows only: opaque floating windows, for setups (RTSS) where a transparent one froze the app.
+        val compat = com.alananasss.kittytune.core.FloatingWindowCompat
+        if (compat.isAvailable) {
+            val compatOn = compat.opaque
+            val autoKey = compat.autoReasonKey
+            val subtitle = if (compatOn && compat.mode == com.alananasss.kittytune.core.FloatingWindowCompat.Mode.AUTO && autoKey != null) {
+                str(autoKey)
+            } else {
+                str("floating_compat_desc")
+            }
+            SwitchRow(str("floating_compat_title"), compatOn, subtitle) {
+                if (!compat.isForced) {
+                    compat.changeMode(
+                        if (compatOn) com.alananasss.kittytune.core.FloatingWindowCompat.Mode.OFF
+                        else com.alananasss.kittytune.core.FloatingWindowCompat.Mode.ON
+                    )
+                }
+            }
+        }
     }
 }
 

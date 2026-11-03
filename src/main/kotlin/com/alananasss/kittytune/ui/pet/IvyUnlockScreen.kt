@@ -45,6 +45,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.clearance
+import com.alananasss.kittytune.ui.common.rememberPlayerBarOverlap
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -111,9 +113,13 @@ fun IvyUnlockScreen(settings: PetSettings, onAdopt: () -> Unit, onClose: () -> U
         phase = 6
     }
 
+    // The floating player bar is drawn over the page: the stars run on under it, the text and buttons stop above it.
+    val barOverlap = rememberPlayerBarOverlap()
+    val barClearance = barOverlap.clearance()
     Box(
         Modifier
             .fillMaxSize()
+            .then(barOverlap.modifier)
             .background(Brush.verticalGradient(listOf(SPACE_TOP, SPACE_BOTTOM)))
     ) {
         Starfield()
@@ -121,7 +127,7 @@ fun IvyUnlockScreen(settings: PetSettings, onAdopt: () -> Unit, onClose: () -> U
             Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+                .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 24.dp + barClearance),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(12.dp))

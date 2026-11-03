@@ -20,6 +20,9 @@ object ToolWindowStyle {
 
     private val isWindows = System.getProperty("os.name").lowercase().contains("win")
 
+    /** Windows already hidden and re-shown once to restyle them (weak: closed windows drop out). */
+    private val restyled: MutableSet<Window> = java.util.Collections.newSetFromMap(java.util.WeakHashMap())
+
     fun apply(window: Window) {
         if (!isWindows || !window.isDisplayable) return
         runCatching {
@@ -36,6 +39,15 @@ object ToolWindowStyle {
             // The shell only re-reads the style when the window is shown, so hide, restyle, show. Through AWT:
             // hiding it with a bare ShowWindow left the toolkit believing the window was still up, and the window
             // came back deaf to the mouse (the mini player could not be dragged, its menu not clicked).
+            //
+            // Once per window, though. Callers re-apply on every componentShown, and the show below fires one:
+            // where the style does not stick (some machines/drivers reset it on show), each pass hid and showed
+            // the window again, forever, and the event thread did nothing else — the whole app froze as soon as
+            // the mini player or the Kitty pet opened. After the one hide/show, the style is only written.
+            if (!restyled.add(window)) {
+                user32.SetWindowLong(hwnd, WinUser.GWL_EXSTYLE, toolStyle)
+                return
+            }
             window.isVisible = false
             user32.SetWindowLong(hwnd, WinUser.GWL_EXSTYLE, toolStyle)
             window.isVisible = true

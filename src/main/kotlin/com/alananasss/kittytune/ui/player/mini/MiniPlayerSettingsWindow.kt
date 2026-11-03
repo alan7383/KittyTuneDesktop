@@ -100,13 +100,15 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? =
         if (shown.isIdle && !shown.currentState && !shown.targetState) onClose()
     }
     val requestClose = { shown.targetState = false }
+    // Opaque where a transparent window froze the app (RTSS); see FloatingWindowCompat.
+    val compat = remember { com.alananasss.kittytune.core.FloatingWindowCompat.opaque }
 
     Window(
         onCloseRequest = requestClose,
         state = state,
         visible = windowReady,
         undecorated = true,
-        transparent = true,
+        transparent = !compat,
         // Above its own mini player: that window is TOPMOST while pinned, so a normal
         // settings window could open underneath it and take clicks meant for it.
         alwaysOnTop = true,
@@ -126,12 +128,14 @@ fun MiniPlayerSettingsWindow(onClose: () -> Unit, nearWindow: java.awt.Window? =
         // for, and there is no hide/show cycle to freeze the window (issue #66). The mini player uses
         // the same pattern for the same reason.
         DisposableEffect(window) {
-            runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
+            if (!compat) runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
+            // Opaque mode: the card's 24 dp corners, inside its 12 dp margin, cut by the window's shape.
+            val removeShape = if (compat) com.alananasss.kittytune.core.FloatingWindowCompat.keepRoundedShape(window, inset = 12.0) { 24.0 } else null
             if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
                 com.alananasss.kittytune.core.ToolWindowStyle.apply(window)
             }
             windowReady = true
-            onDispose { }
+            onDispose { removeShape?.invoke() }
         }
 
         // Once the window is showing, raise it to the foreground above the mini player's topmost tool

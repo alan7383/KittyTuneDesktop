@@ -306,10 +306,6 @@ fun MiniLyricsPlayerWindow(
 
     var isPinned by remember { mutableStateOf(true) }
     var isDragging by remember { mutableStateOf(false) }
-    // Starts hidden: the type and transparency are set before the first map, so tiling
-    // compositors (Hyprland) manage the window as a floating utility from the start
-    // instead of tiling a briefly-NORMAL window that can never be dragged afterwards.
-    var windowReady by remember { mutableStateOf(false) }
 
     // Debounced, and never mid-drag: a drag moves the window a hundred times a second.
     LaunchedEffect(windowState.position, windowState.size, isElongated, isDragging) {
@@ -350,13 +346,25 @@ fun MiniLyricsPlayerWindow(
     // Out of the way while the app is full screen, like any overlay.
     val isFullScreen = isAppFullScreen || com.alananasss.kittytune.core.AppWindowState.fullScreen
 
+    // Opaque on machines where a transparent window froze the app (RTSS); see FloatingWindowCompat. The
+    // transparency of a shown window cannot change, so switching the mode builds the window again.
+    val compat = com.alananasss.kittytune.core.FloatingWindowCompat.opaque
+    androidx.compose.runtime.key(compat) {
+    // Marks the opening on disk: if it freezes the app, the next launch opens it in compatibility mode.
+    remember { com.alananasss.kittytune.core.FloatingWindowCompat.opening() }
+    // Starts hidden: the type and transparency are set before the first map, so tiling
+    // compositors (Hyprland) manage the window as a floating utility from the start
+    // instead of tiling a briefly-NORMAL window that can never be dragged afterwards.
+    // Inside the key, so a window built again is set up again before it shows.
+    var windowReady by remember { mutableStateOf(false) }
+
     Window(
         onCloseRequest = { closeMiniPlayer("os-close-request") },
         state = windowState,
         visible = !isFullScreen && windowReady,
         alwaysOnTop = isPinned,
         undecorated = true,
-        transparent = true,
+        transparent = !compat,
         resizable = true,
         title = "KittyTune Mini Player",
     ) {
@@ -365,7 +373,8 @@ fun MiniLyricsPlayerWindow(
         // maps the window, which is what makes tiling WMs float it as a utility.
         DisposableEffect(window) {
             runCatching { window.type = java.awt.Window.Type.UTILITY }
-            runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
+            // A see-through background makes AWT turn the window translucent: never in the opaque mode.
+            if (!compat) runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
             val shownListener = object : java.awt.event.ComponentAdapter() {
                 override fun componentShown(e: java.awt.event.ComponentEvent?) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
@@ -386,6 +395,20 @@ fun MiniLyricsPlayerWindow(
         val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
         val customDensity = remember(density, uiScale) {
             density.withUiScale(uiScale)
+        }
+
+        // Opaque mode: the card's corners (10 dp elongated, 22 dp otherwise) are cut by the window's shape.
+        if (compat) {
+            DisposableEffect(window, uiScale, isElongated) {
+                val radius = if (isElongated) 10.0 else 22.0
+                val remove = com.alananasss.kittytune.core.FloatingWindowCompat.keepRoundedShape(window) { radius * uiScale }
+                onDispose { remove() }
+            }
+        }
+        // Up and drawing for a few seconds: the opening did not freeze anything.
+        LaunchedEffect(window) {
+            kotlinx.coroutines.delay(4_000)
+            com.alananasss.kittytune.core.FloatingWindowCompat.opened()
         }
 
         // Exact physical pixel limits for window sizing and OS window manager hints
@@ -507,7 +530,7 @@ fun MiniLyricsPlayerWindow(
 
         DisposableEffect(window, isElongated) {
             runCatching {
-                window.background = java.awt.Color(0, 0, 0, 0)
+                if (!compat) window.background = java.awt.Color(0, 0, 0, 0)
                 window.isAlwaysOnTop = isPinned
                 window.minimumSize = java.awt.Dimension(minWidthPx, minHeightPx)
                 window.maximumSize = java.awt.Dimension(maxWidthPx, maxHeightPx)
@@ -561,7 +584,10 @@ fun MiniLyricsPlayerWindow(
                     animationSpec = tween(200)
                 )
 
-                val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = surfaceAlpha)
+                // Nothing shows through an opaque window: a see-through surface would only show black behind it.
+                val surfaceColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                    alpha = if (compat) 1f else surfaceAlpha
+                )
 
                 val surfaceBorder = when {
                     transparentBg && (!isEffectivelyHovered || !hoverIllumination) -> null
@@ -803,6 +829,7 @@ fun MiniLyricsPlayerWindow(
                 }
             }
         }
+    }
     }
 }
 
