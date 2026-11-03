@@ -181,6 +181,14 @@ class AudioEngine {
     private var currentHeaders: Map<String, String> = emptyMap()
     private var hlsAdapter: HlsStreamAdapter? = null
 
+    /**
+     * License token of the track being prepared, for a Widevine-protected (`ctr-encrypted-hls`) stream.
+     *
+     * It is resolved alongside the URL and cached by track id, so it is read here rather than threaded
+     * through every `setMediaItem` call site. Absent for ordinary streams, which is the common case.
+     */
+    private var licenseToken: String? = null
+
     init {
         val fmt = AudioFormat(outputSampleRate, outputChannels)
         chain.forEach { it.configure(fmt) }
@@ -225,8 +233,14 @@ class AudioEngine {
         Logger.e("AudioEngine", "setMediaItem called with url: $url")
 
         try {
+            licenseToken = trackId?.let { id ->
+                runCatching { com.alananasss.kittytune.data.MusicManager.getDrmToken(id) }.getOrNull()
+            }
             hlsAdapter = if (url.contains(".m3u8")) {
-                HlsHeadCache.take(url, ::reResolveUrl) ?: HlsStreamAdapter(url, headers, ::reResolveUrl)
+                (HlsHeadCache.take(url, ::reResolveUrl)
+                    ?: HlsStreamAdapter(url, headers, refreshPlaylistUrl = ::reResolveUrl)).also {
+                    it.licenseToken = licenseToken
+                }
             } else null
             Logger.e("AudioEngine", "hlsAdapter initialized: ${hlsAdapter != null}")
         } catch (e: Exception) {
@@ -696,7 +710,9 @@ class AudioEngine {
         if (isHls) {
             var adapter = hlsAdapter
             if (adapter == null || adapter.playlistUrl != targetUrl) {
-                adapter = HlsStreamAdapter(targetUrl, headers, ::reResolveUrl)
+                adapter = HlsStreamAdapter(targetUrl, headers, refreshPlaylistUrl = ::reResolveUrl).also {
+                    it.licenseToken = licenseToken
+                }
                 hlsAdapter = adapter
             }
             // A maximum size of 0 reads the fragments in order and nothing else. javacv's default treats the stream as

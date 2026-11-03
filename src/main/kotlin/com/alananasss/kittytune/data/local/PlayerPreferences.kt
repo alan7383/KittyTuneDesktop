@@ -479,6 +479,7 @@ class PlayerPreferences {
         private const val KEY_VERIFIED_FILTER_ENABLED = "verified_filter_enabled"
         private const val KEY_YOUTUBE_FALLBACK = "youtube_fallback_enabled"
         private const val KEY_DOWNLOAD_DRM_STREAMS = "download_drm_streams_enabled"
+        private const val KEY_WIDEVINE_CDM_PATH = "widevine_cdm_path"
         private const val KEY_SHOW_LYRICS_BUTTON = "show_lyrics_button_enabled"
         private const val KEY_ONE_LINE_LYRICS = "one_line_lyrics_enabled"
         private const val KEY_WAVE_MODE = "wave_mode"
@@ -773,6 +774,10 @@ class PlayerPreferences {
 
     fun getYouTubeFallbackEnabled(): Boolean = Prefs.getBoolean(KEY_YOUTUBE_FALLBACK, true)
     fun setYouTubeFallbackEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_YOUTUBE_FALLBACK, enabled)
+
+    /** A CDM the user pointed at, when automatic discovery did not find one. Empty means "search". */
+    fun getWidevineCdmPath(): String = Prefs.getString(KEY_WIDEVINE_CDM_PATH, "") ?: ""
+    fun setWidevineCdmPath(path: String) = Prefs.putString(KEY_WIDEVINE_CDM_PATH, path)
 
     fun getDownloadDrmStreamsEnabled(): Boolean = Prefs.getBoolean(KEY_DOWNLOAD_DRM_STREAMS, true)
     fun setDownloadDrmStreamsEnabled(enabled: Boolean) = Prefs.putBoolean(KEY_DOWNLOAD_DRM_STREAMS, enabled)

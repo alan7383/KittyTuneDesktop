@@ -513,6 +513,53 @@ val compileNativeDSP = tasks.register<Exec>("compileNativeDSP") {
     }
 }
 
+val compileNativeWidevine = tasks.register<Exec>("compileNativeWidevine") {
+    description = "Builds the Widevine CDM bridge from source into generated resources."
+    val cppDir = project.file("src/main/cpp/widevine")
+    val outDir = layout.buildDirectory.dir("generated/native-resources/native").get().asFile
+    val osName = System.getProperty("os.name").lowercase()
+    val libExt = if (osName.contains("win")) "dll" else if (osName.contains("mac")) "dylib" else "so"
+    val outFile = File(outDir, "libkittytune_widevine.$libExt")
+
+    inputs.dir(cppDir)
+    inputs.property("osName", osName)
+    outputs.file(outFile)
+
+    doFirst { outDir.mkdirs() }
+
+    doLast {
+        if (!outFile.exists()) {
+            logger.warn("Widevine bridge was not built; protected tracks will fall back to being skipped")
+        }
+    }
+
+    if (osName.contains("win")) {
+        // Expects MinGW g++ on PATH; the CDM is loaded with LoadLibrary either way.
+        commandLine(
+            "g++", "-shared", "-O2", "-std=c++17",
+            "-I${cppDir.absolutePath}",
+            File(cppDir, "WidevineBridge.cpp").absolutePath,
+            "-o", outFile.absolutePath,
+            "-static-libgcc", "-static-libstdc++"
+        )
+    } else if (osName.contains("mac") || osName.contains("darwin")) {
+        commandLine(
+            "g++", "-dynamiclib", "-fPIC", "-O2", "-std=c++17",
+            "-I${cppDir.absolutePath}",
+            File(cppDir, "WidevineBridge.cpp").absolutePath,
+            "-o", outFile.absolutePath
+        )
+    } else {
+        commandLine(
+            "g++", "-shared", "-fPIC", "-O2", "-std=c++17",
+            "-I${cppDir.absolutePath}",
+            File(cppDir, "WidevineBridge.cpp").absolutePath,
+            "-o", outFile.absolutePath,
+            "-ldl", "-pthread"
+        )
+    }
+}
+
 val compileWindowsSmtcBridge = tasks.register<Exec>("compileWindowsSmtcBridge") {
     description = "Builds the Windows media bridge from source into generated resources."
     enabled = desktopIsWindows
@@ -575,6 +622,7 @@ sourceSets.main {
 
 tasks.named<ProcessResources>("processResources") {
     dependsOn(compileNativeDSP)
+    dependsOn(compileNativeWidevine)
     if (desktopIsWindows) dependsOn(compileWindowsSmtcBridge)
     from(layout.buildDirectory.dir("generated/native-resources")) {
         if (desktopIsWindows) {

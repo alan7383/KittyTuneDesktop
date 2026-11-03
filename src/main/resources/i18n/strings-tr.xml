@@ -3109,4 +3109,23 @@
     <string name="pet_desk_bar_button_desc">Kedinin yüzen penceresini gösterir veya gizler</string>
     <string name="pet_desk_photo_filter">Görseller</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- DRM -->
+    <string name="drm_unavailable_toast">🔒 Korumalı parça: Widevine CDM bulunamadı. Chrome, Firefox veya Brave kurup tekrar dene</string>
+    <!-- DRM SETTINGS -->
+    <string name="pref_drm_title">Widevine CDM</string>
+    <string name="pref_drm_info_title">Korumalı parçaları çalmak</string>
+    <string name="misc_drm_sub">Korumalı parçaların kilidini aç</string>
+    <string name="pref_drm_cdm_path">CDM yolu</string>
+    <string name="pref_drm_browse">Gözat…</string>
+    <string name="pref_drm_autodetect">Otomatik bul</string>
+    <string name="pref_drm_test">Test et</string>
+    <string name="pref_drm_searching">Aranıyor…</string>
+    <string name="pref_drm_log_title">Günlük</string>
+    <string name="pref_drm_log_copy">Kopyala</string>
+    <string name="pref_drm_ok">CDM yüklendi, korumalı parçalar çalınacak ve indirilebilecek</string>
+    <string name="pref_drm_failed">CDM yüklenmedi. Chrome, Chromium, Brave, Edge veya Firefox kur ya da dosyayı kendin seç</string>
+    <string name="pref_drm_hint">CDM, kurulu bir tarayıcıdan (Chrome, Chromium, Brave, Edge, Firefox, Opera) ya da aşağıda seçtiğin dosyadan gelir. KittyTune onu asla yeniden dağıtmaz, makinede olanı kullanır.</string>
+    <string name="pref_drm_no_browser">KittyTune, Widevine CDM'i kendi sürecine yükler. Gizli tarayıcı yok, WebView yok: korumalı SoundCloud parçalarının çalmasını sağlayan şey budur.</string>
+    <string name="drm_download_failed">Korumalı parça: indirme başarısız. CDM'i Ayarlar, Diğer bölümünden kontrol et</string>
 </resources>

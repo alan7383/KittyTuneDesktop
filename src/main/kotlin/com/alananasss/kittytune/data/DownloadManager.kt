@@ -1,5 +1,6 @@
 package com.alananasss.kittytune.data
 
+import com.alananasss.kittytune.audio.DrmStreamDownloader
 import com.alananasss.kittytune.core.AppDirs
 import com.alananasss.kittytune.core.str
 import com.alananasss.kittytune.data.local.*
@@ -941,6 +942,7 @@ object DownloadManager {
 
                 val resolvedStream = StreamResolver.resolveStreamWithDrm(track, forDownload = true)
                 val streamUrl = resolvedStream?.url ?: throw Exception("Cannot resolve stream URL for download")
+                val licenseToken = resolvedStream.licenseAuthToken
 
                 val isHlsStream = streamUrl.contains(".m3u8") || streamUrl.contains("hls")
 
@@ -953,7 +955,38 @@ object DownloadManager {
                 taggedAudioFile = File(AppDirs.audioCacheDir, "tagged_${track.id}.$ext")
                 val internalArtFile = File(AppDirs.imageCacheDir, "art_${track.id}.jpg")
 
-                if (isHlsStream) {
+                if (!licenseToken.isNullOrBlank()) {
+                    // Protected HLS: FFmpeg cannot fetch it — every fragment is CENC-encrypted and has
+                    // to go through the CDM — so the stream is read decrypted into a clear fragment
+                    // sequence first, and remuxed like any other HLS. What lands on disk is a normal
+                    // file that plays later without a CDM.
+                    val decrypted = File(AppDirs.audioCacheDir, "temp_drm_${track.id}.mp4")
+                    try {
+                        DrmStreamDownloader.download(streamUrl, licenseToken, decrypted) { p ->
+                            if (isActive) _downloadProgress.update { c -> c + (track.id to p) }
+                        }
+                        val remuxed = runCatching {
+                            remuxHls(decrypted.absolutePath, tempAudioFile) { }
+                        }.isSuccess && tempAudioFile.exists() && tempAudioFile.length() > 0L
+                        if (!remuxed) {
+                            Logger.w("DownloadManager", "Remux of the decrypted stream failed; keeping the fragments")
+                            tempAudioFile.delete()
+                            decrypted.copyTo(tempAudioFile, overwrite = true)
+                        }
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // A protected download can fail on the licence rather than on the network, and
+                        // that would otherwise look like a click that did nothing at all.
+                        Logger.e("DownloadManager", "Protected download failed for ${track.id}: ${e.message}")
+                        withContext(Dispatchers.Main) {
+                            com.alananasss.kittytune.core.Toaster.show(str("drm_download_failed"))
+                        }
+                        throw e
+                    } finally {
+                        decrypted.delete()
+                    }
+                } else if (isHlsStream) {
                     // Plain HLS: remux to .m4a with FFmpeg (no re-encode). DRM HLS was filtered out.
                     remuxHls(streamUrl, tempAudioFile) { p ->
                         if (isActive) _downloadProgress.update { c -> c + (track.id to p) }
