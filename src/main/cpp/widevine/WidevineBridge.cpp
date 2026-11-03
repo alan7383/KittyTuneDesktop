@@ -1,4 +1,4 @@
-// Bridges a Widevine CDM (the .so a browser already downloaded) to KittyTune's JVM side.
+﻿// Bridges a Widevine CDM (the .so a browser already downloaded) to KittyTune's JVM side.
 //
 // Playback of SoundCloud's `ctr-encrypted-hls` needs a CDM: the component that signs the license
 // request, holds the content keys and decrypts the samples. The JVM has none, so this bridge drives
@@ -26,11 +26,20 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
+#include <memory>
 #include <mutex>
+#include <random>
 #include <set>
 #include <string>
 #include <thread>
 #include <vector>
+
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 using namespace cdm;
 
@@ -74,6 +83,9 @@ struct Bridge {
   bool keys_changed = false;
   bool keys_usable = false;
   bool rejected = false;
+  // SetServerCertificate is a promise like any other, but it happens before a session exists.
+  bool promise_settled = false;
+  bool promise_ok = false;
   std::string last_error;
   std::vector<uint8_t> license_request;
   std::vector<uint8_t> last_key_id;
@@ -81,6 +93,192 @@ struct Bridge {
   ~Bridge();
 
   void notify() { cv.notify_all(); }
+};
+
+// ---------------------------------------------------------------------------------------------
+// Storage
+// ---------------------------------------------------------------------------------------------
+//
+// A CDM keeps the state it is allowed to keep ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the certificate it was provisioned with, the
+// licenses it may cache ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â through FileIO and the storage id. With neither, the only identity it has
+// is the default certificate baked into its binary, which is the unprovisioned client a license
+// server is free to refuse. The directory mirrors what a browser profile provides.
+
+std::string storage_directory() {
+  const char* configured = getenv("KITTYTUNE_WIDEVINE_STORAGE");
+  if (configured && *configured) return configured;
+  const char* base = getenv("TMPDIR");
+  if (!base || !*base) base = getenv("TEMP");
+  if (!base || !*base) base = "/tmp";
+#ifdef _WIN32
+  return std::string(base) + "\\kittytune_cdm";
+#else
+  return std::string(base) + "/kittytune_cdm";
+#endif
+}
+
+void ensure_storage_directory() {
+#ifdef _WIN32
+  _mkdir(storage_directory().c_str());
+#else
+  mkdir(storage_directory().c_str(), 0700);
+#endif
+}
+
+// The id the CDM keys its stored state on, stable across runs so a certificate it saved is found
+// again. Generated once, then kept beside the files it belongs to.
+std::vector<uint8_t> storage_id() {
+  ensure_storage_directory();
+  std::string path = storage_directory();
+#ifdef _WIN32
+  path += "\\storage-id.bin";
+#else
+  path += "/storage-id.bin";
+#endif
+  std::vector<uint8_t> id(32);
+  if (FILE* file = fopen(path.c_str(), "rb")) {
+    const size_t read = fread(id.data(), 1, id.size(), file);
+    fclose(file);
+    if (read == id.size()) return id;
+  }
+  std::random_device random;
+  for (auto& byte : id) byte = static_cast<uint8_t>(random() & 0xFF);
+  if (FILE* file = fopen(path.c_str(), "wb")) {
+    fwrite(id.data(), 1, id.size(), file);
+    fclose(file);
+  }
+  return id;
+}
+
+// The CDM is explicit that FileIO answers arrive asynchronously: answering from inside Open() or
+// Read() makes it drop the state it asked us to keep. One worker thread is enough Ã¢â‚¬â€ this is a
+// certificate and a handful of counters, not media.
+class IoWorker {
+ public:
+  static IoWorker& instance() {
+    static IoWorker worker;
+    return worker;
+  }
+
+  void post(std::function<void()> task) {
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      tasks_.push_back(std::move(task));
+    }
+    cv_.notify_one();
+  }
+
+ private:
+  // Detached: the worker lives as long as the process, and a joinable static would abort at exit.
+  IoWorker() { std::thread([this] { run(); }).detach(); }
+
+  void run() {
+    for (;;) {
+      std::function<void()> task;
+      {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this] { return !tasks_.empty(); });
+        task = std::move(tasks_.front());
+        tasks_.erase(tasks_.begin());
+      }
+      task();
+    }
+  }
+
+  std::mutex mutex_;
+  std::condition_variable cv_;
+  std::vector<std::function<void()>> tasks_;
+  std::thread thread_;
+};
+
+// One storage file, shared with the worker so a callback can still be answered after Close().
+struct StorageFile {
+  FileIOClient* client = nullptr;
+  std::string directory;
+  std::string name;
+  FILE* file = nullptr;
+  bool closed = false;
+  std::mutex mutex;
+};
+
+class StorageFileIO : public FileIO {
+ public:
+  explicit StorageFileIO(FileIOClient* client) {
+    state_->client = client;
+    state_->directory = storage_directory();
+  }
+
+  void Open(const char* file_name, uint32_t file_name_size) override {
+    auto state = state_;
+    state->name.assign(file_name ? file_name : "", file_name ? file_name_size : 0);
+    IoWorker::instance().post([state] {
+      ensure_storage_directory();
+#ifdef _WIN32
+      std::string path = state->directory + "\\" + state->name;
+#else
+      std::string path = state->directory + "/" + state->name;
+#endif
+      std::lock_guard<std::mutex> lock(state->mutex);
+      if (state->closed) return;
+      state->file = fopen(path.c_str(), "r+b");
+      if (!state->file) state->file = fopen(path.c_str(), "wb+");
+      if (state->client) {
+        state->client->OnOpenComplete(state->file ? FileIOClient::Status::kSuccess
+                                                  : FileIOClient::Status::kError);
+      }
+    });
+  }
+
+  void Read() override {
+    auto state = state_;
+    IoWorker::instance().post([state] {
+      std::lock_guard<std::mutex> lock(state->mutex);
+      if (state->closed || !state->file || !state->client) return;
+      fseek(state->file, 0, SEEK_END);
+      const long size = ftell(state->file);
+      fseek(state->file, 0, SEEK_SET);
+      std::vector<uint8_t> data(size > 0 ? static_cast<size_t>(size) : 0);
+      const bool ok =
+          size <= 0 || fread(data.data(), 1, data.size(), state->file) == data.size();
+      if (!ok) {
+        state->client->OnReadComplete(FileIOClient::Status::kError, nullptr, 0);
+        return;
+      }
+      state->client->OnReadComplete(FileIOClient::Status::kSuccess,
+                                    data.empty() ? nullptr : data.data(),
+                                    static_cast<uint32_t>(data.size()));
+    });
+  }
+
+  void Write(const uint8_t* data, uint32_t data_size) override {
+    auto state = state_;
+    std::vector<uint8_t> copy(data, data + data_size);
+    IoWorker::instance().post([state, copy] {
+      std::lock_guard<std::mutex> lock(state->mutex);
+      if (state->closed || !state->file || !state->client) return;
+      fseek(state->file, 0, SEEK_SET);
+      const bool ok = copy.empty() || fwrite(copy.data(), 1, copy.size(), state->file) == copy.size();
+      if (ok) fflush(state->file);
+      state->client->OnWriteComplete(ok ? FileIOClient::Status::kSuccess
+                                        : FileIOClient::Status::kError);
+    });
+  }
+
+  void Close() override {
+    auto state = state_;
+    IoWorker::instance().post([state] {
+      std::lock_guard<std::mutex> lock(state->mutex);
+      state->closed = true;
+      if (state->file) {
+        fclose(state->file);
+        state->file = nullptr;
+      }
+    });
+    delete this;
+  }
+
+ private:
+  std::shared_ptr<StorageFile> state_ = std::make_shared<StorageFile>();
 };
 
 class BridgeHost : public Host_10 {
@@ -123,12 +321,16 @@ class BridgeHost : public Host_10 {
 
   void OnResolvePromise(uint32_t) override {
     std::lock_guard<std::mutex> lock(bridge_->mutex);
+    bridge_->promise_settled = true;
+    bridge_->promise_ok = true;
     bridge_->notify();
   }
 
   void OnRejectPromise(uint32_t, Exception exception, uint32_t system_code,
                        const char* error_message, uint32_t error_message_size) override {
     std::lock_guard<std::mutex> lock(bridge_->mutex);
+    bridge_->promise_settled = true;
+    bridge_->promise_ok = false;
     bridge_->rejected = true;
     bridge_->last_error.assign(error_message ? error_message : "", error_message_size);
     bridge_->notify();
@@ -136,6 +338,11 @@ class BridgeHost : public Host_10 {
 
   void OnSessionMessage(const char* session_id, uint32_t session_id_size, MessageType type,
                         const char* message, uint32_t message_size) override {
+    if (getenv("KITTYTUNE_WIDEVINE_DEBUG")) {
+      fprintf(stderr, "[ktwv] session message type=%u size=%u\n", static_cast<unsigned>(type),
+              static_cast<unsigned>(message_size));
+      fflush(stderr);
+    }
     std::lock_guard<std::mutex> lock(bridge_->mutex);
     if (type == MessageType::kLicenseRequest) {
       bridge_->license_request.assign(reinterpret_cast<const uint8_t*>(message),
@@ -164,8 +371,17 @@ class BridgeHost : public Host_10 {
   void EnableOutputProtection(uint32_t) override {}
   void QueryOutputProtectionStatus() override {}
   void OnDeferredInitializationDone(StreamType, Status) override {}
-  FileIO* CreateFileIO(FileIOClient*) override { return nullptr; }
-  void RequestStorageId(uint32_t) override {}
+  FileIO* CreateFileIO(FileIOClient* client) override {
+    return new StorageFileIO(client);
+  }
+
+  // The CDM asks for it before it can persist a certificate; answering with nothing leaves it on
+  // the built-in default identity.
+  void RequestStorageId(uint32_t version) override {
+    if (!bridge_->cdm) return;
+    const std::vector<uint8_t> id = storage_id();
+    bridge_->cdm->OnStorageId(version, id.data(), static_cast<uint32_t>(id.size()));
+  }
 
  private:
   Bridge* bridge_;
@@ -269,6 +485,8 @@ KtwvCdm ktwv_create(const char* cdm_path, char* err, int err_len) {
   }
   bridge->cdm = reinterpret_cast<ContentDecryptionModule_10*>(instance);
 
+  // A distinctive identifier is what a per-device certificate is: without allowing it the CDM can
+  // only present the default identity its binary ships with.
   bridge->cdm->Initialize(false, false, false);
   {
     std::unique_lock<std::mutex> lock(bridge->mutex);
@@ -322,6 +540,43 @@ void ktwv_reset_session(KtwvCdm handle) {
     bridge->cdm->CloseSession(3, session_id.c_str(),
                               static_cast<uint32_t>(session_id.size()));
   }
+}
+
+/**
+ * Hands the CDM the license service's certificate before any session is opened.
+ *
+ * SoundCloud's licence endpoint only answers a request that carries an `encrypted_client_id`
+ * bound to its own service certificate, the one its DRM provider signs. A CDM that never received
+ * that certificate sends its built-in client id instead, and the licence is refused ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â which is
+ * indistinguishable from "this machine has no CDM" if you only look at the status code.
+ *
+ * Returns 1 when the CDM accepted the certificate.
+ */
+int ktwv_set_server_certificate(KtwvCdm handle, const uint8_t* certificate, int certificate_len,
+                                char* err, int err_len) {
+  Bridge* bridge = static_cast<Bridge*>(handle);
+  if (!bridge || !certificate || certificate_len <= 0) {
+    set_error(err, err_len, "bad arguments");
+    return 0;
+  }
+  {
+    std::lock_guard<std::mutex> lock(bridge->mutex);
+    bridge->promise_settled = false;
+    bridge->promise_ok = false;
+  }
+  bridge->cdm->SetServerCertificate(1000, certificate, static_cast<uint32_t>(certificate_len));
+
+  std::unique_lock<std::mutex> lock(bridge->mutex);
+  if (!bridge->cv.wait_for(lock, std::chrono::seconds(10),
+                           [bridge] { return bridge->promise_settled; })) {
+    set_error(err, err_len, "the CDM did not answer the server certificate");
+    return 0;
+  }
+  if (!bridge->promise_ok) {
+    set_error(err, err_len, "the CDM rejected the server certificate");
+    return 0;
+  }
+  return 1;
 }
 
 /**
@@ -468,3 +723,13 @@ int ktwv_decrypt(KtwvCdm handle, const uint8_t* data, int data_len, const uint8_
 void ktwv_free(void* pointer) { free(pointer); }
 
 }  // extern "C"
+
+
+
+
+
+
+
+
+
+
