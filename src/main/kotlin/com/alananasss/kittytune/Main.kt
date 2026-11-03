@@ -110,6 +110,11 @@ fun main(args: Array<String>) {
     }
     com.alananasss.kittytune.data.MacSoundCloudOAuth.installUriHandler()
     AppBootstrap.init()
+    // Transparent windows (pet, mini player, menus) in software on Windows: Direct3D hung on their first frame
+    // on some GPU drivers and froze the whole app.
+    com.alananasss.kittytune.core.TransparentWindowRendering.install()
+    // Opaque floating windows when RTSS is running or a floating window froze the app last time.
+    com.alananasss.kittytune.core.FloatingWindowCompat.init()
     // Swing's own dialogs (folder pickers, the avatar chooser) in the system's look rather than Java's Metal,
     // which is what made them look cut down next to Windows' own. Compose is unaffected.
     runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }

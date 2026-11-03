@@ -122,6 +122,13 @@ fun PetDesktopWindow(
     )
     var isPinned by remember { mutableStateOf(PetConfig.isWindowPinned()) }
     var isDragging by remember { mutableStateOf(false) }
+    // Opaque on machines where a transparent window froze the app (RTSS); see FloatingWindowCompat. The
+    // transparency of a shown window cannot change, so switching the mode builds the window again.
+    val compat = com.alananasss.kittytune.core.FloatingWindowCompat.opaque
+    androidx.compose.runtime.key(compat) {
+    // Marks the opening on disk: if it freezes the app, the next launch opens it in compatibility mode.
+    remember { com.alananasss.kittytune.core.FloatingWindowCompat.opening() }
+    // Inside the key: a window built again is set up again before it shows.
     var windowReady by remember { mutableStateOf(false) }
 
     Window(
@@ -130,14 +137,15 @@ fun PetDesktopWindow(
         visible = !isAppFullScreen && windowReady,
         alwaysOnTop = isPinned,
         undecorated = true,
-        transparent = true,
+        transparent = !compat,
         resizable = true,
         title = "KittyTune Kitty pet",
     ) {
         // Same pre-map setup as the mini player: a floating tool, not another app window.
         DisposableEffect(window) {
             runCatching { window.type = java.awt.Window.Type.UTILITY }
-            runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
+            // A see-through background makes AWT turn the window translucent: never in the opaque mode.
+            if (!compat) runCatching { window.background = java.awt.Color(0, 0, 0, 0) }
             val shownListener = object : java.awt.event.ComponentAdapter() {
                 override fun componentShown(e: java.awt.event.ComponentEvent?) {
                     if (com.alananasss.kittytune.data.theme.WindowsFullScreen.isWindows) {
@@ -156,6 +164,19 @@ fun PetDesktopWindow(
         val density = LocalDensity.current
         val uiScale by prefs.uiScaleFlow().collectAsState(initial = prefs.getUiScale())
         val customDensity = remember(density, uiScale) { density.withUiScale(uiScale) }
+
+        // Opaque mode: the card's 24 dp corners are cut by the window's shape rather than left transparent.
+        if (compat) {
+            DisposableEffect(window, uiScale) {
+                val remove = com.alananasss.kittytune.core.FloatingWindowCompat.keepRoundedShape(window) { 24.0 * uiScale }
+                onDispose { remove() }
+            }
+        }
+        // Up and drawing for a few seconds: the opening did not freeze anything.
+        LaunchedEffect(window) {
+            kotlinx.coroutines.delay(4_000)
+            com.alananasss.kittytune.core.FloatingWindowCompat.opened()
+        }
         val minWpx = with(density) { MIN_W.dp.roundToPx() }
         val minHpx = with(density) { MIN_H.dp.roundToPx() }
         val maxWpx = with(density) { MAX_W.dp.roundToPx() }
@@ -194,7 +215,7 @@ fun PetDesktopWindow(
 
         DisposableEffect(window) {
             runCatching {
-                window.background = java.awt.Color(0, 0, 0, 0)
+                if (!compat) window.background = java.awt.Color(0, 0, 0, 0)
                 window.minimumSize = java.awt.Dimension(minWpx, minHpx)
                 window.maximumSize = java.awt.Dimension(maxWpx, maxHpx)
             }
@@ -296,6 +317,7 @@ fun PetDesktopWindow(
                 }
             }
         }
+    }
     }
 }
 

@@ -53,6 +53,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import com.alananasss.kittytune.core.BackHandler
 import com.alananasss.kittytune.core.str
+import com.alananasss.kittytune.ui.common.clearance
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -146,10 +147,14 @@ fun PetPhotoScreen(
         return
     }
 
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    // The floating player bar is drawn over the page; every step (and its buttons) ends above it.
+    val barOverlap = com.alananasss.kittytune.ui.common.rememberPlayerBarOverlap()
+    val barClearance = barOverlap.clearance()
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize().then(barOverlap.modifier)) {
         Column(
             Modifier
                 .fillMaxSize()
+                .padding(bottom = barClearance)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(8.dp)) {
                 IconButton(onClick = {

@@ -101,6 +101,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.alananasss.kittytune.ui.common.ExpressiveConnectedButtonGroup
+import com.alananasss.kittytune.ui.common.clearance
 import com.alananasss.kittytune.ui.common.SettingsGroup
 import com.alananasss.kittytune.ui.common.SettingsGroupTitle
 import com.alananasss.kittytune.ui.common.SettingsItem
@@ -1012,8 +1013,13 @@ private fun PetOnboarding(
         if (pagerState.currentPage > 0) scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } else onBack()
     }
 
+    // The floating player bar is drawn over the page; the setup's own bar (back / next) is lifted above it.
+    val barOverlap = com.alananasss.kittytune.ui.common.rememberPlayerBarOverlap()
+    val barClearance = barOverlap.clearance()
     Scaffold(
+        modifier = Modifier.then(barOverlap.modifier),
         bottomBar = {
+            Box(Modifier.padding(bottom = barClearance)) {
             PetSetupBottomBar(
                 pagerState = pagerState,
                 onNextClicked = {
@@ -1026,6 +1032,7 @@ private fun PetOnboarding(
                     onFinish()
                 }
             )
+            }
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
