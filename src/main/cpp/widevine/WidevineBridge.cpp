@@ -66,7 +66,7 @@ struct Bridge;
 class BridgeHost;
 
 struct Bridge {
-  ContentDecryptionModule_10* cdm = nullptr;
+  ContentDecryptionModule_11* cdm = nullptr;
   std::string session_id;
 
   // The host is per instance, not global: a second CDM instance (a download running alongside
@@ -99,8 +99,8 @@ struct Bridge {
 // Storage
 // ---------------------------------------------------------------------------------------------
 //
-// A CDM keeps the state it is allowed to keep ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â the certificate it was provisioned with, the
-// licenses it may cache ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â through FileIO and the storage id. With neither, the only identity it has
+// A CDM keeps the state it is allowed to keep ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â the certificate it was provisioned with, the
+// licenses it may cache ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â through FileIO and the storage id. With neither, the only identity it has
 // is the default certificate baked into its binary, which is the unprovisioned client a license
 // server is free to refuse. The directory mirrors what a browser profile provides.
 
@@ -151,7 +151,7 @@ std::vector<uint8_t> storage_id() {
 }
 
 // The CDM is explicit that FileIO answers arrive asynchronously: answering from inside Open() or
-// Read() makes it drop the state it asked us to keep. One worker thread is enough Ã¢â‚¬â€ this is a
+// Read() makes it drop the state it asked us to keep. One worker thread is enough ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â this is a
 // certificate and a handful of counters, not media.
 class IoWorker {
  public:
@@ -281,7 +281,7 @@ class StorageFileIO : public FileIO {
   std::shared_ptr<StorageFile> state_ = std::make_shared<StorageFile>();
 };
 
-class BridgeHost : public Host_10 {
+class BridgeHost : public Host_11 {
  public:
   explicit BridgeHost(Bridge* bridge) : bridge_(bridge) {}
 
@@ -290,7 +290,7 @@ class BridgeHost : public Host_10 {
   // The CDM calls this while holding its lock; re-entering it on this thread would deadlock.
   void SetTimer(int64_t delay_ms, void* context) override {
     if (!context) return;
-    ContentDecryptionModule_10* cdm = bridge_->cdm;
+    ContentDecryptionModule_11* cdm = bridge_->cdm;
     if (!cdm) return;
     std::thread([cdm, delay_ms, context]() {
       std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms > 0 ? delay_ms : 0));
@@ -375,10 +375,17 @@ class BridgeHost : public Host_10 {
     return new StorageFileIO(client);
   }
 
-  // The CDM asks for it before it can persist a certificate; answering with nothing leaves it on
-  // the built-in default identity.
+  void ReportMetrics(MetricName, uint64_t) override {}
+
+  // Gecko answers this with an empty id when it has no per-origin salt to offer, and the CDM then
+  // treats the client as having no persistent identity. Worth matching exactly.
   void RequestStorageId(uint32_t version) override {
     if (!bridge_->cdm) return;
+    const char* mode = getenv("KITTYTUNE_WIDEVINE_STORAGE_ID");
+    if (mode && std::string(mode) == "empty") {
+      bridge_->cdm->OnStorageId(version, nullptr, 0);
+      return;
+    }
     const std::vector<uint8_t> id = storage_id();
     bridge_->cdm->OnStorageId(version, id.data(), static_cast<uint32_t>(id.size()));
   }
@@ -395,7 +402,11 @@ Bridge::~Bridge() {
 }
 
 void* GetCdmHost(int host_interface_version, void* user_data) {
-  if (host_interface_version != Host_10::kVersion || !user_data) return nullptr;
+  if (getenv("KITTYTUNE_WIDEVINE_DEBUG")) {
+    fprintf(stderr, "[ktwv] CDM asked for host interface %d (we speak 11)\n", host_interface_version);
+    fflush(stderr);
+  }
+  if ((host_interface_version != Host_11::kVersion && host_interface_version != 10) || !user_data) return nullptr;
   auto* bridge = static_cast<Bridge*>(user_data);
   std::lock_guard<std::mutex> lock(bridge->host_mutex);
   if (!bridge->host) bridge->host = new BridgeHost(bridge);
@@ -476,14 +487,14 @@ KtwvCdm ktwv_create(const char* cdm_path, char* err, int err_len) {
 
   Bridge* bridge = new Bridge();
   const char* key_system = "com.widevine.alpha";
-  void* instance = create(ContentDecryptionModule_10::kVersion, key_system,
+  void* instance = create(ContentDecryptionModule_11::kVersion, key_system,
                           static_cast<uint32_t>(strlen(key_system)), GetCdmHost, bridge);
   if (!instance) {
     delete bridge;
     set_error(err, err_len, "CreateCdmInstance refused interface 10");
     return nullptr;
   }
-  bridge->cdm = reinterpret_cast<ContentDecryptionModule_10*>(instance);
+  bridge->cdm = reinterpret_cast<ContentDecryptionModule_11*>(instance);
 
   // A distinctive identifier is what a per-device certificate is: without allowing it the CDM can
   // only present the default identity its binary ships with.
@@ -547,7 +558,7 @@ void ktwv_reset_session(KtwvCdm handle) {
  *
  * SoundCloud's licence endpoint only answers a request that carries an `encrypted_client_id`
  * bound to its own service certificate, the one its DRM provider signs. A CDM that never received
- * that certificate sends its built-in client id instead, and the licence is refused ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â which is
+ * that certificate sends its built-in client id instead, and the licence is refused ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â which is
  * indistinguishable from "this machine has no CDM" if you only look at the status code.
  *
  * Returns 1 when the CDM accepted the certificate.
@@ -723,6 +734,13 @@ int ktwv_decrypt(KtwvCdm handle, const uint8_t* data, int data_len, const uint8_
 void ktwv_free(void* pointer) { free(pointer); }
 
 }  // extern "C"
+
+
+
+
+
+
+
 
 
 
