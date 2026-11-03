@@ -1,0 +1,258 @@
+package com.alananasss.kittytune
+
+import com.alananasss.kittytune.audio.HlsStreamAdapter
+import com.alananasss.kittytune.data.drm.ContentKey
+import com.alananasss.kittytune.data.drm.IsoBmff
+import com.alananasss.kittytune.data.drm.SoundCloudDrm
+import com.alananasss.kittytune.data.drm.SoundCloudWidevineLicense
+import com.alananasss.kittytune.data.drm.WidevineCdm
+import com.alananasss.kittytune.data.drm.WidevineCdmRegistry
+import com.alananasss.kittytune.data.drm.WidevineLicenseSession
+import com.sun.net.httpserver.HttpExchange
+import com.sun.net.httpserver.HttpServer
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import java.io.ByteArrayOutputStream
+import java.net.InetSocketAddress
+import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicInteger
+
+/**
+ * End-to-end test of the protected-stream path, with a stand-in CDM.
+ *
+ * Everything except the license exchange is the real code: a real `#EXT-X-KEY` line in the
+ * SoundCloud layout, the real playlist/init/fragment fetching in [HlsStreamAdapter], the real
+ * [SoundCloudDrm] orchestration, the real CENC decryption and the real `moov`/`moof` rewrites. Only
+ * [WidevineCdm] is a stub, because it is the one piece that cannot exist without a licensed CDM.
+ *
+ * The fragment served is the FFmpeg CENC fixture, so the bytes that come out of the adapter are
+ * compared against the same SHA-256 that `ffmpeg -decryption_key` produces for it.
+ */
+class SoundCloudDrmPipelineTest {
+
+    /** Same fixture and key as [CencDecrypterTest]. */
+    private val contentKey = IsoBmff.unhex("0f0e0d0c0b0a09080706050403020100")!!
+    private val keyIdHex = "a1b2c3d4e5f60718293a4b5c6d7e8f90"
+    private val expectedPlaintextSha256 =
+        "92bf2b81e6ae2a5f2f81460ab6817ea9edbfdacbd436c2ea42d7d43fb2e4831f"
+
+    /** The real Widevine PSSH SoundCloud serves, used here verbatim as an opaque blob. */
+    private val psshB64 =
+        "AAAAa3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAAEsSEBb7NIiL+lkEpnFuMsqjKa4aC2J1eWRybWtleW9z" +
+            "IiQwNGJjMjkxYy1jM2E0LTQzMTAtYWNjNy0wMDU3MGYyNTk5ODZI49yVmwY="
+
+    private lateinit var server: HttpServer
+    private lateinit var base: String
+
+    private val licensePosts = AtomicInteger(0)
+    private val licenseRequests = mutableListOf<ByteArray>()
+    private val originalPlaybackUrl = SoundCloudWidevineLicense.playbackUrl
+
+    private val fixture: ByteArray by lazy {
+        javaClass.classLoader!!.getResourceAsStream("drm/cenc_small.mp4")!!.use { it.readBytes() }
+    }
+
+    private val initBytes: ByteArray by lazy {
+        var end = 0
+        for (box in IsoBmff.boxes(fixture, 0, fixture.size)) {
+            if (box.type == "moof") break
+            end = box.end
+        }
+        fixture.copyOfRange(0, end)
+    }
+
+    private val segmentBytes: ByteArray by lazy {
+        var start = -1
+        var end = 0
+        for (box in IsoBmff.boxes(fixture, 0, fixture.size)) {
+            if (box.type == "moof" && start < 0) start = box.start
+            if (box.type == "mdat") end = box.end
+        }
+        fixture.copyOfRange(start, end)
+    }
+
+    @Before
+    fun startServer() {
+        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/playlist.m3u8") { exchange -> respond(exchange, playlist(), "application/vnd.apple.mpegurl") }
+        server.createContext("/init.mp4") { exchange -> respond(exchange, initBytes, "video/mp4") }
+        server.createContext("/data000.m4s") { exchange -> respond(exchange, segmentBytes, "video/iso.segment") }
+        server.createContext("/playback/widevine") { exchange ->
+            licensePosts.incrementAndGet()
+            synchronized(licenseRequests) { licenseRequests.add(exchange.requestBody.readBytes()) }
+            respond(exchange, "LICENSE".toByteArray(), "application/octet-stream")
+        }
+        server.executor = null
+        server.start()
+        base = "http://127.0.0.1:${server.address.port}"
+        SoundCloudWidevineLicense.playbackUrl = "$base/playback/widevine?license_token="
+    }
+
+    @After
+    fun stopServer() {
+        SoundCloudWidevineLicense.playbackUrl = originalPlaybackUrl
+        WidevineCdmRegistry.install(null)
+        SoundCloudDrm.clearCache()
+        server.stop(0)
+    }
+
+    private fun playlist(): ByteArray = """
+        #EXTM3U
+        #EXT-X-VERSION:7
+        #EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;base64,$psshB64",KEYID=0x$keyIdHex,KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",KEYFORMATVERSIONS="1"
+        #EXT-X-KEY:METHOD=SAMPLE-AES-CTR,URI="data:text/plain;charset=UTF-16;base64,AAQAAAEA",KEYID=0x$keyIdHex,KEYFORMAT="com.microsoft.playready",KEYFORMATVERSIONS="1"
+        #EXT-X-MAP:URI="init.mp4"
+        #EXTINF:2.000,
+        data000.m4s
+        #EXT-X-ENDLIST
+    """.trimIndent().toByteArray()
+
+    private fun respond(exchange: HttpExchange, body: ByteArray, contentType: String) {
+        exchange.responseHeaders.add("Content-Type", contentType)
+        exchange.sendResponseHeaders(200, body.size.toLong())
+        exchange.responseBody.use { it.write(body) }
+    }
+
+    // --- the stand-in CDM -------------------------------------------------------------------------
+
+    /** Returns a fixed key, and records what the app asked the license server for. */
+    private inner class FakeCdm : WidevineCdm {
+        override val name = "test CDM"
+
+        var psshSeen: ByteArray? = null
+        var closed = false
+
+
+        override fun openSession(pssh: ByteArray): WidevineLicenseSession {
+            psshSeen = pssh
+            return object : WidevineLicenseSession {
+                override fun licenseRequest(): ByteArray = "REQUEST".toByteArray()
+
+                override fun provideLicense(license: ByteArray): List<ContentKey> {
+                    assertEquals("LICENSE", String(license, Charsets.UTF_8))
+                    return listOf(ContentKey(IsoBmff.unhex(keyIdHex)!!, contentKey))
+                }
+
+                /** Stands in for a CDM: applies the AES-CTR it holds the key for. */
+                override fun decryptSample(
+                    data: ByteArray,
+                    iv: ByteArray,
+                    subsamples: List<Pair<Int, Int>>,
+                ): ByteArray {
+                    val counter = ByteArray(16)
+                    System.arraycopy(iv, 0, counter, 0, minOf(iv.size, 16))
+                    val cipher = javax.crypto.Cipher.getInstance("AES/CTR/NoPadding")
+                    cipher.init(
+                        javax.crypto.Cipher.DECRYPT_MODE,
+                        javax.crypto.spec.SecretKeySpec(contentKey, "AES"),
+                        javax.crypto.spec.IvParameterSpec(counter),
+                    )
+                    if (subsamples.isEmpty()) return cipher.doFinal(data)
+                    val out = data.copyOf()
+                    var cursor = 0
+                    for ((clear, encrypted) in subsamples) {
+                        cursor += clear
+                        val plain = cipher.update(data, cursor, encrypted)
+                        System.arraycopy(plain, 0, out, cursor, plain.size)
+                        cursor += encrypted
+                    }
+                    cipher.doFinal()
+                    return out
+                }
+
+                override fun close() {
+                    closed = true
+                }
+            }
+        }
+    }
+
+    // --- tests ------------------------------------------------------------------------------------
+
+    @Test
+    fun aProtectedPlaylistIsLicensedDecryptedAndFedAsClearAudio() {
+        val cdm = FakeCdm()
+        WidevineCdmRegistry.install(cdm)
+
+        val adapter = HlsStreamAdapter("$base/playlist.m3u8", emptyMap())
+        assertTrue("playlist should be recognised as protected", adapter.isEncrypted)
+        adapter.licenseToken = "test-token"
+        adapter.prefetchOpening()
+
+        val streamed = adapter.getInputStream(0).use { it.readBytes() }
+
+        // The license was asked for once, with the request the CDM produced...
+        assertEquals(1, licensePosts.get())
+        assertEquals("REQUEST", String(synchronized(licenseRequests) { licenseRequests.single() }, Charsets.UTF_8))
+        // ...for the PSSH the playlist declared...
+        assertEquals(107, cdm.psshSeen!!.size)
+        assertEquals("pssh", String(cdm.psshSeen!!, 4, 4, Charsets.US_ASCII))
+
+        // The stream the decoder receives is plain fMP4: no sinf, no enca, no senc.
+        assertFalse("clear stream must not carry sinf", streamed.containsAscii("sinf"))
+        assertFalse("clear stream must not carry enca", streamed.containsAscii("enca"))
+        assertFalse("clear stream must not carry senc", streamed.containsAscii("senc"))
+        assertTrue("sample entry must read as mp4a", streamed.containsAscii("mp4a"))
+
+        // ...and its samples are the ones FFmpeg's own decryption produces.
+        assertEquals(expectedPlaintextSha256, sha256(mdatPayloads(streamed)))
+    }
+
+    @Test
+    fun withoutACdmTheProtectedStreamFailsLoudlyInsteadOfPlayingNoise() {
+        WidevineCdmRegistry.install(null)
+        val adapter = HlsStreamAdapter("$base/playlist.m3u8", emptyMap())
+        adapter.licenseToken = "test-token"
+        assertTrue(adapter.isEncrypted)
+
+        val failure = runCatching { adapter.getInputStream(0).use { it.readBytes() } }.exceptionOrNull()
+        assertTrue("expected an IOException, got $failure", failure is java.io.IOException)
+        assertTrue(
+            "the message should name the missing CDM, was: ${failure?.message}",
+            failure!!.message!!.contains("CDM", ignoreCase = true)
+        )
+        assertEquals("no license should be requested without a CDM", 0, licensePosts.get())
+    }
+
+    @Test
+    fun aProtectedStreamWithoutALicenseTokenFailsBeforeFetchingFragments() {
+        WidevineCdmRegistry.install(FakeCdm())
+        val adapter = HlsStreamAdapter("$base/playlist.m3u8", emptyMap())
+        // licenceToken deliberately left null
+
+        val failure = runCatching { adapter.getInputStream(0).use { it.readBytes() } }.exceptionOrNull()
+        assertTrue(failure is java.io.IOException)
+        assertTrue(
+            "message should mention the token, was: ${failure?.message}",
+            failure!!.message!!.contains("license token", ignoreCase = true)
+        )
+        assertEquals(0, licensePosts.get())
+    }
+
+    // --- helpers ----------------------------------------------------------------------------------
+
+    private fun mdatPayloads(stream: ByteArray): ByteArray {
+        val out = ByteArrayOutputStream()
+        for (box in IsoBmff.boxes(stream, 0, stream.size)) {
+            if (box.type == "mdat") out.write(stream, box.payload, box.size - box.header)
+        }
+        return out.toByteArray()
+    }
+
+    private fun sha256(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    private fun ByteArray.containsAscii(token: String): Boolean {
+        val needle = token.toByteArray(Charsets.US_ASCII)
+        if (needle.isEmpty() || size < needle.size) return false
+        outer@ for (i in 0..size - needle.size) {
+            for (j in needle.indices) if (this[i + j] != needle[j]) continue@outer
+            return true
+        }
+        return false
+    }
+}

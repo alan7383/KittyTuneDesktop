@@ -8,6 +8,25 @@ package com.alananasss.kittytune
 @Suppress("ClassName", "unused")
 object R {
     object string {
+        /** Shown when a SoundCloud track is Widevine-protected and no CDM is installed. */
+        const val drm_unavailable_toast = "drm_unavailable_toast"
+
+        const val pref_drm_title = "pref_drm_title"
+        const val pref_drm_info_title = "pref_drm_info_title"
+        const val misc_drm_sub = "misc_drm_sub"
+        const val pref_drm_cdm_path = "pref_drm_cdm_path"
+        const val pref_drm_browse = "pref_drm_browse"
+        const val pref_drm_autodetect = "pref_drm_autodetect"
+        const val pref_drm_test = "pref_drm_test"
+        const val pref_drm_searching = "pref_drm_searching"
+        const val pref_drm_log_title = "pref_drm_log_title"
+        const val pref_drm_log_copy = "pref_drm_log_copy"
+        const val pref_drm_ok = "pref_drm_ok"
+        const val pref_drm_failed = "pref_drm_failed"
+        const val pref_drm_hint = "pref_drm_hint"
+        const val pref_drm_no_browser = "pref_drm_no_browser"
+        const val drm_download_failed = "drm_download_failed"
+
         const val automix = "automix"
         const val automix_desc = "automix_desc"
         const val automix_debug = "automix_debug"

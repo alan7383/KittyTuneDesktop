@@ -3107,4 +3107,23 @@
     <string name="pet_desk_bar_button_desc">Megjeleníti vagy elrejti a cica lebegő ablakát</string>
     <string name="pet_desk_photo_filter">Képek</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- DRM -->
+    <string name="drm_unavailable_toast">🔒 Védett szám: nem található Widevine CDM. Telepíts Chrome-ot, Firefoxot vagy Brave-et, majd próbáld újra</string>
+    <!-- DRM SETTINGS -->
+    <string name="pref_drm_title">Widevine CDM</string>
+    <string name="pref_drm_info_title">Védett számok lejátszása</string>
+    <string name="misc_drm_sub">Védett számok feloldása</string>
+    <string name="pref_drm_cdm_path">CDM útvonal</string>
+    <string name="pref_drm_browse">Tallózás…</string>
+    <string name="pref_drm_autodetect">Automatikus keresés</string>
+    <string name="pref_drm_test">Teszt</string>
+    <string name="pref_drm_searching">Keresés folyamatban…</string>
+    <string name="pref_drm_log_title">Napló</string>
+    <string name="pref_drm_log_copy">Másolás</string>
+    <string name="pref_drm_ok">CDM betöltve, a védett számok lejátszhatók és letölthetők</string>
+    <string name="pref_drm_failed">Nincs betöltött CDM. Telepíts Chrome-ot, Chromiumot, Brave-et, Edge-et vagy Firefoxot, vagy válaszd ki a fájlt magad</string>
+    <string name="pref_drm_hint">A CDM egy már telepített böngészőből származik (Chrome, Chromium, Brave, Edge, Firefox, Opera), vagy abból a fájlból, amelyet lent kiválasztasz. A KittyTune soha nem terjeszti tovább, a gépen lévőt használja.</string>
+    <string name="pref_drm_no_browser">A KittyTune a Widevine CDM-et a saját folyamatába tölti. Nincs rejtett böngésző, nincs WebView: ez teszi lehetővé a védett SoundCloud-számok lejátszását.</string>
+    <string name="drm_download_failed">Védett szám: a letöltés nem sikerült. Ellenőrizd a CDM-et a Beállítások, Egyéb alatt</string>
 </resources>

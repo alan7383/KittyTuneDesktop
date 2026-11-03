@@ -9,6 +9,7 @@ import com.alananasss.kittytune.audio.providers.tidal.TidalAudioProvider
 import com.alananasss.kittytune.audio.providers.tidal.TidalAudioQuality
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioProvider
 import com.alananasss.kittytune.audio.providers.deezer.DeezerAudioQuality
+import com.alananasss.kittytune.data.drm.SoundCloudDrm
 import com.alananasss.kittytune.data.local.PlayerPreferences
 import com.alananasss.kittytune.data.network.CookieStore
 import com.alananasss.kittytune.data.network.RetrofitClient
@@ -116,8 +117,11 @@ private object ExtractorDownloader : Downloader() {
  * Desktop port of the Android StreamResolver.
  * - Context removed; PlayerPreferences()/RetrofitClient.create() take no args.
  * - WebView CookieManager -> CookieStore.
- * - Widevine DRM (ctr/cbc-encrypted-hls) is NOT decryptable on desktop, so those
- *   candidates are dropped: playback relies on progressive/plain-HLS + YouTube fallback.
+ * - Widevine DRM (ctr-encrypted-hls) is usable only when a Widevine CDM is registered; the
+ *   `licenseAuthToken` comes back with the stream URL and is decoded by
+ *   [com.alananasss.kittytune.audio.HlsStreamAdapter] via [SoundCloudDrm]. Without a CDM the
+ *   protected candidates are dropped, as they were before, so playback falls back to
+ *   progressive/plain-HLS. `cbc-encrypted-hls` is FairPlay and is never offered.
  *   FFmpeg reads plain HLS (m3u8) natively.
  */
 object StreamResolver {
@@ -816,10 +820,15 @@ object StreamResolver {
 
         val transcodingsWithMobile = (mobileTranscodings + transcodings).distinctBy { it.url }
 
-        // Desktop cannot decrypt Widevine, so DRM candidates are never allowed.
-        val candidates = buildTranscodingCandidates(transcodingsWithMobile, qualityPref, forDownload, allowDrm = false)
+        // Widevine (`ctr-encrypted-hls`) candidates are only offered once a CDM is registered: the
+        // license cannot be answered without one, and a protected fragment without a key is noise.
+        // Downloads use them too — DrmStreamDownloader writes a decrypted, clear file — so a track
+        // that exists nowhere else can be saved and then played back without any CDM at all.
+        val allowDrm = SoundCloudDrm.isAvailable
+        val candidates = buildTranscodingCandidates(transcodingsWithMobile, qualityPref, forDownload, allowDrm)
 
         if (candidates.isEmpty()) {
+            notifyIfOnlyProtected(transcodingsWithMobile)
             return null
         }
 
@@ -896,6 +905,15 @@ object StreamResolver {
                 }
 
                 if (streamInfoUrl.isNullOrEmpty()) continue
+
+                // A protected stream is only playable with the JWT that buys its Widevine license. When
+                // the server omits it, this candidate is dead weight: try the next one instead of handing
+                // the engine a stream that will fail at the first fragment.
+                val needsLicense = protocol.contains("encrypted", ignoreCase = true)
+                if (needsLicense && licenseAuthToken.isNullOrEmpty()) {
+                    Logger.d("StreamResolver", "Encrypted candidate without a license token, skipping")
+                    continue
+                }
 
                 val resolvedMime = when {
                     streamInfoUrl.contains(".mp3") -> "audio/mpeg"
@@ -1008,6 +1026,30 @@ object StreamResolver {
         }
 
         return candidates
+    }
+
+    /** When the last "protected track, no CDM" notice was shown, so a queue of them shows one. */
+    private val lastDrmNoticeAt = java.util.concurrent.atomic.AtomicLong(0L)
+    private const val DRM_NOTICE_INTERVAL_MS = 60_000L
+
+    /**
+     * Explains why a track that only exists as CENC-encrypted HLS will not play.
+     *
+     * Such a track has no plain fallback, so resolution finds nothing and the player skips it, which is
+     * indistinguishable from a broken track. Rate limited, because a queue full of protected tracks
+     * would otherwise raise a notice per skip.
+     */
+    private fun notifyIfOnlyProtected(transcodings: List<com.alananasss.kittytune.domain.Transcoding>) {
+        if (SoundCloudDrm.isAvailable) return
+        val onlyProtected = transcodings.isNotEmpty() && transcodings.all {
+            it.format?.protocol?.contains("encrypted", ignoreCase = true) == true
+        }
+        if (!onlyProtected) return
+        val now = System.currentTimeMillis()
+        if (now - lastDrmNoticeAt.getAndSet(now) < DRM_NOTICE_INTERVAL_MS) return
+        com.alananasss.kittytune.core.Toaster.show(
+            com.alananasss.kittytune.core.str(com.alananasss.kittytune.R.string.drm_unavailable_toast)
+        )
     }
 
     private fun buildStreamInfoRequest(url: String, token: String?): okhttp3.Request {

@@ -3328,4 +3328,23 @@
     <string name="pet_desk_bar_button_desc">Zeigt oder verbirgt das schwebende Fenster der Katze</string>
     <string name="pet_desk_photo_filter">Bilder</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- DRM -->
+    <string name="drm_unavailable_toast">🔒 Geschützter Titel: kein Widevine-CDM gefunden. Installiere Chrome, Firefox oder Brave und versuche es erneut</string>
+    <!-- DRM SETTINGS -->
+    <string name="pref_drm_title">Widevine-CDM</string>
+    <string name="pref_drm_info_title">Geschützte Titel abspielen</string>
+    <string name="misc_drm_sub">Geschützte Titel freischalten</string>
+    <string name="pref_drm_cdm_path">CDM-Pfad</string>
+    <string name="pref_drm_browse">Durchsuchen…</string>
+    <string name="pref_drm_autodetect">Automatisch suchen</string>
+    <string name="pref_drm_test">Testen</string>
+    <string name="pref_drm_searching">Suche läuft…</string>
+    <string name="pref_drm_log_title">Protokoll</string>
+    <string name="pref_drm_log_copy">Kopieren</string>
+    <string name="pref_drm_ok">CDM geladen, geschützte Titel werden abgespielt und lassen sich herunterladen</string>
+    <string name="pref_drm_failed">Kein CDM geladen. Installiere Chrome, Chromium, Brave, Edge oder Firefox, oder wähle die Datei selbst</string>
+    <string name="pref_drm_hint">Das CDM stammt von einem bereits installierten Browser (Chrome, Chromium, Brave, Edge, Firefox, Opera) oder aus der Datei, die du unten auswählst. KittyTune gibt es nie weiter, es nutzt das vorhandene.</string>
+    <string name="pref_drm_no_browser">KittyTune lädt das Widevine-CDM in den eigenen Prozess. Kein versteckter Browser, keine WebView: das ist es, was geschützte SoundCloud-Titel abspielbar macht.</string>
+    <string name="drm_download_failed">Geschützter Titel: der Download ist fehlgeschlagen. Prüfe das CDM unter Einstellungen, Sonstiges</string>
 </resources>

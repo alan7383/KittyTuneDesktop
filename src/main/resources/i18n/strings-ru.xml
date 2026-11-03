@@ -3108,4 +3108,23 @@
     <string name="pet_desk_bar_button_desc">Показывает или прячет плавающее окно котика</string>
     <string name="pet_desk_photo_filter">Изображения</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- DRM -->
+    <string name="drm_unavailable_toast">🔒 Защищённый трек: Widevine CDM не найден. Установите Chrome, Firefox или Brave и повторите попытку</string>
+    <!-- DRM SETTINGS -->
+    <string name="pref_drm_title">CDM Widevine</string>
+    <string name="pref_drm_info_title">Прослушивание защищённых треков</string>
+    <string name="misc_drm_sub">Разблокировка защищённых треков</string>
+    <string name="pref_drm_cdm_path">Путь к CDM</string>
+    <string name="pref_drm_browse">Обзор…</string>
+    <string name="pref_drm_autodetect">Найти автоматически</string>
+    <string name="pref_drm_test">Проверить</string>
+    <string name="pref_drm_searching">Идёт поиск…</string>
+    <string name="pref_drm_log_title">Журнал</string>
+    <string name="pref_drm_log_copy">Копировать</string>
+    <string name="pref_drm_ok">CDM загружен, защищённые треки будут играть и их можно скачать</string>
+    <string name="pref_drm_failed">CDM не загружен. Установите Chrome, Chromium, Brave, Edge или Firefox либо укажите файл вручную</string>
+    <string name="pref_drm_hint">CDM берётся из уже установленного браузера (Chrome, Chromium, Brave, Edge, Firefox, Opera) или из файла, который вы выберете ниже. KittyTune никогда его не распространяет, а использует имеющийся.</string>
+    <string name="pref_drm_no_browser">KittyTune загружает Widevine CDM в собственный процесс. Без скрытого браузера и без WebView: именно это позволяет слушать защищённые треки SoundCloud.</string>
+    <string name="drm_download_failed">Защищённый трек: не удалось скачать. Проверьте CDM в Настройки, Разное</string>
 </resources>

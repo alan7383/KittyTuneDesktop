@@ -116,8 +116,8 @@ object AudioCache {
         if (!DownloadManager.hasEnoughFreeStorage(512L * 1024 * 1024)) return
 
         val stream = StreamResolver.resolveStreamWithDrm(track, forDownload = true) ?: return
-        // Encrypted streams cannot be kept; a local path is already on disk.
-        if (stream.isDrmProtected || !stream.url.startsWith("http")) return
+        if (!stream.url.startsWith("http")) return
+        val licenseToken = stream.licenseAuthToken
         if (StreamResolver.isRestricted(track) && (stream.source == "soundcloud" || stream.source.isNullOrEmpty())) {
             Logger.w("AudioCache", "Refusing to store SoundCloud snippet in audio cache for restricted track ${track.id}")
             return
@@ -128,7 +128,13 @@ object AudioCache {
         val partial = File(dir, "${track.id}.part")
         try {
             if (isHls) {
-                DownloadManager.remuxHls(stream.url, partial) {}
+                if (!licenseToken.isNullOrBlank()) {
+                    // A protected stream is cached decrypted: the licence is paid for once here, and
+                    // the file on disk is clear, so playing it back later needs no CDM at all.
+                    com.alananasss.kittytune.audio.DrmStreamDownloader.download(stream.url, licenseToken, partial) {}
+                } else {
+                    DownloadManager.remuxHls(stream.url, partial) {}
+                }
             } else {
                 FileOutputStream(partial).use { out -> DownloadManager.downloadFileToStream(stream.url, out) {} }
             }
