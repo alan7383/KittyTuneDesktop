@@ -95,15 +95,13 @@ object FloatingWindowCompat {
                 Prefs.flush(force = true)
             }
             when {
-                isRtssRunning() -> {
-                    if (!isRtssExempted()) {
-                        autoReason = "RivaTuner Statistics Server is running without exemption"
-                        autoReasonKey = "floating_compat_auto_rtss"
-                    }
-                }
                 Prefs.getBoolean(KEY_TRIPPED, false) -> {
                     autoReason = "a floating window froze the app before"
                     autoReasonKey = "floating_compat_auto_freeze"
+                }
+                isRtssRunning() && !isRtssExempted() -> {
+                    autoReason = "RivaTuner Statistics Server is running without exemption"
+                    autoReasonKey = "floating_compat_auto_rtss"
                 }
             }
         }
@@ -167,7 +165,7 @@ object FloatingWindowCompat {
             val templateFile = File(templatesDir, "KittyTune.exe.cfg")
 
             // If profile is missing in Profiles directory, attempt to deploy it
-            if (profilesDir.exists() && (!profileFile.exists() || !isHookingDisabledIn(profileFile))) {
+            if (profilesDir.exists() && !profileFile.exists()) {
                 runCatching {
                     profileFile.writeText("[Hooking]\r\nEnableHooking = 0\r\n")
                 }
