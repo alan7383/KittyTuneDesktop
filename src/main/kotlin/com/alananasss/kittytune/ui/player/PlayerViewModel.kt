@@ -37,6 +37,7 @@ import com.alananasss.kittytune.ui.player.lyrics.LyricsUtils
 import com.alananasss.kittytune.ui.player.lyrics.LyricSinger
 import com.google.gson.Gson
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -2198,9 +2199,15 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    private val smtcRestartMutex = kotlinx.coroutines.sync.Mutex()
+
     fun restartWindowsSmtc() {
-        windowsSmtcService?.restart()
-        windowsSmtcService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
+        viewModelScope.launch(Dispatchers.IO) {
+            smtcRestartMutex.withLock {
+                windowsSmtcService?.restart()
+                windowsSmtcService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
+            }
+        }
     }
 
     private fun initMacNowPlayingService() {
