@@ -372,23 +372,18 @@ internal fun rememberSmoothPosition(
             smooth.floatValue = positionMs().toFloat()
             return@LaunchedEffect
         }
-        var startedAtMs = System.currentTimeMillis()
-        var startedAt = positionMs().toFloat()
+        var lastReported = positionMs().toFloat()
+        var lastReportedAtMs = System.currentTimeMillis()
         while (isActive) {
             withFrameMillis {
                 val now = System.currentTimeMillis()
                 val reported = positionMs().toFloat()
-                val extrapolated = startedAt + ((now - startedAtMs) * speed)
-                // A jump larger than 200 ms is a seek or a fresh report that's drifted from the
-                // extrapolation — snap to it. Otherwise keep the smooth per-frame extrapolation.
-                if (kotlin.math.abs(reported - extrapolated) > 200f) {
-                    startedAt = reported
-                    startedAtMs = now
-                    smooth.floatValue = reported
-                } else {
-                    val elapsed = (now - startedAtMs).coerceAtMost(MAX_EXTRAPOLATION_MS)
-                    smooth.floatValue = startedAt + (elapsed * speed)
+                if (reported != lastReported) {
+                    lastReported = reported
+                    lastReportedAtMs = now
                 }
+                val elapsed = (now - lastReportedAtMs).coerceIn(0L, MAX_EXTRAPOLATION_MS)
+                smooth.floatValue = lastReported + (elapsed * speed)
             }
         }
     }

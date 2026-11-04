@@ -339,7 +339,6 @@ fun MiniLyricsPlayerWindow(
         } else {
             viewModel.saveMiniPlayerBounds(x, y, w, h)
         }
-        com.alananasss.kittytune.core.Prefs.flush(force = true)
         viewModel.toggleMiniPlayer(false)
     }
 
@@ -523,7 +522,6 @@ fun MiniLyricsPlayerWindow(
                         windowState.position = WindowPosition(window.x.dp, window.y.dp)
                     }
                     saveCurrentBounds()
-                    com.alananasss.kittytune.core.Prefs.flush()
                 }
             )
         }
@@ -552,7 +550,6 @@ fun MiniLyricsPlayerWindow(
                 dragHandler.cleanup()
                 window.removeComponentListener(listener)
                 saveCurrentBounds()
-                com.alananasss.kittytune.core.Prefs.flush(force = true)
             }
         }
 
