@@ -621,62 +621,39 @@ object StreamResolver {
 
     private const val RACE_POLL_MS = 40L
 
-    /**
-     * How far a YouTube candidate's length may be from the track's before it is rejected.
-     *
-     * Wide enough for the usual differences — a fade, a bit of silence, an intro on the upload — and far
-     * too narrow for a snippet or a teaser to slip through.
-     */
-    private const val DURATION_TOLERANCE_SEC = 12L
+    /** Recording identity is checked before duration, including for restricted previews (issue #76). */
+    private fun youtubeFallbackRecording(track: Track): YoutubeFallbackMatcher.Recording {
+        val duration = track.effectiveFullDurationMs ?: 0L
+        val restricted = isRestricted(track) || track.isSnipped
+        val snippet = (restricted || duration in 1..45_000) && track.fullDurationMs == null
+        return YoutubeFallbackMatcher.Recording(track.title.orEmpty(),
+            track.displayArtist.ifBlank { track.user?.username.orEmpty() }, duration / 1000, restricted || snippet, snippet)
+    }
+
+    internal fun matchYoutubeFallbackVideo(track: Track, videos: List<StreamInfoItem>): StreamInfoItem? {
+        val selected = YoutubeFallbackMatcher.match(youtubeFallbackRecording(track), videos.map {
+            YoutubeFallbackMatcher.Candidate(it.url, it.name, listOf(it.uploaderName.orEmpty()), it.duration)
+        }) ?: return null
+        return videos.firstOrNull { it.url == selected.id }
+    }
 
     private fun resolveViaNewPipe(track: Track): String? {
         ensureNewPipeClientVersion()
         fun extract(): String? {
-            val cleanTitle = track.title?.replace(Regex("(?i)(\\[.*?\\]|\\(.*?\\))"), "")?.trim() ?: ""
-            val artistName = track.displayArtist.ifBlank { track.user?.username.orEmpty() }.trim()
-            val query = if (artistName.isNotBlank() && !cleanTitle.contains(artistName, ignoreCase = true)) {
-                "$cleanTitle $artistName"
-            } else {
-                cleanTitle.ifBlank { track.title.orEmpty().trim() }
-            }
-
+            val recording = youtubeFallbackRecording(track)
+            val queries = YoutubeFallbackMatcher.queries(recording)
+            if (queries.isEmpty()) return null
             val youtubeService = ServiceList.YouTube
-            val searchInfo = SearchInfo.getInfo(youtubeService, youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), ""))
-            val videoResults = searchInfo.relatedItems.filterIsInstance<StreamInfoItem>()
-
-            if (videoResults.isEmpty()) return null
-
-            // The first hit was taken blindly, and that is how a twenty-second clip came to stand in for a
-            // three-minute song: YouTube's top result for a track name is frequently a snippet, a teaser or
-            // a "sped up" edit. A substitute has to be the same length as the thing it replaces, so results
-            // whose duration is nowhere near the track's are dropped, and among what is left the closest
-            // wins (issue #33).
-            val rawDurationMs = track.effectiveFullDurationMs ?: track.durationMs ?: 0L
-            val restricted = isRestricted(track)
-            val isSnippetDuration = restricted && rawDurationMs <= 45_000L
-            val wantedSec = if (isSnippetDuration) 0L else rawDurationMs / 1000L
-            val firstResultUrl = if (wantedSec <= 0) {
-                // No duration or snippet track — prefer a full-length video (>45s) over teasers
-                val nonTeaser = videoResults.firstOrNull { it.duration > 45 }
-                (nonTeaser ?: videoResults.first()).url
-            } else {
-                val matched = videoResults
-                    .filter { it.duration > 0 && kotlin.math.abs(it.duration - wantedSec) <= DURATION_TOLERANCE_SEC }
-                    .minByOrNull { kotlin.math.abs(it.duration - wantedSec) }
-                    ?: if (restricted) {
-                        videoResults.filter { it.duration > 0 && kotlin.math.abs(it.duration - wantedSec) <= 30L }
-                            .minByOrNull { kotlin.math.abs(it.duration - wantedSec) }
-                            ?: videoResults.firstOrNull { it.duration > 45 }
-                    } else null
-                if (matched == null) {
-                    println(
-                        "StreamResolver: no YouTube result within tolerance of " +
-                            "${wantedSec}s for '${track.title}' — refusing to substitute a different song"
-                    )
-                    return null
-                }
-                matched.url
-            }
+            val videoResults = queries.flatMap { query ->
+                try {
+                    SearchInfo.getInfo(youtubeService, youtubeService.searchQHFactory.fromQuery(query, listOf("videos"), ""))
+                        .relatedItems.filterIsInstance<StreamInfoItem>()
+                } catch (cancelled: java.util.concurrent.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) { emptyList() }
+            }.distinctBy { it.url }
+            val selected = matchYoutubeFallbackVideo(track, videoResults) ?: return null
+            val firstResultUrl = selected.url
             val extractor = youtubeService.getStreamExtractor(firstResultUrl)
             extractor.fetchPage()
 
