@@ -2199,15 +2199,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    private val smtcRestartMutex = kotlinx.coroutines.sync.Mutex()
-
     fun restartWindowsSmtc() {
-        viewModelScope.launch(Dispatchers.IO) {
-            smtcRestartMutex.withLock {
-                windowsSmtcService?.restart()
-                windowsSmtcService?.updateMedia(currentTrack, isPlaying, currentPosition, duration)
-            }
-        }
+        windowsSmtcService?.restart()
     }
 
     private fun initMacNowPlayingService() {
