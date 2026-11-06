@@ -576,24 +576,24 @@ object UpdateManager {
         val installCmd = if (isMsi) {
             """
             Log "Executing msiexec..."
-            ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru -WindowStyle Hidden
+            ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru -WindowStyle Hidden
             Log "msiexec silent install finished with exit code ${'$'}(${'$'}p.ExitCode)"
 
             # Fallback 1: If exit code 1638 (same version already installed), retry with REINSTALL=ALL
             if (${'$'}p.ExitCode -eq 1638) {
                 Log "Detected exit code 1638 (same version). Retrying silent reinstall..."
-                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru -WindowStyle Hidden
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qn', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru -WindowStyle Hidden
                 Log "msiexec silent reinstall finished with exit code ${'$'}(${'$'}p.ExitCode)"
             }
 
             # Fallback 2: If silent install failed (e.g. 1603 due to UAC elevation required), retry with basic UI (/qb)
             if (${'$'}p.ExitCode -ne 0) {
                 Log "Silent install failed (${'$'}(${'$'}p.ExitCode)). Retrying with basic UI (/qb)..."
-                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
                 Log "msiexec basic UI install finished with exit code ${'$'}(${'$'}p.ExitCode)"
                 if (${'$'}p.ExitCode -eq 1638) {
                     Log "Retrying basic UI install with REINSTALL=ALL..."
-                    ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '$escapedMsiLog') -Wait -PassThru
+                    ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', 'REINSTALL=ALL', 'REINSTALLMODE=amus', '/qb', '/norestart', 'MSIINSTALLPERUSER=1', 'ALLUSERS=2', 'REBOOT=ReallySuppress', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
                     Log "msiexec basic UI reinstall finished with exit code ${'$'}(${'$'}p.ExitCode)"
                 }
             }
@@ -601,7 +601,7 @@ object UpdateManager {
             # Fallback 3: Full interactive wizard if basic UI still failed
             if (${'$'}p.ExitCode -ne 0) {
                 Log "Basic UI install failed (${'$'}(${'$'}p.ExitCode)). Retrying with interactive installer..."
-                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '$escapedInstaller', '/norestart', '/l*v', '$escapedMsiLog') -Wait -PassThru
+                ${'$'}p = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', '"$escapedInstaller"', '/norestart', '/l*v', '"$escapedMsiLog"') -Wait -PassThru
                 Log "msiexec interactive install finished with exit code ${'$'}(${'$'}p.ExitCode)"
             }
             """.trimIndent()

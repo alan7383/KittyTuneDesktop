@@ -802,7 +802,8 @@ tasks.register<Test>("headlessTest") {
             "ConnectNetworkStateTest", "ConnectRefactorTest", "SyncPlaybackTest", "ConnectWireTest",
             "ConnectSocketListenerTest", "ConnectHandoffTest", "ConnectLanServerTest", "ConnectRenderTest", "LocalizationParityTest",
             "PlayerButtonRowsTest", "PlayheadClockTest", "WheelSeekTest",
-            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest"
+            "OnnxNativeLoadTest", "ToolWindowStyleRaiseToFrontTest", "*SoundCloudOAuthTest",
+            "Issue93BugfixesTest.testWindowsUpdaterScriptConstruction*"
         ).forEach(::includeTestsMatching)
     }
 }
