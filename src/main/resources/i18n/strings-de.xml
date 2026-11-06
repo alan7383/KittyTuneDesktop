@@ -3328,4 +3328,14 @@
     <string name="pet_desk_bar_button_desc">Zeigt oder verbirgt das schwebende Fenster der Katze</string>
     <string name="pet_desk_photo_filter">Bilder</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Kompatibilitätsmodus</string>
+    <string name="floating_compat_desc">Undurchsichtige schwebende Fenster. Behebt Einfrieren bei RivaTuner (RTSS) und einigen Overlays</string>
+    <string name="floating_compat_auto_rtss">Automatisch aktiviert: RivaTuner (RTSS) wird ausgeführt</string>
+    <string name="floating_compat_auto_freeze">Automatisch aktiviert: Ein schwebendes Fenster hat die App blockiert</string>
+    <string name="update_nixos_notice_title">NixOS-/Nix-System erkannt</string>
+    <string name="update_nixos_notice_desc">Unter Nix werden Updates deklarativ verwaltet. Führe den folgenden Befehl aus, um deine Installation zu aktualisieren:</string>
+    <string name="update_btn_view_release">Release anzeigen</string>
+    <string name="btn_copy">Kopieren</string>
 </resources>
