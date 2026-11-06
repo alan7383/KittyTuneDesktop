@@ -19,10 +19,6 @@ object OnnxHelper {
     @Volatile
     private var sharedEnv: OrtEnvironment? = null
 
-    init {
-        ensureNativeLibrariesLoaded()
-    }
-
     private interface LibC : com.sun.jna.Library {
         fun setenv(name: String, value: String, overwrite: Int): Int
     }

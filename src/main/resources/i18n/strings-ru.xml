@@ -3108,4 +3108,14 @@
     <string name="pet_desk_bar_button_desc">Показывает или прячет плавающее окно котика</string>
     <string name="pet_desk_photo_filter">Изображения</string>
     <!-- /KITTY PET DESKTOP -->
+
+    <!-- Desktop compatibility and declarative updates -->
+    <string name="floating_compat_title">Режим совместимости</string>
+    <string name="floating_compat_desc">Непрозрачные плавающие окна. Устраняет зависания при использовании RivaTuner (RTSS) и некоторых оверлеев</string>
+    <string name="floating_compat_auto_rtss">Включено автоматически: запущен RivaTuner (RTSS)</string>
+    <string name="floating_compat_auto_freeze">Включено автоматически: плавающее окно вызвало зависание приложения</string>
+    <string name="update_nixos_notice_title">Обнаружена система NixOS / Nix</string>
+    <string name="update_nixos_notice_desc">В Nix обновления управляются декларативно. Чтобы обновить установленную версию, выполните приведённую ниже команду:</string>
+    <string name="update_btn_view_release">Открыть выпуск</string>
+    <string name="btn_copy">Копировать</string>
 </resources>
