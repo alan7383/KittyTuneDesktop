@@ -4,6 +4,8 @@ import org.freedesktop.dbus.DBusPath
 import org.freedesktop.dbus.Struct
 import org.freedesktop.dbus.Tuple
 import org.freedesktop.dbus.annotations.DBusInterfaceName
+import org.freedesktop.dbus.annotations.DBusProperty
+import org.freedesktop.dbus.errors.UnknownProperty
 import org.freedesktop.dbus.annotations.Position
 import org.freedesktop.dbus.connections.impl.DBusConnection
 import org.freedesktop.dbus.connections.impl.DBusConnectionBuilder
@@ -16,6 +18,19 @@ import java.awt.EventQueue
 import java.io.Closeable
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
+
+class StatusNotifierPixmap(
+    @field:Position(0) val width: Int,
+    @field:Position(1) val height: Int,
+    @field:Position(2) val data: ByteArray,
+) : Struct()
+
+class StatusNotifierToolTip(
+    @field:Position(0) val iconName: String,
+    @field:Position(1) val pixmaps: List<StatusNotifierPixmap>,
+    @field:Position(2) val title: String,
+    @field:Position(3) val description: String,
+) : Struct()
 
 class DBusMenuItem(
     @field:Position(0) val id: Int,
@@ -42,7 +57,7 @@ interface DBusMenuInterface : DBusInterface {
     fun AboutToShow(id: Int): Boolean
 
     class LayoutUpdated(path: String, revision: UInt32, parent: Int) :
-        DBusSignal(path, "com.canonical.dbusmenu", "LayoutUpdated", revision, parent)
+        DBusSignal(path, revision, parent)
 }
 
 @DBusInterfaceName("org.kde.StatusNotifierWatcher")
@@ -50,6 +65,7 @@ interface StatusNotifierWatcherInterface : DBusInterface {
     fun RegisterStatusNotifierItem(service: String)
 }
 
+@DBusProperty(name = "ToolTip", type = StatusNotifierToolTip::class, access = DBusProperty.Access.READ)
 @DBusInterfaceName("org.kde.StatusNotifierItem")
 interface StatusNotifierItemInterface : DBusInterface {
     fun ContextMenu(x: Int, y: Int)
@@ -58,10 +74,10 @@ interface StatusNotifierItemInterface : DBusInterface {
     fun Scroll(delta: Int, orientation: String)
     fun ProvideXdgActivationToken(token: String)
 
-    class NewIcon(path: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewIcon")
-    class NewToolTip(path: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewToolTip")
-    class NewStatus(path: String, status: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewStatus", status)
-    class NewMenu(path: String) : DBusSignal(path, "org.kde.StatusNotifierItem", "NewMenu")
+    class NewIcon(path: String) : DBusSignal(path)
+    class NewToolTip(path: String) : DBusSignal(path)
+    class NewStatus(path: String, status: String) : DBusSignal(path, status)
+    class NewMenu(path: String) : DBusSignal(path)
 }
 
 /**
@@ -95,7 +111,25 @@ class LinuxStatusNotifierService(
         private set
 
     private val iconThemePath: String by lazy {
-        File(System.getProperty("user.home"), ".local/share/icons/hicolor").absolutePath
+        val dataHome = System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() }
+            ?.let(::File) ?: File(System.getProperty("user.home"), ".local/share")
+        File(dataHome, "icons/hicolor").absolutePath
+    }
+
+    @Volatile private var toolTip = currentToolTip()
+
+    private fun currentToolTip(): StatusNotifierToolTip {
+        val track = nowPlaying()
+        return StatusNotifierToolTip(iconName, emptyList(), track?.title?.takeIf { it.isNotBlank() }
+            ?: "KittyTune", track?.artist.orEmpty())
+    }
+
+    private fun updateToolTip() {
+        val next = currentToolTip()
+        val previous = toolTip
+        if (next.iconName == previous.iconName && next.title == previous.title && next.description == previous.description) return
+        toolTip = next
+        runCatching { connection?.sendMessage(StatusNotifierItemInterface.NewToolTip("/StatusNotifierItem")) }
     }
 
     private val itemObject = StatusNotifierItemObject()
@@ -106,7 +140,7 @@ class LinuxStatusNotifierService(
             val os = System.getProperty("os.name").lowercase()
             if (!os.contains("linux") && !os.contains("nix")) return false
 
-            val conn = DBusConnectionBuilder.forSessionBus().build()
+            val conn = DBusConnectionBuilder.forSessionBus().withShared(false).build()
             connection = conn
 
             val busName = "org.kde.StatusNotifierItem-$serviceSuffix"
@@ -140,12 +174,14 @@ class LinuxStatusNotifierService(
 
     fun updateIcon(newIconName: String) {
         this.iconName = newIconName
+        updateToolTip()
         try {
             connection?.sendMessage(StatusNotifierItemInterface.NewIcon("/StatusNotifierItem"))
         } catch (_: Exception) {}
     }
 
     fun notifyMenuUpdated() {
+        updateToolTip()
         menuObject.notifyUpdated()
     }
 
@@ -202,7 +238,7 @@ class LinuxStatusNotifierService(
         override fun <A> Get(interface_name: String, property_name: String): A {
             val all = GetAll(interface_name)
             val prop = all[property_name] ?: GetAll("org.kde.StatusNotifierItem")[property_name]
-            return prop?.value as A
+            return (prop ?: throw UnknownProperty("Unknown property: $interface_name.$property_name")) as A
         }
 
         override fun <A> Set(interface_name: String, property_name: String, value: A) {}
@@ -219,6 +255,7 @@ class LinuxStatusNotifierService(
                 map["IconThemePath"] = Variant(iconThemePath, "s")
                 map["Menu"] = Variant(DBusPath("/MenuBar"), "o")
                 map["ItemIsMenu"] = Variant(false, "b")
+                map["ToolTip"] = Variant(toolTip, "(sa(iiay)ss)")
             }
             return map
         }
@@ -427,7 +464,7 @@ class LinuxStatusNotifierService(
         override fun <A> Get(interface_name: String, property_name: String): A {
             val all = GetAll(interface_name)
             val prop = all[property_name] ?: GetAll("com.canonical.dbusmenu")[property_name]
-            return prop?.value as A
+            return (prop ?: throw UnknownProperty("Unknown property: $interface_name.$property_name")) as A
         }
 
         override fun <A> Set(interface_name: String, property_name: String, value: A) {}
@@ -449,7 +486,7 @@ class LinuxStatusNotifierService(
             val os = System.getProperty("os.name").lowercase()
             if (!os.contains("linux") && !os.contains("nix")) return false
             return runCatching {
-                val conn = DBusConnectionBuilder.forSessionBus().build()
+                val conn = DBusConnectionBuilder.forSessionBus().withShared(false).build()
                 val hasWatcher = runCatching {
                     val watcher = conn.getRemoteObject(
                         "org.kde.StatusNotifierWatcher",
